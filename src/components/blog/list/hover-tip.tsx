@@ -1,12 +1,13 @@
 "use client";
 
 // The DS A19 Tooltip for one element of a row (Figma frame 02): the full title
-// of a cut-off blog title, and "Authorized for use" on the reuse check. It
-// opens on hover AND on keyboard focus (the Figma draws hover only; a meaning
-// behind hover alone fails keyboard users), stays while the pointer moves onto
-// it, and Escape, a scroll or leaving closes it (WCAG 1.4.13). The bubble is
-// portalled and placed above its anchor, below when there is no room, clamped
-// into the viewport, so the table never clips it.
+// of a cut-off blog title, "Authorized for use" on the reuse check, what a
+// status means on its badge, and which moment the date is. It opens on hover
+// AND on keyboard focus (the Figma draws hover only; a meaning behind hover
+// alone fails keyboard users), stays while the pointer moves onto it, and
+// Escape, a scroll or leaving closes it (WCAG 1.4.13). The bubble is portalled
+// and placed above its anchor, below when there is no room, clamped into the
+// viewport, so the table never clips it. A sentence uses the DS `wrap` variant.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -23,7 +24,7 @@ const LINGER_MS = 120;
 
 /** `align: "start"` lines the bubble's words up with the anchor's (a cut-off title reads on in
  *  place); "center" centres it over the anchor (an icon). */
-export function useHoverTip(label: string, align: "center" | "start" = "center") {
+export function useHoverTip(label: string, align: "center" | "start" = "center", { wrap = false, id }: { wrap?: boolean; id?: string } = {}) {
   const [shown, setShown] = React.useState(false);
   // State, not a ref: the bubble is placed against it while rendering.
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
@@ -59,7 +60,7 @@ export function useHoverTip(label: string, align: "center" | "start" = "center")
 
   React.useEffect(() => cancel, []);
 
-  const node = shown && anchor ? <TipBubble label={label} anchor={anchor} align={align} onEnter={show} onLeave={() => hide()} /> : null;
+  const node = shown && anchor ? <TipBubble label={label} anchor={anchor} align={align} wrap={wrap} id={id} onEnter={show} onLeave={() => hide()} /> : null;
   /** `setAnchor` is the callback ref for the element the bubble points at. */
   return { shown, show, hide, setAnchor, anchor, node };
 }
@@ -68,12 +69,16 @@ function TipBubble({
   label,
   anchor,
   align,
+  wrap,
+  id,
   onEnter,
   onLeave,
 }: {
   label: string;
   anchor: HTMLElement;
   align: "center" | "start";
+  wrap: boolean;
+  id?: string;
   onEnter: () => void;
   onLeave: () => void;
 }) {
@@ -99,8 +104,11 @@ function TipBubble({
       {/* The DS bubble's arrow points down; under the anchor it points up. */}
       <Tooltip
         label={label}
+        wrap={wrap}
+        id={id}
         className={cn(
-          "pointer-events-auto [&>span]:max-w-[min(480px,calc(100vw-16px))] [&>span]:whitespace-normal",
+          "pointer-events-auto",
+          !wrap && "[&>span]:max-w-[min(480px,calc(100vw-16px))] [&>span]:whitespace-normal",
           below && "flex-col-reverse [&>svg]:rotate-180",
         )}
       />

@@ -212,11 +212,11 @@ test("picking: a start, then an end in either order; the range holds both ends",
   assert.equal(inRange("2026-10-10", null), false);
 });
 
-test("the trigger names the range briefly", () => {
-  assert.equal(rangeLabel({ from: "2026-10-14", to: "2026-10-14" }), "Oct 14, 2026");
-  assert.equal(rangeLabel({ from: "2026-10-08", to: "2026-10-23" }), "Oct 8 – 23, 2026");
-  assert.equal(rangeLabel({ from: "2026-09-28", to: "2026-10-03" }), "Sep 28 – Oct 3, 2026");
-  assert.equal(rangeLabel({ from: "2025-12-30", to: "2026-01-04" }), "Dec 30, 2025 – Jan 4, 2026");
+test("the trigger names the range briefly, day first as the list's dates", () => {
+  assert.equal(rangeLabel({ from: "2026-10-14", to: "2026-10-14" }), "14 Oct 2026");
+  assert.equal(rangeLabel({ from: "2026-10-08", to: "2026-10-23" }), "8 – 23 Oct 2026");
+  assert.equal(rangeLabel({ from: "2026-09-28", to: "2026-10-03" }), "28 Sep – 3 Oct 2026");
+  assert.equal(rangeLabel({ from: "2025-12-30", to: "2026-01-04" }), "30 Dec 2025 – 4 Jan 2026");
 });
 
 test("a live blog's draft details differ from the live ones only after a real change", () => {

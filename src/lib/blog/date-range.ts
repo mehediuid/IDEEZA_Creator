@@ -1,7 +1,8 @@
 // The Blog list's Date range filter (Figma frame 05, requirement L4): days are
 // local calendar days written "YYYY-MM-DD" (they sort as strings, and travel in
 // the URL as they are), a Monday-first month of six weeks, the keyboard's day
-// moves, and the two picks — a start, then an end — that make a range.
+// moves, and the two picks — a start, then an end — that make a range. The
+// range is written day first, as the list's own dates are ("8 – 23 Oct 2026").
 // Relative imports only (node:test loads this).
 
 /** A local calendar day, "2026-10-14". */
@@ -124,13 +125,27 @@ export function pickDay(pending: DayKey | null, day: DayKey): { pending: DayKey 
   return { pending: null, range: ordered(pending, day) };
 }
 
-/** "Oct 14, 2026" · "Oct 8 – 23, 2026" · "Sep 28 – Oct 3, 2026" · "Dec 30, 2025 – Jan 4, 2026". */
+/** "8 Oct" — day first and the month short, as the list's dates (dates.ts). */
+const DAY_MONTH = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+export const dayMonth = (k: DayKey) => DAY_MONTH.format(dateOf(k)).replace("Sept", "Sep");
+
+/** "14 Oct 2026" · "8 – 23 Oct 2026" · "28 Sep – 3 Oct 2026" · "30 Dec 2025 – 4 Jan 2026". */
 export function rangeLabel(r: DayRange): string {
   const a = dateOf(r.from);
   const b = dateOf(r.to);
-  const md = (d: Date) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(d);
-  if (r.from === r.to) return `${md(a)}, ${a.getFullYear()}`;
-  if (a.getFullYear() !== b.getFullYear()) return `${md(a)}, ${a.getFullYear()} – ${md(b)}, ${b.getFullYear()}`;
-  if (a.getMonth() === b.getMonth()) return `${md(a)} – ${b.getDate()}, ${b.getFullYear()}`;
-  return `${md(a)} – ${md(b)}, ${b.getFullYear()}`;
+  if (r.from === r.to) return `${dayMonth(r.from)} ${a.getFullYear()}`;
+  if (a.getFullYear() !== b.getFullYear()) return `${dayMonth(r.from)} ${a.getFullYear()} – ${dayMonth(r.to)} ${b.getFullYear()}`;
+  if (a.getMonth() === b.getMonth()) return `${a.getDate()} – ${dayMonth(r.to)} ${b.getFullYear()}`;
+  return `${dayMonth(r.from)} – ${dayMonth(r.to)} ${b.getFullYear()}`;
+}
+
+/** A day button's name, with where it sits in the range shown: "Thursday, October 8, 2026,
+ *  range start" · "…, in range" · "…, range end" · "…, the whole range" (a one-day range). */
+export function dayName(k: DayKey, band: DayRange | null): string {
+  const name = dayLabel(k);
+  if (!band || k < band.from || k > band.to) return name;
+  if (band.from === band.to) return `${name}, the whole range`;
+  if (k === band.from) return `${name}, range start`;
+  if (k === band.to) return `${name}, range end`;
+  return `${name}, in range`;
 }
