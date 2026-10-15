@@ -1,16 +1,17 @@
 "use client";
 
 // What "Your blogs" says when there are no rows to show, in the Figma's words
-// ("blog", "Create a new blog"). A first visit teaches the three steps and
-// offers Create a new blog; a store that can't be read says so and that nothing
-// is written over it. Both replace the list, so they are the DS StateCard. A
-// status that holds nothing and a search or filters with no match sit inside
-// the list's own surface, under the toolbar, so they are the StateCard's
-// content without its card (never a card inside a card), and they offer the way
-// back — never a second Create button (the toolbar has it).
+// ("blog", "Create a new blog"). Each sits inside the list's own surface,
+// under the toolbar and the column heads (frame 01 stays whole), so they are
+// the StateCard's content without its card (never a card inside a card), and
+// none repeats the toolbar's Create a new blog. A first visit teaches the three
+// steps, what the IDEEZA team looks for (the review's own reasons, so the rules
+// are known before a rejection) and where the blogs are kept. A status that
+// holds nothing and a search or filters with no match offer the way back. A
+// store that can't be read replaces the list: the DS StateCard says so and
+// that nothing is written over it.
 
 import * as React from "react";
-import NextLink from "next/link";
 import {
   AlertCircleIcon,
   CancelCircleIcon,
@@ -24,65 +25,18 @@ import {
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
-import { Badge, Button, StateCard, buttonVariants } from "@/components/ideeza";
-import { newArticleHref } from "@/lib/blog/slug";
+import { Badge, Button, StateCard } from "@/components/ideeza";
+import { LOOKS_FOR } from "@/lib/blog/list";
 import type { DisplayStatus } from "@/lib/blog/status";
-import { cn } from "@/lib/utils";
 
 const STEPS = ["You write", "The IDEEZA team reviews it", "It's published"] as const;
 const TAP = "[@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
-export function FirstVisitState() {
-  return (
-    <StateCard
-      tone="empty"
-      icon={<Icon icon={PencilEdit02Icon} size={32} />}
-      title="Write your first blog"
-      body="Share how you built something, what went wrong, or tips for other makers."
-      action={
-        <div className="flex flex-col items-center gap-10">
-          <ol
-            aria-label="How it works"
-            className="m-0 flex list-none items-center gap-4 p-0 text-sm leading-sm text-text-secondary [@container(max-width:479px)]:flex-col [@container(max-width:479px)]:items-start"
-          >
-            {STEPS.map((step, i) => (
-              <React.Fragment key={step}>
-                {i > 0 && (
-                  <li aria-hidden className="text-text-tertiary [@container(max-width:479px)]:hidden">
-                    →
-                  </li>
-                )}
-                <li className="flex items-center gap-2">
-                  <Badge tone="neutral">{i + 1}</Badge>
-                  {step}
-                </li>
-              </React.Fragment>
-            ))}
-          </ol>
-          <NextLink href={newArticleHref()} className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), TAP)}>
-            Create a new blog
-          </NextLink>
-        </div>
-      }
-      className="mx-auto"
-    />
-  );
-}
-
-export function UnreadableState() {
-  return (
-    <StateCard
-      tone="error"
-      icon={<Icon icon={AlertCircleIcon} size={32} />}
-      title="Your blogs can't be shown"
-      body="The blogs saved in this browser couldn't be read. They've been left as they are, so nothing will be overwritten."
-      className="mx-auto"
-    />
-  );
-}
+/** Demo-only: it leaves at the production cut, with the browser store. */
+export const KEPT_HERE = "Your blogs are kept in this browser on this device.";
 
 /** The StateCard's content, inside the list's surface. */
-function ListMessage({ icon, title, body, action }: { icon: IconValue; title: string; body?: string; action?: React.ReactNode }) {
+function ListMessage({ icon, title, body, children }: { icon: IconValue; title: string; body?: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-10 px-8 py-16 text-center">
       <span aria-hidden className="inline-flex size-[80px] items-center justify-center rounded-full bg-bg-subtle text-text-tertiary">
@@ -92,8 +46,64 @@ function ListMessage({ icon, title, body, action }: { icon: IconValue; title: st
         <p className="m-0 text-2xl font-semibold leading-2xl text-text-primary">{title}</p>
         {body && <p className="m-0 text-md leading-md text-text-secondary">{body}</p>}
       </div>
-      {action}
+      {children}
     </div>
+  );
+}
+
+/** No blogs yet: the steps, the standards and where they're kept. The toolbar above holds
+ *  Create a new blog. */
+export function FirstVisitState() {
+  const headId = React.useId();
+  return (
+    <ListMessage icon={PencilEdit02Icon} title="Write your first blog" body="Share how you built something, what went wrong, or tips for other makers.">
+      <ol
+        aria-label="How it works"
+        className="m-0 flex list-none items-center gap-4 p-0 text-sm leading-sm text-text-secondary [@container(max-width:479px)]:flex-col [@container(max-width:479px)]:items-start"
+      >
+        {STEPS.map((step, i) => (
+          <React.Fragment key={step}>
+            {i > 0 && (
+              <li aria-hidden className="text-text-tertiary [@container(max-width:479px)]:hidden">
+                →
+              </li>
+            )}
+            <li className="flex items-center gap-2">
+              <Badge tone="neutral">{i + 1}</Badge>
+              {step}
+            </li>
+          </React.Fragment>
+        ))}
+      </ol>
+      <section aria-labelledby={headId} className="flex w-full max-w-[720px] flex-col gap-6 rounded-xl bg-bg-subtle p-8 text-left">
+        <h3 id={headId} className="m-0 text-md font-semibold leading-md text-text-primary">
+          What the IDEEZA team looks for
+        </h3>
+        <ul className="m-0 grid list-none gap-x-10 gap-y-4 p-0 [@container(min-width:600px)]:grid-cols-2">
+          {LOOKS_FOR.map((line) => (
+            <li key={line} className="flex gap-4 text-sm leading-sm text-text-secondary">
+              <span aria-hidden className="inline-flex shrink-0 pt-1 text-text-success">
+                <Icon icon={Tick02Icon} size={16} />
+              </span>
+              {line}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <p className="m-0 text-sm leading-sm text-text-secondary">{KEPT_HERE}</p>
+    </ListMessage>
+  );
+}
+
+export function UnreadableState() {
+  return (
+    <StateCard
+      tone="error"
+      icon={<Icon icon={AlertCircleIcon} size={32} />}
+      title="Your blogs can't be shown"
+      body="The blogs saved in this browser couldn't be read. They've been left as they are, so nothing will be overwritten. New blogs can't be saved here until this is fixed."
+      className="mx-auto"
+    />
   );
 }
 
@@ -111,16 +121,11 @@ const EMPTY_STATUS: Record<DisplayStatus, { icon: IconValue; title: string; body
 export function EmptyStatusState({ status, onShowAll }: { status: DisplayStatus; onShowAll: () => void }) {
   const copy = EMPTY_STATUS[status];
   return (
-    <ListMessage
-      icon={copy.icon}
-      title={copy.title}
-      body={copy.body}
-      action={
-        <Button type="button" hierarchy="secondary" size="lg" onClick={onShowAll} className={TAP}>
-          Show all blogs
-        </Button>
-      }
-    />
+    <ListMessage icon={copy.icon} title={copy.title} body={copy.body}>
+      <Button type="button" hierarchy="secondary" size="lg" onClick={onShowAll} className={TAP}>
+        Show all blogs
+      </Button>
+    </ListMessage>
   );
 }
 
@@ -140,24 +145,19 @@ export function NoMatchState({
   const title = !filtered ? `No blogs called “${q}”` : q ? `No blogs called “${q}” with these filters` : "No blogs match these filters";
   const body = filtered ? "Try another status, reuse access or date range." : "Check the spelling or try another word.";
   return (
-    <ListMessage
-      icon={filtered ? FilterIcon : Search01Icon}
-      title={title}
-      body={body}
-      action={
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          {q && (
-            <Button type="button" hierarchy="secondary" size="lg" onClick={onClearSearch} className={TAP}>
-              Clear search
-            </Button>
-          )}
-          {filtered && (
-            <Button type="button" hierarchy={q ? "ghost" : "secondary"} size="lg" onClick={onClearFilters} className={TAP}>
-              Clear filters
-            </Button>
-          )}
-        </div>
-      }
-    />
+    <ListMessage icon={filtered ? FilterIcon : Search01Icon} title={title} body={body}>
+      <div className="flex flex-wrap items-center justify-center gap-4">
+        {q && (
+          <Button type="button" hierarchy="secondary" size="lg" onClick={onClearSearch} className={TAP}>
+            Clear search
+          </Button>
+        )}
+        {filtered && (
+          <Button type="button" hierarchy={q ? "ghost" : "secondary"} size="lg" onClick={onClearFilters} className={TAP}>
+            Clear filters
+          </Button>
+        )}
+      </div>
+    </ListMessage>
   );
 }

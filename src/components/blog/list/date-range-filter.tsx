@@ -10,8 +10,12 @@
 // Keyboard, as the WAI-ARIA date picker dialog: focus opens on the range's first
 // day (else today); ← → move a day, ↑ ↓ a week, Home End to the week's ends,
 // Page Up / Page Down a month (the month shown follows); Enter or Space picks;
-// Escape closes it back to the trigger and drops a half-picked range; Tab stays
-// inside. The panel portals and clamps (popover.ts), so it never clips.
+// Escape closes it back to the trigger and drops a half-picked range; Tab wraps
+// inside (Clear stays in the cycle while it has nothing to clear: it says so
+// rather than going dead). Each day is read out with its place in the range
+// ("range start", "in range", "range end"). On a touch screen every day is
+// 44 px square and the panel grows to hold seven of them. The panel portals and
+// clamps (popover.ts), so it never clips.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -22,7 +26,8 @@ import {
   addDays,
   addMonths,
   dayKey,
-  dayLabel,
+  dayMonth,
+  dayName,
   monthGrid,
   monthLabel,
   monthOf,
@@ -41,10 +46,8 @@ import {
 import { cn } from "@/lib/utils";
 import { PANEL, TRIGGER, TRIGGER_IDLE, TRIGGER_ON, useAnchoredPanel } from "./popover";
 
-const FOCUSABLE = 'button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-/** "Oct 8" — the hint's start day. */
-const shortDay = (k: DayKey) => rangeLabel({ from: k, to: k }).replace(/, \d{4}$/, "");
+/** The panel's Tab stops: the month arrows, the one day in the roving cycle and Clear. */
+const FOCUSABLE = 'button:not([disabled]):not([tabindex="-1"])';
 
 export function DateRangeFilter({
   value,
@@ -57,6 +60,7 @@ export function DateRangeFilter({
 }) {
   const dialogId = React.useId();
   const monthId = React.useId();
+  const clearHintId = React.useId();
   const [open, setOpen] = React.useState(false);
   const [view, setView] = React.useState<Month>(() => monthOf(dayKey(Date.now())));
   const [focusDay, setFocusDay] = React.useState<DayKey>(() => dayKey(Date.now()));
@@ -161,7 +165,8 @@ export function DateRangeFilter({
   // day), else the one that filters the list.
   const band: DayRange | null = pending ? ordered(pending, preview ?? pending) : value;
   const weeks = monthGrid(view);
-  const hint = pending ? `Starts ${shortDay(pending)}. Pick the last day.` : value ? rangeLabel(value) : "Pick the first day.";
+  const hint = pending ? `Starts ${dayMonth(pending)}. Pick the last day.` : value ? rangeLabel(value) : "Pick the first day.";
+  const nothingToClear = !value && !pending;
 
   return (
     <>
@@ -187,7 +192,7 @@ export function DateRangeFilter({
               aria-modal="true"
               aria-label="Date range"
               onKeyDown={onPanelKey}
-              className={cn(PANEL, "flex w-[320px] max-w-[calc(100vw-16px)] flex-col gap-4 p-6")}
+              className={cn(PANEL, "flex w-[320px] max-w-[calc(100vw-16px)] flex-col gap-4 p-6 [@media(pointer:coarse)]:min-w-[min(calc(7*var(--touch-min)+2*var(--spacing-6)),calc(100vw-16px))]")}
             >
               <div className="flex items-center justify-between gap-4 border-0 border-b border-solid border-border-subtle pb-4">
                 <IconButton
@@ -217,7 +222,7 @@ export function DateRangeFilter({
                 <thead>
                   <tr>
                     {WEEKDAYS.map((d, i) => (
-                      <th key={i} scope="col" abbr={d.name} className="h-[32px] p-0 text-center text-sm font-medium leading-xs text-text-tertiary">
+                      <th key={i} scope="col" abbr={d.name} aria-label={d.name} className="h-[32px] p-0 text-center text-sm font-medium leading-xs text-text-tertiary">
                         {d.short}
                       </th>
                     ))}
@@ -241,8 +246,9 @@ export function DateRangeFilter({
                             className={cn(
                               "p-0 py-1",
                               // The band runs between the two days and is cut round at each
-                              // week's edge, as the Figma draws it.
-                              banded && "bg-bg-brand-subtle bg-clip-content",
+                              // week's edge, as the Figma draws it. Violet-100 in light: the
+                              // brand-subtle step barely shows on the white panel.
+                              banded && "bg-violet-100 bg-clip-content dark:bg-bg-brand-subtle",
                               banded && (start || col === 0) && "rounded-l-lg",
                               banded && (end || col === 6) && "rounded-r-lg",
                             )}
@@ -251,7 +257,7 @@ export function DateRangeFilter({
                               type="button"
                               data-day={k}
                               tabIndex={k === focusDay ? 0 : -1}
-                              aria-label={dayLabel(k)}
+                              aria-label={dayName(k, band)}
                               aria-current={k === today ? "date" : undefined}
                               onClick={() => pick(k)}
                               onFocus={() => {
@@ -260,12 +266,14 @@ export function DateRangeFilter({
                               }}
                               onPointerEnter={() => pending && setPreview(k)}
                               className={cn(
-                                "flex h-[36px] w-full cursor-pointer items-center justify-center rounded-lg border border-solid text-md leading-md tabular-nums outline-none transition-colors duration-fast motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:h-[var(--touch-min)]",
+                                // The ring stands off the day by a surface-coloured gap, so it shows
+                                // on a filled day too.
+                                "flex h-[36px] w-full cursor-pointer items-center justify-center rounded-lg border border-solid text-md leading-md tabular-nums outline-none transition-colors duration-fast motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface [@media(pointer:coarse)]:h-[var(--touch-min)] [@media(pointer:coarse)]:min-w-[var(--touch-min)]",
                                 filled
                                   ? "border-transparent bg-bg-brand font-semibold text-text-on-brand"
                                   : cn(
                                       "hover:bg-bg-subtle",
-                                      k === today ? "border-border-strong font-semibold" : "border-transparent",
+                                      k === today ? "border-[color:var(--color-icon-secondary)] font-semibold" : "border-transparent",
                                       d.inMonth ? "text-text-primary" : "text-text-tertiary",
                                     ),
                               )}
@@ -281,22 +289,30 @@ export function DateRangeFilter({
               </table>
 
               <div className="flex items-center justify-between gap-4 border-0 border-t border-solid border-border-subtle pt-4">
-                <p role="status" className="m-0 min-w-0 text-sm leading-sm text-text-secondary">
-                  {hint}
-                </p>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <p role="status" className="m-0 text-sm leading-sm text-text-secondary">
+                    {hint}
+                  </p>
+                  <p className="m-0 text-sm leading-sm text-text-secondary">Filters by the date in Date &amp; time.</p>
+                </div>
                 <Button
                   type="button"
                   hierarchy="ghost"
                   size="md"
-                  disabled={!value && !pending}
+                  aria-disabled={nothingToClear || undefined}
+                  aria-describedby={nothingToClear ? clearHintId : undefined}
                   onClick={() => {
+                    if (nothingToClear) return;
                     if (value) onChange(null);
                     close(true);
                   }}
-                  className="shrink-0 [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
+                  className="shrink-0 aria-disabled:cursor-not-allowed aria-disabled:text-[color:var(--color-button-disabled-text)] aria-disabled:hover:bg-transparent [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
                 >
                   Clear
                 </Button>
+                <span id={clearHintId} hidden>
+                  No dates are picked yet.
+                </span>
               </div>
             </div>,
             document.body,

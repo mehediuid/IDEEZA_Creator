@@ -1,27 +1,33 @@
 "use client";
 
-// Your blogs — /blog (Figma frames 01–09, requirements L1–L15). One surface, as
-// the Figma draws it: the toolbar (search by blog title, the Reuse access and
-// Status filters with their counts, the Date range calendar, Create a new
-// blog), the table (Blog title · Category · Date & Time · Status · ⋯; cards
-// below a 600 px content box) and the pages. Every value comes from the Blog
-// store (useBlog), through the pure list helpers (lib/blog/list.ts).
+// Your blogs — /blog (Figma frames 01–09, requirements L1–L15). The page's name
+// and what the Blog is for sit above the Figma's surface (an addition; nothing
+// in it moves). Then one surface, as the Figma draws it: the toolbar (search by
+// blog title or user name, the Reuse access and Status filters with their
+// counts, the Date range calendar, Clear filters once one narrows, Create a new
+// blog), the table in its own bordered box with the grey head band (Blog title ·
+// Category · Date & Time · Status · ⋯; cards below a 600 px content box) and
+// the pages. A first visit keeps that whole surface and teaches inside the
+// table. Every value comes from the Blog store (useBlog), through the pure list
+// helpers (lib/blog/list.ts).
 //
 // The view lives in the URL — ?q=&status=&reuse=&from=&to=&page=, defaults left
 // out — written with replaceState as My projects does: Next keeps
 // useSearchParams in step, a keystroke never waits on a navigation, nothing
-// scrolls, and Back leaves the list (from a blog it lands on the same view).
-// The ⋯ actions are the shared useArticleActions, so the list and the blog's
-// page behave alike; this page adds Change thumbnail (the shared dialog) and
-// Quick view (a drawer). When an action takes a row away, focus goes to the
-// row that took its place, else to the results heading.
+// scrolls, and Back leaves the list (from a blog it lands on the same view). The
+// tab also remembers it (rememberListQuery), so every in-app way back to the
+// list (listHref) lands on the same view. The ⋯ actions are the shared
+// useArticleActions, so the list and the blog's page behave alike; this page
+// adds Change thumbnail (the shared dialog) and Quick view (a drawer). When an
+// action takes a row away, focus goes to the row that took its place, else to
+// the results heading; a new page puts it on the page's first row.
 
 import * as React from "react";
 import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { SearchInput, buttonVariants } from "@/components/ideeza";
+import { Button, SearchInput, buttonVariants, linkVariants } from "@/components/ideeza";
 import { Pagination } from "@/components/projects/pagination";
 import { whenDialogsClose } from "@/components/create/use-dialog-focus";
 import { useArticleActions } from "@/components/blog/article-actions";
@@ -36,31 +42,42 @@ import {
   hasFilters,
   pageOf,
   parseBlogQuery,
+  rememberListQuery,
   REUSE_FILTERS,
   REUSE_LABEL,
+  searchMatch,
+  searchWords,
   type BlogQuery,
   type ReuseFilter,
 } from "@/lib/blog/list";
 import { newArticleHref } from "@/lib/blog/slug";
 import { DISPLAY_LABEL, DISPLAY_STATUSES, type DisplayStatus } from "@/lib/blog/status";
 import { useBlog } from "@/lib/blog/store";
-import type { BlogArticle } from "@/lib/blog/types";
+import { PAGE_SIZE, type BlogArticle } from "@/lib/blog/types";
+import { useMyProfile } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
 import { ArticleRow, ArticleRowSkeleton, ROW_COLS } from "./article-row";
 import { DateRangeFilter } from "./date-range-filter";
 import { FilterSelect, type FilterOption } from "./filter-select";
-import { EmptyStatusState, FirstVisitState, NoMatchState, UnreadableState } from "./list-states";
+import { EmptyStatusState, FirstVisitState, KEPT_HERE, NoMatchState, UnreadableState } from "./list-states";
 import { QuickView } from "./quick-view";
 
-const LIST = "m-0 flex list-none flex-col gap-5 p-0 [@container(min-width:600px)]:gap-0";
+/** The rows; the head band draws the line above the first one. */
+const LIST = "m-0 flex list-none flex-col gap-5 p-0 [@container(min-width:600px)]:gap-0 [@container(min-width:600px)]:[&>li:first-child]:border-t-0";
 const WIDE_SURFACE =
   "[@container(min-width:600px)]:rounded-xl [@container(min-width:600px)]:border [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle [@container(min-width:600px)]:bg-bg-surface";
+/** The table's own box inside the surface (Figma frame 01): bordered and inset to the
+ *  toolbar's edges, the head band on bg-subtle. */
+const TABLE_BOX =
+  "[@container(min-width:600px)]:mx-8 [@container(min-width:600px)]:overflow-hidden [@container(min-width:600px)]:rounded-xl [@container(min-width:600px)]:border [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle";
+const TAP = "[@container(max-width:599px)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 type StatusChoice = "all" | DisplayStatus;
 type ReuseChoice = "all" | ReuseFilter;
 
 export function BlogList() {
   const { hydrated, data, unreadable } = useBlog();
+  const { fields } = useMyProfile();
   const params = useSearchParams();
   const [coverFor, setCoverFor] = React.useState<string | null>(null);
   const [quickFor, setQuickFor] = React.useState<string | null>(null);
@@ -96,16 +113,27 @@ export function BlogList() {
   };
 
   // ── the rows ──
-  const filtered = React.useMemo(() => filterArticles(data.articles, view), [data, view]);
-  const counts = React.useMemo(() => (hydrated ? filterCounts(data.articles, view) : null), [hydrated, data, view]);
+  // "Search by blog title or user name" (L1, D-6): every blog here is the writer's own, so
+  // their name (and its English letters) is the user name a search can hold.
+  const writer = React.useMemo(() => [fields.name, fields.latinName].filter((s) => s.trim()), [fields.name, fields.latinName]);
+  const narrowing = React.useMemo(() => ({ ...view, writer }), [view, writer]);
+  const filtered = React.useMemo(() => filterArticles(data.articles, narrowing), [data, narrowing]);
+  const counts = React.useMemo(() => (hydrated ? filterCounts(data.articles, narrowing) : null), [hydrated, data, narrowing]);
+  const words = React.useMemo(() => searchWords(view.q), [view.q]);
   const paged = pageOf(filtered, view.page);
-  const narrowed = view.q.trim() !== "" || hasFilters(view);
+  const filters = hasFilters(view);
+  const narrowed = view.q.trim() !== "" || filters;
 
   // A page the list no longer reaches (a delete emptied it, a stale link) shows the last
   // one, and the URL follows so Back lands there too.
   React.useEffect(() => {
     if (hydrated && paged.page !== view.page) write({ ...view, page: paged.page });
   }, [hydrated, paged.page, view, write]);
+
+  // The tab remembers the view, for every in-app way back to the list (listHref).
+  React.useEffect(() => {
+    if (hydrated) rememberListQuery({ ...view, page: paged.page });
+  }, [hydrated, view, paged.page]);
 
   const statusOptions: FilterOption<StatusChoice>[] = [
     { value: "all", label: "All", count: counts?.status.all ?? null },
@@ -122,6 +150,8 @@ export function BlogList() {
   const listRef = React.useRef<HTMLUListElement>(null);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const lastRow = React.useRef<number | null>(null);
+  /** A new page was asked for: its first row takes focus once it is drawn. */
+  const toFirstRow = React.useRef(false);
   const rowsKey = paged.items.map((a) => a.id).join("|");
 
   // Which row the keyboard or pointer was last on — forgotten once either moves somewhere
@@ -140,10 +170,16 @@ export function BlogList() {
     };
   }, []);
 
-  // A row that had focus went away with what its menu did: once the dialog has handed focus
-  // back (to a ⋯ that is gone, so to nothing), the row now in its place takes it, else the
-  // results heading.
+  // A new page: its first row takes focus, where the reading goes on. A row that had focus
+  // went away with what its menu did: once the dialog has handed focus back (to a ⋯ that is
+  // gone, so to nothing), the row now in its place takes it, else the results heading.
   React.useEffect(() => {
+    if (toFirstRow.current) {
+      toFirstRow.current = false;
+      const first = listRef.current?.querySelector<HTMLElement>("[data-row-link]");
+      (first ?? headingRef.current)?.focus({ preventScroll: true });
+      return;
+    }
     const at = lastRow.current;
     if (at === null) return;
     const frame = requestAnimationFrame(() => {
@@ -157,10 +193,21 @@ export function BlogList() {
   }, [rowsKey]);
 
   const changePage = (page: number) => {
+    toFirstRow.current = true;
     write({ ...view, page });
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     sectionRef.current?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
-    headingRef.current?.focus({ preventScroll: true });
+  };
+
+  const clearSearch = () => {
+    changeQuery("");
+    searchRef.current?.focus();
+  };
+  /** Takes off the three filters and keeps the search: the toolbar's Clear filters and the
+   *  no-match state's do the same. */
+  const clearFilters = () => {
+    changeView({ status: undefined, reuse: undefined, from: undefined, to: undefined });
+    searchRef.current?.focus();
   };
 
   // Edit from the quick view: the drawer closes and hands focus back to the ⋯ first, so the
@@ -172,12 +219,13 @@ export function BlogList() {
 
   const firstVisit = hydrated && !unreadable && data.articles.length === 0;
 
-  // The table's column heads, from 600 px: visual only, as each row reads in order.
+  // The table's column heads, from 600 px, on the Figma's grey band: visual only, as each row
+  // names its own cells for a screen reader.
   const heads = (
     <div
       aria-hidden
       className={cn(
-        "hidden gap-x-8 border-0 border-b border-t border-solid border-border-subtle px-8 py-6 text-sm font-semibold leading-xs text-text-secondary [@container(min-width:600px)]:grid",
+        "hidden gap-x-8 border-0 border-b border-solid border-border-subtle bg-bg-subtle px-8 py-6 text-sm font-semibold leading-xs text-text-secondary [@container(min-width:600px)]:grid",
         ROW_COLS,
       )}
     >
@@ -191,16 +239,16 @@ export function BlogList() {
 
   let body: React.ReactNode;
   if (!hydrated) {
+    // A full page of rows, so nothing jumps when the real ones arrive.
     body = (
-      <>
-        {heads}
-        <ul aria-busy="true" aria-label="Loading your blogs" className={LIST}>
-          {Array.from({ length: 6 }, (_, i) => (
-            <ArticleRowSkeleton key={i} />
-          ))}
-        </ul>
-      </>
+      <ul aria-busy="true" aria-label="Loading your blogs" className={LIST}>
+        {Array.from({ length: PAGE_SIZE }, (_, i) => (
+          <ArticleRowSkeleton key={i} />
+        ))}
+      </ul>
     );
+  } else if (firstVisit) {
+    body = <FirstVisitState />;
   } else if (paged.items.length === 0) {
     // The Status filter alone, on a status that holds nothing; else the search or the filters
     // emptied it.
@@ -208,50 +256,45 @@ export function BlogList() {
       view.status && !view.q.trim() && !view.reuse && !view.from ? (
         <EmptyStatusState status={view.status} onShowAll={() => changeView({ status: undefined })} />
       ) : (
-        <NoMatchState
-          query={view.q}
-          filtered={hasFilters(view)}
-          onClearSearch={() => {
-            changeQuery("");
-            searchRef.current?.focus();
-          }}
-          onClearFilters={() => {
-            changeView({ status: undefined, reuse: undefined, from: undefined, to: undefined });
-            searchRef.current?.focus();
-          }}
-        />
+        <NoMatchState query={view.q} filtered={filters} onClearSearch={clearSearch} onClearFilters={clearFilters} />
       );
   } else {
     body = (
-      <>
-        {heads}
-        <ul
-          ref={listRef}
-          aria-label="Your blogs"
-          onFocus={(e) => {
-            const row = (e.target as HTMLElement).closest<HTMLElement>("li[data-row]");
-            if (row) lastRow.current = Number(row.dataset.row);
-          }}
-          className={LIST}
-        >
-          {paged.items.map((a, i) => (
-            <ArticleRow key={a.id} article={a} index={i} menuItems={actions.menuItems(a)} />
-          ))}
-        </ul>
-      </>
+      <ul
+        ref={listRef}
+        aria-label="Your blogs"
+        onFocus={(e) => {
+          const row = (e.target as HTMLElement).closest<HTMLElement>("li[data-row]");
+          if (row) lastRow.current = Number(row.dataset.row);
+        }}
+        className={LIST}
+      >
+        {paged.items.map((a, i) => (
+          <ArticleRow key={a.id} article={a} index={i} menuItems={actions.menuItems(a)} draftMatch={searchMatch(a, words, writer) === "draft"} />
+        ))}
+      </ul>
     );
   }
 
   return (
     <div className="mx-auto w-full max-w-[1120px] px-8 pb-24 pt-12 min-[640px]:px-16">
       <div className="flex flex-col gap-10 [container-type:inline-size]">
-        {/* The Figma opens straight on the list: the page's name is for screen readers. */}
-        <h1 className="sr-only">Blog</h1>
+        {/* The page's name and what the Blog is for, as My projects opens. */}
+        <header className="flex flex-col gap-2">
+          <h1 className="m-0 text-xl font-bold leading-xl tracking-tight text-text-primary">Blog</h1>
+          <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
+            Long write-ups about what you build. The IDEEZA team reviews each one before it goes on the IDEEZA Blog.
+          </p>
+          <p className="m-0 text-md leading-md text-text-secondary">
+            Short post or video?{" "}
+            <NextLink href="/innovations" className={cn(linkVariants({ color: "brand", size: "lg" }), "font-medium")}>
+              Share it on Innovations
+            </NextLink>
+          </p>
+        </header>
 
         {unreadable ? (
           <UnreadableState />
-        ) : firstVisit ? (
-          <FirstVisitState />
         ) : (
           <section ref={sectionRef} aria-label="Your blogs" className={cn("flex scroll-mt-12 flex-col", WIDE_SURFACE)}>
             {/* The toolbar (Figma frame 01): search on the left, the filters and Create a new
@@ -274,8 +317,8 @@ export function BlogList() {
                       changeQuery("");
                     }
                   }}
-                  placeholder="Search by blog title"
-                  aria-label="Search by blog title"
+                  placeholder="Search by blog title or user name"
+                  aria-label="Search by blog title or user name"
                   enterKeyHint="search"
                   className="text-[length:var(--font-size-md)]"
                   containerClassName="min-h-[42px] [@container(max-width:599px)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)] [&>button]:before:-inset-[15.5px]"
@@ -305,12 +348,18 @@ export function BlogList() {
                   onChange={(r) => changeView({ from: r?.from, to: r?.to })}
                   className="[@container(max-width:599px)]:flex-auto"
                 />
+                {filters && (
+                  <Button type="button" hierarchy="ghost" size="md" onClick={clearFilters} className={TAP}>
+                    Clear filters
+                  </Button>
+                )}
               </div>
               <NextLink
                 href={newArticleHref()}
                 className={cn(
                   buttonVariants({ hierarchy: "primary", size: "lg" }),
-                  "no-underline [@container(max-width:599px)]:min-h-[var(--touch-min)] [@container(min-width:600px)]:ml-auto [@container(min-width:1000px)]:ml-0 [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
+                  "no-underline [@container(min-width:600px)]:ml-auto [@container(min-width:1000px)]:ml-0",
+                  TAP,
                 )}
               >
                 <Icon icon={Add01Icon} size={16} />
@@ -322,13 +371,20 @@ export function BlogList() {
               <h2 ref={headingRef} tabIndex={-1} className="sr-only">
                 Your blogs
               </h2>
-              {body}
-              <div className="flex flex-wrap items-center justify-between gap-6 pt-8 [@container(min-width:600px)]:border-0 [@container(min-width:600px)]:border-t [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle [@container(min-width:600px)]:px-8 [@container(min-width:600px)]:py-6">
-                <p role="status" aria-atomic="true" className="m-0 text-sm leading-sm text-text-secondary">
-                  {hydrated
-                    ? countLine({ from: paged.from, to: paged.to, total: filtered.length, pageCount: paged.pageCount, searching: narrowed })
-                    : "Loading your blogs…"}
-                </p>
+              <div className={TABLE_BOX}>
+                {heads}
+                {body}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-6 pt-8 [@container(min-width:600px)]:px-8 [@container(min-width:600px)]:py-6">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <p role="status" aria-atomic="true" className="m-0 text-sm leading-sm text-text-secondary">
+                    {hydrated
+                      ? countLine({ from: paged.from, to: paged.to, total: filtered.length, pageCount: paged.pageCount, searching: narrowed })
+                      : "Loading your blogs…"}
+                  </p>
+                  {/* The first visit says it in its own body. */}
+                  {hydrated && !firstVisit && <p className="m-0 text-sm leading-sm text-text-secondary">{KEPT_HERE}</p>}
+                </div>
                 {hydrated && paged.pageCount > 1 && (
                   <div className="[&>nav]:mt-0">
                     <Pagination page={paged.page} pageCount={paged.pageCount} onChange={changePage} />
