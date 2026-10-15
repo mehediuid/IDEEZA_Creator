@@ -9,6 +9,7 @@ import * as React from "react";
 import { notifyStores, parseStored, readStoredKey, storedUnreadable, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
 import { reportWrite } from "../storage-status";
 import { nextDecision, removeArticle, settleReviews } from "./article";
+import { filesToSweep } from "./doc";
 import { blogFileKeys, deleteBlogFiles } from "./files";
 import { isBlogShape, isBodyShape, normalizeBlog, normalizeBody } from "./normalize";
 import { BLOG_KEY, blogDocKey, blogLiveKey, type BlogData, type BlogDoc, type StoredBody } from "./types";
@@ -180,7 +181,24 @@ export function settleDueReviews(now: number = Date.now()): void {
     approved = r.approved;
     return r.data;
   });
-  if (res.ok) for (const id of approved) copyBody(id, "doc", "live");
+  if (res.ok) {
+    for (const id of approved) {
+      copyBody(id, "doc", "live");
+      void sweepUnusedFiles(id);
+    }
+  }
+}
+
+/** Once a review approves a blog, files nothing uses any more (an abandoned upload, a photo the
+ *  writer removed) are deleted: the approved body, the draft and both thumbnails keep theirs (F74). */
+export async function sweepUnusedFiles(id: string): Promise<void> {
+  const article = readBlogNow().articles.find((a) => a.id === id);
+  if (!article) return;
+  const drop = filesToSweep(await blogFileKeys(id), {
+    docs: [readBody(id, "doc").doc, readBody(id, "live").doc],
+    covers: [article.draft.cover?.fileKey, article.live?.cover?.fileKey],
+  });
+  if (drop.length) await deleteBlogFiles(drop);
 }
 
 /** Settles due reviews now and again at the next decision time, while the app is open, so

@@ -350,6 +350,15 @@ export function unreferencedKeys(all: readonly string[], keep: { docs: readonly 
   return all.filter((k) => !used.has(k));
 }
 
+/** Stored keys to delete: originals nothing uses, and each one's `.thumb` (a thumb whose
+ *  original is still used always stays). */
+export function filesToSweep(all: readonly string[], keep: { docs: readonly BlogDoc[]; covers: readonly (string | null | undefined)[] }): string[] {
+  const THUMB = ".thumb";
+  const base = (k: string) => (k.endsWith(THUMB) ? k.slice(0, -THUMB.length) : k);
+  const unused = new Set(unreferencedKeys(all.map(base), keep));
+  return all.filter((k) => unused.has(base(k)));
+}
+
 /** Nothing worth saving: no text, no image, no video, no card. */
 export function isEmptyDoc(doc: BlogDoc): boolean {
   let empty = true;

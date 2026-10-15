@@ -225,7 +225,7 @@ export function ArticleReader({
               )}
               {meta.projectId && (
                 <section className="flex flex-col gap-4">
-                  <h3 className={RAIL_LABEL}>Tag link</h3>
+                  <h3 className={RAIL_LABEL}>IDEEZA project</h3>
                   <ProjectTile projectId={meta.projectId} />
                 </section>
               )}

@@ -108,7 +108,7 @@ test("the reject-reason panel: grouped by review, latest first and open; each ro
     p.latest.rows.map((r) => [r.title, r.found, r.fix]),
     [
       ["Needs more detail.", "We counted 92 words. Blogs need at least 150.", "Add the steps you took, photos, results or what you learned."],
-      ["Hard to follow.", null, "Split it into short sections, each with its own heading."],
+      ["Hard to read without sections.", null, "Split it into short sections, each with its own heading."],
     ],
   );
   assert.deepEqual(p.earlier, []);

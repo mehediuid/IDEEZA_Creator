@@ -434,7 +434,7 @@ export function CoverPicker({
                     on ? "border-2 border-border-brand" : "border border-border",
                   )}
                 >
-                  <BlogImage fileKey={c.fileKey} alt="" className="size-full object-cover" />
+                  <BlogImage fileKey={c.fileKey} alt="" thumb className="size-full object-cover" />
                 </button>
               );
             })}

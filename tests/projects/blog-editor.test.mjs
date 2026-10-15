@@ -346,3 +346,13 @@ test("a stored body with columns and alignment reads back the same (normalising 
   );
   assert.deepEqual(normalizeDoc(JSON.parse(JSON.stringify(once))), once);
 });
+
+test("F74: the sweep drops files nothing uses, with their thumbs, and keeps every used one", async () => {
+  const { filesToSweep } = await import("../../.tmp-test/lib/blog/doc.js");
+  const img = (k) => ({ type: "image", attrs: { fileKey: k, alt: "", caption: "", decorative: false, width: 10, height: 10 } });
+  const doc = { type: "doc", content: [img("file_a"), { type: "paragraph" }] };
+  const live = { type: "doc", content: [img("file_b")] };
+  const all = ["file_a", "file_a.thumb", "file_b", "file_b.thumb", "file_c", "file_c.thumb", "file_cover", "file_old"];
+  assert.deepEqual(filesToSweep(all, { docs: [doc, live], covers: ["file_cover", null] }), ["file_c", "file_c.thumb", "file_old"]);
+  assert.deepEqual(filesToSweep(["file_x.thumb"], { docs: [], covers: [] }), ["file_x.thumb"], "a thumb whose original is gone goes too");
+});

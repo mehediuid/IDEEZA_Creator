@@ -16,11 +16,11 @@ export const REASONS: Readonly<Record<string, ReasonInfo>> = {
     title: "We can't tell if you may use some images.",
     fix: "Use your own images, or images you have permission to use. Say where each one comes from in its caption.",
   },
-  "hard-to-follow": { title: "Hard to follow.", fix: "Split it into short sections, each with its own heading." },
+  "hard-to-follow": { title: "Hard to read without sections.", fix: "Split it into short sections, each with its own heading." },
   "personal-unsafe": { title: "Personal or unsafe information.", fix: "Remove private details (phone numbers, home addresses) and any unsafe steps." },
 };
 
-const FALLBACK: ReasonInfo = { title: "Needs changes.", fix: "The IDEEZA team didn't add details. Use Report a problem to ask what to change." };
+const FALLBACK: ReasonInfo = { title: "Changes needed.", fix: "The IDEEZA team didn't add details. Use Report a problem to ask what to change." };
 
 export function reasonInfo(id: string): ReasonInfo {
   return REASONS[id] ?? FALLBACK;

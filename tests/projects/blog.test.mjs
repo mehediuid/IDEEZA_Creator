@@ -323,7 +323,7 @@ test("categories and reasons speak plain words", () => {
   assert.equal(categoryLabel("nft"), null);
   assert.equal(reasonInfo("reads-like-ad").title, "Looks like an advertisement.");
   assert.equal(reasonInfo("off-topic").fix, "Write about how you made, shipped or sold a hardware product.");
-  assert.equal(reasonInfo("unknown").title, "Needs changes.");
+  assert.equal(reasonInfo("unknown").title, "Changes needed.");
   assert.doesNotMatch(reasonInfo("unknown").fix, /writing guide/, "never points at a guide that doesn't exist");
 });
 

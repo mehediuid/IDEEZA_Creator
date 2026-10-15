@@ -97,6 +97,8 @@ function article(v: unknown): BlogArticle | null {
     reuse: reuseOf(v.reuse),
     featured: v.featured === true && live !== null,
     takenDown: takenAt !== null && isObj(v.takenDown) ? { at: takenAt, reasons: reasons(v.takenDown.reasons) } : null,
+    // The row's own revision (meta writes), kept so it persists across reads.
+    ...(typeof v.rev === "number" && Number.isInteger(v.rev) && v.rev >= 0 ? { rev: v.rev } : {}),
   };
 }
 

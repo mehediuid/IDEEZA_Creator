@@ -39,25 +39,25 @@ import {
   WifiOff01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Banner, Button, buttonVariants, iconButtonVariants, linkVariants, ModalFrame, Skeleton, Spinner, StateCard, Tooltip } from "@/components/ideeza";
+import { Banner, Button, buttonVariants, iconButtonVariants, linkVariants, ModalFrame, Skeleton, Spinner, StateCard, Tooltip } from "@/components/ideeza";
 import { useArticleActions } from "@/components/blog/article-actions";
+import { ReasonPanel } from "@/components/blog/article/reason-panel";
+import { reasonPanel } from "@/lib/blog/article-view";
 import { StatusBadges } from "@/components/blog/status-badges";
 import { usePostToast } from "@/components/innovations/toast";
-import { canEdit, createArticle, findArticle, markSeen, patchDraft, sendLabel, touchArticle } from "@/lib/blog/article";
-import { clockTime, dayDate } from "@/lib/blog/dates";
-import { DEMO_REVIEW_NOTE } from "@/lib/blog/demo-review";
+import { canEdit, createArticle, displayTitle, findArticle, markSeen, patchDraft, sendLabel, touchArticle } from "@/lib/blog/article";
+import { clockTime } from "@/lib/blog/dates";
 import { articleHref, blogHref, editHref, findBySlug, previewHref, slugOf } from "@/lib/blog/slug";
 import { openReasons, statusOf } from "@/lib/blog/status";
 import { newBlogId, readBlogNow, readBody, updateBlog, useBlog, useBody, writeBody, type StoreCause } from "@/lib/blog/store";
 import { tagLinkOf } from "@/lib/blog/tag-link";
 import { useManualProjects } from "@/lib/manual/projects";
-import { EMPTY_DOC, EMPTY_META, TITLE_MAX, type ArticleMeta, type BlogArticle, type BlogDoc, type ReviewRound } from "@/lib/blog/types";
+import { EMPTY_DOC, EMPTY_META, TITLE_MAX, type ArticleMeta, type BlogArticle, type BlogDoc } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
 import type { BodyApi, BodyEditorProps } from "./body-editor";
 import {
   addingLine,
   bodyKey,
-  changesHeading,
   cleanTitle,
   conflictBody,
   diffFields,
@@ -956,7 +956,7 @@ function Workspace({
         </Banner>
       )}
 
-      {round && !frozen && article && <FixPanel ref={panelRef} round={round} label={label} reasonsHref={articleHref(slugOf(article))} />}
+      {round && !frozen && article && <FixPanel ref={panelRef} article={article} label={label} reasonsHref={articleHref(slugOf(article))} />}
     </>
   );
 
@@ -1354,63 +1354,46 @@ function SaveSlot({
 
 const Problem = FieldProblem;
 
-/** "Reject reason": pinned above the title while the IDEEZA team's reasons are open. */
+/** "Reject reason": the blog page's own panel (reason-panel.tsx — what was found and how to fix
+ *  it, grouped by review, the latest first), pinned above the details while the reasons are
+ *  open, with the editor's Hide and the way to Publish. */
 const FixPanel = React.memo(
-  React.forwardRef<HTMLElement, { round: ReviewRound; label: string; reasonsHref: string }>(function FixPanel({ round, label, reasonsHref }, ref) {
+  React.forwardRef<HTMLElement, { article: BlogArticle; label: string; reasonsHref: string }>(function FixPanel({ article, label, reasonsHref }, ref) {
     const [open, setOpen] = React.useState(true);
     const ids = React.useId();
-    const lines = fixLines(round);
+    const panel = reasonPanel(article);
+    if (!panel) return null;
     return (
       <section
         ref={ref}
         tabIndex={-1}
-        aria-labelledby={`${ids}-h`}
-        className="flex scroll-mt-32 flex-col gap-6 rounded-xl border border-solid border-[var(--color-border-warning)] bg-bg-warning-subtle p-8 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        aria-label="Reject reason"
+        className="flex scroll-mt-32 flex-col gap-4 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        <div className="flex items-start gap-6">
-          <span aria-hidden className="mt-1 shrink-0 text-[color:var(--color-icon-warning)]">
-            <Icon icon={Alert02Icon} size={20} />
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-4">
-              <h2 id={`${ids}-h`} className="m-0 text-lg font-semibold leading-lg text-text-primary">
-                {changesHeading(lines.length)}
-              </h2>
-              {round.demo && (
-                <Badge tone="neutral" className="gap-2 px-4 py-2 text-sm leading-xs">
-                  Demo review
-                </Badge>
-              )}
-            </div>
-            <p className="m-0 text-md leading-md text-text-secondary">
-              Rejected {dayDate(round.at)}. Fix these, then press <b className="font-semibold text-text-primary">{label}</b>.
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="m-0 text-md leading-md text-text-secondary">
+            Fix these, then press <b className="font-semibold text-text-primary">{label}</b>.
+          </p>
           <Button
             type="button"
             hierarchy="ghost"
             size="md"
             aria-expanded={open}
-            aria-controls={`${ids}-list`}
+            aria-controls={`${ids}-panel`}
             onClick={() => setOpen((v) => !v)}
             className="shrink-0 [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]"
           >
             {open ? "Hide reasons" : "Show reasons"}
           </Button>
         </div>
-        <div id={`${ids}-list`} className={cn("flex flex-col gap-6 pl-16 max-md:pl-0", !open && "hidden")}>
-          <ol className="m-0 flex list-decimal flex-col gap-4 pl-8">
-            {lines.map((l) => (
-              <li key={l.id} className="pl-2 text-md leading-md text-text-primary">
-                <span className="flex flex-col gap-1">
-                  <span className="font-semibold">{l.title}</span>
-                  {l.found && <span className="text-text-secondary">{l.found}</span>}
-                  <span>{l.fix}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-          {round.demo && <p className="m-0 text-sm leading-sm text-text-secondary">{DEMO_REVIEW_NOTE}</p>}
+        <div id={`${ids}-panel`} className={cn("flex flex-col gap-4", !open && "hidden")}>
+          <ReasonPanel
+            key={`${article.id}:${panel.latest.at}:${panel.open}`}
+            panel={panel}
+            blogTitle={displayTitle(article)}
+            headingLevel={2}
+            updateHref={panel.aboutUpdate && article.live ? previewHref(slugOf(article)) : undefined}
+          />
           <NextLink href={reasonsHref} className={cn(linkVariants({ color: "brand", size: "lg" }), "w-fit font-semibold [@media(pointer:coarse)]:min-h-[var(--touch-min)]")}>
             See all reasons
           </NextLink>

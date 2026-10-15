@@ -104,7 +104,7 @@ export function QuickView({ article, onClose, onEdit }: { article: BlogArticle |
           ) : isEmptyDoc(body.doc) ? (
             <p className="m-0 text-lg leading-lg text-text-secondary">Nothing written yet.</p>
           ) : (
-            <ArticleBody doc={body.doc} />
+            <ArticleBody doc={body.doc} headingOffset={2} />
           )}
         </div>
       </article>
