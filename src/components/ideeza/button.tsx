@@ -3,7 +3,7 @@
 // IDEEZA Design System — A01 Button
 // Converted from Figma (node 172:1679). Token-driven via the IDEEZA design
 // tokens: semantic button colors, --spacing-*, --radius-*, --font-* scales.
-// Variants: hierarchy (primary/secondary/ghost/danger) × size (sm–2xl) +
+// Variants: hierarchy (primary/secondary/ghost/danger/tonal/outline-brand) × size (sm–2xl) +
 // icon leading/trailing, loading, disabled. Light/dark ready through tokens.
 //
 // The focus ring's 2 px offset gap is the surface colour, not the page's:
@@ -31,6 +31,11 @@ const buttonVariants = cva(
           "border border-solid border-transparent bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
         danger:
           "border border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:brightness-105 active:brightness-95",
+        // DS Hierarchy=Tonal (3288:640) and Outline brand (3289:700).
+        tonal:
+          "border border-solid border-transparent bg-[var(--color-button-tonal-bg)] text-[color:var(--color-button-tonal-text)] hover:bg-[var(--color-button-tonal-bg-hover)] active:bg-[var(--color-button-tonal-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
+        "outline-brand":
+          "border border-solid border-[var(--color-border-brand)] bg-transparent text-[color:var(--color-text-brand)] hover:bg-[var(--color-bg-brand-subtle)] disabled:border-[var(--color-border-default)] disabled:text-[color:var(--color-button-disabled-text)]",
       },
       size: {
         sm: "gap-[var(--spacing-2)] px-[var(--spacing-5)] py-[var(--spacing-4)] rounded-[var(--radius-sm)] text-[length:var(--font-size-xs)]",

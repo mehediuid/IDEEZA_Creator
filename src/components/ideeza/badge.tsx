@@ -8,7 +8,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export type BadgeTone = "blue" | "brand" | "brand-outline" | "neutral" | "success" | "info" | "warning";
+export type BadgeTone = "blue" | "brand" | "brand-outline" | "neutral" | "success" | "info" | "warning" | "brand-solid";
 
 const TONE_CLASS: Record<BadgeTone, string> = {
   blue: "bg-badge-blue-bg px-[6px] py-[2px] text-xs leading-xs text-badge-blue-text",
@@ -21,6 +21,9 @@ const TONE_CLASS: Record<BadgeTone, string> = {
   info: "bg-badge-blue-bg px-[8px] py-[2px] text-xs leading-xs text-badge-blue-text",
   // Phase 2: the "Testnet demo" pill (TestnetDemoBadge). Existing tokens only; 4.76 : 1 light, 5.66 : 1 dark.
   warning: "bg-bg-warning-subtle px-[8px] py-[2px] text-xs leading-xs text-text-warning",
+  // DS A17 Style=Solid, Color=Brand (492:165): Caption/MD on the brand fill (7.9 : 1). Solid
+  // Success and Warning put white on green-500 / yellow-500 (under 3 : 1), so they stay subtle here.
+  "brand-solid": "bg-bg-brand px-[8px] py-[4px] text-sm leading-xs text-text-on-brand",
 };
 
 export function Badge({

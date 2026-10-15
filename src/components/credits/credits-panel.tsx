@@ -1,137 +1,154 @@
 "use client";
 
-// The Credits tab of Plan & pricing (User Panel V2, "Credits" 41549:170244):
-// buy AI credits as a pack or a custom amount, see the balance and, behind
-// it, every purchase with what's left of it and when it expires.
+// Credits — the Credits tab of Plan & pricing, laid out as User Panel V2
+// draws it ("Credits" 41549:170244, Better Deal 41549:171154, Disruptor
+// discount 41549:171369, Compare Plans 41549:170446, Current Balance
+// 41549:172078):
 //
-// - Packs: Starter, Pro (most popular), Power — price, base, bonus, total,
-//   "Buy now". Under each, what a plan would save, with "Compare plans".
-// - Custom amount: at least 50 credits at $0.10 each. When a pack gives as
-//   many for less, it says so and offers to switch ("Better deal").
-// - Current balance opens the credit history.
-// Every Buy opens the one Buy credits dialog on its Pay step.
+// - "Purchase AI credits" with the 12-month line; on the right the current
+//   balance (it opens the credit history) and, on a plan with a discount,
+//   "Your <plan> discount · N% OFF".
+// - Three pack cards — Starter, Pro (most popular), Power: the price (struck
+//   through when a plan discount applies), base, bonus and total, Purchase
+//   now, and under a hairline what a plan saves, with Compare plans.
+// - Custom amount: at least 50 credits at $0.10 each, the price and the
+//   rate (and your discount), Purchase credits; when a pack gives as many for
+//   less, "Better deal available!" with Switch to pack.
+// Purchase goes to the checkout page (checkout-page.tsx).
 
 import * as React from "react";
 import Link from "next/link";
-import { Badge, Banner, Button, ModalFrame, NumberInput, buttonVariants } from "@/components/ideeza";
+import { useRouter } from "next/navigation";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import { Badge, Button, ModalFrame, NumberInput, buttonVariants } from "@/components/ideeza";
+import { checkoutHref } from "@/lib/create/checkout-route";
 import {
   CREDIT_PACKS,
   CUSTOM_MIN,
   CUSTOM_RATE,
   MAX_DISCOUNT,
   PLAN_PRICING_HREF,
+  VALIDITY_MONTHS,
   betterDeal,
   customAmountError,
   customPrice,
   discountRows,
   packPrice,
   usd,
-  VALIDITY_MONTHS,
 } from "@/lib/create/credit-pricing";
 import { lotsOf } from "@/lib/create/credit-lots";
 import { useCredits, type CreditEntry } from "@/lib/create/credits";
-import { cn } from "@/lib/utils";
-import { useCreditDiscount } from "@/lib/create/plan";
+import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
-import { useBuyCredits } from "./buy-credits";
+import { cn } from "@/lib/utils";
 
 const pct = (d: number) => `${Math.round(d * 100)}%`;
+const n = (v: number) => v.toLocaleString("en-US");
 const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+/** "$5", "$8.50": whole dollars without cents. */
+const price = (v: number) => (Number.isInteger(v) ? `$${v}` : usd(v));
+
+const CARD_FILL = "bg-[linear-gradient(160deg,var(--color-bg-brand-subtle),var(--color-bg-surface)_55%)]";
 
 export function CreditsPanel() {
+  const router = useRouter();
   const { hydrated, balance } = useCredits();
-  const { open } = useBuyCredits();
+  const { plan } = useCreatePlan();
   const [history, setHistory] = React.useState(false);
   const [compare, setCompare] = React.useState(false);
   const discount = useCreditDiscount();
 
   return (
-    <div className="flex flex-col gap-[24px]">
-      <div className="flex flex-wrap items-end justify-between gap-[16px]">
-        <div className="flex max-w-[62ch] flex-col gap-[4px]">
-          <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Buy AI credits</h2>
-          <p className="text-md leading-md text-text-secondary">
-            Credits pay for AI work: a concept render uses 1, a product build uses 4 per product. Credits you buy last{" "}
-            {VALIDITY_MONTHS} months.
+    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-[40px]">
+      <div className="flex flex-wrap items-start justify-between gap-[24px]">
+        <div className="flex max-w-[62ch] flex-col gap-[12px]">
+          <h2 className="text-4xl font-semibold leading-4xl text-text-primary">Purchase AI credits</h2>
+          <p className="text-lg leading-lg text-text-secondary">
+            Power your creativity with flexible credit options with {VALIDITY_MONTHS}-month validity.
           </p>
         </div>
-        <button
-          type="button"
-          aria-haspopup="dialog"
-          onClick={() => setHistory(true)}
-          className="flex flex-col items-end gap-[2px] rounded-lg px-[10px] py-[6px] text-right outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          <span className="text-sm leading-sm text-text-secondary">Current balance</span>
-          <span className="text-lg font-semibold leading-lg tabular-nums text-text-brand">
-            {hydrated ? `${balance.toLocaleString("en-US")} credits` : "—"}
-          </span>
-          <span className="text-sm font-medium leading-sm text-text-link">Credit history</span>
-        </button>
+        <div className="flex flex-wrap items-stretch gap-[16px]">
+          <div className="flex flex-col items-end gap-[6px]">
+            <span className="text-lg leading-lg text-text-secondary">Current balance</span>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setHistory(true)}
+              title="Open your credit history"
+              className="rounded-lg bg-bg-brand-subtle px-[16px] py-[4px] text-2xl font-semibold leading-2xl tabular-nums text-text-brand outline-none transition-colors duration-fast hover:bg-[var(--color-button-tonal-bg-hover)] focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              {hydrated ? `${n(balance)} credits` : "—"}
+            </button>
+          </div>
+          {discount > 0 && (
+            <div className="flex flex-col justify-center gap-[2px] rounded-xl bg-bg-success-subtle px-[16px] py-[8px]">
+              <span className="text-lg leading-lg text-text-success">Your {plan.name} discount</span>
+              <span className="text-2xl font-semibold leading-2xl text-text-success">{pct(discount)} OFF</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <ul role="list" className="grid grid-cols-3 gap-[16px] max-lg:grid-cols-1">
+      <ul role="list" className="grid grid-cols-3 gap-[32px] pt-[12px] max-xl:gap-[16px] max-lg:grid-cols-1">
         {CREDIT_PACKS.map((p) => {
-          const price = packPrice(p, discount);
+          const cost = packPrice(p, discount);
           return (
             <li
               key={p.id}
               className={cn(
-                "flex flex-col rounded-xl border border-solid bg-bg-surface",
+                "relative flex flex-col rounded-2xl border border-solid",
+                CARD_FILL,
                 p.popular ? "border-border-brand" : "border-border",
               )}
             >
-              <div className="flex flex-1 flex-col gap-[12px] p-[20px]">
-                <div className="flex items-center justify-between gap-[8px]">
-                  <h3 className="text-lg font-semibold leading-lg text-text-primary">{p.name}</h3>
-                  {p.popular && <Badge tone="brand">Most popular</Badge>}
-                </div>
+              {p.popular && (
+                <Badge tone="brand-solid" className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 px-[12px] text-md leading-md">
+                  Most popular
+                </Badge>
+              )}
+              <div className="flex flex-1 flex-col gap-[16px] p-[24px]">
+                <h3 className="text-3xl font-semibold leading-3xl text-text-primary">{p.name}</h3>
                 <p className="flex items-baseline gap-[8px]">
-                  <span className="text-3xl font-semibold leading-3xl tabular-nums text-text-primary">{usd(price.final)}</span>
-                  {price.saved > 0 && (
-                    <s className="text-md leading-md tabular-nums text-text-tertiary">{usd(price.base)}</s>
-                  )}
+                  <span className="text-5xl font-bold leading-5xl tabular-nums text-text-primary">{price(cost.final)}</span>
+                  {cost.saved > 0 && <s className="text-lg leading-lg tabular-nums text-text-tertiary">{usd(cost.base)}</s>}
                 </p>
-                <dl className="flex flex-col gap-[6px] text-md leading-md">
+                <dl className="flex flex-col gap-[12px] text-lg leading-lg">
                   <div className="flex justify-between gap-[12px]">
                     <dt className="text-text-secondary">Base credits</dt>
-                    <dd className="tabular-nums text-text-primary">{p.base.toLocaleString("en-US")}</dd>
+                    <dd className="tabular-nums text-text-secondary">{n(p.base)}</dd>
                   </div>
-                  {p.bonus > 0 && (
-                    <div className="flex justify-between gap-[12px]">
-                      <dt className="text-text-success">Bonus credits</dt>
-                      <dd className="tabular-nums text-text-success">+{p.bonus}</dd>
-                    </div>
-                  )}
-                  <div className="flex justify-between gap-[12px] border-t border-solid border-border pt-[6px] font-semibold">
-                    <dt className="text-text-primary">Total</dt>
-                    <dd className="tabular-nums text-text-primary">{(p.base + p.bonus).toLocaleString("en-US")}</dd>
+                  <div className={cn("flex justify-between gap-[12px]", p.bonus === 0 && "invisible")} aria-hidden={p.bonus === 0}>
+                    <dt className="text-text-success">Bonus credits</dt>
+                    <dd className="tabular-nums text-text-success">+{n(p.bonus)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-[12px]">
+                    <dt className="text-text-primary">Total credit</dt>
+                    <dd className="tabular-nums text-text-primary">{n(p.base + p.bonus)}</dd>
                   </div>
                 </dl>
                 <Button
-                  hierarchy={p.popular ? "primary" : "secondary"}
+                  hierarchy={p.popular ? "primary" : "tonal"}
                   size="lg"
                   className="mt-auto w-full"
-                  aria-haspopup="dialog"
-                  aria-label={`Buy the ${p.name} pack, ${p.base + p.bonus} credits for ${usd(price.final)}`}
-                  onClick={() => open({ pick: { kind: "pack", id: p.id } })}
+                  aria-label={`Purchase the ${p.name} pack, ${n(p.base + p.bonus)} credits for ${usd(cost.final)}`}
+                  onClick={() => router.push(checkoutHref({ kind: "pack", id: p.id }))}
                 >
-                  Buy now
+                  Purchase now
                 </Button>
               </div>
-              <div className="flex flex-col items-center gap-[2px] border-t border-solid border-border px-[20px] py-[12px] text-center">
-                <span className="text-sm leading-sm text-text-secondary">
-                  {discount > 0 ? `You save ${pct(discount)} with your plan` : `Save up to ${pct(MAX_DISCOUNT)} with an IDEEZA plan`}
+              <div className="flex flex-col items-center gap-[4px] border-t border-solid border-border px-[24px] py-[20px] text-center">
+                <span className="text-md leading-md text-text-primary">
+                  {discount > 0 ? `You're saving ${pct(discount)} with your ${plan.name} plan` : `Save up to ${pct(MAX_DISCOUNT)} with an IDEEZA plan`}
                 </span>
-                {discount === 0 && (
-                  <button
-                    type="button"
-                    aria-haspopup="dialog"
-                    onClick={() => setCompare(true)}
-                    className="text-sm font-semibold leading-sm text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-                  >
-                    Compare plans
-                  </button>
-                )}
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setCompare(true)}
+                  className="text-md font-semibold leading-md text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  Compare plans
+                </button>
               </div>
             </li>
           );
@@ -147,13 +164,13 @@ export function CreditsPanel() {
 }
 
 function CustomAmount({ discount }: { discount: number }) {
-  const { open } = useBuyCredits();
+  const router = useRouter();
   const [text, setText] = React.useState("");
   const [touched, setTouched] = React.useState(false);
   const credits = Number(text);
   const error = text === "" ? null : customAmountError(credits);
   const valid = text !== "" && !error;
-  const price = customPrice(valid ? credits : 0, discount);
+  const cost = customPrice(valid ? credits : 0, discount);
   const deal = valid ? betterDeal(credits, discount) : null;
   const inputId = React.useId();
   const errorId = React.useId();
@@ -161,30 +178,30 @@ function CustomAmount({ discount }: { discount: number }) {
   return (
     <section
       aria-labelledby={`${inputId}-label`}
-      className="flex flex-col gap-[16px] rounded-xl border border-solid border-border bg-bg-surface p-[20px]"
+      className="flex flex-col gap-[24px] rounded-2xl border border-solid border-border bg-bg-surface p-[24px]"
     >
       {deal && (
-        <Banner
-          tone="info"
-          title="Better deal available"
-          action={
-            <Button
-              hierarchy="primary"
-              size="md"
-              aria-haspopup="dialog"
-              onClick={() => open({ pick: { kind: "pack", id: deal.id } })}
-            >
-              Switch to {deal.name}
-            </Button>
-          }
-        >
-          The {deal.name} pack gives {(deal.base + deal.bonus).toLocaleString("en-US")} credits for{" "}
-          {usd(packPrice(deal, discount).final)}.
-        </Banner>
+        <div role="status" className="flex flex-wrap items-center justify-between gap-[16px] rounded-xl bg-bg-brand-subtle px-[24px] py-[20px]">
+          <div className="flex items-start gap-[12px]">
+            <span aria-hidden className="mt-[2px] text-text-brand">
+              <Icon icon={InformationCircleIcon} size={20} />
+            </span>
+            <div className="flex flex-col gap-[4px]">
+              <p className="text-lg font-semibold leading-lg text-text-brand">Better deal available!</p>
+              <p className="text-md leading-md text-text-secondary">
+                Get {n(deal.base)} credits{deal.bonus > 0 ? ` (+${deal.bonus} bonus)` : " (0 bonus)"} for just{" "}
+                {usd(packPrice(deal, discount).final)} instead.
+              </p>
+            </div>
+          </div>
+          <Button hierarchy="primary" size="lg" className="min-w-[200px]" onClick={() => router.push(checkoutHref({ kind: "pack", id: deal.id }))}>
+            Switch to {deal.name} pack
+          </Button>
+        </div>
       )}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-[16px] max-md:grid-cols-1">
-        <div className="flex flex-col gap-[6px]">
-          <label id={`${inputId}-label`} htmlFor={inputId} className="text-md font-semibold leading-md text-text-primary">
+      <div className="grid grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)_auto] items-center gap-[32px] max-lg:grid-cols-1 max-lg:gap-[16px]">
+        <div className="flex flex-col gap-[12px]">
+          <label id={`${inputId}-label`} htmlFor={inputId} className="text-xl font-semibold leading-xl text-text-primary">
             Custom amount
           </label>
           <NumberInput
@@ -197,41 +214,49 @@ function CustomAmount({ discount }: { discount: number }) {
             step={10}
             min={0}
             size="lg"
-            placeholder={`At least ${CUSTOM_MIN}`}
+            placeholder={`Enter amount… (min ${CUSTOM_MIN})`}
             stepsWhat="custom credits"
             ariaDescribedBy={error && touched ? errorId : undefined}
           />
           {error && touched && (
-            <p id={errorId} className="text-sm leading-sm text-text-error">
+            <p id={errorId} role="alert" className="text-sm leading-sm text-text-error">
               {error}
             </p>
           )}
         </div>
-        <div className="flex flex-col gap-[2px]">
-          <span className="text-2xl font-semibold leading-2xl tabular-nums text-text-primary">{usd(price.final)}</span>
-          <span className="text-sm leading-sm text-text-secondary">
-            {usd(CUSTOM_RATE)} per credit{discount > 0 && ` · ${pct(discount)} off`}
-          </span>
+        <span aria-hidden className="h-full w-px bg-border max-lg:hidden" />
+        <div className="flex flex-wrap items-end gap-[32px]">
+          <div className="flex flex-col gap-[4px]">
+            <span className="text-4xl font-semibold leading-4xl tabular-nums text-text-primary">{usd(cost.final)}</span>
+            <span className="text-lg leading-lg text-text-secondary">Rate: {usd(CUSTOM_RATE)} / credit</span>
+          </div>
+          {discount > 0 && (
+            <div className="flex flex-col gap-[4px]">
+              <span className="text-4xl font-semibold leading-4xl tabular-nums text-text-success">−{usd(cost.saved)}</span>
+              <span className="text-lg leading-lg text-text-secondary">Your discount</span>
+            </div>
+          )}
         </div>
         <Button
-          hierarchy="secondary"
+          hierarchy="tonal"
           size="lg"
+          className="min-w-[220px]"
           disabled={!valid}
-          aria-haspopup="dialog"
-          onClick={() => valid && open({ pick: { kind: "custom", credits } })}
+          onClick={() => valid && router.push(checkoutHref({ kind: "custom", credits }))}
         >
-          Buy credits
+          Purchase credits
         </Button>
       </div>
     </section>
   );
 }
 
-/** "Pro pack", "Custom credits", "Starting balance", "Top up". */
+/** "Pro pack", "Custom credit", "Starting balance", "Builder plan", "Top up". */
 function lotName(e: CreditEntry | undefined): string {
   if (!e) return "Credits";
-  if (e.reason === "purchase") return e.pack ? `${e.pack} pack` : "Custom credits";
+  if (e.reason === "purchase") return e.pack ? `${e.pack} pack` : "Custom credit";
   if (e.reason === "seed") return "Starting balance";
+  if (e.reason === "grant") return "Plan credits";
   return "Top up";
 }
 
@@ -241,16 +266,16 @@ function CreditHistoryDialog({ onClose }: { onClose: () => void }) {
   const lots = lotsOf(ledger).slice().reverse();
   const [now] = React.useState(() => Date.now());
   return (
-    <ModalFrame open onClose={onClose} title="Credit history" description="What you bought, what's left of it and when it expires." size="lg">
+    <ModalFrame open onClose={onClose} title="Credit history" description="Track your purchases and credit usage." size="lg">
       {lots.length === 0 ? (
         <p className="text-md leading-md text-text-secondary">No credits yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-solid border-border">
-          <table className="w-full min-w-[640px] border-collapse text-left text-md leading-md">
-            <thead className="bg-bg-subtle text-sm leading-sm text-text-secondary">
+        <div className="overflow-x-auto rounded-xl border border-solid border-border">
+          <table className="w-full min-w-[720px] border-collapse text-left text-lg leading-lg">
+            <thead className="bg-bg-subtle text-md leading-md text-text-primary">
               <tr>
-                {["Type", "Date", "Credits", "Bonus", "Left", "Expires", "Price"].map((h) => (
-                  <th key={h} scope="col" className="px-[14px] py-[10px] font-semibold">
+                {["Type", "Purchase date", "Base credits", "Bonus", "Remaining", "Expiry date", "Price"].map((h) => (
+                  <th key={h} scope="col" className="px-[20px] py-[16px] font-medium">
                     {h}
                   </th>
                 ))}
@@ -262,19 +287,17 @@ function CreditHistoryDialog({ onClose }: { onClose: () => void }) {
                 const expired = l.expiresAt !== null && l.expiresAt <= now;
                 return (
                   <tr key={l.id} className="border-t border-solid border-border">
-                    <th scope="row" className="px-[14px] py-[10px] font-medium text-text-primary">
+                    <th scope="row" className="px-[20px] py-[14px] font-regular text-text-primary">
                       {lotName(e)}
                     </th>
-                    <td className="px-[14px] py-[10px] tabular-nums text-text-secondary">{date(l.ts)}</td>
-                    <td className="px-[14px] py-[10px] tabular-nums text-text-primary">{(l.amount - l.bonus).toLocaleString("en-US")}</td>
-                    <td className="px-[14px] py-[10px] tabular-nums text-text-secondary">{l.bonus > 0 ? `+${l.bonus}` : "—"}</td>
-                    <td className="px-[14px] py-[10px] tabular-nums text-text-primary">{l.remaining.toLocaleString("en-US")}</td>
-                    <td className={cn("px-[14px] py-[10px] tabular-nums", expired ? "text-text-tertiary" : "text-text-secondary")}>
+                    <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{date(l.ts)}</td>
+                    <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{n(l.amount - l.bonus)}</td>
+                    <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{l.bonus > 0 ? `+${l.bonus}` : "-"}</td>
+                    <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{n(l.remaining)}</td>
+                    <td className={cn("px-[20px] py-[14px] tabular-nums", expired ? "text-text-tertiary" : "text-text-primary")}>
                       {l.expiresAt === null ? "Never" : `${expired ? "Expired " : ""}${date(l.expiresAt)}`}
                     </td>
-                    <td className="px-[14px] py-[10px] tabular-nums text-text-secondary">
-                      {e?.price !== undefined ? usd(e.price) : "Free"}
-                    </td>
+                    <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{e?.price !== undefined ? usd(e.price) : "Free"}</td>
                   </tr>
                 );
               })}
@@ -292,47 +315,73 @@ function DiscountsDialog({ onClose }: { onClose: () => void }) {
     <ModalFrame
       open
       onClose={onClose}
-      title="Credit discounts by plan"
-      description={`A paid plan takes a share off every credit you buy. Here is the ${pro.name} pack (${pro.base + pro.bonus} credits) on each.`}
-      size="md"
+      title="Compare credit discounts by plan"
+      description="See how much you save on credit purchases with each IDEEZA plan."
+      size="lg"
     >
-      <div className="flex flex-col gap-[12px]">
-        <div className="overflow-x-auto rounded-lg border border-solid border-border">
-          <table className="w-full min-w-[480px] border-collapse text-left text-md leading-md">
-            <thead className="bg-bg-subtle text-sm leading-sm text-text-secondary">
+      <div className="flex flex-col items-center gap-[24px]">
+        <div className="w-full overflow-x-auto rounded-xl border border-solid border-border">
+          <table className="w-full min-w-[640px] border-collapse text-left text-lg leading-lg">
+            <thead className="bg-bg-subtle text-md leading-md text-text-primary">
               <tr>
-                {["Plan", "Discount", `${pro.name} pack`, "You save"].map((h) => (
-                  <th key={h} scope="col" className="px-[14px] py-[10px] font-semibold">
-                    {h}
-                  </th>
-                ))}
+                <th scope="col" className="px-[20px] py-[16px] font-medium">
+                  IDEEZA plan
+                </th>
+                <th scope="col" className="px-[20px] py-[16px] font-medium">
+                  Base price
+                </th>
+                <th scope="col" className="px-[20px] py-[16px] font-medium">
+                  Final price <span className="font-regular text-text-secondary">(after discount)</span>
+                </th>
+                <th scope="col" className="px-[20px] py-[16px] font-medium">
+                  Total credits
+                </th>
               </tr>
             </thead>
             <tbody>
+              <tr className="border-t border-solid border-border">
+                <th scope="row" className="px-[20px] py-[14px] font-regular text-text-primary">
+                  Free and Tinkerer
+                </th>
+                <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{price(pro.price)}</td>
+                <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{price(pro.price)}</td>
+                <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{n(pro.base + pro.bonus)}</td>
+              </tr>
               {discountRows().map((r) => {
-                const price = packPrice(pro, r.discount);
+                const cost = packPrice(pro, r.discount);
                 return (
                   <tr key={`${r.tier}-${r.cycle}`} className="border-t border-solid border-border">
-                    <th scope="row" className="px-[14px] py-[10px] font-medium text-text-primary">
-                      {planOf(r.tier).name} ({r.cycle})
+                    <th scope="row" className="px-[20px] py-[14px] font-regular text-text-primary">
+                      {planOf(r.tier).name} ({r.cycle === "yearly" ? "Yearly" : "Monthly"})
+                      <span className="block text-md leading-md text-text-secondary">{pct(r.discount)} discount</span>
                     </th>
-                    <td className="px-[14px] py-[10px] tabular-nums text-text-secondary">{pct(r.discount)}</td>
-                    <td className="px-[14px] py-[10px] tabular-nums text-text-primary">{usd(price.final)}</td>
-                    <td className="px-[14px] py-[10px] tabular-nums text-text-success">{usd(price.saved)}</td>
+                    <td className="px-[20px] py-[14px] tabular-nums text-text-primary">{price(pro.price)}</td>
+                    <td className="px-[20px] py-[14px] tabular-nums text-text-primary">
+                      {usd(cost.final)}
+                      <span className="block text-md leading-md text-text-secondary">Save {usd(cost.saved)}</span>
+                    </td>
+                    <td className="px-[20px] py-[14px] tabular-nums text-text-primary">
+                      {n(pro.base + pro.bonus)}
+                      <span className="block text-md leading-md text-text-secondary">
+                        ({n(pro.base)} + {pro.bonus} bonus)
+                      </span>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        <p className="text-sm leading-sm text-text-secondary">Free and Tinkerer have no credit discount.</p>
         <Link
           href={PLAN_PRICING_HREF}
           onClick={onClose}
-          className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), "self-start")}
+          className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), "w-full max-w-[480px]")}
         >
-          See plans
+          Upgrade plan &amp; save up to {pct(MAX_DISCOUNT)}
         </Link>
+        <p className="text-center text-md leading-md text-text-tertiary">
+          Discounts apply to the Builder and Disruptor plans. Free and Tinkerer get no AI credit discount.
+        </p>
       </div>
     </ModalFrame>
   );

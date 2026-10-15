@@ -1,31 +1,28 @@
 "use client";
 
-// Buy credits — the one purchase flow for AI credits (User Panel V2, "AI
-// Credit Purchase" 41549:170243 and its checkouts 41549:166643 / 166716).
-// Opened in place from every place that runs short — the paused-build toast
-// and page, a concept card that can't build, the build gate — and from the
-// Credits page's packs. It never navigates, so a paused build starts by itself
-// once the credits cover it (the build simulator watches the balance).
+// Buy credits in place — when a build or a render runs short (the paused-build
+// toast and page, a concept card that can't build, the build gate). It never
+// navigates, so a paused build starts by itself once the credits cover it
+// (the build simulator watches the balance). The Credits page buys on the
+// checkout page instead (checkout-page.tsx); both use the same parts: the
+// pack cards' look, the payment column (payment-picker) and the order
+// summary (order-summary), so the two read as one checkout.
 //
-// Two steps in one frame:
-//   choose — the packs, the smallest one that covers the shortfall chosen
-//            (skipped when a pack or an amount was picked on the Credits page)
-//   pay    — the order, its price after any plan discount, how to pay, and
-//            "Pay $10.00"
+//   choose — the three packs, the smallest that covers the shortfall chosen
+//   pay    — how to pay | the order and Pay $N
 // then "Payment successful" (N credits added, a paused build starting) or
 // "Payment failed" with Try again.
 //
-// Payments aren't on. Crypto works for real on testnet: the Demo wallet pays
-// in USDT or IDZ through its own request flow (connect, network, review,
-// sign), and the credits land in the same commit as the wallet's debit. Card
-// and PayPal are listed, disabled, with the reason. Each dialog is one order
-// id, so a double press or a replayed confirm adds once (purchaseState).
+// Payments aren't on: the Demo wallet pays in test USDT or IDZ through its
+// own request flow, and the credits land in the same commit as its debit.
+// Each dialog is one order id, so a double press adds once (purchaseState).
 
 import * as React from "react";
-import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Banner, Button, ModalFrame, Radio, TestnetDemoBadge } from "@/components/ideeza";
+import { Badge, Button, ModalFrame } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
+import { useDefaultToken } from "@/lib/account/payment";
 import {
   CREDIT_PACKS,
   VALIDITY_MONTHS,
@@ -38,12 +35,12 @@ import {
   type CreditPack,
   type PackId,
 } from "@/lib/create/credit-pricing";
-import { useDefaultToken } from "@/lib/account/payment";
 import { BUILD_COST, CONCEPT_COST, buildCost, useCredits } from "@/lib/create/credits";
 import { productsOf, useCreateHistory } from "@/lib/create/history";
-import { useCreditDiscount } from "@/lib/create/plan";
+import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
-import { PAY_CARD, PAY_CARD_OFF, PAY_CARD_ON, PaymentPicker, type PayCoin } from "./payment-picker";
+import { OrderSummary, PaymentResult } from "./order-summary";
+import { CHOICE, CHOICE_OFF, CHOICE_ON, PaymentPicker, useWalletStatus, type PayCoin } from "./payment-picker";
 
 /** What is being bought: a pack, or a custom number of credits. */
 export type CreditPick = { kind: "pack"; id: PackId } | { kind: "custom"; credits: number };
@@ -51,7 +48,7 @@ export type CreditPick = { kind: "pack"; id: PackId } | { kind: "custom"; credit
 type OpenArgs = {
   /** What the action waiting on credits costs — a build's price. */
   need?: number;
-  /** Chosen already (the Credits page): the dialog opens on Pay. */
+  /** Chosen already: the dialog opens on Pay. */
   pick?: CreditPick;
 };
 
@@ -98,6 +95,7 @@ export function BuyCreditsButton({
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+const pct = (d: number) => `${Math.round(d * 100)}%`;
 
 /** What a pick buys and costs. */
 export function orderOf(pick: CreditPick, discount: number) {
@@ -121,8 +119,10 @@ type Step = "choose" | "pay" | "done" | "failed";
 
 function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose: () => void }) {
   const { hydrated, balance, purchase } = useCredits();
+  const { plan } = useCreatePlan();
   const { attentionBuilds } = useCreateHistory();
   const { request } = useWalletRequest();
+  const wallet = useWalletStatus();
   // Builder and Disruptor take a share off every credit (the plan's discount).
   const discount = useCreditDiscount();
   const short = need !== undefined && hydrated ? Math.max(0, need - balance) : 0;
@@ -136,25 +136,15 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
   const [done, setDone] = React.useState<{ added: number; after: number; paused: string | null } | null>(null);
   const [orderId, setOrderId] = React.useState(newOrderId);
   const firstRef = React.useRef<HTMLButtonElement | null>(null);
-  const doneRef = React.useRef<HTMLButtonElement>(null);
   const packRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
   const coinRef = React.useRef<HTMLButtonElement | null>(null);
   const packsId = React.useId();
+  const [openedAt] = React.useState(() => Date.now());
 
   const order = orderOf(pick, discount);
-  const amount = coinAmount(order.price.final, coin);
-  // The day the dialog opened: what "these credits last until" counts from.
-  const [openedAt] = React.useState(() => Date.now());
-  const expires = new Date(addMonths(openedAt, VALIDITY_MONTHS)).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 
-  // The step's first control takes the focus the last step's button had.
   React.useEffect(() => {
-    if (step === "done" || step === "failed") doneRef.current?.focus();
-    else if (step === "pay") coinRef.current?.focus();
+    if (step === "pay") coinRef.current?.focus();
   }, [step]);
 
   const pay = async () => {
@@ -179,7 +169,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
           ],
           note: `Testnet demo, no real money moves. The credits last ${VALIDITY_MONTHS} months.`,
           doneLine: `${plural(credits, "credit")} added to your account.`,
-          charge: { network: "baseSepolia", lines: [{ coin, amount: String(amount) }] },
+          charge: { network: "baseSepolia", lines: [{ coin, amount: String(coinAmount(order.price.final, coin)) }] },
         },
         {
           commit: (proof) => {
@@ -209,9 +199,9 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
         setDone({ added: credits, after, paused: line });
         setStep("done");
       } else if (result.reason === "rejected") {
-        setNote("Payment cancelled. Nothing was charged.");
+        setNote("Payment cancelled in the wallet. Nothing was charged.");
       } else {
-        setFailure(result.message ?? "We couldn't take the payment. Nothing was charged.");
+        setFailure(result.message ?? "The wallet couldn't take the payment.");
         setOrderId(newOrderId());
         setStep("failed");
       }
@@ -226,52 +216,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
     packRefs.current[next]?.focus();
   };
 
-  const title =
-    step === "done" ? "Payment successful" : step === "failed" ? "Payment failed" : step === "pay" ? "Pay for credits" : "Buy credits";
-
-  const footer =
-    step === "done" || step === "failed" ? (
-      <>
-        {step === "failed" && (
-          <Button hierarchy="secondary" size="lg" className="ml-auto" onClick={onClose}>
-            Close
-          </Button>
-        )}
-        <Button
-          ref={doneRef}
-          hierarchy="primary"
-          size="lg"
-          className={step === "done" ? "ml-auto" : undefined}
-          onClick={step === "done" ? onClose : () => setStep("pay")}
-        >
-          {step === "done" ? "Done" : "Try again"}
-        </Button>
-      </>
-    ) : step === "choose" ? (
-      <>
-        <Button hierarchy="secondary" size="lg" className="ml-auto" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button hierarchy="primary" size="lg" onClick={() => setStep("pay")}>
-          Continue
-        </Button>
-      </>
-    ) : (
-      <>
-        <Button
-          hierarchy="secondary"
-          size="lg"
-          className="ml-auto"
-          onClick={picked ? onClose : () => setStep("choose")}
-          disabled={paying}
-        >
-          {picked ? "Cancel" : "Back"}
-        </Button>
-        <Button hierarchy="primary" size="lg" onClick={pay} loading={paying} disabled={!hydrated}>
-          Pay {usd(order.price.final)}
-        </Button>
-      </>
-    );
+  const title = step === "done" ? "Payment successful" : step === "failed" ? "Payment failed" : step === "pay" ? "Payment details" : "Buy AI credits";
 
   return (
     <ModalFrame
@@ -285,125 +230,129 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
           ? `Credits pay for AI work. A concept render uses ${CONCEPT_COST}, a product build uses ${BUILD_COST} per product.`
           : undefined
       }
-      size="sm"
-      initialFocus={picked ? coinRef : firstRef}
-      footer={footer}
+      size={step === "pay" ? "lg" : "md"}
+      initialFocus={step === "pay" ? coinRef : firstRef}
+      footer={
+        step === "choose" ? (
+          <>
+            <Button hierarchy="secondary" size="lg" className="ml-auto" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button hierarchy="primary" size="lg" onClick={() => setStep("pay")}>
+              Continue
+            </Button>
+          </>
+        ) : undefined
+      }
     >
       {step === "done" && done && (
-        <div role="status" className="flex items-start gap-[12px]">
-          <span aria-hidden className="mt-[2px] shrink-0 text-text-success">
-            <Icon icon={CheckmarkCircle02Icon} size={20} />
-          </span>
-          <div className="flex flex-col gap-[4px]">
-            <p className="text-md font-semibold leading-md text-text-primary">
-              {plural(done.added, "credit")} added. You now have {plural(done.after, "credit")}.
-            </p>
-            {done.paused && <p className="text-md leading-md text-text-secondary">{done.paused}</p>}
-            <p className="flex flex-wrap items-center gap-[8px] text-sm leading-sm text-text-secondary">
-              <TestnetDemoBadge /> Paid from your demo wallet. No real money moved.
-            </p>
-          </div>
-        </div>
+        <PaymentResult compact tone="success" title={`${plural(done.added, "credit")} added`} primary={{ label: "Done", onClick: onClose }}>
+          <p>You now have {plural(done.after, "credit")}.</p>
+          {done.paused && <p className="font-semibold text-text-primary">{done.paused}</p>}
+        </PaymentResult>
       )}
 
       {step === "failed" && (
-        <Banner tone="error" title="We couldn't take the payment">
-          {failure} Nothing was charged.
-        </Banner>
+        <PaymentResult compact tone="error" title="Payment failed" primary={{ label: "Try again", onClick: () => setStep("pay") }}>
+          <p>Unfortunately, we couldn&apos;t process your payment. Please try again.</p>
+          <p className="text-md leading-md">{failure} Nothing was charged.</p>
+        </PaymentResult>
       )}
 
       {step === "choose" && (
         <div className="flex flex-col gap-[16px]">
-          <p className="text-md leading-md text-text-secondary">
+          <p className="text-lg leading-lg text-text-secondary">
             {!hydrated
               ? "Reading your balance…"
               : short > 0
                 ? `This needs ${plural(need ?? 0, "credit")}. You have ${balance}, so ${short} more.`
                 : `You have ${plural(balance, "credit")}.`}
           </p>
-          <div className="flex flex-col gap-[8px]">
-            <span id={packsId} className="text-md font-semibold leading-md text-text-primary">
+          <div role="radiogroup" aria-labelledby={packsId} className="grid grid-cols-3 gap-[12px] max-sm:grid-cols-1">
+            <span id={packsId} className="sr-only">
               Choose a pack
             </span>
-            <div role="radiogroup" aria-labelledby={packsId} className="flex flex-col gap-[8px]">
-              {CREDIT_PACKS.map((p, i) => {
-                const on = pick.kind === "pack" && pick.id === p.id;
-                const price = packPrice(p, discount);
-                return (
-                  <button
-                    key={p.id}
-                    ref={(el) => {
-                      packRefs.current[i] = el;
-                      if (on) firstRef.current = el;
-                    }}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    tabIndex={on ? 0 : -1}
-                    onClick={() => setPick({ kind: "pack", id: p.id })}
-                    onKeyDown={(e) => {
-                      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-                        e.preventDefault();
-                        movePack(i, 1);
-                      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-                        e.preventDefault();
-                        movePack(i, -1);
-                      }
-                    }}
-                    className={cn(PAY_CARD, on ? PAY_CARD_ON : PAY_CARD_OFF)}
-                  >
-                    <Radio checked={on} decorative size="sm" />
-                    <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-                      <span className="flex flex-wrap items-center gap-[8px] text-md font-semibold leading-md text-text-primary">
-                        {p.name}
-                        {p.popular && <Badge tone="brand">Most popular</Badge>}
-                      </span>
-                      <span className="text-sm leading-sm text-text-secondary">{creditsLine(p.base, p.bonus)}</span>
-                    </span>
-                    <span className="shrink-0 text-md font-semibold leading-md tabular-nums text-text-primary">
-                      {usd(price.final)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            {CREDIT_PACKS.map((p, i) => {
+              const on = pick.kind === "pack" && pick.id === p.id;
+              const price = packPrice(p, discount);
+              return (
+                <button
+                  key={p.id}
+                  ref={(el) => {
+                    packRefs.current[i] = el;
+                    if (on) firstRef.current = el;
+                  }}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  tabIndex={on ? 0 : -1}
+                  onClick={() => setPick({ kind: "pack", id: p.id })}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+                      e.preventDefault();
+                      movePack(i, 1);
+                    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      movePack(i, -1);
+                    }
+                  }}
+                  className={cn(CHOICE, on ? CHOICE_ON : CHOICE_OFF, "relative flex-col items-start gap-[4px] py-[16px]")}
+                >
+                  {p.popular && (
+                    <Badge tone="brand-solid" className="absolute right-[12px] top-[12px]">
+                      Popular
+                    </Badge>
+                  )}
+                  <span className="text-xl font-semibold leading-xl text-text-primary">{p.name}</span>
+                  <span className="flex items-baseline gap-[6px]">
+                    <span className="text-3xl font-bold leading-3xl tabular-nums text-text-primary">{usd(price.final)}</span>
+                    {price.saved > 0 && <s className="text-md leading-md tabular-nums text-text-tertiary">{usd(price.base)}</s>}
+                  </span>
+                  <span className="text-md leading-md text-text-secondary">{creditsLine(p.base, p.bonus)}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
       {step === "pay" && (
         <div className="flex flex-col gap-[16px]">
-          {/* The order: what, how many, and what it costs. */}
-          <dl className="flex flex-col gap-[6px] rounded-lg border border-solid border-border bg-bg-subtle px-[14px] py-[12px] text-md leading-md">
-            <div className="flex items-baseline justify-between gap-[12px]">
-              <dt className="font-semibold text-text-primary">{order.name}</dt>
-              <dd className="tabular-nums text-text-primary">{usd(order.price.base)}</dd>
-            </div>
-            <div className="text-sm leading-sm text-text-secondary">{creditsLine(order.base, order.bonus)}</div>
-            {order.price.saved > 0 && (
-              <div className="flex items-baseline justify-between gap-[12px] text-sm leading-sm">
-                <dt className="text-text-secondary">Plan discount</dt>
-                <dd className="tabular-nums text-text-success">−{usd(order.price.saved)}</dd>
-              </div>
-            )}
-            <div className="mt-[4px] flex items-baseline justify-between gap-[12px] border-t border-solid border-border pt-[8px]">
-              <dt className="font-semibold text-text-primary">Total</dt>
-              <dd className="font-semibold tabular-nums text-text-primary">{usd(order.price.final)}</dd>
-            </div>
-          </dl>
-
-          <PaymentPicker
-            amountUsd={order.price.final}
-            coin={coin}
-            onCoin={setCoin}
-            coinRef={coinRef}
-            footnote={`These credits last until ${expires}.`}
-          />
-          {note && (
-            <p role="status" className="text-md leading-md text-text-secondary">
-              {note}
-            </p>
+          {!picked && (
+            <button
+              type="button"
+              onClick={() => setStep("choose")}
+              disabled={paying}
+              className="inline-flex items-center gap-[4px] self-start text-md font-semibold leading-md text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              <Icon icon={ArrowLeft01Icon} size={16} /> Change pack
+            </button>
           )}
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,400px)] items-start gap-[32px] max-md:grid-cols-1">
+            <PaymentPicker amountUsd={order.price.final} coin={coin} onCoin={setCoin} coinRef={coinRef} />
+            <OrderSummary
+              head={{ title: order.pack ? `${order.pack} pack` : "Custom AI credits", price: usd(order.price.base), sub: creditsLine(order.base, order.bonus) }}
+              lines={[
+                {
+                  label: "Credits last",
+                  value: `Until ${new Date(addMonths(openedAt, VALIDITY_MONTHS)).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
+                },
+              ]}
+              adjustments={
+                order.price.saved > 0 ? [{ label: `${plan.name} plan discount (${pct(discount)})`, value: `−${usd(order.price.saved)}`, tone: "success" }] : []
+              }
+              subtotal={usd(order.price.base)}
+              total={usd(order.price.final)}
+              cta={{
+                label: `Pay ${usd(order.price.final)}`,
+                onClick: pay,
+                loading: paying,
+                disabled: !hydrated || !wallet.connected,
+                hint: !wallet.connected ? "Connect your wallet to pay." : undefined,
+              }}
+              note={note && <p role="status">{note}</p>}
+            />
+          </div>
         </div>
       )}
     </ModalFrame>

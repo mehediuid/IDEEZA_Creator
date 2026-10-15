@@ -56,8 +56,11 @@ ideeza-creator-panel/
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
    │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), command-palette (⌘K)
-   │  ├─ credits/            buy-credits (the one Buy credits dialog), credits-panel, plans-panel,
-   │  │                      payment-picker (Card · PayPal · Crypto), plan-pricing-page
+   │  ├─ credits/            Settings › Plan & pricing (User Panel V2 layouts): pricing-frame (sheet,
+   │  │                      breadcrumb, pill tabs), plan-pricing-page, plans-panel, credits-panel,
+   │  │                      billing-history, payment-method-panel, plan-banner (+ plan details),
+   │  │                      checkout-page + order-summary + payment-picker (the checkout page),
+   │  │                      buy-credits (the in-place shortfall dialog), invoice-view
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
