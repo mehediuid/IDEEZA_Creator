@@ -41,14 +41,46 @@ export function useBlog(): BlogStore {
   return { hydrated, data, unreadable: unreadableRaw(raw) };
 }
 
+/** Why a write didn't go through: storage is full, the browser refuses this site any storage,
+ *  or what is stored can't be read (and so is never written over). */
+export type StoreCause = "full" | "blocked" | "unreadable";
+
+export type StoreWrite = { ok: true } | { ok: false; cause: StoreCause };
+
+/** After a refused write: a tiny probe tells "full" (a small write still fits, or the browser
+ *  says quota) from "blocked" (the browser refuses this site's storage outright). */
+export function storageCause(): Exclude<StoreCause, "unreadable"> {
+  const probe = "ideeza:blog:probe";
+  try {
+    window.localStorage.setItem(probe, "1");
+    window.localStorage.removeItem(probe);
+    return "full";
+  } catch (e) {
+    return e instanceof DOMException && (e.name === "QuotaExceededError" || e.code === 22) ? "full" : "blocked";
+  }
+}
+
+let persistAsked = false;
+
+/** Asks the browser once to keep this site's storage when space runs low (blogs live only in
+ *  this browser). The answer changes nothing here; a refusal is not an error. */
+export function askToPersist(): void {
+  if (persistAsked || typeof navigator === "undefined") return;
+  persistAsked = true;
+  void navigator.storage?.persist?.().catch(() => false);
+}
+
 /** Applies `fn` to the freshest stored index and writes the result. `null` (or the same
  *  object) writes nothing and succeeds. */
-export function updateBlog(fn: (data: BlogData) => BlogData | null): WriteResult {
-  if (storedUnreadable(BLOG_KEY, isBlogShape)) return { ok: false };
+export function updateBlog(fn: (data: BlogData) => BlogData | null): StoreWrite {
+  if (storedUnreadable(BLOG_KEY, isBlogShape)) return { ok: false, cause: "unreadable" };
   const current = readBlogNow();
   const next = fn(current);
   if (!next || next === current) return { ok: true };
-  return writeStoredKey(BLOG_KEY, next);
+  const res: WriteResult = writeStoredKey(BLOG_KEY, next);
+  if (!res.ok) return { ok: false, cause: storageCause() };
+  askToPersist();
+  return res;
 }
 
 const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -69,24 +101,37 @@ export function readBody(id: string, which: BodyWhich): StoredBody {
   return normalizeBody(parseStored(readStoredKey(bodyKey(id, which))).value);
 }
 
-export function useBody(id: string | null, which: BodyWhich): { hydrated: boolean; body: StoredBody } {
+export function useBody(id: string | null, which: BodyWhich): { hydrated: boolean; body: StoredBody; unreadable: boolean } {
   const { hydrated, raw } = useStoredKey(id ? bodyKey(id, which) : null);
   const body = React.useMemo(() => normalizeBody(parseStored(raw).value), [raw]);
-  return { hydrated, body };
+  const unreadable = React.useMemo(() => {
+    if (raw === null) return false;
+    const { value, unreadable: bad } = parseStored(raw);
+    return bad || !isBodyShape(value);
+  }, [raw]);
+  return { hydrated, body, unreadable };
 }
 
-export type BodyWrite = { ok: true; rev: number } | { ok: false; conflict: boolean };
+export type BodyWrite = { ok: true; rev: number } | { ok: false; conflict: boolean; cause?: StoreCause };
+
+/** Whether a stored body is there but can't be read: it is never written over, and the editor
+ *  opens it read-only instead of showing it as empty. */
+export function bodyUnreadable(id: string, which: BodyWhich): boolean {
+  return storedUnreadable(bodyKey(id, which), isBodyShape);
+}
 
 /** Saves a body as `baseRev + 1`. Refused as a conflict when the stored copy moved past
  *  `baseRev` (another tab saved), and refused when the key can't be read. */
 export function writeBody(id: string, which: BodyWhich, doc: BlogDoc, baseRev: number): BodyWrite {
   const key = bodyKey(id, which);
-  if (storedUnreadable(key, isBodyShape)) return { ok: false, conflict: false };
+  if (storedUnreadable(key, isBodyShape)) return { ok: false, conflict: false, cause: "unreadable" };
   const stored = readBody(id, which);
   if (stored.rev > baseRev) return { ok: false, conflict: true };
   const rev = baseRev + 1;
   const res = writeStoredKey(key, { rev, doc });
-  return res.ok ? { ok: true, rev } : { ok: false, conflict: false };
+  if (!res.ok) return { ok: false, conflict: false, cause: storageCause() };
+  askToPersist();
+  return { ok: true, rev };
 }
 
 /** Copies one body over the other (approval: draft → live; discard: live → draft). */

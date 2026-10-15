@@ -1,8 +1,9 @@
 "use client";
 
 // The selection bubble (desktop, fine pointer): selected words get Bold, Link,
-// Heading, Subheading and Quote, the five things a writer formats; lists and
-// blocks live in "+" and the markdown shortcuts, never twice. It is a toolbar:
+// Heading, Subheading and Quote, then Bulleted list, Numbered list and Code — so
+// a line already written can become a list or code with the mouse ("+" stands
+// only beside an empty line, Figma E5). Each says its keys. It is a toolbar:
 // Tab from the selection lands on it, ← → move along it, Escape goes back to the
 // words. ⌘K (or Link) turns it into the link field, which also opens on a bare
 // caret so a typed address can be inserted as a link.
@@ -19,10 +20,12 @@ export function FormatBubble({
   editor,
   linkOpen,
   setLinkOpen,
+  onAnnounce,
 }: {
   editor: Editor;
   linkOpen: boolean;
   setLinkOpen: (open: boolean) => void;
+  onAnnounce: (text: string) => void;
 }) {
   // The app shell scrolls <main>, not the window: the bubble follows that.
   const [scrollTarget] = React.useState(() => document.getElementById("main-content"));
@@ -57,7 +60,6 @@ export function FormatBubble({
       if (linkOpenRef.current) return true;
       const { selection } = state;
       if (selection.empty || !(selection instanceof TextSelection)) return false;
-      if (e.isActive("codeBlock")) return false;
       if (!state.doc.textBetween(selection.from, selection.to, " ").trim()) return false;
       return view.hasFocus() || !!menuRef.current?.contains(document.activeElement);
     },
@@ -114,10 +116,38 @@ export function FormatBubble({
                 setLinkOpen(true);
               }}
             />
-            <span aria-hidden className="mx-1 h-[20px] w-px bg-border-subtle" />
+            <span aria-hidden className="mx-1 h-10 w-px bg-border-subtle" />
             <FormatButton id="h2" on={s.h2} touch={false} onPress={() => toggleFormat(editor, "h2")} />
             <FormatButton id="h3" on={s.h3} touch={false} onPress={() => toggleFormat(editor, "h3")} />
             <FormatButton id="quote" on={s.quote} touch={false} onPress={() => toggleFormat(editor, "quote")} />
+            <span aria-hidden className="mx-1 h-10 w-px bg-border-subtle" />
+            <FormatButton
+              id="bullet"
+              on={s.bullet}
+              touch={false}
+              onPress={() => {
+                toggleFormat(editor, "bullet");
+                onAnnounce(s.bullet ? "List removed" : "Bulleted list");
+              }}
+            />
+            <FormatButton
+              id="ordered"
+              on={s.ordered}
+              touch={false}
+              onPress={() => {
+                toggleFormat(editor, "ordered");
+                onAnnounce(s.ordered ? "List removed" : "Numbered list");
+              }}
+            />
+            <FormatButton
+              id="code"
+              on={s.code}
+              touch={false}
+              onPress={() => {
+                toggleFormat(editor, "code");
+                onAnnounce(s.code ? "Code removed" : "Code block. Tab indents, Escape leaves.");
+              }}
+            />
           </>
         )}
       </div>

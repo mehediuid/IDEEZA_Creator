@@ -19,9 +19,10 @@ import { Icon } from "@/components/dashboard/icon";
 import { BlogImage } from "@/components/blog/cover-image";
 import { Badge, Button, Checkbox, Spinner, Tag, TextInput } from "@/components/ideeza";
 import { cn } from "@/lib/utils";
-import { IMAGE_TYPES } from "@/lib/blog/media";
+import { IMAGE_ACCEPT } from "@/lib/blog/media";
 
-export type Upload = { name: string; error: string | null };
+/** A photo or video on its way into the blog (`error` once it was refused). */
+export type Upload = { name: string; error: string | null; kind: "image" | "video" };
 
 export type UploadsApi = {
   uploads: Readonly<Record<string, Upload>>;
@@ -42,7 +43,37 @@ type ImageAttrs = {
 };
 
 const FRAME = "rounded-2xl border border-solid border-border-subtle bg-bg-subtle";
-const ACCEPT = IMAGE_TYPES.join(",");
+const ACCEPT = IMAGE_ACCEPT;
+
+/** Which image this is in the blog (1-based), for names like "Caption for image 2". */
+function imageNumber(editor: NodeViewProps["editor"], pos: number | undefined): number {
+  if (typeof pos !== "number") return 0;
+  let n = 0;
+  let at = 0;
+  editor.state.doc.descendants((node, p) => {
+    if (at) return false;
+    if (node.type.name === "image") {
+      n += 1;
+      if (p === pos) at = n;
+    }
+    return true;
+  });
+  return at;
+}
+
+/** Under this width an image's controls stack below it instead of covering it (columns, rows). */
+function useNarrow(ref: React.RefObject<HTMLElement | null>): boolean {
+  const [narrow, setNarrow] = React.useState(false);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // 280 px: the Description field and its help need that much beside nothing else.
+    const ro = new ResizeObserver(() => setNarrow(el.getBoundingClientRect().width < 280));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return narrow;
+}
 
 export function ImageView({ node, updateAttributes, deleteNode, selected, editor, getPos }: NodeViewProps) {
   const a = node.attrs as ImageAttrs;
@@ -64,6 +95,8 @@ export function ImageView({ node, updateAttributes, deleteNode, selected, editor
   }, [editor]);
   // "Add description" was pressed: open the details and put the caret in the field.
   const [asked, setAsked] = React.useState(false);
+  const frameRef = React.useRef<HTMLDivElement>(null);
+  const narrow = useNarrow(frameRef);
   const active = editable && ((selected && writing) || within || asked);
   const altRef = React.useRef<HTMLInputElement>(null);
   const focusAlt = React.useRef(false);
@@ -112,9 +145,8 @@ export function ImageView({ node, updateAttributes, deleteNode, selected, editor
           {error === null ? (
             <>
               <Spinner size={24} />
-              <p role="status" className="text-md leading-md text-text-secondary">
-                Uploading {up?.name}…
-              </p>
+              {/* Counted once in the page's save slot, not spoken per photo. */}
+              <p className="text-md leading-md text-text-secondary">Adding {up?.name}…</p>
             </>
           ) : (
             <>
@@ -159,7 +191,9 @@ export function ImageView({ node, updateAttributes, deleteNode, selected, editor
   }
 
   const missing = !a.decorative && !a.alt.trim();
-  const ratio = a.width && a.height ? { aspectRatio: `${a.width} / ${a.height}` } : undefined;
+  // Data, not design values: the stored picture's own proportions, and never wider than it is.
+  const ratio = a.width && a.height ? { aspectRatio: `${a.width} / ${a.height}`, maxWidth: a.width } : undefined;
+  const number = imageNumber(editor, getPos());
 
   return (
     <NodeViewWrapper
@@ -174,7 +208,7 @@ export function ImageView({ node, updateAttributes, deleteNode, selected, editor
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setWithin(false);
       }}
     >
-      <div className="relative">
+      <div ref={frameRef} className="relative">
         <BlogImage
           fileKey={a.fileKey}
           alt={a.decorative ? "" : a.alt}
@@ -186,7 +220,7 @@ export function ImageView({ node, updateAttributes, deleteNode, selected, editor
           // Data, not a design value: the stored picture's own proportions.
           style={ratio}
         />
-        {editable && (
+        {editable && !narrow && (
           <div className="absolute bottom-6 left-6 flex flex-wrap items-center gap-4">
             {missing ? (
               <>
@@ -218,8 +252,23 @@ export function ImageView({ node, updateAttributes, deleteNode, selected, editor
         )}
       </div>
 
+      {editable && narrow && (
+        // A narrow image (in a column or a row): its state under it, not over the picture.
+        <div className="flex flex-wrap items-center gap-2">
+          {missing ? (
+            <Badge tone="warning" className="gap-2 px-4 py-2 text-sm leading-xs" icon={<Icon icon={Alert02Icon} size={12} />}>
+              No description
+            </Badge>
+          ) : (
+            <Tag size="sm" icon={<Icon icon={Tick02Icon} size={12} />}>
+              {a.decorative ? "Decoration only" : "Description added"}
+            </Tag>
+          )}
+        </div>
+      )}
+
       {editable ? (
-        <CaptionField value={a.caption} tabIndex={tab} onChange={(caption) => updateAttributes({ caption })} />
+        <CaptionField value={a.caption} number={number} tabIndex={tab} onChange={(caption) => updateAttributes({ caption })} />
       ) : (
         a.caption.trim() && <figcaption className="text-center text-sm leading-xs text-text-tertiary">{a.caption}</figcaption>
       )}
@@ -282,12 +331,12 @@ function useLocalValue(value: string, onChange: (v: string) => void) {
   };
 }
 
-function CaptionField({ value, tabIndex, onChange }: { value: string; tabIndex: number; onChange: (v: string) => void }) {
+function CaptionField({ value, number, tabIndex, onChange }: { value: string; number: number; tabIndex: number; onChange: (v: string) => void }) {
   const f = useLocalValue(value, onChange);
   return (
     <input
       type="text"
-      aria-label="Caption"
+      aria-label={number ? `Caption for image ${number}` : "Caption"}
       placeholder="Add a caption (optional)"
       maxLength={300}
       tabIndex={tabIndex}
@@ -320,6 +369,7 @@ function AltField({
     <TextInput
       ref={inputRef}
       id={id}
+      data-alt-field=""
       size="lg"
       maxLength={300}
       placeholder="e.g. Soldered ESP32 board on a breadboard"

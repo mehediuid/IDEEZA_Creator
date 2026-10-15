@@ -7,13 +7,24 @@
 
 import * as React from "react";
 import { useEditorState, type Editor } from "@tiptap/react";
-import { Link01Icon, QuoteDownIcon, TextBoldIcon } from "@hugeicons/core-free-icons";
+import {
+  Heading02Icon,
+  Heading03Icon,
+  LeftToRightListBulletIcon,
+  LeftToRightListNumberIcon,
+  Link01Icon,
+  QuoteDownIcon,
+  SourceCodeIcon,
+  TextBoldIcon,
+} from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, IconButton, TextInput, Tooltip } from "@/components/ideeza";
 import { cn } from "@/lib/utils";
-import { linkFromInput } from "./editor-logic";
+import { isApple, keyLabel, linkFromInput } from "./editor-logic";
 
-export type FormatId = "bold" | "link" | "h2" | "h3" | "quote";
+export type FormatId = "bold" | "link" | "h2" | "h3" | "quote" | "bullet" | "ordered" | "code";
+
+const NONE: Record<FormatId, boolean> = { bold: false, link: false, h2: false, h3: false, quote: false, bullet: false, ordered: false, code: false };
 
 export function useFormatState(editor: Editor): Record<FormatId, boolean> {
   return (
@@ -25,8 +36,11 @@ export function useFormatState(editor: Editor): Record<FormatId, boolean> {
         h2: e.isActive("heading", { level: 2 }),
         h3: e.isActive("heading", { level: 3 }),
         quote: e.isActive("blockquote"),
+        bullet: e.isActive("bulletList"),
+        ordered: e.isActive("orderedList"),
+        code: e.isActive("codeBlock"),
       }),
-    }) ?? { bold: false, link: false, h2: false, h3: false, quote: false }
+    }) ?? NONE
   );
 }
 
@@ -35,8 +49,20 @@ export function toggleFormat(editor: Editor, id: Exclude<FormatId, "link">): voi
   if (id === "bold") c.toggleBold().run();
   else if (id === "h2") c.toggleHeading({ level: 2 }).run();
   else if (id === "h3") c.toggleHeading({ level: 3 }).run();
+  else if (id === "bullet") c.toggleBulletList().run();
+  else if (id === "ordered") c.toggleOrderedList().run();
+  else if (id === "code") c.toggleCodeBlock().run();
   else if (editor.isActive("blockquote")) c.unsetBlockquote().run();
   else c.setParagraph().setBlockquote().run();
+}
+
+/** Whether the shortcuts are shown with ⌘ (Apple) or Ctrl (anything else). */
+export function useApple(): boolean {
+  return React.useSyncExternalStore(
+    () => () => {},
+    () => isApple(navigator.platform || navigator.userAgent),
+    () => true,
+  );
 }
 
 /** Before the link field opens: a caret inside a link takes the whole link. */
@@ -44,12 +70,15 @@ export function prepareLink(editor: Editor): void {
   if (editor.state.selection.empty && editor.isActive("link")) editor.chain().extendMarkRange("link").run();
 }
 
-export const FORMAT_META: Record<FormatId, { label: string; keys?: string; aria?: string; icon: React.ReactNode }> = {
-  bold: { label: "Bold", keys: "⌘B", aria: "Meta+B", icon: <Icon icon={TextBoldIcon} size={16} /> },
-  link: { label: "Link", keys: "⌘K", aria: "Meta+K", icon: <Icon icon={Link01Icon} size={16} /> },
-  h2: { label: "Heading", icon: <span className="text-sm font-bold leading-xs">H2</span> },
-  h3: { label: "Subheading", icon: <span className="text-sm font-bold leading-xs">H3</span> },
-  quote: { label: "Quote", icon: <Icon icon={QuoteDownIcon} size={16} /> },
+export const FORMAT_META: Record<FormatId, { label: string; keys?: string; icon: React.ReactNode }> = {
+  bold: { label: "Bold", keys: "Mod-B", icon: <Icon icon={TextBoldIcon} size={16} /> },
+  link: { label: "Link", keys: "Mod-K", icon: <Icon icon={Link01Icon} size={16} /> },
+  h2: { label: "Heading", keys: "Mod-Alt-2", icon: <Icon icon={Heading02Icon} size={16} /> },
+  h3: { label: "Subheading", keys: "Mod-Alt-3", icon: <Icon icon={Heading03Icon} size={16} /> },
+  quote: { label: "Quote", keys: "Mod-Shift-B", icon: <Icon icon={QuoteDownIcon} size={16} /> },
+  bullet: { label: "Bulleted list", keys: "Mod-Shift-8", icon: <Icon icon={LeftToRightListBulletIcon} size={16} /> },
+  ordered: { label: "Numbered list", keys: "Mod-Shift-7", icon: <Icon icon={LeftToRightListNumberIcon} size={16} /> },
+  code: { label: "Code", keys: "Mod-Alt-C", icon: <Icon icon={SourceCodeIcon} size={16} /> },
 };
 
 /** One format button: ghost, 32 on a mouse (44 on touch), pressed when the format is on. */
@@ -67,6 +96,8 @@ export function FormatButton({
   tabIndex?: number;
 }) {
   const m = FORMAT_META[id];
+  const apple = useApple();
+  const keys = m.keys ? keyLabel(m.keys, apple) : null;
   return (
     <span className="group relative inline-flex">
       <IconButton
@@ -76,7 +107,7 @@ export function FormatButton({
         size={touch ? "xl" : "sm"}
         aria-label={m.label}
         aria-pressed={on}
-        aria-keyshortcuts={m.aria}
+        aria-keyshortcuts={keys?.aria}
         tabIndex={tabIndex}
         // Keeps the caret (and the phone's keyboard) where it is.
         onMouseDown={(e) => e.preventDefault()}
@@ -86,7 +117,7 @@ export function FormatButton({
       />
       {!touch && (
         <Tooltip
-          label={m.keys ? `${m.label} · ${m.keys}` : m.label}
+          label={keys ? `${m.label} · ${keys.show}` : m.label}
           className="absolute bottom-full left-1/2 z-popover mb-2 hidden -translate-x-1/2 group-hover:flex group-has-[:focus-visible]:flex"
         />
       )}

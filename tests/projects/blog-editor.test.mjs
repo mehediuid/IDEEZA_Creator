@@ -31,6 +31,7 @@ import {
   LINK_REFUSED,
 } from "../../.tmp-test/components/blog/editor/editor-logic.js";
 import { EMPTY_DOC, EMPTY_META, TITLE_MAX } from "../../.tmp-test/lib/blog/types.js";
+import { reasonInfo } from "../../.tmp-test/lib/blog/reasons.js";
 import {
   normalizeDoc,
   alignOf,
@@ -54,10 +55,11 @@ test("the save line says what happened to the writing: Saving…, then the Figma
   assert.equal(saveLine({ kind: "pending" }), "Saving…");
   assert.equal(saveLine({ kind: "saved", at }), "Drafted");
   assert.equal(DRAFTED_LINE, "Drafted");
+  // A failure says what it means (F01): the words are only in this tab.
   assert.equal(saveLine({ kind: "failed" }), FAILED_LINE);
-  assert.equal(FAILED_LINE, "Couldn't save. Your text is kept on this device.");
-  assert.equal(saveLine({ kind: "offline" }), OFFLINE_LINE);
-  assert.equal(OFFLINE_LINE, "You're offline. Changes save when you're back.");
+  assert.equal(FAILED_LINE, "Couldn't save. Your latest words are only in this tab, so keep it open.");
+  // Offline is a fact, not a save state (F02): saving goes on in this browser.
+  assert.equal(OFFLINE_LINE, "You're offline. Your words are saved in this browser.");
   assert.equal(saveLine({ kind: "conflict" }), "Not saved: this blog changed in another tab.");
 });
 
@@ -164,10 +166,12 @@ test("the What to change panel counts the changes and says how to fix each", () 
   };
   const lines = fixLines(round);
   assert.equal(lines.length, 3);
-  assert.deepEqual(lines[0], { id: "needs-detail:0", title: "Needs more detail.", text: "Write at least 150 words; you have 92." });
-  assert.equal(lines[1].title, "Hard to follow.");
-  assert.equal(lines[1].text, "Split it into short sections, each with its own heading.");
-  assert.equal(lines[2].title, "Needs changes.");
+  // Each line says what was found and how to fix it (F18); the titles are reasons.ts's own.
+  assert.deepEqual(lines[0], { id: "needs-detail:0", title: reasonInfo("needs-detail").title, found: "Write at least 150 words; you have 92.", fix: reasonInfo("needs-detail").fix });
+  assert.equal(lines[1].title, reasonInfo("hard-to-follow").title);
+  assert.equal(lines[1].found, "");
+  assert.equal(lines[1].fix, reasonInfo("hard-to-follow").fix);
+  assert.equal(lines[2].title, reasonInfo("made-up").title, "an unknown reason takes the fallback");
 });
 
 test("the leave guard holds back in-app pages only", () => {
@@ -189,7 +193,7 @@ test("the + toolbar is the Figma's (frame 13), in its order, then what a blog ne
       "2 columns",
       "3 columns",
       "Align left",
-      "Center",
+      "Align center",
       "Align right",
       "Justify",
       "Bulleted list",
@@ -210,9 +214,10 @@ test("the + toolbar is the Figma's (frame 13), in its order, then what a blog ne
     ["video", "code", "quote", "divider", "row", "project"],
   );
   assert.equal(NOT_IN_COLUMNS, "Not inside columns");
+  // Every tool with a shortcut says it (F34), in TipTap's own form.
   assert.deepEqual(
-    TOOLS.filter((t) => t.keys).map((t) => t.keys.show),
-    ["⌘⇧L", "⌘⇧E", "⌘⇧R", "⌘⇧J"],
+    TOOLS.filter((t) => t.keys).map((t) => `${t.id} ${t.keys}`),
+    ["left Mod-Shift-L", "center Mod-Shift-E", "right Mod-Shift-R", "justify Mod-Shift-J", "bullet Mod-Shift-8", "ordered Mod-Shift-7", "code Mod-Alt-C", "heading Mod-Alt-2", "subheading Mod-Alt-3", "quote Mod-Shift-B"],
   );
 });
 

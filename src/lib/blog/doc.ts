@@ -148,7 +148,9 @@ function block(n: Record<string, unknown>, depth: number): BlogNode | null {
     }
     case "codeBlock": {
       const content = plain(n.content);
-      return content.length ? { type: "codeBlock", content } : { type: "codeBlock" };
+      const language = isObj(n.attrs) ? codeLanguage(n.attrs.language) : "";
+      const code: BlogNode = language ? { type: "codeBlock", attrs: { language } } : { type: "codeBlock" };
+      return content.length ? { ...code, content } : code;
     }
     case "horizontalRule":
       return { type: "horizontalRule" };
@@ -169,7 +171,11 @@ function block(n: Record<string, unknown>, depth: number): BlogNode | null {
     case "video": {
       if (!isObj(n.attrs)) return null;
       const fileKey = str(n.attrs.fileKey, 200);
-      return fileKey ? { type: "video", attrs: { fileKey, caption: str(n.attrs.caption, 300) } } : null;
+      if (!fileKey) return null;
+      const width = num(n.attrs.width);
+      const height = num(n.attrs.height);
+      const size = width && height ? { width, height } : {};
+      return { type: "video", attrs: { fileKey, caption: str(n.attrs.caption, 300), ...size } };
     }
     case "projectCard": {
       const projectId = isObj(n.attrs) ? str(n.attrs.projectId, 200) : "";
@@ -210,10 +216,24 @@ export function readingBlocks(doc: BlogDoc): BlogNode[] {
   return out;
 }
 
-/** Any value → a valid BlogDoc. Unknown nodes and marks are dropped, never kept. */
+/** A code block's language as a paste named it: a short lowercase word, or nothing. */
+function codeLanguage(v: unknown): string {
+  const s = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return /^[a-z0-9+#._-]{1,24}$/.test(s) ? s : "";
+}
+
+/** An empty line: a paragraph with no words (its alignment, if any, says nothing). */
+const blankLine = (n: BlogNode) => n.type === "paragraph" && !n.content?.length;
+
+/** Any value → a valid BlogDoc. Unknown nodes and marks are dropped, never kept. Empty lines
+ *  at the very end are dropped too: the editor always keeps one there for the caret, and it is
+ *  not part of the blog, so a body saved after Enter is the same body (one rule for "is it
+ *  saved" and "is it changed", wherever the two are compared). */
 export function normalizeDoc(v: unknown): BlogDoc {
   if (!isObj(v) || v.type !== "doc") return EMPTY_DOC;
-  return { type: "doc", content: blocks(v.content, 0) };
+  const content = blocks(v.content, 0);
+  while (content.length && blankLine(content[content.length - 1])) content.pop();
+  return { type: "doc", content };
 }
 
 function each(nodes: readonly BlogNode[] | undefined, fn: (n: BlogNode) => void): void {
@@ -246,7 +266,10 @@ export function blockTexts(doc: BlogDoc): string[] {
   return out;
 }
 
-const WORD = /[\p{L}\p{N}][\p{L}\p{N}'’_-]*/gu;
+/** A word starts with a letter or a digit and runs on through letters, combining marks (the
+ *  vowel signs of Bangla and Hindi are marks: without them one word counted as two or three),
+ *  digits, apostrophes, underscores and hyphens. */
+const WORD = /[\p{L}\p{N}][\p{L}\p{M}\p{N}'’_-]*/gu;
 
 export function wordCount(doc: BlogDoc): number {
   let words = 0;
@@ -336,9 +359,32 @@ export function isEmptyDoc(doc: BlogDoc): boolean {
   return empty;
 }
 
+/** What a body says, as one string: equal strings, the same blog. The one rule the editor's
+ *  autosave, Publish's "is the latest saved" and "Unsent changes" all use. */
+export function docKey(doc: BlogDoc): string {
+  return JSON.stringify(normalizeDoc(doc));
+}
+
 /** Whether two bodies say the same thing (used for "Unsent changes"). */
 export function sameDoc(a: BlogDoc, b: BlogDoc): boolean {
-  return JSON.stringify(normalizeDoc(a)) === JSON.stringify(normalizeDoc(b));
+  return docKey(a) === docKey(b);
+}
+
+/** Scripts that need their own language for hyphenation and the reader's voice. */
+const SCRIPTS: readonly { lang: string; re: RegExp }[] = [
+  { lang: "bn", re: /\p{Script=Bengali}/gu },
+  { lang: "hi", re: /\p{Script=Devanagari}/gu },
+];
+
+/** The body's language when most of its letters are in another script than Latin (Bangla,
+ *  Hindi), so the page can say so (`lang`) and break words the right way; otherwise null and
+ *  the page's own language stands. */
+export function docLang(doc: BlogDoc): string | null {
+  const text = blockTexts(doc).join(" ");
+  const letters = (text.match(/\p{L}/gu) ?? []).length;
+  if (!letters) return null;
+  for (const s of SCRIPTS) if ((text.match(s.re) ?? []).length * 2 > letters) return s.lang;
+  return null;
 }
 
 /** Every link in the body. */

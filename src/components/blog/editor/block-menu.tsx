@@ -1,19 +1,26 @@
 "use client";
 
-// Adding to the blog (Figma frame 13, E6). On a mouse, the "+" beside an empty
-// line opens the Figma's toolbar in its place: ✕ close · Image · Video | 1, 2,
-// 3 columns | Align left, Center, Align right, Justify | Bulleted list, Numbered
-// list | Code, then what a blog needs that the Figma lacks: Heading, Subheading,
-// Quote, Divider, Images side by side, IDEEZA project. "/" on an empty line opens
-// it too. Every tool is a DS IconButton with its name and a tooltip on hover and
-// on keyboard focus. Tab or ← → move along the row, Escape closes it. Inside
-// columns the tools a column can't hold are greyed, and say why.
+// Adding to the blog (Figma frame 13, E5–E6). On a mouse, the "+" beside an
+// empty line opens the Figma's toolbar in its place: ✕ close · Image · Video |
+// 1, 2, 3 columns | Align left, Align center, Align right, Justify | Bulleted
+// list, Numbered list | Code, then what a blog needs that the Figma lacks:
+// Heading, Subheading, Quote, Divider, Images side by side, IDEEZA project. On a
+// new blog the "+" stands at rest beside "Start your story here…" in the drawn
+// gutter (frame 10), before the caret is anywhere. "/" on an empty line opens the
+// toolbar too, and a letter typed then closes it and types "/" and the letter.
+// Every tool is a DS IconButton (md, 36) with its name and its keys — ⌘ on a Mac,
+// Ctrl elsewhere — in a tooltip on hover and on keyboard focus; tools that set
+// the kind of line (lists, headings, code, quote) show when they're on. The
+// toolbar is one Tab stop: ← → Home End move along it, Escape closes it. It opens
+// as a popover over the caret's own column. Inside columns the tools a column
+// can't hold are greyed, and say why.
 //
 // On a phone the format bar's labelled "Add" opens the same tools, named, in a
 // bottom sheet — a floating "+" fights the phone's own selection handles there.
 
 import * as React from "react";
 import { useEditorState, type Editor } from "@tiptap/react";
+import { TextSelection } from "@tiptap/pm/state";
 import {
   Add01Icon,
   Cancel01Icon,
@@ -39,7 +46,8 @@ import {
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { IconButton, ModalFrame, Tooltip } from "@/components/ideeza";
 import { cn } from "@/lib/utils";
-import { ALIGN_OF, COLUMNS_OF, NOT_IN_COLUMNS, TOOLS, toolPressed, type Tool, type ToolGroup, type ToolId } from "./editor-logic";
+import { ALIGN_OF, COLUMNS_OF, keyLabel, NOT_IN_COLUMNS, TOOLS, toolPressed, type Tool, type ToolGroup, type ToolId } from "./editor-logic";
+import { useApple, rovingKeys } from "./format";
 import { caretAt, onEmptyLine, setAlign, setColumns, type CaretAt } from "./layout";
 
 const ICONS: Record<ToolId, IconValue> = {
@@ -108,7 +116,7 @@ export function runTool(editor: Editor, id: ToolId, pick: (what: ToolPick) => vo
   }
 }
 
-const NO_CARET: CaretAt = { align: "left", columns: 1, inColumns: false };
+const NO_CARET: CaretAt = { align: "left", columns: 1, inColumns: false, blocks: [] };
 
 /** Where the caret is, kept current as it moves. */
 export function useCaretAt(editor: Editor): CaretAt {
@@ -118,21 +126,9 @@ export function useCaretAt(editor: Editor): CaretAt {
 const GROUP_ORDER: readonly ToolGroup[] = ["media", "columns", "align", "lists", "code", "blocks"];
 const BY_GROUP = GROUP_ORDER.map((g) => TOOLS.filter((t) => t.group === g));
 
-const tipOf = (tool: Tool, off: boolean) => (off ? `${tool.label} · ${NOT_IN_COLUMNS}` : tool.keys ? `${tool.label} · ${tool.keys.show}` : tool.label);
-
-/** ← → Home End along a row of [data-tool] buttons; every button stays a Tab stop too. */
-function arrowKeys(e: React.KeyboardEvent<HTMLElement>): void {
-  const tools = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("[data-tool]"));
-  const at = tools.indexOf(document.activeElement as HTMLElement);
-  if (at < 0) return;
-  const go = (i: number) => {
-    e.preventDefault();
-    tools[(i + tools.length) % tools.length].focus();
-  };
-  if (e.key === "ArrowRight") go(at + 1);
-  else if (e.key === "ArrowLeft") go(at - 1);
-  else if (e.key === "Home") go(0);
-  else if (e.key === "End") go(tools.length - 1);
+function tipOf(tool: Tool, off: boolean, apple: boolean): string {
+  if (off) return `${tool.label} · ${NOT_IN_COLUMNS}`;
+  return tool.keys ? `${tool.label} · ${keyLabel(tool.keys, apple).show}` : tool.label;
 }
 
 /** A button with its tooltip above it, shown on hover and on keyboard focus. */
@@ -145,26 +141,29 @@ function WithTip({ tip, className, style, children }: { tip: string; className?:
   );
 }
 
-function ToolButton({ tool, at, onPick }: { tool: Tool; at: CaretAt; onPick: (id: ToolId) => void }) {
+function ToolButton({ tool, at, first, onPick }: { tool: Tool; at: CaretAt; first: boolean; onPick: (id: ToolId) => void }) {
+  const apple = useApple();
   const off = toolOff(tool, at);
   const pressed = toolPressed(tool.id, at);
   return (
-    <WithTip tip={tipOf(tool, off)}>
+    <WithTip tip={tipOf(tool, off, apple)}>
       <IconButton
         type="button"
         data-tool=""
         hierarchy="ghost"
-        size="sm"
+        size="md"
+        // One Tab stop for the whole toolbar; the arrows move along it.
+        tabIndex={first ? 0 : -1}
         aria-label={off ? `${tool.label} (${NOT_IN_COLUMNS.toLowerCase()})` : tool.label}
         aria-pressed={pressed}
         aria-disabled={off || undefined}
-        aria-keyshortcuts={tool.keys?.aria}
+        aria-keyshortcuts={tool.keys ? keyLabel(tool.keys, apple).aria : undefined}
         // Keeps the caret where it is: the tool acts on that line.
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
           if (!off) onPick(tool.id);
         }}
-        icon={<Icon icon={ICONS[tool.id]} size={16} />}
+        icon={<Icon icon={ICONS[tool.id]} size={20} />}
         className={cn(
           pressed && "bg-bg-brand-subtle text-text-brand hover:bg-bg-brand-subtle",
           off && "cursor-not-allowed text-[color:var(--color-button-disabled-text)] hover:bg-transparent",
@@ -173,6 +172,8 @@ function ToolButton({ tool, at, onPick }: { tool: Tool; at: CaretAt; onPick: (id
     </WithTip>
   );
 }
+
+type Spot = { top: number; left: number };
 
 /** The "+" beside an empty line; it opens the toolbar in the line's place. "/" opens it too. */
 export function BlockInserter({
@@ -189,8 +190,10 @@ export function BlockInserter({
   const barRef = React.useRef<HTMLDivElement>(null);
   const barId = React.useId();
   const at = useCaretAt(editor);
-  const [top, setTop] = React.useState<number | null>(null);
+  const [spot, setSpot] = React.useState<Spot | null>(null);
   const [onLine, setOnLine] = React.useState(false);
+  // A blog with nothing in it shows the "+" at rest beside its first line (Figma frame 10).
+  const [empty, setEmpty] = React.useState(() => editor.isEmpty);
   const [within, setWithin] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   // "/" opened it: Escape leaves the "/" typed, as if the toolbar never came.
@@ -200,28 +203,40 @@ export function BlockInserter({
   React.useEffect(() => {
     const update = () => {
       if (editor.isDestroyed) return;
-      const show = editor.isEditable && editor.view.hasFocus() && onEmptyLine(editor);
+      const isEmpty = editor.isEmpty;
+      setEmpty(isEmpty);
+      const focused = editor.view.hasFocus();
+      const show = editor.isEditable && focused && onEmptyLine(editor);
       setOnLine(show);
-      if (!show) {
+      if (!show && !(isEmpty && !focused)) {
         // The caret moved on (typing, a click elsewhere in the blog): the toolbar goes too.
-        if (editor.view.hasFocus()) setOpen(false);
+        if (focused) setOpen(false);
         return;
       }
-      const box = boxRef.current?.parentElement?.getBoundingClientRect();
-      const caret = editor.view.coordsAtPos(editor.state.selection.from);
-      if (box) setTop((caret.top + caret.bottom) / 2 - box.top);
+      const host = boxRef.current?.parentElement;
+      const box = host?.getBoundingClientRect();
+      if (!box) return;
+      // The line itself: the caret's line, or the first line of an empty blog.
+      const pos = show ? editor.state.selection.from : 1;
+      const caret = editor.view.coordsAtPos(Math.min(pos, editor.state.doc.content.size));
+      // The column the line stands in (a column of 2 or 3, or the whole body).
+      const dom = editor.view.domAtPos(pos).node;
+      const el = (dom instanceof HTMLElement ? dom : dom.parentElement)?.closest("[data-column]") ?? editor.view.dom;
+      setSpot({ top: (caret.top + caret.bottom) / 2 - box.top, left: el.getBoundingClientRect().left - box.left });
     };
     const later = () => window.setTimeout(update, 0);
     editor.on("selectionUpdate", update);
     editor.on("update", update);
     editor.on("focus", update);
     editor.on("blur", later);
+    window.addEventListener("resize", update);
     update();
     return () => {
       editor.off("selectionUpdate", update);
       editor.off("update", update);
       editor.off("focus", update);
       editor.off("blur", later);
+      window.removeEventListener("resize", update);
     };
   }, [editor]);
 
@@ -242,23 +257,37 @@ export function BlockInserter({
     barRef.current?.querySelector<HTMLElement>("[data-tool]")?.focus();
   }, [open]);
 
-  /** Closes the toolbar. `back`: the caret returns to the line (with the "/" when "/" opened it). */
-  const close = (back: boolean) => {
+  /** Closes the toolbar. `back`: the caret returns to the line (with the "/" when "/" opened it,
+   *  and `typed` after it when a letter closed it). */
+  const close = (back: boolean, typed = "") => {
     const slash = fromSlash.current;
     fromSlash.current = false;
     setOpen(false);
+    setWithin(false);
     if (!back) return;
-    if (slash) editor.chain().focus().insertContent("/").run();
+    if (slash) editor.chain().focus().insertContent(`/${typed}`).run();
     else editor.commands.focus();
   };
 
   const pick = (id: ToolId) => {
     fromSlash.current = false;
     setOpen(false);
+    setWithin(false);
     onTool(id);
   };
 
-  const shown = onLine || within || open;
+  /** The "+" at rest on an empty blog: the caret goes to the first line, and the toolbar opens. */
+  const openHere = () => {
+    if (!onLine) {
+      const { state, view } = editor;
+      view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, 1)));
+      view.focus();
+    }
+    focusFirst.current = true;
+    setOpen(true);
+  };
+
+  const shown = editor.isEditable && (onLine || within || open || empty);
 
   return (
     <div
@@ -267,7 +296,7 @@ export function BlockInserter({
       onBlur={(e) => {
         if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
         setWithin(false);
-        // Focus went elsewhere (Tab past the last tool, a click away): the toolbar closes.
+        // Focus went elsewhere (Tab past the toolbar, a click away): the toolbar closes.
         if (open) close(false);
       }}
       onKeyDown={(e) => {
@@ -278,27 +307,35 @@ export function BlockInserter({
           else editor.commands.focus();
           return;
         }
-        if (open) arrowKeys(e);
+        // Opened by "/": a letter means the writer was typing, not choosing.
+        if (open && fromSlash.current && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && e.key !== " ") {
+          e.preventDefault();
+          close(true, e.key);
+        }
       }}
     >
       <WithTip
         tip={open ? "Close" : "Add image, columns, list…"}
-        // Data, not a design value: the empty line's own height in the blog.
-        style={top === null ? undefined : { top }}
-        className={cn("absolute right-full mr-6 -translate-y-1/2", shown ? "visible" : "invisible")}
+        // Data, not a design value: the line's own place in the blog.
+        style={spot === null ? undefined : { top: spot.top, left: spot.left }}
+        className={cn("absolute -ml-6 -translate-x-full -translate-y-1/2", shown ? "visible" : "invisible")}
       >
         <IconButton
           type="button"
-          data-tool=""
           hierarchy="secondary"
-          size="sm"
-          aria-label={open ? "Close" : "Add"}
+          size="md"
+          aria-label={open ? "Close" : "Add to your blog"}
           aria-expanded={open}
           aria-controls={open ? barId : undefined}
-          icon={<Icon icon={open ? Cancel01Icon : Add01Icon} size={16} />}
-          onClick={() => (open ? close(true) : setOpen(true))}
+          aria-keyshortcuts="/"
+          icon={<Icon icon={open ? Cancel01Icon : Add01Icon} size={20} />}
+          onMouseDown={(e) => {
+            // The caret stays on its line while the toolbar opens beside it.
+            if (onLine) e.preventDefault();
+          }}
+          onClick={() => (open ? close(true) : openHere())}
           // The reset drops a button's border style; the secondary edge needs it named.
-          className="border-solid"
+          className="border-solid border-border-brand bg-bg-brand-subtle text-text-brand hover:bg-bg-brand-subtle"
         />
       </WithTip>
       {open && (
@@ -307,16 +344,17 @@ export function BlockInserter({
           id={barId}
           role="toolbar"
           aria-label="Add to your blog"
-          // Data, not a design value: the empty line's own height in the blog.
-          style={top === null ? undefined : { top }}
-          // Its first row sits on the line (half a 32 px button up); a narrow page wraps it downward.
-          className="absolute left-0 z-popover -mt-8 flex max-w-full flex-wrap items-center gap-1 rounded-lg bg-bg-surface"
+          onKeyDown={rovingKeys}
+          // Data, not a design value: the line's own place in the blog.
+          style={spot === null ? undefined : { top: spot.top, left: spot.left }}
+          // A popover over the line, in the line's column; a narrow page wraps it downward.
+          className="absolute z-popover -mt-10 flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-solid border-border bg-bg-surface p-1 shadow-3"
         >
           {BY_GROUP.map((tools, i) => (
             <React.Fragment key={GROUP_ORDER[i]}>
-              {i > 0 && <span aria-hidden className="mx-2 h-[20px] w-px shrink-0 bg-border-subtle" />}
-              {tools.map((t) => (
-                <ToolButton key={t.id} tool={t} at={at} onPick={pick} />
+              {i > 0 && <span aria-hidden className="mx-2 h-10 w-px shrink-0 bg-border-subtle" />}
+              {tools.map((t, j) => (
+                <ToolButton key={t.id} tool={t} at={at} first={i === 0 && j === 0} onPick={pick} />
               ))}
             </React.Fragment>
           ))}
@@ -338,7 +376,7 @@ const SECTIONS: readonly { label: string; groups: readonly ToolGroup[] }[] = [
 export function BlockSheet({ open, onClose, onTool, at }: { open: boolean; onClose: () => void; onTool: (id: ToolId) => void; at: CaretAt }) {
   const ids = React.useId();
   return (
-    <ModalFrame open={open} onClose={onClose} title="Add" size="sm" sheet bodyClassName="px-4 pb-8">
+    <ModalFrame open={open} onClose={onClose} title="Add to your blog" size="sm" sheet bodyClassName="px-4 pb-8">
       <div className="flex flex-col gap-6">
         {SECTIONS.map((s, si) => (
           <section key={s.label} aria-labelledby={`${ids}-${si}`} className="flex flex-col gap-2">
@@ -364,7 +402,7 @@ export function BlockSheet({ open, onClose, onTool, at }: { open: boolean; onClo
                         off && "cursor-not-allowed text-[color:var(--color-button-disabled-text)] hover:bg-transparent",
                       )}
                     >
-                      <span aria-hidden className="inline-flex size-[20px] shrink-0 items-center justify-center">
+                      <span aria-hidden className="inline-flex size-10 shrink-0 items-center justify-center">
                         <Icon icon={ICONS[t.id]} size={20} />
                       </span>
                       <span className="flex min-w-0 flex-col">

@@ -11,32 +11,48 @@ import { useBlogFileUrl } from "@/lib/blog/files";
 import type { BlogCover } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
 
-/** A stored image. While it loads, and if it is gone, the box keeps its size. */
+/** A stored image. While it loads, and if it is gone, the box keeps its size; a gone one says
+ *  so in words too, not only to screen readers. `loading`: "lazy" for images below the first
+ *  (decoded only as they come into view); `thumb`: the small stored copy, for small places. */
 export function BlogImage({
   fileKey,
   alt,
   className,
   style,
+  loading = "eager",
+  thumb = false,
 }: {
   fileKey: string;
   alt: string;
   className?: string;
   style?: React.CSSProperties;
+  loading?: "eager" | "lazy";
+  thumb?: boolean;
 }) {
-  const { url, missing } = useBlogFileUrl(fileKey);
+  const { url, missing } = useBlogFileUrl(fileKey, { thumb });
   if (!url) {
     return (
       <span
         role={missing ? "img" : undefined}
         aria-label={missing ? "This image is no longer in this browser" : undefined}
-        className={cn("flex items-center justify-center bg-bg-subtle text-[color:var(--color-icon-secondary)]", className)}
+        className={cn("flex flex-col items-center justify-center gap-2 bg-bg-subtle px-4 text-center text-[color:var(--color-icon-secondary)]", className)}
+        style={style}
       >
-        {missing && <Icon icon={Image01Icon} size={20} />}
+        {missing && (
+          <>
+            <Icon icon={Image01Icon} size={20} />
+            {!thumb && (
+              <span aria-hidden className="text-sm leading-sm text-text-secondary">
+                This image is no longer in this browser.
+              </span>
+            )}
+          </>
+        )}
       </span>
     );
   }
   // eslint-disable-next-line @next/next/no-img-element -- a blob: URL from IndexedDB; next/image can't load it
-  return <img src={url} alt={alt} className={className} style={style} draggable={false} />;
+  return <img src={url} alt={alt} className={className} style={style} loading={loading} decoding="async" draggable={false} />;
 }
 
 /** The 3:2 cover frame. No cover: a quiet placeholder of the same size. */

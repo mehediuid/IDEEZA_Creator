@@ -9,6 +9,7 @@ import type { Editor } from "@tiptap/core";
 import { Fragment, type Node as PMNode, type ResolvedPos } from "@tiptap/pm/model";
 import { Selection, type EditorState } from "@tiptap/pm/state";
 import type { BlogAlign } from "@/lib/blog/types";
+import type { CaretBlock } from "./editor-logic";
 
 /** What a column may hold (BlogDoc's rule, lib/blog/doc.ts). */
 const IN_COLUMN = new Set(["paragraph", "heading", "bulletList", "orderedList", "image"]);
@@ -33,15 +34,25 @@ export function onEmptyLine(editor: Editor): boolean {
   return $a.depth === 1 || $a.node($a.depth - 1).type.name === "column";
 }
 
-export type CaretAt = { align: BlogAlign; columns: 1 | 2 | 3; inColumns: boolean };
+export type CaretAt = { align: BlogAlign; columns: 1 | 2 | 3; inColumns: boolean; blocks: CaretBlock[] };
 
-/** Where the caret is, for the toolbar: its line's alignment and the columns around it. */
+/** Where the caret is, for the toolbar: its line's alignment, the columns around it, and the
+ *  kinds of block it stands in (a heading, a list, code, a quote). */
 export function caretAt(state: EditorState): CaretAt {
   const $from = state.selection.$from;
   const parent = $from.parent;
   const align = parent.type.name === "paragraph" || parent.type.name === "heading" ? ((parent.attrs.align as BlogAlign | null) ?? "left") : "left";
   const d = columnsDepth($from);
-  return { align, columns: d < 0 ? 1 : ($from.node(d).childCount as 2 | 3), inColumns: d >= 0 };
+  const blocks: CaretBlock[] = [];
+  for (let i = $from.depth; i > 0; i--) {
+    const n = $from.node(i);
+    if (n.type.name === "heading") blocks.push(n.attrs.level === 3 ? "subheading" : "heading");
+    else if (n.type.name === "bulletList") blocks.push("bullet");
+    else if (n.type.name === "orderedList") blocks.push("ordered");
+    else if (n.type.name === "codeBlock") blocks.push("code");
+    else if (n.type.name === "blockquote") blocks.push("quote");
+  }
+  return { align, columns: d < 0 ? 1 : ($from.node(d).childCount as 2 | 3), inColumns: d >= 0, blocks };
 }
 
 /** Aligns the line the caret is in, or every line in the selection. Left is no alignment. */
