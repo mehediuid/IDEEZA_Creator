@@ -93,10 +93,18 @@ export function idFromUrl(url: string): string | null {
 
 // ─────────────────────────────── disk ────────────────────────────────
 
+// The folder is only known at run time, so each file call carries
+// `turbopackIgnore`: without it the build's file tracer reads these paths as
+// "any file in the project" and traces the whole repository into the route
+// (Turbopack's "overly broad pattern" / "unexpected file in NFT list").
 function dir(): string {
-  return (
-    process.env.IDEEZA_IMAGE_DIR?.trim() ||
-    path.join(process.cwd(), ".ideeza", "concept-images")
+  // Both branches pass through a marked join, and each file call marks both
+  // its own argument and the join inside it: the comment covers only the
+  // expression it sits on, and the tracer follows dir() into each call (a
+  // build with fewer of them still traced 1,292 files into the image route).
+  return path.join(
+    /* turbopackIgnore: true */ process.env.IDEEZA_IMAGE_DIR?.trim() ||
+      path.join(/* turbopackIgnore: true */ process.cwd(), ".ideeza", "concept-images"),
   );
 }
 
@@ -107,15 +115,15 @@ async function diskPut(
   record: ImageMeta,
 ): Promise<void> {
   const base = dir();
-  await mkdir(base, { recursive: true });
-  await writeFile(path.join(base, `${id}.${extFor(contentType)}`), bytes);
-  await writeFile(path.join(base, `${id}.json`), JSON.stringify(record), "utf8");
+  await mkdir(/* turbopackIgnore: true */ base, { recursive: true });
+  await writeFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ base, `${id}.${extFor(contentType)}`), bytes);
+  await writeFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ base, `${id}.json`), JSON.stringify(record), "utf8");
 }
 
 async function diskRecord(id: string): Promise<Partial<ImageMeta> | null> {
   try {
     return JSON.parse(
-      await readFile(path.join(dir(), `${id}.json`), "utf8"),
+      await readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ dir(), `${id}.json`), "utf8"),
     ) as Partial<ImageMeta>;
   } catch {
     return null;
@@ -127,7 +135,7 @@ async function diskRead(
   contentType: string,
 ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
   try {
-    const bytes = await readFile(path.join(dir(), `${id}.${extFor(contentType)}`));
+    const bytes = await readFile(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ dir(), `${id}.${extFor(contentType)}`));
     return { bytes: new Uint8Array(bytes), contentType };
   } catch {
     return null;

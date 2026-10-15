@@ -34,9 +34,11 @@ const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "
 
 export const imageFileOf = (i: number, contentType: string) => `${i + 1}.${EXT[contentType] ?? "img"}`;
 
+// Run-time folders: `turbopackIgnore` keeps the build's file tracer from
+// reading path.join(process.cwd(), …) as the whole project (image-store.ts).
 function dir(id: string): string {
-  const base = process.env.IDEEZA_REPORT_DIR?.trim() || path.join(process.cwd(), ".ideeza", PREFIX);
-  return path.join(base, id);
+  const base = process.env.IDEEZA_REPORT_DIR?.trim() || path.join(/* turbopackIgnore: true */ process.cwd(), ".ideeza", PREFIX);
+  return path.join(/* turbopackIgnore: true */ base, id);
 }
 
 /** What makes two sends the same report. */
@@ -48,7 +50,7 @@ async function existing(id: string): Promise<StoredReport | null> {
   const auth = await blobAuth();
   const bytes = auth ? await blobGet(auth, `${PREFIX}/${id}/report.json`).catch(() => null) : null;
   try {
-    const text = bytes ? new TextDecoder().decode(bytes) : await readFile(path.join(dir(id), "report.json"), "utf8");
+    const text = bytes ? new TextDecoder().decode(bytes) : await readFile(path.join(/* turbopackIgnore: true */ dir(id), "report.json"), "utf8");
     return JSON.parse(text) as StoredReport;
   } catch {
     return null;
@@ -100,10 +102,10 @@ export async function saveReport(
   const folder = dir(report.id);
   await mkdir(folder, { recursive: true });
   for (let i = 0; i < images.length; i++) {
-    await writeFile(path.join(folder, report.images[i].file), images[i].bytes);
+    await writeFile(path.join(/* turbopackIgnore: true */ folder, report.images[i].file), images[i].bytes);
   }
   try {
-    await writeFile(path.join(folder, "report.json"), json, { encoding: "utf8", flag: "wx" });
+    await writeFile(path.join(/* turbopackIgnore: true */ folder, "report.json"), json, { encoding: "utf8", flag: "wx" });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "EEXIST") return (await settle(report)) ?? "already";
     throw err;
