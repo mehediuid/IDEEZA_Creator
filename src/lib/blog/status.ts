@@ -1,20 +1,24 @@
-// An article's status, worked out from its record (spec § Statuses) — never
-// stored, so it can't disagree with the review history. Five words a writer
-// learns once (Draft · In review · Needs changes · Live · Taken down), plus the
-// Featured badge and the "Changes in review" state of a live article.
+// A blog's status, worked out from its record (spec § Statuses) — never stored,
+// so it can't disagree with the review history. The writer reads only the
+// Figma's seven words (DISPLAY_LABEL, requirements L9) plus "published version"
+// for what readers see; `ArticleStatus` is the record's own shape underneath,
+// for the rules (what can be edited, which ⋯ rows apply). Relative imports only
+// (node:test loads this).
 
+import { thingsLine, uniqueReasons } from "./reasons";
 import type { BlogArticle, ReviewRound } from "./types";
 
 export type ArticleStatus = "draft" | "review" | "needs" | "live" | "changes" | "down";
 
 export type StatusTab = "all" | "drafts" | "review" | "needs" | "live";
 
+/** The list's legacy `tab` query (list.ts reads it); its ids never reach the screen. */
 export const STATUS_TABS: readonly { id: StatusTab; label: string }[] = [
   { id: "all", label: "All" },
   { id: "drafts", label: "Drafts" },
-  { id: "review", label: "In review" },
-  { id: "needs", label: "Needs changes" },
-  { id: "live", label: "Live" },
+  { id: "review", label: "Pending" },
+  { id: "needs", label: "Rejected" },
+  { id: "live", label: "Approved" },
 ];
 
 /** The latest review round, if any. */
@@ -28,35 +32,6 @@ export function statusOf(a: BlogArticle): ArticleStatus {
   if (a.submission) return "review";
   return lastReview(a)?.outcome === "changes" ? "needs" : "draft";
 }
-
-export const STATUS_LABEL: Readonly<Record<ArticleStatus, string>> = {
-  draft: "Draft",
-  review: "In review",
-  needs: "Needs changes",
-  live: "Live",
-  changes: "Live",
-  down: "Taken down",
-};
-
-/** The DS Badge colour for each status. Never the error badge (it fails contrast). */
-export const STATUS_TONE: Readonly<Record<ArticleStatus, "neutral" | "blue" | "warning" | "success">> = {
-  draft: "neutral",
-  review: "blue",
-  needs: "warning",
-  live: "success",
-  changes: "success",
-  down: "neutral",
-};
-
-/** One sentence that says what the status means for the writer. */
-export const STATUS_SENTENCE: Readonly<Record<ArticleStatus, string>> = {
-  draft: "Only you can see this.",
-  review: "The IDEEZA team is reading it. We'll let you know when it's live.",
-  needs: "The IDEEZA team asked for changes. See what to fix, then send it again.",
-  live: "Anyone can read it on the IDEEZA Blog.",
-  changes: "Readers still see the live version until your changes are checked.",
-  down: "The IDEEZA team took this off the Blog. Only you can see it.",
-};
 
 export function tabOf(s: ArticleStatus): Exclude<StatusTab, "all"> | null {
   if (s === "draft") return "drafts";
@@ -73,13 +48,31 @@ export function openReasons(a: BlogArticle): ReviewRound | null {
   return r;
 }
 
-/** A second line under a live article's badge, when there is something to say. */
-export function liveNote(a: BlogArticle, draftDiffers: boolean): "Update needs changes" | "Unsent changes" | null {
-  const s = statusOf(a);
-  if (s !== "live") return null;
+/** A live blog whose latest review sent its update back: readers keep the published version. */
+export function updateRejected(a: BlogArticle): boolean {
+  if (a.takenDown || !a.live || a.submission) return false;
   const r = lastReview(a);
-  if (r && r.outcome === "changes" && a.live && r.at > a.live.approvedAt) return "Update needs changes";
-  return draftDiffers ? "Unsent changes" : null;
+  return !!r && r.outcome === "changes" && r.at > a.live.approvedAt;
+}
+
+export type LiveNoteKind = "update-review" | "update-rejected" | "unsent";
+
+/** A second line under a live blog's badge, when there is something to say: its update waits
+ *  for review, its update was rejected (with the latest round's count), or it has changes
+ *  readers don't see yet. */
+export function liveNoteOf(a: BlogArticle, draftDiffers: boolean): { kind: LiveNoteKind; text: string } | null {
+  const s = statusOf(a);
+  if (s === "changes") return { kind: "update-review", text: "Update in review" };
+  if (s !== "live") return null;
+  if (updateRejected(a)) {
+    const n = uniqueReasons(lastReview(a)?.reasons ?? []).length;
+    return { kind: "update-rejected", text: n ? `Update rejected · ${thingsLine(n)}` : "Update rejected" };
+  }
+  return draftDiffers ? { kind: "unsent", text: "Unsent changes" } : null;
+}
+
+export function liveNote(a: BlogArticle, draftDiffers: boolean): string | null {
+  return liveNoteOf(a, draftDiffers)?.text ?? null;
 }
 
 export type ArticleAction = "view" | "quick-view" | "copy-link" | "change-cover" | "edit" | "take-offline" | "discard-changes" | "delete";
@@ -131,7 +124,7 @@ export function relative(t: number, now: number): string {
 /** The list's "Last change" cell, in the words of the status. */
 export function whenLine(a: BlogArticle, now: number): string {
   const s = statusOf(a);
-  if (s === "down" && a.takenDown) return `Taken down ${shortDate(a.takenDown.at)}`;
+  if (s === "down" && a.takenDown) return `Removed ${shortDate(a.takenDown.at)}`;
   if (s === "review" || s === "changes") return `Sent ${a.submission ? relative(a.submission.at, now) : ""}`.trim();
   if (s === "needs") {
     const r = lastReview(a);
@@ -162,15 +155,17 @@ export const DISPLAY_LABEL: Readonly<Record<DisplayStatus, string>> = {
   rejected: "Rejected",
 };
 
-/** One sentence for each, shown with the badge where there is room (tooltip, details). */
+/** One sentence for each, wherever the badge has room to explain itself (the list's tooltip;
+ *  details and Quick view say more, from the record: article-view.ts `statusView`). Never
+ *  says who decided: in this build a demo check does (DEMO_REVIEW_NOTE). */
 export const DISPLAY_SENTENCE: Readonly<Record<DisplayStatus, string>> = {
   featured: "Live on the IDEEZA Blog, and picked by the IDEEZA team.",
   approved: "Approved and live on the IDEEZA Blog.",
   draft: "Only you can see this.",
-  resubmitted: "Sent again. The IDEEZA team is reviewing it.",
-  removed: "The IDEEZA team removed this from the Blog. Only you can see it.",
-  pending: "Waiting for the IDEEZA team to review it.",
-  rejected: "The IDEEZA team rejected it. See the reasons, then edit it and publish it again.",
+  resubmitted: "Sent again. Waiting for the IDEEZA team to review it.",
+  removed: "The IDEEZA team removed this from the IDEEZA Blog. Readers can't see it.",
+  pending: "Waiting for the IDEEZA team to review it. To change something, use Edit. It leaves review until you publish again.",
+  rejected: "Rejected in review. See the reasons, then edit it and publish it again.",
 };
 
 export function displayStatusOf(a: BlogArticle): DisplayStatus {
@@ -180,21 +175,42 @@ export function displayStatusOf(a: BlogArticle): DisplayStatus {
   return lastReview(a)?.outcome === "changes" ? "rejected" : "draft";
 }
 
-/** The ⋯ menu the Figma draws for each status (L10–L13), plus Copy link, Take offline and
- *  Discard changes where they apply. */
-export function menuFor(a: BlogArticle): ArticleAction[] {
+/** A Featured blog whose update waits for review: it keeps its Featured mark beside
+ *  Re-submitted (F23), and stays under the Featured filter. */
+export function featuredUpdating(a: BlogArticle): boolean {
+  return !a.takenDown && !!a.live && !!a.submission && a.featured;
+}
+
+/** Whether the Status filter `s` lists this blog. Its badge decides, plus two blogs the badge
+ *  alone would hide: a live blog whose update was rejected is also Rejected (it needs the
+ *  writer), and a Featured blog with an update in review is also Featured. */
+export function inStatus(a: BlogArticle, s: DisplayStatus): boolean {
+  if (displayStatusOf(a) === s) return true;
+  if (s === "rejected") return updateRejected(a);
+  if (s === "featured") return featuredUpdating(a);
+  return false;
+}
+
+/** The ⋯ menu the Figma draws for each status (L10–L13: View to website · Quick view · Edit ·
+ *  Change thumbnail · Delete), plus Copy link, Take offline and Discard changes where they
+ *  apply. `unsent`: a live blog's draft differs from what readers see, so it can be thrown away. */
+export function menuFor(a: BlogArticle, opts: { unsent?: boolean } = {}): ArticleAction[] {
   const d = displayStatusOf(a);
   switch (d) {
     case "featured":
     case "approved":
-      return ["view", "edit", "change-cover", "copy-link", "take-offline", "delete"];
+      return opts.unsent
+        ? ["view", "edit", "change-cover", "copy-link", "discard-changes", "take-offline", "delete"]
+        : ["view", "edit", "change-cover", "copy-link", "take-offline", "delete"];
     case "draft":
       return ["edit", "delete"];
     case "pending":
     case "rejected":
       return ["quick-view", "edit", "change-cover", "delete"];
     case "resubmitted":
-      return a.live ? ["view", "quick-view", "edit", "change-cover", "discard-changes", "delete"] : ["quick-view", "edit", "change-cover", "delete"];
+      return a.live
+        ? ["view", "quick-view", "edit", "change-cover", "copy-link", "discard-changes", "take-offline", "delete"]
+        : ["quick-view", "edit", "change-cover", "delete"];
     case "removed":
       return ["view", "delete"];
   }

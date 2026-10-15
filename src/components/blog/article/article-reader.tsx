@@ -2,24 +2,32 @@
 
 // The blog as readers see it, in the Figma's card (frames 20–22): a top row
 // (the breadcrumb and the page's own buttons) over a rule; the title (the
-// page's only H1), the writer on the left and "n min read · date" on the right,
+// page's only H1), the writer (their profile name and photo, a link to their
+// profile) on the left and "● n minutes to read · 24 Mar 2025" on the right,
 // the 3:2 thumbnail and the body; beside it from a 1024 px page container a
-// sticky rail — the details page's status first, then Category, On this page,
-// the tags and the tag link — each block under a rule. In one column the rail
-// follows the blog while "On this page" folds under the thumbnail. The details
-// page and the preview both draw it, so the preview is exactly what readers get.
+// sticky rail in an article-dominant 9/3 split — the details page's status
+// first, then Category, On this page, the tags and the tag link — each block
+// under a rule. In one column the rail follows the blog, "On this page" folds
+// under the thumbnail, and a copy of the status badge sits in the byline row so
+// the status is on the first screen (the rail keeps its order). The details
+// page, the preview and the reading view all draw it, so each is exactly what
+// readers get.
 
 import * as React from "react";
 import Link from "next/link";
-import { News01Icon } from "@hugeicons/core-free-icons";
+import { Image01Icon, News01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { AvatarLabelGroup, Badge, Skeleton, StateCard, Tag, buttonVariants } from "@/components/ideeza";
 import { CoverImage } from "@/components/blog/cover-image";
+import { PersonName } from "@/components/profile/person-name";
 import { useStickyTop } from "@/components/innovations/post-bits";
-import { bylineDate, minRead, showContents, type BodyKind } from "@/lib/blog/article-view";
+import { bylineDate, minRead, missingBody, showContents, type BodyKind } from "@/lib/blog/article-view";
 import { categoryLabel } from "@/lib/blog/categories";
 import { headingsOf, isEmptyDoc, readingMinutes } from "@/lib/blog/doc";
 import { blogHref } from "@/lib/blog/slug";
+import { ME, displayNameOf, initialsOf } from "@/lib/people/ids";
+import { useMyPhoto } from "@/lib/people/photo-store";
+import { useMyProfile } from "@/lib/people/profile-store";
 import type { ArticleMeta, BlogArticle, BlogDoc } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
 import { ArticleBody, ArticleBodySkeleton, ProjectTile } from "./article-body";
@@ -32,14 +40,14 @@ export const ARTICLE_PAGE = "relative [container-type:inline-size]";
 export const ARTICLE_CONTENT = "mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-8 pb-24 pt-10 [@container(min-width:640px)]:px-16";
 /** The Figma's white card the blog sits in, on the grey page. */
 const CARD = "flex min-w-0 flex-col rounded-2xl border border-solid border-border-subtle bg-bg-surface px-8 py-8 [@container(min-width:640px)]:px-12 [@container(min-width:640px)]:py-10";
-/** One column; from 1024 px the 680 px article and the rail beside it. */
+/** One column; from 1024 px the article and the rail beside it, article-dominant (9/3, F80). */
 const COLUMNS =
-  "flex flex-col gap-16 [@container(min-width:1024px)]:grid [@container(min-width:1024px)]:grid-cols-[minmax(0,680px)_minmax(0,280px)] [@container(min-width:1024px)]:items-start [@container(min-width:1024px)]:justify-between [@container(min-width:1024px)]:gap-x-16";
+  "flex flex-col gap-16 [@container(min-width:1024px)]:grid [@container(min-width:1024px)]:grid-cols-[minmax(0,9fr)_minmax(0,3fr)] [@container(min-width:1024px)]:items-start [@container(min-width:1024px)]:gap-x-16";
 const WIDE_ONLY = "hidden [@container(min-width:1024px)]:flex";
 const NARROW_ONLY = "[@container(min-width:1024px)]:hidden";
 
-/** Rail block labels: DS Heading/H6 (16/24 SemiBold), under the rail's hidden H2. */
-const RAIL_LABEL = "text-lg font-semibold leading-lg text-text-primary";
+/** Rail block labels: DS Label LG (14/20 SemiBold, owner D-20), under the rail's hidden H2. */
+const RAIL_LABEL = "text-md font-semibold leading-md text-text-primary";
 const BADGE_MD = "gap-2 px-4 py-2 text-sm leading-xs";
 
 /** Each rail block under a rule, as the Figma draws them. */
@@ -61,9 +69,31 @@ function CategoryBlock({ meta }: { meta: ArticleMeta }) {
   );
 }
 
+/** The writer, as frames 20–22 draw them: the profile photo (initials until there is one) and
+ *  name, a link to their profile. "You" until they give a name, as everywhere on `main`. */
+function Byline() {
+  const { fields } = useMyProfile();
+  const photo = useMyPhoto();
+  const name = displayNameOf(fields.name);
+  return (
+    <AvatarLabelGroup
+      initials={initialsOf(name, fields.latinName || null)}
+      src={photo.url ?? undefined}
+      name={
+        <PersonName id={ME} className="[@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:items-center">
+          {name}
+        </PersonName>
+      }
+      size="sm"
+    />
+  );
+}
+
 /** The blog and its rail, in the card. `article` holds the record (dates); `meta` and `doc`
  *  are the version on show. `header` is the card's top row; `status` opens the rail (the
- *  details page's status, not the preview's); `dated` adds the date after the read time. */
+ *  details page's status, not the preview's) and `bylineStatus` is its badge again in the
+ *  byline row, shown only in one column; `dated` adds the date after the read time;
+ *  `coverSlot` draws the thumbnail's place when there is none yet (the preview). */
 export function ArticleReader({
   article,
   meta,
@@ -72,7 +102,9 @@ export function ArticleReader({
   body,
   header,
   status,
+  bylineStatus,
   dated = true,
+  coverSlot = false,
   stickyGap = 24,
 }: {
   article: BlogArticle;
@@ -82,7 +114,9 @@ export function ArticleReader({
   body: BodyKind;
   header: React.ReactNode;
   status?: React.ReactNode;
+  bylineStatus?: React.ReactNode;
   dated?: boolean;
+  coverSlot?: boolean;
   /** How far below the top of <main> the rail sticks. */
   stickyGap?: number;
 }) {
@@ -119,17 +153,37 @@ export function ArticleReader({
         {header}
       </div>
       <div className={cn(COLUMNS, "pt-12")}>
-        <article aria-labelledby={titleId} className="flex w-full min-w-0 max-w-[680px] flex-col gap-12">
+        <article aria-labelledby={titleId} className="flex w-full min-w-0 flex-col gap-12">
           <header className="flex flex-col gap-8">
             <h1 id={titleId} className="text-4xl font-semibold leading-4xl tracking-tight text-text-primary [overflow-wrap:anywhere] max-md:leading-3xl">
               {title}
             </h1>
-            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
-              <AvatarLabelGroup initials="YO" name="You" size="sm" />
-              {byline && <p className="text-sm leading-sm text-text-secondary">{byline}</p>}
+            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
+                <Byline />
+                {bylineStatus && <div className={NARROW_ONLY}>{bylineStatus}</div>}
+              </div>
+              {byline && (
+                <p className="m-0 flex items-center gap-3 text-sm leading-sm text-text-secondary">
+                  {/* The Figma's dot before the read time (frames 20–22). */}
+                  <span aria-hidden className="size-[8px] shrink-0 rounded-full bg-bg-brand" />
+                  {byline}
+                </p>
+              )}
             </div>
           </header>
-          {meta.cover && <CoverImage cover={meta.cover} className="rounded-2xl border border-solid border-border-subtle" />}
+          {meta.cover ? (
+            <CoverImage cover={meta.cover} className="rounded-2xl border border-solid border-border-subtle" />
+          ) : (
+            coverSlot && (
+              <div className="flex aspect-[3/2] w-full flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border bg-bg-subtle px-8 text-center">
+                <span aria-hidden className="text-[color:var(--color-icon-secondary)]">
+                  <Icon icon={Image01Icon} size={32} />
+                </span>
+                <p className="m-0 max-w-[320px] text-md leading-md text-text-secondary">Your thumbnail goes here. You&apos;ll pick it when you publish.</p>
+              </div>
+            )
+          )}
           {contents && (
             <div className={NARROW_ONLY}>
               <ContentsDisclosure headings={headings} current={current} onGo={setCurrent} />
@@ -220,8 +274,8 @@ export function ArticleSkeleton() {
   );
 }
 
-/** No blog at this address (a wrong link, or it was deleted): say so, and the way back. */
-export function ArticleMissing() {
+/** No blog at this address (a wrong link, deleted, or written elsewhere): say so, and the way back. */
+export function ArticleMissing({ browserHasBlogs = true }: { browserHasBlogs?: boolean }) {
   const titleRef = React.useRef<HTMLHeadingElement>(null);
   React.useEffect(() => {
     titleRef.current?.focus({ preventScroll: true });
@@ -233,7 +287,7 @@ export function ArticleMissing() {
           tone="empty"
           icon={<Icon icon={News01Icon} size={32} />}
           title="We couldn't find this blog"
-          body="The link may be wrong, or the blog was deleted."
+          body={missingBody(browserHasBlogs)}
           titleAs="h1"
           titleRef={titleRef}
           action={

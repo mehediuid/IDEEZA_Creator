@@ -5,6 +5,7 @@
 
 import { demoReview } from "./demo-review";
 import { isEmptyDoc } from "./doc";
+import { thingsLine, uniqueReasons } from "./reasons";
 import { lastReview, statusOf } from "./status";
 import {
   EMPTY_META,
@@ -196,27 +197,84 @@ export function markSeen(data: BlogData, id: string): BlogData {
   return patch(data, id, (a) => (a.reviews.some((r) => !r.seen) ? { ...a, reviews: a.reviews.map((r) => (r.seen ? r : { ...r, seen: true })) } : null));
 }
 
-export type Outcome = { id: string; title: string; outcome: "approved" | "changes"; things: number; at: number; kind: SubmissionKind };
+export type Outcome = { id: string; title: string; outcome: "approved" | "changes"; things: number; at: number; kind: SubmissionKind; demo: boolean };
 
-/** Review outcomes the writer hasn't opened yet, newest first — the bell's Blog items. */
+/** Review outcomes the writer hasn't opened yet, newest first — the bell's Blog review items.
+ *  `things` counts the latest round only, repeats dropped, like every other count. */
 export function unseenOutcomes(data: BlogData): Outcome[] {
   const out: Outcome[] = [];
   for (const a of data.articles) {
     const r = lastReview(a);
-    if (!r || r.seen || a.submission) continue;
-    out.push({ id: a.id, title: a.draft.title.trim() || "Untitled article", outcome: r.outcome, things: r.reasons.length, at: r.at, kind: r.kind });
+    if (!r || r.seen || a.submission || a.takenDown) continue;
+    out.push({
+      id: a.id,
+      title: displayTitle(a),
+      outcome: r.outcome,
+      things: uniqueReasons(r.reasons).length,
+      at: r.at,
+      kind: r.kind,
+      demo: r.demo,
+    });
   }
   return out.sort((x, y) => y.at - x.at);
 }
 
-/** "2 things to fix", for the list row of an article that needs changes. */
+/** "2 things to fix", for the list row of a rejected blog: the latest round only, repeats
+ *  dropped. A live blog whose update was rejected says it in its live note instead
+ *  ("Update rejected · 2 things to fix", status.ts `liveNoteOf`), with the same count. */
 export function thingsToFix(a: BlogArticle): string | null {
   if (statusOf(a) !== "needs") return null;
-  const n = lastReview(a)?.reasons.length ?? 0;
-  return n ? `${n} thing${n === 1 ? "" : "s"} to fix` : null;
+  const n = uniqueReasons(lastReview(a)?.reasons ?? []).length;
+  return n ? thingsLine(n) : null;
 }
 
 /** The title a list or a page shows. */
 export function displayTitle(a: BlogArticle): string {
   return (a.live && statusOf(a) !== "draft" ? a.live.title : a.draft.title).trim() || "Untitled draft";
+}
+
+// ─────────────────────────── Undo (D-17) ───────────────────────────
+
+/** Puts a blog's record back as it was before a Delete, Take offline or Discard changes was
+ *  undone: in place when it is still listed, at its old position when it was deleted. */
+export function restoreArticle(data: BlogData, snapshot: BlogArticle, index: number): BlogData {
+  if (data.articles.some((a) => a.id === snapshot.id)) return patch(data, snapshot.id, () => snapshot);
+  const articles = [...data.articles];
+  articles.splice(Math.max(0, Math.min(index, articles.length)), 0, snapshot);
+  return { ...data, articles };
+}
+
+// ─────────────────── the bell's Featured and Removed items (D-16) ───────────────────
+// The IDEEZA team features or removes a blog without a review round, so these two have no
+// `seen` flag in the record; the writer's opened ones are kept as keys beside it
+// (notice-seen.ts). A blog featured again after losing it, or removed on a new date, is a
+// new key, so it is news again.
+
+export type BlogNotice = { key: string; id: string; title: string; kind: "featured" | "removed"; at: number; reasons: number };
+
+export function noticeKeysOf(a: BlogArticle): string[] {
+  const keys: string[] = [];
+  if (a.takenDown) keys.push(`removed:${a.id}:${a.takenDown.at}`);
+  else if (a.live && a.featured) keys.push(`featured:${a.id}:${a.live.approvedAt}`);
+  return keys;
+}
+
+/** Featured and Removed news the writer hasn't opened, newest first. */
+export function unseenNotices(data: BlogData, seen: ReadonlySet<string>): BlogNotice[] {
+  const out: BlogNotice[] = [];
+  for (const a of data.articles) {
+    for (const key of noticeKeysOf(a)) {
+      if (seen.has(key)) continue;
+      const removed = key.startsWith("removed:");
+      out.push({
+        key,
+        id: a.id,
+        title: displayTitle(a),
+        kind: removed ? "removed" : "featured",
+        at: removed && a.takenDown ? a.takenDown.at : (a.live?.approvedAt ?? a.updatedAt),
+        reasons: removed && a.takenDown ? uniqueReasons(a.takenDown.reasons).length : 0,
+      });
+    }
+  }
+  return out.sort((x, y) => y.at - x.at);
 }

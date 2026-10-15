@@ -166,7 +166,8 @@ test("approval publishes; editing a live article sends changes while the live ve
   data = decide(data, a.id, "changes", [{ id: "reads-like-ad", detail: "" }], T0 + 140_000, true);
   a = article(data, a.id);
   assert.equal(statusOf(a), "live", "a sent-back update leaves the article live");
-  assert.equal(liveNote(a, true), "Update needs changes");
+  assert.equal(liveNote(a, true), "Update rejected · 1 thing to fix", "the latest round's count, readers keep the published version");
+  assert.equal(thingsToFix(a), null, "a rejected update says it in its live note, with the same count");
   assert.equal(a.live.title, "Smart lamp board");
   data = discardChanges(data, a.id, T0 + 150_000);
   assert.equal(article(data, a.id).draft.title, "Smart lamp board", "discarding goes back to the live meta");
@@ -225,7 +226,7 @@ test("the demo review approves a real article and explains every send-back", () 
   const short = demoReview(doc(p(words(92))));
   assert.equal(short.outcome, "changes");
   assert.equal(short.reasons[0].id, "needs-detail");
-  assert.match(short.reasons[0].detail, new RegExp(`${MIN_WORDS} words; you have 92`));
+  assert.equal(short.reasons[0].detail, `We counted 92 words. Blogs need at least ${MIN_WORDS}.`);
   const long = demoReview(doc(p(words(450))));
   assert.deepEqual(long.reasons.map((r) => r.id), ["hard-to-follow"]);
   const link = { type: "link", attrs: { href: "https://shop.example.com" } };
@@ -320,8 +321,10 @@ test("categories and reasons speak plain words", () => {
   assert.deepEqual(BLOG_CATEGORIES.map((c) => c.label), ["Build story", "How-to", "Electronics & PCB", "Firmware & code", "3D & mechanical", "Robotics", "Manufacturing", "Selling hardware"]);
   assert.equal(categoryLabel("pcb"), "Electronics & PCB");
   assert.equal(categoryLabel("nft"), null);
-  assert.equal(reasonInfo("reads-like-ad").title, "Reads like an ad.");
+  assert.equal(reasonInfo("reads-like-ad").title, "Looks like an advertisement.");
+  assert.equal(reasonInfo("off-topic").fix, "Write about how you made, shipped or sold a hardware product.");
   assert.equal(reasonInfo("unknown").title, "Needs changes.");
+  assert.doesNotMatch(reasonInfo("unknown").fix, /writing guide/, "never points at a guide that doesn't exist");
 });
 
 test("dates read the way the status speaks", () => {
@@ -381,7 +384,7 @@ test("the Figma's seven statuses read the same record (requirements L9)", async 
   assert.equal(label(), "Featured");
   data = submit(patchDraft(data, id, { title: "v2" }, T0 + 4), id, T0 + 5);
   assert.equal(label(), "Re-submitted", "an approved blog's changes waiting for review");
-  assert.deepEqual(menuFor(article(data, id)), ["view", "quick-view", "edit", "change-cover", "discard-changes", "delete"]);
+  assert.deepEqual(menuFor(article(data, id)), ["view", "quick-view", "edit", "change-cover", "copy-link", "discard-changes", "take-offline", "delete"]);
   const removed = { ...article(data, id), takenDown: { at: T0, reasons: [] } };
   assert.equal(DISPLAY_LABEL[displayStatusOf(removed)], "Removed");
   assert.deepEqual(menuFor(removed), ["view", "delete"]);

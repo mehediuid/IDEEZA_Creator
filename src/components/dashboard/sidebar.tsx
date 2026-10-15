@@ -62,9 +62,12 @@ import { useMessages } from "@/lib/messages/store";
 import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
 import { useBlog, useReviewClock, updateBlog } from "@/lib/blog/store";
-import { findArticle, markSeen, unseenOutcomes, type Outcome } from "@/lib/blog/article";
+import { findArticle, markSeen } from "@/lib/blog/article";
+import { DEMO_REVIEW_LABEL } from "@/lib/blog/demo-review";
+import { blogNews, newsAnnouncement, newsKicker, newsMessage, type BlogNews } from "@/lib/blog/news";
+import { markNoticesSeen, useSeenNotices } from "@/lib/blog/notice-seen";
 import { articleHref, slugOf } from "@/lib/blog/slug";
-import { linkVariants } from "@/components/ideeza";
+import { Badge, linkVariants } from "@/components/ideeza";
 import { openReportProblem } from "@/lib/support/open-report";
 import { displayNameOf, initialsOf } from "@/lib/people/ids";
 import { useMyPhoto } from "@/lib/people/photo-store";
@@ -163,6 +166,8 @@ export function DashboardSidebar({
         onOpenMenu={() => setDrawerOpen(true)}
         onOpenSearch={onOpenSearch}
       />
+      {/* Blog results are said once when they arrive, on any page and any width. */}
+      <BlogNewsAnnouncer />
       <aside
         aria-label="Primary navigation"
         data-collapsed={collapsed}
@@ -239,8 +244,9 @@ function SidebarBody({
   );
 }
 
-/** The phone's own chrome: the menu, the mark, and search — the three things
- *  the sidebar is for, at 56 px instead of 280. */
+/** The phone's own chrome: the menu, the mark, the bell and search — the
+ *  things the sidebar is for, at 56 px instead of 280. The bell sits here, not
+ *  in the drawer, so a result shows its count on every phone page (F25). */
 function MobileBar({
   onOpenMenu,
   onOpenSearch,
@@ -266,6 +272,7 @@ function MobileBar({
       >
         <IdeezaLogo height={24} decorative className="shrink-0" />
       </Link>
+      <PhoneBell />
       <button
         type="button"
         onClick={onOpenSearch}
@@ -789,24 +796,27 @@ function ProfileRow({
         </button>
 
         {/* Credits and notifications sit beside the account button, not
-            inside it — each is its own destination. */}
+            inside it — each is its own destination. In the phone drawer the
+            bell is left out: it lives in the phone's top bar. */}
         {!collapsed && (
           <>
             <Link
               href="/history#credits"
               aria-label="Credits ledger"
               title="Credits ledger"
-              className="inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border border-border text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+              className="inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border border-border text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:size-[var(--touch-min)]"
             >
               <Icon icon={Wallet01Icon} />
             </Link>
-            <NotificationBell
-              open={openPanel === "bell"}
-              onToggle={() =>
-                setOpenPanel((v) => (v === "bell" ? null : "bell"))
-              }
-              onClose={() => setOpenPanel(null)}
-            />
+            {!onLeave && (
+              <NotificationBell
+                open={openPanel === "bell"}
+                onToggle={() =>
+                  setOpenPanel((v) => (v === "bell" ? null : "bell"))
+                }
+                onClose={() => setOpenPanel(null)}
+              />
+            )}
           </>
         )}
       </div>
@@ -831,43 +841,128 @@ const ATTENTION_KICKER: Record<BuildAttention["reason"], string> = {
   credits: "Paused — needs credits",
 };
 
+/** The Blog's news the bell lists: unopened review results, and Featured or Removed. */
+function useBlogNews(): BlogNews[] {
+  const blog = useBlog();
+  const notices = useSeenNotices();
+  return React.useMemo(
+    () => (blog.hydrated && notices.hydrated ? blogNews(blog.data, notices.seen) : []),
+    [blog.hydrated, blog.data, notices.hydrated, notices.seen],
+  );
+}
+
+/** Opening a news item: it is seen (the record's round, or the notice's key). */
+function markNewsSeen(n: BlogNews): void {
+  if (n.notice) markNoticesSeen([n.key]);
+  else updateBlog((d) => markSeen(d, n.id));
+}
+
+/** The rows a keyboard moves through, in order. */
+const bellRows = (panel: HTMLElement | null) => Array.from(panel?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+
+// A focused row shows a ring inside its own edge (the DS Menu row's), not just a fill
+// that measures 1.04:1 against the panel (F10).
+const BELL_ROW =
+  "block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+const BELL_KICKER = "flex flex-wrap items-center gap-[6px] text-sm font-medium leading-sm text-text-secondary";
+
 // The bell answers with what the app actually knows: the builds waiting
-// for the user (the same list the attention banner surfaces), or, when
-// there are none, a panel that says so — never a click that does nothing.
-// Open state is controlled by ProfileRow so the bell and the account menu
-// can never both be open at once.
+// for the user (the same list the attention banner surfaces) and the Blog's
+// news, or, when there are none, a panel that says so — never a click that
+// does nothing. Open state is controlled by the place that draws it (the
+// sidebar's profile row, the phone top bar), so it never stacks with the
+// account menu. A menu button (WAI-ARIA APG): Enter, Space or ↓ opens it on the
+// first row, ↑ on the last; ↑ ↓ wrap, Home End jump; Escape closes it back to
+// the bell; Tab closes it and moves on from the bell.
 function NotificationBell({
   open,
   onToggle,
   onClose,
+  placement = "above",
 }: {
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
+  /** Above the sidebar's profile row; below the phone top bar. */
+  placement?: "above" | "below";
 }) {
   const attentionBuilds = useAttentionElsewhere();
   const { getChat } = useCreateHistory();
-  const blog = useBlog();
-  const outcomes = blog.hydrated ? unseenOutcomes(blog.data) : [];
-  const count = attentionBuilds.length + outcomes.length;
+  const news = useBlogNews();
+  const count = attentionBuilds.length + news.length;
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const panelId = React.useId();
+  // Where focus goes when the panel opens: a row (keyboard), or the panel itself (pointer).
+  const focusOnOpen = React.useRef<"first" | "last" | "panel">("panel");
 
   const builds = attentionBuilds.length;
   const parts = [
     builds ? `${builds} need${builds === 1 ? "s" : ""} attention` : "",
-    outcomes.length ? `${outcomes.length} Blog review result${outcomes.length === 1 ? "" : "s"}` : "",
+    news.length ? `${news.length} Blog update${news.length === 1 ? "" : "s"}` : "",
   ].filter(Boolean);
   const label = count > 0 ? `Notifications, ${parts.join(", ")}` : "No notifications yet";
+
+  React.useEffect(() => {
+    if (!open) return;
+    const rows = bellRows(panelRef.current);
+    const want = focusOnOpen.current;
+    focusOnOpen.current = "panel";
+    if (want === "first" && rows[0]) rows[0].focus();
+    else if (want === "last" && rows.length) rows[rows.length - 1].focus();
+    else panelRef.current?.focus();
+  }, [open]);
+
+  const closeToBell = () => {
+    buttonRef.current?.focus();
+    onClose();
+  };
+
+  const onButtonKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (open) return;
+    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") focusOnOpen.current = "first";
+    else if (e.key === "ArrowUp") focusOnOpen.current = "last";
+    else return;
+    e.preventDefault();
+    onToggle();
+  };
+
+  const onPanelKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const rows = bellRows(panelRef.current);
+    const at = rows.indexOf(document.activeElement as HTMLElement);
+    const go = (i: number) => rows.length && rows[(i + rows.length) % rows.length].focus();
+    if (e.key === "ArrowDown") go(at + 1);
+    else if (e.key === "ArrowUp") go(at < 0 ? rows.length - 1 : at - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(rows.length - 1);
+    else if (e.key === "Escape") closeToBell();
+    else if (e.key === "Tab") {
+      // Focus the bell first, so the browser's own Tab moves on from it.
+      buttonRef.current?.focus();
+      onClose();
+      return;
+    } else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
 
   return (
     <div className="relative shrink-0">
       <button
+        ref={buttonRef}
         type="button"
         onClick={onToggle}
+        onKeyDown={onButtonKey}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         aria-label={label}
         title={label}
-        className="relative inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-border text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+        className={
+          placement === "below"
+            ? "relative inline-flex h-[var(--touch-min)] w-[var(--touch-min)] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+            : "relative inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-border text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:size-[var(--touch-min)]"
+        }
       >
         <Icon icon={Notification03Icon} />
         {count > 0 && (
@@ -884,21 +979,27 @@ function NotificationBell({
 
       {open && (
         <div
+          ref={panelRef}
+          id={panelId}
           role="menu"
           aria-label="Notifications"
-          className="absolute bottom-[calc(100%+8px)] right-0 z-dropdown w-[260px] overflow-hidden rounded-xl border border-border bg-bg-surface shadow-3"
+          tabIndex={-1}
+          onKeyDown={onPanelKey}
+          className={[
+            "absolute right-0 z-dropdown overflow-hidden rounded-xl border border-border bg-bg-surface shadow-3 outline-none",
+            // Above, it spans the sidebar from the bell's edge; below the phone bar it may be wider.
+            placement === "below" ? "top-[calc(100%+8px)] w-[300px] max-w-[calc(100vw-24px)]" : "bottom-[calc(100%+8px)] w-[260px]",
+          ].join(" ")}
         >
-          <p className="border-b border-border px-[16px] py-[10px] text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-            Notifications
-          </p>
+          <p className="border-b border-border px-[16px] py-[10px] text-sm font-semibold leading-sm text-text-primary">Notifications</p>
           {count === 0 ? (
-            <p className="px-[16px] py-[16px] text-sm font-regular text-text-tertiary">
-              No notifications yet — builds that need you and Blog review results show up here.
+            <p className="px-[16px] py-[16px] text-sm font-regular text-text-secondary">
+              No notifications yet. Builds that need you and your Blog&apos;s review results show up here.
             </p>
           ) : (
-            <ul role="none" className="py-[4px]">
-              {outcomes.map((o) => (
-                <BlogOutcomeItem key={`blog-${o.id}-${o.at}`} outcome={o} onClose={onClose} />
+            <ul role="none" className="max-h-[min(420px,60vh)] overflow-y-auto py-[4px]">
+              {news.map((n) => (
+                <BlogNewsItem key={n.key} news={n} onClose={onClose} />
               ))}
               {attentionBuilds.map((att) => (
                 <li key={att.job.id} role="none">
@@ -912,11 +1013,9 @@ function NotificationBell({
                     }
                     role="menuitem"
                     onClick={onClose}
-                    className="block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle"
+                    className={BELL_ROW}
                   >
-                    <span className="block text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-                      {ATTENTION_KICKER[att.reason]}
-                    </span>
+                    <span className={BELL_KICKER}>{ATTENTION_KICKER[att.reason]}</span>
                     <span className="mt-[2px] block truncate text-sm font-regular text-text-primary">
                       {att.message}
                     </span>
@@ -931,38 +1030,121 @@ function NotificationBell({
   );
 }
 
-/** A Blog review result in the bell (D10), in the Figma's status words: opening it marks it
- *  seen and lands on the blog's details, where a rejection's reasons sit above the blog. */
-function BlogOutcomeItem({ outcome: o, onClose }: { outcome: Outcome; onClose: () => void }) {
+/** A Blog item in the bell (D10, D-16), in the Figma's status words: opening it marks it seen
+ *  and lands on the blog's details, where a rejection's or removal's reasons sit on top. */
+function BlogNewsItem({ news: n, onClose }: { news: BlogNews; onClose: () => void }) {
   const { data } = useBlog();
-  const article = findArticle(data, o.id);
+  const article = findArticle(data, n.id);
   if (!article) return null;
-  const rejected = o.outcome === "changes";
-  const href = articleHref(slugOf(article));
-  const kicker = rejected ? "Blog · Rejected" : "Blog · Approved";
-  const reasons = o.things === 1 ? "1 reason" : `${o.things} reasons`;
-  const message = rejected
-    ? o.kind === "changes"
-      ? `Your update to “${o.title}” was rejected${o.things ? ` · ${reasons}` : ""}`
-      : `“${o.title}” was rejected${o.things ? ` · ${reasons}` : ""}`
-    : o.kind === "changes"
-      ? `Your update to “${o.title}” is approved and live`
-      : `“${o.title}” is approved and live on the IDEEZA Blog`;
   return (
     <li role="none">
       <Link
-        href={href}
+        href={articleHref(slugOf(article))}
         role="menuitem"
         onClick={() => {
-          updateBlog((d) => markSeen(d, o.id));
+          markNewsSeen(n);
           onClose();
         }}
-        className="block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle"
+        className={BELL_ROW}
       >
-        <span className="block text-2xs font-bold uppercase tracking-wider text-text-tertiary">{kicker}</span>
-        <span className="mt-[2px] block text-sm font-regular text-text-primary">{message}</span>
+        <span className={BELL_KICKER}>
+          {newsKicker(n)}
+          {n.demo && (
+            <Badge tone="neutral" className="px-[6px] py-0 text-xs leading-xs">
+              {DEMO_REVIEW_LABEL}
+            </Badge>
+          )}
+        </span>
+        <span className="mt-[2px] block text-sm font-regular text-text-primary">{newsMessage(n)}</span>
       </Link>
     </li>
+  );
+}
+
+/** The phone's bell, in the top bar (F25): the same bell and panel at 44 px, opening below. */
+function PhoneBell() {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
+  }, [open]);
+  return (
+    <div ref={ref}>
+      <NotificationBell open={open} onToggle={() => setOpen((v) => !v)} onClose={() => setOpen(false)} placement="below" />
+    </div>
+  );
+}
+
+/** Says once, politely, when a Blog result arrives (F25): a toast anyone can see, read out by
+ *  screen readers, with a way to it. Nothing is said for what was already waiting when the app
+ *  opened, and a result that arrives in a background tab waits until the tab is in view. */
+function BlogNewsAnnouncer() {
+  const news = useBlogNews();
+  const blog = useBlog();
+  const known = React.useRef<Set<string> | null>(null);
+  const [say, setSay] = React.useState<BlogNews | null>(null);
+  const [queued, setQueued] = React.useState<BlogNews | null>(null);
+
+  React.useEffect(() => {
+    if (!blog.hydrated) return;
+    const keys = new Set(news.map((n) => n.key));
+    if (known.current === null) {
+      known.current = keys;
+      return;
+    }
+    const fresh = news.find((n) => !known.current!.has(n.key));
+    for (const k of keys) known.current.add(k);
+    if (fresh) setQueued(fresh);
+  }, [news, blog.hydrated]);
+
+  React.useEffect(() => {
+    if (!queued) return;
+    const show = () => {
+      if (document.visibilityState !== "visible") return;
+      setSay(queued);
+      setQueued(null);
+    };
+    show();
+    document.addEventListener("visibilitychange", show);
+    return () => document.removeEventListener("visibilitychange", show);
+  }, [queued]);
+
+  React.useEffect(() => {
+    if (!say) return;
+    const t = window.setTimeout(() => setSay(null), 8000);
+    return () => window.clearTimeout(t);
+  }, [say]);
+
+  const article = say ? findArticle(blog.data, say.id) : null;
+  return (
+    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-[64px] z-toast flex justify-center px-8 md:top-auto md:bottom-[88px]">
+      {say && (
+        <div className="pointer-events-auto flex max-w-[480px] items-center gap-8 rounded-xl bg-bg-inverse px-8 py-6 text-sm text-text-inverse shadow-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal">
+          <span>{newsAnnouncement(say)}</span>
+          {article && (
+            <Link
+              href={articleHref(slugOf(article))}
+              onClick={() => {
+                markNewsSeen(say);
+                setSay(null);
+              }}
+              className="inline-flex shrink-0 items-center rounded-md font-semibold text-text-inverse underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
+            >
+              View
+            </Link>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

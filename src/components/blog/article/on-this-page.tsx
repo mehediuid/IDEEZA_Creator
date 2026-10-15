@@ -119,7 +119,7 @@ export function ContentsList({ headings, current, onGo }: { headings: readonly H
   const id = React.useId();
   return (
     <nav aria-labelledby={id} className="flex flex-col gap-4">
-      <h3 id={id} className="text-lg font-semibold leading-lg text-text-primary">
+      <h3 id={id} className="text-md font-semibold leading-md text-text-primary">
         On this page
       </h3>
       <div className="border-0 border-l border-solid border-border-subtle">
