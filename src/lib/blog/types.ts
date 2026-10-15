@@ -22,11 +22,13 @@ export type BlogNode =
   | { type: "orderedList"; content: BlogNode[] }
   | { type: "listItem"; content: BlogNode[] }
   | { type: "blockquote"; content: BlogNode[] }
-  | { type: "codeBlock"; content?: BlogNode[] }
+  /** `language` is what the writer's paste said the code is ("ts", "c"); kept, never required. */
+  | { type: "codeBlock"; attrs?: { language: string }; content?: BlogNode[] }
   | { type: "horizontalRule" }
   | { type: "image"; attrs: BlogImageAttrs }
   | { type: "imageRow"; content: BlogNode[] }
-  | { type: "video"; attrs: { fileKey: string; caption: string } }
+  /** `width`/`height` are the clip's own size (0 when unknown), so a phone's tall clip is drawn tall. */
+  | { type: "video"; attrs: { fileKey: string; caption: string; width?: number; height?: number } }
   | { type: "projectCard"; attrs: { projectId: string } }
   /** 2 or 3 columns side by side (Figma E6); each holds paragraphs, headings, lists and images. */
   | { type: "columns"; attrs: { count: 2 | 3 }; content: BlogNode[] }
@@ -54,6 +56,8 @@ export type ArticleMeta = {
   title: string;
   categoryId: string | null;
   topics: string[];
+  /** The Tag link (Figma E4): one of the writer's project ids, or an ideeza.com address the
+   *  writer pasted ("https://ideeza.com/…"). `tagLinkOf` (tag-link.ts) tells the two apart. */
   projectId: string | null;
   cover: BlogCover | null;
 };
@@ -91,6 +95,9 @@ export type BlogArticle = {
   featured: boolean;
   /** Set by the IDEEZA team only; the demo never sets it. */
   takenDown: { at: number; reasons: ReviewReason[] } | null;
+  /** Grows on every change to the draft's details (title, category, tags, tag link), so a tab
+   *  can tell another tab saved them after it read them. Absent on blogs stored before it. */
+  rev?: number;
 };
 
 export type BlogData = { v: 1; articles: BlogArticle[] };

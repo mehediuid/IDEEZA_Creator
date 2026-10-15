@@ -4,7 +4,6 @@
 // data URLs in localStorage — a ten-photo article would fill it.
 
 import * as React from "react";
-import type { WriteResult } from "../key-store";
 
 export const BLOG_FILES_DB = "ideeza-blog";
 export const BLOG_FILES_STORE = "files";
@@ -60,16 +59,30 @@ function committed(tx: IDBTransaction): Promise<boolean> {
   });
 }
 
-export async function putBlogFile(file: BlogFile): Promise<WriteResult> {
+/** Why a file wasn't stored: the browser won't open the picture store at all (private
+ *  browsing, blocked site data), or it opened and refused the file (storage is full). */
+export type FileCause = "unavailable" | "full";
+
+export type FileWrite = { ok: true } | { ok: false; cause: FileCause };
+
+/** The thumbnail stored beside an image (a small copy for small places). */
+export const thumbKey = (fileKey: string) => `${fileKey}.thumb`;
+
+export async function putBlogFile(file: BlogFile): Promise<FileWrite> {
   const db = await openFiles();
-  if (!db) return { ok: false };
+  if (!db) return { ok: false, cause: "unavailable" };
   try {
     const tx = db.transaction(BLOG_FILES_STORE, "readwrite");
     tx.objectStore(BLOG_FILES_STORE).put(file);
-    return (await committed(tx)) ? { ok: true } : { ok: false };
+    return (await committed(tx)) ? { ok: true } : { ok: false, cause: "full" };
   } catch {
-    return { ok: false };
+    return { ok: false, cause: "full" };
   }
+}
+
+/** Whether the picture store opens in this browser at all. */
+export async function blogFilesAvailable(): Promise<boolean> {
+  return (await openFiles()) !== null;
 }
 
 export async function getBlogFile(key: string): Promise<Blob | null> {
@@ -114,8 +127,10 @@ export async function deleteBlogFiles(keys: readonly string[]): Promise<boolean>
 }
 
 /** An object URL for a stored file, revoked when the component lets go of it.
- *  `missing` once the read finished without a file. */
-export function useBlogFileUrl(key: string | null): { url: string | null; missing: boolean } {
+ *  `missing` once the read finished without a file. `thumb`: the small copy when there is one
+ *  (images stored since thumbnails exist), else the file itself. */
+export function useBlogFileUrl(key: string | null, opts: { thumb?: boolean } = {}): { url: string | null; missing: boolean } {
+  const thumb = !!opts.thumb;
   const [state, setState] = React.useState<{ key: string | null; url: string | null; missing: boolean }>({
     key: null,
     url: null,
@@ -125,15 +140,16 @@ export function useBlogFileUrl(key: string | null): { url: string | null; missin
     if (!key) return;
     let url: string | null = null;
     let live = true;
-    void getBlogFile(key).then((blob) => {
+    void (async () => {
+      const blob = (thumb ? await getBlogFile(thumbKey(key)) : null) ?? (await getBlogFile(key));
       if (!live) return;
       url = blob ? URL.createObjectURL(blob) : null;
       setState({ key, url, missing: !blob });
-    });
+    })();
     return () => {
       live = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [key]);
+  }, [key, thumb]);
   return state.key === key ? { url: state.url, missing: state.missing } : { url: null, missing: false };
 }

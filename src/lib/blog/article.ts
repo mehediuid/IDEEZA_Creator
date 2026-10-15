@@ -68,14 +68,16 @@ function cleanTopics(topics: readonly string[]): string[] {
   return out;
 }
 
-/** Changes the draft's meta. Refused (the same data back) while the draft is frozen. */
+/** Changes the draft's meta: only the fields in `change` (the editor sends just the fields
+ *  that changed in its tab, so a second tab's change to another field is never written over).
+ *  Each change moves the article's `rev`. Refused (the same data back) while the draft is frozen. */
 export function patchDraft(data: BlogData, id: string, change: Partial<ArticleMeta>, now: number): BlogData {
   return patch(data, id, (a) => {
     if (!canEdit(a)) return null;
     const draft: ArticleMeta = { ...a.draft, ...change };
     draft.title = draft.title.slice(0, TITLE_MAX);
     draft.topics = cleanTopics(draft.topics);
-    return { ...a, draft, updatedAt: now };
+    return { ...a, draft, updatedAt: now, rev: (a.rev ?? 0) + 1 };
   });
 }
 

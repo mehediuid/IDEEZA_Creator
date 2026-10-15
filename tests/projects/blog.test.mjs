@@ -336,9 +336,9 @@ test("media: what an article accepts, and each refusal names the file and the fi
   const { imageProblem, videoProblem, smallCoverWarning, fitWithin } = await import("../../.tmp-test/lib/blog/media.js");
   assert.equal(imageProblem({ name: "board.jpg", type: "image/jpeg", size: 3_000_000 }), null);
   assert.equal(imageProblem({ name: "lamp.heic", type: "image/heic", size: 100 }), "lamp.heic isn't a supported image. Use JPG, PNG, WebP or GIF.");
-  assert.equal(imageProblem({ name: "big.png", type: "image/png", size: 21 * 1024 * 1024 }), "big.png is over 20 MB. Choose a smaller image.");
+  assert.equal(imageProblem({ name: "big.png", type: "image/png", size: 21 * 1024 * 1024 }), "big.png is 21 MB. Images can be up to 20 MB.");
   assert.equal(videoProblem({ name: "demo.mov", type: "video/quicktime", size: 1 }), "demo.mov isn't a supported video. Use MP4 or WebM.");
-  assert.equal(videoProblem({ name: "demo.mp4", type: "video/mp4", size: 51 * 1024 * 1024 }), "demo.mp4 is over 50 MB. Choose a shorter video.");
+  assert.equal(videoProblem({ name: "demo.mp4", type: "video/mp4", size: 51 * 1024 * 1024 }), "demo.mp4 is 51 MB. Videos can be up to 50 MB.");
   assert.equal(smallCoverWarning(1600, 1067), null);
   assert.equal(smallCoverWarning(640, 427), "This image is small (640 × 427 px) and may look blurry. Best at 1200 × 800 px or bigger.");
   assert.deepEqual(fitWithin(4000, 3000), { width: 2000, height: 1500 });
