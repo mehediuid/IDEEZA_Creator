@@ -89,6 +89,8 @@ ideeza-creator-panel/
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
    │  │                      bid dialogs, Ask the creator / Get creator support, demo-buyer banner
+   │  ├─ blog/               Blog: list/, editor/ (TipTap, editor routes only), article/ (page, reader,
+   │  │                      renderer, preview), send/ (Send for review, cover picker, Change cover)
    │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, settings + report dialogs
@@ -175,6 +177,8 @@ ideeza-creator-panel/
    │  │                      sell-flow (the Sell copies flow's steps), fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
    │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
+   │  ├─ blog/               Blog: the model (doc, statuses, actions, demo review, list, slugs, cover),
+   │  │                      the local store (ideeza:blog + rev'd bodies), IndexedDB files (ideeza-blog)
    │  ├─ people/             the creator profile's people layer: one person id and handles, profile
    │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt
    │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration, demo seed),

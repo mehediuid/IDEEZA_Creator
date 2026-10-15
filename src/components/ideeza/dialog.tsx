@@ -56,6 +56,13 @@ export interface ModalFrameProps {
   /** Below `md`, a bottom sheet (DS M09): full width, anchored to the bottom edge, square at the
    *  foot. Centered as usual from `md`. */
   sheet?: boolean;
+  /** The id of a heading inside the body that names the dialog. The header then shows only ✕ and
+   *  `title` is read by assistive tech only (for layouts whose design puts the question in a column). */
+  labelledBy?: string;
+  /** `alertdialog` for a confirmation that interrupts (a destructive choice). */
+  role?: "dialog" | "alertdialog";
+  /** The id of body content that describes the dialog, when there is no `description`. */
+  describedBy?: string;
 }
 
 export function ModalFrame({
@@ -71,6 +78,9 @@ export function ModalFrame({
   initialFocus,
   closeUnavailable = false,
   sheet = false,
+  labelledBy,
+  role = "dialog",
+  describedBy,
 }: ModalFrameProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
@@ -94,10 +104,10 @@ export function ModalFrame({
       />
       <div
         ref={panelRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descId : undefined}
+        aria-labelledby={labelledBy ?? titleId}
+        aria-describedby={description ? descId : describedBy}
         onKeyDown={(e) => {
           if (e.key === "Escape" && !covered && !e.defaultPrevented) {
             e.stopPropagation();
@@ -113,11 +123,14 @@ export function ModalFrame({
             "max-md:max-h-[90dvh] max-md:max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:motion-safe:slide-in-from-bottom-4",
         )}
       >
-        <header className="flex items-start gap-6 px-10 pb-4 pt-8">
+        <div className={cn("flex items-start gap-6 px-10 pt-8", labelledBy ? "pb-0" : "pb-4")}>
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-bold text-text-primary">
-              {title}
-            </h2>
+            {/* Named from the body (labelledBy): the heading there is the only one, read once. */}
+            {!labelledBy && (
+              <h2 id={titleId} className="text-lg font-bold text-text-primary">
+                {title}
+              </h2>
+            )}
             {description && (
               <p id={descId} className="mt-2 text-sm text-text-secondary">
                 {description}
@@ -130,7 +143,7 @@ export function ModalFrame({
             aria-label="Close"
             aria-disabled={closeUnavailable || undefined}
             className={cn(
-              "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] max-md:w-[var(--touch-min)]",
+              "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] max-md:w-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)] [@media(pointer:coarse)]:w-[var(--touch-min)]",
               closeUnavailable
                 ? "cursor-not-allowed text-text-disabled"
                 : "text-text-tertiary hover:bg-bg-subtle hover:text-text-primary",
@@ -138,12 +151,12 @@ export function ModalFrame({
           >
             <Icon icon={Cancel01Icon} size={18} />
           </button>
-        </header>
+        </div>
         <div className={cn("min-h-0 flex-1 overflow-y-auto px-10 pb-8", bodyClassName)}>{children}</div>
         {footer && (
-          <footer className="flex flex-wrap items-center gap-6 border-t border-solid border-border px-10 py-8">
+          <div className="flex flex-wrap items-center gap-6 border-t border-solid border-border px-10 py-8">
             {footer}
-          </footer>
+          </div>
         )}
       </div>
     </div>,
@@ -177,12 +190,15 @@ export function ConfirmDialog({
   confirmUnavailable = false,
 }: ConfirmDialogProps) {
   const cancelRef = React.useRef<HTMLButtonElement>(null);
-  const tap = "max-md:min-h-[var(--touch-min)]";
+  const bodyId = React.useId();
+  const tap = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
   return (
     <ModalFrame
       open={open}
       onClose={onCancel}
       title={title}
+      describedBy={bodyId}
+      role={tone === "danger" ? "alertdialog" : "dialog"}
       size="sm"
       initialFocus={cancelRef}
       footer={
@@ -206,7 +222,9 @@ export function ConfirmDialog({
         </div>
       }
     >
-      <div className="text-sm leading-relaxed text-text-secondary">{children}</div>
+      <div id={bodyId} className="text-sm leading-relaxed text-text-secondary">
+        {children}
+      </div>
     </ModalFrame>
   );
 }

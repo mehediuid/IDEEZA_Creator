@@ -20,10 +20,11 @@ function filesUnder(dir) {
   return out;
 }
 
-/** The creator pages' components: My projects, a project, a product, Earn, Explore marketplace. */
+/** The creator pages' components: My projects, a project, a product, Earn, Explore marketplace, Blog. */
 const CREATOR = [
   ...filesUnder("components/projects"),
   ...filesUnder("components/marketplace"),
+  ...filesUnder("components/blog"),
   "components/brief/step-details.tsx",
   "components/brief/step-review.tsx",
   "components/brief/step-success.tsx",

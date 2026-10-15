@@ -255,7 +255,7 @@ function MenuRow({
         if (document.activeElement === e.currentTarget) panelRef.current?.focus({ preventScroll: true });
       }}
       className={cn(
-        "flex w-full shrink-0 items-center gap-5 rounded-md px-6 py-5 text-left outline-none transition-colors duration-fast motion-reduce:transition-none",
+        "flex w-full shrink-0 items-center gap-5 rounded-md px-6 py-5 text-left outline-none transition-colors duration-fast motion-reduce:transition-none [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
         "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus",
         disabled ? "cursor-not-allowed" : "cursor-pointer",
         selected ? "bg-bg-brand-subtle" : !disabled && (danger ? "focus:bg-bg-error-subtle" : "focus:bg-bg-subtle"),

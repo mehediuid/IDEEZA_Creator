@@ -49,7 +49,7 @@ export function PostToastProvider({ children }: { children: React.ReactNode }) {
                   window.clearTimeout(timer.current);
                   setToast(null);
                 }}
-                className="rounded-md font-semibold text-text-inverse underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                className="inline-flex items-center rounded-md font-semibold text-text-inverse underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:px-4"
               >
                 Undo
               </button>

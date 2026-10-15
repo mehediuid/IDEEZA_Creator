@@ -4,7 +4,7 @@ Moved verbatim from `CLAUDE.md` §3 on 2026-09-29. Keep it current: [AGENTS.md �
 
 **Global shell** (`components/app-chrome`, `components/dashboard/sidebar`):
 left sidebar nav — **Home · History · My projects · Parts & agile module ·
-Explore marketplace · Innovations · Messages · Blog**; top bar — Search + **⌘K
+Explore marketplace · Innovations · Blog · Messages**; top bar — Search + **⌘K
 command palette**, Tutorial / Tour guide / Help / Report, the sidebar's
 **Upgrade to Builder / Disruptor** card, the profile popover (name, plan).
 
@@ -19,6 +19,7 @@ command palette**, Tutorial / Tour guide / Help / Report, the sidebar's
 - `/marketplace` — **Explore marketplace**: For sale · Sold · Purchased, with the *Shopping as* demo-buyer switch (all Testnet demo).
 - `/marketplace/[id]`, `/marketplace/[id]/products/[productId]` — the buyer view of a listed project and its products: buyer rail, purchase, bids, holder features. A paused listing reads "off the marketplace for now" to anyone who holds none of it.
 - `/messages`, `/messages/[conversationId]`, `/messages/new` (`?to=&project=&about=listing|purchase:<saleId>|team`, `?to=feed:<id>&post=<slug>`, `?team=<projectId>`; any of them `?as=<person>`) — **Messages**: the conversation list (Inbox · Requests) and one conversation, two panes from 1024 px; `new` finds the conversation an entry point names or drafts it. Demo identities in this browser; see [features/messages.md](features/messages.md).
+- `/blog`, `/blog/new`, `/blog/[slug]`, `/blog/[slug]/edit`, `/blog/[slug]/preview`, `/blog/[slug]/read` (`/blog?q=&status=&reuse=&from=&to=&page=`) — **Blog**: your blogs (filters, calendar, Quick view), the editor (new or one blog), Blog details with its status and reject reasons, the draft in the reader view, and the reading view of the published version ("View to website"). A blog is found by the end of its id, so an old title's address still opens it; see [features/blog.md](features/blog.md).
 - `/history` — **History**: Model Generations · Project/Product Generations.
 - `/settings/plan` — **Plan & pricing** (User Panel V2 layouts on the DS): Available plan (the default: Tinkerer · Builder · Disruptor cards and a wide Free card, monthly or annual, Compare plans, Pricing FAQs) · Credits (`?tab=credits`: packs, custom amount, balance → credit history) · Billing history (`?tab=billing`: every payment, each with its invoice) · Payment method (`?tab=payment`: the demo wallet and the default token). Your plan banner (View details) over Billing history and Payment method.
 - `/settings/plan/checkout` (`?plan=builder&cycle=monthly`, `?pack=pro`, `?credits=80`) — **Payment details**: how to pay | the order, then Upgrade completed / Payment successful / Payment failed.

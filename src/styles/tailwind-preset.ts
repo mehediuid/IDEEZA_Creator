@@ -216,6 +216,8 @@ export const ideezaPreset = {
         badge: {
           "blue-bg": "var(--color-badge-blue-bg)",
           "blue-text": "var(--color-badge-blue-text)",
+          "error-bg": "var(--color-badge-error-bg)",
+          "error-text": "var(--color-badge-error-text)",
         },
         focus: {
           halo: "var(--color-focus-halo)",
@@ -231,6 +233,8 @@ export const ideezaPreset = {
           "secondary-text": "var(--color-button-secondary-text)",
           "ghost-bg-hover": "var(--color-button-ghost-bg-hover)",
           "danger-bg": "var(--color-button-danger-bg)",
+          "danger-bg-hover": "var(--color-button-danger-bg-hover)",
+          "danger-bg-pressed": "var(--color-button-danger-bg-pressed)",
         },
       },
     },

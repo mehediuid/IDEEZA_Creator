@@ -182,7 +182,8 @@ test("every page has a name in the maker's words", () => {
     ["/messages/conv_1", "Messages"],
     ["/parts", "Parts & agile module"],
     ["/parts/new", "Parts › New package"],
-    ["/blog", "Page not found"],
+    ["/blog", "Blog"],
+    ["/nowhere", "Page not found"],
   ];
   for (const [path, page] of cases) assert.equal(pageRefFor(path.split("?")[0], path.split("?")[1] ?? "").page, page, path);
 });
@@ -266,3 +267,14 @@ test("the sidebar, ⌘K and the editors' Help menus open the dialog", () => {
   assert.match(src("src/components/3d/three-menu.tsx"), /"Report a problem…", run: openReportProblem/);
   assert.match(src("src/app/layout.tsx"), /<ReportProblemHost \/>/);
 });
+
+test("the Blog's pages are named, not 'Page not found'", () => {
+  const page = (path) => pageRefFor(path, "").page;
+  assert.equal(page("/blog"), "Blog");
+  assert.equal(page("/blog/new"), "Blog › Create new blog");
+  assert.equal(page("/blog/lamp-ab12cd34"), "Blog › Blog details");
+  assert.equal(page("/blog/lamp-ab12cd34/edit"), "Blog › Edit blog");
+  assert.equal(page("/blog/lamp-ab12cd34/preview"), "Blog › Blog preview");
+  assert.equal(page("/blog/lamp-ab12cd34/read"), "Blog › Reader view");
+});
+

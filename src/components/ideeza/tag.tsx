@@ -99,7 +99,8 @@ export function Tag(props: TagProps) {
           aria-label={props.dismissLabel}
           disabled={disabled}
           onClick={props.onDismiss}
-          className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full disabled:cursor-not-allowed"
+          // On touch the ✕ keeps its glyph and gains a 44 px hit area around it (the chip doesn't grow).
+          className="relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full disabled:cursor-not-allowed [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:left-1/2 [@media(pointer:coarse)]:after:top-1/2 [@media(pointer:coarse)]:after:size-[var(--touch-min)] [@media(pointer:coarse)]:after:-translate-x-1/2 [@media(pointer:coarse)]:after:-translate-y-1/2 [@media(pointer:coarse)]:after:content-['']"
         >
           <Icon icon={Cancel01Icon} size={s.close} />
         </button>

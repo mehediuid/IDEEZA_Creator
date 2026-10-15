@@ -16,7 +16,7 @@ export interface SearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInp
 
 const MagnifierIcon = () => (
   <span className="inline-flex shrink-0 text-[color:var(--color-text-tertiary)] transition-colors duration-150 group-focus-within:text-[color:var(--color-violet-600)]">
-    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg aria-hidden width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
       <circle cx="11" cy="11" r="7" />
       <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
     </svg>
@@ -24,7 +24,7 @@ const MagnifierIcon = () => (
 );
 
 const ClearIcon = () => (
-  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+  <svg aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
     <path d="M6 6l12 12M18 6L6 18" />
   </svg>
 );

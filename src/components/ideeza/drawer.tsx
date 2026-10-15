@@ -118,7 +118,7 @@ export function Drawer({
           ENTER,
         )}
       >
-        <header className="flex items-start gap-4 border-b border-solid border-border px-8 pb-5 pt-7">
+        <div className="flex items-start gap-4 border-b border-solid border-border px-8 pb-5 pt-7">
           {onBack && (
             <button
               type="button"
@@ -147,7 +147,7 @@ export function Drawer({
           >
             <Icon icon={Cancel01Icon} size={18} />
           </button>
-        </header>
+        </div>
         {pinned && <div className="border-b border-solid border-border px-8 py-5">{pinned}</div>}
         <div className={cn("min-h-0 flex-1 overflow-y-auto px-8 py-6", bodyClassName)}>{children}</div>
         {footer && <div className="border-t border-solid border-border px-8 py-6">{footer}</div>}
