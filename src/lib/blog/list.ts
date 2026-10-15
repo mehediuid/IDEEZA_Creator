@@ -13,7 +13,8 @@ import { displayTitle, thingsToFix } from "./article";
 import { dayKey, isDayKey, ordered, type DayKey } from "./date-range";
 import { MIN_WORDS } from "./demo-review";
 import { REASONS } from "./reasons";
-import { displayStatusOf, lastReview, liveNote, statusOf, tabOf, DISPLAY_STATUSES, STATUS_TABS, type DisplayStatus, type StatusTab } from "./status";
+import { inStatus, lastReview, liveNote, statusOf, tabOf, updateRejected, DISPLAY_STATUSES, STATUS_TABS, type DisplayStatus, type StatusTab } from "./status";
+export { updateRejected } from "./status";
 import { PAGE_SIZE, type BlogArticle } from "./types";
 
 /** The first visit's "What the IDEEZA team looks for" (F20): what the review asks for, said
@@ -152,14 +153,6 @@ export type RowMoment =
   | "Live since"
   | "Removed";
 
-/** A live blog whose latest update the IDEEZA team sent back: readers still see the published
- *  version, but the writer has something to fix, so the Rejected filter finds it too. */
-export function updateRejected(a: BlogArticle): boolean {
-  if (statusOf(a) !== "live" || !a.live) return false;
-  const r = lastReview(a);
-  return !!r && r.outcome === "changes" && r.at > a.live.approvedAt;
-}
-
 /** The row's date: the latest status event — removed, sent, decided — or, for a draft, the last
  *  edit. The list sorts and the Date range filters by it, and the row names it. */
 export function rowEvent(a: BlogArticle): { at: number; moment: RowMoment } {
@@ -216,7 +209,7 @@ type Narrowing = Pick<BlogQuery, "tab" | "q"> &
     writer?: readonly string[];
   };
 
-const matchesStatus = (a: BlogArticle, s: DisplayStatus | undefined) => !s || displayStatusOf(a) === s || (s === "rejected" && updateRejected(a));
+const matchesStatus = (a: BlogArticle, s: DisplayStatus | undefined) => !s || inStatus(a, s);
 const matchesReuse = (a: BlogArticle, r: ReuseFilter | undefined) => !r || a.reuse.allowed === (r === "allowed");
 /** The row's date is its Date & time column, as a local day. */
 const matchesDates = (a: BlogArticle, from: DayKey | undefined, to: DayKey | undefined) => {
@@ -250,9 +243,7 @@ export function filterCounts(articles: readonly BlogArticle[], q: Narrowing): Fi
   const reuse = { all: 0, allowed: 0, not: 0 };
   const forStatus = filterArticles(articles, { ...q, status: undefined });
   for (const a of forStatus) {
-    const s = displayStatusOf(a);
-    status[s] += 1;
-    if (s !== "rejected" && updateRejected(a)) status.rejected += 1;
+    for (const s of DISPLAY_STATUSES) if (inStatus(a, s)) status[s] += 1;
   }
   status.all = forStatus.length;
   const forReuse = filterArticles(articles, { ...q, reuse: undefined });

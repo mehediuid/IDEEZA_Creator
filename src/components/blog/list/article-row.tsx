@@ -161,7 +161,8 @@ export function ArticleRow({
   draftMatch = false,
 }: {
   article: BlogArticle;
-  menuItems: MenuItem[];
+  /** The ⋯ rows; `unsent` adds Discard changes when a live blog has edits readers don't see. */
+  menuItems: (o: { unsent: boolean }) => MenuItem[];
   /** The row's place on this page, for putting focus back when a row goes. */
   index: number;
   /** The search matched the draft's newer title only: say so under the title (F42). */
@@ -251,7 +252,7 @@ export function ArticleRow({
       {/* After the link, so it sits above the row's stretched link. */}
       <div className={cn("relative justify-self-end", MENU_CELL)}>
         <Menu
-          items={menuItems}
+          items={menuItems({ unsent: differs })}
           label={menuLabel}
           align="end"
           trigger={(p) => (

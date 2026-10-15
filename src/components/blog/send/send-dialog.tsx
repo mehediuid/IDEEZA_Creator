@@ -39,10 +39,10 @@ import { coverFrom } from "@/lib/blog/cover";
 import { demoReview, MIN_WORDS } from "@/lib/blog/demo-review";
 import { imagesOf, missingAlt } from "@/lib/blog/doc";
 import { REASONS } from "@/lib/blog/reasons";
-import { blogHref } from "@/lib/blog/slug";
 import { updateBlog } from "@/lib/blog/store";
 import { TOPICS_MAX, type BlogArticle, type BlogDoc, type SubmissionKind } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
+import { listHref } from "@/lib/blog/list";
 
 /** The question at the head of the right column (P1), on a first publish and on an edit (frame 19). */
 export const PUBLISH_QUESTION = "Do you want to publish your blog?";
@@ -197,7 +197,7 @@ export function SendDialog({
     toast(SENT[kind]);
     onClose();
     // Replace, so Back from the list doesn't land on the editor of a blog that is now in review.
-    router.replace(blogHref());
+    router.replace(listHref());
   };
 
   const lineId = `${ids}-line`;

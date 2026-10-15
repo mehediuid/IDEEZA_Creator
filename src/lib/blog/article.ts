@@ -76,6 +76,8 @@ export function patchDraft(data: BlogData, id: string, change: Partial<ArticleMe
     const draft: ArticleMeta = { ...a.draft, ...change };
     draft.title = draft.title.slice(0, TITLE_MAX);
     draft.topics = cleanTopics(draft.topics);
+    // Nothing changed (e.g. the publish step closed untouched): the blog's last change stays put.
+    if (JSON.stringify(draft) === JSON.stringify(a.draft)) return null;
     return { ...a, draft, updatedAt: now };
   });
 }

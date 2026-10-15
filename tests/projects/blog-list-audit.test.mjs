@@ -135,7 +135,7 @@ test("F17 / F22 / F57: the row's second line", () => {
   assert.equal(note("art_00update01"), LIVE_UPDATE_NOTE);
   assert.equal(LIVE_UPDATE_NOTE, "Live · update in review");
   assert.equal(note("art_000again01"), null, "a blog that was never live waits without a note");
-  assert.equal(note("art_0uprejct01"), "Update needs changes");
+  assert.match(note("art_0uprejct01"), /^Update rejected( · \d+ things? to fix)?$/, "the live blog's rejected update, in status.ts's words");
   assert.equal(note("art_00000live1"), null);
   assert.equal(note("art_00000live1", true), "Unsent changes");
 });

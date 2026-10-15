@@ -24,7 +24,6 @@ import { useStickyTop } from "@/components/innovations/post-bits";
 import { bylineDate, minRead, missingBody, showContents, type BodyKind } from "@/lib/blog/article-view";
 import { categoryLabel } from "@/lib/blog/categories";
 import { headingsOf, isEmptyDoc, readingMinutes } from "@/lib/blog/doc";
-import { blogHref } from "@/lib/blog/slug";
 import { ME, displayNameOf, initialsOf } from "@/lib/people/ids";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMyProfile } from "@/lib/people/profile-store";
@@ -32,6 +31,7 @@ import type { ArticleMeta, BlogArticle, BlogDoc } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
 import { ArticleBody, ArticleBodySkeleton, ProjectTile } from "./article-body";
 import { ContentsDisclosure, ContentsList, scrollToHeading, useScrollSpy } from "./on-this-page";
+import { useListHref } from "@/components/blog/list/use-list-href";
 
 /** The page container the layout's container queries measure (the width of <main>). Positioned,
  *  so a visually hidden label inside stays inside <main>'s scroll instead of stretching the page. */
@@ -277,6 +277,7 @@ export function ArticleSkeleton() {
 /** No blog at this address (a wrong link, deleted, or written elsewhere): say so, and the way back. */
 export function ArticleMissing({ browserHasBlogs = true }: { browserHasBlogs?: boolean }) {
   const titleRef = React.useRef<HTMLHeadingElement>(null);
+  const listView = useListHref();
   React.useEffect(() => {
     titleRef.current?.focus({ preventScroll: true });
   }, []);
@@ -292,7 +293,7 @@ export function ArticleMissing({ browserHasBlogs = true }: { browserHasBlogs?: b
           titleRef={titleRef}
           action={
             <Link
-              href={blogHref()}
+              href={listView}
               className={cn(buttonVariants({ hierarchy: "secondary", size: "lg" }), "no-underline hover:text-[color:var(--color-button-secondary-text)] max-md:min-h-[var(--touch-min)]")}
             >
               Back to your blogs

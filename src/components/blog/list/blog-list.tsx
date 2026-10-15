@@ -270,7 +270,7 @@ export function BlogList() {
         className={LIST}
       >
         {paged.items.map((a, i) => (
-          <ArticleRow key={a.id} article={a} index={i} menuItems={actions.menuItems(a)} draftMatch={searchMatch(a, words, writer) === "draft"} />
+          <ArticleRow key={a.id} article={a} index={i} menuItems={(o) => actions.menuItems(a, o)} draftMatch={searchMatch(a, words, writer) === "draft"} />
         ))}
       </ul>
     );

@@ -26,13 +26,14 @@ import { markSeen, noticeKeysOf } from "@/lib/blog/article";
 import { metaDiffers, readerVersion, reasonPanel, statusView } from "@/lib/blog/article-view";
 import { sameDoc } from "@/lib/blog/doc";
 import { markNoticesSeen } from "@/lib/blog/notice-seen";
-import { articleHref, blogHref, findBySlug, previewHref, slugOf } from "@/lib/blog/slug";
+import { articleHref, findBySlug, previewHref, slugOf } from "@/lib/blog/slug";
 import { menuFor, statusOf } from "@/lib/blog/status";
 import { settleDueReviews, updateBlog, useBlog, useBody } from "@/lib/blog/store";
 import type { BlogArticle } from "@/lib/blog/types";
 import { ARTICLE_CONTENT, ARTICLE_PAGE, ArticleMissing, ArticleReader, ArticleSkeleton } from "./article-reader";
 import { BlogBreadcrumb } from "./breadcrumb";
 import { ReasonPanel } from "./reason-panel";
+import { listHref } from "@/lib/blog/list";
 
 /** Keeps the address on the article's current slug (and its #anchor). */
 export function useCanonicalPath(path: string | null) {
@@ -178,7 +179,7 @@ export function ArticlePage({ slug }: { slug: string }) {
   if (article && shownId !== article.id) setShownId(article.id);
 
   const [coverFor, setCoverFor] = React.useState<BlogArticle | null>(null);
-  const actions = useArticleActions({ onDeleted: () => router.replace(blogHref()), onChangeCover: setCoverFor });
+  const actions = useArticleActions({ onDeleted: () => router.replace(listHref()), onChangeCover: setCoverFor });
 
   React.useEffect(() => {
     settleDueReviews();
