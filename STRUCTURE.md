@@ -56,7 +56,12 @@ ideeza-creator-panel/
    │
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
-   │  ├─ dashboard/          sidebar, workspace-prompt (hero), command-palette (⌘K)
+   │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), command-palette (⌘K)
+   │  ├─ credits/            Settings › Plan & pricing (User Panel V2 layouts): pricing-frame (sheet,
+   │  │                      breadcrumb, pill tabs), plan-pricing-page, plans-panel, credits-panel,
+   │  │                      billing-history, payment-method-panel, plan-banner (+ plan details),
+   │  │                      checkout-page + order-summary + payment-picker (the checkout page),
+   │  │                      buy-credits (the in-place shortfall dialog), invoice-view
    │  ├─ support/            report-problem (the one Report a problem dialog + host)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
@@ -129,8 +134,9 @@ ideeza-creator-panel/
    │  │                      diff, master change, blockers), planner (rule map, layout,
    │  │                      AI-answer validation), geometry, products, store,
    │  │                      from-concept (the concept network as the saved Network)
-   │  ├─ create/             history.tsx (chats + build jobs), credits.tsx
-   │  │                      (credits ledger), concept.ts (concept/parts model),
+   │  ├─ create/             history.tsx (chats + build jobs), credits.tsx, credit-pricing.ts, credit-lots.ts
+   │  │                      (credits ledger), plans.ts + plan.tsx (the account's plan:
+   │  │                      subscription, renewals, monthly credit grants), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
    │  │                      plan.tsx (build-plan data)
    │  ├─ three/              providers.ts (image→3D), assembly.ts (the build as

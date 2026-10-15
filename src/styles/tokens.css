@@ -488,6 +488,12 @@
   --color-button-danger-text: var(--color-text-on-brand);
   --color-button-disabled-bg: var(--color-bg-subtle);
   --color-button-disabled-text: var(--color-text-disabled);
+  /* DS A01 Button, Hierarchy=Tonal (V3uizmZLHo5Xhy65Dp3F0O 3288:640): a
+   * brand-tinted fill. Dark mirrors bg-brand-subtle's dark step. */
+  --color-button-tonal-bg: var(--color-violet-50);
+  --color-button-tonal-bg-hover: var(--color-violet-100);
+  --color-button-tonal-bg-pressed: var(--color-violet-200);
+  --color-button-tonal-text: var(--color-violet-700);
 
   --color-input-bg: var(--color-bg-surface);
   --color-input-bg-disabled: var(--color-bg-subtle);
@@ -533,6 +539,11 @@
  * Dark theme — overrides
  * ============================================================ */
 [data-theme="dark"] {
+  /* DS Tonal button, dark: the brand-subtle step and the brand ink. */
+  --color-button-tonal-bg: var(--color-violet-950);
+  --color-button-tonal-bg-hover: var(--color-violet-900);
+  --color-button-tonal-bg-pressed: var(--color-violet-800);
+  --color-button-tonal-text: var(--color-violet-200);
   /* Review fix — dark theme: selection has to outrank hover (violet-400 reads
    * 5.1:1 here, so violet-600 at 2.6:1 inverted the hierarchy), and the net
    * highlight can go back to the brighter amber. */
@@ -660,6 +671,11 @@
 /* Honor system preference when no explicit theme is set */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
+  /* DS Tonal button, dark: the brand-subtle step and the brand ink. */
+  --color-button-tonal-bg: var(--color-violet-950);
+  --color-button-tonal-bg-hover: var(--color-violet-900);
+  --color-button-tonal-bg-pressed: var(--color-violet-800);
+  --color-button-tonal-text: var(--color-violet-200);
   /* Review fix — dark theme: selection has to outrank hover (violet-400 reads
    * 5.1:1 here, so violet-600 at 2.6:1 inverted the hierarchy), and the net
    * highlight can go back to the brighter amber. */

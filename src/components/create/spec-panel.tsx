@@ -113,7 +113,7 @@ export function SpecPanel({ card }: { card: SpecCard }) {
       <h4 className="text-sm text-text-tertiary">What will be built</h4>
 
       {spec ? (
-        <Facts spec={spec} parts={card.parts} pairs={card.pairs} />
+        <SpecFacts spec={spec} parts={card.parts} pairs={card.pairs} />
       ) : (
         <>
           {/* One line the height of a line of facts, so the card doesn't
@@ -163,7 +163,9 @@ export function EditSpecButton({ card }: { card: SpecCard }) {
   );
 }
 
-function Facts({
+/** The card's facts on their own — also the built concepts' short spec
+ *  (chat-thread.tsx BuiltFrom), which shows them with nothing to press. */
+export function SpecFacts({
   spec,
   parts,
   pairs,

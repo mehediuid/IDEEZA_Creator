@@ -1,9 +1,8 @@
 "use client";
 
 // CreditsCard — sits beside QuotaCard at the top of /history. Reads the
-// local credits ledger live from CreditsProvider. There's no backend
-// yet, so Top up is honest about what it does: it adds to the local
-// balance, nothing more.
+// local credits ledger live from CreditsProvider. Buy credits goes to
+// Settings › Plan & pricing, the credits' own page.
 
 import * as React from "react";
 import {
@@ -11,12 +10,13 @@ import {
   CONCEPT_COST,
   describeEntry,
   useCredits,
-  TOP_UP_CREDITS,
 } from "@/lib/create/credits";
+import Link from "next/link";
+import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useCreateHistory } from "@/lib/create/history";
 
 export function CreditsCard() {
-  const { hydrated, balance, ledger, topUp } = useCredits();
+  const { hydrated, balance, ledger } = useCredits();
   // A build's ledger line names the build, not its id.
   const { builds } = useCreateHistory();
   const titles = React.useMemo(
@@ -61,18 +61,14 @@ export function CreditsCard() {
         )}
       </div>
 
-      {/* Right: top-up affordance */}
+      {/* Right: where more credits come from */}
       <div className="flex shrink-0 flex-col items-end gap-[6px]">
-        <button
-          type="button"
-          onClick={() => topUp(TOP_UP_CREDITS)}
+        <Link
+          href={CREDITS_HREF}
           className="inline-flex h-[40px] items-center gap-[8px] rounded-lg border border-border-strong bg-bg-surface px-[16px] text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
         >
-          Top up
-        </button>
-        <p className="max-w-[220px] text-right text-sm text-text-tertiary">
-          No payments are wired yet — this adds to your local balance.
-        </p>
+          Buy credits
+        </Link>
       </div>
     </Shell>
   );

@@ -1841,7 +1841,7 @@ export function buildAttention(job: BuildJob): BuildAttention | null {
     return {
       job,
       reason: "credits",
-      message: `${name} is paused — top up credits to start it`,
+      message: `${name} is paused — buy credits to start it`,
     };
   }
   if (job.failure === "system") {

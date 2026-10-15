@@ -6,9 +6,10 @@
 // costs CONCEPT_COST. Charging refines alone would have left the
 // loophole open: regenerate runs the same model for the same money, so
 // anyone avoiding the charge would just press that instead. There is no
-// backend yet, so
-// this is a local balance the user can top up for free — see
-// describeEntry's "topup" line, which says so plainly.
+// backend yet, so this is a local balance. Credits come in as lots — the
+// starting balance, purchases (Buy credits, paid from the Demo wallet on
+// testnet) and the free top-ups of earlier builds — and a purchase expires
+// after VALIDITY_MONTHS (credit-lots.ts).
 //
 // Charging and refunding are keyed by buildId and idempotent: a given
 // build can only be charged once, and only a charged build can be
@@ -19,6 +20,8 @@
 // plan.tsx exactly (hydrate once, persist post-hydration).
 
 import * as React from "react";
+import { expiredLines } from "./credit-lots";
+import { VALIDITY_MONTHS, addMonths } from "./credit-pricing";
 
 /** What building ONE product costs. A build covers every product in the
  *  project, each with its own five deliverables, so the price is per product —
@@ -70,11 +73,30 @@ export type ChargeReason = "build" | "concept";
 export type CreditEntry = {
   id: string;
   delta: number;
-  reason: ChargeReason | "seed" | "refund" | "topup";
+  /** `topup`: the free demo top-ups of earlier builds, kept readable.
+   *  `purchase`: credits bought. `grant`: the plan's monthly credits.
+   *  `expiry`: a lot ran out of time. */
+  reason: ChargeReason | "seed" | "refund" | "topup" | "purchase" | "grant" | "expiry";
   /** What was charged: a build id, or a concept turn id. The field keeps
    *  its name because ledgers are already stored under it. */
   buildId?: string;
+  /** A purchase's order: one payment. The same order adds once. */
+  orderId?: string;
   ts: number;
+  /** A purchase: when its credits expire (VALIDITY_MONTHS after it). */
+  expiresAt?: number;
+  /** A purchase: the bonus credits inside `delta`, the pack, the dollar price
+   *  paid and how ("IDZ · demo wallet"), the price before the plan's discount,
+   *  and the wallet's transaction and paying address. */
+  bonus?: number;
+  pack?: string;
+  price?: number;
+  paidWith?: string;
+  listPrice?: number;
+  txHash?: string;
+  payer?: string;
+  /** An expiry: the lot (ledger line id) it empties. */
+  lotId?: string;
 };
 
 export type CreditsState = {
@@ -84,7 +106,6 @@ export type CreditsState = {
 
 const STORAGE_KEY = "ideeza:create:credits";
 const SEED_BALANCE = 8;
-const TOP_UP_AMOUNT = 10;
 
 // Safe placeholder for the pre-hydration render only — never shown,
 // since both QuotaCard's and CreditsCard's convention is to render a
@@ -126,7 +147,7 @@ function loadStored(): CreditsState {
 // ─────────────────────── pure helpers (testable) ────────────────────
 
 // Appends an entry and applies its delta to the balance. The one place
-// that mutates a CreditsState — chargeState/refundState/topUpState all
+// that mutates a CreditsState — chargeState/refundState/purchaseState all
 // route through it so balance and ledger can never drift apart.
 export function applyEntry(
   state: CreditsState,
@@ -206,16 +227,75 @@ export function refundState(
   return { state: applyEntry(state, entry), ok: true };
 }
 
-// Adds credits with no charge behind them — there's no payment
-// integration, so every call site that offers this must say so (see
-// describeEntry's "topup" line and the CreditsCard copy).
-export function topUpState(state: CreditsState, n: number): CreditsState {
+export type CreditOrder = {
+  orderId: string;
+  base: number;
+  bonus: number;
+  /** "Pro" — a pack's name; absent for a custom amount. */
+  pack?: string;
+  /** Dollars paid, after any plan discount. */
+  price: number;
+  /** "IDZ · demo wallet" */
+  paidWith: string;
+  ts?: number;
+  /** Dollars before the plan's discount. */
+  listPrice?: number;
+  txHash?: string;
+  payer?: string;
+};
+
+// Credits bought: base plus bonus, expiring VALIDITY_MONTHS later. Idempotent
+// per `orderId`: an order already in the ledger returns the state unchanged,
+// so a double click or a replayed confirm adds once.
+export function purchaseState(state: CreditsState, order: CreditOrder): CreditsState {
+  const base = Math.trunc(order.base);
+  const bonus = Math.max(0, Math.trunc(order.bonus));
+  if (base <= 0) return state;
+  if (state.ledger.some((e) => e.orderId === order.orderId)) return state;
+  const ts = order.ts ?? Date.now();
   return applyEntry(state, {
     id: makeId(),
-    delta: n,
-    reason: "topup",
-    ts: Date.now(),
+    delta: base + bonus,
+    reason: "purchase",
+    orderId: order.orderId,
+    ts,
+    expiresAt: addMonths(ts, VALIDITY_MONTHS),
+    bonus,
+    ...(order.pack ? { pack: order.pack } : {}),
+    price: order.price,
+    paidWith: order.paidWith,
+    ...(order.listPrice !== undefined && order.listPrice !== order.price ? { listPrice: order.listPrice } : {}),
+    ...(order.txHash ? { txHash: order.txHash } : {}),
+    ...(order.payer ? { payer: order.payer } : {}),
   });
+}
+
+// A plan's credits for one monthly period, expiring when the period ends.
+// Idempotent per grant id (lib/create/plans.ts `grantDue`).
+export function grantState(
+  state: CreditsState,
+  grant: { orderId: string; credits: number; plan: string; ts: number; expiresAt: number },
+): CreditsState {
+  if (grant.credits <= 0 || state.ledger.some((e) => e.orderId === grant.orderId)) return state;
+  return applyEntry(state, {
+    id: makeId(),
+    delta: grant.credits,
+    reason: "grant",
+    orderId: grant.orderId,
+    ts: grant.ts,
+    expiresAt: grant.expiresAt,
+    pack: grant.plan,
+  });
+}
+
+// The lots past their expiry at `now` lose what they had left: one `expiry`
+// line each, so the balance and the ledger stay one story.
+export function expireState(state: CreditsState, now: number): CreditsState {
+  let next = state;
+  for (const d of expiredLines(state.ledger, now)) {
+    next = applyEntry(next, { id: makeId(), delta: d.delta, reason: "expiry", lotId: d.lotId, ts: now });
+  }
+  return next;
 }
 
 // One-line description of a ledger entry for display (CreditsCard). `subject`
@@ -230,12 +310,22 @@ export function describeEntry(entry: CreditEntry, subject?: string): string {
       return `${sign}${amount} Starting balance`;
     case "topup":
       return `${sign}${amount} Top up`;
+    case "purchase":
+      return `${sign}${amount} ${entry.pack ? `${entry.pack} pack` : "Credits bought"}`;
+    case "grant":
+      return `${sign}${amount} ${entry.pack ?? "Plan"} plan credits`;
+    case "expiry":
+      return `${sign}${amount} Expired`;
     case "build":
       return `${sign}${amount} Build${about}`;
     case "concept":
       return `${sign}${amount} Concept render`;
     case "refund":
       return `${sign}${amount} Refund${about}`;
+    default:
+      // A reason this build doesn't know (a ledger written by newer code)
+      // still reads as an amount rather than a blank row.
+      return `${sign}${amount} Credits`;
   }
 }
 
@@ -248,7 +338,10 @@ type Ctx = {
   canAfford: (cost?: number) => boolean;
   charge: (buildId: string, cost?: number, reason?: ChargeReason) => boolean;
   refund: (buildId: string) => boolean;
-  topUp: (n: number) => void;
+  /** Adds a paid order's credits once per `orderId`; false when it already did. */
+  purchase: (order: CreditOrder) => boolean;
+  /** Adds a plan's monthly credits once per grant id. */
+  grant: (g: Parameters<typeof grantState>[1]) => boolean;
 };
 
 const CreditsContext = React.createContext<Ctx | null>(null);
@@ -260,15 +353,37 @@ export function CreditsProvider({
 }) {
   const [state, setState] = React.useState<CreditsState>(DEFAULT_STATE);
   const [hydrated, setHydrated] = React.useState(false);
+  // The latest state, for writes decided at event time. Every write sets it
+  // before its setState — there is no effect copying `state` into it, since
+  // that ran after children's effects and put back a stale state over a
+  // write a child had just made.
   const stateRef = React.useRef(state);
-  React.useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
 
-  // Hydrate once.
+  // Hydrate once, letting any lot past its date expire first. The ref is set
+  // here, not left to the effect that follows `state`: children's effects run
+  // before this provider's, so the first write after hydration (PlanCredits'
+  // monthly grant) read the empty pre-hydration ref and replaced the whole
+  // ledger with its one line.
   React.useEffect(() => {
-    setState(loadStored());
+    const loaded = expireState(loadStored(), Date.now());
+    stateRef.current = loaded;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of localStorage after mount
+    setState(loaded);
     setHydrated(true);
+  }, []);
+
+  // Another tab wrote the ledger (a purchase there, a build charged there):
+  // adopt it, so this tab's next write doesn't put back a stale balance.
+  // Writing the same value back raises no event, so the tabs don't echo.
+  React.useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || e.newValue === null) return;
+      const next = expireState(loadStored(), Date.now());
+      stateRef.current = next;
+      setState(next);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   // Persist on change post-hydration.
@@ -307,8 +422,9 @@ export function CreditsProvider({
       cost: number = BUILD_COST,
       reason: ChargeReason = "build",
     ) => {
-      const result = chargeState(stateRef.current, buildId, cost, reason);
-      if (result.ok) {
+      // A lot that ran out of time since the page loaded can't pay for it.
+      const result = chargeState(expireState(stateRef.current, Date.now()), buildId, cost, reason);
+      if (result.state !== stateRef.current) {
         stateRef.current = result.state;
         setState(result.state);
       }
@@ -326,8 +442,23 @@ export function CreditsProvider({
     return result.ok;
   }, []);
 
-  const topUp = React.useCallback((n: number) => {
-    setState((prev) => topUpState(prev, n));
+  // Through the ref like charge and refund: an addition that only queued a
+  // setState updater was lost when a build charged in the same tick, since
+  // the charge wrote its state from the ref the addition never advanced.
+  const purchase = React.useCallback((order: CreditOrder) => {
+    const next = purchaseState(stateRef.current, order);
+    if (next === stateRef.current) return false;
+    stateRef.current = next;
+    setState(next);
+    return true;
+  }, []);
+
+  const grant = React.useCallback((g: Parameters<typeof grantState>[1]) => {
+    const next = grantState(stateRef.current, g);
+    if (next === stateRef.current) return false;
+    stateRef.current = next;
+    setState(next);
+    return true;
   }, []);
 
   const value: Ctx = {
@@ -337,7 +468,8 @@ export function CreditsProvider({
     canAfford,
     charge,
     refund,
-    topUp,
+    purchase,
+    grant,
   };
 
   return (
@@ -353,6 +485,3 @@ export function useCredits(): Ctx {
   return ctx;
 }
 
-// Exported for the Top-up affordance's copy — kept here so the amount
-// can't drift from what topUp() actually adds.
-export const TOP_UP_CREDITS = TOP_UP_AMOUNT;

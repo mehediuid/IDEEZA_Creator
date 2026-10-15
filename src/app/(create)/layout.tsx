@@ -32,7 +32,8 @@ export default function CreateLayout({
   return (
     // A column at phone width (the bar over the page), a row from `md` (the
     // sidebar beside it).
-    <div className="flex h-dvh w-full flex-col overflow-hidden bg-bg-page font-sans text-text-primary md:flex-row">
+    // On paper (an invoice's Print or save as PDF) only the page prints.
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-bg-page font-sans text-text-primary md:flex-row print:block print:h-auto print:overflow-visible">
       {/* First in the document, so it is the first Tab stop — it sat after
           the whole sidebar, sixteen stops in, where skipping was pointless. */}
       <a
@@ -41,11 +42,13 @@ export default function CreateLayout({
       >
         Skip to main content
       </a>
-      <DashboardSidebar onOpenSearch={() => setSearchOpen(true)} />
+      <div className="contents print:hidden">
+        <DashboardSidebar onOpenSearch={() => setSearchOpen(true)} />
+      </div>
       <main
         id="main-content"
         tabIndex={-1}
-        className="min-h-0 flex-1 overflow-y-auto outline-none"
+        className="min-h-0 flex-1 overflow-y-auto outline-none print:overflow-visible"
       >
         {children}
       </main>
@@ -53,7 +56,9 @@ export default function CreateLayout({
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
       />
-      <BuildAttentionBanner />
+      <div className="contents print:hidden">
+        <BuildAttentionBanner />
+      </div>
     </div>
   );
 }

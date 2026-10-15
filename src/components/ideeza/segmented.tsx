@@ -37,7 +37,8 @@ const SIZES = {
 export type SegmentedSize = keyof typeof SIZES;
 
 export interface SegmentedOption<T extends string> {
-  label: string;
+  /** Usually a word; a node when part of it is coloured (Plans' "Annual (save 20%)"). */
+  label: React.ReactNode;
   value: T;
 }
 

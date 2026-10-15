@@ -6,12 +6,13 @@ import { GlobalRenderIndicator } from "@/components/video-jobs/global-render-ind
 import { ProductFlowProvider } from "@/components/product-flow/product-flow-provider";
 import { PcbProvider } from "@/lib/pcb/store";
 import { CreateHistoryProvider } from "@/lib/create/history";
-import { CreatePlanProvider } from "@/lib/create/plan";
+import { CreatePlanProvider, PlanCredits } from "@/lib/create/plan";
 import { CreditsProvider } from "@/lib/create/credits";
 import { ManualProjectsProvider } from "@/lib/manual/projects";
 import { MarketProvider } from "@/lib/market/market-store";
 import { BuildSimulator } from "@/components/create/build-simulator";
 import { WalletProvider } from "@/components/wallet/wallet-provider";
+import { BuyCreditsProvider } from "@/components/credits/buy-credits";
 import { VideosDialogHost } from "@/components/projects/make-videos";
 import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
@@ -116,22 +117,28 @@ export default function RootLayout({
                               useWalletRequest(), inside the projects and
                               market stores its requests write to. */}
                           <WalletProvider>
-                            {children}
-                            {/* The products' videos dialog a missing-video step
-                                opens (make-videos.tsx): here, so it outlives the
-                                step's row when the last video lands. */}
-                            <VideosDialogHost />
-                            {/* Report a problem: one dialog for every page,
-                                editors included, since they sit outside
-                                both sidebar layouts. Opened by
-                                openReportProblem() from anywhere. */}
-                            <ReportProblemHost />
+                            {/* BuyCreditsProvider: the one Buy credits dialog,
+                                opened in place from every shortfall. */}
+                            <BuyCreditsProvider>
+                              {children}
+                              {/* The products' videos dialog a missing-video step
+                                  opens (make-videos.tsx): here, so it outlives the
+                                  step's row when the last video lands. */}
+                              <VideosDialogHost />
+                              {/* Report a problem: one dialog for every page,
+                                  editors included, since they sit outside
+                                  both sidebar layouts. Opened by
+                                  openReportProblem() from anywhere. */}
+                              <ReportProblemHost />
+                            </BuyCreditsProvider>
                           </WalletProvider>
                           {/* A build is a background job: it has to keep
                               running whatever page the user is on, so the
                               worker lives here rather than on the build
                               page. Renders nothing. */}
                           <BuildSimulator />
+                          {/* The plan's credits for each monthly period. */}
+                          <PlanCredits />
                           <GlobalRenderIndicator />
                           <PlanRunner />
                         </CreateHistoryProvider>

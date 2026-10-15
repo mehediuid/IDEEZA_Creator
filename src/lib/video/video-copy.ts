@@ -36,7 +36,7 @@ export function storyboardHonesty(productName: string): string {
 }
 export const CANNOT_PLAY_COPY = "This browser can't play this video file.";
 export const PROMPT_BLOCKER = "Write what the video should show.";
-export const HIGH_LOCKED_NOTE = "720p comes with the Builder plan, which isn't on sale yet.";
+export const HIGH_LOCKED_NOTE = "720p comes with the Disruptor plan.";
 export const PROMPT_PLACEHOLDER = "Describe the shot — the product, the setting, how the camera moves";
 export const RENDER_KEEPS_RUNNING = "You can close this — the render keeps running, and its progress shows in the corner.";
 export const NO_VIDEO_PRODUCT =

@@ -8,7 +8,7 @@ UI grouped by module; logic and data for the same module live in [src/lib/](../l
 | `ui/` | shadcn-style primitives (badge, button, card, input) | ui-ux.md |
 | `theme-provider.tsx`, `theme-toggle.tsx`, `brand/`, `app-chrome/` | Light/dark theme, logo, profile dropdown | [features/platform-and-projects.md](../../docs/guides/features/platform-and-projects.md) |
 | `support/` | `report-problem.tsx`: the one Report a problem dialog and its host, mounted in the root layout | features/platform-and-projects.md › Platform & shell |
-| `dashboard/` | Global sidebar (+ phone drawer), home `workspace-prompt`, ⌘K `command-palette` | features/platform-and-projects.md; [features/ai-create-flow.md](../../docs/guides/features/ai-create-flow.md) |
+| `dashboard/` | Global sidebar (+ phone drawer, footer account / wallet popovers), home `workspace-prompt`, ⌘K `command-palette` | features/platform-and-projects.md; [features/ai-create-flow.md](../../docs/guides/features/ai-create-flow.md) |
 | `create/` | AI flow: concept chat + rail + thread, setup turn, image turns, spec sheet, build gate, build rail/status/shell, `review-outputs`, credits, history, toasts, the mounted `build-simulator` | features/ai-create-flow.md; Part 4 spec |
 | `create/model-panel/` | The review card's 3D tab: assembly viewer, rail, controls, states | features/ai-create-flow.md; spec `2026-09-25-3d-model-review-design.md` |
 | `voice/` | `voice-listening` — a prompt box's listening state (presentational) | features/ai-create-flow.md › voice hook |

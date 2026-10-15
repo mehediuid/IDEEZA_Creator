@@ -18,60 +18,59 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
-  ArrowDown01Icon,
   BookOpen01Icon,
   Bug01Icon,
   Cancel01Icon,
   Compass01Icon,
-  ComputerIcon,
   CpuIcon,
-  CrownIcon,
   FlashIcon,
   Folder01Icon,
   HistoryIcon,
   Home01Icon,
   HelpCircleIcon,
-  Logout01Icon,
   Mail01Icon,
   Menu01Icon,
-  Moon01Icon,
   MortarboardIcon,
   News01Icon,
   Notification03Icon,
   Search01Icon,
-  Settings01Icon,
   ShoppingBag01Icon,
   SidebarLeft01Icon,
   SidebarRight01Icon,
-  Sun01Icon,
-  User02Icon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
-import { useTheme } from "@/components/theme-provider";
 import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
+import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { useCreatePlan } from "@/lib/create/plan";
+import { planOf } from "@/lib/create/plans";
 import { Icon, type IconValue } from "./icon";
+import {
+  AccountPopover,
+  FloatingPanel,
+  WalletPopover,
+  moveFocus,
+  useMe,
+  usePlanLabel,
+} from "./sidebar-account";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
+import { Avatar } from "@/components/ideeza";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
-import { WalletMenuEntry } from "@/components/wallet/wallet-menu-entry";
 import { useStoredActingAs } from "@/lib/messages/identity";
 import { MESSAGES_HREF } from "@/lib/messages/links";
 import { countsFor } from "@/lib/messages/rules";
 import { useMessages } from "@/lib/messages/store";
 import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
+import { Badge, linkVariants } from "@/components/ideeza";
+import { openReportProblem } from "@/lib/support/open-report";
 import { useBlog, useReviewClock, updateBlog } from "@/lib/blog/store";
 import { findArticle, markSeen } from "@/lib/blog/article";
 import { DEMO_REVIEW_LABEL } from "@/lib/blog/demo-review";
 import { blogNews, newsAnnouncement, newsKicker, newsMessage, type BlogNews } from "@/lib/blog/news";
 import { markNoticesSeen, useSeenNotices } from "@/lib/blog/notice-seen";
 import { articleHref, slugOf } from "@/lib/blog/slug";
-import { Badge, linkVariants } from "@/components/ideeza";
-import { openReportProblem } from "@/lib/support/open-report";
-import { displayNameOf, initialsOf } from "@/lib/people/ids";
-import { useMyPhoto } from "@/lib/people/photo-store";
-import { useMyProfile } from "@/lib/people/profile-store";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -147,14 +146,14 @@ export function DashboardSidebar({
   onOpenSearch: () => void;
 }) {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
-  // The Blog's demo review decides about a minute after sending, on every page.
-  useReviewClock();
   // The page the drawer was opened on. A drawer is for getting somewhere, so
   // arriving closes it: once the path changes it no longer matches.
   const pathname = usePathname();
   const [openOn, setOpenOn] = React.useState<string | null>(null);
   const drawerOpen = openOn === pathname;
   const setDrawerOpen = (open: boolean) => setOpenOn(open ? pathname : null);
+  // The Blog's demo review decides about a minute after sending, on every page.
+  useReviewClock();
 
   return (
     <>
@@ -244,9 +243,8 @@ function SidebarBody({
   );
 }
 
-/** The phone's own chrome: the menu, the mark, the bell and search — the
- *  things the sidebar is for, at 56 px instead of 280. The bell sits here, not
- *  in the drawer, so a result shows its count on every phone page (F25). */
+/** The phone's own chrome: the menu, the mark, and search — the three things
+ *  the sidebar is for, at 56 px instead of 280. */
 function MobileBar({
   onOpenMenu,
   onOpenSearch,
@@ -535,50 +533,52 @@ function NavRow({
 function Footer({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
   return (
     <div className="border-t border-border p-[12px]">
-      <UpgradeButton collapsed={collapsed} />
+      <UpgradeButton collapsed={collapsed} onLeave={onLeave} />
       <SupportBlock collapsed={collapsed} onLeave={onLeave} />
       <ProfileRow collapsed={collapsed} onLeave={onLeave} />
     </div>
   );
 }
 
-// There is no paid plan to move to yet, so this is not a button that does
-// nothing: it names the plan and says it is not on sale, the convention every
-// other not-yet control here follows.
-function UpgradeButton({ collapsed }: { collapsed: boolean }) {
-  const why = "The Builder plan isn't on sale yet";
+// The way up from your plan (Creator Panel V3.0's "Upgrade to Builder · Unlock
+// more features"): a link to the plans, naming the next plan worth it — Builder
+// from Free or Tinkerer, Disruptor from Builder. Gone on the top plan.
+function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
+  const { hydrated, sub } = useCreatePlan();
+  if (!hydrated || sub.tier === "disruptor") return null;
+  const next = planOf(sub.tier === "builder" ? "disruptor" : "builder");
+  const label = `Upgrade to ${next.name}`;
   if (collapsed) {
     return (
-      <span
-        role="img"
-        aria-label={why}
-        title={why}
-        className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg bg-bg-subtle text-text-tertiary"
+      <Link
+        href={PLAN_PRICING_HREF}
+        aria-label={label}
+        title={label}
+        className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg bg-bg-brand-subtle text-text-brand outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        <Icon icon={CrownIcon} />
-      </span>
+        <Icon icon={FlashIcon} />
+      </Link>
     );
   }
   return (
-    <div
-      aria-label={why}
-      className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-subtle px-[12px] py-[12px]"
+    <Link
+      href={PLAN_PRICING_HREF}
+      onClick={onLeave}
+      className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-brand-subtle px-[12px] py-[12px] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
     >
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-md font-semibold text-text-secondary">
-          Builder plan
-        </span>
-        <span className="block truncate text-xs font-regular text-text-tertiary">
-          Not on sale yet — you are on Free
+        <span className="block truncate text-md font-semibold leading-md text-text-brand">{label}</span>
+        <span className="block truncate text-sm font-regular leading-sm text-text-secondary">
+          {next.credits.toLocaleString("en-US")} AI credits a month, and more
         </span>
       </span>
       <span
         aria-hidden
-        className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-lg bg-bg-surface text-text-tertiary"
+        className="inline-flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-bg-surface text-text-brand"
       >
         <Icon icon={FlashIcon} />
       </span>
-    </div>
+    </Link>
   );
 }
 
@@ -702,6 +702,11 @@ function SupportAction({
   );
 }
 
+// The footer's account row, drawn from Creator Panel V3.0 (Figma 45356:2823):
+// the avatar with your name and plan, then the wallet and the bell. Each opens
+// its own popover (sidebar-account.tsx), one at a time — opening one closes
+// the other rather than stacking them. On the collapsed rail the three stack,
+// wallet and bell above the avatar, and the popovers open beside the rail.
 function ProfileRow({
   collapsed,
   onLeave,
@@ -711,126 +716,148 @@ function ProfileRow({
    *  menu doesn't sit over a second focus trap. */
   onLeave?: () => void;
 }) {
-  // One panel open at a time — the account menu and the notification bell
-  // both anchor to this row, and opening one must close the other rather
-  // than let them stack on top of each other.
-  const [openPanel, setOpenPanel] = React.useState<"menu" | "bell" | null>(
-    null,
-  );
-  const ref = React.useRef<HTMLDivElement>(null);
+  const [openPanel, setOpenPanel] = React.useState<Panel | null>(null);
+  const [byKeyboard, setByKeyboard] = React.useState(false);
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  const railRef = React.useRef<HTMLElement | null>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
   const accountButton = React.useRef<HTMLButtonElement>(null);
+  const walletButton = React.useRef<HTMLButtonElement>(null);
+  const bellButton = React.useRef<HTMLButtonElement>(null);
+  const ids = { account: React.useId(), wallet: React.useId(), bell: React.useId() };
+  const planLabel = usePlanLabel();
+  const me = useMe();
 
-  // The Demo wallet dialog opens from inside the account menu, which closes
-  // (P2-MINT-2). Focus goes to the account button first, so the dialog hands
-  // it back there when it closes — the entry itself is gone with the menu.
-  // In the drawer, the drawer closes too and hands focus to its menu button.
-  const openWallet = () => {
-    accountButton.current?.focus();
+  React.useLayoutEffect(() => {
+    railRef.current = rowRef.current?.closest("aside") ?? null;
+  });
+
+  const close = (restoreFocus: boolean) => {
+    const opener = { account: accountButton, wallet: walletButton, bell: bellButton };
+    if (restoreFocus && openPanel) opener[openPanel].current?.focus({ preventScroll: true });
     setOpenPanel(null);
-    onLeave?.();
   };
+  // A keyboard press arrives as a click with no pointer detail: it opens on
+  // the first row, a pointer on the panel.
+  const toggle = (which: Panel) => (e: React.MouseEvent) => {
+    if (openPanel === which) return close(true);
+    setByKeyboard(e.detail === 0);
+    setOpenPanel(which);
+  };
+  const trigger = (which: Panel) => ({
+    type: "button" as const,
+    onClick: toggle(which),
+    "aria-expanded": openPanel === which,
+    "aria-controls": openPanel === which ? ids[which] : undefined,
+  });
 
   React.useEffect(() => {
     if (!openPanel) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpenPanel(null);
-      }
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Element;
+      if (rowRef.current?.contains(t) || t.closest?.("[data-footer-popover]")) return;
+      setOpenPanel(null);
     };
-    const onKey = (e: KeyboardEvent) =>
-      e.key === "Escape" && setOpenPanel(null);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
   }, [openPanel]);
 
-  const { fields: profile } = useMyProfile();
-  const photo = useMyPhoto();
-  const meName = displayNameOf(profile.name);
-  const meInitials = initialsOf(meName, profile.latinName || null);
+  const side = collapsed ? "right" : "top";
+  const frameRef = collapsed ? railRef : rowRef;
+  const popover = {
+    frameRef,
+    side,
+    panelRef,
+    focusFirst: byKeyboard,
+    onClose: close,
+    onLeave,
+  } as const;
+
+  const account = (
+    <button
+      ref={accountButton}
+      {...trigger("account")}
+      aria-haspopup="dialog"
+      aria-label={`${me.name}, ${planLabel} — open account menu`}
+      title={collapsed ? `${me.name} — account` : undefined}
+      className={[
+        "flex items-center rounded-lg outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
+        collapsed
+          ? "size-[40px] justify-center max-md:size-[var(--touch-min)]"
+          : "min-w-0 flex-1 gap-[8px] p-[4px] max-md:min-h-[var(--touch-min)]",
+        // Pressed while its popover is open, in the popover's own fill: that
+        // is what ties the two together, where the design had an arrow.
+        openPanel === "account" ? "bg-bg-surface-raised" : "",
+      ].join(" ")}
+    >
+      <Avatar initials={me.initials} src={me.photo} size="sm" />
+      {!collapsed && (
+        <span className="flex min-w-0 flex-1 flex-col gap-[2px] text-left">
+          <span className="truncate text-md font-medium leading-md text-text-primary">
+            {me.name}
+          </span>
+          <span className="truncate text-sm font-regular leading-xs text-text-secondary">
+            {planLabel}
+          </span>
+        </span>
+      )}
+    </button>
+  );
+  const wallet = (
+    <button
+      ref={walletButton}
+      {...trigger("wallet")}
+      aria-haspopup="menu"
+      aria-label="Wallet and tokens"
+      title="Wallet and tokens"
+      className={[FOOTER_BUTTON, openPanel === "wallet" ? "bg-bg-subtle text-text-primary" : ""].join(" ")}
+    >
+      <Icon icon={Wallet01Icon} />
+    </button>
+  );
+  // In the phone drawer the bell is left out: it lives in the phone's top bar (F25).
+  const bell = onLeave ? null : (
+    <NotificationBell
+      buttonRef={bellButton}
+      trigger={trigger("bell")}
+      open={openPanel === "bell"}
+      id={ids.bell}
+      popover={popover}
+      onPick={() => setOpenPanel(null)}
+    />
+  );
 
   return (
-    <div ref={ref} className="relative border-t border-border pt-[12px]">
-      <div className="flex items-center gap-[6px]">
-        <button
-          ref={accountButton}
-          type="button"
-          onClick={() =>
-            setOpenPanel((v) => (v === "menu" ? null : "menu"))
-          }
-          aria-haspopup="menu"
-          aria-expanded={openPanel === "menu"}
-          aria-label={`${meName} — open account menu`}
-          title={collapsed ? `${meName} — account` : undefined}
-          className={[
-            "flex min-w-0 flex-1 items-center rounded-lg outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
-            collapsed
-              ? "h-[44px] justify-center px-0"
-              : "h-[52px] gap-[12px] px-[8px]",
-          ].join(" ")}
-        >
-          <span
-            aria-hidden
-            className="relative inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-full bg-bg-brand text-md font-bold text-text-on-brand"
-          >
-            {photo.url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photo.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            ) : (
-              meInitials
-            )}
-          </span>
-          {!collapsed && (
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block truncate text-md font-medium text-text-primary">
-                {meName}
-              </span>
-              <span className="block truncate text-xs font-regular text-text-tertiary">
-                Free plan
-              </span>
-            </span>
-          )}
-        </button>
+    <div ref={rowRef} className="relative border-t border-border pt-[12px]">
+      {collapsed ? (
+        <div className="flex flex-col items-center gap-[12px]">
+          {wallet}
+          {bell}
+          {account}
+        </div>
+      ) : (
+        <div className="flex items-center gap-[10px]">
+          {account}
+          {wallet}
+          {bell}
+        </div>
+      )}
 
-        {/* Credits and notifications sit beside the account button, not
-            inside it — each is its own destination. In the phone drawer the
-            bell is left out: it lives in the phone's top bar. */}
-        {!collapsed && (
-          <>
-            <Link
-              href="/history#credits"
-              aria-label="Credits ledger"
-              title="Credits ledger"
-              className="inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border border-border text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:size-[var(--touch-min)]"
-            >
-              <Icon icon={Wallet01Icon} />
-            </Link>
-            {!onLeave && (
-              <NotificationBell
-                open={openPanel === "bell"}
-                onToggle={() =>
-                  setOpenPanel((v) => (v === "bell" ? null : "bell"))
-                }
-                onClose={() => setOpenPanel(null)}
-              />
-            )}
-          </>
-        )}
-      </div>
-
-      {openPanel === "menu" && (
-        <AccountMenu
-          collapsed={collapsed}
-          onClose={() => setOpenPanel(null)}
-          onOpenWallet={openWallet}
-        />
+      {openPanel === "account" && (
+        <AccountPopover id={ids.account} anchorRef={accountButton} {...popover} />
+      )}
+      {openPanel === "wallet" && (
+        <WalletPopover id={ids.wallet} anchorRef={walletButton} {...popover} />
       )}
     </div>
   );
 }
+
+type Panel = "account" | "wallet" | "bell";
+
+// Figma A01 Button, Secondary, icon-only SM: 32 px, a 1.5 px edge, radius lg.
+const FOOTER_BUTTON =
+  "relative inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg border-[length:var(--border-width-1-5)] border-solid border-[var(--color-button-secondary-border)] bg-[var(--color-button-secondary-bg)] text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)] [@media(pointer:coarse)]:size-[var(--touch-min)]";
 
 // Exhaustive over BuildAttention.reason — a build blocked on credits reads
 // and links differently than one merely waiting on a retry or a review, and
@@ -840,6 +867,149 @@ const ATTENTION_KICKER: Record<BuildAttention["reason"], string> = {
   retry: "Needs attention",
   credits: "Paused — needs credits",
 };
+
+// The bell answers with what the app actually knows: the builds waiting
+// for the user (the same list the attention banner surfaces), or, when
+// there are none, a panel that says so — never a click that does nothing.
+// Open state is controlled by ProfileRow so the bell and the other popovers
+// can never be open at once.
+function NotificationBell({
+  buttonRef,
+  trigger,
+  open,
+  id,
+  popover,
+  onPick,
+}: {
+  buttonRef: React.RefObject<HTMLButtonElement | null>;
+  trigger: {
+    type: "button";
+    onClick: (e: React.MouseEvent) => void;
+    "aria-expanded": boolean;
+    "aria-controls": string | undefined;
+  };
+  open: boolean;
+  id: string;
+  popover: {
+    frameRef: React.RefObject<HTMLElement | null>;
+    side: "top" | "right";
+    panelRef: React.RefObject<HTMLDivElement | null>;
+    focusFirst: boolean;
+    onClose: (restoreFocus: boolean) => void;
+  };
+  /** A notification was followed: close, and close the drawer too. */
+  onPick: () => void;
+}) {
+  const attentionBuilds = useAttentionElsewhere();
+  const { getChat } = useCreateHistory();
+  const news = useBlogNews();
+  const count = attentionBuilds.length + news.length;
+  const { frameRef, side, panelRef, focusFirst, onClose } = popover;
+
+  const label = bellLabel(attentionBuilds.length, news.length);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        {...trigger}
+        aria-haspopup="menu"
+        aria-label={label}
+        title={label}
+        className={[FOOTER_BUTTON, open ? "bg-bg-subtle text-text-primary" : ""].join(" ")}
+      >
+        <Icon icon={Notification03Icon} />
+        {count > 0 && (
+          <span
+            aria-hidden
+            // Filled with the error ink, not the error fill: white on
+            // red-500 is 3.76:1 at 10 px, on red-600 it is 4.83:1.
+            className="absolute right-[-6px] top-[-6px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--color-text-error)] px-[4px] text-2xs font-bold leading-none text-text-inverse"
+          >
+            {count > 99 ? "99+" : count}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <FloatingPanel
+          id={id}
+          role="menu"
+          aria-label="Notifications"
+          anchorRef={buttonRef}
+          frameRef={frameRef}
+          side={side}
+          tone="surface"
+          panelRef={panelRef}
+          initialFocus={focusFirst ? "first" : "panel"}
+          onKeyDown={(e) => {
+            if (moveFocus(e, panelRef.current)) return;
+            if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose(true);
+            } else if (e.key === "Tab") {
+              onClose(true);
+            }
+          }}
+        >
+          <p className="border-b border-border px-[16px] py-[10px] text-2xs font-bold uppercase tracking-wider text-text-tertiary">
+            Notifications
+          </p>
+          {count === 0 ? (
+            <p className="px-[16px] py-[16px] text-sm font-regular text-text-tertiary">
+              No notifications yet — builds that need you and your Blog&apos;s review results show up here.
+            </p>
+          ) : (
+            <ul role="none" className="max-h-[min(420px,60vh)] overflow-y-auto py-[4px]">
+              {news.map((n) => (
+                <BlogNewsItem key={n.key} news={n} onPick={onPick} />
+              ))}
+              {attentionBuilds.map((att) => (
+                <li key={att.job.id} role="none">
+                  <Link
+                    href={
+                      att.reason === "credits"
+                        ? "/history#credits"
+                        : getChat(att.job.chatId)
+                          ? `/chat/${att.job.chatId}`
+                          : `/build/${att.job.id}`
+                    }
+                    role="menuitem"
+                    data-nav-item
+                    onClick={onPick}
+                    className={BELL_ROW}
+                  >
+                    <span className="block text-2xs font-bold uppercase tracking-wider text-text-tertiary">
+                      {ATTENTION_KICKER[att.reason]}
+                    </span>
+                    <span className="mt-[2px] block truncate text-sm font-regular text-text-primary">
+                      {att.message}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </FloatingPanel>
+      )}
+    </>
+  );
+}
+
+/** The bell's name: how many builds need the maker, and how many Blog updates wait. */
+function bellLabel(builds: number, blog: number): string {
+  const parts = [
+    builds ? `${builds} need${builds === 1 ? "s" : ""} attention` : "",
+    blog ? `${blog} Blog update${blog === 1 ? "" : "s"}` : "",
+  ].filter(Boolean);
+  return parts.length ? `Notifications, ${parts.join(", ")}` : "No notifications yet";
+}
+
+// A focused row shows a ring inside its own edge (the DS Menu row's), not just a fill that
+// measures 1.04:1 against the panel (F10); 44 px tall on touch.
+const BELL_ROW =
+  "block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 /** The Blog's news the bell lists: unopened review results, and Featured or Removed. */
 function useBlogNews(): BlogNews[] {
@@ -857,24 +1027,49 @@ function markNewsSeen(n: BlogNews): void {
   else updateBlog((d) => markSeen(d, n.id));
 }
 
+/** A Blog item in the bell (D10, D-16), in the Figma's status words: opening it marks it seen
+ *  and lands on the blog's details, where a rejection's or removal's reasons sit on top. */
+function BlogNewsItem({ news: n, onPick }: { news: BlogNews; onPick: () => void }) {
+  const { data } = useBlog();
+  const article = findArticle(data, n.id);
+  if (!article) return null;
+  return (
+    <li role="none">
+      <Link
+        href={articleHref(slugOf(article))}
+        role="menuitem"
+        data-nav-item
+        onClick={() => {
+          markNewsSeen(n);
+          onPick();
+        }}
+        className={BELL_ROW}
+      >
+        <span className="flex flex-wrap items-center gap-[6px] text-2xs font-bold uppercase tracking-wider text-text-tertiary">
+          {newsKicker(n)}
+          {n.demo && (
+            <Badge tone="neutral" className="px-[6px] py-0 text-xs normal-case leading-xs tracking-normal">
+              {DEMO_REVIEW_LABEL}
+            </Badge>
+          )}
+        </span>
+        <span className="mt-[2px] block text-sm font-regular text-text-primary">{newsMessage(n)}</span>
+      </Link>
+    </li>
+  );
+}
+
 /** The rows a keyboard moves through, in order. */
 const bellRows = (panel: HTMLElement | null) => Array.from(panel?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
 
 // A focused row shows a ring inside its own edge (the DS Menu row's), not just a fill
 // that measures 1.04:1 against the panel (F10).
-const BELL_ROW =
+const PHONE_BELL_ROW =
   "block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
-const BELL_KICKER = "flex flex-wrap items-center gap-[6px] text-sm font-medium leading-sm text-text-secondary";
+const PHONE_BELL_KICKER = "flex flex-wrap items-center gap-[6px] text-sm font-medium leading-sm text-text-secondary";
 
-// The bell answers with what the app actually knows: the builds waiting
-// for the user (the same list the attention banner surfaces) and the Blog's
-// news, or, when there are none, a panel that says so — never a click that
-// does nothing. Open state is controlled by the place that draws it (the
-// sidebar's profile row, the phone top bar), so it never stacks with the
-// account menu. A menu button (WAI-ARIA APG): Enter, Space or ↓ opens it on the
-// first row, ↑ on the last; ↑ ↓ wrap, Home End jump; Escape closes it back to
-// the bell; Tab closes it and moves on from the bell.
-function NotificationBell({
+// The phone top bar's bell: the same news and builds in a panel that opens below the bar.
+function PhoneNotificationBell({
   open,
   onToggle,
   onClose,
@@ -999,7 +1194,7 @@ function NotificationBell({
           ) : (
             <ul role="none" className="max-h-[min(420px,60vh)] overflow-y-auto py-[4px]">
               {news.map((n) => (
-                <BlogNewsItem key={n.key} news={n} onClose={onClose} />
+                <BlogNewsItem key={n.key} news={n} onPick={onClose} />
               ))}
               {attentionBuilds.map((att) => (
                 <li key={att.job.id} role="none">
@@ -1013,9 +1208,9 @@ function NotificationBell({
                     }
                     role="menuitem"
                     onClick={onClose}
-                    className={BELL_ROW}
+                    className={PHONE_BELL_ROW}
                   >
-                    <span className={BELL_KICKER}>{ATTENTION_KICKER[att.reason]}</span>
+                    <span className={PHONE_BELL_KICKER}>{ATTENTION_KICKER[att.reason]}</span>
                     <span className="mt-[2px] block truncate text-sm font-regular text-text-primary">
                       {att.message}
                     </span>
@@ -1027,37 +1222,6 @@ function NotificationBell({
         </div>
       )}
     </div>
-  );
-}
-
-/** A Blog item in the bell (D10, D-16), in the Figma's status words: opening it marks it seen
- *  and lands on the blog's details, where a rejection's or removal's reasons sit on top. */
-function BlogNewsItem({ news: n, onClose }: { news: BlogNews; onClose: () => void }) {
-  const { data } = useBlog();
-  const article = findArticle(data, n.id);
-  if (!article) return null;
-  return (
-    <li role="none">
-      <Link
-        href={articleHref(slugOf(article))}
-        role="menuitem"
-        onClick={() => {
-          markNewsSeen(n);
-          onClose();
-        }}
-        className={BELL_ROW}
-      >
-        <span className={BELL_KICKER}>
-          {newsKicker(n)}
-          {n.demo && (
-            <Badge tone="neutral" className="px-[6px] py-0 text-xs leading-xs">
-              {DEMO_REVIEW_LABEL}
-            </Badge>
-          )}
-        </span>
-        <span className="mt-[2px] block text-sm font-regular text-text-primary">{newsMessage(n)}</span>
-      </Link>
-    </li>
   );
 }
 
@@ -1079,7 +1243,7 @@ function PhoneBell() {
   }, [open]);
   return (
     <div ref={ref}>
-      <NotificationBell open={open} onToggle={() => setOpen((v) => !v)} onClose={() => setOpen(false)} placement="below" />
+      <PhoneNotificationBell open={open} onToggle={() => setOpen((v) => !v)} onClose={() => setOpen(false)} placement="below" />
     </div>
   );
 }
@@ -1145,204 +1309,5 @@ function BlogNewsAnnouncer() {
         </div>
       )}
     </div>
-  );
-}
-
-function AccountMenu({
-  collapsed,
-  onClose,
-  onOpenWallet,
-}: {
-  collapsed: boolean;
-  onClose: () => void;
-  /** Closes the menu before the Demo wallet dialog opens. */
-  onOpenWallet: () => void;
-}) {
-  const [walletOpen, setWalletOpen] = React.useState(false);
-  const router = useRouter();
-  return (
-    <div
-      role="menu"
-      aria-label="Account"
-      className={[
-        "absolute bottom-[calc(100%+8px)] z-dropdown overflow-hidden rounded-xl border border-border bg-bg-surface shadow-3",
-        // Collapsed: pop out to a fixed width beside the rail. Expanded: span
-        // the sidebar width.
-        collapsed ? "left-[8px] w-[260px]" : "left-[8px] right-[8px]",
-      ].join(" ")}
-    >
-      <ul role="none" className="py-[8px]">
-        <MenuRow
-          icon={User02Icon}
-          label="Profile"
-          onClick={() => {
-            onClose();
-            router.push("/creators/me");
-          }}
-        />
-        <MenuRow
-          icon={Settings01Icon}
-          label="Settings"
-          onClick={() => {
-            onClose();
-          }}
-        />
-        <li role="none" className="my-[4px] border-t border-border" />
-        <li role="none">
-          <button
-            type="button"
-            role="menuitem"
-            aria-haspopup="menu"
-            aria-expanded={walletOpen}
-            onClick={() => setWalletOpen((v) => !v)}
-            className="flex h-[36px] w-full items-center gap-[12px] px-[16px] text-left text-md font-regular text-text-primary outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle"
-          >
-            <span aria-hidden className="text-text-secondary">
-              <Icon icon={Wallet01Icon} />
-            </span>
-            <span className="flex-1 truncate">Wallet & tokens</span>
-            <span
-              aria-hidden
-              className={[
-                "text-text-tertiary transition-transform duration-fast",
-                walletOpen ? "" : "-rotate-90",
-              ].join(" ")}
-            >
-              <Icon icon={ArrowDown01Icon} />
-            </span>
-          </button>
-          {walletOpen && (
-            <ul role="menu" className="bg-bg-page py-[4px]">
-              {/* The wallet's one standing home (P2-MINT-2): it opens the
-                  Demo wallet dialog, where every identity connects. */}
-              <li role="none">
-                <WalletMenuEntry variant="sidebar" onOpen={onOpenWallet} />
-              </li>
-              <WalletSubRow
-                title="Earn IDZ tokens"
-                hint="Free tokens to start"
-              />
-              <WalletSubRow
-                title="Claim rewards"
-                hint="See pending claims"
-              />
-              <li className="px-[20px] py-[12px] text-xs text-text-tertiary">
-                Needed to mint or buy. Testnet demo — no real money.
-              </li>
-            </ul>
-          )}
-        </li>
-        <li role="none" className="my-[4px] border-t border-border" />
-        <ThemeSelector />
-        <li role="none" className="my-[4px] border-t border-border" />
-        <MenuRow
-          icon={Logout01Icon}
-          label="Sign out"
-          destructive
-          onClick={() => {
-            onClose();
-          }}
-        />
-      </ul>
-    </div>
-  );
-}
-
-function ThemeSelector() {
-  const { theme, setTheme } = useTheme();
-  const options: Array<{
-    value: "light" | "dark" | "system";
-    label: string;
-    icon: IconValue;
-  }> = [
-    { value: "light", label: "Light", icon: Sun01Icon },
-    { value: "dark", label: "Dark", icon: Moon01Icon },
-    { value: "system", label: "System", icon: ComputerIcon },
-  ];
-  return (
-    <li role="none" className="px-[16px] py-[6px]">
-      <p className="mb-[6px] text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-        Theme
-      </p>
-      <div
-        role="radiogroup"
-        aria-label="Theme"
-        className="inline-flex h-[36px] w-full items-center gap-[2px] rounded-md border border-border bg-bg-page p-[2px]"
-      >
-        {options.map((o) => {
-          const active = theme === o.value;
-          return (
-            <button
-              key={o.value}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              aria-label={`Use ${o.label.toLowerCase()} theme`}
-              onClick={() => setTheme(o.value)}
-              className={[
-                "inline-flex h-[28px] flex-1 items-center justify-center gap-[6px] rounded-sm text-2xs outline-none transition-colors duration-fast",
-                "focus-visible:ring-2 focus-visible:ring-border-focus",
-                active
-                  ? "bg-bg-surface font-medium text-text-primary shadow-1"
-                  : "font-regular text-text-secondary hover:text-text-primary",
-              ].join(" ")}
-            >
-              <Icon icon={o.icon} size={14} />
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-    </li>
-  );
-}
-
-function MenuRow({
-  icon,
-  label,
-  destructive,
-  onClick,
-}: {
-  icon: IconValue;
-  label: string;
-  destructive?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <li role="none">
-      <button
-        type="button"
-        role="menuitem"
-        onClick={onClick}
-        className={[
-          "flex h-[36px] w-full items-center gap-[12px] px-[16px] text-left text-md font-regular outline-none transition-colors duration-fast",
-          "hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle",
-          destructive ? "text-text-error" : "text-text-primary",
-        ].join(" ")}
-      >
-        <span
-          aria-hidden
-          className={destructive ? "text-text-error" : "text-text-secondary"}
-        >
-          <Icon icon={icon} />
-        </span>
-        <span className="flex-1 truncate">{label}</span>
-      </button>
-    </li>
-  );
-}
-
-function WalletSubRow({ title, hint }: { title: string; hint: string }) {
-  return (
-    <li role="none">
-      <button
-        type="button"
-        role="menuitem"
-        className="flex w-full flex-col items-start gap-[2px] px-[20px] py-[12px] text-left outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle"
-      >
-        <span className="text-md font-regular text-text-primary">{title}</span>
-        <span className="text-xs font-regular text-text-tertiary">{hint}</span>
-      </button>
-    </li>
   );
 }
