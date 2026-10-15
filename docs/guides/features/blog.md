@@ -25,7 +25,7 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
   - **Filter rule:** `inStatus` is the only one. A rejected update also counts under Rejected. A Featured blog with an update in review also counts under Featured.
   - **Dates:** day first everywhere (`lib/blog/dates.ts`: "24 Mar 2025", "03:32 AM").
 - **The list** (`/blog`, `components/blog/list/`, Figma frames 01–09).
-  - **Header:** an `h1` "Blog", one line on what it is for, and a link to Innovations for short posts.
+  - **Header:** an `h1` "Blog" and one line on what it is for.
   - **The Figma toolbar:**
     - "Search by blog title or user name": matches every word in any order, and the writer's own name.
     - **Reuse access**: All · Allow for use · Not allow.

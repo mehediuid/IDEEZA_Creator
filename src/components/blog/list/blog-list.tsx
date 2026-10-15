@@ -27,7 +27,7 @@ import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button, SearchInput, buttonVariants, linkVariants } from "@/components/ideeza";
+import { Button, SearchInput, buttonVariants } from "@/components/ideeza";
 import { Pagination } from "@/components/projects/pagination";
 import { whenDialogsClose } from "@/components/create/use-dialog-focus";
 import { useArticleActions } from "@/components/blog/article-actions";
@@ -284,12 +284,6 @@ export function BlogList() {
           <h1 className="m-0 text-xl font-bold leading-xl tracking-tight text-text-primary">Blog</h1>
           <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
             Long write-ups about what you build. The IDEEZA team reviews each one before it goes on the IDEEZA Blog.
-          </p>
-          <p className="m-0 text-md leading-md text-text-secondary">
-            Short post or video?{" "}
-            <NextLink href="/innovations" className={cn(linkVariants({ color: "brand", size: "lg" }), "font-medium")}>
-              Share it on Innovations
-            </NextLink>
           </p>
         </header>
 

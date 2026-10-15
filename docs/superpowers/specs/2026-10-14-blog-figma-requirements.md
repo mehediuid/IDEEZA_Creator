@@ -94,7 +94,7 @@ Status key: **was** = what the first build did · **now** = what this pass build
 - L7, L8, L9: tooltips open on hover, keyboard focus and tap; each badge carries its status sentence. Status marks: Featured a star (the Figma's gem reads as "paid"), Removed eye-off; Rejected is the filled DS error badge, as frame 01 draws it.
 - L10–L13: extra ⋯ rows Copy link, Take offline and Discard changes where they apply; Quick view is a DS Drawer.
 - L14: "Delete blog?" for every status; the body says what happens for that status and that Undo is offered.
-- Above the toolbar: an `h1` "Blog", one line on what the Blog is for and a link to Innovations for short posts. The first visit teaches the three steps and "What the IDEEZA team looks for", and says blogs are kept in this browser (demo only). "Clear filters" appears while a filter narrows.
+- Above the toolbar: an `h1` "Blog" and one line on what the Blog is for. The first visit teaches the three steps and "What the IDEEZA team looks for", and says blogs are kept in this browser (demo only). "Clear filters" appears while a filter narrows.
 
 **Create / edit (E1–E7)**
 - E1: on phones the crumbs sit above Blog category and Preview is a visible button. Publish stays enabled before anything is written and names what is missing under each field.
