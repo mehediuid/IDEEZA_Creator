@@ -1,13 +1,143 @@
 # Features — Blog
 
-Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md › Keeping docs current](../../../AGENTS.md#keeping-docs-current-required). Design: spec `docs/superpowers/specs/2026-10-14-blog-design.md` (owner decisions D1–D10, approved 2026-10-14) and, overriding it where they differ, the requirement-by-requirement list `docs/superpowers/specs/2026-10-14-blog-figma-requirements.md` (owner, 2026-10-14: every Figma requirement is built; only the look is the design system's); plan https://claude.ai/artifact/VoL35ZTNLEzNu7EUWd4sLv, mockup https://claude.ai/artifact/EtZyjmB325okQ4XN2PnxaB. The Figma "User Panel V2 › User Blog" frames are the requirements; every screen uses the design system.
+Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md › Keeping docs current](../../../AGENTS.md#keeping-docs-current-required).
+
+**Sources**
+- Design spec: `docs/superpowers/specs/2026-10-14-blog-design.md` (owner decisions D1–D10).
+- Requirement list: `docs/superpowers/specs/2026-10-14-blog-figma-requirements.md`. It has one row per Figma element, the audit's owner decisions D-1…D-20 and every named difference. Where it differs from the spec, the list wins.
+- Plan: https://claude.ai/artifact/VoL35ZTNLEzNu7EUWd4sLv
+- Audit: https://claude.ai/artifact/QUM6js2CMEwNyQxwHtEjBH (2026-10-15).
+- The Figma "User Panel V2 › User Blog" frames are the requirements; every screen uses the design system.
 
 ## Blog (`/blog`, `lib/blog`, `components/blog`)
-- **One entry is a blog; the IDEEZA team reads it before it goes live.** The Figma's seven statuses (`displayStatusOf` in `lib/blog/status.ts`, derived from the record, never stored): **Draft · Pending · Rejected · Re-submitted · Approved · Featured · Removed** (Re-submitted also covers a live blog whose update waits). DS A17 badges with their word, never colour alone: Approved success, Featured brand with a star, Pending warning with a clock, Re-submitted blue, Draft neutral, Removed neutral with eye-off, Rejected error ink on an error outline (the error fill under 12 px text fails AA).
-- **The list** (`/blog`, `components/blog/list/`, Figma frames 01–09): "Search by blog title", **Reuse access** (All · Allowed for use · Not allowed), **Status** (All and the seven, in the Figma's order) — both with counts of what each choice would show — a **Date range** month calendar (start and end in either order, the band, Clear; full keyboard) and **Create a new blog**. Filters live in the URL (`?q=&status=&reuse=&from=&to=&page=`, defaults left out, bad values dropped), 12 a page. Columns **Blog title** (one line; the full title in a DS tooltip on hover and focus) with the green check **Authorized for use** when reuse is allowed · **Category** · **Date & time** ("Oct 14, 2026 · 06:04 PM") · **Status** (+ "n things to fix" / "Update needs changes") · ⋯; cards below a 600 px box. The ⋯ by status (`menuFor`): Approved/Featured → View · Edit · Change thumbnail · Copy link · Take offline · Delete; Draft → Edit · Delete; Pending/Rejected → Quick view · Edit · Change thumbnail · Delete; Re-submitted → (View ·) Quick view · Edit · Change thumbnail · (Discard changes ·) Delete; Removed → View · Delete. **Quick view** is a DS Drawer with the thumbnail, title, status, category, date, the dated reject reasons and the body, plus Open blog and Edit. Edit of a blog in review asks to take it out of review first. **Delete blog?** opens on a trash mark, "Yes, delete". First visit, an empty status, no match (Clear search / Clear filters), loading and an unreadable store each say so.
-- **The editor** (`/blog/new`, `/blog/[slug]/edit`, `components/blog/editor/`, TipTap v3 loaded only here; Figma frames 10–13): one card with a sticky bar — **Blog › Create new blog** (**Edit blog** once it has been sent), the save state ("Saving…" → **Drafted**; failed and offline say so), **Preview** and **Publish** (**Update** for a live blog) — then **Blog category (Required)**, **Tag (Optional)** (chips, Enter or comma, up to 5; the same list the publish modal's topics change) and **Tag link (Optional)** (one of your IDEEZA projects), saved as you go and locked while in review; then the writing card: **Title** and "Start your story here…". Publish refuses a missing category, title or body with the reason under the field. Nothing is stored until there is something to keep; then the address becomes the blog's own without losing the caret. "+" beside an empty line (or "/") opens the Figma's toolbar: Image · Video (MP4/WebM ≤ 50 MB) · 1 / 2 / 3 columns · align left / center / right / justify (⌘⇧L/E/R/J) · bulleted and numbered lists · code, then Heading, Subheading, Quote, Divider, Images side by side and an IDEEZA project card — DS IconButtons with tooltips on hover and focus, ←/→/Home/End and Escape; inside columns the tools a column can't hold are greyed and say so; phones get them named in an Add sheet. Columns (`columns` › `column`, BlogDoc v1) stack below 600 px; "1 column" unwraps keeping every word. A new block goes after what is selected, never over it. The selection bubble does Bold, Link (⌘K, http/https/mailto only), Heading, Subheading, Quote; no italic (Manrope has none). Images ask for a description (or "decoration only"); pasted text keeps only the blog's own marks. A blog in review is read-only until taken out of review; a rejected one shows **Reject reason** above the title.
-- **The publish modal** (`components/blog/send/`, Figma frames 14–19): the editor checks the title, the body, the Blog category, uploads and that the latest text is saved, then "Do you want to publish your blog?" ("…update your blog?" once it is live) opens in two columns (one on phones). **Thumbnail**: with no image, "Include a high-quality image in your blog" and Upload; with one, the 3:2 frame with − / + on the image and "Drag or use arrow keys to reposition image" until it is first moved, "Select a thumbnail from your images" as a strip that scrolls with arrows and opens on the chosen one, and Upload (Upload new when the blog has no images). The right column: **Add or change topics (up to 5) so readers know what your blog is about** (the same list as the editor's Tags), **Give access to IDEEZA for future use** with a ? help on hover, focus and tap — unticked until the writer ticks it (the Figma pre-ticks it; consent stays the writer's) and locked on with "can't be unchecked, contact support" once IDEEZA has shared it (`reuse.sharedOn`; nothing sets it until a Medium link exists) — then **Save and publish** (**Update** for a live blog), off without a thumbnail, and a line saying the IDEEZA team reviews it first. A toast and the list follow; choices are kept when the modal is closed.
-- **Demo review** (`lib/blog/demo-review.ts`, labelled wherever it shows): with no backend, an automatic check decides about a minute after sending, on any page (the sidebar's clock) or when a page next reads the blog — fewer than 150 words, 400+ words with no heading, or ad-like links/capitals/repeats reject it with how to fix each; otherwise it is approved and its body is copied to the live version. It never features or removes a blog.
-- **Review results in the bell**, in the Figma's status words: "Blog · Approved — “…” is approved and live on the IDEEZA Blog" / "Blog · Rejected — “…” was rejected · n reasons" (an update: "Your update to “…” …"). Opening one marks it seen and lands on the blog's details.
-- **Blog details** (`/blog/[slug]`, `components/blog/article/`, Figma frames 21–22): the **Reject reason** panel on top when the IDEEZA team rejected it (every reason since it was last approved, newest first, each dated, labelled Demo review; open while there is something to fix, folded to the newest once sent again; **Removal reason** for a removed blog); then the white card — **Blog › Blog details** with **Edit** and a ⋯ for the status's other actions (Change thumbnail, Copy link, Take offline, Discard changes, Delete) — and the blog as readers see it: title, the writer with "n min read · date" on the right, the 3:2 thumbnail, prose with images, image rows, video and project cards. The rail opens on the status badge and its sentence, then **Category**, **On this page** (scroll-spy on `<main>`), the tags and the **Tag link** project, each under a rule. Live blogs show their live version. **Change thumbnail** (Figma 23–25): the same picker and **Update**, off until something changed; one of the blog's own images applies at once, a new upload waits for the next approved update and the modal says so. **Blog preview** (`/blog/[slug]/preview`, Figma 20): the draft in the same card under **Blog › Create new blog (Edit blog) › Blog preview** with **Close preview ×** (or Esc), rail without the status.
-- **Store:** `ideeza:blog` (the index, read-modify-write on the freshest copy, never written over when unreadable), `ideeza:blog:doc:<id>` / `ideeza:blog:live:<id>` (bodies with a `rev`), files in IndexedDB `ideeza-blog`. Bodies are BlogDoc v1 JSON, normalised on every read and drawn as React elements; no blog code injects HTML (guard test).
+- **One entry is a blog; the IDEEZA team reads it before it goes live.**
+  - **Statuses:** the Figma's seven, from `displayStatusOf` in `lib/blog/status.ts`. They are derived from the record, never stored: **Draft · Pending · Rejected · Re-submitted · Approved · Featured · Removed**.
+    - Re-submitted also covers a live blog whose update waits.
+    - Featured keeps its badge beside Re-submitted.
+  - **Badges:** DS A17, always with their word.
+    - Approved: success.
+    - Featured: brand, with a star.
+    - Pending: warning.
+    - Re-submitted: blue.
+    - Draft: neutral.
+    - Removed: neutral, with eye-off.
+    - Rejected: the filled DS error badge.
+  - **Filter rule:** `inStatus` is the only one. A rejected update also counts under Rejected. A Featured blog with an update in review also counts under Featured.
+  - **Dates:** day first everywhere (`lib/blog/dates.ts`: "24 Mar 2025", "03:32 AM").
+- **The list** (`/blog`, `components/blog/list/`, Figma frames 01–09).
+  - **Header:** an `h1` "Blog", one line on what it is for, and a link to Innovations for short posts.
+  - **The Figma toolbar:**
+    - "Search by blog title or user name": matches every word in any order, and the writer's own name.
+    - **Reuse access**: All · Allow for use · Not allow.
+    - **Status**: All plus the seven, with typeahead.
+    - **Date range**: a calendar that works by keyboard, with 44 px days on touch.
+    - **Create a new blog**.
+    - "Clear filters" appears while a filter narrows. Each option counts what it would show.
+  - **URL:** `?q=&status=&reuse=&from=&to=&page=`. The last view is remembered in sessionStorage (`listHref`/`useListHref`), and every way back lands on it.
+  - **Columns:**
+    - **Blog title**: one line, with the full title in a tooltip.
+    - The **Authorized for use** check.
+    - **Category**: "-" when there is none.
+    - **Date & time**: the latest status event, named on hover.
+    - **Status**, with a note: "n things to fix", "Live · update in review", "Update rejected · n things to fix" or "Unsent changes".
+    - ⋯
+  - **Phones:** cards below 600 px.
+  - **The ⋯ by status** (`menuFor`):
+    - Approved and Featured: View to website · Edit · Change thumbnail · Copy link · Take offline · Delete.
+    - Draft: Edit · Delete.
+    - Pending and Rejected: Quick view · Edit · Change thumbnail · Delete.
+    - Re-submitted: (View to website ·) Quick view · Edit · Change thumbnail · (Discard changes ·) Delete.
+    - Removed: View to website · Delete.
+    - Unsent edits also add Discard changes.
+  - **Confirmations:** Delete, Take offline and Discard changes confirm in alertdialogs that say where the blog goes and what is lost. Their toast offers **Undo**.
+  - **Quick view:** a DS Drawer with the thumbnail, the status, the reasons grouped by review, and the body.
+  - **First visit:** it teaches the three steps and "What the IDEEZA team looks for", and says blogs live in this browser (demo).
+- **The editor** (`/blog/new`, `/blog/[slug]/edit`, `components/blog/editor/`, Figma frames 10–13). TipTap v3 loads only here.
+  - **Sticky bar:** **Blog › Create new blog**, the save state, **Preview**, and **Publish** (**Update** on a live blog).
+  - **Fields:**
+    - **Blog category (Required)**.
+    - **Tag (Optional)**: a DS listbox of up to 5 that snaps to known spellings.
+    - **Tag link (Optional)**: a combobox that picks one of your projects or takes a pasted ideeza.com link.
+  - **Writing card:** **Title** (focused on a new blog, with "n of 140" from 120 characters) and "Start your story here…", with the "+" shown at rest beside the empty line.
+  - **The "+" toolbar** (or "/"):
+    - Image · video · 1/2/3 columns · four alignments (⌘/Ctrl⇧L/E/R/J) · lists · code · heading · subheading · quote · divider · images side by side · IDEEZA project.
+    - It is one Tab stop, and its tooltips show the platform's keys.
+    - On phones it is a named Add sheet, and the phone bar adds Undo and Redo.
+  - **Writing:**
+    - The selection bubble also turns typed lines into lists or code.
+    - Links don't swallow the next words.
+    - Tab indents inside code, and Esc leaves it.
+    - Pasting from Docs or Word keeps what fits and names what didn't.
+    - Bangla words count right.
+  - **Saving:**
+    - Saves go to this browser, even offline: "You're offline. Your words are saved in this browser."
+    - Hovering "Drafted" shows "saved … in this browser".
+    - A failed save says why and offers **Try again**. Nothing claims the words are kept when they aren't.
+    - Every exit is guarded while something is unsaved or uploading: links, Back, and the editor's own moves.
+    - Autosave runs at least every 2 s while typing goes on.
+    - Two tabs on one blog raise "This blog changed in another tab."
+    - One rule decides "saved": `bodyKey` and `normalizeDoc` strip the trailing empty line, so Publish never refuses a saved blog.
+  - **States:**
+    - A blog in review is read-only until it is taken out.
+    - A live blog says readers keep the published version.
+    - A rejected blog shows the same **Reject reason** panel as its details page.
+    - On phones the caret stays above the format bar.
+- **The publish modal** (`components/blog/send/`, Figma frames 14–19). The dialog is named by its question.
+  - **Left column, Thumbnail:**
+    - Empty: "Include a high quality 400×267 pixels image in your blog" and Upload.
+    - −/+ on the image.
+    - "Drag or use arrow keys to reposition image". The drag follows the pointer, and moves are announced.
+    - "Select thumbnail one of your images": a strip with ‹ › that opens on the chosen image, drawn from stored 320 px thumbs.
+    - Upload or Upload new.
+    - A small-image warning and a crop warning.
+  - **Right column:**
+    - The question: **"Do you want to publish your blog?"**
+    - "Add or change topics (up to 5) so readers know what your story is about".
+    - **Give access to IDEEZA to future use**, with a visible helper (the one scope string, that it's optional, how to revoke) and a "?" that opens on click, tap and Enter.
+    - **Consent is asymmetric.** A grant is saved only by **Save and publish** / **Update**. Unticking on close is saved, with a toast.
+    - **Locked (P6)** once shared on Medium: the Figma sentence, "Shared on Medium · <date>", and "support", which opens Report a problem prefilled. Nothing sets the lock yet.
+    - Save and publish stays off without a thumbnail, but says why.
+    - Under it: the review line, "Demo review · decides in about a minute", "What the IDEEZA team looks for", and the demo check's advice.
+  - **On a phone** the sheet scrolls under a vertical swipe and the button is pinned.
+  - **After sending,** the remembered list replaces the editor.
+  - **Change thumbnail** (Figma 23–25, from ⋯):
+    - The same picker, and **Update**, which stays off until something changed and explains why.
+    - On a live blog, one of its own images applies at once.
+    - A new upload goes for review with Update and is marked "Waiting for review".
+    - A blog in review is taken out of review first.
+- **Demo review** (`lib/blog/demo-review.ts`). With no backend, an automatic check decides about a minute after sending, on any page (the sidebar's clock).
+  - **It rejects** for fewer than 150 words, 400+ words with no heading, or ad-like links, capitals or repeats, saying what it found and how to fix each.
+  - **Otherwise it approves,** copies the body to the live version and sweeps files nothing uses.
+  - **It is labelled visibly** wherever a result shows ("Demo: an automatic check decides here instead of the IDEEZA team.").
+- **Results in the bell:**
+  - **Blog · Approved / Rejected / Featured / Removed**.
+  - On phones the bell sits in the top bar at 44 px, with its count.
+  - A decided review is announced politely.
+  - Opening a result marks it seen and lands on the blog's details.
+- **Blog details** (`/blog/[slug]`, `components/blog/article/`, Figma frames 21–22).
+  - **The Reject reason panel** sits on top, grouped by review.
+    - "Latest review" opens, with a count caption, the Demo note and three lines per reason: title, what was found, how to fix.
+    - "Earlier reviews (n)" is folded. Re-submitted shows the panel folded.
+    - **Removal reason** has no fix lines (removal is final, D-3) and offers Contact IDEEZA support.
+  - **The card:** **Blog › Blog details** with **Edit** and the ⋯. It holds:
+    - the title;
+    - the writer's profile name and photo, linking to their profile;
+    - "n minutes to read · 14 Oct 2026";
+    - the 3:2 thumbnail;
+    - the body: headings H3 24 / H4 20, text Body MD 16/24 at a reading measure, images never wider than stored.
+  - **The rail,** in an article-led 9/3 split:
+    - The status badge or badges, their sentence, the demo time, and "Shared on Medium · <date>".
+    - **Category**, **On this page**, the tags, and the **IDEEZA project**.
+    - On phones a copy of the badge sits in the byline row.
+  - **Reading view** (`/blog/[slug]/read`, D-1): the published version without Edit, ⋯, reasons or rail, under "Blog › Blog details › Reader view" with Close ×.
+    - "View to website" opens it, and Copy link copies its address.
+    - The demo says it opens only in this browser.
+  - **Blog preview** (`/blog/[slug]/preview`, Figma 20): the draft in the same card, under **Blog › Create new blog › Blog preview**.
+    - **Close preview ×** (or Esc) goes back.
+    - A thumbnail placeholder shows until one is picked.
+- **Store:**
+  - `ideeza:blog` is the index: each row has a `rev`, writes go to the freshest copy, and an unreadable index is never written over.
+  - `ideeza:blog:doc:<id>` and `ideeza:blog:live:<id>` hold the bodies, each with its own `rev`.
+  - Files are in IndexedDB `ideeza-blog`, with a `<key>.thumb` beside each image. Storage failures name their cause.
+  - Bodies are BlogDoc v1 JSON (with columns and alignment). They are normalised on every read and drawn as React elements; no blog code injects HTML (a guard test checks this).
+- **Not this release:** DS-wide token changes (owner D-20), a public blog route, sync across devices, and an appeal flow.
