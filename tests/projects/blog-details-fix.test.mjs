@@ -72,6 +72,8 @@ test("the rail's sentence and extras, from the record (F19, F22, F23, F24, F53, 
   assert.equal(rejected.demo, null);
   const offTopic = statusView(one(sendBack(sent(fresh()), T0 + 2 * DAY, [{ id: "off-topic", detail: "" }], false)), false, now);
   assert.equal(offTopic.sentence, "The IDEEZA team rejected it. See the reason above.", "off topic only: editing can't fix it");
+  const inQuickView = statusView(one(sendBack(sent(fresh()), T0 + 2 * DAY, [{ id: "needs-detail", detail: "" }])), false, now, "below");
+  assert.equal(inQuickView.sentence, "The demo check rejected it. See the reasons below, then edit it and publish it again.", "Quick view's reasons come after the sentence");
 
   const approved = statusView(one(live()), false, now);
   assert.equal(approved.caption, DEMO_LINK_CAPTION);
