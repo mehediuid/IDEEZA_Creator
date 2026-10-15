@@ -2,38 +2,43 @@
 
 // What a writer can do to one blog, in one place, so the list's ⋯ and the blog's
 // own page behave the same. The ⋯ holds what the Figma draws for each status
-// (requirements L10–L13): View · Quick view · Edit · Change thumbnail · Delete,
-// plus Copy link, Take offline and Discard changes where they apply. Each action
-// is real: edit takes a submitted blog out of review first (the IDEEZA team reads
-// exactly what was sent); destructive ones ask first, in words that fit the
-// status; every outcome ends in a toast.
+// (requirements L10–L13): View to website · Quick view · Edit · Change thumbnail
+// · Delete, plus Copy link, Take offline and Discard changes where they apply.
+// Each action is real: View to website opens the reading view of the published
+// version (owner D-1) and Copy link copies that address; Edit takes a submitted
+// blog out of review first (the IDEEZA team reads exactly what was sent);
+// destructive ones ask first, in words worked out from the record
+// (confirm-copy.ts), and end in a toast with Undo (owner D-17): a deleted blog's
+// text and images are only wiped once the Undo has gone.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Delete02Icon,
-  EyeIcon,
+  Globe02Icon,
   Image01Icon,
   Link01Icon,
   PencilEdit02Icon,
+  SidebarRight01Icon,
   Undo02Icon,
-  ViewIcon,
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ConfirmDialog, type MenuItem } from "@/components/ideeza";
 import { usePostToast } from "@/components/innovations/toast";
 import { copyText } from "@/components/innovations/comments/comment-dom";
-import { discardChanges, displayTitle, takeOffline, withdraw } from "@/lib/blog/article";
-import { articleHref, editHref, slugOf } from "@/lib/blog/slug";
+import { discardChanges, removeArticle, restoreArticle, takeOffline, withdraw } from "@/lib/blog/article";
+import { confirmCopy, type ConfirmKind } from "@/lib/blog/confirm-copy";
+import { blogFileKeys, deleteBlogFiles } from "@/lib/blog/files";
+import { editHref, readHref, slugOf } from "@/lib/blog/slug";
 import { menuFor, statusOf, type ArticleAction } from "@/lib/blog/status";
-import { copyBody, deleteArticle, updateBlog } from "@/lib/blog/store";
+import { copyBody, readBlogNow, readBody, removeBodies, updateBlog, writeBody } from "@/lib/blog/store";
 import type { BlogArticle } from "@/lib/blog/types";
 
-type Confirm = { kind: "edit" | "take-offline" | "discard-changes" | "delete"; article: BlogArticle };
+type Confirm = { kind: ConfirmKind; article: BlogArticle };
 
 const LABEL: Record<ArticleAction, string> = {
-  view: "View",
+  view: "View to website",
   "quick-view": "Quick view",
   edit: "Edit",
   "change-cover": "Change thumbnail",
@@ -44,8 +49,8 @@ const LABEL: Record<ArticleAction, string> = {
 };
 
 const ICON = {
-  view: ViewIcon,
-  "quick-view": EyeIcon,
+  view: Globe02Icon,
+  "quick-view": SidebarRight01Icon,
   edit: PencilEdit02Icon,
   "change-cover": Image01Icon,
   "copy-link": Link01Icon,
@@ -54,29 +59,53 @@ const ICON = {
   delete: Delete02Icon,
 } as const;
 
-function confirmCopy(c: Confirm): { title: string; body: string; cta: string; tone: "danger" | "primary" } {
-  const t = `“${displayTitle(c.article)}”`;
-  const s = statusOf(c.article);
-  switch (c.kind) {
-    case "edit":
-      return s === "changes"
-        ? { title: "Take your changes out of review?", body: "You can edit them again. Readers keep seeing the published version until you send the changes again.", cta: "Edit changes", tone: "primary" }
-        : { title: "Take this blog out of review to edit it?", body: "It moves back to your drafts. Publish it again when you're done.", cta: "Edit blog", tone: "primary" };
-    case "take-offline":
-      return { title: "Take this blog offline?", body: "Readers won't see it any more. It moves to your drafts. To bring it back, publish it again.", cta: "Take offline", tone: "primary" };
-    case "discard-changes":
-      return { title: "Discard your changes?", body: "The changes waiting for review are deleted. Readers keep seeing the published version.", cta: "Discard changes", tone: "danger" };
-    case "delete":
-      if (s === "draft") return { title: "Delete this draft?", body: `${t} will be deleted from your blog list. You can't undo this.`, cta: "Yes, delete", tone: "danger" };
-      if (s === "review") return { title: "Delete blog?", body: `${t} will be taken out of review and deleted from your blog list. You can't undo this.`, cta: "Yes, delete", tone: "danger" };
-      if (s === "live" || s === "changes") return { title: "Delete blog?", body: `${t} will be taken off the IDEEZA Blog and deleted from your blog list. Links to it will stop working. You can't undo this.`, cta: "Yes, delete", tone: "danger" };
-      return { title: "Delete blog?", body: `${t} will be deleted from your blog list. You can't undo this.`, cta: "Yes, delete", tone: "danger" };
-  }
+/** How long a toast with Undo stays (the toast's own 6 s), plus a little for the click. */
+const UNDO_MS = 6500;
+
+export const LINK_COPIED = "Link copied. In this demo it opens only in this browser.";
+
+// ─────────────── a deleted blog's text and images, wiped once Undo has gone ───────────────
+// Module scope, so a delete from the blog's page still finishes after the page has moved on
+// to the list; a page closed inside the window wipes what it can on the way out.
+
+const pendingWipes = new Map<string, number>();
+
+function wipe(id: string): void {
+  window.clearTimeout(pendingWipes.get(id));
+  pendingWipes.delete(id);
+  removeBodies(id);
+  void blogFileKeys(id).then(deleteBlogFiles);
+}
+
+function onPageHide() {
+  for (const id of [...pendingWipes.keys()]) wipe(id);
+}
+
+function wipeLater(id: string): void {
+  window.clearTimeout(pendingWipes.get(id));
+  pendingWipes.set(
+    id,
+    window.setTimeout(() => wipe(id), UNDO_MS),
+  );
+  window.addEventListener("pagehide", onPageHide);
+}
+
+function keep(id: string): void {
+  window.clearTimeout(pendingWipes.get(id));
+  pendingWipes.delete(id);
+}
+
+/** The record as it stands, and where it sits in the list, for Undo. */
+function snapshotOf(id: string): { snapshot: BlogArticle; index: number } | null {
+  const articles = readBlogNow().articles;
+  const index = articles.findIndex((a) => a.id === id);
+  return index < 0 ? null : { snapshot: articles[index], index };
 }
 
 export type ArticleActions = {
-  /** The ⋯ rows for this blog, in the Figma's order for its status (menuFor). */
-  menuItems: (article: BlogArticle, opts?: { omit?: ArticleAction[] }) => MenuItem[];
+  /** The ⋯ rows for this blog, in the Figma's order for its status (menuFor). `unsent`: a live
+   *  blog's draft differs from what readers see (adds Discard changes). */
+  menuItems: (article: BlogArticle, opts?: { omit?: ArticleAction[]; unsent?: boolean }) => MenuItem[];
   run: (action: ArticleAction, article: BlogArticle) => void;
   /** The confirm dialog; render once, anywhere in the page. */
   dialogs: React.ReactNode;
@@ -96,14 +125,14 @@ export function useArticleActions(
     (action: ArticleAction, article: BlogArticle) => {
       switch (action) {
         case "view":
-          router.push(articleHref(slugOf(article)));
+          router.push(readHref(slugOf(article)));
           return;
         case "quick-view":
           onQuickView?.(article);
           return;
         case "copy-link":
-          void copyText(`${window.location.origin}${articleHref(slugOf(article))}`).then((ok) =>
-            toast(ok ? "Link copied." : "Couldn't copy the link. Copy it from the address bar."),
+          void copyText(`${window.location.origin}${readHref(slugOf(article))}`).then((ok) =>
+            toast(ok ? LINK_COPIED : "Couldn't copy the link. Use View to website and copy it from the address bar."),
           );
           return;
         case "change-cover":
@@ -123,38 +152,56 @@ export function useArticleActions(
     [onChangeCover, onQuickView, router, toast],
   );
 
-  const accept = async () => {
+  const accept = () => {
     if (!confirm) return;
     const { kind, article } = confirm;
+    const id = article.id;
     const now = Date.now();
     setConfirm(null);
     if (kind === "edit") {
-      const res = updateBlog((d) => withdraw(d, article.id, now));
+      const res = updateBlog((d) => withdraw(d, id, now));
       if (!res.ok) return toast("Couldn't take it out of review: this browser's storage is full.");
       router.push(editHref(slugOf(article)));
       return;
     }
+    const before = snapshotOf(id);
+    if (!before) return;
+    // The toast closes itself after its Undo runs, so the word that it worked comes a tick later.
+    const undoRecord = (done: string) => () => {
+      const res = updateBlog((d) => restoreArticle(d, before.snapshot, before.index));
+      window.setTimeout(() => toast(res.ok ? done : "Couldn't undo: this browser's storage is full."), 0);
+      return res.ok;
+    };
     if (kind === "take-offline") {
-      const res = updateBlog((d) => takeOffline(d, article.id, now));
-      toast(res.ok ? "Blog taken offline. It's in your drafts now." : "Couldn't take it offline: this browser's storage is full.");
+      const res = updateBlog((d) => takeOffline(d, id, now));
+      if (!res.ok) return toast("Couldn't take it offline: this browser's storage is full.");
+      toast("Blog taken offline. It's in your drafts now.", undoRecord("It's back online. Readers can see it again."));
       return;
     }
     if (kind === "discard-changes") {
-      const res = updateBlog((d) => discardChanges(d, article.id, now));
-      if (res.ok) copyBody(article.id, "live", "doc");
-      toast(res.ok ? "Changes discarded. Readers still see the published version." : "Couldn't discard: this browser's storage is full.");
+      const draft = readBody(id, "doc");
+      const res = updateBlog((d) => discardChanges(d, id, now));
+      if (!res.ok) return toast("Couldn't discard: this browser's storage is full.");
+      copyBody(id, "live", "doc");
+      toast("Changes discarded. Readers still see the published version.", () => {
+        if (undoRecord("Your changes are back.")()) writeBody(id, "doc", draft.doc, readBody(id, "doc").rev);
+      });
       return;
     }
     const wasDraft = statusOf(article) === "draft";
-    const res = await deleteArticle(article.id);
+    const res = updateBlog((d) => removeArticle(d, id));
     if (!res.ok) return toast("Couldn't delete it: this browser's storage is full.");
-    toast(wasDraft ? "Draft deleted." : "Blog deleted.");
+    wipeLater(id);
     onDeleted?.(article);
+    toast(wasDraft ? "Draft deleted." : "Blog deleted.", () => {
+      keep(id);
+      undoRecord(wasDraft ? "Draft restored." : "Blog restored.")();
+    });
   };
 
   const menuItems = React.useCallback(
-    (article: BlogArticle, o?: { omit?: ArticleAction[] }): MenuItem[] =>
-      menuFor(article)
+    (article: BlogArticle, o?: { omit?: ArticleAction[]; unsent?: boolean }): MenuItem[] =>
+      menuFor(article, { unsent: o?.unsent })
         .filter((a) => !(o?.omit ?? []).includes(a))
         .filter((a) => (a !== "change-cover" || !!onChangeCover) && (a !== "quick-view" || !!onQuickView))
         .map((a) => ({
@@ -167,7 +214,7 @@ export function useArticleActions(
     [onChangeCover, onQuickView, run],
   );
 
-  const copy = confirm ? confirmCopy(confirm) : null;
+  const copy = confirm ? confirmCopy(confirm.kind, confirm.article) : null;
   const dialogs = (
     <ConfirmDialog
       open={!!confirm}
@@ -186,7 +233,7 @@ export function useArticleActions(
       }
       confirmLabel={copy?.cta ?? ""}
       tone={copy?.tone ?? "danger"}
-      onConfirm={() => void accept()}
+      onConfirm={accept}
       onCancel={() => setConfirm(null)}
     >
       {copy?.body}

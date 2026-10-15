@@ -2,10 +2,12 @@
 
 // /blog/<slug>/preview — Blog preview (Figma frame 20): the draft (its meta and
 // working body) in exactly the reader view, in the same card as the details
-// page: "Blog › Create new blog › Blog preview" (Edit blog once it has been
-// sent), "Close preview ×" on the right, and a rail of Category, On this page
-// and the tags — no status, no actions, nothing to change here. Close preview
-// (or Esc) returns to the editor.
+// page: "Blog › Create new blog › Blog preview" (frame 19's editor name on every
+// editor page, owner D-7), "Close preview ×" on the right, and a rail of
+// Category, On this page and the tags — no status, no actions, nothing to change
+// here. Before a thumbnail is picked, its place is drawn and says when it comes.
+// Close preview (or Esc, when no menu or dialog is open) returns to the editor:
+// back when the editor opened it, so Back never loops between the two (F50).
 
 import * as React from "react";
 import Link from "next/link";
@@ -20,11 +22,10 @@ import { cn } from "@/lib/utils";
 import { useCanonicalPath, useDocumentTitle } from "./article-page";
 import { ARTICLE_CONTENT, ARTICLE_PAGE, ArticleMissing, ArticleReader, ArticleSkeleton } from "./article-reader";
 import { BlogBreadcrumb } from "./breadcrumb";
+import { layerOpen, leave, tailOfPath } from "./leave";
 
-/** The editor's own name in the breadcrumb: a blog never sent is still being created. */
-export function editorCrumb(a: BlogArticle): string {
-  return a.live || a.submission || a.reviews.length || a.takenDown ? "Edit blog" : "Create new blog";
-}
+/** The editor's name in the breadcrumb: frame 19's "Create new blog", on every editor page (D-7). */
+export const EDITOR_CRUMB = "Create new blog";
 
 function PreviewView({ article }: { article: BlogArticle }) {
   const router = useRouter();
@@ -33,14 +34,19 @@ function PreviewView({ article }: { article: BlogArticle }) {
   const title = article.draft.title.trim() || "Untitled draft";
   useDocumentTitle(`Preview: ${title}`);
 
+  const close = React.useCallback(() => {
+    const tail = tailOfPath(edit);
+    leave(router, edit, (p) => p.endsWith("/edit") && tailOfPath(p) === tail);
+  }, [router, edit]);
+
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
-      router.push(edit);
+      if (e.key !== "Escape" || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || layerOpen()) return;
+      close();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [router, edit]);
+  }, [close]);
 
   return (
     <div className={ARTICLE_PAGE}>
@@ -52,11 +58,18 @@ function PreviewView({ article }: { article: BlogArticle }) {
           bodyReady={body.hydrated}
           body="doc"
           dated={false}
+          coverSlot
           header={
             <>
-              <BlogBreadcrumb trail={[{ label: editorCrumb(article), href: edit }, { label: "Blog preview" }]} />
+              <BlogBreadcrumb trail={[{ label: EDITOR_CRUMB, href: edit }, { label: "Blog preview" }]} />
               <Link
                 href={edit}
+                replace
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                  e.preventDefault();
+                  close();
+                }}
                 className={cn(
                   buttonVariants({ hierarchy: "ghost", size: "md" }),
                   "no-underline max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
@@ -78,5 +91,5 @@ export function ArticlePreview({ slug }: { slug: string }) {
   const article = hydrated ? findBySlug(data, slug) : null;
   useCanonicalPath(article ? previewHref(slugOf(article)) : null);
   if (!hydrated) return <ArticleSkeleton />;
-  return article ? <PreviewView article={article} /> : <ArticleMissing />;
+  return article ? <PreviewView article={article} /> : <ArticleMissing browserHasBlogs={data.articles.length > 0} />;
 }

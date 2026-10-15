@@ -1,7 +1,9 @@
 "use client";
 
-// Blog › <article> (› Preview): where the page sits. The last crumb is the page
-// itself and truncates; a middle crumb folds to "…" on a narrow page.
+// Blog › <page> (› Preview): where the page sits. Every crumb keeps its words on
+// every width (F09): on a narrow page the row wraps instead of folding a crumb to
+// "…", and each link is a 44 px target on touch. The last crumb is the page
+// itself; a long one truncates on its own line.
 
 import * as React from "react";
 import Link from "next/link";
@@ -18,12 +20,11 @@ export function BlogBreadcrumb({ trail }: { trail: readonly BlogCrumb[] }) {
   const all: BlogCrumb[] = [{ label: "Blog", href: blogHref() }, ...trail];
   return (
     <nav aria-label="Breadcrumb" className="min-w-0">
-      <ol className="m-0 flex min-w-0 list-none items-center gap-3 p-0 text-md leading-md">
+      <ol className="m-0 flex min-w-0 list-none flex-wrap items-center gap-x-3 gap-y-1 p-0 text-md leading-md">
         {all.map((crumb, i) => {
           const last = i === all.length - 1;
-          const middle = i > 0 && !last;
           return (
-            <li key={`${i}:${crumb.label}`} className={last ? "flex min-w-0 items-center gap-3" : "flex shrink-0 items-center gap-3"}>
+            <li key={`${i}:${crumb.label}`} className={last ? "flex min-w-0 max-w-full items-center gap-3" : "flex shrink-0 items-center gap-3"}>
               {i > 0 && (
                 <span aria-hidden className="text-text-tertiary">
                   <Icon icon={ArrowRight01Icon} size={14} />
@@ -34,17 +35,8 @@ export function BlogBreadcrumb({ trail }: { trail: readonly BlogCrumb[] }) {
                   {crumb.label}
                 </span>
               ) : (
-                <Link href={crumb.href} aria-label={middle ? crumb.label : undefined} className={CRUMB_LINK}>
-                  {middle ? (
-                    <>
-                      <span className="hidden max-w-[240px] truncate [@container(min-width:640px)]:inline">{crumb.label}</span>
-                      <span aria-hidden className="[@container(min-width:640px)]:hidden">
-                        …
-                      </span>
-                    </>
-                  ) : (
-                    crumb.label
-                  )}
+                <Link href={crumb.href} className={CRUMB_LINK}>
+                  {crumb.label}
                 </Link>
               )}
             </li>
