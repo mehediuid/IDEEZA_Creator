@@ -152,6 +152,15 @@ export type ProjectState = {
  *  build, which made nothing and gave the credits back. */
 const LOCKS: ReadonlySet<BuildStatus> = new Set(["queued", "running", "ready", "partial"]);
 
+/** The build holds its concepts: booked and not failed. From then on the
+ *  concepts are the record of what was built — the canvas shows them and
+ *  offers nothing to change, and the composer draws nothing. A change to a
+ *  built product is made in its editor. A failed build made nothing, and a
+ *  cancelled one is gone, so both leave the concepts open again. */
+export function buildHolds(job?: BuildJob | null): job is BuildJob {
+  return !!job && LOCKS.has(statusOf(job));
+}
+
 /** The maker's decisions a booked snapshot was worked out with, as edits —
  *  the fields specKey compares, so the spec they work out to keys as the
  *  snapshot does. A locked product built again is booked from these, not
@@ -325,11 +334,16 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     if (!booked) return Object.keys(editsBy.get(t.id) ?? {}).some((k) => k !== "basedOn");
     return specKey(now) !== specKey(booked);
   };
+  //
+  // While the build holds its concepts nothing on the canvas can change
+  // them, so nothing has changed: a chat refined after its build, from
+  // before the concepts were held, offers no build again either.
+  const open = !!job && !buildHolds(job);
   const productChanged = (t: AssistantTurn) =>
-    !!job && (t.status !== "ready" || !inBuild(t) || specChangedFor(t));
-  const specChanged = !!job && selected.some(specChangedFor);
+    open && (t.status !== "ready" || !inBuild(t) || specChangedFor(t));
+  const specChanged = open && selected.some(specChangedFor);
   const conceptChanged =
-    !!job &&
+    open &&
     (selected.some((t) => t.status !== "ready" || !inBuild(t)) ||
       builtImages.size !== selected.filter(inBuild).length);
   const changedSinceBuild = conceptChanged || specChanged;
