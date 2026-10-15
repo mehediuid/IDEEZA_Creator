@@ -54,12 +54,21 @@ export type PostProduct = {
   parts: PostPart[];
   /** "mine" only: the build product behind it, so the post can show the real 3D model and parts. */
   build: { buildId: string; productId: string } | null;
+  /** The product's video, what its view opens on; null only when it has none (sharing requires one). */
+  video: PostVideo | null;
 };
 
+/** Every post and every product opens on its video (owner, 2026-10-13); images and the rest follow. */
 export type PostMedia =
   | { kind: "image"; src: string; alt: string; label: string }
+  /** A product's video as a file (sample posts: `public/innovations/videos/`). */
+  | { kind: "video"; src: string; poster: string | null; alt: string; label: string; durationMs: number | null; productId: string }
   /** A product's video in this browser's clip store ("mine" only). */
-  | { kind: "clip"; takeId: string; alt: string; label: string; durationMs: number | null };
+  | { kind: "clip"; takeId: string; alt: string; label: string; durationMs: number | null; productId: string };
+
+export type PostVideo = Extract<PostMedia, { kind: "video" | "clip" }>;
+
+export const isPostVideo = (m: PostMedia): m is PostVideo => m.kind === "video" || m.kind === "clip";
 
 /** What the post says about a sale. Buying happens on the Marketplace page (one home). */
 export type PostListing = {

@@ -1,7 +1,7 @@
 "use client";
 
-// ProfileDropdown — clickable wrapper around the "NR Nick Rough" pill in
-// the TopBar. Click opens a menu that hosts the Earn IDZ Tokens and Connect
+// ProfileDropdown — clickable wrapper around your name pill (your profile
+// name and initials, `useMe`) in the TopBar. Click opens a menu that hosts the Earn IDZ Tokens and Connect
 // Wallet actions (relocated from the TopBar middle slot) plus the usual
 // account / settings / sign-out items.
 //
@@ -13,7 +13,9 @@
 // dialog behind it — can be reached without a mouse.
 
 import * as React from "react";
+import Link from "next/link";
 import { WalletMenuEntry } from "@/components/wallet/wallet-menu-entry";
+import { useMe } from "@/lib/people/profile-store";
 
 export function ProfileDropdown({
   trigger,
@@ -21,6 +23,7 @@ export function ProfileDropdown({
   trigger: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
+  const me = useMe();
   const [toast, setToast] = React.useState<string | null>(null);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLDivElement>(null);
@@ -123,7 +126,7 @@ export function ProfileDropdown({
                 flex: "0 0 36px",
               }}
             >
-              NR
+              {me.initials}
             </div>
             <div>
               <div
@@ -133,17 +136,20 @@ export function ProfileDropdown({
                   color: "var(--color-text-primary)",
                 }}
               >
-                Nick Rough
+                {me.name}
               </div>
-              <div
+              <Link
+                href="/creators/me"
+                onClick={() => setOpen(false)}
                 style={{
                   fontSize: 11,
-                  color: "var(--color-text-secondary)",
+                  color: "var(--color-text-link)",
                   marginTop: 1,
+                  display: "inline-block",
                 }}
               >
-                Creator account
-              </div>
+                Your profile
+              </Link>
             </div>
           </div>
 

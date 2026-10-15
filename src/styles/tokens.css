@@ -96,8 +96,8 @@
   --color-black: #000000;
 
   /* ── Typography ─────────────────────────────────────────────── */
-  --font-family-display: "Manrope", system-ui, -apple-system, sans-serif;
-  --font-family-body: "Manrope", system-ui, -apple-system, sans-serif;
+  --font-family-display: "Manrope", "Noto Sans Bengali", system-ui, -apple-system, sans-serif;
+  --font-family-body: "Manrope", "Noto Sans Bengali", system-ui, -apple-system, sans-serif;
   --font-family-mono: "Roboto Mono", ui-monospace, "SF Mono", monospace;
 
   --font-weight-regular: 400;

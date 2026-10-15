@@ -112,14 +112,14 @@ function EarnRights(props: SlotProps) {
   const editable = can(viewer, "legal.edit", view.canCtx);
   const rows = legalRows(project.legal);
   return (
-    <EarnBlock id="rights" title="Rights" lead="The patent, copyright and trademark details anyone buying it should know, as you state them." className={NEXT}>
-      {/* The legal details are absent while they hold nothing and can't be edited (sold in full). */}
+    <EarnBlock id="rights" title="Rights" lead="The patents, copyrights and trademarks anyone buying it should know about, as you state them. Add as many as you have." className={NEXT}>
+      {/* The rights are absent while there are none and they can't be edited (sold in full). */}
       {editable || rows.length > 0 ? (
         <RailStackScope className="flex flex-col gap-6">
           <LegalBody project={project} editable={editable} rows={rows} announce={announce} />
         </RailStackScope>
       ) : (
-        !license && <p className={EARN_LEAD}>No legal details were added before it sold in full.</p>
+        !license && <p className={EARN_LEAD}>No rights were added before it sold in full.</p>
       )}
       {license && (
         <RailStackScope>

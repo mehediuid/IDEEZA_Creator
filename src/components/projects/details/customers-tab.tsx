@@ -17,6 +17,7 @@
 // telling every customer at once is Activity's job, so a line above the rows
 // points there (Messages spec §6).
 
+import { profileHrefOf } from "@/lib/people/ids";
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -371,6 +372,11 @@ function DisclosureBody({
           >
             Message {buyerName}
           </Link>
+          {profileHrefOf(row.buyerId) && (
+            <Link href={profileHrefOf(row.buyerId) as string} tabIndex={open ? 0 : -1} className={QUIET_LINK}>
+              {`See ${buyerName}'s profile`}
+            </Link>
+          )}
         </div>
       </div>
     </div>

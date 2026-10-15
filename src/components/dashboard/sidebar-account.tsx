@@ -44,10 +44,19 @@ import { BUILD_COST, useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { menuEntryOf } from "@/lib/wallet/request-view";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { displayNameOf, initialsOf } from "@/lib/people/ids";
+import { useMyPhoto } from "@/lib/people/photo-store";
+import { useMyProfile } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
 import { Icon, type IconValue } from "./icon";
 
-export const ACCOUNT = { name: "You", initials: "Y" };
+/** Who you are, as your profile says (Creators: name, Latin name for the initials, photo). */
+export function useMe(): { name: string; initials: string; photo: string | undefined } {
+  const { fields } = useMyProfile();
+  const photo = useMyPhoto();
+  const name = displayNameOf(fields.name);
+  return { name, initials: initialsOf(name, fields.latinName || null), photo: photo.url ?? undefined };
+}
 
 /** The plan line under the name: "Free plan". */
 export function usePlanLabel(): string {
@@ -283,6 +292,7 @@ export function AccountPopover({
   onLeave?: () => void;
 }) {
   const planLabel = usePlanLabel();
+  const me = useMe();
   const { ledger, hydrated } = useCredits();
   const totals = creditTotals(ledger);
   const level = levelOf(xpOf(ledger));
@@ -347,9 +357,9 @@ export function AccountPopover({
           {/* Who you are. No chevron: "My profile" below is where it goes, and
               one destination gets one row. */}
           <div className="flex items-center gap-[8px] p-[8px]">
-            <Avatar initials={ACCOUNT.initials} size="sm" />
+            <Avatar initials={me.initials} src={me.photo} size="sm" />
             <span className="flex min-w-0 flex-col gap-[2px]">
-              <span className="truncate text-md font-medium leading-md text-text-primary">{ACCOUNT.name}</span>
+              <span className="truncate text-md font-medium leading-md text-text-primary">{me.name}</span>
               <span className="truncate text-sm font-regular leading-xs text-text-secondary">{planLabel}</span>
             </span>
           </div>
@@ -363,7 +373,10 @@ export function AccountPopover({
           />
 
           <div className="mt-[2px] flex flex-col gap-[2px]">
-            <SoonRow icon={UserCircleIcon} label="My profile" why="your profile page isn't open yet" />
+            <Link href="/creators/me" data-nav-item onClick={leave} className={cn(ROW, ROW_LIVE)}>
+              <Icon icon={UserCircleIcon} size={20} />
+              <span className="min-w-0 flex-1 truncate">My profile</span>
+            </Link>
             <AppearanceRow />
             <button
               ref={appRowRef}

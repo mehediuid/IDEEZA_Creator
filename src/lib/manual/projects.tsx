@@ -34,7 +34,7 @@ import { productsOf, type BuildJob, type BuildProduct } from "../create/history"
 // loading — only from inside functions. editor-scope.ts, contributors.ts and
 // ../wallet/mint.ts join the same cycle on the same terms.
 import { lineageProjectOf, modelNameOf } from "./project-read";
-import { renameProduct as renameProductPatch, stampEditorOpened } from "./editor-scope";
+import { addHandProduct, renameProduct as renameProductPatch, stampEditorOpened } from "./editor-scope";
 import {
   CONTRIBUTOR_NAME_MAX,
   CONTRIBUTORS_MAX,
@@ -1165,6 +1165,9 @@ type Ctx = {
    *  while they agree). False, and no write, for an empty name or an unknown
    *  row. Bumps updatedAt. */
   renameProduct: (id: string, rowId: string, name: string) => boolean;
+  /** "Add a product" › Build manually: a new hand-made row named `name`, after the others. Its id,
+   *  or null when the name is empty or the project isn't there. Bumps updatedAt. */
+  addProduct: (id: string, name: string) => string | null;
   /** P2-MINT-8: the demo mint record — only the mint and listing commits call
    *  this. Stored as normalizeMintRecord reads it, and written to storage before
    *  it returns: false, and nothing changed, for a record that doesn't parse, a
@@ -1512,6 +1515,24 @@ export function ManualProjectsProvider({
     [recordOf],
   );
 
+  const addProduct = React.useCallback(
+    (id: string, name: string) => {
+      const base = recordOf(id);
+      const now = Date.now();
+      const rowId = newProductId();
+      if (!base || !Object.keys(addHandProduct(base, rowId, name, now)).length) return null;
+      setProjects((arr) =>
+        arr.map((p) => {
+          if (p.id !== id) return p;
+          const patch = addHandProduct(p, rowId, name, now);
+          return Object.keys(patch).length ? applyPatch(p, patch, now) : p;
+        }),
+      );
+      return rowId;
+    },
+    [recordOf],
+  );
+
   // P2-MINT-8 — the mint record, stored exactly as a reload will read it, and
   // written to storage NOW (R2-9): the caller's next write (a listing) must
   // never land when this one was refused, so true means it's in storage.
@@ -1688,6 +1709,7 @@ export function ManualProjectsProvider({
     activeProductId,
     touchOpened,
     renameProduct,
+    addProduct,
     setMint,
     addContributor,
     updateContributor,

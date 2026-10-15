@@ -2,6 +2,7 @@
 // Maps the editor's icon keys to @hugeicons/core-free-icons icon objects.
 // Adopts the IDEEZA design-system icon set (Hugeicons) for editor chrome.
 import {
+  Bug01Icon,
   Activity01Icon,
   AlignBottomIcon,
   AlignHorizontalCenterIcon,
@@ -202,6 +203,7 @@ export const HICON: Record<string, typeof Activity01Icon> = {
   community: UserGroupIcon,
   tutorial: OnlineLearning01Icon,
   contact: ContactIcon,
+  bug: Bug01Icon,
   chat: BubbleChatIcon,
   about: InformationCircleIcon,
   video: Video01Icon,

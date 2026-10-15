@@ -16,6 +16,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { PersonName } from "@/components/profile/person-name";
 import { useRouter } from "next/navigation";
 import {
   FavouriteIcon,
@@ -123,9 +124,9 @@ export function ProjectCard({ project }: { project: Project }) {
           >
             {project.creator.initials}
           </span>
-          <span className="truncate text-sm font-medium text-text-secondary">
+          <PersonName id={project.creator.id} from="innovations" tone="secondary" className="truncate text-sm font-medium">
             {project.creator.name}
-          </span>
+          </PersonName>
           {project.creator.pro && (
             <span className="shrink-0 rounded-[4px] border border-border px-[4px] py-[1px] text-[9px] font-bold uppercase leading-none tracking-wide text-text-tertiary">
               Pro

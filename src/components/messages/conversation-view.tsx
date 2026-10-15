@@ -199,6 +199,7 @@ export function ConversationView({
         initials={otherPerson?.initials ?? ""}
         team={team}
         items={items}
+        personId={team ? null : (other?.id ?? null)}
       />
       {failure && (
         <div className="shrink-0 px-4 pt-4 md:px-8">

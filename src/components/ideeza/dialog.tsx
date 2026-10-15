@@ -53,6 +53,9 @@ export interface ModalFrameProps {
   initialFocus?: React.RefObject<HTMLElement | null>;
   /** The dialog can't be closed right now: ✕ reads aria-disabled, and `onClose` explains. */
   closeUnavailable?: boolean;
+  /** Below `md`, a bottom sheet (DS M09): full width, anchored to the bottom edge, square at the
+   *  foot. Centered as usual from `md`. */
+  sheet?: boolean;
 }
 
 export function ModalFrame({
@@ -67,6 +70,7 @@ export function ModalFrame({
   bodyClassName,
   initialFocus,
   closeUnavailable = false,
+  sheet = false,
 }: ModalFrameProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
@@ -74,7 +78,12 @@ export function ModalFrame({
   useDialogFocus(open && !covered, panelRef, initialFocus);
   if (!open || typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 z-modal flex items-center justify-center px-8 py-12">
+    <div
+      className={cn(
+        "fixed inset-0 z-modal flex items-center justify-center px-8 py-12",
+        sheet && "max-md:items-end max-md:px-0 max-md:pb-0",
+      )}
+    >
       <div
         aria-hidden
         onClick={covered ? undefined : onClose}
@@ -100,6 +109,8 @@ export function ModalFrame({
           ENTER,
           "motion-safe:zoom-in-95",
           WIDTH[size],
+          sheet &&
+            "max-md:max-h-[90dvh] max-md:max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:motion-safe:slide-in-from-bottom-4",
         )}
       >
         <header className="flex items-start gap-6 px-10 pb-4 pt-8">

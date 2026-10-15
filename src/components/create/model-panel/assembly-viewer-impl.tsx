@@ -20,6 +20,7 @@ import { partPosition, type AssemblyPart, type Vec3 } from "@/lib/three/assembly
 import { useTokens } from "@/lib/three/use-tokens";
 import { PartMesh, type PartColors } from "./part-mesh";
 import type { AssemblyViewerProps, ScreenBox, ViewPreset } from "./viewer-types";
+import { recordCaught } from "@/lib/support/recent-errors";
 
 type OrbitControlsImpl = React.ComponentRef<typeof OrbitControls>;
 
@@ -340,7 +341,8 @@ class SceneBoundary extends React.Component<{ onError: () => void; children: Rea
   static getDerivedStateFromError() {
     return { failed: true };
   }
-  componentDidCatch() {
+  componentDidCatch(error: unknown) {
+    recordCaught(error);
     this.props.onError();
   }
   render() {

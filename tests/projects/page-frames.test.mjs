@@ -176,11 +176,17 @@ test("P0: the moved addresses redirect on the server before the page renders", (
   assert.match(read("lib/manual/project-summary.ts"), /return earnHref\(projectId, "sell", \{ list: "1" \}\);/);
 });
 
-test("the Add a product tile is the owner's first tile, a link to /?addTo= behind the edit gate (P2-TABS-29)", () => {
+test("the Add a product tile is the owner's first tile; it opens the dialog on the page, never Home (owner, 2026-10-13)", () => {
   const tab = read(DETAILS + "products-tab.tsx");
-  assert.match(tab, /`\/\?addTo=\$\{encodeURIComponent\(projectId\)\}`/);
-  assert.match(tab, /gate\.guard\("addProduct"/);
+  assert.doesNotMatch(tab, /\?addTo=\$\{/, "no trip to Home");
+  assert.match(tab, /<AddProductDialog project=\{project\}/);
+  assert.match(tab, /gate\.reasonOf\("addProduct"\)/, "a blocked project says why instead of opening");
   assert.match(tab, /\{canAddProduct && <AddProductTile/);
+  const dialog = read(DETAILS + "add-product-dialog.tsx");
+  assert.match(dialog, /createChat\(prompt\.trim\(\), \{ addTo: project\.id \}\)/, "AI starts the ordinary chat, on this project");
+  assert.match(dialog, /router\.push\(`\/chat\/\$\{chat\.id\}`\)/);
+  assert.match(dialog, /gate\.guard\("addProduct"/, "a manual product passes the listing's pause first");
+  assert.match(dialog, /editorHref\(project, rowId, "pcb"\)/);
   assert.match(read(DETAILS + "project-page.tsx"), /canAddProduct=\{can\(viewer, "product\.add", view\.canCtx\)\}/);
 });
 

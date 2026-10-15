@@ -5,6 +5,7 @@
 // write is refused.
 
 import { deleteMessageFiles, putMessageFile } from "./files";
+import { seedDemoMessages, type DemoSeedInput } from "./demo-seed";
 import { migrateSupport, type SupportLike } from "./migrate";
 import { MAKER_NAME } from "./people";
 import {
@@ -235,4 +236,9 @@ export function migrateSupportOnce(
   updateMessages((data) =>
     migrateSupport(data, support, { ...names, makerName: MAKER_NAME, newId: newMessagesId }),
   );
+}
+
+/** Adds the demo conversations a first visit finds (demo-seed.ts); nothing once they are there. */
+export function seedDemoMessagesOnce(input: Omit<DemoSeedInput, "makerName">): void {
+  updateMessages((data) => seedDemoMessages(data, { ...input, makerName: MAKER_NAME }));
 }

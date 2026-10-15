@@ -36,6 +36,7 @@ ideeza-creator-panel/
    │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
    │  │   │   ├─ new/                 "/parts/new" — New Package authoring flow
    │  │   │   └─ [id]/                "/parts/<id>" — one part + its land pattern
+   │  │   ├─ creators/[handle]/       a creator's profile (me = yours)
    │  │   └─ innovations/[slug]/      community feed + the post (+ products/[productId]/)
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/                    "/projects" — My projects (index)
@@ -61,6 +62,7 @@ ideeza-creator-panel/
    │  │                      billing-history, payment-method-panel, plan-banner (+ plan details),
    │  │                      checkout-page + order-summary + payment-picker (the checkout page),
    │  │                      buy-credits (the in-place shortfall dialog), invoice-view
+   │  ├─ support/            report-problem (the one Report a problem dialog + host)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
@@ -87,7 +89,8 @@ ideeza-creator-panel/
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
    │  │                      bid dialogs, Ask the creator / Get creator support, demo-buyer banner
-   │  ├─ messages/           Messages: shell + Acting as, list, conversation (header, context card,
+   │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
+   │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, settings + report dialogs
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
@@ -119,6 +122,9 @@ ideeza-creator-panel/
    │
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
+   │  ├─ support/            Report a problem: form rules, page names, recent
+   │  │                      errors, image shrink/capture, openReportProblem()
+   │  ├─ server/             server-only: Vercel Blob driver, report store
    │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
    │  │                      units), store, wizard (24 families), kicad parsers,
    │  │                      library (save/publish, version lock)
@@ -169,7 +175,9 @@ ideeza-creator-panel/
    │  │                      sell-flow (the Sell copies flow's steps), fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
    │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
-   │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration),
+   │  ├─ people/             the creator profile's people layer: one person id and handles, profile
+   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt
+   │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration, demo seed),
    │  │                      the local store (ideeza:messages), IndexedDB files, acting-as, actions
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)
    │  ├─ key-store.ts · storage-status.ts   one live localStorage key; refused-write reporting

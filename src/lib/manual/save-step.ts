@@ -33,7 +33,7 @@ import type { ProjectStatus } from "./project-summary";
 export type SaveMode =
   | { kind: "saved"; project: ManualProject }
   | { kind: "version"; project: ManualProject; version: number; chatTitle: string }
-  | { kind: "join"; project: ManualProject } // setup's projectChoiceId, live; single product only
+  | { kind: "join"; project: ManualProject } // setup's projectChoiceId, live — one product or several
   | { kind: "new"; choiceGone: boolean; canJoin: boolean }; // canJoin: single product, no lineage, ≥1 project
 
 function isSingleProduct(job: BuildJob): boolean {
@@ -76,10 +76,13 @@ export function saveModeOf(
     return { kind: "version", project: sibling, version, chatTitle };
   }
 
+  // The project the setup question settled on — a project page's "Add a product" opens it there.
+  // Whatever the build holds goes into it, one product or several (owner, 2026-10-13: a product
+  // added from a project never lands in a new one).
   const single = isSingleProduct(job);
   const choiceId = job.projectChoiceId;
   const chosen = choiceId ? projects.find((p) => p.id === choiceId) : undefined;
-  if (single && chosen) return { kind: "join", project: chosen };
+  if (chosen) return { kind: "join", project: chosen };
 
   const choiceGone = Boolean(choiceId) && !chosen;
   const canJoin = single && projects.length > 0;
@@ -214,8 +217,18 @@ export function versionChangesOf(
 // ─────────────────────────── copy (P2-SAVE-1, 5, 6, 9, 10) ───────────────────────────
 
 /** P2-SAVE-5/6: the neutral mint line in join and version modes. Not Draft → shown. */
-export function mintNoticeOf(status: ProjectStatus, project: string, what: "product" | "version"): string | null {
-  return status === "draft" ? null : `${project} is already minted. This ${what} won't be part of that mint.`;
+export function mintNoticeOf(status: ProjectStatus, project: string, what: "product" | "products" | "version"): string | null {
+  if (status === "draft") return null;
+  return what === "products"
+    ? `${project} is already minted. These products won't be part of that mint.`
+    : `${project} is already minted. This ${what} won't be part of that mint.`;
+}
+
+/** "A", "A and B", "A, B and C" — the products a join adds, named in the dialog's sentence. */
+export function namesOf(names: readonly string[]): string {
+  const clean = names.map((n) => n.trim()).filter(Boolean);
+  if (clean.length <= 1) return clean[0] ?? "";
+  return `${clean.slice(0, -1).join(", ")} and ${clean[clean.length - 1]}`;
 }
 
 const PIECE_WORDS: Record<number, string> = { 5: "five" };

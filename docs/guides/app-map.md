@@ -26,6 +26,7 @@ command palette**, Tutorial / Tour guide / Help / Report, the sidebar's
 - `/parts` — **Parts & Agile Module**: the catalogue, captured Agile Modules, and the packages you have authored.
 - `/parts/new` — **New Package flow**: Package → Symbol → Footprint → 3D Place → Finalize (full-viewport).
 - `/parts/[id]` — one part, with its land pattern.
+- `/creators/[handle]` — **a creator's profile**: what they made and put out (shared or on sale), its current Activity, Follow · Message · ⋯ for someone else, Edit profile and one owner-only line for you; `/creators/me` is yours. See [features/platform-and-projects.md](features/platform-and-projects.md) › Creator profile.
 - `/innovations` — **community feed** (Discover/Following, categories, minted badges, Shared by you).
 - `/innovations/[slug]` — **one post**: a sample feed project, or this browser's shared project (`<name>-<id tail>`); `?focus=comments` and `#comment-<id>` deep-link into the thread. `/innovations/[slug]/products/[productId]` — one product of the post.
 - `/(create)/chat/[chatId]`, `/(create)/build/[jobId]` — **AI concept chat → build job**.
@@ -37,4 +38,4 @@ modules in `FLOW_STEPS` order (`src/lib/manual/projects.tsx`): **PCB Design · C
 
 **Monetization:** **minting** (Utility NFT, Lazy or Instant), the Explore marketplace with a 2.5 % IDEEZA fee, all on a local **demo wallet** (Testnet demo, nothing touches a chain); plans and AI credits paid from the same wallet (Settings › Plan & pricing).
 
-**API:** `/api/business-plan/section` writes one business-plan section (keyless text model; 503 on failure, never filler).
+**API:** `/api/business-plan/section` writes one business-plan section (keyless text model; 503 on failure, never filler). `/api/reports` keeps a problem report from the Report a problem dialog (private Blob store, or disk locally; 400 for a body that isn't a report, idempotent per report id).

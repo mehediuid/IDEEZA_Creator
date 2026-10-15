@@ -68,7 +68,9 @@ const INSPIRATION: Project[] = PROJECTS.slice(0, 4);
 
 const AI_PLACEHOLDER = "Describe your electronics project...";
 
-// `/?addTo=<projectId>` — a project page's "Add a product" (P2-TABS-29). Read
+// `/?addTo=<projectId>` — how a project page's "Add a product" used to start
+// here (P2-TABS-29); the page opens its own dialog now, and this stays for an
+// address already shared or bookmarked. Read
 // from the address itself rather than useSearchParams, so the page needs no
 // Suspense boundary; the server has no address, so the chip appears once
 // the page is in the browser. Back and Forward re-read it.

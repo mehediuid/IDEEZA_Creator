@@ -3,8 +3,11 @@
 // ChatThread — the chat's canvas. The setup question while it is still a
 // question; then one card per product (its current concept) and the one build
 // action for all of them; once a build exists, the build leads and the
-// concepts stay beneath it, so a change made after the build is visible and
-// can be built again.
+// concepts it was made from sit beneath it as a record — the picture, the
+// prompt and the short spec, with nothing to press (owner, 2026-10-15: the
+// concepts came first and the build was made from them, so they are not
+// edited under it). A change to a built product is made in its editor. A
+// build that failed made nothing, so its concepts are open again.
 //
 // Spec §4a / §10: regenerations APPEND new turns and never overwrite older
 // ones — the rail keeps that history; the canvas shows the current state.
@@ -21,14 +24,18 @@ import { Add01Icon, Refresh01Icon, Undo02Icon } from "@hugeicons/core-free-icons
 import { Icon } from "@/components/dashboard/icon";
 import { TextInput } from "@/components/ideeza/text-input";
 import {
+  productsOf,
   type BuildJob,
   type ChatSession,
   type ChatTurn,
   type SetupAnswer,
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
-import type { SpecEdits } from "@/lib/spec/types";
+import type { ConceptPart } from "@/lib/create/concept";
+import type { RadioPair } from "@/lib/spec/facts";
+import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import {
+  buildHolds,
   linksFor,
   peersOf,
   productIdOf,
@@ -42,12 +49,16 @@ import {
   BUILD_REVIEW_ID,
   CREDITS_NOTICE_ID,
   SETUP_QUESTION_ID,
+  productCardId,
   scrollWithin,
 } from "./anchors";
+import { useMinuteClock } from "./build-status";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
 import { ReviewOutputs } from "./review-outputs";
+import { SpecFacts } from "./spec-panel";
+import { relativeLabel } from "./use-clock";
 
 // Label every concept by its lineage, not by its position: a fresh take
 // counts up ("1", "2", …) and a refine hangs off the concept it evolves
@@ -222,6 +233,39 @@ export function ChatThread({
   );
   const offerBuild = !!buildable && (!job || changedSinceBuild);
 
+  // Once the build holds its concepts, the canvas shows what it was made
+  // from — the build's own products, each with the drawing it booked, its
+  // prompt and the spec it was booked with — and nothing that changes them.
+  const held = buildHolds(job);
+  const builtFrom: BuiltConcept[] = held
+    ? productsOf(job).map((p) => {
+        // The card's turn while its latest concept is the one booked; else
+        // the turn that drew the booked image (a chat refined after its
+        // build, from before the concepts were held).
+        const turn =
+          products.find((t) => locked.get(t.id)?.id === p.id) ??
+          [...chat.turns]
+            .reverse()
+            .find(
+              (t): t is Extract<ChatTurn, { role: "assistant" }> =>
+                t.role === "assistant" && !!p.conceptImageUrl && t.imageUrl === p.conceptImageUrl,
+            );
+        const own = !!turn && locked.has(turn.id);
+        return {
+          productId: p.id,
+          name: (turn && productNameOf(turn)) || p.name || p.title,
+          conceptLabel: turn ? labels.get(turn.id) : undefined,
+          ts: turn?.ts,
+          imageUrl: p.conceptImageUrl || turn?.imageUrl,
+          prompt: turn?.prompt || p.conceptPrompt || "",
+          spec: own ? (specs.get(turn.id) ?? null) : (p.spec ?? null),
+          parts: own ? (parts.get(turn.id) ?? p.parts) : p.parts,
+          pairs: linksFor(peers, p.id).filter((l) => l.about === "radio"),
+          summary: p.summary,
+        };
+      })
+    : [];
+
   // The credit gate is explained ONCE, beside the one build action — every
   // reason it is off is the same reason. The rendered balance, not
   // canAfford(): the provider refreshes that ref in its own effect, which
@@ -340,7 +384,22 @@ export function ChatThread({
       {/* One product is one 640 px card, so its section is that wide too —
           the build action used to sit at the far edge of a 1000 px canvas,
           a long way from the card it builds. Several products take the width. */}
-      {products.length > 0 && (
+      {held && builtFrom.length > 0 && (
+        <section aria-labelledby="built-from-title" className="flex w-full flex-col items-start gap-[20px]">
+          <header className="flex flex-col gap-[2px]">
+            <h2 id="built-from-title" className="text-lg font-semibold text-text-primary">
+              Concepts
+            </h2>
+            <p className="text-sm text-text-tertiary">
+              This build was made from {builtFrom.length === 1 ? "this concept" : "these concepts"}. They&apos;re
+              fixed now — a change to the product is made in its editor.
+            </p>
+          </header>
+          <BuiltFrom items={builtFrom} />
+        </section>
+      )}
+
+      {!held && products.length > 0 && (
         <div
           className={[
             "flex w-full flex-col items-start gap-[28px]",
@@ -357,7 +416,7 @@ export function ChatThread({
                   ? "Changed since this build — build again to carry the change into the deliverables."
                   : specChanged
                     ? "Spec changed since this build — building again makes a new version."
-                    : "The drawings this build was made from. Refine one to change the next build."}
+                    : "The build didn't go through, so these concepts are open again."}
               </p>
             </header>
           ) : (
@@ -422,6 +481,107 @@ export function ChatThread({
       )}
       <div ref={endRef} />
     </div>
+  );
+}
+
+/** One built product's concept, as the build booked it. */
+type BuiltConcept = {
+  productId: string;
+  name: string;
+  conceptLabel?: string;
+  ts?: number;
+  imageUrl?: string;
+  prompt: string;
+  /** The spec it was booked with — null for a build from before products
+   *  had one, which says its parts line instead. */
+  spec: ResolvedSpec | null;
+  parts: ConceptPart[];
+  pairs: RadioPair[];
+  summary?: string;
+};
+
+/** What the build was made from: one quiet row per product — the picture,
+ *  the product, the prompt it was drawn from and the short spec it was built
+ *  with. A record, not a workspace: no tick, no remove, no Refine, no
+ *  Regenerate, no spec button — the build above is the thing to look at, and
+ *  the rail's row opens the full spec. */
+function BuiltFrom({ items }: { items: BuiltConcept[] }) {
+  return (
+    <ul
+      role="list"
+      className="grid w-full grid-cols-[repeat(auto-fill,minmax(min(440px,100%),1fr))] items-start gap-[16px]"
+    >
+      {items.map((c) => (
+        <li key={c.productId} className="min-w-0">
+          <BuiltConceptCard concept={c} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Side by side where the card has room for both — the picture at a fixed
+ *  200 px and the words beside it — and stacked where it doesn't. The card
+ *  is the container, so a docked sheet's narrow column stacks it too. The
+ *  variants are written out whole: Tailwind only finds a class it can read. */
+function BuiltConceptCard({ concept: c }: { concept: BuiltConcept }) {
+  const [imgOk, setImgOk] = React.useState(true);
+  // Re-read on the minute clock, so "just now" does not stay "just now".
+  const now = useMinuteClock();
+  const meta = [c.conceptLabel ? `Concept ${c.conceptLabel}` : null, c.ts ? relativeLabel(c.ts, now) : null]
+    .filter(Boolean)
+    .join(" · ");
+  const name = c.conceptLabel ? `${c.name}, concept ${c.conceptLabel}` : c.name;
+  return (
+    // The rail's jumps to a product's card land here once it is built.
+    <article
+      id={productCardId(c.productId)}
+      tabIndex={-1}
+      aria-label={name}
+      className={`[container-type:inline-size] rounded-2xl border border-solid border-border bg-bg-surface p-[12px] ${LANDING}`}
+    >
+      <div className="flex flex-col gap-[12px] [@container(min-width:420px)]:flex-row [@container(min-width:420px)]:gap-[16px]">
+        {c.imageUrl && imgOk ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={c.imageUrl}
+            alt={`${name}: ${c.prompt}`}
+            loading="lazy"
+            onError={() => setImgOk(false)}
+            className="aspect-[16/10] w-full shrink-0 rounded-xl bg-bg-subtle object-cover [@container(min-width:420px)]:w-[200px]"
+          />
+        ) : (
+          <div
+            className="flex aspect-[16/10] w-full shrink-0 items-center justify-center rounded-xl bg-bg-surface-raised px-[12px] text-center text-sm text-text-tertiary [@container(min-width:420px)]:w-[200px]"
+          >
+            {c.imageUrl ? "Couldn't load this image." : "No image"}
+          </div>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col gap-[10px] py-[2px]">
+          <div className="flex min-w-0 flex-col gap-[2px]">
+            <h3 className="truncate text-md font-semibold text-text-primary">{c.name}</h3>
+            {meta && <p className="truncate text-sm text-text-tertiary">{meta}</p>}
+          </div>
+          {c.prompt && (
+            <p title={c.prompt} className="line-clamp-2 text-sm text-text-tertiary">
+              <span className="font-semibold text-text-secondary">Prompt: </span>
+              {c.prompt}
+            </p>
+          )}
+          {c.spec ? (
+            <div className="flex min-w-0 flex-col gap-[4px]">
+              <h4 className="text-sm text-text-tertiary">What was built</h4>
+              <SpecFacts spec={c.spec} parts={c.parts} pairs={c.pairs} />
+            </div>
+          ) : c.summary ? (
+            <div className="flex min-w-0 flex-col gap-[4px]">
+              <h4 className="text-sm text-text-tertiary">What was built</h4>
+              <p className="line-clamp-2 text-sm text-text-primary">{c.summary}</p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </article>
   );
 }
 

@@ -171,6 +171,23 @@ export function renameProduct(p: ManualProject, rowId: string, name: string, now
   return patch;
 }
 
+/** A product made by hand in a project that already exists (its page's "Add a product" ›
+ *  Build manually; owner, 2026-10-13): a new row with its name and nothing built behind it,
+ *  added after the others. A project with no stored list keeps its headline product first, as
+ *  row "p1", when it has a name or editor work — the way a build joining it keeps it — so that
+ *  product's documents stay its own. An empty name, or an id already used, is refused. */
+export function addHandProduct(p: ManualProject, rowId: string, name: string, now: number): ProjectPatch {
+  const clean = name.trim();
+  if (!clean) return {};
+  const held: ManualProductInput[] = p.products?.length
+    ? p.products
+    : p.productName.trim() || p.editorOpened?.p1
+      ? [{ id: "p1", name: p.productName, description: p.description }]
+      : [];
+  if (held.some((r) => r.id === rowId)) return {};
+  return { products: [...held, { id: rowId, name: clean, description: "", updatedAt: now }] };
+}
+
 /** The row a build product lives in, for SAVE's "review this version" button
  *  and BUILDLOAD's seeding. Null when no row was built from it. */
 export function rowOfBuildProduct(p: ManualProject, buildId: string, productId: string): string | null {

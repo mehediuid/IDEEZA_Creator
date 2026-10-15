@@ -10,7 +10,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
-import { ACCOUNT } from "@/components/dashboard/sidebar-account";
+import { useMe } from "@/components/dashboard/sidebar-account";
 import { Badge, Button, TestnetDemoBadge } from "@/components/ideeza";
 import { invoicesOf } from "@/lib/account/invoices";
 import { usd } from "@/lib/create/credit-pricing";
@@ -24,6 +24,7 @@ const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "nu
 export function InvoiceView({ orderId }: { orderId: string }) {
   const { hydrated: creditsReady, ledger } = useCredits();
   const { hydrated: planReady, sub } = useCreatePlan();
+  const me = useMe();
   const invoice = React.useMemo(() => invoicesOf(ledger, sub.orders).find((i) => i.id === orderId) ?? null, [ledger, sub.orders, orderId]);
 
   React.useEffect(() => {
@@ -90,7 +91,7 @@ export function InvoiceView({ orderId }: { orderId: string }) {
             <h2 id="billed-to" className="text-sm font-medium leading-sm text-text-tertiary">
               Billed to
             </h2>
-            <p className="font-semibold text-text-primary">{ACCOUNT.name}</p>
+            <p className="font-semibold text-text-primary">{me.name}</p>
             {invoice.payer && <p className="font-mono text-text-secondary">{shortAddress(invoice.payer)}</p>}
           </section>
           <section aria-labelledby="order-details" className="flex flex-col gap-[4px] text-md leading-md">

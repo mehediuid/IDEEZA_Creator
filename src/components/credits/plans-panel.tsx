@@ -30,7 +30,7 @@ import {
   ThumbsUpIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { ACCOUNT } from "@/components/dashboard/sidebar-account";
+import { useMe } from "@/components/dashboard/sidebar-account";
 import { Avatar, Badge, Banner, Button, ModalFrame, Segmented } from "@/components/ideeza";
 import { checkoutHref } from "@/lib/create/checkout-route";
 import { discountFor, usd, type BillingCycle } from "@/lib/create/credit-pricing";
@@ -703,6 +703,7 @@ const SMALLEST_PAID: PlanTier = "tinkerer";
 /** Cancel subscription (User Panel V2 41549:164558): what you lose, a smaller plan instead, or cancel. */
 export function CancelDialog({ onClose }: { onClose: () => void }) {
   const { sub, plan: current, cancel, schedule } = useCreatePlan();
+  const me = useMe();
   const firstRef = React.useRef<HTMLButtonElement>(null);
   const when = sub.renewsAt ? date(sub.renewsAt) : "";
   const smaller = planOf(SMALLEST_PAID);
@@ -716,8 +717,8 @@ export function CancelDialog({ onClose }: { onClose: () => void }) {
             Your IDEEZA plan won&apos;t be the same. Credits you bought stay until they expire, and nothing you made is deleted.
           </p>
           <span className="mt-[8px] inline-flex items-center gap-[10px] rounded-xl border border-solid border-border bg-bg-subtle px-[16px] py-[10px] text-md leading-md text-text-primary">
-            <Avatar initials={ACCOUNT.initials} size="sm" />
-            {ACCOUNT.name} · {current.name} plan
+            <Avatar initials={me.initials} src={me.photo} size="sm" />
+            {me.name} · {current.name} plan
           </span>
         </div>
         <div className="flex flex-col gap-[16px] rounded-xl bg-bg-subtle p-[20px]">

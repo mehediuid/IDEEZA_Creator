@@ -47,6 +47,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { useTheme } from "@/components/theme-provider";
 import { Icon, type IconValue } from "./icon";
+import { openReportProblem } from "@/lib/support/open-report";
 
 type Command = {
   id: string;
@@ -123,7 +124,7 @@ export function CommandPalette({
       { id: "help", label: "Help & support", category: "Resources",
         icon: HelpCircleIcon, onActivate: exit(() => {}) },
       { id: "bug", label: "Report a problem", category: "Resources",
-        icon: Bug01Icon, onActivate: exit(() => {}) },
+        icon: Bug01Icon, onActivate: exit(openReportProblem) },
       // Theme
       { id: "theme-light", label: "Switch to Light theme", category: "Theme",
         icon: Sun01Icon, onActivate: exit(() => setTheme("light")) },
@@ -133,7 +134,7 @@ export function CommandPalette({
         icon: ComputerIcon, onActivate: exit(() => setTheme("system")) },
       // Account
       { id: "profile", label: "Profile", category: "Account",
-        icon: User02Icon, onActivate: exit(() => {}) },
+        icon: User02Icon, onActivate: exit(() => router.push("/creators/me")) },
       { id: "wallet", label: "Wallet & tokens", category: "Account",
         icon: Wallet01Icon, onActivate: exit(() => {}) },
       { id: "settings", label: "Settings", category: "Account",

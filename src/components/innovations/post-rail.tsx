@@ -6,6 +6,9 @@
 // places each block in the flow (post-page.tsx), and on a phone the actions
 // move to the sticky bar at the bottom (PostActionBar).
 
+import { FollowButton } from "@/components/profile/person-actions";
+import { PersonName } from "@/components/profile/person-name";
+import { canonicalId } from "@/lib/people/ids";
 import * as React from "react";
 import Link from "next/link";
 import {
@@ -17,14 +20,11 @@ import {
   CpuIcon,
   FavouriteIcon,
   Link01Icon,
-  UserAdd01Icon,
-  UserCheck01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { AvatarLabelGroup, Badge, Button, buttonVariants, IconButton } from "@/components/ideeza";
 import { MessageCreator, useMessageRefusal } from "@/components/newsfeed/creator-row";
-import { CREATORS, formatCount } from "@/lib/feed";
-import { follows, useReactions } from "@/lib/innovations/reactions";
+import { formatCount } from "@/lib/feed";
 import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
 import { postHref } from "@/lib/innovations/slug";
 import { ME_ID, type InnovationPost } from "@/lib/innovations/types";
@@ -64,32 +64,27 @@ function useMakerPostCount(post: InnovationPost): number {
 
 /** The maker: a card in the rail, a row under the title on a phone. */
 export function MakerBlock({ post, owner, layout, className }: { post: InnovationPost; owner: boolean; layout: "card" | "row"; className?: string }) {
-  const { reactions, setFollow } = useReactions();
   const count = useMakerPostCount(post);
   const maker = post.creator;
-  const following = follows(reactions, maker.id, CREATORS.find((c) => c.id === maker.id)?.following ?? false);
   const supporting = count > 0 ? `${count} ${count === 1 ? "project" : "projects"} on Innovations` : "Nothing on Innovations right now";
   const refusal = useMessageRefusal(maker);
   const reasonId = React.useId();
 
   const name = (
     <span className="inline-flex min-w-0 items-center gap-3">
-      <span className="truncate">{maker.name}</span>
+      <PersonName id={maker.id} from="innovations" className="truncate">
+        {maker.name}
+      </PersonName>
       {maker.pro && <Badge tone="neutral">Pro</Badge>}
     </span>
   );
   const follow = owner ? null : (
-    <Button
-      type="button"
+    <FollowButton
+      person={{ id: canonicalId(maker.id, "innovations"), kind: maker.id === ME_ID ? "me" : "feed", name: maker.name }}
       hierarchy="secondary"
       size="md"
-      aria-pressed={following}
-      onClick={() => setFollow(maker.id, !following)}
-      iconLeading={<Icon icon={following ? UserCheck01Icon : UserAdd01Icon} size={16} />}
       className={cn(TAP, layout === "card" && "w-full")}
-    >
-      {following ? "Following" : "Follow"}
-    </Button>
+    />
   );
   const message = owner ? null : (
     <MessageCreator creator={maker} slug={post.slug} refusal={refusal} reasonId={reasonId} className={cn(TAP, layout === "card" && "w-full")} />
@@ -125,7 +120,7 @@ export function MakerBlock({ post, owner, layout, className }: { post: Innovatio
           {message}
         </div>
       ) : (
-        <p className="text-sm leading-sm text-text-secondary">This is you. Visitors can follow you from here.</p>
+        <p className="text-sm leading-sm text-text-secondary">This is you. Other creators can follow you from here.</p>
       )}
       {why}
     </section>

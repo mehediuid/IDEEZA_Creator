@@ -16,6 +16,8 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { LockIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import {
   conceptBriefOf,
   deriveTitle,
@@ -38,6 +40,7 @@ import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useGuards } from "@/lib/manual/use-write-guard";
 import {
+  buildHolds,
   companionNameOf,
   composerTarget,
   linksFor,
@@ -1836,6 +1839,26 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         </div>
         <div className="border-t border-solid border-border">
           <div className="w-full px-[14px] py-[14px]">
+          {buildHolds(activeBuild) ? (
+            // The build holds its concepts, so there is nothing for a
+            // sentence here to redraw: it used to redraw a built product's
+            // image for a credit and offer the build again, under a build
+            // that was made from the drawing it replaced. Said once, where
+            // the composer was, so its going is not a mystery.
+            <p
+              data-testid="composer-held"
+              className="flex items-start gap-[10px] rounded-xl bg-bg-subtle px-[14px] py-[12px] text-sm text-text-secondary"
+            >
+              <span aria-hidden className="mt-[2px] inline-flex shrink-0 text-text-tertiary">
+                <Icon icon={LockIcon} size={16} />
+              </span>
+              <span>
+                Built from these concepts, so they&apos;re fixed now. A change to the product is made in
+                its editor{activeBuild.projectId ? "" : " once the project is saved"}.
+              </span>
+            </p>
+          ) : (
+          <>
           <PromptBar
             onSubmit={(text) => {
               if (!handleUserSubmit(text)) return false;
@@ -1894,6 +1917,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                       }`
                     : `Each drawing costs ${CONCEPT_COST} credit.`}
           </p>
+          )}
+          </>
           )}
           </div>
         </div>

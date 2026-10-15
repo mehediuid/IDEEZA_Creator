@@ -51,6 +51,9 @@ export interface SegmentedProps<T extends string> {
   size?: SegmentedSize;
   disabled?: boolean;
   className?: string;
+  /** A required choice not yet made: the group reads invalid and names its error. */
+  invalid?: boolean;
+  describedBy?: string;
 }
 
 export function Segmented<T extends string>({
@@ -61,6 +64,8 @@ export function Segmented<T extends string>({
   size = "md",
   disabled,
   className,
+  invalid,
+  describedBy,
 }: SegmentedProps<T>) {
   const s = SIZES[size];
   const refs = React.useRef<(HTMLButtonElement | null)[]>([]);
@@ -106,9 +111,12 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
       onKeyDown={onKeyDown}
       className={cn(
-        "inline-flex w-fit self-start overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-default)]",
+        "inline-flex w-fit self-start overflow-hidden rounded-[var(--radius-lg)] border",
+        invalid ? "border-[var(--color-border-error)]" : "border-[var(--color-border-default)]",
         disabled && "opacity-[var(--opacity-disabled)]",
         className,
       )}

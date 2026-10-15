@@ -89,6 +89,24 @@ describe("saveRecord · new", () => {
 });
 
 describe("saveRecord · join", () => {
+  it("a build of several products joins with all of them — each a new row of the chosen project (owner, 2026-10-13)", () => {
+    const garden = project({ id: "p-garden", name: "Garden", productName: "Rain Gauge", description: "Beds.", createdAt: T });
+    const job = build({
+      id: "b-hub",
+      chatId: "c-hub",
+      title: "Garden Hub",
+      projectChoiceId: "p-garden",
+      companions: [companion({ id: "valve", name: "Valve" })],
+      createdAt: T,
+    });
+    const r = saveRecord({ kind: "join", projectId: "p-garden" }, job, [], [garden], NOW, IDS);
+    assert.equal(r.next.id, "p-garden");
+    assert.equal(r.before, garden);
+    const fromBuild = r.next.products.filter((x) => x.source?.buildId === job.id);
+    assert.equal(fromBuild.length, 2, "the primary and its companion");
+    assert.ok(r.next.products.some((x) => x.name === "Rain Gauge"), "the project's own product stays");
+  });
+
   it("attaches the build to the chosen project and writes no name, description or cover", () => {
     const garden = project({ id: "p-garden", name: "Garden", productName: "Rain Gauge", description: "Beds.", createdAt: T });
     const job = build({ id: "b-hub", chatId: "c-hub", title: "Garden Hub", projectChoiceId: "p-garden", createdAt: T });

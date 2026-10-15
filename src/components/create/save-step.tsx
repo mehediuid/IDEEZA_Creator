@@ -7,8 +7,9 @@
 //   ProjectDetailsFields, with "Update with AI" on a multi-product build) and,
 //   when the build has two or more images, its first cover. A single-product
 //   build with no lineage can switch to join instead.
-// - join: "Add to {project}" — the project the setup question chose. It asks
-//   nothing; Change swaps the project, or goes back to a new one.
+// - join: "Add to {project}" — the project the setup question chose (a project
+//   page's "Add a product" chooses it), with every product the build holds. It
+//   asks nothing; Change swaps the project, or goes back to a new one.
 // - version: "Save version {n}" — a rebuild of a chat already saved (O2 makes
 //   it binding): the project, what changes, and nothing to type.
 //
@@ -53,6 +54,7 @@ import {
   describedProductsOf,
   holderOf,
   mintNoticeOf,
+  namesOf,
   saveBlockOf,
   saveDefaultsOf,
   saveModeOf,
@@ -203,8 +205,10 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const joinTarget = joining && draft.joinId ? (joinable.find((p) => p.id === draft.joinId) ?? null) : null;
   const kind: "new" | "join" | "version" = version ? "version" : joining ? "join" : "new";
   const target: ManualProject | null = version?.project ?? joinTarget;
+  // A single product may switch to joining a project; several join only the one the setup question
+  // chose (a project's "Add a product"), and may still Change it.
   const canJoin =
-    single && (info.mode.kind === "new" ? info.mode.canJoin : info.mode.kind === "join") && joinable.length > 0;
+    (info.mode.kind === "new" ? single && info.mode.canJoin : info.mode.kind === "join") && joinable.length > 0;
 
   // The Change chooser. Open when join mode has no project yet.
   const [changing, setChanging] = React.useState(false);
@@ -222,7 +226,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
       })
     : "draft";
   const mintLine =
-    target && kind !== "new" ? mintNoticeOf(status, target.name, kind === "version" ? "version" : "product") : null;
+    target && kind !== "new" ? mintNoticeOf(status, target.name, kind === "version" ? "version" : single ? "product" : "products") : null;
 
   // ── fields ──
   const fieldsRef = React.useRef<ProjectDetailsFieldsHandle>(null);
@@ -360,6 +364,8 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
 
   // ── copy ──
   const product = job.title.trim();
+  // A join of several products names them all (a project's "Add a product", owner 2026-10-13).
+  const joinNames = namesOf([job.title, ...(job.companions ?? []).map((c) => c.name)]);
   const n = version?.version ?? 0;
   const title =
     kind === "new" ? "Save project" : kind === "version" ? `Save version ${n}` : joinTarget ? `Add to ${joinTarget.name}` : "Add to a project";
@@ -369,8 +375,12 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
       : kind === "version" && version
         ? `This is a rebuild in the chat “${version.chatTitle}”, so it becomes version ${n} of ${version.project.name}. Version ${n - 1} stays in the project's history.`
         : joinTarget
-          ? `${product} joins ${joinTarget.name} as a new product. The project's name and description stay as they are.`
-          : `Pick the project ${product} joins. Its name and description stay as they are.`;
+          ? single
+            ? `${product} joins ${joinTarget.name} as a new product. The project's name and description stay as they are.`
+            : `${joinNames} join ${joinTarget.name} as new products. The project's name and description stay as they are.`
+          : single
+            ? `Pick the project ${product} joins. Its name and description stay as they are.`
+            : `Pick the project ${joinNames} join. Its name and description stay as they are.`;
   const primaryLabel = kind === "new" ? "Save Project" : kind === "version" ? `Save version ${n}` : "Add to project";
   const reason = refusal ?? blocked;
   const reasonId = React.useId();

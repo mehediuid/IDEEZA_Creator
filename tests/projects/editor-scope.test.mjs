@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   EDITOR_STEPS,
+  addHandProduct,
   docReadKeys,
   editorDocKey,
   editorHref,
@@ -179,6 +180,28 @@ test("stampEditorOpened: a minute later, or another step, or another product, is
   const r = stampEditorOpened(p, "prd_b", "code", 10_001);
   assert.deepEqual(r.editorOpened, { prd_a: { step: "pcb", at: 10_000 }, prd_b: { step: "code", at: 10_001 } });
   assert.equal(r.updatedAt, 2_000);
+});
+
+// ───────────────────────────── addHandProduct ─────────────────────────────
+// "Add a product" › Build manually (owner, 2026-10-13): a new hand-made row in a project that exists.
+
+test("addHandProduct: a new row after the others, named and trimmed, with nothing built behind it", () => {
+  const p = project({ products: [row("prd_a", "Car"), row("prd_b", "Remote")] });
+  const patch = addHandProduct(p, "prd_new", "  Charger  ", 9_000);
+  assert.deepEqual(patch.products, [row("prd_a", "Car"), row("prd_b", "Remote"), { id: "prd_new", name: "Charger", description: "", updatedAt: 9_000 }]);
+  assert.equal("source" in patch.products[2], false);
+});
+
+test("addHandProduct: a project with no stored list keeps its headline product first, as p1", () => {
+  const patch = addHandProduct(project({ productName: "Car", description: "A car." }), "prd_new", "Charger", 9_000);
+  assert.deepEqual(patch.products.map((r) => r.id), ["p1", "prd_new"]);
+  assert.equal(patch.products[0].name, "Car");
+});
+
+test("addHandProduct: an empty name, or an id already used, adds nothing", () => {
+  const p = project({ products: [row("prd_a", "Car")] });
+  assert.deepEqual(addHandProduct(p, "prd_new", "   ", 9_000), {});
+  assert.deepEqual(addHandProduct(p, "prd_a", "Charger", 9_000), {});
 });
 
 // ───────────────────────────── renameProduct ─────────────────────────────
