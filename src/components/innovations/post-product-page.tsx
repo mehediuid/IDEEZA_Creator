@@ -33,6 +33,7 @@ import { POST_COLUMNS, POST_CONTENT, POST_PAGE, PostMissing, PostProductSkeleton
 import { ProductPage } from "@/components/projects/product/product-page";
 import { isLockedPiece, LockedPiecePanel, PostProductLinks, type LockedId } from "./post-product-bits";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
+import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import { usePost, type MinePostFacts } from "./use-post";
 
@@ -301,8 +302,9 @@ function PartsPanel({ post, product, build }: { post: InnovationPost; product: P
 
 /** The product's own Activity, as on a product page read by a visitor (a sample post's journey). */
 function SampleProductActivity({ post, productId, name }: { post: InnovationPost; productId: string; name: string }) {
-  const [now] = React.useState(() => Date.now());
-  const journey = React.useMemo(() => sampleJourneyOf(post, now), [post, now]);
+  // As on the post page: the journey's own clock until hydrated, so the server and the browser agree.
+  const now = useMinuteClock();
+  const journey = React.useMemo(() => sampleJourneyOf(post, now > 0 ? now : undefined), [post, now]);
   return (
     <ActivityNow
       projectId={post.id}

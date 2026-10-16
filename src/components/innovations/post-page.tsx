@@ -39,6 +39,7 @@ import { sampleJourneyOf, sampleStatusOf } from "@/lib/innovations/sample-activi
 import { historyOf, labelOf, shortOf, type JourneyEntry } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
+import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
 import { PostComments } from "./comments/post-comments";
@@ -395,8 +396,10 @@ function ProductRow({ slug, product }: { slug: string; product: InnovationPost["
  *  happening now, with its proof, and Earlier. */
 function PostActivity({ post, mine }: { post: InnovationPost; mine: MinePostFacts | null }) {
   const id = React.useId();
-  const [now] = React.useState(() => Date.now());
-  const sample = React.useMemo(() => (mine ? undefined : sampleJourneyOf(post, now)), [mine, post, now]);
+  // The sample's dates hang off the minute clock: 0 on the server and while hydrating (the journey's
+  // own fixed clock, so both stamp the same times), this browser's minute from then on.
+  const now = useMinuteClock();
+  const sample = React.useMemo(() => (mine ? undefined : sampleJourneyOf(post, now > 0 ? now : undefined)), [mine, post, now]);
   const projectId = mine ? mine.project.id : post.id;
   const defaultAt = mine ? mine.project.createdAt : post.createdAt;
   const stored = useJourney(mine ? projectId : null);
