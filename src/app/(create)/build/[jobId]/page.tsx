@@ -3,6 +3,9 @@
 
 import * as React from "react";
 import { BuildShell } from "@/components/create/build-shell";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Project build · IDEEZA" };
 
 export default async function BuildPage({
   params,

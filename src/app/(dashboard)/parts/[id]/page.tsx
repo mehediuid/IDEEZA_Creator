@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PartDetail } from "@/components/parts/part-detail";
 
 export const metadata: Metadata = {
-  title: "IDEEZA — Part details",
+  title: "Part details · Parts & agile module · IDEEZA",
   description: "The symbol, footprint and specification behind one library entry.",
 };
 

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ideeza/page-header";
 import { PartsLibrary } from "@/components/parts/parts-library";
 
 export const metadata: Metadata = {
-  title: "IDEEZA — Parts & Agile Module",
+  title: "Parts & agile module · IDEEZA",
   description: "The part catalogue, your captured Agile Modules, and the packages you have authored.",
 };
 

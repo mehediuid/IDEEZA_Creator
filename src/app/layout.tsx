@@ -17,6 +17,8 @@ import { VideosDialogHost } from "@/components/projects/make-videos";
 import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
 import { ReportProblemHost } from "@/components/support/report-problem";
+import { AppShell } from "@/components/dashboard/app-shell";
+import { SIDEBAR_PREPAINT } from "@/components/dashboard/sidebar-state";
 
 export const metadata: Metadata = {
   title: "IDEEZA Creator Panel",
@@ -25,7 +27,7 @@ export const metadata: Metadata = {
 
 // ToastLayer — the two toast stacks. GlobalRenderIndicator and
 // BuildAttentionBanner live in different React subtrees (one hangs off the
-// root, the other off nested route-group layouts), so each portals its card
+// root, the other off the app shell around the pages), so each portals its card
 // into its own labelled slot here instead of self-positioning with `fixed`.
 // The attention toast is top-centre: it asks for something and goes away. A
 // video render reports for minutes, and parked top-centre it sat over every
@@ -45,7 +47,7 @@ function ToastLayer() {
           two-line attention message reached as far as the button (COR-103,
           "the attention toast never covers the header primary"). No
           (create) page has a separate app bar above its own header (the
-          shell is sidebar + `main`, `(create)/layout.tsx`), so 132px clears
+          shell is sidebar + `main`, `components/dashboard/app-shell.tsx`), so 132px clears
           every page's first row instead of measuring one page at a time.
           It spans main, not the window — attention-banner.tsx writes main's
           edges — so the toast centres on the page beside the sidebar. */}
@@ -83,6 +85,11 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* The sidebar's collapsed choice, on <html> before the first paint
+            (sidebar-state.ts), so a collapsed sidebar never paints at 280. */}
+        <script dangerouslySetInnerHTML={{ __html: SIDEBAR_PREPAINT }} />
+      </head>
       <body>
         <ThemeProvider>
           {/* PcbProvider lives at the root so the AppMenuBar inside the
@@ -122,14 +129,18 @@ export default function RootLayout({
                             {/* BuyCreditsProvider: the one Buy credits dialog,
                                 opened in place from every shortfall. */}
                             <BuyCreditsProvider>
-                              {children}
+                              {/* The sidebar and <main> around every page of
+                                  the (dashboard) and (create) groups: one
+                                  shell, so moving between them never builds
+                                  it again. */}
+                              <AppShell>{children}</AppShell>
                               {/* The products' videos dialog a missing-video step
                                   opens (make-videos.tsx): here, so it outlives the
                                   step's row when the last video lands. */}
                               <VideosDialogHost />
                               {/* Report a problem: one dialog for every page,
                                   editors included, since they sit outside
-                                  both sidebar layouts. Opened by
+                                  the app shell. Opened by
                                   openReportProblem() from anywhere. */}
                               <ReportProblemHost />
                             </BuyCreditsProvider>

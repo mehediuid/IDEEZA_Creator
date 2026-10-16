@@ -27,6 +27,23 @@
   }
 }
 
+/* A collapsed sidebar before hydration (components/dashboard/sidebar-state.ts).
+   <html data-sidebar="collapsed"> is set before the first paint, but the
+   server drew the sidebar expanded; until React draws the rail, that aside
+   takes the rail's width, hidden, so the page beside it never paints at 280
+   first and then jumps. */
+html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
+  width: var(--layout-sidebar-collapsed);
+  visibility: hidden;
+}
+
+/* After a navigation the shell moves focus to the page's h1
+   (components/dashboard/main-scroll.tsx) so the keyboard scrolls the page and
+   a screen reader starts at its name. It is not a control: no ring. */
+#main-content h1[tabindex="-1"]:focus {
+  outline: none;
+}
+
 
 /* Design-system Slider (components/ideeza/slider.tsx) — the track and thumb are
    vendor pseudo-elements, so they can't be utility classes. `--ds-slider-fill`

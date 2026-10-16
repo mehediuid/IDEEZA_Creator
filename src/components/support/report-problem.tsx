@@ -7,7 +7,7 @@
 // dialog opens and shown as one line the maker can untick.
 //
 // One dialog for the whole app, mounted at the root like the videos dialog,
-// because the editors sit outside both sidebar layouts. Anything opens it
+// because the editors sit outside the app shell. Anything opens it
 // with openReportProblem() (lib/support/open-report.ts). The draft lives
 // here, not in the dialog, so closing it (to take a screenshot, or by a
 // stray Esc) loses nothing; its text also survives a reload. Only a sent

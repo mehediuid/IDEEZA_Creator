@@ -5,7 +5,7 @@ import { NARROW_COLUMN, PAGE_GRID, Page } from "@/components/ideeza/page";
 import { PageHeader } from "@/components/ideeza/page-header";
 
 export const metadata: Metadata = {
-  title: "IDEEZA — Innovations",
+  title: "Innovations · IDEEZA",
   description:
     "Discover projects from the IDEEZA community — follow creators, appreciate and save projects.",
 };
