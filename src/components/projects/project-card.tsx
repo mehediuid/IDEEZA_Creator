@@ -145,10 +145,7 @@ export function ProjectCardSkeleton() {
 
 // ───────────────────────── empty states ─────────────────────────
 
-// Each takes the place of what it replaces, on the same edges: the grid's full
-// width (with no projects, the tabs', toolbar's and grid's), its words centred
-// inside at a reading measure.
-const REGION = "w-full [&_p]:max-w-[62ch]";
+// Each sits on the left edge of what it replaces, as the grid does.
 
 /** LST-52: no projects anywhere. The caller hides the tabs and toolbar. */
 export function NoProjectsState({ onGoHome }: { onGoHome: () => void }) {
@@ -163,7 +160,7 @@ export function NoProjectsState({ onGoHome }: { onGoHome: () => void }) {
           Go to Home
         </Button>
       }
-      className={REGION}
+      className="mt-[24px]"
     />
   );
 }
@@ -199,7 +196,7 @@ export function NoMatchState({
           )}
         </div>
       }
-      className={`${REGION} mt-8`}
+      className="mt-[24px]"
     />
   );
 }
@@ -220,7 +217,7 @@ export function EmptyTabState({ tab }: { tab: Exclude<ListQuery["tab"], "all"> }
       icon={<Icon icon={ICONS[copy.icon]} size={32} />}
       title={copy.title}
       body={copy.body}
-      className={`${REGION} mt-8`}
+      className="mt-[24px]"
     />
   );
 }
@@ -233,7 +230,7 @@ export function NoShowcaseState({ tabLabel }: { tabLabel: string | null }) {
       tone="empty"
       icon={<Icon icon={ICONS.eye} size={32} />}
       title={tabLabel ? `Nothing shared in ${tabLabel}` : "Nothing shared to Innovations yet"}
-      className={`${REGION} mt-8`}
+      className="mt-[24px]"
     />
   );
 }

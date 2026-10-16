@@ -37,7 +37,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { GridViewIcon, ListViewIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { SearchInput, buttonVariants } from "@/components/ideeza";
-import { Page, PAGE_GRID } from "@/components/ideeza/page";
+import { Page } from "@/components/ideeza/page";
 import { PageHeader } from "@/components/ideeza/page-header";
 import { Icon } from "@/components/dashboard/icon";
 import { glyphFor } from "@/lib/pcb/glyphs";
@@ -90,9 +90,6 @@ const writeView = (v: View) => {
 };
 
 // ── the model the page renders ──────────────────────────────────────────────
-/** The header's one line — the same words the route's metadata uses. */
-const PARTS_DESCRIPTION = "The part catalogue, your captured Agile Modules, and the packages you have authored.";
-
 const ALL = "all";
 const MODULES = "modules";
 const MINE = "mine";
@@ -214,7 +211,7 @@ function PartGlyph({ kind, className }: { kind: string; className?: string }) {
 /** What a row or card shows for its thing — a module shows the symbols it is
  *  built from, a package its own drawn symbol, a part its kind's symbol. */
 function Thumb({ item, size }: { item: Item; size: "row" | "card" }) {
-  const cls = size === "row" ? "h-[28px] w-[40px]" : "mx-auto h-full w-full max-w-[150px]";
+  const cls = size === "row" ? "h-[28px] w-[40px]" : "h-full w-full max-w-[150px]";
   if (item.pkg) {
     return (
       <span className={size === "row" ? "block h-[28px] w-[40px]" : "block h-full w-full"}>
@@ -484,7 +481,6 @@ export function PartsLibrary() {
     <Page>
       <PageHeader
         title="Parts & Agile Module"
-        description={PARTS_DESCRIPTION}
         actions={
           // Going somewhere is a link — it gets a hover href, a middle-click and
           // a client-side transition, like every other navigation on the page.
@@ -568,7 +564,7 @@ export function PartsLibrary() {
                 )}
               </p>
             ) : view === "grid" ? (
-              <ul role="list" aria-label={activeLabel} className={PAGE_GRID}>
+              <ul role="list" aria-label={activeLabel} className="grid grid-cols-2 gap-[var(--spacing-5)] [@container(min-width:640px)]:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
                 {shown.map((i) => (
                   <Card key={`${i.section}-${i.id}`} item={i} />
                 ))}

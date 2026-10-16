@@ -103,35 +103,37 @@ export function StepSuccess({
   const listed = listing && listing.kind !== "none" ? listing.listing : null;
   const onMarket = listing?.kind === "live" || listing?.kind === "paused";
 
-  // The title is the page's h1 like every step's (O02); the tick leads it at its line height.
-  const title = (
-    <span className="inline-flex items-center gap-6">
-      <span
+  // The tick sits over the title, on the frame's left edge like it.
+  const tick = (
+    <div
+      className={[
+        "mb-[24px] flex h-[64px] w-[64px] items-center justify-center rounded-full shadow-2",
+        isLive ? "bg-bg-success-subtle" : "bg-bg-brand-subtle",
+      ].join(" ")}
+    >
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={isLive ? "var(--color-text-success)" : "var(--color-text-brand)"}
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         aria-hidden
-        className={[
-          "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full",
-          isLive ? "bg-bg-success-subtle" : "bg-bg-brand-subtle",
-        ].join(" ")}
       >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={isLive ? "var(--color-text-success)" : "var(--color-text-brand)"}
-          strokeWidth="2.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M5 13l4 4 10-10" />
-        </svg>
-      </span>
-      <span className="min-w-0">{heading}</span>
-    </span>
+        <path d="M5 13l4 4 10-10" />
+      </svg>
+    </div>
   );
 
   return (
-    <MintStep title={title} description={subline}>
+    <MintStep
+      lead={tick}
+      title={heading}
+      description={subline}
+      descriptionClassName="max-w-[460px] text-md text-text-secondary"
+    >
       <div className="flex w-full flex-col gap-[24px]">
         {project?.mint ? (
           <MintProofCard record={project.mint} owner intent={intent} className="w-full text-left" />

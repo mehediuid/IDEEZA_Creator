@@ -464,6 +464,7 @@ export function ProjectsHeader() {
     <PageHeader
       title="My projects"
       description="Every project you've saved — from an AI build or started by hand. They're stored in this browser."
+      descriptionClassName="max-w-[62ch] text-md text-text-secondary"
       actions={
         // Creation lives on Home (owner decision O11): a link, not a flow on this page.
         <Link

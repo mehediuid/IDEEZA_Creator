@@ -44,8 +44,7 @@ import { useArticleActions } from "@/components/blog/article-actions";
 import { ReasonPanel } from "@/components/blog/article/reason-panel";
 import { reasonPanel } from "@/lib/blog/article-view";
 import { StatusBadges } from "@/components/blog/status-badges";
-import { READING_FRAME, READING_GRID } from "@/components/blog/reading-frame";
-import { Page, PAGE_CONTAINER, PAGE_FRAME } from "@/components/ideeza/page";
+import { NARROW_COLUMN, Page, PAGE_CONTAINER, PAGE_FRAME } from "@/components/ideeza/page";
 import { usePostToast } from "@/components/innovations/toast";
 import { canEdit, createArticle, displayTitle, findArticle, markSeen, patchDraft, sendLabel, touchArticle } from "@/lib/blog/article";
 import { clockTime } from "@/lib/blog/dates";
@@ -234,14 +233,16 @@ function writePlace(id: string, place: Place | null): void {
 }
 
 /** A phone, or any coarse pointer: one top row, the format bar, no floating "+". The page's
- *  layout never follows it — the frame, the column and the bar's width are the same either way. */
+ *  inset never follows it: that is the page frame's, on every screen. */
 const TOUCH = "(pointer: coarse), (max-width: 767px)";
 
-/** The page container (main's width, which the column and rail switch on), as tall as main, so
- *  the writing reaches the foot of the screen. */
+/** The page container (main's width), as tall as main, so the writing reaches the foot of the
+ *  screen. */
 const EDITOR_PAGE = cn(PAGE_CONTAINER, "flex min-h-full flex-col");
 /** The app's page frame, stretched to that height. */
 const EDITOR_FRAME = cn(PAGE_FRAME, "flex flex-1 flex-col");
+/** The details and the writing: the narrow column on the left edge, never re-centred. */
+const COLUMN = cn(NARROW_COLUMN, "flex flex-col gap-12");
 
 /** The Figma's crumb on every editor page, edits too (frame 19, owner D-7). */
 const CRUMB = "Create new blog";
@@ -888,7 +889,7 @@ function Workspace({
   const fixCount = round && !frozen ? fixLines(round).length : 0;
 
   const failedBanner = save.kind === "failed" && (
-    <div className="pb-6">
+    <div className="px-8 pb-4 md:px-12">
       <Banner tone="error">{failedLine(save.cause)}</Banner>
     </div>
   );
@@ -982,7 +983,7 @@ function Workspace({
 
   const count = titleCount(fields.title.length);
   const writing = (
-    <div className="flex w-full flex-col gap-12">
+    <div className={COLUMN}>
       <div className="flex flex-col gap-4">
         <textarea
           ref={titleRef}
@@ -1120,7 +1121,7 @@ function Workspace({
   );
 
   return (
-    <div className={EDITOR_PAGE}>
+    <div className={cn(EDITOR_PAGE, touch && "bg-bg-surface")}>
       <div className={EDITOR_FRAME}>
         <h1 className="sr-only">{CRUMB}</h1>
         <span className="sr-only" aria-live="polite">
@@ -1129,13 +1130,11 @@ function Workspace({
         <span className="sr-only" role="alert">
           {said.alert}
         </span>
-        <div className={cn(READING_FRAME, "flex-1")}>
-          {/* The bar heads the column (and the reader's rail beside it), never the frame's whole
-              width. Its top padding sits in the frame's inset, so its row lines up with the
-              reader's top row and keeps that padding when it sticks. */}
-          {touch ? (
-            <div className="sticky top-0 z-sticky -mt-3 border-0 border-b border-solid border-border-subtle bg-bg-page pt-3">
-              <div className="flex items-center gap-2 pb-3">
+        {touch ? (
+          <>
+            {/* Edge to edge as before the page frame: it bleeds out of the frame's inset. */}
+            <div className="sticky top-0 z-sticky -mx-[var(--layout-page-inset)] -mt-[var(--layout-page-inset)] border-0 border-b border-solid border-border-subtle bg-bg-surface">
+              <div className="flex items-center gap-2 py-3 pl-2 pr-4">
                 <NextLink href={blogHref()} aria-label="Back to your blogs" className={iconButtonVariants({ hierarchy: "ghost", size: "xl" })}>
                   <Icon icon={ArrowLeft01Icon} size={20} />
                 </NextLink>
@@ -1167,9 +1166,23 @@ function Workspace({
               </div>
               {failedBanner}
             </div>
-          ) : (
-            <div className="sticky top-0 z-sticky -mt-6 border-0 border-b border-solid border-border-subtle bg-bg-page pt-6">
-              <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4 pb-8">
+            <div className="flex flex-1 flex-col gap-12 pb-32 pt-8">
+              <Crumbs current={CRUMB} />
+              <div className={COLUMN}>
+                {banners}
+                {details}
+                <hr className="m-0 h-0 border-0 border-t border-solid border-border-subtle" />
+                {pasteBanner}
+              </div>
+              <section ref={writingRef} tabIndex={-1} aria-label="Writing" className="flex flex-col outline-none">
+                {writing}
+              </section>
+            </div>
+          </>
+        ) : (
+          <div className="flex w-full flex-1 flex-col rounded-2xl bg-bg-surface">
+            <div className="sticky top-0 z-sticky rounded-t-2xl border-0 border-b border-solid border-border-subtle bg-bg-surface">
+              <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 px-12 py-6">
                 <Crumbs current={CRUMB} />
                 <div className="flex flex-wrap items-center gap-6">
                   {!frozen && slot}
@@ -1187,32 +1200,29 @@ function Workspace({
               </div>
               {failedBanner}
             </div>
-          )}
-          {/* The reader's grid with its rail's track left empty, so the column is the reader's. */}
-          <div className={cn(READING_GRID, "flex-1 pt-12")}>
-            <div className="flex min-w-0 flex-col gap-12 self-stretch">
-              {touch && <Crumbs current={CRUMB} />}
-              {banners}
-              {details}
-              <hr className="m-0 h-0 border-0 border-t border-solid border-border-subtle" />
-              {pasteBanner}
+            <div className="flex flex-1 flex-col gap-12 px-12 pb-12 pt-10">
+              <div className={COLUMN}>
+                {banners}
+                {details}
+                {pasteBanner}
+              </div>
               <section
                 ref={writingRef}
                 tabIndex={-1}
                 aria-label="Writing"
-                // A click on the empty space below the words continues the blog.
+                // A click on the card's empty space below the words continues the blog.
                 onMouseDown={(e) => {
-                  if (touch || e.target !== e.currentTarget || !editable) return;
+                  if (e.target !== e.currentTarget || !editable) return;
                   e.preventDefault();
                   apiRef.current?.focus("end");
                 }}
-                className="flex flex-1 flex-col rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                className="flex flex-1 flex-col rounded-xl border border-solid border-border-subtle px-24 py-24 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
               >
                 {writing}
               </section>
             </div>
           </div>
-        </div>
+        )}
 
         {actions.dialogs}
         <ModalFrame
@@ -1424,23 +1434,21 @@ function BodySkeleton() {
 
 function EditorSkeleton() {
   return (
-    <div className={EDITOR_PAGE} aria-busy="true" aria-label="Loading the editor">
+    <div className={cn(EDITOR_PAGE, "bg-bg-surface md:bg-bg-page")} aria-busy="true" aria-label="Loading the editor">
       <div className={EDITOR_FRAME}>
-        <div className={READING_FRAME}>
-          <div className="flex min-h-[40px] items-center border-0 border-b border-solid border-border-subtle pb-8">
+        <div className="flex w-full flex-col gap-12 rounded-2xl bg-bg-surface px-8 pb-12 md:px-12">
+          <div className="border-0 border-b border-solid border-border-subtle py-8">
             <Skeleton shape="text" size="md" className="w-1/4" />
           </div>
-          <div className={cn(READING_GRID, "pt-12")}>
-            <div className="flex min-w-0 flex-col gap-12">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="flex flex-col gap-4">
-                  <Skeleton shape="text" size="md" className="w-1/5" />
-                  <Skeleton shape="block" className="h-20 w-full rounded-lg" />
-                </div>
-              ))}
-              <Skeleton shape="text" size="lg" className="w-2/3" />
-              <BodySkeleton />
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex flex-col gap-4">
+              <Skeleton shape="text" size="md" className="w-1/5" />
+              <Skeleton shape="block" className="h-20 w-full rounded-lg" />
             </div>
+          ))}
+          <div className={cn(COLUMN, "pt-12")}>
+            <Skeleton shape="text" size="lg" className="w-2/3" />
+            <BodySkeleton />
           </div>
         </div>
       </div>

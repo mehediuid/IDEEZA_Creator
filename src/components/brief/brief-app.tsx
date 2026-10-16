@@ -22,7 +22,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { refusedCopy } from "@/components/projects/listing/listing-dialog";
 import { Banner } from "@/components/ideeza";
 import { Page } from "@/components/ideeza/page";
-import { Breadcrumb } from "@/components/projects/details/breadcrumb";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useMint } from "@/components/wallet/use-mint";
@@ -420,16 +419,6 @@ export function BriefApp({ projectId }: { projectId: string }) {
 
   // Each step is a page on the app's frame (brief-card.tsx): this is what sits around it.
   const chrome: MintChrome = {
-    breadcrumb: (
-      <Breadcrumb
-        trail={[
-          { label: "My projects", href: "/projects" },
-          { label: project.name, href: `/projects/${encodeURIComponent(project.id)}` },
-          { label: "Earn", href: earnHref(project.id) },
-          { label: "Mint" },
-        ]}
-      />
-    ),
     above:
       step !== "success" ? (
         <MintStepLine current={step} skipChoose={asked !== null} />

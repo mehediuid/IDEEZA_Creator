@@ -6,11 +6,11 @@
 // filling the frame, as the Figma draws it: the toolbar (search by blog title or
 // user name, the Reuse access and Status filters with their counts, the Date
 // range calendar, Clear filters once one narrows, Create a new blog), the table
-// under a rule with the grey head band (Blog title · Category · Date & Time ·
-// Status · ⋯; cards below a 600 px content box) running to the surface's edges
-// — no bordered box inside the bordered surface — and the pages. A first visit
-// keeps that whole surface and teaches inside the table. Every value comes from the Blog store (useBlog), through the pure list
-// helpers (lib/blog/list.ts).
+// in its own bordered box with the grey head band (Blog title · Category · Date
+// & Time · Status · ⋯; cards below a 600 px content box) and the pages. A first
+// visit keeps that whole surface and teaches inside the table. Every value
+// comes from the Blog store (useBlog), through the pure list helpers
+// (lib/blog/list.ts).
 //
 // The view lives in the URL — ?q=&status=&reuse=&from=&to=&page=, defaults left
 // out — written with replaceState as My projects does: Next keeps
@@ -69,10 +69,10 @@ import { QuickView } from "./quick-view";
 const LIST = "m-0 flex list-none flex-col gap-5 p-0 [@container(min-width:600px)]:gap-0 [@container(min-width:600px)]:[&>li:first-child]:border-t-0";
 const WIDE_SURFACE =
   "[@container(min-width:600px)]:rounded-xl [@container(min-width:600px)]:border [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle [@container(min-width:600px)]:bg-bg-surface";
-/** The table inside the surface (Figma frame 01): a rule over and under it, the head band on
- *  bg-subtle running to the surface's edges — never a second bordered box in it. */
+/** The table's own box inside the surface (Figma frame 01): bordered and inset to the
+ *  toolbar's edges, the head band on bg-subtle. */
 const TABLE_BOX =
-  "[@container(min-width:600px)]:border-0 [@container(min-width:600px)]:border-y [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle";
+  "[@container(min-width:600px)]:mx-8 [@container(min-width:600px)]:overflow-hidden [@container(min-width:600px)]:rounded-xl [@container(min-width:600px)]:border [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle";
 const TAP = "[@container(max-width:599px)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 type StatusChoice = "all" | DisplayStatus;

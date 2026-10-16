@@ -1,10 +1,10 @@
 "use client";
 
 // The mint flow's frame, shared by every step: each step is a page on the
-// app's frame (O01) — the breadcrumb and the step's title as the page's one h1
-// (O02), then, in the narrow column on the frame's left edge, the step line
-// over the card — a "← Back" text link over one white card — so no two steps
-// can drift apart on width, padding or where Back sits.
+// app's frame (O01) — the step's title as the page's one h1 (O02), then, in
+// the narrow column on the frame's left edge, the step line over the card — a
+// "← Back" text link over one white card — so no two steps can drift apart on
+// width, padding or where Back sits.
 
 import * as React from "react";
 import { NARROW_COLUMN } from "@/components/ideeza/page";
@@ -24,29 +24,35 @@ export const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min
 export const FIELD_BASE =
   "ix-brief-field w-full rounded-lg border border-solid border-border bg-[var(--color-input-bg)] text-md text-text-primary outline-none [font-family:inherit]";
 
-/** What the flow (brief-app.tsx) puts around every step: the breadcrumb over
- *  the title, and in the column the step line (or on Done a banner) above the
- *  step and "Saved as you go" under it. The steps only name their title. */
-export type MintChrome = { breadcrumb?: React.ReactNode; above?: React.ReactNode; below?: React.ReactNode };
+/** What the flow (brief-app.tsx) puts around every step, in the column: the
+ *  step line (or on Done a banner) above the step and "Saved as you go" under
+ *  it. The steps only name their title. */
+export type MintChrome = { above?: React.ReactNode; below?: React.ReactNode };
 
 export const MintChromeContext = React.createContext<MintChrome>({});
 
-/** One step's page: its header, then the step in the narrow column. Only the
- *  step itself slides in when the step changes; the header and the step line
- *  stay put. */
+/** One step's page: its header (with `lead` over it — Done's tick), then the
+ *  step in the narrow column. Only the step itself slides in when the step
+ *  changes; the header and the step line stay put. `descriptionClassName` is
+ *  the step's own text style for the line under the title. */
 export function MintStep({
   title,
   description,
+  descriptionClassName,
+  lead,
   children,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
+  descriptionClassName?: string;
+  lead?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const { breadcrumb, above, below } = React.useContext(MintChromeContext);
+  const { above, below } = React.useContext(MintChromeContext);
   return (
     <>
-      <PageHeader breadcrumb={breadcrumb} title={title} description={description} />
+      {lead}
+      <PageHeader title={title} description={description} descriptionClassName={descriptionClassName} />
       <div className={cn(NARROW_COLUMN, "flex flex-col gap-6")}>
         {above}
         <div className="flex animate-[ix-brief-in_.2s_ease-out] flex-col gap-8 motion-reduce:animate-none">{children}</div>
@@ -59,16 +65,18 @@ export function MintStep({
 export function BriefCard({
   title,
   description,
+  descriptionClassName,
   onBack,
   children,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
+  descriptionClassName?: string;
   onBack?: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <MintStep title={title} description={description}>
+    <MintStep title={title} description={description} descriptionClassName={descriptionClassName}>
       {onBack ? (
         <button
           type="button"

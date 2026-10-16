@@ -1,7 +1,7 @@
 "use client";
 
-// Settings › Plan & pricing (User Panel V2, "✅ Pricing" page), on the page
-// frame under its header, with four tabs: Available plan, Credits, Billing
+// Settings › Plan & pricing (User Panel V2, "✅ Pricing" page), on the white
+// sheet with the breadcrumb and four tabs: Available plan, Credits, Billing
 // history (every payment, each with its invoice) and Payment method. Your
 // plan sits over Billing history and Payment method, as the design puts it.
 //
@@ -35,9 +35,10 @@ export function PlanPricingPage() {
   const select = (id: Tab) => router.replace(id === "plans" ? pathname : `${pathname}?tab=${id}`, { scroll: false });
 
   return (
-    <PricingFrame crumbs={[{ label: "Settings" }, { label: "Plan & pricing" }]} title="Plan & pricing">
+    <PricingFrame crumbs={[{ label: "Settings" }, { label: "Plan & pricing" }]}>
+      <h1 className="sr-only">Plan &amp; pricing</h1>
       <PricingTabs label="Plan and pricing sections" tabs={TABS} active={tab} onSelect={select} />
-      <section id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} className="mt-16 flex flex-col gap-[32px]">
+      <section id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} className="flex flex-col gap-[32px]">
         {(tab === "billing" || tab === "payment") && <PlanBanner onSeePlans={() => select("plans")} />}
         {tab === "plans" ? <PlansPanel /> : tab === "credits" ? <CreditsPanel /> : tab === "billing" ? <BillingHistory /> : <PaymentMethodPanel />}
       </section>

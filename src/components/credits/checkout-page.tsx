@@ -5,12 +5,11 @@
 // a credit pack 41549:166716, custom credits 41549:166643). One page for a
 // plan upgrade and for credits, chosen by the query (lib/create/checkout-route).
 //
-// Under the page's header, the form column on the frame's edge: for an
-// upgrade from a paid plan, "Confirm your upgrade" (from → to, and what
-// happens now); then how to pay. The rail beside it (under it on a narrow
-// page): the order — what, how billed, Auto renewal for a plan, anything
-// taken off, Due today, and the button, which waits for the wallet. Paying runs the Demo wallet's own
-// request (review, sign) and lands the plan or the credits in the same
+// Left: for an upgrade from a paid plan, "Confirm your upgrade" (from → to,
+// and what happens now); then how to pay. Right (under it on a narrow page):
+// the order — what, how billed, Auto renewal for a plan, anything taken off,
+// Due today, and the button, which waits for the wallet. Paying runs the Demo
+// wallet's own request (review, sign) and lands the plan or the credits in the same
 // commit as its debit. Then "Upgrade completed" / "Payment successful", or
 // "Payment failed" with Try again. Payments aren't on: it is all testnet.
 
@@ -21,6 +20,7 @@ import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { buttonVariants } from "@/components/ideeza";
 import { NARROW_COLUMN, NARROW_WITH_RAIL } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { useDefaultToken } from "@/lib/account/payment";
 import { PLAN_PRICING_HREF, VALIDITY_MONTHS, addMonths, coinAmount, usd } from "@/lib/create/credit-pricing";
@@ -52,7 +52,7 @@ export function CheckoutPage() {
   const params = useSearchParams();
   const order = checkoutOrderOf((k) => params.get(k));
   return (
-    <PricingFrame crumbs={CRUMBS} title="Payment details">
+    <PricingFrame crumbs={CRUMBS}>
       {order ? <Checkout key={params.toString()} order={order} /> : <NothingToBuy />}
     </PricingFrame>
   );
@@ -60,8 +60,8 @@ export function CheckoutPage() {
 
 function NothingToBuy({ line }: { line?: string }) {
   return (
-    <div className={cn(NARROW_COLUMN, "flex flex-col items-start gap-[12px]")}>
-      <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Nothing to pay for</h2>
+    <div className="flex flex-col items-start gap-[12px] py-[24px]">
+      <h1 className="text-4xl font-semibold leading-4xl text-text-primary">Nothing to pay for</h1>
       <p className="max-w-[62ch] text-lg leading-lg text-text-secondary">
         {line ?? "This link doesn't name a plan or credits to buy. Choose one on Plan & pricing."}
       </p>
@@ -100,39 +100,43 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   const credits = !isPlan ? orderOf(order.kind === "pack" ? { kind: "pack", id: order.id } : { kind: "custom", credits: order.credits }, discount) : null;
   const due = isPlan ? quote!.due : credits!.price.final;
 
-  // The result takes the form's column, so it starts on the same edge.
   if (phase.kind === "done") {
-    return (
-      <div className={cn(NARROW_COLUMN, "flex flex-col")}>
-        <PaymentResult
-          tone="success"
-          title={isPlan ? "Upgrade completed" : "Payment successful"}
-          primary={{ label: "Go to dashboard", href: "/" }}
-          secondary={{ label: "View invoice", href: invoiceHref(phase.id) }}
-        >
-          <p>{phase.line}</p>
-        </PaymentResult>
-      </div>
+    return isPlan ? (
+      <PaymentResult
+        tone="success"
+        title="Upgrade completed"
+        primary={{ label: "Go to dashboard", href: "/" }}
+        secondary={{ label: "View invoice", href: invoiceHref(phase.id) }}
+      >
+        <p>{phase.line}</p>
+      </PaymentResult>
+    ) : (
+      <PaymentResult
+        tone="success"
+        title="Payment successful"
+        primary={{ label: "Go to dashboard", href: "/" }}
+        secondary={{ label: "View invoice", href: invoiceHref(phase.id) }}
+      >
+        <p>{phase.line}</p>
+      </PaymentResult>
     );
   }
   if (phase.kind === "failed") {
     return (
-      <div className={cn(NARROW_COLUMN, "flex flex-col")}>
-        <PaymentResult
-          tone="error"
-          title="Payment failed"
-          primary={{
-            label: "Try again",
-            onClick: () => {
-              setOrderId(newOrderId(isPlan ? "plan" : "order"));
-              setPhase({ kind: "form" });
-            },
-          }}
-        >
-          <p>Unfortunately, we couldn&apos;t process your payment. Please try again.</p>
-          <p className="text-md leading-md">{phase.message} Nothing was charged.</p>
-        </PaymentResult>
-      </div>
+      <PaymentResult
+        tone="error"
+        title="Payment failed"
+        primary={{
+          label: "Try again",
+          onClick: () => {
+            setOrderId(newOrderId(isPlan ? "plan" : "order"));
+            setPhase({ kind: "form" });
+          },
+        }}
+      >
+        <p>Unfortunately, we couldn&apos;t process your payment. Please try again.</p>
+        <p className="text-md leading-md">{phase.message} Nothing was charged.</p>
+      </PaymentResult>
     );
   }
 
@@ -287,41 +291,43 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   );
 
   return (
-    // Form and summary switch on the page container (main's width), never the
-    // window: under 1024 the summary stacks under the form, both on the
-    // narrow column.
-    <div className={NARROW_WITH_RAIL}>
-      <div className={cn(NARROW_COLUMN, "flex flex-col gap-[32px]")}>
-        {fromPaid && (
-          <section aria-labelledby="confirm-upgrade" className="flex flex-col gap-[16px]">
-            <h2 id="confirm-upgrade" className="text-2xl font-semibold leading-2xl text-text-primary">
-              Confirm your upgrade
-            </h2>
-            <div className="grid grid-cols-2 gap-[16px] max-sm:grid-cols-1">
-              <PlanTile label="From" name={current.name} line={`${usd(priceOf(sub.tier, sub.cycle).perMonth)} / month${sub.cycle === "yearly" ? " · annual" : ""}`} />
-              <PlanTile label="Upgrading to" name={target!.name} line={`${usd(per!.perMonth)} / month${cycle === "yearly" ? " · annual" : ""}`} brand />
-            </div>
-            <div className="flex items-start gap-[12px] rounded-xl bg-bg-subtle p-[16px]">
-              <span aria-hidden className="mt-[2px] text-text-brand">
-                <Icon icon={InformationCircleIcon} size={20} />
-              </span>
-              <div className="flex flex-col gap-[4px]">
-                <p className="text-lg font-semibold leading-lg text-text-brand">Important</p>
-                <p className="text-md leading-md text-text-secondary">
-                  Your plan becomes {target!.name} now. The unused time on {current.name} comes off today&apos;s price, and the next
-                  billing is on {date(renewsAt!)}. Cancel any time.
-                </p>
+    <div className="flex flex-col gap-[32px] pb-[24px]">
+      <PageHeader title="Payment details" className="mb-0" />
+      {/* Form and summary switch on the page container (main's width), never
+          the window: under 1024 the summary stacks under the form. */}
+      <div className={NARROW_WITH_RAIL}>
+        <div className={cn(NARROW_COLUMN, "flex flex-col gap-[32px]")}>
+          {fromPaid && (
+            <section aria-labelledby="confirm-upgrade" className="flex flex-col gap-[16px]">
+              <h2 id="confirm-upgrade" className="text-2xl font-semibold leading-2xl text-text-primary">
+                Confirm your upgrade
+              </h2>
+              <div className="grid grid-cols-2 gap-[16px] max-sm:grid-cols-1">
+                <PlanTile label="From" name={current.name} line={`${usd(priceOf(sub.tier, sub.cycle).perMonth)} / month${sub.cycle === "yearly" ? " · annual" : ""}`} />
+                <PlanTile label="Upgrading to" name={target!.name} line={`${usd(per!.perMonth)} / month${cycle === "yearly" ? " · annual" : ""}`} brand />
               </div>
-            </div>
-          </section>
-        )}
-        {due > 0 ? (
-          <PaymentPicker amountUsd={due} coin={coin} onCoin={setCoin} />
-        ) : (
-          <p className="text-lg leading-lg text-text-secondary">The unused time on {current.name} covers this upgrade. Nothing to pay today.</p>
-        )}
+              <div className="flex items-start gap-[12px] rounded-xl bg-bg-subtle p-[16px]">
+                <span aria-hidden className="mt-[2px] text-text-brand">
+                  <Icon icon={InformationCircleIcon} size={20} />
+                </span>
+                <div className="flex flex-col gap-[4px]">
+                  <p className="text-lg font-semibold leading-lg text-text-brand">Important</p>
+                  <p className="text-md leading-md text-text-secondary">
+                    Your plan becomes {target!.name} now. The unused time on {current.name} comes off today&apos;s price, and the next
+                    billing is on {date(renewsAt!)}. Cancel any time.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+          {due > 0 ? (
+            <PaymentPicker amountUsd={due} coin={coin} onCoin={setCoin} />
+          ) : (
+            <p className="text-lg leading-lg text-text-secondary">The unused time on {current.name} covers this upgrade. Nothing to pay today.</p>
+          )}
+        </div>
+        <div className={NARROW_COLUMN}>{summary}</div>
       </div>
-      <div className={NARROW_COLUMN}>{summary}</div>
     </div>
   );
 }

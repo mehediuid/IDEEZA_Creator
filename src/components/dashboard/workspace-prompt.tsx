@@ -4,9 +4,8 @@
 // help the user describe an electronics project and start the build.
 // Uses Hugeicons (IDEEZA DS icon set) via the shared `Icon` wrapper.
 //
-// Sizing note: the Tailwind preset overrides `spacing` with DS tokens, so
-// the controls' own dimensions use explicit arbitrary px values for clarity;
-// the page layout (band, column, strip) is tokens only, on the page frame.
+// Sizing note: the Tailwind preset overrides `spacing` with DS tokens,
+// so component dimensions use explicit arbitrary px values for clarity.
 
 import * as React from "react";
 import Link from "next/link";
@@ -40,7 +39,6 @@ import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
 import { formatCount, PROJECTS, type Project } from "@/lib/feed";
 import { MintedBadge } from "@/components/newsfeed/minted-badge";
-import { NARROW_COLUMN } from "@/components/ideeza/page";
 import { BuildManuallyInfo } from "./build-manually-info";
 import { ProjectInfoModal } from "./project-info-modal";
 import { Icon, type IconValue } from "./icon";
@@ -192,83 +190,78 @@ export function WorkspacePrompt() {
   );
 
   return (
-    <>
-      {/* Hero — the launchpad band (User Panel V2 Dashboard's banner): it
-          fills the page frame edge to edge, and the title and the composer
-          sit in a narrow column centred inside it — the one centred title in
-          the app. Its padding steps up from a 640 px page container. */}
-      <div className="relative overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface px-8 py-24 [@container(min-width:640px)]:px-16 [@container(min-width:640px)]:py-32">
-        <HeroGlow />
+    <div className="relative flex min-h-full w-full flex-col pb-[64px]">
+      <HeroGlow />
 
-        <div className={cn(NARROW_COLUMN, "relative mx-auto")}>
-          <h1 className="m-0 text-center text-5xl font-semibold leading-5xl tracking-tight text-text-primary">
-            What will you build today?
-          </h1>
-          <p className="mx-auto mt-8 max-w-[62ch] text-balance text-center text-md leading-relaxed text-text-secondary">
-            Turn your electronics idea into a buildable design&nbsp;— with AI
-            or on your own. No wallet or KYC to start.
-          </p>
+      {/* Hero — centered narrow column. */}
+      <div className="relative mx-auto w-full max-w-[760px] px-[var(--layout-page-inset)] pt-[64px]">
+        <h1 className="text-center text-5xl font-bold tracking-tight text-text-primary">
+          What will you build today?
+        </h1>
+        <p className="mx-auto mt-[16px] max-w-[560px] text-center text-md leading-relaxed text-text-secondary">
+          Turn your electronics idea into a buildable design — with AI or on
+          your own. No wallet or KYC to start.
+        </p>
 
-          <div className="mt-20 flex justify-center">
-            <ModeToggle mode={mode} onChange={setMode} />
-          </div>
+        <div className="mt-[40px] flex justify-center">
+          <ModeToggle mode={mode} onChange={setMode} />
+        </div>
 
-          <div className="mt-12">
-            {mode === "ai" && addTo && (
-              <div className="mb-6 flex justify-center">
-                <p className="inline-flex max-w-full items-center gap-[4px] rounded-full border border-solid border-border bg-bg-surface py-[2px] pl-[14px] pr-[2px] text-sm text-text-secondary">
-                  <span className="min-w-0 truncate">
-                    Adding to <strong className="font-semibold text-text-primary">{addTo.name}</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={dropAddTo}
-                    aria-label={`Stop adding to ${addTo.name}`}
-                    className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[44px]"
-                  >
-                    <Icon icon={Cancel01Icon} size={16} />
-                  </button>
-                </p>
-              </div>
-            )}
-            {mode === "ai" ? (
-              <PromptCard
-                ref={taRef}
-                value={prompt}
-                onChange={setPrompt}
-                onSubmit={handleSubmit}
-                submitting={submitting}
-                placeholder={placeholder}
-                mode={mode}
-                onRefine={handleRefine}
-                refining={refining}
-                canRender={canRender}
-              />
-            ) : (
-              <BuildManuallyInfo onCreate={() => setProjectModalOpen(true)} />
-            )}
-          </div>
-
-          {/* Chips suggest prompts — only meaningful in AI mode. */}
-          {mode === "ai" && (
-            <div className="mt-8">
-              <Chips
-                items={chips}
-                onPick={pickChip}
-                onShuffle={() =>
-                  setChipOffset((o) => (o + CHIPS_SHOWN) % CHIP_POOL.length)
-                }
-              />
+        <div className="mt-[24px]">
+          {mode === "ai" && addTo && (
+            <div className="mb-[12px] flex justify-center">
+              <p className="inline-flex max-w-full items-center gap-[4px] rounded-full border border-solid border-border bg-bg-surface py-[2px] pl-[14px] pr-[2px] text-sm text-text-secondary">
+                <span className="min-w-0 truncate">
+                  Adding to <strong className="font-semibold text-text-primary">{addTo.name}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={dropAddTo}
+                  aria-label={`Stop adding to ${addTo.name}`}
+                  className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[44px]"
+                >
+                  <Icon icon={Cancel01Icon} size={16} />
+                </button>
+              </p>
             </div>
           )}
+          {mode === "ai" ? (
+            <PromptCard
+              ref={taRef}
+              value={prompt}
+              onChange={setPrompt}
+              onSubmit={handleSubmit}
+              submitting={submitting}
+              placeholder={placeholder}
+              mode={mode}
+              onRefine={handleRefine}
+              refining={refining}
+              canRender={canRender}
+            />
+          ) : (
+            <BuildManuallyInfo onCreate={() => setProjectModalOpen(true)} />
+          )}
+        </div>
 
-          <div className="mt-24 flex flex-col items-center">
-            <WhatYouGet />
+        {/* Chips suggest prompts — only meaningful in AI mode. */}
+        {mode === "ai" && (
+          <div className="mt-[16px]">
+            <Chips
+              items={chips}
+              onPick={pickChip}
+              onShuffle={() =>
+                setChipOffset((o) => (o + CHIPS_SHOWN) % CHIP_POOL.length)
+              }
+            />
           </div>
+        )}
+
+        <div className="mt-[48px] flex flex-col items-center">
+          <WhatYouGet />
         </div>
       </div>
 
-      {/* Examples — on the frame, from the band's left edge. */}
+      {/* Examples — full main width, capped at 1400px. */}
       <Examples items={INSPIRATION} />
 
       {/* Manual mode → Create Project → opens this modal. Closing
@@ -278,7 +271,7 @@ export function WorkspacePrompt() {
         open={projectModalOpen}
         onClose={() => setProjectModalOpen(false)}
       />
-    </>
+    </div>
   );
 }
 
@@ -293,11 +286,12 @@ function HeroGlow() {
   return (
     <div
       aria-hidden
-      // The band clips it: its own rounded edge is where the wash and the
-      // travelling light stop, so neither can widen the page nor leave a
-      // hard rule inside the hero. A container, so the light's travel
-      // (`cqw` in globals.css) is the band's width, not the window's.
-      className="pointer-events-none absolute inset-0 [container-type:inline-size]"
+      // Tall enough that the clip falls where the glow has already reached
+      // the page's own colour. `overflow-hidden` is here for the travelling
+      // light, which crosses ±42vw and would otherwise widen the page — but
+      // it was cutting the wash at 420px while a 120px blur was still 33
+      // levels above the background, leaving a hard rule across the hero.
+      className="pointer-events-none absolute inset-x-0 top-0 h-[900px] overflow-hidden"
     >
       <div className="flex justify-center">
         <div
@@ -759,44 +753,44 @@ function WhatYouGet() {
   );
 }
 
-// One teaser row of four, not a gallery, so it never leaves a card alone on a
-// second row or an empty slot at the end of the first. Columns follow the
-// strip's own width at the gallery's card-min (280) and gutter (24): two from
-// 584, three from 888 (the fourth waits), all four from 1192. Closed ranges,
-// because Tailwind orders arbitrary container variants as strings (1192 before
-// 888), so an open-ended 888 rule would win over the 1192 one.
-const INSPIRATION_GRID =
-  "grid grid-cols-1 gap-[var(--layout-gutter)] [@container(min-width:584px)_and_(max-width:887.98px)]:grid-cols-2 [@container(min-width:888px)_and_(max-width:1191.98px)]:grid-cols-3 [@container(min-width:888px)_and_(max-width:1191.98px)]:[&>li:nth-child(4)]:hidden [@container(min-width:1192px)]:grid-cols-4";
-
 function Examples({ items }: { items: Project[] }) {
   return (
     <section
       aria-labelledby="examples-heading"
-      className="mt-16 [container-type:inline-size]"
+      // On the page frame's edge (F07 — Page Layout), like every page's
+      // content: the inset, filling the width. Its columns follow the strip's
+      // own width, not the window's — beside the sidebar a 1024 window has a
+      // 680 px strip, where four columns cut every title.
+      className="mt-[64px] w-full px-[var(--layout-page-inset)] [container-type:inline-size]"
     >
-      <header className="mb-10 flex items-end justify-between gap-8">
-        <h2
-          id="examples-heading"
-          className="text-lg font-bold text-text-primary"
-        >
-          Get inspired
-        </h2>
-        <Link
-          href="/innovations"
-          className="inline-flex h-[36px] items-center gap-[6px] rounded-lg px-[12px] text-md font-semibold text-text-brand outline-none transition-colors duration-fast hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          Browse all
-          <Icon icon={ArrowRight01Icon} />
-        </Link>
-      </header>
+      <div className="w-full">
+        <header className="mb-[20px] flex items-end justify-between gap-[16px]">
+          <h2
+            id="examples-heading"
+            className="text-lg font-bold text-text-primary"
+          >
+            Get inspired
+          </h2>
+          <Link
+            href="/innovations"
+            className="inline-flex h-[36px] items-center gap-[6px] rounded-lg px-[12px] text-md font-semibold text-text-brand outline-none transition-colors duration-fast hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            Browse all
+            <Icon icon={ArrowRight01Icon} />
+          </Link>
+        </header>
 
-      <ul role="list" className={INSPIRATION_GRID}>
-        {items.map((p) => (
-          <li key={p.id}>
-            <ExampleTile item={p} />
-          </li>
-        ))}
-      </ul>
+        <ul
+          role="list"
+          className="grid grid-cols-1 gap-[16px] [@container(min-width:560px)]:grid-cols-2 [@container(min-width:900px)]:grid-cols-4"
+        >
+          {items.map((p) => (
+            <li key={p.id}>
+              <ExampleTile item={p} />
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }

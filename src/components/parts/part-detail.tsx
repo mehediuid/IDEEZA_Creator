@@ -14,10 +14,11 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { Button, buttonVariants } from "@/components/ideeza";
-import { Page, WITH_RAIL } from "@/components/ideeza/page";
+import { Icon } from "@/components/dashboard/icon";
+import { Page } from "@/components/ideeza/page";
 import { PageHeader } from "@/components/ideeza/page-header";
-import { Breadcrumb } from "@/components/projects/details/breadcrumb";
 import { glyphFor } from "@/lib/pcb/glyphs";
 import { FOOTPRINT } from "@/lib/pcb/schematic-to-pcb";
 import { landPatternFor, unresolvedReason } from "@/lib/pcb/land-patterns";
@@ -174,26 +175,6 @@ export function PartDetail({ id }: { id: string }) {
         visibility={p.visibility === "community" ? "public" : "private"}
         action={open}
         description={p.description}
-        rail={
-          <Panel title="This package">
-            <Rows
-              rows={[
-                ["Category", p.category],
-                ["Pins", String(p.pins)],
-                ["Pads", String(p.pads)],
-                ["Mounting", p.mounting],
-                ["Reference", `${p.prefix || "U"}?`],
-                ["Value", p.value || "—"],
-                ["Body height", `${p.body.height.toFixed(2)} mm`],
-                ["Standoff", `${p.body.z.toFixed(2)} mm`],
-                ["Body rotation", `${p.body.rot}°`],
-                ["Authored via", p.path === "wizard" ? "Part Wizard" : p.path === "import" ? "Import" : "Custom"],
-                ["Version", `v${p.version}`],
-                ["Created", new Date(p.createdAt).toLocaleDateString()],
-              ]}
-            />
-          </Panel>
-        }
       >
         <Panel title="Geometry">
           <div className="flex flex-wrap gap-[var(--spacing-6)]">
@@ -204,6 +185,25 @@ export function PartDetail({ id }: { id: string }) {
               <FootprintThumb draft={p} />
             </Frame>
           </div>
+        </Panel>
+
+        <Panel title="This package">
+          <Rows
+            rows={[
+              ["Category", p.category],
+              ["Pins", String(p.pins)],
+              ["Pads", String(p.pads)],
+              ["Mounting", p.mounting],
+              ["Reference", `${p.prefix || "U"}?`],
+              ["Value", p.value || "—"],
+              ["Body height", `${p.body.height.toFixed(2)} mm`],
+              ["Standoff", `${p.body.z.toFixed(2)} mm`],
+              ["Body rotation", `${p.body.rot}°`],
+              ["Authored via", p.path === "wizard" ? "Part Wizard" : p.path === "import" ? "Import" : "Custom"],
+              ["Version", `v${p.version}`],
+              ["Created", new Date(p.createdAt).toLocaleDateString()],
+            ]}
+          />
         </Panel>
 
         <Note>
@@ -222,22 +222,7 @@ export function PartDetail({ id }: { id: string }) {
     // and the client's, which is the same mismatch the action used to suffer.
     const byMpn = new Map([...PART_CATALOG, ...(storeKnown ? readPersonalParts() : [])].map((p) => [p.part, p]));
     return (
-      <Shell
-        name={m.name}
-        badge="Agile Module"
-        visibility={found.own ? "private" : "public"}
-        action={open}
-        description={m.summary}
-        rail={
-          <Panel title="Type">
-            <div className="flex flex-wrap gap-[var(--spacing-3)]">
-              {m.features.map((f) => (
-                <Chip key={f}>{f}</Chip>
-              ))}
-            </div>
-          </Panel>
-        }
-      >
+      <Shell name={m.name} badge="Agile Module" visibility={found.own ? "private" : "public"} action={open} description={m.summary}>
         <Panel title={`Built from ${m.parts.length} part${m.parts.length === 1 ? "" : "s"}`}>
           <ul role="list" className="flex flex-col gap-[var(--spacing-3)]">
             {m.parts.map((mpn) => {
@@ -269,6 +254,14 @@ export function PartDetail({ id }: { id: string }) {
           </ul>
         </Panel>
 
+        <Panel title="Type">
+          <div className="flex flex-wrap gap-[var(--spacing-3)]">
+            {m.features.map((f) => (
+              <Chip key={f}>{f}</Chip>
+            ))}
+          </div>
+        </Panel>
+
         <Note>
           {found.own
             ? "Captured in this browser. Placing it re-creates its objects at the drop point, keeping their relative layout."
@@ -284,35 +277,7 @@ export function PartDetail({ id }: { id: string }) {
   const converted = FOOTPRINT[p.kind];
   const land = landPatternFor(p.pkg);
   return (
-    <Shell
-      name={p.part}
-      badge="Part"
-      visibility={found.own ? "private" : "public"}
-      action={open}
-      rail={
-        <>
-          <Panel title="Specification">
-            <Rows
-              rows={[
-                ["Manufacturer", p.mfr],
-                ["Package", p.pkg],
-                ["Unit price", p.price],
-                ["Stock", p.stock],
-                ["Land pattern", land ? `${land.count} pads` : "not modelled"],
-              ]}
-            />
-          </Panel>
-
-          <Panel title="Features">
-            <div className="flex flex-wrap gap-[var(--spacing-3)]">
-              {p.features.map((f) => (
-                <Chip key={f}>{f}</Chip>
-              ))}
-            </div>
-          </Panel>
-        </>
-      }
-    >
+    <Shell name={p.part} badge="Part" visibility={found.own ? "private" : "public"} action={open}>
       <Panel title="Geometry">
         <div className="flex flex-wrap gap-[var(--spacing-6)]">
           <Frame label="Symbol — what the schematic places">
@@ -323,6 +288,26 @@ export function PartDetail({ id }: { id: string }) {
               <FootprintThumb draft={{ symbol: [], footprint: land.pads }} />
             </Frame>
           ) : null}
+        </div>
+      </Panel>
+
+      <Panel title="Specification">
+        <Rows
+          rows={[
+            ["Manufacturer", p.mfr],
+            ["Package", p.pkg],
+            ["Unit price", p.price],
+            ["Stock", p.stock],
+            ["Land pattern", land ? `${land.count} pads` : "not modelled"],
+          ]}
+        />
+      </Panel>
+
+      <Panel title="Features">
+        <div className="flex flex-wrap gap-[var(--spacing-3)]">
+          {p.features.map((f) => (
+            <Chip key={f}>{f}</Chip>
+          ))}
         </div>
       </Panel>
 
@@ -402,19 +387,12 @@ function activeBoardHref(): string | null {
   }
 }
 
-/**
- * The page around every state: the app's page frame, the O02 header with the
- * trail back to the library, then the entry's content. When the entry has a
- * summary — its specification, its facts, its type — that sits in the rail
- * beside the content; the states with nothing to summarise use the column alone.
- */
 function Shell({
   name,
   badge,
   visibility,
   description,
   action,
-  rail,
   children,
 }: {
   name: string;
@@ -423,15 +401,22 @@ function Shell({
   description?: string;
   /** Only the states that have something to act on pass one. */
   action?: React.ReactNode;
-  /** The entry's summary blocks; only a resolved entry has them. */
-  rail?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const column = <div className="flex min-w-0 flex-col gap-[var(--spacing-10)]">{children}</div>;
+  // The app's page frame: the content starts on the frame's left edge, the
+  // same edge as the library it came from, and fills the width.
   return (
     <Page>
       <PageHeader
-        breadcrumb={<Breadcrumb trail={[{ label: "Parts & Agile Module", href: "/parts" }, { label: name }]} />}
+        breadcrumb={
+          <Link
+            href="/parts"
+            className="inline-flex min-h-[24px] w-fit items-center gap-[var(--spacing-3)] rounded-[var(--radius-lg)] py-[var(--spacing-2)] font-display text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <Icon icon={ArrowLeft01Icon} size={16} />
+            Parts &amp; Agile Module
+          </Link>
+        }
         title={name}
         meta={
           badge || visibility ? (
@@ -454,18 +439,16 @@ function Shell({
             </span>
           ) : null
         }
-        description={description}
+        description={
+          // The description keeps its own type, as it was before the header was shared.
+          description ? (
+            <span className="block max-w-[62ch] font-display text-md font-regular leading-relaxed text-text-secondary">{description}</span>
+          ) : undefined
+        }
         actions={action}
       />
 
-      {rail ? (
-        <div className={WITH_RAIL}>
-          {column}
-          <div className="flex min-w-0 flex-col gap-[var(--spacing-10)]">{rail}</div>
-        </div>
-      ) : (
-        column
-      )}
+      <div className="flex flex-col gap-[var(--spacing-10)]">{children}</div>
     </Page>
   );
 }

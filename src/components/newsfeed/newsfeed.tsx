@@ -36,6 +36,7 @@ export function Newsfeed() {
       <PageHeader
         title="Innovations"
         description="Discover what creators are building. Follow, appreciate, and save projects."
+        descriptionClassName="text-sm text-text-secondary"
       />
 
       <div className="flex flex-col gap-12">

@@ -64,7 +64,7 @@ export function CreditsPanel() {
     <div className="flex w-full flex-col gap-[40px]">
       <div className="flex flex-wrap items-start justify-between gap-[24px]">
         <div className="flex max-w-[62ch] flex-col gap-[12px]">
-          <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Purchase AI credits</h2>
+          <h2 className="text-4xl font-semibold leading-4xl text-text-primary">Purchase AI credits</h2>
           <p className="text-lg leading-lg text-text-secondary">
             Power your creativity with flexible credit options with {VALIDITY_MONTHS}-month validity.
           </p>

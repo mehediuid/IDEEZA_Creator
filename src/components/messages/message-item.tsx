@@ -132,8 +132,7 @@ export function MessageItem({
 
   return (
     <div ref={rowRef} className={cn("group/msg flex w-full items-start gap-2", mine ? "flex-row-reverse" : "flex-row")}>
-      {/* A bubble keeps a reading measure on a wide pane: 75 % of the column, never past 62ch. */}
-      <div className={cn("flex min-w-0 max-w-[85%] flex-col gap-2 text-md md:max-w-[min(75%,62ch)]", mine ? "items-end" : "items-start")}>
+      <div className={cn("flex min-w-0 max-w-[85%] flex-col gap-2 md:max-w-[75%]", mine ? "items-end" : "items-start")}>
         {deleted ? (
           <p className="rounded-xl border border-dashed border-border px-6 py-3 text-md leading-md text-text-tertiary">
             Message deleted

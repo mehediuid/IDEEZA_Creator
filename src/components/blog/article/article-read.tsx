@@ -2,13 +2,13 @@
 
 // /blog/<slug>/read — the reading view of the published version (owner D-1):
 // what "View to website" (L10) opens and what Copy link copies. The same
-// ArticleReader as the preview, with "Close ×" (and Esc, when no menu or dialog
-// is open) back to where you came from — and nothing of the writer's: no Edit,
-// no ⋯, no reasons, no status. In this demo blogs live in the browser they were
-// written in, so the page says so where it matters (the toast, the rail caption,
-// the not-found body). A removed blog can still be read here by its writer, with
-// a line under the title saying readers can't; a blog that was never published
-// says so and links to its page.
+// ArticleReader as the preview, inside D1's card, with "Close ×" (and Esc, when
+// no menu or dialog is open) back to where you came from — and nothing of the
+// writer's: no Edit, no ⋯, no reasons, no status. In this demo blogs live in the
+// browser they were written in, so the page says so where it matters (the
+// toast, the rail caption, the not-found body). A removed blog can still be read
+// here by its writer, with a line under the title saying readers can't; a blog
+// that was never published says so and links to its page.
 
 import * as React from "react";
 import Link from "next/link";

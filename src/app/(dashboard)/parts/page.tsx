@@ -18,7 +18,7 @@ export default function PartsPage() {
     <React.Suspense
       fallback={
         <Page>
-          <PageHeader title="Parts & Agile Module" description={metadata.description} />
+          <PageHeader title="Parts & Agile Module" />
         </Page>
       }
     >

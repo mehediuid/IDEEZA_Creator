@@ -14,7 +14,7 @@ export default function CheckoutRoute() {
   return (
     <React.Suspense
       fallback={
-        <PricingFrame crumbs={[{ label: "Plan & pricing", href: PLAN_PRICING_HREF }, { label: "Payment details" }]} title="Payment details">
+        <PricingFrame crumbs={[{ label: "Plan & pricing", href: PLAN_PRICING_HREF }, { label: "Payment details" }]}>
           <p className="text-md leading-md text-text-tertiary">Loading payment details…</p>
         </PricingFrame>
       }

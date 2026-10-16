@@ -94,7 +94,7 @@ export function PaymentMethodPanel() {
           This browser couldn&apos;t save the choice (storage is full or blocked).
         </p>
       )}
-      <p className="max-w-[62ch] text-md leading-md text-text-tertiary">
+      <p className="text-md leading-md text-text-tertiary">
         Checkout opens on your default token; you can pick the other one when you pay. A plan&apos;s renewal isn&apos;t charged on
         testnet.
       </p>

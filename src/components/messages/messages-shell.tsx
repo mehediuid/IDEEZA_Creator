@@ -68,6 +68,7 @@ function Panes({ children }: { children: React.ReactNode }) {
         <PageHeader
           title="Messages"
           description="Demo · messages stay in this browser."
+          descriptionClassName="text-md leading-md text-text-tertiary"
           actions={
             <IconButton
               aria-label="Message settings"

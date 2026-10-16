@@ -163,7 +163,12 @@ export function StepReview({
     : (readiness.rules.find((r) => r.id === "videos" && !r.ok)?.reason ?? VIDEOS_READY);
 
   return (
-    <BriefCard title="Review and sign" description={SUB_BY_INTENT[intent]} onBack={minting ? undefined : onBack}>
+    <BriefCard
+      title="Review and sign"
+      description={SUB_BY_INTENT[intent]}
+      descriptionClassName="text-md text-text-secondary"
+      onBack={minting ? undefined : onBack}
+    >
       <div className="flex flex-col gap-[20px]">
         <section aria-label="What is minted" className="flex flex-col gap-[14px]">
           <div className="flex items-start gap-[14px]">

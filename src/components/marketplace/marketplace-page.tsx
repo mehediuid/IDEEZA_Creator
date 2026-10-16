@@ -80,9 +80,6 @@ const tabId = (tab: Tab) => `market-tab-${tab}`;
 // As many columns as fit; the list is its own container too, so a card turns
 // into a row below a 560 px list (listing-card.tsx).
 const GRID = cn(PAGE_GRID, "[container-type:inline-size]");
-// An empty state takes the grid's place on its edges, its words centred inside
-// at a reading measure.
-const EMPTY_REGION = "mt-8 w-full [&_p]:max-w-[62ch]";
 // A link dressed as the quiet button; the reset colours every a:hover as a link.
 const QUIET_LINK = cn(
   buttonVariants({ hierarchy: "secondary", size: "md" }),
@@ -276,7 +273,7 @@ export function MarketplacePage() {
                   Clear search
                 </Button>
               }
-              className={EMPTY_REGION}
+              className="mt-[24px]"
             />
           ) : counts[view.tab] > 0 ? (
             // The Type filter alone emptied the tab.
@@ -290,7 +287,7 @@ export function MarketplacePage() {
                   Show every type
                 </Button>
               }
-              className={EMPTY_REGION}
+              className="mt-[24px]"
             />
           ) : (
             <EmptyTab tab={view.tab} buyerName={buyer.name} onForSale={() => changeView({ tab: "forSale" })} />
@@ -325,6 +322,7 @@ export function MarketplaceHeader({ forSale }: { forSale: number | null }) {
   return (
     <PageHeader
       title="Explore marketplace"
+      descriptionClassName="text-md text-text-secondary"
       description={
         <span aria-live="polite">
           {forSale === null ? "—" : forSale === 0 ? "Nothing for sale" : `${forSale} for sale`}
@@ -439,7 +437,7 @@ function EmptyTab({ tab, buyerName, onForSale }: { tab: Tab; buyerName: string; 
         icon={<Icon icon={Tag01Icon} size={32} />}
         title="Nothing sold yet"
         body="A sale shows here once a demo creator buys a listing."
-        className={EMPTY_REGION}
+        className="mt-[24px]"
       />
     );
   }
@@ -455,7 +453,7 @@ function EmptyTab({ tab, buyerName, onForSale }: { tab: Tab; buyerName: string; 
             See what&apos;s for sale
           </Button>
         }
-        className={EMPTY_REGION}
+        className="mt-[24px]"
       />
     );
   }
@@ -470,7 +468,7 @@ function EmptyTab({ tab, buyerName, onForSale }: { tab: Tab; buyerName: string; 
           Go to My projects
         </Link>
       }
-      className={EMPTY_REGION}
+      className="mt-[24px]"
     />
   );
 }

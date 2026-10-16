@@ -1,20 +1,18 @@
 "use client";
 
-// The blog as readers see it (Figma frames 20–22), on the page frame in the
-// Blog's reading geometry (reading-frame.ts — the editor's own, so Preview
-// doesn't move the words): a top row (the breadcrumb and the page's own
-// buttons) over a rule; the title (the page's only H1, Heading/H2 28/36 as
-// published content), the writer (their profile name and photo, a link to their
-// profile) on the left and "● n minutes to read · 24 Mar 2025" on the right, the
-// page's notice under them (a notice never sits above the title), the 3:2
-// thumbnail and the body, in the narrow column on the frame's left edge; beside
-// it from a 1024 px page container a sticky rail — the details page's status
-// first, then Category, On this page, the tags and the tag link — each block
-// under a rule. In one column the rail follows the blog, "On this page" folds
-// under the thumbnail, and a copy of the status badge sits in the byline row so
-// the status is on the first screen (the rail keeps its order). The details
-// page, the preview and the reading view all draw it, so each is exactly what
-// readers get.
+// The blog as readers see it, in the Figma's card (frames 20–22), as wide as
+// the page frame: a top row (the breadcrumb and the page's own buttons) over a
+// rule; the title (the page's only H1), the writer (their profile name and
+// photo, a link to their profile) on the left and "● n minutes to read · 24 Mar
+// 2025" on the right, the page's notice under them (a notice never sits above
+// the title), the 3:2 thumbnail and the body, in the narrow column on the
+// card's left edge; beside it from a 1024 px page container a sticky rail —
+// the details page's status first, then Category, On this page, the tags and
+// the tag link — each block under a rule. In one column the rail follows the
+// blog, "On this page" folds under the thumbnail, and a copy of the status
+// badge sits in the byline row so the status is on the first screen (the rail
+// keeps its order). The details page, the preview and the reading view all
+// draw it, so each is exactly what readers get.
 
 import * as React from "react";
 import Link from "next/link";
@@ -35,16 +33,18 @@ import { cn } from "@/lib/utils";
 import { ArticleBody, ArticleBodySkeleton, ProjectTile } from "./article-body";
 import { ContentsDisclosure, ContentsList, scrollToHeading, useScrollSpy } from "./on-this-page";
 import { useListHref } from "@/components/blog/list/use-list-href";
-import { READING_FRAME, READING_GRID } from "@/components/blog/reading-frame";
-import { PAGE_CONTAINER, PAGE_FRAME } from "@/components/ideeza/page";
+import { NARROW_WITH_RAIL, PAGE_CONTAINER, PAGE_FRAME } from "@/components/ideeza/page";
 
 /** The page container the layout's container queries measure (the width of <main>). Positioned,
  *  so a visually hidden label inside stays inside <main>'s scroll instead of stretching the page. */
 export const ARTICLE_PAGE = cn(PAGE_CONTAINER, "relative");
 /** The app's page frame: the layout inset on every side, filling the width. */
 export const ARTICLE_CONTENT = cn(PAGE_FRAME, "flex flex-col gap-10");
-/** The top row: the breadcrumb and the page's buttons, over a rule. */
-const TOP_ROW = "flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4 border-0 border-b border-solid border-border-subtle pb-8";
+/** The Figma's white card the blog sits in, on the grey page. */
+const CARD = "flex min-w-0 flex-col rounded-2xl border border-solid border-border-subtle bg-bg-surface px-8 py-8 [@container(min-width:640px)]:px-12 [@container(min-width:640px)]:py-10";
+/** The reading column on the card's left edge, at most the narrow column; from a 1024 px page
+ *  container the rail beside it. */
+const COLUMNS = cn(NARROW_WITH_RAIL, "max-w-[var(--layout-content-narrow)] [@container(min-width:1024px)]:max-w-none");
 const WIDE_ONLY = "hidden [@container(min-width:1024px)]:flex";
 const NARROW_ONLY = "[@container(min-width:1024px)]:hidden";
 
@@ -153,9 +153,11 @@ export function ArticleReader({
   }, [bodyReady, anchors]);
 
   return (
-    <div className={READING_FRAME}>
-      <div className={TOP_ROW}>{header}</div>
-      <div className={cn(READING_GRID, "pt-12")}>
+    <div className={CARD}>
+      <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4 border-0 border-b border-solid border-border-subtle pb-8">
+        {header}
+      </div>
+      <div className={cn(COLUMNS, "pt-12")}>
         <article aria-labelledby={titleId} className="flex w-full min-w-0 flex-col gap-12">
           <header className="flex flex-col gap-8">
             <h1 id={titleId} className="text-4xl font-semibold leading-4xl tracking-tight text-text-primary [overflow-wrap:anywhere] max-md:leading-3xl">
@@ -251,11 +253,11 @@ export function ArticleSkeleton() {
         <span className="sr-only" role="status">
           Loading the blog
         </span>
-        <div className={READING_FRAME}>
-          <div className={TOP_ROW}>
+        <div className={CARD}>
+          <div className="border-0 border-b border-solid border-border-subtle pb-8">
             <Skeleton shape="text" size="md" className="w-[220px]" />
           </div>
-          <div className={cn(READING_GRID, "pt-12")}>
+          <div className={cn(COLUMNS, "pt-12")}>
             <div className="flex min-w-0 flex-col gap-12">
               <div className="flex flex-col gap-8">
                 <Skeleton shape="text" size="lg" className="h-[28px] w-[80%]" />

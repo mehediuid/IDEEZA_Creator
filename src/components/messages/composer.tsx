@@ -139,7 +139,7 @@ export function Composer({
   const describedBy = [showCount ? counterId : null, error ? errorId : null].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className="flex shrink-0 flex-col gap-3 border-t border-solid border-border bg-bg-surface px-8 py-4">
+    <div className="flex shrink-0 flex-col gap-3 border-t border-solid border-border bg-bg-surface px-6 py-4 md:px-8">
       {pendingLine && (
         <p className="w-fit max-w-full truncate rounded-full bg-bg-subtle px-4 py-1 text-md leading-md text-text-secondary">
           {pendingLine}

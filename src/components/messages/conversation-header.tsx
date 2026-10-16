@@ -32,7 +32,7 @@ export function ConversationHeader({
   personId?: string | null;
 }) {
   return (
-    <header className="flex min-h-[64px] shrink-0 items-center gap-4 border-b border-solid border-border bg-bg-surface px-8 py-2">
+    <header className="flex min-h-[64px] shrink-0 items-center gap-4 border-b border-solid border-border bg-bg-surface px-4 py-2 md:px-8">
       <h1 className="sr-only [@container(min-width:768px)]:hidden">Messages</h1>
       <Link
         href={MESSAGES_HREF}

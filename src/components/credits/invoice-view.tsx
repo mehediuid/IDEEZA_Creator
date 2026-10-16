@@ -3,8 +3,7 @@
 // One invoice (User Panel V2 › Invoice 41549:165299 / 41549:165359): who paid,
 // for what period or credits, the lines, what was taken off, tax, the total,
 // how it was paid and the transaction — readable here, and printed or saved as
-// a PDF from the browser's print dialog (the page chrome and the page's header
-// stay off paper; the document keeps its own title).
+// a PDF from the browser's print dialog (the page chrome stays off paper).
 // Built from the payment itself (lib/account/invoices.ts); a testnet invoice
 // says so on its face.
 
@@ -14,21 +13,14 @@ import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { useMe } from "@/components/dashboard/sidebar-account";
 import { Badge, Button, TestnetDemoBadge } from "@/components/ideeza";
 import { NARROW_COLUMN, Page } from "@/components/ideeza/page";
-import { PageHeader } from "@/components/ideeza/page-header";
 import { invoicesOf } from "@/lib/account/invoices";
-import { PLAN_PRICING_HREF, usd } from "@/lib/create/credit-pricing";
+import { usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
-import { PricingBreadcrumb } from "./pricing-frame";
 
 const BILLING_HREF = "/settings/plan?tab=billing";
-const CRUMBS = [
-  { label: "Plan & pricing", href: PLAN_PRICING_HREF },
-  { label: "Billing history", href: BILLING_HREF },
-  { label: "Invoice" },
-];
 const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 export function InvoiceView({ orderId }: { orderId: string }) {
@@ -57,7 +49,7 @@ export function InvoiceView({ orderId }: { orderId: string }) {
     return (
       <Shell>
         <div className="flex flex-col items-start gap-[8px] rounded-xl border border-solid border-border bg-bg-surface p-[24px]">
-          <h2 className="text-xl font-semibold leading-xl text-text-primary">No invoice here</h2>
+          <h1 className="text-xl font-semibold leading-xl text-text-primary">No invoice here</h1>
           <p className="text-md leading-md text-text-secondary">
             There&apos;s no payment with this number in this browser. Payments are kept in the browser they were made in.
           </p>
@@ -69,13 +61,14 @@ export function InvoiceView({ orderId }: { orderId: string }) {
 
   const renewal = invoice.status === "Not charged";
   return (
-    <Shell
-      actions={
+    <Shell>
+      <div className="flex flex-wrap items-center justify-between gap-[12px] print:hidden">
+        {back}
         <Button hierarchy="secondary" size="lg" onClick={() => window.print()}>
           Print or save as PDF
         </Button>
-      }
-    >
+      </div>
+
       <article
         aria-labelledby="invoice-title"
         className="flex flex-col gap-[28px] rounded-xl border border-solid border-border bg-bg-surface p-[40px] max-md:p-[20px] print:border-0 print:p-0"
@@ -83,9 +76,9 @@ export function InvoiceView({ orderId }: { orderId: string }) {
         <header className="flex flex-wrap items-start justify-between gap-[16px] border-b border-solid border-border-subtle pb-[20px]">
           <IdeezaLogo height={32} decorative={false} />
           <div className="flex flex-col items-end gap-[4px] text-right max-md:items-start max-md:text-left">
-            <h2 id="invoice-title" className="text-3xl font-semibold leading-3xl text-text-primary">
+            <h1 id="invoice-title" className="text-3xl font-semibold leading-3xl text-text-primary">
               Invoice
-            </h2>
+            </h1>
             <p className="font-mono text-md leading-md text-text-secondary">{invoice.number}</p>
             <p className="text-md leading-md text-text-secondary">Issued {date(invoice.ts)}</p>
             <div className="flex flex-wrap items-center gap-[8px]">
@@ -199,16 +192,12 @@ export function InvoiceView({ orderId }: { orderId: string }) {
   );
 }
 
-/** The page frame and, on its left edge, the narrow column: the header (off
- *  paper) and the document. On paper the frame's inset and the column's cap
- *  fall away, so the invoice fills the sheet. */
-function Shell({ actions, children }: { actions?: React.ReactNode; children: React.ReactNode }) {
+/** The page frame and, on its left edge, the narrow column. On paper the
+ *  frame's inset and the column's cap fall away, so the invoice fills the sheet. */
+function Shell({ children }: { children: React.ReactNode }) {
   return (
     <Page className="print:bg-bg-surface print:p-0">
-      <div className={cn(NARROW_COLUMN, "print:max-w-none")}>
-        <PageHeader breadcrumb={<PricingBreadcrumb crumbs={CRUMBS} />} title="Invoice" actions={actions} className="print:hidden" />
-        {children}
-      </div>
+      <div className={cn(NARROW_COLUMN, "flex flex-col gap-[20px] print:max-w-none")}>{children}</div>
     </Page>
   );
 }

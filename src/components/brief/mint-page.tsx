@@ -16,7 +16,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { NoteRemoveIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Skeleton, StateCard, buttonVariants } from "@/components/ideeza";
+import { StateCard, buttonVariants } from "@/components/ideeza";
 import { NARROW_COLUMN, Page } from "@/components/ideeza/page";
 import { ProjectNotFound } from "@/components/projects/details/page-states";
 import { earnHref } from "@/lib/manual/earn-route";
@@ -49,24 +49,19 @@ export function MintPage({ id }: { id: string }) {
   return <BriefApp key={project.id} projectId={project.id} />;
 }
 
-/** The flow's own shape while it loads, on the page's frame — the header (the
- *  breadcrumb and the title), then the step line and the card in the column. */
+/** The flow's own shape while it loads — the step line and the card, in the
+ *  page frame's narrow column. */
 function MintSkeleton() {
   return (
     <Page>
-      <div role="status" aria-label="Loading the mint flow" aria-busy className="flex flex-col">
+      <div
+        role="status"
+        aria-label="Loading the mint flow"
+        className={cn(NARROW_COLUMN, "flex flex-col gap-6 motion-safe:animate-pulse")}
+      >
         <span className="sr-only">Loading the mint flow</span>
-        <div className="mb-12 flex flex-col gap-6">
-          <Skeleton shape="text" size="lg" />
-          <div className="flex flex-col gap-2">
-            <Skeleton shape="text" size="lg" className="h-16" />
-            <Skeleton shape="text" size="lg" className="w-full max-w-[62ch]" />
-          </div>
-        </div>
-        <div className={cn(NARROW_COLUMN, "flex flex-col gap-6")}>
-          <Skeleton shape="text" size="md" />
-          <Skeleton className="h-[420px] w-full rounded-2xl" />
-        </div>
+        <div className="h-[14px] w-full rounded bg-bg-subtle" />
+        <div className="h-[420px] w-full rounded-2xl bg-bg-subtle" />
       </div>
     </Page>
   );
@@ -78,8 +73,7 @@ function NoBrief({ name, href }: { name: string; href: string }) {
     titleRef.current?.focus({ preventScroll: true });
   }, []);
   return (
-    // The card is the whole page, set as the project page's not-found state is (page-states.tsx).
-    <div className="flex justify-center px-8 py-40">
+    <div className="flex justify-center px-[16px] py-[48px] md:py-[80px]">
       <StateCard
         tone="empty"
         titleAs="h1"

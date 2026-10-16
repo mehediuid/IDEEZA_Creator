@@ -1,10 +1,9 @@
 "use client";
 
 // /blog/<slug>/preview — Blog preview (Figma frame 20): the draft (its meta and
-// working body) in exactly the reader view, in the details page's frame and the
-// editor's own column: "Blog › Create new blog › Blog preview" (frame 19's
-// editor name on every editor page, owner D-7), "Close preview ×" on the right,
-// and a rail of
+// working body) in exactly the reader view, in the same card as the details
+// page: "Blog › Create new blog › Blog preview" (frame 19's editor name on every
+// editor page, owner D-7), "Close preview ×" on the right, and a rail of
 // Category, On this page and the tags — no status, no actions, nothing to change
 // here. Before a thumbnail is picked, its place is drawn and says when it comes.
 // Close preview (or Esc, when no menu or dialog is open) returns to the editor:

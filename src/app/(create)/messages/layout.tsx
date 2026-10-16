@@ -18,7 +18,11 @@ export default function MessagesLayout({ children }: { children: React.ReactNode
     <React.Suspense
       fallback={
         <Page>
-          <PageHeader title="Messages" description="Demo · messages stay in this browser." />
+          <PageHeader
+            title="Messages"
+            description="Demo · messages stay in this browser."
+            descriptionClassName="text-md leading-md text-text-tertiary"
+          />
         </Page>
       }
     >

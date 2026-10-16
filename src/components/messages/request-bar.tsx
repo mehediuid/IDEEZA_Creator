@@ -32,7 +32,7 @@ export function RequestBar({
   return (
     <section
       aria-label="Message request"
-      className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 border-b border-solid border-border bg-bg-subtle px-8 py-4"
+      className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 border-b border-solid border-border bg-bg-subtle px-4 py-4 md:px-8"
     >
       <p className="min-w-[200px] flex-1 text-md leading-md text-text-primary">
         {other.name} wants to message you about {subjectName}.

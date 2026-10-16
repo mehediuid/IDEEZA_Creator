@@ -4,7 +4,7 @@
 // draws it ("Pricing FAQs | General | Monthly" 41551:109175, "Monthly V3"
 // 41549:166935), in the design system's parts:
 //
-// - "Choose a plan" on the frame's edge, Monthly | Annual (save 20%) beside it.
+// - "Choose a plan", centred, over Monthly | Annual (save 20%).
 // - The three paid plans as cards (Builder raised: brand border and fill,
 //   Most popular), each with its price, its button, "Everything in <the plan
 //   below>", and what it gives — AI credits first, as a chip.
@@ -46,7 +46,6 @@ import {
   type Plan,
   type PlanTier,
 } from "@/lib/create/plans";
-import { NARROW_COLUMN } from "@/components/ideeza/page";
 import { cn } from "@/lib/utils";
 import { PLAN_CARDS } from "./pricing-frame";
 
@@ -82,35 +81,34 @@ export function PlansPanel() {
 
   return (
     <div className="flex flex-col gap-[56px]">
-      <section aria-labelledby="choose-plan" className="flex flex-col gap-[32px]">
-        <div className="flex flex-wrap items-end justify-between gap-x-[24px] gap-y-[16px]">
-          <div className="flex flex-col gap-[12px]">
-            <h2 id="choose-plan" className="text-2xl font-semibold leading-2xl text-text-primary">
-              Choose a plan
-            </h2>
-            <p className="max-w-[62ch] text-lg leading-lg text-text-secondary">
-              Break creative boundaries with flexible plans made just for you.
-            </p>
-          </div>
-          <Segmented
-            label="Billing"
-            value={cycle}
-            onChange={setCycle}
-            options={[
-              { value: "monthly", label: "Monthly plan" },
-              {
-                value: "yearly",
-                label: (
-                  <>
-                    Annual plan <span className="text-text-success">(Save {pct(YEARLY_OFF)})</span>
-                  </>
-                ),
-              },
-            ]}
-          />
+      <section aria-labelledby="choose-plan" className="flex flex-col items-center gap-[32px]">
+        <div className="flex flex-col items-center gap-[12px] text-center">
+          <h2 id="choose-plan" className="text-5xl font-semibold leading-5xl text-text-primary">
+            Choose a plan
+          </h2>
+          <p className="max-w-[62ch] text-lg leading-lg text-text-secondary">
+            Break creative boundaries with flexible plans made just for you.
+          </p>
         </div>
+        <Segmented
+          label="Billing"
+          className="self-center"
+          value={cycle}
+          onChange={setCycle}
+          options={[
+            { value: "monthly", label: "Monthly plan" },
+            {
+              value: "yearly",
+              label: (
+                <>
+                  Annual plan <span className="text-text-success">(Save {pct(YEARLY_OFF)})</span>
+                </>
+              ),
+            },
+          ]}
+        />
 
-        <ul role="list" className={PLAN_CARDS}>
+        <ul role="list" className={cn(PLAN_CARDS, "w-full")}>
           {PAID.map((p, i) => (
             <PlanCard
               key={p.tier}
@@ -363,7 +361,7 @@ function CompareTable({
         <thead>
           <tr className="align-top">
             <th scope="col" className="w-[30%] pb-[20px] pr-[16px] font-regular">
-              <h2 id="compare-plans" className="text-2xl font-semibold leading-2xl text-text-primary">
+              <h2 id="compare-plans" className="text-3xl font-semibold leading-3xl text-text-primary">
                 Compare plans
               </h2>
               <p className="mt-[8px] text-xl font-semibold leading-xl text-text-secondary">Features</p>
@@ -502,9 +500,9 @@ function Faq() {
   return (
     <section
       aria-labelledby="plans-faq"
-      className="flex flex-col items-start gap-[24px] rounded-2xl bg-bg-subtle px-[24px] py-[32px] max-md:px-[12px]"
+      className="flex flex-col items-center gap-[24px] rounded-2xl bg-bg-subtle px-[24px] py-[48px] max-md:px-[12px] max-md:py-[32px]"
     >
-      <h2 id="plans-faq" className="text-2xl font-semibold leading-2xl text-text-primary">
+      <h2 id="plans-faq" className="text-4xl font-semibold leading-4xl text-text-primary">
         Pricing FAQs
       </h2>
       <div
@@ -520,7 +518,7 @@ function Faq() {
           setOpen(FAQ[id][0]?.q ?? null);
           (e.currentTarget.querySelector(`[data-faq="${id}"]`) as HTMLElement | null)?.focus();
         }}
-        className="flex flex-wrap gap-[8px]"
+        className="flex flex-wrap justify-center gap-[8px]"
       >
         {FAQ_TABS.map((t) => {
           const on = tab === t.id;
@@ -546,7 +544,7 @@ function Faq() {
           );
         })}
       </div>
-      <ul role="list" className={cn(NARROW_COLUMN, "flex flex-col gap-[12px]")}>
+      <ul role="list" className="flex w-full max-w-[880px] flex-col gap-[12px]">
         {FAQ[tab].map((f, i) => {
           const on = open === f.q;
           const id = `faq-${tab}-${i}`;
@@ -568,7 +566,7 @@ function Faq() {
               </h3>
               {on && (
                 <div id={id} className="flex flex-col items-start gap-[16px] px-[20px] pb-[20px]">
-                  <p className="max-w-[62ch] text-md leading-md text-text-secondary">{f.a}</p>
+                  <p className="max-w-[80ch] text-md leading-md text-text-secondary">{f.a}</p>
                   <Helpful vote={votes[f.q]} onVote={(v) => vote(f.q, v)} />
                 </div>
               )}

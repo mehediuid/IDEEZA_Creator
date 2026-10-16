@@ -130,6 +130,9 @@ export function PaymentResult({
   const ref = React.useRef<HTMLHeadingElement>(null);
   React.useEffect(() => ref.current?.focus(), []);
   const ok = tone === "success";
+  // On the checkout page the result is the page, so its title is the page's
+  // h1; inside a dialog it sits under the dialog's own title.
+  const Heading = compact ? "h2" : "h1";
   return (
     <section
       role="status"
@@ -154,9 +157,9 @@ export function PaymentResult({
           <Icon icon={Alert02Icon} size={64} strokeWidth={2} />
         )}
       </span>
-      <h2 id="payment-result" ref={ref} tabIndex={-1} className="text-3xl font-semibold leading-3xl text-text-primary outline-none">
+      <Heading id="payment-result" ref={ref} tabIndex={-1} className="text-3xl font-semibold leading-3xl text-text-primary outline-none">
         {title}
-      </h2>
+      </Heading>
       <div className="flex max-w-[56ch] flex-col items-center gap-[8px] text-lg leading-lg text-text-secondary">{children}</div>
       <div className="mt-[8px] flex flex-wrap items-center justify-center gap-[12px]">
         {primary.href ? (

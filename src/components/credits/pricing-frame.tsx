@@ -1,17 +1,18 @@
 "use client";
 
-// The frame every Plan & pricing screen sits in: the app's page frame (F07 —
-// Page Layout) with the O02 Page Header — the breadcrumb, then the page's title
-// — and, on the tabbed page, the four tabs on the frame's edge over a
-// hairline. The checkout uses the same frame with its own breadcrumb, the
-// invoice the same breadcrumb. Main scrolls; nothing in here scrolls on its own.
+// The frame every Plan & pricing screen sits in (User Panel V2 "✅ Pricing"):
+// a white sheet on the page, a breadcrumb on its first line, and — on the
+// tabbed page — the four tabs centred over a hairline. The checkout and its
+// result use the same sheet with their own breadcrumb. The sheet fills the
+// app's page frame (F07 — Page Layout) and main scrolls; nothing in here
+// scrolls on its own. On a phone the sheet runs edge to edge, its own padding
+// being the frame's inset.
 
 import * as React from "react";
 import Link from "next/link";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Page } from "@/components/ideeza/page";
-import { PageHeader } from "@/components/ideeza/page-header";
 import { moveTab } from "@/lib/ui/tab-keys";
 import { cn } from "@/lib/utils";
 
@@ -24,56 +25,51 @@ export type Crumb = { label: string; href?: string };
 export const PLAN_CARDS =
   "grid grid-cols-1 gap-[var(--layout-gutter)] [@container(min-width:952px)]:grid-cols-3";
 
-export function PricingFrame({ crumbs, title, children }: { crumbs: Crumb[]; title: React.ReactNode; children: React.ReactNode }) {
+export function PricingFrame({ crumbs, children }: { crumbs: Crumb[]; children: React.ReactNode }) {
   return (
-    <Page>
-      <PageHeader breadcrumb={<PricingBreadcrumb crumbs={crumbs} />} title={title} />
-      {children}
+    <Page className="max-md:p-0">
+      {/* At least as tall as main less the frame's top and bottom. */}
+      <div className="flex min-h-[calc(100dvh-var(--layout-page-inset)-var(--spacing-24))] flex-col gap-[32px] rounded-2xl bg-bg-surface p-[24px] max-md:min-h-0 max-md:rounded-none max-md:p-[16px]">
+        <nav aria-label="Breadcrumb">
+          <ol className="flex flex-wrap items-center gap-[8px] text-lg leading-lg">
+            {crumbs.map((c, i) => {
+              const last = i === crumbs.length - 1;
+              return (
+                <li key={c.label} className="flex items-center gap-[8px]">
+                  {c.href && !last ? (
+                    <Link
+                      href={c.href}
+                      className="text-text-primary outline-none hover:text-text-brand focus-visible:ring-2 focus-visible:ring-border-focus"
+                    >
+                      {c.label}
+                    </Link>
+                  ) : (
+                    <span
+                      aria-current={last ? "page" : undefined}
+                      className={last ? "text-text-tertiary underline decoration-border-strong underline-offset-4" : "text-text-primary"}
+                    >
+                      {c.label}
+                    </span>
+                  )}
+                  {!last && (
+                    <span aria-hidden className="text-text-tertiary">
+                      <Icon icon={ArrowRight01Icon} size={16} />
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+        {children}
+      </div>
     </Page>
-  );
-}
-
-/** The project page's breadcrumb look (details/breadcrumb.tsx): links quiet, the
- *  page itself in full ink. A crumb with no page of its own ("Settings") is
- *  plain text in the links' ink and height, so every breadcrumb row is as tall. */
-export function PricingBreadcrumb({ crumbs }: { crumbs: Crumb[] }) {
-  return (
-    <nav aria-label="Breadcrumb">
-      <ol className="flex min-w-0 flex-wrap items-center gap-3 text-md leading-md">
-        {crumbs.map((c, i) => {
-          const last = i === crumbs.length - 1;
-          return (
-            <li key={c.label} className="flex min-w-0 items-center gap-3">
-              {i > 0 && (
-                <span aria-hidden className="text-text-tertiary">
-                  <Icon icon={ArrowRight01Icon} size={14} />
-                </span>
-              )}
-              {last ? (
-                <span aria-current="page" className="truncate font-semibold text-text-primary">
-                  {c.label}
-                </span>
-              ) : c.href ? (
-                <Link
-                  href={c.href}
-                  className="inline-flex min-h-[24px] items-center rounded-sm font-medium text-text-secondary outline-none transition-colors duration-normal ease-out hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
-                >
-                  {c.label}
-                </Link>
-              ) : (
-                <span className="inline-flex min-h-[24px] items-center font-medium text-text-secondary">{c.label}</span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
   );
 }
 
 export type PricingTab<T extends string> = { id: T; label: string };
 
-/** The page's tabs: pills on the frame's edge, over a hairline. One Tab stop; ←/→/Home/End move. */
+/** The page's tabs: pills, centred, over a hairline. One Tab stop; ←/→/Home/End move. */
 export function PricingTabs<T extends string>({
   label,
   tabs,
@@ -92,7 +88,7 @@ export function PricingTabs<T extends string>({
         role="tablist"
         aria-label={label}
         onKeyDown={(e) => moveTab(e, ids, active, onSelect)}
-        className="flex flex-wrap gap-[8px] max-md:flex-nowrap max-md:overflow-x-auto [scrollbar-width:none]"
+        className="flex flex-wrap justify-center gap-[8px] max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto [scrollbar-width:none]"
       >
         {tabs.map((t) => {
           const on = t.id === active;

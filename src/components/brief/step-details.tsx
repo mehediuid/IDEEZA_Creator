@@ -154,7 +154,12 @@ export function StepDetails({
   };
 
   return (
-    <BriefCard title={HEADING[intent]} description={SUB_BY_INTENT[intent]} onBack={onBack}>
+    <BriefCard
+      title={HEADING[intent]}
+      description={SUB_BY_INTENT[intent]}
+      descriptionClassName="text-md text-text-secondary"
+      onBack={onBack}
+    >
       <div ref={bodyRef} className="flex flex-col gap-[20px]">
         {intent === "sell" && (
           <div className="flex flex-col gap-[16px]">

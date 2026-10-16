@@ -43,7 +43,7 @@ Doc card **F07 — Page Layout** on Foundations (`4503:186`); F05's spec lines n
 2. One header: `PageHeader` (O02) — breadcrumb when deeper, H3 title, one-line description, actions right.
 3. Banners and notices go below the title.
 4. A page never picks its own width; its type does:
-   - **Launchpad** (Home): hero band fills the frame, prompt centred inside (the only centred title).
+   - **Launchpad** (Home): the hero keeps its own full-width design (the wash, the travelling light), title and prompt centred — the only centred title; the "Get inspired" strip sits on the frame's edge. (A bordered hero box was tried and rejected by the owner, 2026-10-16: a layout fix never restyles a component.)
    - **Collection** (Innovations, Marketplace, My projects, Parts, History, Blog list): fills the frame; grids auto-fill from `layout/card-min`.
    - **Detail** (project, product, post, market item, part, network, profile): main column + 360 rail.
    - **Form / Reading** (Earn, Plan, checkout, mint, invoice, blog editor/reader): 720 column on the left edge + rail of real content; prose 62ch.

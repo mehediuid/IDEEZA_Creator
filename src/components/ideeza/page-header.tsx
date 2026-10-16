@@ -1,12 +1,14 @@
 // IDEEZA Design System — O02 Page Header (Figma 2473:562): the breadcrumb when
 // the page is deeper than the sidebar, 12 px, the title (Heading/H3 24/32
-// SemiBold), the description 4 px under it (Body/MD 16/24), the actions on the
+// SemiBold), the description 4 px under it, the actions on the
 // right, 8 px apart. Everything is left-aligned on the page frame's edge, and
 // the content starts 24 px below (O01). Published content — a post, an
 // article, a profile — may set its title a step up (`level="content"`,
-// Heading/H2 28/36). The title wraps rather than truncating. `meta` (a status
-// badge, a type tag) sits on the title's line but outside the h1, so the
-// page's name is read alone.
+// Heading/H2 28/36). The title wraps rather than truncating. The description
+// keeps the page's own text style (a layout fix restyles nothing): 14 px
+// secondary by default, or the page's classes in `descriptionClassName`.
+// `meta` (a status badge, a type tag) sits on the title's line but outside
+// the h1, so the page's name is read alone.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -14,6 +16,7 @@ import { cn } from "@/lib/utils";
 export function PageHeader({
   title,
   description,
+  descriptionClassName,
   breadcrumb,
   meta,
   actions,
@@ -23,6 +26,7 @@ export function PageHeader({
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
+  descriptionClassName?: string;
   breadcrumb?: React.ReactNode;
   meta?: React.ReactNode;
   actions?: React.ReactNode;
@@ -50,7 +54,7 @@ export function PageHeader({
             {meta}
           </div>
           {description != null && (
-            <p className="m-0 max-w-[62ch] text-lg leading-lg text-text-secondary">{description}</p>
+            <p className={cn("m-0", descriptionClassName ?? "max-w-[62ch] text-md leading-md text-text-secondary")}>{description}</p>
           )}
         </div>
         {actions != null && <div className="flex shrink-0 flex-wrap items-center gap-4">{actions}</div>}

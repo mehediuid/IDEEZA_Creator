@@ -13,12 +13,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Cancel01Icon, ConnectIcon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, Cancel01Icon, ConnectIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button } from "@/components/ideeza";
 import { Page, WITH_RAIL } from "@/components/ideeza/page";
 import { PageHeader } from "@/components/ideeza/page-header";
-import { Breadcrumb } from "@/components/projects/details/breadcrumb";
 import { cn } from "@/lib/utils";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf } from "@/lib/manual/project-read";
@@ -75,45 +73,50 @@ export function ConnectionMapPage({ id }: { id: string }) {
   if (!project) {
     return (
       <Page>
-        <PageHeader title={"This project isn't in this browser"} />
-        <Link href="/projects" className={cn(btn.link, "inline-block")}>
+        <p className="text-md font-semibold text-text-primary">This project isn&apos;t in this browser</p>
+        <Link href="/projects" className={cn(btn.link, "mt-4 inline-block")}>
           Back to My projects
         </Link>
       </Page>
     );
   }
 
-  const breadcrumb = (
-    <Breadcrumb
-      trail={[
-        { label: "My projects", href: "/projects" },
-        { label: project.name, href: `/projects/${project.id}?tab=network` },
-        { label: "Network" },
-      ]}
-    />
-  );
-
   return (
     <Page>
+      <nav aria-label="Breadcrumb" className="mb-8 flex min-w-0 items-center gap-3 text-sm">
+        <Link href="/projects" className="rounded-sm font-medium text-text-secondary no-underline outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus">
+          My projects
+        </Link>
+        <span aria-hidden className="text-text-tertiary">
+          <Icon icon={ArrowRight01Icon} size={15} />
+        </span>
+        <Link href={`/projects/${project.id}?tab=network`} className="truncate rounded-sm font-medium text-text-secondary no-underline outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus">
+          {project.name}
+        </Link>
+        <span aria-hidden className="text-text-tertiary">
+          <Icon icon={ArrowRight01Icon} size={15} />
+        </span>
+        <span aria-current="page" className="font-semibold text-text-primary">
+          Network
+        </span>
+      </nav>
+
       {network ? (
-        <MapView key={network.createdAt} network={network} products={products} projectId={project.id} breadcrumb={breadcrumb} onDeleted={() => router.push(`/projects/${project.id}`)} />
+        <MapView key={network.createdAt} network={network} products={products} projectId={project.id} onDeleted={() => router.push(`/projects/${project.id}`)} />
       ) : (
-        <>
-          <PageHeader breadcrumb={breadcrumb} title="Network" />
-          {/* The empty region spans the frame; only its contents are centred. */}
-          <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border bg-bg-surface px-10 py-24 text-center">
-            <span aria-hidden className="text-text-tertiary">
-              <Icon icon={ConnectIcon} size={24} />
-            </span>
-            <h2 className="text-lg font-bold text-text-primary">No network yet</h2>
-            <p className="max-w-[56ch] text-sm text-text-secondary">
-              A network records which products in this project talk to each other, over which protocol, and what each one does.
-            </p>
-            <Button hierarchy="primary" size="lg" className="mt-2" onClick={() => setCreating(true)}>
-              Create Network
-            </Button>
-          </div>
-        </>
+        // The empty region spans the frame; only its contents are centred.
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border bg-bg-surface px-10 py-24 text-center">
+          <span aria-hidden className="text-text-tertiary">
+            <Icon icon={ConnectIcon} size={24} />
+          </span>
+          <h1 className="text-lg font-bold text-text-primary">No network yet</h1>
+          <p className="max-w-[56ch] text-sm text-text-secondary">
+            A network records which products in this project talk to each other, over which protocol, and what each one does.
+          </p>
+          <button type="button" className={cn(btn.primary, "mt-2")} onClick={() => setCreating(true)}>
+            Create Network
+          </button>
+        </div>
       )}
       {creating && (
         <AddNetworkDialog project={project} refs={refs} onClose={() => setCreating(false)} onViewNetwork={() => setCreating(false)} />
@@ -126,13 +129,11 @@ function MapView({
   network,
   products,
   projectId,
-  breadcrumb,
   onDeleted,
 }: {
   network: Network;
   products: ReturnType<typeof networkProducts>;
   projectId: string;
-  breadcrumb: React.ReactNode;
   onDeleted: () => void;
 }) {
   const members = React.useMemo(
@@ -237,8 +238,8 @@ function MapView({
   return (
     <>
       <PageHeader
-        breadcrumb={breadcrumb}
         title={shown.name || "Unnamed Network"}
+        descriptionClassName="text-sm text-text-secondary"
         description={
           mode === "edit"
             ? "Editing — changes are not saved until you press Save changes."
@@ -254,22 +255,22 @@ function MapView({
         actions={
           mode === "read" ? (
             <>
-              <Button hierarchy="secondary" size="lg" className="ring-offset-bg-page" onClick={() => setSettingsOpen(true)}>
+              <button type="button" className={btn.quiet} onClick={() => setSettingsOpen(true)}>
                 Settings
-              </Button>
-              <Button hierarchy="primary" size="lg" className="ring-offset-bg-page" onClick={startEdit}>
+              </button>
+              <button type="button" className={btn.primary} onClick={startEdit}>
                 Edit map
-              </Button>
+              </button>
             </>
           ) : (
             <>
               {pendingLink && <p className="text-sm text-text-tertiary">Save or cancel the new link first.</p>}
-              <Button hierarchy="secondary" size="lg" className="ring-offset-bg-page" onClick={() => (changeCount ? setDiscarding(true) : stopEdit())}>
+              <button type="button" className={btn.quiet} onClick={() => (changeCount ? setDiscarding(true) : stopEdit())}>
                 Cancel
-              </Button>
-              <Button hierarchy="primary" size="lg" className="ring-offset-bg-page" disabled={!changeCount || pendingLink} onClick={saveEdit}>
+              </button>
+              <button type="button" className={btn.primary} disabled={!changeCount || pendingLink} onClick={saveEdit}>
                 Save changes
-              </Button>
+              </button>
             </>
           )
         }

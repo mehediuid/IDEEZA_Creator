@@ -30,6 +30,7 @@ function NewsfeedFallback() {
       <PageHeader
         title="Innovations"
         description="Discover what creators are building. Follow, appreciate, and save projects."
+        descriptionClassName="text-sm text-text-secondary"
       />
       <div className="flex flex-col gap-12">
         <div className={`h-[48px] animate-pulse rounded-full bg-bg-surface-raised ${NARROW_COLUMN}`} />

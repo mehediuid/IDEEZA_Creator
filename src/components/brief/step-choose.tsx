@@ -76,6 +76,7 @@ export function StepChoose({
     <BriefCard
       title="Mint your project"
       description="Minting records that you made it first. Choose how it goes out — you can still list a private project later."
+      descriptionClassName="text-sm text-text-secondary"
       onBack={onBack}
     >
       <div className="flex flex-col gap-[20px]">
