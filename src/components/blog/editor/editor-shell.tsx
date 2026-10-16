@@ -39,6 +39,7 @@ import {
   WifiOff01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { useMainScrollPadding } from "@/components/dashboard/main-scroll";
 import { Banner, Button, buttonVariants, iconButtonVariants, linkVariants, ModalFrame, Skeleton, Spinner, StateCard, Tooltip } from "@/components/ideeza";
 import { useArticleActions } from "@/components/blog/article-actions";
 import { ReasonPanel } from "@/components/blog/article/reason-panel";
@@ -324,6 +325,8 @@ function Workspace({
   const toast = usePostToast();
   const actions = useArticleActions();
   const online = useOnline();
+  // The bar sticks over main's top: a field Tab reaches scrolls in below it.
+  const stuckBarRef = useMainScrollPadding("top");
   const apiRef = React.useRef<BodyApi | null>(null);
   const titleRef = React.useRef<HTMLTextAreaElement>(null);
   const retryRef = React.useRef<HTMLButtonElement>(null);
@@ -1134,7 +1137,7 @@ function Workspace({
               width. Its top padding sits in the frame's inset, so its row lines up with the
               reader's top row and keeps that padding when it sticks. */}
           {touch ? (
-            <div className="sticky top-0 z-sticky -mt-3 border-0 border-b border-solid border-border-subtle bg-bg-page pt-3">
+            <div ref={stuckBarRef} className="sticky top-0 z-sticky -mt-3 border-0 border-b border-solid border-border-subtle bg-bg-page pt-3">
               <div className="flex items-center gap-2 pb-3">
                 <NextLink href={blogHref()} aria-label="Back to your blogs" className={iconButtonVariants({ hierarchy: "ghost", size: "xl" })}>
                   <Icon icon={ArrowLeft01Icon} size={20} />
@@ -1168,7 +1171,7 @@ function Workspace({
               {failedBanner}
             </div>
           ) : (
-            <div className="sticky top-0 z-sticky -mt-6 border-0 border-b border-solid border-border-subtle bg-bg-page pt-6">
+            <div ref={stuckBarRef} className="sticky top-0 z-sticky -mt-6 border-0 border-b border-solid border-border-subtle bg-bg-page pt-6">
               <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4 pb-8">
                 <Crumbs current={CRUMB} />
                 <div className="flex flex-wrap items-center gap-6">

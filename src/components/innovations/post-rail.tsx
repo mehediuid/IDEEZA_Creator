@@ -22,6 +22,7 @@ import {
   Link01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { useMainScrollPadding } from "@/components/dashboard/main-scroll";
 import { AvatarLabelGroup, Badge, Button, buttonVariants, IconButton } from "@/components/ideeza";
 import { MessageCreator, useMessageRefusal } from "@/components/newsfeed/creator-row";
 import { formatCount } from "@/lib/feed";
@@ -237,8 +238,11 @@ export function ActionsCard({
 export function PostActionBar({ owner, counts, actions }: { owner: boolean; counts: PostCounts; actions: PostActions }) {
   const square =
     "inline-flex h-[48px] flex-1 items-center justify-center gap-3 rounded-lg border border-solid border-border bg-bg-surface text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
+  // The bar covers main's foot: a control Tab reaches scrolls in above it.
+  const barRef = useMainScrollPadding("bottom");
   return (
     <div
+      ref={barRef}
       role="group"
       aria-label="Post actions"
       className="fixed inset-x-0 bottom-0 z-sticky flex gap-3 border-t border-solid border-border bg-bg-surface px-6 pb-6 pt-4 md:hidden [body:has(#comments_textarea:focus)_&]:hidden"

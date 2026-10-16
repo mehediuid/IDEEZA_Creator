@@ -5,6 +5,9 @@
 import * as React from "react";
 import { PlanPricingPage } from "@/components/credits/plan-pricing-page";
 import { PricingFrame } from "@/components/credits/pricing-frame";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Plan & pricing · IDEEZA" };
 
 export default function PlanPricingRoute() {
   return (

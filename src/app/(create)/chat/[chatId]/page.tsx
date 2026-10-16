@@ -3,6 +3,9 @@
 
 import * as React from "react";
 import { ConceptChat } from "@/components/create/concept-chat";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Concept chat · IDEEZA" };
 
 export default async function ChatPage({
   params,

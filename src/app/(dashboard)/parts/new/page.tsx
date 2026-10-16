@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PackageFlow } from "@/components/package/package-flow";
 
 export const metadata: Metadata = {
-  title: "IDEEZA — New Package",
+  title: "New package · Parts & agile module · IDEEZA",
   description: "Author a part: symbol, footprint and 3D body, saved privately or published to the community library.",
 };
 

@@ -4,6 +4,9 @@
 
 import * as React from "react";
 import { ConnectionMapPage } from "@/components/network/connection-map-page";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Network · IDEEZA" };
 
 export default async function ProjectNetworkPage({
   params,

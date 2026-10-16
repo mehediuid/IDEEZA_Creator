@@ -6,6 +6,10 @@
 
 import * as React from "react";
 import { ProductPage } from "@/components/projects/product/product-page";
+import type { Metadata } from "next";
+
+// The client sets "{product} · {project} · IDEEZA" once it has read the project.
+export const metadata: Metadata = { title: "My projects · IDEEZA" };
 
 export default async function ProjectProductPage({
   params,

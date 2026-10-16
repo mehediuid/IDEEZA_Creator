@@ -101,5 +101,5 @@ test("container-query steps on one property never resolve backwards", () => {
 
 test("one <main> — the shell's", () => {
   const mains = SHELL_PAGES.filter((p) => /<main[\s>]/.test(code(p)));
-  assert.deepEqual(mains.sort(), ["app/(create)/layout.tsx", "app/(dashboard)/layout.tsx"]);
+  assert.deepEqual(mains.sort(), ["components/dashboard/app-shell.tsx"]);
 });

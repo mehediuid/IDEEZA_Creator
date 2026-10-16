@@ -8,7 +8,7 @@
 // Collapsible: the top toggle shrinks the sidebar to a 64px icon rail (O04,
 // --layout-sidebar-collapsed)
 // (labels hidden, tooltips + aria-labels keep every item reachable) and
-// expands it back. The choice persists in localStorage.
+// expands it back. The choice persists in localStorage (sidebar-state.ts).
 //
 // Messages carries the unread badge (Messages spec §6; D7: only here, never
 // the bell): a count pill beside the label, a dot on the collapsed rail.
@@ -47,6 +47,7 @@ import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
 import { Icon, type IconValue } from "./icon";
+import { SIDEBAR_COLLAPSED_KEY } from "./sidebar-state";
 import {
   AccountPopover,
   FloatingPanel,
@@ -114,28 +115,33 @@ function useMessagesUnread(): number {
   return countsFor(data, asId, people.teamIdsOf).unread;
 }
 
-const COLLAPSED_KEY = "ideeza:sidebar:collapsed";
+// The collapsed choice is read from <html data-sidebar>, which the root
+// layout's script sets from localStorage before the first paint
+// (sidebar-state.ts). So a mount reads the right width at once; it used to be
+// read in an effect, and every mount painted one frame at 280 and then jumped
+// to 64. The server renders expanded: hydration starts there and catches up
+// straight after, while globals.css keeps that first draw at the rail's width.
+const collapsedListeners = new Set<() => void>();
+function subscribeCollapsed(onChange: () => void) {
+  collapsedListeners.add(onChange);
+  return () => {
+    collapsedListeners.delete(onChange);
+  };
+}
+const readCollapsed = () => document.documentElement.dataset.sidebar === "collapsed";
+const serverCollapsed = () => false;
 
-// Collapsed state persisted to localStorage. Loads after mount (the component
-// SSRs expanded, then adopts the stored value) to avoid a hydration mismatch.
 function useSidebarCollapsed(): [boolean, () => void] {
-  const [collapsed, setCollapsed] = React.useState(false);
-
-  React.useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of localStorage after mount (see above)
-      if (window.localStorage.getItem(COLLAPSED_KEY) === "1") setCollapsed(true);
-    } catch {}
-  }, []);
+  const collapsed = React.useSyncExternalStore(subscribeCollapsed, readCollapsed, serverCollapsed);
 
   const toggle = React.useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
-      } catch {}
-      return next;
-    });
+    const next = !readCollapsed();
+    if (next) document.documentElement.dataset.sidebar = "collapsed";
+    else delete document.documentElement.dataset.sidebar;
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+    } catch {}
+    collapsedListeners.forEach((onChange) => onChange());
   }, []);
 
   return [collapsed, toggle];

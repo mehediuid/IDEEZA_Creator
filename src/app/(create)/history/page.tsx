@@ -10,6 +10,9 @@ import * as React from "react";
 import { HistoryTabbedPage } from "@/components/create/history-page";
 import { Page } from "@/components/ideeza/page";
 import { PageHeader } from "@/components/ideeza/page-header";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "History · IDEEZA" };
 
 export default function HistoryPage() {
   return (

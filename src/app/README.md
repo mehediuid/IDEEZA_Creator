@@ -4,8 +4,8 @@ Next App Router (modified Next 16: read `node_modules/next/dist/docs/` before to
 
 | Folder or file | What lives there | Read before changing |
 |---|---|---|
-| `layout.tsx`, `globals.css` | Root layout: every app-wide provider (theme, PCB store, manual projects, history, credits, plan, market, video jobs), the mounted `BuildSimulator` and `ReportProblemHost`, the toast layers | [features/ai-create-flow.md](../../docs/guides/features/ai-create-flow.md) (simulator, toasts) |
-| `(dashboard)/layout.tsx`, `(create)/layout.tsx` | The two dashboard shells: global sidebar, ⌘K palette, build attention toast | [features/platform-and-projects.md](../../docs/guides/features/platform-and-projects.md) |
+| `layout.tsx`, `globals.css` | Root layout: every app-wide provider (theme, PCB store, manual projects, history, credits, plan, market, video jobs), the mounted `BuildSimulator` and `ReportProblemHost`, the toast layers, the sidebar's pre-paint script, and `AppShell` | [features/ai-create-flow.md](../../docs/guides/features/ai-create-flow.md) (simulator, toasts) |
+| `(dashboard)/`, `(create)/` | Folders only: no layout of their own. Every page in either gets the one shell (`components/dashboard/app-shell.tsx`: sidebar, `<main>`, ⌘K palette, build attention toast), mounted once by the root layout, so moving between the two groups never rebuilds it. Every page names its tab "‹Page› · IDEEZA" (`tests/projects/app-shell.test.mjs`) | [features/platform-and-projects.md](../../docs/guides/features/platform-and-projects.md) › Platform & shell |
 | `(dashboard)/page.tsx` | `/` — home prompt (`components/dashboard/workspace-prompt.tsx`) | features/ai-create-flow.md |
 | `(dashboard)/parts/`, `parts/new/`, `parts/[id]/` | `/parts` library, New Package flow, one part | [features/parts-package.md](../../docs/guides/features/parts-package.md) |
 | `(dashboard)/creators/[handle]/` | A creator's profile; `me` is yours | features/platform-and-projects.md › Creator profile; spec `2026-10-14-creator-profile-design.md` |
