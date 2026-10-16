@@ -12,10 +12,12 @@ import Link from "next/link";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { useMe } from "@/components/dashboard/sidebar-account";
 import { Badge, Button, TestnetDemoBadge } from "@/components/ideeza";
+import { NARROW_COLUMN, Page } from "@/components/ideeza/page";
 import { invoicesOf } from "@/lib/account/invoices";
 import { usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
+import { cn } from "@/lib/utils";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
 
 const BILLING_HREF = "/settings/plan?tab=billing";
@@ -190,12 +192,12 @@ export function InvoiceView({ orderId }: { orderId: string }) {
   );
 }
 
+/** The page frame and, on its left edge, the narrow column. On paper the
+ *  frame's inset and the column's cap fall away, so the invoice fills the sheet. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="h-full overflow-y-auto bg-bg-page print:h-auto print:overflow-visible print:bg-bg-surface">
-      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-[20px] px-[32px] py-[28px] max-md:px-[16px] max-md:py-[20px] print:max-w-none print:p-0">
-        {children}
-      </div>
-    </div>
+    <Page className="print:bg-bg-surface print:p-0">
+      <div className={cn(NARROW_COLUMN, "flex flex-col gap-[20px] print:max-w-none")}>{children}</div>
+    </Page>
   );
 }

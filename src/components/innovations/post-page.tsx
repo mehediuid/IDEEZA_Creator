@@ -156,7 +156,7 @@ function PostBody({
                 <h1
                   ref={focusComposer ? undefined : titleRef}
                   tabIndex={-1}
-                  className="text-4xl font-extrabold leading-4xl tracking-tight text-text-primary outline-none max-md:text-2xl max-md:leading-2xl"
+                  className="text-4xl font-semibold leading-4xl tracking-tight text-text-primary outline-none max-md:text-2xl max-md:leading-2xl"
                 >
                   {post.title}
                 </h1>

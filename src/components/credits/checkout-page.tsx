@@ -6,10 +6,10 @@
 // plan upgrade and for credits, chosen by the query (lib/create/checkout-route).
 //
 // Left: for an upgrade from a paid plan, "Confirm your upgrade" (from → to,
-// and what happens now); then how to pay. Right: the order — what, how
-// billed, Auto renewal for a plan, anything taken off, Due today, and the
-// button, which waits for the wallet. Paying runs the Demo wallet's own
-// request (review, sign) and lands the plan or the credits in the same
+// and what happens now); then how to pay. Right (under it on a narrow page):
+// the order — what, how billed, Auto renewal for a plan, anything taken off,
+// Due today, and the button, which waits for the wallet. Paying runs the Demo
+// wallet's own request (review, sign) and lands the plan or the credits in the same
 // commit as its debit. Then "Upgrade completed" / "Payment successful", or
 // "Payment failed" with Try again. Payments aren't on: it is all testnet.
 
@@ -19,6 +19,8 @@ import { useSearchParams } from "next/navigation";
 import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { buttonVariants } from "@/components/ideeza";
+import { NARROW_COLUMN, NARROW_WITH_RAIL } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { useDefaultToken } from "@/lib/account/payment";
 import { PLAN_PRICING_HREF, VALIDITY_MONTHS, addMonths, coinAmount, usd } from "@/lib/create/credit-pricing";
@@ -289,10 +291,12 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-[32px] pb-[24px]">
-      <h1 className="text-4xl font-semibold leading-4xl text-text-primary">Payment details</h1>
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,470px)] items-start gap-[40px] max-lg:grid-cols-1">
-        <div className="flex flex-col gap-[32px]">
+    <div className="flex flex-col gap-[32px] pb-[24px]">
+      <PageHeader title="Payment details" className="mb-0" />
+      {/* Form and summary switch on the page container (main's width), never
+          the window: under 1024 the summary stacks under the form. */}
+      <div className={NARROW_WITH_RAIL}>
+        <div className={cn(NARROW_COLUMN, "flex flex-col gap-[32px]")}>
           {fromPaid && (
             <section aria-labelledby="confirm-upgrade" className="flex flex-col gap-[16px]">
               <h2 id="confirm-upgrade" className="text-2xl font-semibold leading-2xl text-text-primary">
@@ -322,7 +326,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
             <p className="text-lg leading-lg text-text-secondary">The unused time on {current.name} covers this upgrade. Nothing to pay today.</p>
           )}
         </div>
-        {summary}
+        <div className={NARROW_COLUMN}>{summary}</div>
       </div>
     </div>
   );

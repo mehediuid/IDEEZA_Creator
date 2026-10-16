@@ -1,17 +1,22 @@
 "use client";
 
-// The Messages layout (spec §6): from 1024 px the list (320 px) beside the
-// open conversation; below, one pane — the list on /messages, the
-// conversation full width anywhere under it. Both panes fill the shell's
-// height and scroll on their own. Above them: the line that says this tab acts
-// as someone else, and the one error a store that can't be read leaves.
+// The Messages layout (spec §6), a workspace on the page frame (D7): the
+// title, then the list (320 px) beside the open conversation — two surfaces
+// that fill the frame and scroll on their own. They sit side by side from a
+// 768 px page container (the list, the gutter and a conversation as wide as a
+// rail); below it one shows at a time — the list on /messages, the
+// conversation anywhere under it, where the title steps aside for its
+// ‹ Messages. Under the title: the line that says this tab acts as someone
+// else, and the one error a store that can't be read leaves.
 //
 // The old support requests become conversations here, once the market and the
 // projects have been read.
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { Banner } from "@/components/ideeza";
+import { Settings02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import { Banner, IconButton, PAGE_CONTAINER, PageHeader } from "@/components/ideeza";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useMarket } from "@/lib/market/market-store";
 import { migrateSupportOnce } from "@/lib/messages/actions";
@@ -22,6 +27,10 @@ import { cn } from "@/lib/utils";
 import { ActingBanner } from "./acting-as";
 import { ConversationList } from "./conversation-list";
 import { MessagesViewProvider, useMessagesView } from "./messages-context";
+import { SettingsDialog } from "./settings-dialog";
+
+/** A pane's surface: the list and the conversation are two of them, side by side on the page. */
+const PANE = "min-h-0 flex-col overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface";
 
 function useSupportMigration() {
   const { ready, people } = useMessagesView();
@@ -47,34 +56,56 @@ function useMessagesTitle() {
 }
 
 function Panes({ children }: { children: React.ReactNode }) {
-  const { unreadable } = useMessagesView();
+  const { ready, unreadable } = useMessagesView();
   const pathname = usePathname();
   const open = pathname !== MESSAGES_HREF;
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
   useSupportMigration();
   useMessagesTitle();
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg-surface">
-      <div className="flex shrink-0 flex-col gap-3 px-4 py-3 empty:hidden md:px-6">
-        {unreadable && <Banner tone="error">This browser&apos;s messages couldn&apos;t be read, so new ones can&apos;t be saved.</Banner>}
-        <ActingBanner />
+    <div className={cn(PAGE_CONTAINER, "h-full")}>
+      <div className="flex h-full min-h-0 flex-col p-[var(--layout-page-inset)]">
+        <PageHeader
+          title="Messages"
+          description="Demo · messages stay in this browser."
+          descriptionClassName="text-md leading-md text-text-tertiary"
+          actions={
+            <IconButton
+              aria-label="Message settings"
+              hierarchy="ghost"
+              size="lg"
+              icon={<Icon icon={Settings02Icon} size={20} />}
+              onClick={() => setSettingsOpen(true)}
+              disabled={!ready}
+              className="max-md:size-[var(--touch-min)]"
+            />
+          }
+          className={cn("shrink-0", open && "hidden [@container(min-width:768px)]:flex")}
+        />
+        <div className="mb-12 flex shrink-0 flex-col gap-6 empty:hidden">
+          {unreadable && <Banner tone="error">This browser&apos;s messages couldn&apos;t be read, so new ones can&apos;t be saved.</Banner>}
+          <ActingBanner />
+        </div>
+        <div className="flex min-h-0 flex-1 gap-[var(--layout-gutter)]">
+          <section
+            aria-label="Conversations"
+            className={cn(
+              PANE,
+              "w-full [@container(min-width:768px)]:flex [@container(min-width:768px)]:w-[320px] [@container(min-width:768px)]:shrink-0",
+              open ? "hidden" : "flex",
+            )}
+          >
+            <ConversationList />
+          </section>
+          <section
+            aria-label="Conversation"
+            className={cn(PANE, "min-w-0 flex-1 [@container(min-width:768px)]:flex", open ? "flex" : "hidden")}
+          >
+            {children}
+          </section>
+        </div>
       </div>
-      <div className="flex min-h-0 flex-1">
-        <section
-          aria-label="Conversations"
-          className={cn(
-            "min-h-0 w-full flex-col border-solid border-border lg:flex lg:w-[320px] lg:shrink-0 lg:border-r",
-            open ? "hidden" : "flex",
-          )}
-        >
-          <ConversationList />
-        </section>
-        <section
-          aria-label="Conversation"
-          className={cn("min-h-0 min-w-0 flex-1 flex-col lg:flex", open ? "flex" : "hidden")}
-        >
-          {children}
-        </section>
-      </div>
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

@@ -21,12 +21,13 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { refusedCopy } from "@/components/projects/listing/listing-dialog";
 import { Banner } from "@/components/ideeza";
+import { Page } from "@/components/ideeza/page";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useMint } from "@/components/wallet/use-mint";
 import { useMintShortfall } from "@/components/wallet/mint-cost";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { MintStepLine } from "./brief-card";
+import { MintChromeContext, MintStepLine, type MintChrome } from "./brief-card";
 import { StepChoose } from "./step-choose";
 import { StepDetails } from "./step-details";
 import { StepReview } from "./step-review";
@@ -416,20 +417,27 @@ export function BriefApp({ projectId }: { projectId: string }) {
   const conceptImage =
     headline?.built?.product.conceptImageUrl || (project.buildId ? getBuild(project.buildId)?.conceptImageUrl : undefined);
 
-  return (
-    <div
-      data-mint-flow
-      // Tighter at phone width, where 32 px a side was a fifth of the screen.
-      className="flex min-h-full flex-col items-center gap-6 px-[16px] pb-[48px] pt-[24px] md:px-[32px] md:pb-[64px] md:pt-[40px]"
-    >
-      {step !== "success" && <MintStepLine current={step} skipChoose={asked !== null} />}
-      {draftNotSaved && step === "success" ? (
-        <Banner tone="attention" className="w-full max-w-[600px]">
-          {DRAFT_NOT_SAVED}
-        </Banner>
-      ) : null}
+  // Each step is a page on the app's frame (brief-card.tsx): this is what sits around it.
+  const chrome: MintChrome = {
+    above:
+      step !== "success" ? (
+        <MintStepLine current={step} skipChoose={asked !== null} />
+      ) : draftNotSaved ? (
+        <Banner tone="attention">{DRAFT_NOT_SAVED}</Banner>
+      ) : null,
+    below:
+      step !== "success" ? (
+        // Under the card, at reading contrast.
+        <p role="status" className="m-0 inline-flex items-center gap-[6px] text-sm text-text-tertiary">
+          <span aria-hidden className="h-[6px] w-[6px] rounded-full bg-bg-success" />
+          Saved as you go
+        </p>
+      ) : null,
+  };
 
-      <div key={`step-${step}`} className="flex w-full animate-[ix-brief-in_.2s_ease-out] justify-center motion-reduce:animate-none">
+  return (
+    <Page>
+      <MintChromeContext.Provider value={chrome} key={`step-${step}`}>
         {step === "choose" && (
           <StepChoose
             project={read}
@@ -479,15 +487,7 @@ export function BriefApp({ projectId }: { projectId: string }) {
             products={products}
           />
         )}
-      </div>
-
-      {step !== "success" ? (
-        // Under the card, at reading contrast.
-        <p role="status" className="m-0 inline-flex items-center gap-[6px] text-sm text-text-tertiary">
-          <span aria-hidden className="h-[6px] w-[6px] rounded-full bg-bg-success" />
-          Saved as you go
-        </p>
-      ) : null}
+      </MintChromeContext.Provider>
 
       <style>{`
         @keyframes ix-brief-in {
@@ -502,6 +502,6 @@ export function BriefApp({ projectId }: { projectId: string }) {
         }
         .ix-brief-back:hover { color: var(--color-text-primary); }
       `}</style>
-    </div>
+    </Page>
   );
 }

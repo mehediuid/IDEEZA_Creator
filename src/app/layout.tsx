@@ -46,15 +46,17 @@ function ToastLayer() {
           "the attention toast never covers the header primary"). No
           (create) page has a separate app bar above its own header (the
           shell is sidebar + `main`, `(create)/layout.tsx`), so 132px clears
-          every page's first row instead of measuring one page at a time. */}
+          every page's first row instead of measuring one page at a time.
+          It spans main, not the window — attention-banner.tsx writes main's
+          edges — so the toast centres on the page beside the sidebar. */}
       <div
         id="ideeza-toast-layer"
-        className="pointer-events-none fixed bottom-[16px] left-1/2 z-toast flex -translate-x-1/2 flex-col items-center gap-[8px] max-md:[body:has(.ix-render-toast)_&]:bottom-[88px] max-md:[body:has(.ix-render-toast):has(.ix-render-more)_&]:bottom-[120px] md:bottom-auto md:top-[132px]"
+        className="pointer-events-none fixed bottom-[16px] left-[var(--toast-main-left,0px)] right-[var(--toast-main-right,0px)] z-toast flex flex-col items-center gap-[8px] px-[16px] max-md:[body:has(.ix-render-toast)_&]:bottom-[88px] max-md:[body:has(.ix-render-toast):has(.ix-render-more)_&]:bottom-[120px] md:bottom-auto md:top-[132px]"
       >
         <div
           id="ideeza-toast-layer-attention"
           data-slot="attention"
-          className="flex flex-col items-center gap-[8px]"
+          className="flex max-w-full flex-col items-center gap-[8px]"
         />
       </div>
       <div

@@ -2,7 +2,8 @@
 
 // The Earn tabs' one visual system (owner, 2026-10-11: the area looked messy),
 // so every tab reads the same:
-// - one column, left-aligned, at most 760 px (EARN_COLUMN);
+// - one column on the page frame's left edge, at most the layout's narrow
+//   column (EARN_COLUMN, --layout-content-narrow);
 // - one card (EARN_CARD): the same radius, border, padding and width;
 // - one heading scale: an h2 per section, an h3 inside one;
 // - one rhythm: 32 px between sections, 16 px between a section's blocks,
@@ -13,8 +14,9 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { NARROW_COLUMN } from "@/components/ideeza/page";
 
-export const EARN_COLUMN = "w-full max-w-[760px]";
+export const EARN_COLUMN = NARROW_COLUMN;
 
 /** The gap between a tab's sections. */
 export const EARN_STACK = "flex flex-col gap-16";

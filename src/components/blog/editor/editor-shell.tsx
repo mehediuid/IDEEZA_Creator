@@ -44,6 +44,7 @@ import { useArticleActions } from "@/components/blog/article-actions";
 import { ReasonPanel } from "@/components/blog/article/reason-panel";
 import { reasonPanel } from "@/lib/blog/article-view";
 import { StatusBadges } from "@/components/blog/status-badges";
+import { NARROW_COLUMN, Page, PAGE_CONTAINER, PAGE_FRAME } from "@/components/ideeza/page";
 import { usePostToast } from "@/components/innovations/toast";
 import { canEdit, createArticle, displayTitle, findArticle, markSeen, patchDraft, sendLabel, touchArticle } from "@/lib/blog/article";
 import { clockTime } from "@/lib/blog/dates";
@@ -231,8 +232,17 @@ function writePlace(id: string, place: Place | null): void {
   }
 }
 
-/** A phone, or any coarse pointer: one top row, the format bar, no floating "+". */
+/** A phone, or any coarse pointer: one top row, the format bar, no floating "+". The page's
+ *  inset never follows it: that is the page frame's, on every screen. */
 const TOUCH = "(pointer: coarse), (max-width: 767px)";
+
+/** The page container (main's width), as tall as main, so the writing reaches the foot of the
+ *  screen. */
+const EDITOR_PAGE = cn(PAGE_CONTAINER, "flex min-h-full flex-col");
+/** The app's page frame, stretched to that height. */
+const EDITOR_FRAME = cn(PAGE_FRAME, "flex flex-1 flex-col");
+/** The details and the writing: the narrow column on the left edge, never re-centred. */
+const COLUMN = cn(NARROW_COLUMN, "flex flex-col gap-12");
 
 /** The Figma's crumb on every editor page, edits too (frame 19, owner D-7). */
 const CRUMB = "Create new blog";
@@ -973,7 +983,7 @@ function Workspace({
 
   const count = titleCount(fields.title.length);
   const writing = (
-    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-12">
+    <div className={COLUMN}>
       <div className="flex flex-col gap-4">
         <textarea
           ref={titleRef}
@@ -1111,142 +1121,149 @@ function Workspace({
   );
 
   return (
-    <div className={cn("flex min-h-full flex-col", touch ? "bg-bg-surface" : "bg-bg-page px-16 pb-24 pt-12")}>
-      <h1 className="sr-only">{CRUMB}</h1>
-      <span className="sr-only" aria-live="polite">
-        {said.polite}
-      </span>
-      <span className="sr-only" role="alert">
-        {said.alert}
-      </span>
-      {touch ? (
-        <>
-          <div className="sticky top-0 z-sticky border-0 border-b border-solid border-border-subtle bg-bg-surface">
-            <div className="flex items-center gap-2 py-3 pl-2 pr-4">
-              <NextLink href={blogHref()} aria-label="Back to your blogs" className={iconButtonVariants({ hierarchy: "ghost", size: "xl" })}>
-                <Icon icon={ArrowLeft01Icon} size={20} />
-              </NextLink>
-              <span className="flex min-w-0 flex-1 flex-col">
-                {frozen ? null : slot}
-                {fixCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      panelRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-                      panelRef.current?.focus({ preventScroll: true });
-                    }}
-                    className={cn(linkVariants({ color: "brand", size: "md" }), "w-fit bg-transparent p-0 font-semibold")}
-                  >
-                    {fixCount === 1 ? "1 thing to fix" : `${fixCount} things to fix`}
-                  </button>
-                )}
-              </span>
-              {frozen && article ? (
-                <StatusBadges article={article} />
-              ) : (
-                <>
-                  {previewButton}
-                  <Button type="button" hierarchy="primary" size="md" className="min-h-[var(--touch-min)]" onClick={requestSend} disabled={contentError || readOnlyCause}>
-                    {label}
-                  </Button>
-                </>
-              )}
-            </div>
-            {failedBanner}
-          </div>
-          <div className="flex flex-1 flex-col gap-12 px-8 pb-32 pt-8">
-            <Crumbs current={CRUMB} />
-            {banners}
-            {details}
-            <hr className="m-0 h-0 border-0 border-t border-solid border-border-subtle" />
-            {pasteBanner}
-            <section ref={writingRef} tabIndex={-1} aria-label="Writing" className="flex flex-col outline-none">
-              {writing}
-            </section>
-          </div>
-        </>
-      ) : (
-        <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col rounded-2xl bg-bg-surface">
-          <div className="sticky top-0 z-sticky rounded-t-2xl border-0 border-b border-solid border-border-subtle bg-bg-surface">
-            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 px-12 py-6">
-              <Crumbs current={CRUMB} />
-              <div className="flex flex-wrap items-center gap-6">
-                {!frozen && slot}
+    <div className={cn(EDITOR_PAGE, touch && "bg-bg-surface")}>
+      <div className={EDITOR_FRAME}>
+        <h1 className="sr-only">{CRUMB}</h1>
+        <span className="sr-only" aria-live="polite">
+          {said.polite}
+        </span>
+        <span className="sr-only" role="alert">
+          {said.alert}
+        </span>
+        {touch ? (
+          <>
+            {/* Edge to edge as before the page frame: it bleeds out of the frame's inset. */}
+            <div className="sticky top-0 z-sticky -mx-[var(--layout-page-inset)] -mt-[var(--layout-page-inset)] border-0 border-b border-solid border-border-subtle bg-bg-surface">
+              <div className="flex items-center gap-2 py-3 pl-2 pr-4">
+                <NextLink href={blogHref()} aria-label="Back to your blogs" className={iconButtonVariants({ hierarchy: "ghost", size: "xl" })}>
+                  <Icon icon={ArrowLeft01Icon} size={20} />
+                </NextLink>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  {frozen ? null : slot}
+                  {fixCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        panelRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+                        panelRef.current?.focus({ preventScroll: true });
+                      }}
+                      className={cn(linkVariants({ color: "brand", size: "md" }), "w-fit bg-transparent p-0 font-semibold")}
+                    >
+                      {fixCount === 1 ? "1 thing to fix" : `${fixCount} things to fix`}
+                    </button>
+                  )}
+                </span>
                 {frozen && article ? (
                   <StatusBadges article={article} />
                 ) : (
                   <>
                     {previewButton}
-                    <Button type="button" hierarchy="primary" size="lg" onClick={requestSend} disabled={contentError || readOnlyCause}>
+                    <Button type="button" hierarchy="primary" size="md" className="min-h-[var(--touch-min)]" onClick={requestSend} disabled={contentError || readOnlyCause}>
                       {label}
                     </Button>
                   </>
                 )}
               </div>
+              {failedBanner}
             </div>
-            {failedBanner}
+            <div className="flex flex-1 flex-col gap-12 pb-32 pt-8">
+              <Crumbs current={CRUMB} />
+              <div className={COLUMN}>
+                {banners}
+                {details}
+                <hr className="m-0 h-0 border-0 border-t border-solid border-border-subtle" />
+                {pasteBanner}
+              </div>
+              <section ref={writingRef} tabIndex={-1} aria-label="Writing" className="flex flex-col outline-none">
+                {writing}
+              </section>
+            </div>
+          </>
+        ) : (
+          <div className="flex w-full flex-1 flex-col rounded-2xl bg-bg-surface">
+            <div className="sticky top-0 z-sticky rounded-t-2xl border-0 border-b border-solid border-border-subtle bg-bg-surface">
+              <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 px-12 py-6">
+                <Crumbs current={CRUMB} />
+                <div className="flex flex-wrap items-center gap-6">
+                  {!frozen && slot}
+                  {frozen && article ? (
+                    <StatusBadges article={article} />
+                  ) : (
+                    <>
+                      {previewButton}
+                      <Button type="button" hierarchy="primary" size="lg" onClick={requestSend} disabled={contentError || readOnlyCause}>
+                        {label}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {failedBanner}
+            </div>
+            <div className="flex flex-1 flex-col gap-12 px-12 pb-12 pt-10">
+              <div className={COLUMN}>
+                {banners}
+                {details}
+                {pasteBanner}
+              </div>
+              <section
+                ref={writingRef}
+                tabIndex={-1}
+                aria-label="Writing"
+                // A click on the card's empty space below the words continues the blog.
+                onMouseDown={(e) => {
+                  if (e.target !== e.currentTarget || !editable) return;
+                  e.preventDefault();
+                  apiRef.current?.focus("end");
+                }}
+                className="flex flex-1 flex-col rounded-xl border border-solid border-border-subtle px-24 py-24 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                {writing}
+              </section>
+            </div>
           </div>
-          <div className="flex flex-1 flex-col gap-12 px-12 pb-12 pt-10">
-            {banners}
-            {details}
-            {pasteBanner}
-            <section
-              ref={writingRef}
-              tabIndex={-1}
-              aria-label="Writing"
-              // A click on the card's empty space below the words continues the blog.
-              onMouseDown={(e) => {
-                if (e.target !== e.currentTarget || !editable) return;
-                e.preventDefault();
-                apiRef.current?.focus("end");
-              }}
-              className="flex flex-1 flex-col rounded-xl border border-solid border-border-subtle px-24 py-24 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              {writing}
-            </section>
-          </div>
-        </div>
-      )}
+        )}
 
-      {actions.dialogs}
-      <ModalFrame
-        open={leave !== null}
-        onClose={() => setLeave(null)}
-        title={leaveWords?.title ?? "Leave without saving?"}
-        size="sm"
-        role="alertdialog"
-        describedBy={`${ids}-leave-body`}
-        initialFocus={keepRef}
-        footer={
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
-            <Button ref={keepRef} type="button" hierarchy="secondary" size="lg" className="max-md:min-h-[var(--touch-min)]" onClick={() => setLeave(null)}>
-              Keep editing
-            </Button>
-            <Button
-              type="button"
-              hierarchy="danger"
-              size="lg"
-              className="max-md:min-h-[var(--touch-min)]"
-              onClick={() => {
-                const to = leave;
-                setLeave(null);
-                blocked.current = true;
-                allowLeave.current = true;
-                if (!to) return;
-                // Past the guard's own same-address entry too, where there is one.
-                if ("back" in to) window.history.go(window.history.state?.blogGuard ? -2 : -1);
-                else router.push(to.to);
-              }}
-            >
-              Discard
-            </Button>
-          </div>
-        }
-      >
-        <p id={`${ids}-leave-body`} className="text-md leading-md text-text-secondary">
-          {leaveWords?.body ?? "Your latest changes couldn't be saved. If you leave now, they'll be lost."}
-        </p>
-      </ModalFrame>
+        {actions.dialogs}
+        <ModalFrame
+          open={leave !== null}
+          onClose={() => setLeave(null)}
+          title={leaveWords?.title ?? "Leave without saving?"}
+          size="sm"
+          role="alertdialog"
+          describedBy={`${ids}-leave-body`}
+          initialFocus={keepRef}
+          footer={
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
+              <Button ref={keepRef} type="button" hierarchy="secondary" size="lg" className="max-md:min-h-[var(--touch-min)]" onClick={() => setLeave(null)}>
+                Keep editing
+              </Button>
+              <Button
+                type="button"
+                hierarchy="danger"
+                size="lg"
+                className="max-md:min-h-[var(--touch-min)]"
+                onClick={() => {
+                  const to = leave;
+                  setLeave(null);
+                  blocked.current = true;
+                  allowLeave.current = true;
+                  if (!to) return;
+                  // Past the guard's own same-address entry too, where there is one.
+                  if ("back" in to) window.history.go(window.history.state?.blogGuard ? -2 : -1);
+                  else router.push(to.to);
+                }}
+              >
+                Discard
+              </Button>
+            </div>
+          }
+        >
+          <p id={`${ids}-leave-body`} className="text-md leading-md text-text-secondary">
+            {leaveWords?.body ?? "Your latest changes couldn't be saved. If you leave now, they'll be lost."}
+          </p>
+        </ModalFrame>
+      </div>
     </div>
   );
 }
@@ -1417,20 +1434,22 @@ function BodySkeleton() {
 
 function EditorSkeleton() {
   return (
-    <div className="flex min-h-full flex-col bg-bg-surface md:bg-bg-page md:px-16 md:pt-12" aria-busy="true" aria-label="Loading the editor">
-      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-12 rounded-2xl bg-bg-surface px-8 pb-12 md:px-12">
-        <div className="border-0 border-b border-solid border-border-subtle py-8">
-          <Skeleton shape="text" size="md" className="w-1/4" />
-        </div>
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="flex flex-col gap-4">
-            <Skeleton shape="text" size="md" className="w-1/5" />
-            <Skeleton shape="block" className="h-20 w-full rounded-lg" />
+    <div className={cn(EDITOR_PAGE, "bg-bg-surface md:bg-bg-page")} aria-busy="true" aria-label="Loading the editor">
+      <div className={EDITOR_FRAME}>
+        <div className="flex w-full flex-col gap-12 rounded-2xl bg-bg-surface px-8 pb-12 md:px-12">
+          <div className="border-0 border-b border-solid border-border-subtle py-8">
+            <Skeleton shape="text" size="md" className="w-1/4" />
           </div>
-        ))}
-        <div className="mx-auto flex w-full max-w-[680px] flex-col gap-12 pt-12">
-          <Skeleton shape="text" size="lg" className="w-2/3" />
-          <BodySkeleton />
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex flex-col gap-4">
+              <Skeleton shape="text" size="md" className="w-1/5" />
+              <Skeleton shape="block" className="h-20 w-full rounded-lg" />
+            </div>
+          ))}
+          <div className={cn(COLUMN, "pt-12")}>
+            <Skeleton shape="text" size="lg" className="w-2/3" />
+            <BodySkeleton />
+          </div>
         </div>
       </div>
     </div>
@@ -1446,7 +1465,7 @@ function useFocusOnArrival() {
 function NotFound() {
   const ref = useFocusOnArrival();
   return (
-    <div className="flex min-h-full items-start justify-center px-8 py-24">
+    <Page>
       <StateCard
         tone="empty"
         titleAs="h1"
@@ -1460,14 +1479,14 @@ function NotFound() {
           </NextLink>
         }
       />
-    </div>
+    </Page>
   );
 }
 
 function Unreadable() {
   const ref = useFocusOnArrival();
   return (
-    <div className="flex min-h-full items-start justify-center px-8 py-24">
+    <Page>
       <StateCard
         tone="empty"
         titleAs="h1"
@@ -1481,14 +1500,14 @@ function Unreadable() {
           </NextLink>
         }
       />
-    </div>
+    </Page>
   );
 }
 
 function TakenDown({ article }: { article: BlogArticle }) {
   const ref = useFocusOnArrival();
   return (
-    <div className="flex min-h-full items-start justify-center px-8 py-24">
+    <Page>
       <StateCard
         tone="empty"
         titleAs="h1"
@@ -1502,6 +1521,6 @@ function TakenDown({ article }: { article: BlogArticle }) {
           </NextLink>
         }
       />
-    </div>
+    </Page>
   );
 }

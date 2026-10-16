@@ -22,19 +22,16 @@
 import * as React from "react";
 import { flushSync } from "react-dom";
 import { cn } from "@/lib/utils";
+import { PAGE_CONTAINER, PAGE_FRAME } from "@/components/ideeza/page";
 
 /** The page container: as wide as "main", and that width is what the container
  *  queries measure (§7 X6). At 1366 px with the sidebar open it is 1086 px, so
  *  the rail stays beside the tabs. */
-export const PAGE_CONTAINER = "[container-type:inline-size]";
+export { PAGE_CONTAINER };
 
-/** The content box: capped at 1280 px, 16 px gutters, 32 px from a 640 px page
- *  container (spacing tokens). While render toasts are up, its foot clears their
- *  capped stack (global-render-indicator.tsx: two toasts and a line from `md`,
- *  one below it), so the rail's last controls can always be scrolled out from
- *  under it. */
-export const PAGE_CONTENT =
-  "mx-auto w-full max-w-[1280px] px-8 pb-24 pt-10 [@container(min-width:640px)]:px-16 max-md:[body:has(.ix-render-toast)_&]:pb-[120px] md:[body:has(.ix-render-toast)_&]:pb-[184px]";
+/** The content box: the app's one page frame (F07 — Page Layout) — the layout
+ *  inset on every side, filling the width, with no cap and no centring. */
+export const PAGE_CONTENT = PAGE_FRAME;
 
 /** The rail's one surface: hairlines between blocks, no card in a card
  *  (COR-54). Stacked after the tab panel it is a hairline-topped run of blocks
@@ -43,7 +40,7 @@ export const RAIL_SURFACE =
   "min-w-0 divide-y divide-border border-t border-solid border-border [@container(min-width:1024px)]:rounded-2xl [@container(min-width:1024px)]:border [@container(min-width:1024px)]:bg-bg-surface";
 
 const WIDE_COLUMNS =
-  "[@container(min-width:1024px)]:grid-cols-[minmax(0,1fr)_360px] [@container(min-width:1024px)]:items-start [@container(min-width:1024px)]:gap-x-[calc(var(--spacing-7)*2)]";
+  "[@container(min-width:1024px)]:grid-cols-[minmax(0,1fr)_var(--layout-rail)] [@container(min-width:1024px)]:items-start [@container(min-width:1024px)]:gap-x-[var(--layout-gutter)]";
 
 const COLUMNS = cn("mt-10 grid grid-cols-1 gap-y-16", WIDE_COLUMNS);
 

@@ -21,7 +21,12 @@ import { cn } from "@/lib/utils";
 import { durationLabel, ImageGone, PostImg } from "./post-bits";
 import type { MinePostFacts } from "./use-post";
 
-const STAGE = "relative aspect-video w-full overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface-raised";
+/** 16:9 across the story column, but never so tall that the title under it
+ *  leaves the first screen: on a wide, short window (an ultrawide, a docked
+ *  laptop) its width stops where its height would pass the window less the
+ *  room the crumbs, thumbnails and title take. It keeps the column's left edge. */
+const STAGE =
+  "relative aspect-video w-full max-w-[calc((100dvh-var(--spacing-48)*3)*16/9)] overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface-raised";
 
 /** A "mine" post's take by id, from the project's videos. */
 export function takeOf(mine: MinePostFacts | null, takeId: string): VideoTake | null {

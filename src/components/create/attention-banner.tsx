@@ -15,10 +15,12 @@
 //     sidebar's History row stays on independently (until the user
 //     actually resolves the situation), so dismiss never hides the
 //     underlying signal.
-//   • Sits top-centre of the viewport (frame 20) so it can't occlude
+//   • Sits top-centre of the page (frame 20) so it can't occlude
 //     the prompt bar — via the shared `ToastLayer` (src/app/layout.tsx),
 //     portalled into its "attention" slot so it can never overlap the
 //     video-render toasts, which live in the same layer's "render" slot.
+//     The page is main, not the window: the layer spans main's edges,
+//     which this measures, so the toast centres beside the sidebar too.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -41,9 +43,37 @@ function failedLabels(items: BuildItem[]): string[] {
   return items.filter((i) => i.status === "failed").map((i) => ITEM_LABELS[i.kind]);
 }
 
+/** Lays the toast layer over main (the sidebar's width off one side, measured
+ *  as blog/editor/phone-bar.tsx does), so its toast centres on the page rather
+ *  than 140 px left of it. Data, not design values: written as the two custom
+ *  properties the layer's own classes read, and taken off again on the way out. */
+function useLayerOverMain() {
+  React.useEffect(() => {
+    const main = document.getElementById("main-content");
+    const layer = document.getElementById("ideeza-toast-layer");
+    if (!main || !layer) return;
+    const on = () => {
+      const r = main.getBoundingClientRect();
+      layer.style.setProperty("--toast-main-left", `${Math.max(0, Math.round(r.left))}px`);
+      layer.style.setProperty("--toast-main-right", `${Math.max(0, Math.round(window.innerWidth - r.right))}px`);
+    };
+    on();
+    const ro = new ResizeObserver(on);
+    ro.observe(main);
+    window.addEventListener("resize", on);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", on);
+      layer.style.removeProperty("--toast-main-left");
+      layer.style.removeProperty("--toast-main-right");
+    };
+  }, []);
+}
+
 export function BuildAttentionBanner() {
   const pathname = usePathname();
   const { topAttention, dismissAttention } = useCreateHistory();
+  useLayerOverMain();
 
   // Re-plays the enter transition each time a new attention item takes
   // the slot (a different job id, or the same job's reason changing).
@@ -132,7 +162,7 @@ export function BuildAttentionBanner() {
       role="status"
       aria-live="polite"
       className={[
-        "pointer-events-auto w-[540px] max-w-[calc(100vw-32px)]",
+        "pointer-events-auto w-[540px] max-w-full",
         "flex items-center gap-[12px] rounded-2xl border bg-bg-surface px-[16px] py-[12px] shadow-3",
         tone === "error"
           ? "border-[var(--color-border-error)]"

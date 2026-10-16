@@ -8,14 +8,9 @@
 import * as React from "react";
 import { ProjectCard } from "./project-card";
 import { EmptyState } from "./empty-state";
+import { PAGE_GRID } from "@/components/ideeza/page";
 import { fetchFeed, followParamOf, type FeedParams, type Project } from "@/lib/feed";
 import { useReactions } from "@/lib/innovations/reactions";
-
-// Up to 4 columns, never more — collapses 4 → 3 → 2 → 1 as the viewport
-// narrows. Capping the column count makes each card fill a larger share of the
-// full width (bigger thumbnails) instead of packing in extra columns.
-const GRID =
-  "grid gap-[24px] grid-cols-1 min-[640px]:grid-cols-2 min-[1024px]:grid-cols-3 min-[1440px]:grid-cols-4";
 
 export function ProjectGrid({
   params,
@@ -108,7 +103,7 @@ export function ProjectGrid({
 
   return (
     <div>
-      <div className={GRID}>
+      <div className={PAGE_GRID}>
         {items.map((p) => (
           <ProjectCard key={p.id} project={p} />
         ))}
@@ -133,7 +128,7 @@ export function ProjectGrid({
 
 function SkeletonGrid() {
   return (
-    <div className={GRID} aria-hidden>
+    <div className={PAGE_GRID} aria-hidden>
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="flex flex-col gap-[10px]">
           <div className="aspect-[4/3] animate-pulse rounded-[12px] bg-bg-surface-raised motion-reduce:animate-none" />

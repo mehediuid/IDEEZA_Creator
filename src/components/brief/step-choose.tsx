@@ -73,15 +73,13 @@ export function StepChoose({
   const missing = intent ? null : PICK_REASON;
 
   return (
-    <BriefCard onBack={onBack}>
+    <BriefCard
+      title="Mint your project"
+      description="Minting records that you made it first. Choose how it goes out — you can still list a private project later."
+      descriptionClassName="text-sm text-text-secondary"
+      onBack={onBack}
+    >
       <div className="flex flex-col gap-[20px]">
-        <div>
-          <h1 className="m-0 text-2xl font-bold tracking-tight text-text-primary">Mint your project</h1>
-          <p className="mt-[6px] max-w-[62ch] text-sm text-text-secondary">
-            Minting records that you made it first. Choose how it goes out — you can still list a private project later.
-          </p>
-        </div>
-
         <section aria-label="Project" className="flex min-w-0 flex-col gap-[6px] rounded-lg bg-bg-subtle px-[14px] py-[12px]">
           <span className="block truncate text-md font-semibold text-text-primary">{project.name}</span>
           <p className="m-0 line-clamp-3 max-w-[62ch] text-sm text-text-secondary">

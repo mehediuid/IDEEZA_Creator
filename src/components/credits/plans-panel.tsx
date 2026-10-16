@@ -47,6 +47,7 @@ import {
   type PlanTier,
 } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
+import { PLAN_CARDS } from "./pricing-frame";
 
 const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const pct = (d: number) => `${Math.round(d * 100)}%`;
@@ -107,7 +108,7 @@ export function PlansPanel() {
           ]}
         />
 
-        <ul role="list" className="grid w-full max-w-[1180px] grid-cols-3 gap-[32px] max-xl:gap-[16px] max-lg:grid-cols-1">
+        <ul role="list" className={cn(PLAN_CARDS, "w-full")}>
           {PAID.map((p, i) => (
             <PlanCard
               key={p.tier}
@@ -260,7 +261,7 @@ function FreeCard({ hydrated, onAct }: { hydrated: boolean; onAct: () => void })
   return (
     <section
       aria-labelledby="free-plan"
-      className="grid w-full max-w-[1180px] grid-cols-[minmax(180px,1fr)_minmax(0,2fr)_auto] items-center gap-[32px] rounded-2xl border border-solid border-border bg-bg-surface p-[24px] max-lg:grid-cols-1 max-lg:gap-[20px]"
+      className="grid w-full grid-cols-1 items-center gap-[20px] rounded-2xl border border-solid border-border bg-bg-surface p-[24px] [@container(min-width:1024px)]:grid-cols-[minmax(180px,1fr)_minmax(0,2fr)_auto] [@container(min-width:1024px)]:gap-[32px]"
     >
       <div className="flex flex-col gap-[8px]">
         <h3 id="free-plan" className="text-2xl font-semibold leading-2xl text-text-primary">

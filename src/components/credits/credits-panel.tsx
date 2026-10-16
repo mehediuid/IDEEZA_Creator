@@ -42,6 +42,7 @@ import { useCredits, type CreditEntry } from "@/lib/create/credits";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
+import { PLAN_CARDS } from "./pricing-frame";
 
 const pct = (d: number) => `${Math.round(d * 100)}%`;
 const n = (v: number) => v.toLocaleString("en-US");
@@ -60,7 +61,7 @@ export function CreditsPanel() {
   const discount = useCreditDiscount();
 
   return (
-    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-[40px]">
+    <div className="flex w-full flex-col gap-[40px]">
       <div className="flex flex-wrap items-start justify-between gap-[24px]">
         <div className="flex max-w-[62ch] flex-col gap-[12px]">
           <h2 className="text-4xl font-semibold leading-4xl text-text-primary">Purchase AI credits</h2>
@@ -90,7 +91,7 @@ export function CreditsPanel() {
         </div>
       </div>
 
-      <ul role="list" className="grid grid-cols-3 gap-[32px] pt-[12px] max-xl:gap-[16px] max-lg:grid-cols-1">
+      <ul role="list" className={cn(PLAN_CARDS, "pt-[12px]")}>
         {CREDIT_PACKS.map((p) => {
           const cost = packPrice(p, discount);
           return (
@@ -199,7 +200,7 @@ function CustomAmount({ discount }: { discount: number }) {
           </Button>
         </div>
       )}
-      <div className="grid grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)_auto] items-center gap-[32px] max-lg:grid-cols-1 max-lg:gap-[16px]">
+      <div className="grid grid-cols-1 items-center gap-[16px] [@container(min-width:1024px)]:grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)_auto] [@container(min-width:1024px)]:gap-[32px]">
         <div className="flex flex-col gap-[12px]">
           <label id={`${inputId}-label`} htmlFor={inputId} className="text-xl font-semibold leading-xl text-text-primary">
             Custom amount
@@ -224,7 +225,7 @@ function CustomAmount({ discount }: { discount: number }) {
             </p>
           )}
         </div>
-        <span aria-hidden className="h-full w-px bg-border max-lg:hidden" />
+        <span aria-hidden className="hidden h-full w-px bg-border [@container(min-width:1024px)]:block" />
         <div className="flex flex-wrap items-end gap-[32px]">
           <div className="flex flex-col gap-[4px]">
             <span className="text-4xl font-semibold leading-4xl tabular-nums text-text-primary">{usd(cost.final)}</span>

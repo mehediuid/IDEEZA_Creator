@@ -258,7 +258,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                     <h1
                       ref={titleRef}
                       tabIndex={-1}
-                      className="min-w-0 break-words text-3xl font-bold leading-3xl tracking-tight text-text-primary outline-none"
+                      className="min-w-0 break-words text-3xl font-semibold leading-3xl tracking-slight text-text-primary outline-none"
                     >
                       {name}
                     </h1>

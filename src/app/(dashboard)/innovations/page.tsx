@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import * as React from "react";
 import { Newsfeed } from "@/components/newsfeed/newsfeed";
+import { NARROW_COLUMN, PAGE_GRID, Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 
 export const metadata: Metadata = {
   title: "IDEEZA — Innovations",
@@ -19,19 +21,28 @@ export default function NewsfeedPage() {
   );
 }
 
+// The feed's own frame and header (the title is static, so it does not jump
+// when the feed arrives; keep the copy in step with newsfeed.tsx), the search
+// at its narrow width and the grid's columns.
 function NewsfeedFallback() {
   return (
-    <div className="w-full px-[32px] py-[28px]">
-      <div className="h-[24px] w-[160px] animate-pulse rounded-full bg-bg-surface-raised" />
-      <div className="mt-[24px] h-[48px] w-full animate-pulse rounded-full bg-bg-surface-raised" />
-      <div className="mt-[24px] grid gap-[24px] grid-cols-1 min-[640px]:grid-cols-2 min-[1024px]:grid-cols-3 min-[1440px]:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="aspect-[4/3] animate-pulse rounded-[12px] bg-bg-surface-raised"
-          />
-        ))}
+    <Page>
+      <PageHeader
+        title="Innovations"
+        description="Discover what creators are building. Follow, appreciate, and save projects."
+        descriptionClassName="text-sm text-text-secondary"
+      />
+      <div className="flex flex-col gap-12">
+        <div className={`h-[48px] animate-pulse rounded-full bg-bg-surface-raised ${NARROW_COLUMN}`} />
+        <div className={PAGE_GRID}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="aspect-[4/3] animate-pulse rounded-[12px] bg-bg-surface-raised"
+            />
+          ))}
+        </div>
       </div>
-    </div>
+    </Page>
   );
 }

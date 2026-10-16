@@ -97,7 +97,9 @@ export function BillingHistory() {
           No payment matches “{query.trim()}”{year !== ALL ? ` in ${year}` : ""}.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-solid border-border">
+        // `relative`: the table's visually hidden labels are positioned, and
+        // without it they escape this scroller and widen the whole page.
+        <div className="relative overflow-x-auto rounded-xl border border-solid border-border">
           <table className="w-full min-w-[1000px] border-collapse text-left text-lg leading-lg">
             <caption className="sr-only">Payments, newest first</caption>
             <thead className="bg-bg-subtle text-lg leading-lg text-text-primary">

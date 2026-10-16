@@ -4,10 +4,10 @@
 // (an old title's address still works), then the address is replaced with the
 // current one. Due demo reviews are settled on arrival, and an outcome shown here
 // counts as seen (the bell stops listing it) once the page is actually in view.
-// In the Figma's order: the reject-reason panel when there is one (grouped by
-// review), then the card — "Blog › Blog details" with Edit (and the ⋯ for the
-// status's other actions) — the blog exactly as readers see it, and the rail
-// opening on its status: the badge, one sentence from the record, the demo
+// "Blog › Blog details" with Edit (and the ⋯ for the status's other actions),
+// the blog exactly as readers see it — with the reject-reason panel, when there
+// is one (grouped by review), under its title: a notice never sits above the
+// page's title — and the rail opening on its status: the badge, one sentence from the record, the demo
 // review's time while one waits, where IDEEZA shared it, and the demo's
 // reading-address caption. Readers' version shows while there is one (a live
 // blog's pending changes stay in the editor and the preview).
@@ -96,20 +96,22 @@ function ArticleView({ article, actions }: { article: BlogArticle; actions: Retu
   return (
     <div className={ARTICLE_PAGE}>
       <div className={ARTICLE_CONTENT}>
-        {panel && (
-          <ReasonPanel
-            key={`${article.id}:${panel.latest.at}:${panel.open}`}
-            panel={panel}
-            blogTitle={title}
-            updateHref={panel.aboutUpdate && article.live ? previewHref(slugOf(article)) : undefined}
-          />
-        )}
         <ArticleReader
           article={article}
           meta={version.meta}
           doc={shown.body.doc}
           bodyReady={shown.hydrated}
           body={version.body}
+          notice={
+            panel && (
+              <ReasonPanel
+                key={`${article.id}:${panel.latest.at}:${panel.open}`}
+                panel={panel}
+                blogTitle={title}
+                updateHref={panel.aboutUpdate && article.live ? previewHref(slugOf(article)) : undefined}
+              />
+            )
+          }
           header={
             <>
               <BlogBreadcrumb trail={[{ label: "Blog details" }]} />

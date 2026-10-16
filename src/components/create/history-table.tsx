@@ -57,32 +57,34 @@ export function HistoryTable({
   onToggleExpand: (id: string) => void;
   renderDetail: (row: HistoryRow) => React.ReactNode;
 }) {
+  // The six columns need more room than a phone (or a narrow page) has,
+  // so the table scrolls sideways inside its own frame rather than
+  // clipping Date, Status and Action. Rows and their actions are focusable,
+  // so the keyboard scrolls it too.
   return (
-    <div
-      role="table"
-      aria-label="History"
-      className="overflow-hidden rounded-2xl border border-border bg-bg-surface"
-    >
-      <HeaderRow />
-      <div role="rowgroup">
-        {rows.map((row, idx) => (
-          <React.Fragment key={row.id}>
-            <Row
-              row={row}
-              serial={serialOffset + idx + 1}
-              expanded={expandedId === row.id}
-              onToggle={() => onToggleExpand(row.id)}
-            />
-            {expandedId === row.id && (
-              <div
-                role="row"
-                className="border-t border-border bg-bg-page"
-              >
-                {renderDetail(row)}
-              </div>
-            )}
-          </React.Fragment>
-        ))}
+    <div className="overflow-x-auto rounded-2xl border border-border bg-bg-surface">
+      <div role="table" aria-label="History" className="min-w-min">
+        <HeaderRow />
+        <div role="rowgroup">
+          {rows.map((row, idx) => (
+            <React.Fragment key={row.id}>
+              <Row
+                row={row}
+                serial={serialOffset + idx + 1}
+                expanded={expandedId === row.id}
+                onToggle={() => onToggleExpand(row.id)}
+              />
+              {expandedId === row.id && (
+                <div
+                  role="row"
+                  className="border-t border-border bg-bg-page"
+                >
+                  {renderDetail(row)}
+                </div>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -99,11 +101,18 @@ const COLS = [
   { key: "action", label: "Action", w: "w-[140px]" },
 ] as const;
 
+// One template for the header and every row. The prompt keeps the
+// thumbnail column's width as its floor, so the table's narrowest
+// (min-content) width is the sum of the columns and below it the table
+// scrolls instead of squeezing the prompt to nothing.
+const ROW_GRID =
+  "grid grid-cols-[88px_minmax(120px,1fr)_120px_180px_120px_140px] items-center gap-[16px]";
+
 function HeaderRow() {
   return (
     <div
       role="row"
-      className="grid grid-cols-[88px_minmax(0,1fr)_120px_180px_120px_140px] items-center gap-[16px] border-b border-border bg-bg-page px-[20px] py-[14px]"
+      className={`${ROW_GRID} border-b border-border bg-bg-page px-[20px] py-[14px]`}
     >
       {COLS.map((c) => (
         <div
@@ -146,7 +155,7 @@ function Row({
       onClick={onToggle}
       onKeyDown={onKey}
       className={[
-        "grid grid-cols-[88px_minmax(0,1fr)_120px_180px_120px_140px] items-center gap-[16px] border-b border-border px-[20px] py-[12px] outline-none transition-colors duration-fast",
+        `${ROW_GRID} border-b border-border px-[20px] py-[12px] outline-none transition-colors duration-fast`,
         "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus",
         expanded ? "bg-bg-surface-raised" : "hover:bg-bg-surface-raised",
         "cursor-pointer",

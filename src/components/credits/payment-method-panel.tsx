@@ -29,7 +29,7 @@ export function PaymentMethodPanel() {
   const choose = (coin: PayToken) => setRefused(!setDefaultToken(coin));
 
   return (
-    <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-[24px]">
+    <div className="flex w-full flex-col gap-[24px]">
       <div className="flex flex-wrap items-center justify-between gap-[16px]">
         <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Payment method</h2>
         <Button hierarchy="primary" size="lg" aria-haspopup="dialog" onClick={() => setAdding(true)}>

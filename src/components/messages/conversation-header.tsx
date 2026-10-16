@@ -1,6 +1,7 @@
 "use client";
 
-// The conversation's header (spec §6): ‹ Messages below 1024 px, the person
+// The conversation's header (spec §6): ‹ Messages while the list is not
+// beside it (below a 768 px page container, messages-shell.tsx), the person
 // (or "{Project} team" and how many people), the role tag, and ⋯ with Mute ·
 // Archive · Block (direct only) · Report….
 
@@ -32,10 +33,10 @@ export function ConversationHeader({
 }) {
   return (
     <header className="flex min-h-[64px] shrink-0 items-center gap-4 border-b border-solid border-border bg-bg-surface px-4 py-2 md:px-8">
-      <h1 className="sr-only lg:hidden">Messages</h1>
+      <h1 className="sr-only [@container(min-width:768px)]:hidden">Messages</h1>
       <Link
         href={MESSAGES_HREF}
-        className="-ml-2 inline-flex min-h-[var(--touch-min)] shrink-0 items-center gap-1 rounded-lg px-2 text-md font-medium leading-md text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus lg:hidden"
+        className="-ml-2 inline-flex min-h-[var(--touch-min)] shrink-0 items-center gap-1 rounded-lg px-2 text-md font-medium leading-md text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus [@container(min-width:768px)]:hidden"
       >
         <Icon icon={ArrowLeft01Icon} size={18} />
         Messages

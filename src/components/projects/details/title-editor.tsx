@@ -44,7 +44,7 @@ export function ProjectTitle({
         ref={setH1}
         id={PROJECT_TITLE_ID}
         tabIndex={-1}
-        className="min-w-0 truncate text-3xl font-bold leading-3xl tracking-tight text-text-primary outline-none"
+        className="min-w-0 truncate text-3xl font-semibold leading-3xl tracking-slight text-text-primary outline-none"
       >
         {project.name}
       </h1>

@@ -6,6 +6,8 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { FeedControls } from "./feed-controls";
 import { ProjectGrid } from "./project-grid";
 import { SharedByYou } from "./shared-by-you";
@@ -30,22 +32,18 @@ export function Newsfeed() {
   }, [router]);
 
   return (
-    <div className="w-full px-[32px] py-[28px]">
-      <header className="mb-[24px]">
-        <h1 className="text-xl font-bold tracking-tight text-text-primary">
-          Innovations
-        </h1>
-        <p className="mt-[4px] text-sm text-text-secondary">
-          Discover what creators are building. Follow, appreciate, and save
-          projects.
-        </p>
-      </header>
+    <Page>
+      <PageHeader
+        title="Innovations"
+        description="Discover what creators are building. Follow, appreciate, and save projects."
+        descriptionClassName="text-sm text-text-secondary"
+      />
 
-      <div className="flex flex-col gap-[24px]">
+      <div className="flex flex-col gap-12">
         <SharedByYou />
         <FeedControls params={params} onChange={updateParams} />
         <ProjectGrid params={params} onClearFilters={clearFilters} />
       </div>
-    </div>
+    </Page>
   );
 }

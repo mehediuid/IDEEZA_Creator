@@ -51,9 +51,10 @@ npm run test:projects             # node:test over pure src/lib modules
 ## UI/UX hard rules
 Reasoning, component notes, exceptions: [docs/guides/ui-ux.md](docs/guides/ui-ux.md).
 - **Use `/ui-ux-pro-max` and `/impeccable`** to plan and build every interface, visual, layout or design-system change, before deciding.
-- **Tokens only** — never hardcode color/spacing/radius/shadow/type (`--color-*` `--spacing-*` `--radius-*` `--font-size-*` `--line-height-*` `--letter-spacing-*` `--elevation-*` `--border-width-*`); **light + dark** (`data-theme` + `prefers-color-scheme`). Tokens come from the Figma variables — never guessed or minted; a missing value is left out and reported.
+- **Tokens only** — never hardcode color/spacing/radius/shadow/type/width (`--color-*` `--spacing-*` `--radius-*` `--font-size-*` `--line-height-*` `--letter-spacing-*` `--elevation-*` `--border-width-*` `--layout-*`); **light + dark** (`data-theme` + `prefers-color-scheme`). Tokens come from the Figma variables — never guessed or minted; a missing value is left out and reported.
 - **Classes, not `style={{…}}`**, except where the value is data. **Line height pairs with font size**; no arbitrary `leading-[…]`/`tracking-[…]`. **10px is for a micro-label, not for reading** (one exception, see the guide). **Prose gets a measure** (`62ch`).
 - **Brand = violet** (`--color-violet-600`); accent for **selection / active / primary only**. **Weight matches urgency.** **No card inside a card.**
+- **One page frame** — every shell page is `<Page>` + `<PageHeader>` (`components/ideeza/page*.tsx`, Figma F07): main less `--layout-page-inset`, filling the width, no page `max-w`/`mx-auto`; the page type sets what fills it (grid, main + rail, 720 narrow column on the left edge, workspace panes). Layout switches query the page container, never the viewport.
 - **One control, one home** — never duplicate a control across surfaces (the Position panel owns z-order; the Route menu owns corners).
 - **Contextual disable, not stubs** — grey a control whose precondition isn't met, with the reason. **Empty states teach.**
 - **Menus & dropdowns never clip** — portal to `<body>`, `position: fixed`, clamp into the viewport; anchor context menus at the cursor.

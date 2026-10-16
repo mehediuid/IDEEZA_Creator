@@ -15,6 +15,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight01Icon, Cancel01Icon, ConnectIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { Page, WITH_RAIL } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { cn } from "@/lib/utils";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf } from "@/lib/manual/project-read";
@@ -66,21 +68,21 @@ export function ConnectionMapPage({ id }: { id: string }) {
   const [creating, setCreating] = React.useState(false);
 
   if (!hydrated || !buildsHydrated || !netHydrated) {
-    return <div className="mx-auto w-full max-w-7xl px-16 py-12 text-sm text-text-tertiary">Loading…</div>;
+    return <Page className="text-sm text-text-tertiary">Loading…</Page>;
   }
   if (!project) {
     return (
-      <div className="mx-auto w-full max-w-7xl px-16 py-12">
+      <Page>
         <p className="text-md font-semibold text-text-primary">This project isn&apos;t in this browser</p>
         <Link href="/projects" className={cn(btn.link, "mt-4 inline-block")}>
           Back to My projects
         </Link>
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-16 py-12">
+    <Page>
       <nav aria-label="Breadcrumb" className="mb-8 flex min-w-0 items-center gap-3 text-sm">
         <Link href="/projects" className="rounded-sm font-medium text-text-secondary no-underline outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus">
           My projects
@@ -102,6 +104,7 @@ export function ConnectionMapPage({ id }: { id: string }) {
       {network ? (
         <MapView key={network.createdAt} network={network} products={products} projectId={project.id} onDeleted={() => router.push(`/projects/${project.id}`)} />
       ) : (
+        // The empty region spans the frame; only its contents are centred.
         <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border bg-bg-surface px-10 py-24 text-center">
           <span aria-hidden className="text-text-tertiary">
             <Icon icon={ConnectIcon} size={24} />
@@ -118,7 +121,7 @@ export function ConnectionMapPage({ id }: { id: string }) {
       {creating && (
         <AddNetworkDialog project={project} refs={refs} onClose={() => setCreating(false)} onViewNetwork={() => setCreating(false)} />
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -234,43 +237,44 @@ function MapView({
 
   return (
     <>
-      <header className="mb-8 flex flex-wrap items-start gap-8">
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-bold tracking-tight text-text-primary">{shown.name || "Unnamed Network"}</h1>
-          <p className="mt-2 text-sm text-text-secondary">
-            {mode === "edit"
-              ? "Editing — changes are not saved until you press Save changes."
-              : [
-                  `${network.productIds.length} ${network.productIds.length === 1 ? "product" : "products"}`,
-                  `${network.links.length} ${network.links.length === 1 ? "link" : "links"}`,
-                  network.cloudType !== "none" && network.cloudName ? `shared cloud ${network.cloudName}` : null,
-                  `last edited ${formatEdited(network.updatedAt)}`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-          </p>
-        </div>
-        {mode === "read" ? (
-          <div className="flex items-center gap-6">
-            <button type="button" className={btn.quiet} onClick={() => setSettingsOpen(true)}>
-              Settings
-            </button>
-            <button type="button" className={btn.primary} onClick={startEdit}>
-              Edit map
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-end gap-6">
-            {pendingLink && <p className="text-sm text-text-tertiary">Save or cancel the new link first.</p>}
-            <button type="button" className={btn.quiet} onClick={() => (changeCount ? setDiscarding(true) : stopEdit())}>
-              Cancel
-            </button>
-            <button type="button" className={btn.primary} disabled={!changeCount || pendingLink} onClick={saveEdit}>
-              Save changes
-            </button>
-          </div>
-        )}
-      </header>
+      <PageHeader
+        title={shown.name || "Unnamed Network"}
+        descriptionClassName="text-sm text-text-secondary"
+        description={
+          mode === "edit"
+            ? "Editing — changes are not saved until you press Save changes."
+            : [
+                `${network.productIds.length} ${network.productIds.length === 1 ? "product" : "products"}`,
+                `${network.links.length} ${network.links.length === 1 ? "link" : "links"}`,
+                network.cloudType !== "none" && network.cloudName ? `shared cloud ${network.cloudName}` : null,
+                `last edited ${formatEdited(network.updatedAt)}`,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+        }
+        actions={
+          mode === "read" ? (
+            <>
+              <button type="button" className={btn.quiet} onClick={() => setSettingsOpen(true)}>
+                Settings
+              </button>
+              <button type="button" className={btn.primary} onClick={startEdit}>
+                Edit map
+              </button>
+            </>
+          ) : (
+            <>
+              {pendingLink && <p className="text-sm text-text-tertiary">Save or cancel the new link first.</p>}
+              <button type="button" className={btn.quiet} onClick={() => (changeCount ? setDiscarding(true) : stopEdit())}>
+                Cancel
+              </button>
+              <button type="button" className={btn.primary} disabled={!changeCount || pendingLink} onClick={saveEdit}>
+                Save changes
+              </button>
+            </>
+          )
+        }
+      />
 
       {mode === "edit" && changeCount > 0 && (
         <div role="status" className="mb-8 rounded-xl border border-solid border-border-brand bg-bg-brand-subtle px-8 py-5">
@@ -282,7 +286,7 @@ function MapView({
       )}
 
       {mode === "read" ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className={WITH_RAIL}>
           <div className="flex min-w-0 flex-col gap-3">
             <div style={{ height: CANVAS_H }}>
               <MapCanvas
@@ -299,7 +303,8 @@ function MapView({
             </div>
             <p className="text-xs text-text-tertiary">{mapStatusLine(network.nodes, network.links)}</p>
           </div>
-          <aside aria-label="Details" className="overflow-y-auto rounded-xl border border-solid border-border bg-bg-surface p-8" style={{ maxHeight: CANVAS_H }}>
+          {/* As tall as the canvas beside it (the rail's grid aligns its items to the top). */}
+          <aside aria-label="Details" className="self-stretch overflow-y-auto rounded-xl border border-solid border-border bg-bg-surface p-8" style={{ maxHeight: CANVAS_H }}>
             {readPanel}
           </aside>
         </div>
@@ -314,6 +319,7 @@ function MapView({
           onHowTo={() => setHowTo(true)}
           onPendingChange={setPendingLink}
           canvasHeight={CANVAS_H}
+          columns={WITH_RAIL}
           fitKey={`edit-${editKey}`}
           keysActive={!settingsOpen && !howTo && !discarding && !breaking}
           renderIdle={() => summary("Pick a product or a link to edit it. Drawing a new link opens the three questions.")}

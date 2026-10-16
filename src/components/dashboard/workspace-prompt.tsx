@@ -194,7 +194,7 @@ export function WorkspacePrompt() {
       <HeroGlow />
 
       {/* Hero — centered narrow column. */}
-      <div className="relative mx-auto w-full max-w-[760px] px-[32px] pt-[64px]">
+      <div className="relative mx-auto w-full max-w-[760px] px-[var(--layout-page-inset)] pt-[64px]">
         <h1 className="text-center text-5xl font-bold tracking-tight text-text-primary">
           What will you build today?
         </h1>
@@ -757,9 +757,13 @@ function Examples({ items }: { items: Project[] }) {
   return (
     <section
       aria-labelledby="examples-heading"
-      className="mt-[64px] w-full px-[40px]"
+      // On the page frame's edge (F07 — Page Layout), like every page's
+      // content: the inset, filling the width. Its columns follow the strip's
+      // own width, not the window's — beside the sidebar a 1024 window has a
+      // 680 px strip, where four columns cut every title.
+      className="mt-[64px] w-full px-[var(--layout-page-inset)] [container-type:inline-size]"
     >
-      <div className="mx-auto w-full max-w-[1400px]">
+      <div className="w-full">
         <header className="mb-[20px] flex items-end justify-between gap-[16px]">
           <h2
             id="examples-heading"
@@ -778,7 +782,7 @@ function Examples({ items }: { items: Project[] }) {
 
         <ul
           role="list"
-          className="grid grid-cols-1 gap-[16px] sm:grid-cols-2 lg:grid-cols-4"
+          className="grid grid-cols-1 gap-[16px] [@container(min-width:560px)]:grid-cols-2 [@container(min-width:900px)]:grid-cols-4"
         >
           {items.map((p) => (
             <li key={p.id}>

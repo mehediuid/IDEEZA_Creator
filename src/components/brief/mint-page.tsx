@@ -17,6 +17,7 @@ import Link from "next/link";
 import { NoteRemoveIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { StateCard, buttonVariants } from "@/components/ideeza";
+import { NARROW_COLUMN, Page } from "@/components/ideeza/page";
 import { ProjectNotFound } from "@/components/projects/details/page-states";
 import { earnHref } from "@/lib/manual/earn-route";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -48,18 +49,21 @@ export function MintPage({ id }: { id: string }) {
   return <BriefApp key={project.id} projectId={project.id} />;
 }
 
-/** The flow's own shape while it loads — the step line and the card. */
+/** The flow's own shape while it loads — the step line and the card, in the
+ *  page frame's narrow column. */
 function MintSkeleton() {
   return (
-    <div
-      role="status"
-      aria-label="Loading the mint flow"
-      className="flex min-h-full w-full flex-col items-center gap-6 px-[16px] pb-[48px] pt-[24px] motion-safe:animate-pulse md:px-[32px] md:pb-[64px] md:pt-[40px]"
-    >
-      <span className="sr-only">Loading the mint flow</span>
-      <div className="h-[14px] w-full max-w-[600px] rounded bg-bg-subtle" />
-      <div className="h-[420px] w-full max-w-[600px] rounded-2xl bg-bg-subtle" />
-    </div>
+    <Page>
+      <div
+        role="status"
+        aria-label="Loading the mint flow"
+        className={cn(NARROW_COLUMN, "flex flex-col gap-6 motion-safe:animate-pulse")}
+      >
+        <span className="sr-only">Loading the mint flow</span>
+        <div className="h-[14px] w-full rounded bg-bg-subtle" />
+        <div className="h-[420px] w-full rounded-2xl bg-bg-subtle" />
+      </div>
+    </Page>
   );
 }
 

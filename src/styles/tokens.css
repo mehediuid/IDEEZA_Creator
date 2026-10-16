@@ -177,6 +177,17 @@
   --touch-comfortable: 48px;
   --touch-large: 56px;
 
+  /* ── Layout (Figma "📐 Layout", F07 — Page Layout) ─────────── */
+  /* The page frame is main less the inset on every side and fills the width:
+     no max-width, nothing centred, so every page title starts at one edge. */
+  --layout-page-inset: var(--spacing-16);
+  --layout-gutter: var(--spacing-12);
+  --layout-content-narrow: 720px;
+  --layout-rail: 360px;
+  --layout-card-min: 280px;
+  --layout-sidebar: 280px;
+  --layout-sidebar-collapsed: 64px;
+
   /* ── Radius (Desktop) ───────────────────────────────────────── */
   --radius-none: 0;
   --radius-xs: 2px;
@@ -251,6 +262,11 @@
     --spacing-32: 56px;
     --spacing-40: 64px;
     --spacing-48: 80px;
+
+    /* Layout (mobile): spacing/8 for both, not the 24 / 20 spacing/16 and
+       spacing/12 step down to here. */
+    --layout-page-inset: var(--spacing-8);
+    --layout-gutter: var(--spacing-8);
 
     /* Radius (mobile) */
     --radius-xs: 4px;

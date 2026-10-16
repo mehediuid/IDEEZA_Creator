@@ -51,7 +51,7 @@ import { OwnerFacts } from "./owner-line";
 import { FollowButton, MessageButton, PersonMenu, useBlocked, useMessageRefusalFor, type PersonNotice } from "./person-actions";
 import { WorkTabs } from "./work";
 
-const CONTENT = cn(PAGE_CONTENT, "flex max-w-[1200px] flex-col gap-8 max-md:pb-[104px]");
+const CONTENT = cn(PAGE_CONTENT, "flex flex-col gap-8 max-md:pb-[104px]");
 
 const PHONE_BAR =
   "fixed inset-x-0 bottom-0 z-sticky flex gap-3 border-t border-solid border-border bg-bg-surface px-6 pb-6 pt-4 md:hidden";

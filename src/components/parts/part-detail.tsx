@@ -17,6 +17,8 @@ import Link from "next/link";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { Button, buttonVariants } from "@/components/ideeza";
 import { Icon } from "@/components/dashboard/icon";
+import { Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { glyphFor } from "@/lib/pcb/glyphs";
 import { FOOTPRINT } from "@/lib/pcb/schematic-to-pcb";
 import { landPatternFor, unresolvedReason } from "@/lib/pcb/land-patterns";
@@ -401,47 +403,52 @@ function Shell({
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // The app's page frame: the content starts on the frame's left edge, the
+  // same edge as the library it came from, and fills the width.
   return (
-    <div className="mx-auto flex w-full max-w-[900px] flex-col gap-[var(--spacing-10)] px-[var(--spacing-12)] py-[var(--spacing-16)]">
-      <Link
-        href="/parts"
-        className="inline-flex min-h-[24px] w-fit items-center gap-[var(--spacing-3)] rounded-[var(--radius-lg)] py-[var(--spacing-2)] font-display text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        <Icon icon={ArrowLeft01Icon} size={16} />
-        Parts &amp; Agile Module
-      </Link>
+    <Page>
+      <PageHeader
+        breadcrumb={
+          <Link
+            href="/parts"
+            className="inline-flex min-h-[24px] w-fit items-center gap-[var(--spacing-3)] rounded-[var(--radius-lg)] py-[var(--spacing-2)] font-display text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <Icon icon={ArrowLeft01Icon} size={16} />
+            Parts &amp; Agile Module
+          </Link>
+        }
+        title={name}
+        meta={
+          badge || visibility ? (
+            <span className="flex flex-wrap items-center gap-[var(--spacing-4)]">
+              {badge ? (
+                <span className="rounded-[var(--radius-md)] bg-bg-subtle px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-xs font-medium text-text-secondary">
+                  {badge}
+                </span>
+              ) : null}
+              {visibility ? (
+                <span
+                  className={[
+                    "rounded-[var(--radius-full)] px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-xs font-medium",
+                    visibility === "public" ? "bg-bg-success-subtle text-text-success" : "bg-bg-subtle text-text-secondary",
+                  ].join(" ")}
+                >
+                  {visibility === "public" ? "Public" : "Private"}
+                </span>
+              ) : null}
+            </span>
+          ) : null
+        }
+        description={
+          // The description keeps its own type, as it was before the header was shared.
+          description ? (
+            <span className="block max-w-[62ch] font-display text-md font-regular leading-relaxed text-text-secondary">{description}</span>
+          ) : undefined
+        }
+        actions={action}
+      />
 
-      <header className="flex flex-wrap items-start justify-between gap-[var(--spacing-6)]">
-        <div className="flex min-w-0 flex-col gap-[var(--spacing-4)]">
-          <div className="flex flex-wrap items-center gap-[var(--spacing-4)]">
-            <h1 className="min-w-0 break-words font-display text-2xl font-semibold leading-2xl tracking-tight text-text-primary">
-              {name}
-            </h1>
-            {badge ? (
-              <span className="rounded-[var(--radius-md)] bg-bg-subtle px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-xs font-medium text-text-secondary">
-                {badge}
-              </span>
-            ) : null}
-            {visibility ? (
-              <span
-                className={[
-                  "rounded-[var(--radius-full)] px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-xs font-medium",
-                  visibility === "public" ? "bg-bg-success-subtle text-text-success" : "bg-bg-subtle text-text-secondary",
-                ].join(" ")}
-              >
-                {visibility === "public" ? "Public" : "Private"}
-              </span>
-            ) : null}
-          </div>
-          {description ? (
-            <p className="max-w-[62ch] font-display text-md font-regular leading-relaxed text-text-secondary">{description}</p>
-          ) : null}
-        </div>
-
-        {action}
-      </header>
-
-      {children}
-    </div>
+      <div className="flex flex-col gap-[var(--spacing-10)]">{children}</div>
+    </Page>
   );
 }

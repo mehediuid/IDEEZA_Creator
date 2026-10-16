@@ -5,7 +5,8 @@
 // `Icon` wrapper. Sizes: 16px on list rows / 20px on primary actions +
 // the brand mark. 14px font (text-md token).
 //
-// Collapsible: the top toggle shrinks the sidebar to a 72px icon rail
+// Collapsible: the top toggle shrinks the sidebar to a 64px icon rail (O04,
+// --layout-sidebar-collapsed)
 // (labels hidden, tooltips + aria-labels keep every item reachable) and
 // expands it back. The choice persists in localStorage.
 //
@@ -175,7 +176,7 @@ export function DashboardSidebar({
         // toggle is a state change that needs no choreography.
         className={[
           "hidden h-full shrink-0 flex-col border-r border-border bg-bg-page md:flex",
-          collapsed ? "w-[72px]" : "w-[280px]",
+          collapsed ? "w-[var(--layout-sidebar-collapsed)]" : "w-[var(--layout-sidebar)]",
         ].join(" ")}
       >
         <SidebarBody
@@ -312,7 +313,7 @@ function SidebarDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="Primary navigation"
-        className="relative flex h-full w-[280px] max-w-[85vw] flex-col border-r border-border bg-bg-page shadow-3"
+        className="relative flex h-full w-[var(--layout-sidebar)] max-w-[85vw] flex-col border-r border-border bg-bg-page shadow-3"
       >
         <SidebarBody
           collapsed={false}

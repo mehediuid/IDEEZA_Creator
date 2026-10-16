@@ -3,7 +3,7 @@
 // The article body as readers see it (spec § Body, U-ui-ds §5): a normalised
 // BlogDoc drawn as React elements — never an HTML string. One reading ladder on
 // the DS F01 styles (owner D-18, D-20): text Body MD 16/24 at a reading measure
-// (max-w-prose) inside the 680 px column, the body's Heading H3 24/32 SemiBold,
+// (max-w-prose) inside the reading column, the body's Heading H3 24/32 SemiBold,
 // its Subheading H4 20/28 SemiBold (one step down on phones, line heights paired);
 // the title is the only H1. `TYPE` is that ladder, and the editor draws its
 // headings, quotes and code with these same classes (extensions.ts), so the two

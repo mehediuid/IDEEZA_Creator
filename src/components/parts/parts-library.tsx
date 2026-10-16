@@ -37,6 +37,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { GridViewIcon, ListViewIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { SearchInput, buttonVariants } from "@/components/ideeza";
+import { Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { Icon } from "@/components/dashboard/icon";
 import { glyphFor } from "@/lib/pcb/glyphs";
 import { MODULE_CATALOG, PART_CATALOG, readPersonalModules, readPersonalParts, type AgileModule, type CatalogPart } from "@/lib/pcb/part-catalog";
@@ -311,10 +313,12 @@ function SectionNav({ groups, active, q, variant }: { groups: SectionGroup[]; ac
         : undefined;
     return (
       <nav aria-label="Library sections">
+        {/* It bleeds to main's edge so chips scroll out under it, and its snap
+            points keep the inset, so the first chip rests on the frame's edge. */}
         <div
           ref={stripRef}
           data-section-strip
-          className="-mx-[var(--spacing-12)] flex snap-x snap-mandatory gap-[var(--spacing-2)] overflow-x-auto px-[var(--spacing-12)]"
+          className="-mx-[var(--layout-page-inset)] flex snap-x snap-mandatory scroll-px-[var(--layout-page-inset)] gap-[var(--spacing-2)] overflow-x-auto px-[var(--layout-page-inset)]"
           style={{ maskImage: fade, WebkitMaskImage: fade }}
         >
           {groups.flatMap((g) => g.items).map((r) => (
@@ -326,7 +330,7 @@ function SectionNav({ groups, active, q, variant }: { groups: SectionGroup[]; ac
   }
 
   return (
-    <nav aria-label="Library sections" className="flex flex-col gap-[var(--spacing-6)] lg:sticky lg:top-[var(--spacing-8)] lg:self-start">
+    <nav aria-label="Library sections" className="flex flex-col gap-[var(--spacing-6)] [@container(min-width:720px)]:sticky [@container(min-width:720px)]:top-[var(--spacing-8)] [@container(min-width:720px)]:self-start">
       {groups.map((g) => (
         <div key={g.group} className="flex flex-col gap-[var(--spacing-1)]">
           {g.group ? (
@@ -474,101 +478,107 @@ export function PartsLibrary() {
   const activeLabel = SECTION_LABEL[section];
 
   return (
-    <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-[var(--spacing-8)] px-[var(--spacing-12)] py-[var(--spacing-12)]">
-      <header className="flex flex-wrap items-center justify-between gap-[var(--spacing-6)]">
-        <h1 className="font-display text-2xl font-semibold leading-2xl tracking-tight text-text-primary">Parts &amp; Agile Module</h1>
-        {/* Going somewhere is a link — it gets a hover href, a middle-click and
-            a client-side transition, like every other navigation on the page. */}
-        <Link href="/parts/new" className={buttonVariants({ hierarchy: "primary", size: "md" })}>
-          <span className="inline-flex size-[16px] shrink-0 items-center justify-center">
-            <Icon icon={PlusSignIcon} size={16} />
-          </span>
-          New package
-        </Link>
-      </header>
+    <Page>
+      <PageHeader
+        title="Parts & Agile Module"
+        actions={
+          // Going somewhere is a link — it gets a hover href, a middle-click and
+          // a client-side transition, like every other navigation on the page.
+          <Link href="/parts/new" className={buttonVariants({ hierarchy: "primary", size: "md" })}>
+            <span className="inline-flex size-[16px] shrink-0 items-center justify-center">
+              <Icon icon={PlusSignIcon} size={16} />
+            </span>
+            New package
+          </Link>
+        }
+      />
 
-      <SearchInput value={q} onValueChange={onQuery} placeholder="Search by part number, package, manufacturer or feature…" aria-label="Search the library" />
+      <div className="flex flex-col gap-[var(--spacing-8)]">
+        <SearchInput value={q} onValueChange={onQuery} placeholder="Search by part number, package, manufacturer or feature…" aria-label="Search the library" />
 
-      <div className="grid grid-cols-1 gap-[var(--spacing-8)] lg:grid-cols-[200px_minmax(0,1fr)]">
-        {/* Below lg the sections are a scrolling chip strip, so they stay one
-            tap away on a phone; above it they are the column. One component
-            draws both. */}
-        <div className="min-w-0">
-          <div className="lg:hidden">
-            <SectionNav groups={groups} active={section} q={q} variant="chips" />
-          </div>
-          <div className="hidden lg:block">
-            <SectionNav groups={groups} active={section} q={q} variant="rail" />
-          </div>
-        </div>
-
-        <section aria-labelledby="parts-heading" className="flex min-w-0 flex-col gap-[var(--spacing-4)]">
-          <div className="flex items-center justify-between gap-[var(--spacing-4)] border-b border-border-subtle pb-[var(--spacing-4)]">
-            <h2 id="parts-heading" className="font-display text-sm font-medium text-text-secondary">
-              {activeLabel} <span className="ml-[var(--spacing-2)] font-mono text-xs text-text-tertiary">{shown.length}</span>
-            </h2>
-            <div role="group" aria-label="View" className="flex items-center gap-[var(--spacing-1)]">
-              {(
-                [
-                  ["list", "List", ListViewIcon],
-                  ["grid", "Grid", GridViewIcon],
-                ] as const
-              ).map(([v, label, glyph]) => {
-                const on = view === v;
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    aria-pressed={on}
-                    aria-label={`${label} view`}
-                    title={`${label} view`}
-                    onClick={() => writeView(v)}
-                    className={[
-                      "inline-flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border outline-none",
-                      "transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                      on ? NAV_ON : ["text-text-tertiary", NAV_OFF].join(" "),
-                    ].join(" ")}
-                  >
-                    <Icon icon={glyph} size={16} strokeWidth={1.8} />
-                  </button>
-                );
-              })}
+        {/* The switch reads the page container, not the window, so it holds with
+            the sidebar open, collapsed or gone. */}
+        <div className="grid grid-cols-1 gap-[var(--spacing-8)] [@container(min-width:720px)]:grid-cols-[200px_minmax(0,1fr)]">
+          {/* On a narrow page the sections are a scrolling chip strip, so they
+              stay one tap away on a phone; on a wide one they are the column.
+              One component draws both. */}
+          <div className="min-w-0">
+            <div className="[@container(min-width:720px)]:hidden">
+              <SectionNav groups={groups} active={section} q={q} variant="chips" />
+            </div>
+            <div className="hidden [@container(min-width:720px)]:block">
+              <SectionNav groups={groups} active={section} q={q} variant="rail" />
             </div>
           </div>
 
-          {shown.length === 0 ? (
-            <p className="py-[var(--spacing-10)] text-center font-display text-sm leading-md text-text-tertiary">
-              {section === MINE && !needle ? (
-                <>
-                  No packages of your own yet.{" "}
-                  <Link href="/parts/new" className="font-medium text-text-brand no-underline transition-colors duration-fast hover:text-text-brand-hover">
-                    Author one
-                  </Link>
-                  : a symbol, a footprint and a 3D body, kept here until you publish it.
-                </>
-              ) : needle ? (
-                // The section's real label — lower-casing it turned
-                // "My packages" into "my packages" and "ICs" into "ics".
-                <>Nothing in {activeLabel} matches “{q}”.</>
-              ) : (
-                <>Nothing here yet.</>
-              )}
-            </p>
-          ) : view === "grid" ? (
-            <ul role="list" aria-label={activeLabel} className="grid grid-cols-2 gap-[var(--spacing-5)] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
-              {shown.map((i) => (
-                <Card key={`${i.section}-${i.id}`} item={i} />
-              ))}
-            </ul>
-          ) : (
-            <ul role="list" aria-label={activeLabel} className="flex flex-col divide-y divide-border-subtle">
-              {shown.map((i) => (
-                <Row key={`${i.section}-${i.id}`} item={i} />
-              ))}
-            </ul>
-          )}
-        </section>
+          <section aria-labelledby="parts-heading" className="flex min-w-0 flex-col gap-[var(--spacing-4)]">
+            <div className="flex items-center justify-between gap-[var(--spacing-4)] border-b border-border-subtle pb-[var(--spacing-4)]">
+              <h2 id="parts-heading" className="font-display text-sm font-medium text-text-secondary">
+                {activeLabel} <span className="ml-[var(--spacing-2)] font-mono text-xs text-text-tertiary">{shown.length}</span>
+              </h2>
+              <div role="group" aria-label="View" className="flex items-center gap-[var(--spacing-1)]">
+                {(
+                  [
+                    ["list", "List", ListViewIcon],
+                    ["grid", "Grid", GridViewIcon],
+                  ] as const
+                ).map(([v, label, glyph]) => {
+                  const on = view === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={`${label} view`}
+                      title={`${label} view`}
+                      onClick={() => writeView(v)}
+                      className={[
+                        "inline-flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border outline-none",
+                        "transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+                        on ? NAV_ON : ["text-text-tertiary", NAV_OFF].join(" "),
+                      ].join(" ")}
+                    >
+                      <Icon icon={glyph} size={16} strokeWidth={1.8} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {shown.length === 0 ? (
+              <p className="py-[var(--spacing-10)] text-center font-display text-sm leading-md text-text-tertiary">
+                {section === MINE && !needle ? (
+                  <>
+                    No packages of your own yet.{" "}
+                    <Link href="/parts/new" className="font-medium text-text-brand no-underline transition-colors duration-fast hover:text-text-brand-hover">
+                      Author one
+                    </Link>
+                    : a symbol, a footprint and a 3D body, kept here until you publish it.
+                  </>
+                ) : needle ? (
+                  // The section's real label — lower-casing it turned
+                  // "My packages" into "my packages" and "ICs" into "ics".
+                  <>Nothing in {activeLabel} matches “{q}”.</>
+                ) : (
+                  <>Nothing here yet.</>
+                )}
+              </p>
+            ) : view === "grid" ? (
+              <ul role="list" aria-label={activeLabel} className="grid grid-cols-2 gap-[var(--spacing-5)] [@container(min-width:640px)]:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
+                {shown.map((i) => (
+                  <Card key={`${i.section}-${i.id}`} item={i} />
+                ))}
+              </ul>
+            ) : (
+              <ul role="list" aria-label={activeLabel} className="flex flex-col divide-y divide-border-subtle">
+                {shown.map((i) => (
+                  <Row key={`${i.section}-${i.id}`} item={i} />
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       </div>
-    </div>
+    </Page>
   );
 }

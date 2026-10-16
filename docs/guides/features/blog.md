@@ -25,7 +25,7 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
   - **Filter rule:** `inStatus` is the only one. A rejected update also counts under Rejected. A Featured blog with an update in review also counts under Featured.
   - **Dates:** day first everywhere (`lib/blog/dates.ts`: "24 Mar 2025", "03:32 AM").
 - **The list** (`/blog`, `components/blog/list/`, Figma frames 01–09).
-  - **Header:** an `h1` "Blog" and one line on what it is for.
+  - **Header:** the page header (O02): the `h1` "Blog" and one line on what it is for. The surface fills the page frame.
   - **The Figma toolbar:**
     - "Search by blog title or user name": matches every word in any order, and the writer's own name.
     - **Reuse access**: All · Allow for use · Not allow.
@@ -53,6 +53,7 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
   - **Quick view:** a DS Drawer with the thumbnail, the status, the reasons grouped by review, and the body.
   - **First visit:** it teaches the three steps and "What the IDEEZA team looks for", and says blogs live in this browser (demo).
 - **The editor** (`/blog/new`, `/blog/[slug]/edit`, `components/blog/editor/`, Figma frames 10–13). TipTap v3 loads only here.
+  - **Layout:** the card fills the page frame; the details and the writing sit in the narrow column (at most 720) on the left edge, never centred.
   - **Sticky bar:** **Blog › Create new blog**, the save state, **Preview**, and **Publish** (**Update** on a live blog).
   - **Fields:**
     - **Blog category (Required)**.
@@ -115,17 +116,17 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
   - A decided review is announced politely.
   - Opening a result marks it seen and lands on the blog's details.
 - **Blog details** (`/blog/[slug]`, `components/blog/article/`, Figma frames 21–22).
-  - **The Reject reason panel** sits on top, grouped by review.
+  - **The Reject reason panel** sits under the title and byline (a notice never sits above the page's title), grouped by review.
     - "Latest review" opens, with a count caption, the Demo note and three lines per reason: title, what was found, how to fix.
     - "Earlier reviews (n)" is folded. Re-submitted shows the panel folded.
     - **Removal reason** has no fix lines (removal is final, D-3) and offers Contact IDEEZA support.
-  - **The card:** **Blog › Blog details** with **Edit** and the ⋯. It holds:
+  - **The card** (as wide as the page frame; the reading column, at most 720, on its left edge): **Blog › Blog details** with **Edit** and the ⋯. It holds:
     - the title;
     - the writer's profile name and photo, linking to their profile;
     - "n minutes to read · 14 Oct 2026";
     - the 3:2 thumbnail;
     - the body: headings H3 24 / H4 20, text Body MD 16/24 at a reading measure, images never wider than stored.
-  - **The rail,** in an article-led 9/3 split:
+  - **The rail** (360) beside the column from a 1024 px page container, under it below that:
     - The status badge or badges, their sentence, the demo time, and "Shared on Medium · <date>".
     - **Category**, **On this page**, the tags, and the **IDEEZA project**.
     - On phones a copy of the badge sits in the byline row.
