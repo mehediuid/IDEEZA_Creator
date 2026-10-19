@@ -1,11 +1,7 @@
-// /settings/personal-information — bio and About, addresses, skills and top
-// specialities, connected accounts, time zone and the languages you speak.
+// /settings/personal-information — folded into /settings/account in Settings v2.
 
-import type { Metadata } from "next";
-import { PersonalInformationPage } from "@/components/settings/profile/personal-information";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "Personal Information · Settings · IDEEZA" };
-
-export default function PersonalInformationRoute() {
-  return <PersonalInformationPage />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("personal-information", await searchParams);
 }

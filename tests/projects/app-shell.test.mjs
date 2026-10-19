@@ -59,13 +59,15 @@ test("a fixed or stuck bar over <main> is <main>'s scroll-padding, so focus neve
   assert.equal(editor.match(/ref=\{stuckBarRef\} className="sticky top-0/g)?.length, 2, "the touch bar and the desktop bar");
 });
 
-// Pages that render nothing of their own: they send the reader on at once.
+// Pages that render nothing of their own: they send the reader on at once
+// (and the settings pages Settings v2 folded into others).
 const REDIRECTS = ["app/(create)/build/[jobId]/brief/page.tsx", "app/(create)/projects/[id]/business-plan/page.tsx"];
+const isRedirect = (page) => REDIRECTS.includes(page) || /^\s*redirectLegacy\(/m.test(read(page));
 
 test("every shell page names its tab ‹Page› · IDEEZA", () => {
   const untitled = [];
   for (const page of [...pagesUnder("app/(dashboard)"), ...pagesUnder("app/(create)")]) {
-    if (REDIRECTS.includes(page)) continue;
+    if (isRedirect(page)) continue;
     // Its own metadata, or a layout's between it and its group.
     let titled = /export (const metadata|async function generateMetadata)/.test(read(page));
     for (let dir = page.slice(0, page.lastIndexOf("/")); !titled && /^app\/\([a-z]+\)/.test(dir); dir = dir.slice(0, dir.lastIndexOf("/"))) {

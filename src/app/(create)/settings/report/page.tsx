@@ -1,11 +1,7 @@
-// /settings/report — the reports you made, and (once reviews exist) the
-// reports about your work.
+// /settings/report — folded into /settings/privacy#reports in Settings v2.
 
-import type { Metadata } from "next";
-import { ReportPage } from "@/components/settings/report-page";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "Report · Settings · IDEEZA" };
-
-export default function ReportRoute() {
-  return <ReportPage />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("report", await searchParams);
 }

@@ -1,5 +1,5 @@
-// The settings side-nav's icons (User Panel V2 "Settings Sidenav V2"), one per
-// group and per page, from the DS icon set.
+// The settings side-nav's icons, one per page, from the DS icon set. Legacy
+// ids keep an icon only because the map is keyed by every page id.
 
 import {
   AiBrain01Icon,
@@ -16,38 +16,33 @@ import {
   TranslateIcon,
   UserAccountIcon,
   UserBlock01Icon,
+  UserCircleIcon,
   UserIcon,
   UserIdVerificationIcon,
   UserMultiple02Icon,
-  UserSettings01Icon,
   Wallet03Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
-import type { SettingsGroup, SettingsPageId } from "@/lib/settings/registry";
-
-export const GROUP_ICON: Record<SettingsGroup, IconValue> = {
-  General: DashboardSquare02Icon,
-  Preferences: UserSettings01Icon,
-  Audience: UserMultiple02Icon,
-  "Policy & Privacy": ShieldUserIcon,
-};
+import type { SettingsPageId } from "@/lib/settings/registry";
 
 export const PAGE_ICON: Record<SettingsPageId, IconValue> = {
   home: DashboardSquare02Icon,
+  account: UserCircleIcon,
+  notifications: Notification03Icon,
+  privacy: ShieldUserIcon,
+  language: TranslateIcon,
+  appearance: PaintBoardIcon,
+  data: Database01Icon,
+  plan: CreditCardIcon,
+  "get-paid": Wallet03Icon,
   profile: UserIcon,
   "personal-information": UserAccountIcon,
   security: Shield01Icon,
   kyc: UserIdVerificationIcon,
-  "get-paid": Wallet03Icon,
-  notifications: Notification03Icon,
-  language: TranslateIcon,
-  appearance: PaintBoardIcon,
   ai: AiBrain01Icon,
   "profile-locking": SquareLock02Icon,
   "profile-share": UserMultiple02Icon,
   blocking: UserBlock01Icon,
-  plan: CreditCardIcon,
-  privacy: Shield01Icon,
   "personal-data": Database01Icon,
   activity: Analytics01Icon,
   report: File02Icon,

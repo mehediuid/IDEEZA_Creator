@@ -1,10 +1,7 @@
-// /settings/profile-share — who can reach you, see you, comment and message you, and quiet mode.
+// /settings/profile-share — folded into /settings/privacy in Settings v2.
 
-import type { Metadata } from "next";
-import { ProfileSharePage } from "@/components/settings/profile-share-page";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "Profile & Share · Settings · IDEEZA" };
-
-export default function ProfileShareRoute() {
-  return <ProfileSharePage />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("profile-share", await searchParams);
 }

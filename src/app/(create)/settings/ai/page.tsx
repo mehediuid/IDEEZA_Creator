@@ -1,16 +1,7 @@
-// /settings/ai — where AI requests go, and the two AI switches. The services
-// depend on this deployment's keys, read at request time (`connection()`),
-// so the page states what this install actually does.
+// /settings/ai — folded into /settings/data#ai in Settings v2.
 
-import type { Metadata } from "next";
-import { connection } from "next/server";
-import { AiPage } from "@/components/settings/ai-page";
-import { activeProvider as imageProvider } from "@/lib/create/image-gen";
-import { activeProvider as threeProvider } from "@/lib/three/providers";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "AI Properties · Settings · IDEEZA" };
-
-export default async function AiRoute() {
-  await connection();
-  return <AiPage images={imageProvider()} threeD={threeProvider()} />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("ai", await searchParams);
 }

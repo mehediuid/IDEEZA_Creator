@@ -1,11 +1,7 @@
-// /settings/security — what sign-in will bring, and a download of your work
-// until then.
+// /settings/security — folded into /settings/account#sign-in in Settings v2.
 
-import type { Metadata } from "next";
-import { SecurityPage } from "@/components/settings/security-page";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "Security · Settings · IDEEZA" };
-
-export default function SecurityRoute() {
-  return <SecurityPage />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("security", await searchParams);
 }

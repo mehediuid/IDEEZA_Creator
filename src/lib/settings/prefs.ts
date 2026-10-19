@@ -92,7 +92,11 @@ export interface SettingsV1 {
     quietUntil: number | null;
   };
   blocking: { hiddenWords: string[] };
-  privacy: { searchEngines: boolean };
+  privacy: {
+    searchEngines: boolean;
+    /** Keep the searches you run in AI & your data › Search history (off by default, V12). */
+    keepSearchHistory: boolean;
+  };
   credits: {
     lowAt: number;
     expiryReminderDays: number;
@@ -119,7 +123,7 @@ export const DEFAULT_SETTINGS: SettingsV1 = Object.freeze({
   notifications: {
     channels: channelDefaults(),
     digest: "instant",
-    quietHours: { on: false, from: "22:00", to: "07:00", urgentBreaksThrough: true },
+    quietHours: { on: false, from: "22:00", to: "07:00", urgentBreaksThrough: false },
     bidThreshold: null,
     mutedProjects: [],
   },
@@ -145,11 +149,11 @@ export const DEFAULT_SETTINGS: SettingsV1 = Object.freeze({
     quietUntil: null,
   },
   blocking: { hiddenWords: [] },
-  privacy: { searchEngines: false },
+  privacy: { searchEngines: false, keepSearchHistory: false },
   credits: {
-    // "Running low" at or under 3: less than one product build (4), the rule
-    // the account popover always used, so a new account isn't warned at once.
-    lowAt: 3,
+    // "Running low" at or under 8: two product builds (4 each), so the
+    // warning comes while there's still room to finish what you started (V11).
+    lowAt: 8,
     expiryReminderDays: 14,
     monthlyCap: null,
     confirmAbove: null,
@@ -251,7 +255,10 @@ export function normalizeSettings(raw: unknown): SettingsV1 {
       quietUntil: typeof quietUntil === "number" && Number.isFinite(quietUntil) && quietUntil > 0 ? quietUntil : null,
     },
     blocking: { hiddenWords: cleanWords(b.hiddenWords) },
-    privacy: { searchEngines: bool(p.searchEngines, d.privacy.searchEngines) },
+    privacy: {
+      searchEngines: bool(p.searchEngines, d.privacy.searchEngines),
+      keepSearchHistory: bool(p.keepSearchHistory, d.privacy.keepSearchHistory),
+    },
     credits: {
       lowAt: count(c.lowAt, d.credits.lowAt, 100_000),
       expiryReminderDays: count(c.expiryReminderDays, d.credits.expiryReminderDays, 365),

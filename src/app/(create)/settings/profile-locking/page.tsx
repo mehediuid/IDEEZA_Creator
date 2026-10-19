@@ -1,10 +1,7 @@
-// /settings/profile-locking — lock your profile, and how locking works.
+// /settings/profile-locking — folded into /settings/privacy#lock in Settings v2.
 
-import type { Metadata } from "next";
-import { ProfileLockingPage } from "@/components/settings/profile-locking-page";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "Profile Locking · Settings · IDEEZA" };
-
-export default function ProfileLockingRoute() {
-  return <ProfileLockingPage />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("profile-locking", await searchParams);
 }

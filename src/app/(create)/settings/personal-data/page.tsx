@@ -1,10 +1,7 @@
-// /settings/personal-data — download what this browser keeps, as a .zip.
+// /settings/personal-data — folded into /settings/data#download in Settings v2.
 
-import type { Metadata } from "next";
-import { PersonalDataPage } from "@/components/settings/personal-data-page";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "Personal Data · Settings · IDEEZA" };
-
-export default function PersonalDataRoute() {
-  return <PersonalDataPage />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("personal-data", await searchParams);
 }

@@ -1,10 +1,7 @@
-// /settings/blocking — blocked people, blocked conversations and hidden words.
+// /settings/blocking — folded into /settings/privacy#blocked in Settings v2.
 
-import type { Metadata } from "next";
-import { BlockingPage } from "@/components/settings/blocking-page";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "Manage Blocking · Settings · IDEEZA" };
-
-export default function BlockingRoute() {
-  return <BlockingPage />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("blocking", await searchParams);
 }

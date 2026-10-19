@@ -30,11 +30,14 @@ import {
 } from "@/lib/data/activity-log";
 import { ME_ID } from "@/lib/innovations/types";
 import { useReactions } from "@/lib/innovations/reactions";
-import { ACTIVITY_LISTS, type ActivityList } from "@/lib/settings/rows/activity";
 import { SAVE_FAILED, SettingsCard, SettingsRow } from "./settings-card";
 import { SettingsFrame } from "./settings-frame";
 import { usePostLookup, useStoredThreads, type PostInfo } from "./use-data-reads";
 
+
+/** The histories, each its own list (`?list=<id>`). */
+export const ACTIVITY_LISTS = ["appreciated", "comments", "videos", "searches"] as const;
+export type ActivityList = (typeof ACTIVITY_LISTS)[number];
 
 const LISTS: Record<ActivityList, { label: string; icon: IconValue; unit: [string, string] }> = {
   appreciated: { label: "Appreciated", icon: FavouriteIcon, unit: ["post", "posts"] },

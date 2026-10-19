@@ -1,12 +1,11 @@
 import type { SettingsRowEntry } from "./types";
 
 export const appearanceRows: SettingsRowEntry[] = [
-  { id: "theme", label: "Theme", help: "Light, dark or match system: in the account menu", keywords: ["dark mode", "light mode"] },
-  { id: "text-size", label: "Text size", help: "Default or Large", keywords: ["font size", "bigger text", "zoom"] },
-  { id: "contrast", label: "High contrast", keywords: ["contrast", "readability"] },
-  { id: "motion", label: "Reduce motion", help: "Match system or Reduce", keywords: ["animation", "motion"] },
-  { id: "single-key", label: "Single-key shortcuts", help: "Letter and number keys in the editors", keywords: ["keyboard", "shortcuts", "hotkeys", "speech input"] },
-  { id: "units", label: "Units, grid and hotkeys", help: "In the PCB editor's Setting menu", keywords: ["mm", "mil", "inch", "grid", "snap", "measurement unit"] },
-  { id: "keep-notices", label: "Keep notices until I close them", keywords: ["toast", "notice", "screen reader"] },
-  { id: "data-saver", label: "Data saver", help: "Post videos load only when you press play", keywords: ["autoplay", "mobile data", "bandwidth", "video"] },
+  { id: "theme", label: "Theme", help: "Light, dark or match system", keywords: ["dark mode", "light mode", "night mode", "colors"] },
+  { id: "text-size", label: "Text size", keywords: ["font size", "bigger text", "larger text", "zoom", "fonts"] },
+  { id: "contrast", label: "High contrast", keywords: ["contrast", "readability", "low vision"] },
+  { id: "motion", label: "Reduce motion", keywords: ["animation", "motion", "vestibular"] },
+  { id: "single-key", label: "Single-key shortcuts", keywords: ["keyboard", "shortcuts", "hotkeys", "screen reader"] },
+  { id: "data-saver", label: "Data saver", help: "Videos don't load by themselves", keywords: ["autoplay", "mobile data", "bandwidth"] },
+  { id: "units", label: "Default units", help: "mm, mil or inch for new boards and parts", keywords: ["mm", "mil", "inch", "units", "measurement", "grid", "snap", "pcb"] },
 ];

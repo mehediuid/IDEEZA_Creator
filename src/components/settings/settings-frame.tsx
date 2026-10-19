@@ -3,7 +3,7 @@
 // Settings — the frame every settings page sits in (User Panel V2 "✅
 // Settings", e.g. General | Security 22048:30800): a white sheet on the page
 // frame holding the settings side-nav, a hairline, and the page — its
-// breadcrumb (Settings › Group › Page), its title, then its cards. From a
+// breadcrumb (Settings › Page), its title, then its cards. From a
 // 768 px page container down the side-nav goes and a "Settings" link leads
 // back to the list (spec §2); the sheet then runs edge to edge.
 

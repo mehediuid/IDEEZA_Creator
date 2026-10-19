@@ -1,11 +1,7 @@
-// /settings/profile — your picture, legal name, handle, gender, links and
-// wallet address.
+// /settings/profile — folded into /settings/account in Settings v2.
 
-import type { Metadata } from "next";
-import { ProfileSettingsPage } from "@/components/settings/profile/profile-settings";
+import { redirectLegacy } from "@/lib/settings/legacy-route";
 
-export const metadata: Metadata = { title: "Profile · Settings · IDEEZA" };
-
-export default function ProfileSettingsRoute() {
-  return <ProfileSettingsPage />;
+export default async function LegacyRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirectLegacy("profile", await searchParams);
 }
