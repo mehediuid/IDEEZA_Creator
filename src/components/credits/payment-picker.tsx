@@ -4,7 +4,7 @@
 // details" 41549:165658, Crypto · USDT / IDZ 41549:166351 / 166427, Wallet
 // connected 41549:166562). Payments aren't on: Card and PayPal are listed,
 // not available yet; Crypto pays from the Demo wallet on testnet, USDT one for
-// one and IDZ at the demo rate. Until the wallet is connected the column ends
+// one and IDZ at the one IDZ price. Until the wallet is connected the column ends
 // in Connect wallet (the wallet's own dialog); once it is, in the address it
 // pays from.
 
@@ -14,7 +14,8 @@ import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, TestnetDemoBadge } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { IDZ_PER_USD, coinAmount, usd } from "@/lib/create/credit-pricing";
+import { coinAmount } from "@/lib/create/credit-pricing";
+import { IDZ_USD_PRICE } from "@/lib/wallet/idz-price";
 import { demoAddress, makerId, shortAddress } from "@/lib/wallet/demo-wallet";
 import { identityLabelOf, networkLabelOf } from "@/lib/wallet/request-view";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
@@ -166,7 +167,7 @@ export function PaymentPicker({
             );
           })}
         </div>
-        {coin === "IDZ" && <p className="text-sm leading-sm text-text-tertiary">Demo rate: 1 IDZ = {usd(1 / IDZ_PER_USD)}</p>}
+        {coin === "IDZ" && <p className="text-sm leading-sm text-text-tertiary">Demo rate: 1 IDZ = ${IDZ_USD_PRICE}</p>}
       </div>
 
       {wallet.connected ? (

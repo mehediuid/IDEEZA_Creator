@@ -40,14 +40,15 @@ export function activeBuyerOf(raw: string | null | undefined): DemoBuyer {
 }
 
 /**
- * Every identity's starting balance (P2-MINT-1): the maker gets 40 IDZ, 0.05
+ * Every identity's starting balance (P2-MINT-1): the maker gets 2,000 IDZ (about
+ * $50 at the one IDZ price, owner 2026-10-19: enough to buy a credit pack), 0.05
  * test ETH on Base Sepolia and 0.5 test MATIC on Amoy, 0 of the others. A
  * demo buyer gets 0 IDZ and a spread of test tokens on both networks, so a
  * purchase or a bid always has something to spend.
  */
 export const SEED_BALANCES: { maker: Balances; buyer: Balances } = {
   maker: {
-    idz: "40",
+    idz: "2000",
     native: {
       baseSepolia: { ETH: "0.05" },
       mumbai: { MATIC: "0.5" },

@@ -47,6 +47,7 @@ test("one price: 40 IDZ at $0.025065 is $1.00, 4 IDZ is $0.10, a sliver reads un
   assert.equal(idz.idzUsdOf("0"), "$0.00");
   assert.equal(idz.idzUsdOf("0.1"), "< $0.01");
   assert.equal(idz.idzUsdOf("1000000"), "$25,065.00");
+  assert.equal(idz.idzUsdOf("2000"), "$50.13");
 });
 
 test("the IDZ contract: a 0x address per network, the same every time, different per network", () => {
@@ -57,13 +58,13 @@ test("the IDZ contract: a 0x address per network, the same every time, different
   assert.deepEqual(idz.IDZ_TOKEN, { name: "IDEEZA Coin", symbol: "IDZ", decimals: 18 });
 });
 
-test("a fresh maker's ledger is the starting balance alone, as a Reward coming in", () => {
+test("a fresh maker's ledger is the 2,000 IDZ starting balance alone, as a Reward coming in", () => {
   const rows = idz.idzLedgerOf(defaultWallet(), "maker-1");
   assert.equal(rows.length, 1);
   const [seed] = rows;
   assert.equal(seed.type, "reward");
   assert.equal(seed.direction, "in");
-  assert.equal(seed.amount, "40");
+  assert.equal(seed.amount, "2000");
   assert.equal(seed.at, null);
   assert.equal(seed.network, null);
   assert.equal(seed.txHash, null);
@@ -83,7 +84,7 @@ test("spends come out newest first, typed by purpose, with only their IDZ line c
   assert.deepEqual(rows.map((r) => [r.type, r.direction, r.amount]), [
     ["credits", "out", "8"],
     ["projectCreate", "out", "4"],
-    ["reward", "in", "40"],
+    ["reward", "in", "2000"],
   ]);
   assert.equal(rows[1].title, "Minted on chain · Car");
   assert.equal(rows[1].network, "baseSepolia");
@@ -121,12 +122,12 @@ test("the ledger reconciles: the starting balance less every Out row is the deri
   const rows = idz.idzLedgerOf(w, "maker-1");
   const net = rows.reduce((sum, r) => sum + (r.direction === "in" ? 1 : -1) * Number(r.amount), 0);
   assert.equal(String(net), balancesOf("maker-1", ctx(w)).idz);
-  assert.equal(idz.idzHoldingsOf(w, "maker-1", ctx(w)).available, "19.5");
+  assert.equal(idz.idzHoldingsOf(w, "maker-1", ctx(w)).available, "1979.5");
 });
 
 test("holdings: Staked, Ready to claim and Pending are 0 until staking and buying exist", () => {
   const h = idz.idzHoldingsOf(defaultWallet(), "maker-1", ctx(defaultWallet()));
-  assert.deepEqual(h, { available: "40", staked: "0", claimable: "0", pending: "0" });
+  assert.deepEqual(h, { available: "2000", staked: "0", claimable: "0", pending: "0" });
 });
 
 test("filters: by network (the starting row has none, so it shows only under every network) and by type", () => {
@@ -161,4 +162,11 @@ test("a confirmed request now records its purpose, and a stored purpose survives
 
 test("dates read one way: day, short month, four-digit year, then the time", () => {
   assert.match(idz.formatWhen(Date.UTC(2024, 7, 13, 14, 8)), /^\d{1,2} Aug 2024, \d{1,2}:\d{2} (AM|PM)$/);
+});
+
+test("the wallet button's short figure: whole thousands as K, a decimal kept to one place", () => {
+  assert.equal(idz.idzCompactOf("40"), "40 IDZ");
+  assert.equal(idz.idzCompactOf("19.5"), "19.5 IDZ");
+  assert.equal(idz.idzCompactOf("1800.52"), "1.8K IDZ");
+  assert.equal(idz.idzCompactOf("2000"), "2K IDZ");
 });

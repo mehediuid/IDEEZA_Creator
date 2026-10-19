@@ -119,7 +119,7 @@ test("chargeRowsOf labels the mint fee and the network fee, and totals the charg
 test("shortfallOf: MINT-3's IDZ and network-fee copy", () => {
   let w = walletConnect(defaultWallet(), "maker-1");
   assert.equal(rv.shortfallOf(MINT, "maker-1", ctx(w)), null);
-  const poor = spend(w, "maker-1", [{ coin: "IDZ", amount: "38" }]);
+  const poor = spend(w, "maker-1", [{ coin: "IDZ", amount: "1998" }]);
   assert.equal(rv.shortfallOf(MINT, "maker-1", ctx(poor)).text, "Not enough IDZ — you have 2 IDZ, this needs 4 IDZ.");
   const noGas = spend(w, "maker-1", [{ coin: "ETH", amount: "0.0497" }]);
   assert.equal(
@@ -145,17 +145,17 @@ test("errata 29: affordability reads the market — a seller's payout lifts the 
   assert.equal(rv.balanceChangedLine(short), "Your balance changed — you now have 0.49896 ETH.");
 });
 
-test("balanceAfterOf: 36 IDZ · 0.04896 ETH after an instant mint", () => {
+test("balanceAfterOf: 1,996 IDZ · 0.04896 ETH after an instant mint", () => {
   const w = walletConnect(defaultWallet(), "maker-1");
-  assert.equal(rv.balanceAfterOf(MINT, "maker-1", ctx(w)), "36 IDZ · 0.04896 ETH");
+  assert.equal(rv.balanceAfterOf(MINT, "maker-1", ctx(w)), "1,996 IDZ · 0.04896 ETH");
   assert.equal(rv.balanceAfterOf(SIGN, "maker-1", ctx(w)), null);
 });
 
 test("balanceLineOf, accountRowOf and buyerRowOf use the chosen network's own coin", () => {
   const w = walletConnect(defaultWallet(), "maker-1");
-  assert.equal(rv.balanceLineOf("maker-1", "baseSepolia", ctx(w)), "40 IDZ · 0.05 test ETH");
-  assert.equal(rv.balanceLineOf("maker-1", "mumbai", ctx(w)), "40 IDZ · 0.5 test MATIC");
-  assert.equal(rv.accountRowOf(2, ctx(w)), "Demo account 2 · 0x2b10…3c00 · 40 IDZ");
+  assert.equal(rv.balanceLineOf("maker-1", "baseSepolia", ctx(w)), "2,000 IDZ · 0.05 test ETH");
+  assert.equal(rv.balanceLineOf("maker-1", "mumbai", ctx(w)), "2,000 IDZ · 0.5 test MATIC");
+  assert.equal(rv.accountRowOf(2, ctx(w)), "Demo account 2 · 0x2b10…3c00 · 2,000 IDZ");
   const mira = walletSwitchNetwork(w, "buyer-mira", "mumbai");
   assert.match(rv.buyerRowOf("buyer-mira", "Mira", mira, ctx(mira)), /^Mira · 0x[0-9a-f]{4}…[0-9a-f]{4} · 10 test MATIC$/);
   assert.match(rv.buyerRowOf("buyer-leo", "Leo", mira, ctx(mira)), / · 1 test ETH$/);
@@ -224,14 +224,14 @@ test("walletFactLineOf: balance on a connected instant mint, and the can't-affor
   const on = walletConnect(defaultWallet(), "maker-1");
   assert.equal(
     rv.walletFactLineOf(on, { type: "instant", network: "baseSepolia" }, m).line,
-    "Demo account 1 · 0x955d…ed95 · Balance 40 IDZ · 0.05 ETH",
+    "Demo account 1 · 0x955d…ed95 · Balance 2,000 IDZ · 0.05 ETH",
   );
   assert.equal(rv.walletFactLineOf(on, { type: "lazy", network: "baseSepolia" }, m).line, "Demo account 1 · 0x955d…ed95");
   assert.equal(
     rv.walletFactLineOf(defaultWallet(), { type: "instant", network: "baseSepolia" }, m).line,
     "No wallet connected yet — you'll connect the demo wallet when you pay.",
   );
-  const poor = spend(on, "maker-1", [{ coin: "IDZ", amount: "38" }]);
+  const poor = spend(on, "maker-1", [{ coin: "IDZ", amount: "1998" }]);
   const warn = rv.walletFactLineOf(poor, { type: "instant", network: "baseSepolia" }, m);
   assert.equal(warn.tone, "warning");
   assert.equal(

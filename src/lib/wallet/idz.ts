@@ -10,11 +10,11 @@
 import type { Network } from "../brief/types";
 import { balancesOf, seedBalancesOf, type BalanceCtx } from "./balances";
 import { demoAddress, demoHex } from "./demo-wallet";
+import { IDZ_USD_PRICE } from "./idz-price";
 import { addAmounts, compareAmounts, toMicros } from "./money";
 import type { Amount, DemoWallet, IdentityId, RequestPurpose, WalletActivity } from "./types";
 
-/** The one IDZ price in US dollars (D5: the Figma presale's 1 $IDZ = $0.025065). */
-export const IDZ_USD_PRICE = "0.025065";
+export { IDZ_USD_PRICE };
 
 export const IDZ_TOKEN = { name: "IDEEZA Coin", symbol: "IDZ", decimals: 18 } as const;
 
@@ -25,7 +25,7 @@ export function idzContractOf(network: Network): string {
 
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** "$1.00" for 40 IDZ; "< $0.01" for a sliver that would round to nothing. */
+/** "$50.13" for 2,000 IDZ; "< $0.01" for a sliver that would round to nothing. */
 export function idzUsdOf(amount: Amount): string {
   const units = toMicros(amount) ?? BigInt(0);
   const price = toMicros(IDZ_USD_PRICE) ?? BigInt(0);
@@ -33,6 +33,15 @@ export function idzUsdOf(amount: Amount): string {
   const cents = (units * price + BigInt(5_000_000_000)) / BigInt(10_000_000_000);
   if (cents === BigInt(0) && units > BigInt(0)) return "< $0.01";
   return USD.format(Number(cents) / 100);
+}
+
+const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
+/** "1.8K IDZ" for 1,800.52: the sidebar's wallet button, where the full figure
+ *  (in its label and the wallet menu) would squeeze the name beside it. */
+export function idzCompactOf(amount: Amount): string {
+  const units = toMicros(amount);
+  return `${units === null ? amount : COMPACT.format(Number(units) / 1_000_000)} IDZ`;
 }
 
 // ── the ledger ──────────────────────────────────────────────────────────

@@ -59,7 +59,10 @@ test("money and dates", () => {
   assert.equal(P.usd(6), "$6.00");
   assert.equal(P.usd(8.5), "$8.50");
   assert.equal(P.coinAmount(10, "USDT"), 10);
-  assert.equal(P.coinAmount(10, "IDZ"), 10 * P.IDZ_PER_USD);
+  // IDZ at the one IDZ price, $0.025065: about 39.9 IDZ a dollar, to the cent.
+  assert.ok(Math.abs(P.IDZ_PER_USD - 39.8962697) < 1e-6);
+  assert.equal(P.coinAmount(10, "IDZ"), 398.96);
+  assert.equal(P.coinAmount(5, "IDZ"), 199.48);
   assert.equal(new Date(P.addMonths(T0, 12)).toISOString().slice(0, 10), "2027-04-15");
   assert.equal(new Date(P.addMonths(Date.UTC(2026, 0, 31, 12), 1)).getUTCDate(), 28);
 });

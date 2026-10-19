@@ -13,7 +13,7 @@
 - Every visual value is a DS token or component; layout follows the Figma frame inside the Plan & pricing sheet (`PricingFrame`, the V2 white sheet with the breadcrumb on its first line).
 
 ## Data (`src/lib/wallet/idz.ts`, pure)
-- One price: `IDZ_USD_PRICE = "0.025065"` (D5, the Figma presale price). The card's "= $…" and the popover's "=$…" read it.
+- One price: `IDZ_USD_PRICE = "0.025065"` (D5, the Figma presale price, `lib/wallet/idz-price.ts`). The card's "= $…", the popover's "=$…" and paying for credits in IDZ (`IDZ_PER_USD`) all read it. So a credit pack stays affordable, each demo account starts with 2,000 IDZ (about $50; owner 2026-10-19), and amounts are written with thousands grouped ("2,000 IDZ").
 - The IDZ contract address per network is a deterministic demo address (`idzContractOf`), as the wallet's own addresses are.
 - The ledger (`idzLedgerOf`): the identity's starting balance as one "Reward" row (no date: the seed has no moment), then every wallet activity line of that identity whose charge carries IDZ, newest first, as "Out". Transfer types (D11): Reward · Project Create (an instant mint's fee) · Credits (AI credits or a plan paid in IDZ). Buy, Stake, Withdraw and Claim join with Phases 2–3. New activity records carry their `purpose`; older ones are typed from their title.
 - The ledger reconciles: the starting balance minus every Out row equals `balancesOf(id).idz`.

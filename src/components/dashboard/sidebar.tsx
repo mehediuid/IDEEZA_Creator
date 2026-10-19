@@ -46,6 +46,7 @@ import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
 import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
+import { idzCompactOf } from "@/lib/wallet/idz";
 import { formatAmount } from "@/lib/wallet/money";
 import { useMakerIdz } from "@/components/balance/use-maker-idz";
 import { Icon, type IconValue } from "./icon";
@@ -822,12 +823,12 @@ function ProfileRow({
       {...trigger("wallet")}
       aria-haspopup="menu"
       aria-label={showIdz ? `Wallet and tokens, ${formatAmount(idz.idz!, "IDZ")}` : "Wallet and tokens"}
-      title="Wallet and tokens"
+      title={showIdz ? `Wallet and tokens · ${formatAmount(idz.idz!, "IDZ")}` : "Wallet and tokens"}
       className={[showIdz ? WALLET_PILL : FOOTER_BUTTON, openPanel === "wallet" ? "bg-bg-subtle text-text-primary" : ""].join(" ")}
     >
       <Icon icon={Wallet01Icon} />
       {showIdz && (
-        <span className="text-sm font-semibold leading-xs tabular-nums text-text-primary">{formatAmount(idz.idz!, "IDZ")}</span>
+        <span aria-hidden className="text-sm font-semibold leading-xs tabular-nums text-text-primary">{idzCompactOf(idz.idz!)}</span>
       )}
     </button>
   );
