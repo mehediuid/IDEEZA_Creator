@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { demoAddress, makerId } from "@/lib/wallet/demo-wallet";
 import { identityLabelOf } from "@/lib/wallet/request-view";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { COUNTRIES, countryNameOf } from "@/lib/account/countries";
 
 export const GET_PAID = "/settings/get-paid";
 export const GET_PAID_BALANCE = "/settings/get-paid/balance";
@@ -43,34 +44,13 @@ export function formatDay(ts: number): string {
 
 // ───────────────────────── countries ─────────────────────────
 
-const NOT_COUNTRIES = new Set(["EU", "UN", "EZ", "ZZ", "QO", "XA", "XB"]);
-let countries: { value: string; label: string }[] | null = null;
-
-/** Every region the browser can name, by its two-letter code, sorted by name. */
+/** Every country as select options (the one list, lib/account/countries.ts). */
 export function countryOptions(): { value: string; label: string }[] {
-  if (countries) return countries;
-  const names = new Intl.DisplayNames(["en"], { type: "region" });
-  const out: { value: string; label: string }[] = [];
-  const A = 65;
-  for (let i = 0; i < 26; i++) {
-    for (let j = 0; j < 26; j++) {
-      const code = String.fromCharCode(A + i, A + j);
-      if (NOT_COUNTRIES.has(code)) continue;
-      let name: string | undefined;
-      try {
-        name = names.of(code);
-      } catch {
-        name = undefined;
-      }
-      if (name && name !== code) out.push({ value: code, label: name });
-    }
-  }
-  countries = out.sort((a, b) => a.label.localeCompare(b.label));
-  return countries;
+  return COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 }
 
 export function countryName(code: string): string {
-  return countryOptions().find((c) => c.value === code)?.label ?? code;
+  return countryNameOf(code) || code;
 }
 
 // ───────────────────────── earnings ─────────────────────────
