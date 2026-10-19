@@ -26,21 +26,21 @@ import { PageHeader } from "@/components/ideeza/page-header";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { useDefaultToken } from "@/lib/account/payment";
 import { needsConfirm } from "@/lib/create/credit-limits";
-import { PLAN_PRICING_HREF, VALIDITY_MONTHS, addMonths, coinAmount, usd } from "@/lib/create/credit-pricing";
+import { BUY_CREDITS_HREF, PRICING_HREF, VALIDITY_MONTHS, addMonths, coinAmount, usd } from "@/lib/create/credit-pricing";
 import { checkoutOrderOf, type CheckoutOrder } from "@/lib/create/checkout-route";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { YEARLY_OFF, planOf, priceOf, quoteUpgrade, relationOf } from "@/lib/create/plans";
+import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { invoiceHref } from "./billing-history";
 import { creditsLine, orderOf } from "./buy-credits";
 import { OrderSummary, PaymentResult } from "./order-summary";
 import { PaymentPicker, useWalletStatus, type PayCoin } from "./payment-picker";
-import { PricingFrame } from "./pricing-frame";
+import { PLAN_CRUMBS, PRICING_CRUMB, PricingFrame, type Crumb } from "./pricing-frame";
 import { PurchaseConfirm } from "./purchase-confirm";
 
-const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const n = (v: number) => v.toLocaleString("en-US");
 const pct = (d: number) => `${Math.round(d * 100)}%`;
 
@@ -48,16 +48,25 @@ function newOrderId(prefix: "plan" | "order"): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-const CRUMBS = [
-  { label: "Plan & pricing", href: PLAN_PRICING_HREF },
-  { label: "Payment details" },
-];
+const HERE: Crumb = { label: "Payment details" };
+/** Settings › Plan & billing › (Pricing ›, for a plan) Payment details. */
+const crumbsFor = (order: CheckoutOrder | null): Crumb[] =>
+  order?.kind === "plan" ? [...PLAN_CRUMBS, PRICING_CRUMB, HERE] : [...PLAN_CRUMBS, HERE];
+
+/** The route's frame while the query is read. */
+export function CheckoutFallback() {
+  return (
+    <PricingFrame crumbs={crumbsFor(null)}>
+      <p className="m-0 text-md leading-md text-text-tertiary">Loading payment details…</p>
+    </PricingFrame>
+  );
+}
 
 export function CheckoutPage() {
   const params = useSearchParams();
   const order = checkoutOrderOf((k) => params.get(k));
   return (
-    <PricingFrame crumbs={CRUMBS}>
+    <PricingFrame crumbs={crumbsFor(order)}>
       {order ? <Checkout key={params.toString()} order={order} /> : <NothingToBuy />}
     </PricingFrame>
   );
@@ -65,14 +74,19 @@ export function CheckoutPage() {
 
 function NothingToBuy({ line }: { line?: string }) {
   return (
-    <div className="flex flex-col items-start gap-[12px] py-[24px]">
-      <h1 className="text-4xl font-semibold leading-4xl text-text-primary">Nothing to pay for</h1>
-      <p className="max-w-[62ch] text-lg leading-lg text-text-secondary">
-        {line ?? "This link doesn't name a plan or credits to buy. Choose one on Plan & pricing."}
+    <div className="flex flex-col items-start gap-[12px]">
+      <PageHeader title="Nothing to pay for" className="mb-0" />
+      <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
+        {line ?? "This link doesn't name a plan or credits to buy. Choose a plan on Pricing, or credits on Plan & billing."}
       </p>
-      <Link href={PLAN_PRICING_HREF} className={buttonVariants({ hierarchy: "primary", size: "lg" })}>
-        See plans
-      </Link>
+      <div className="flex flex-wrap gap-[8px]">
+        <Link href={PRICING_HREF} className={buttonVariants({ hierarchy: "primary", size: "lg" })}>
+          See plans
+        </Link>
+        <Link href={BUY_CREDITS_HREF} className={buttonVariants({ hierarchy: "secondary", size: "lg" })}>
+          Buy credits
+        </Link>
+      </div>
     </div>
   );
 }
@@ -95,6 +109,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   const [asking, setAsking] = React.useState(false);
   const [orderId, setOrderId] = React.useState(() => newOrderId(order.kind === "plan" ? "plan" : "order"));
   const [now] = React.useState(() => Date.now());
+  const { date } = useDates();
 
   if (!planReady || !creditsReady) return <p className="text-lg leading-lg text-text-tertiary">Reading your plan and credits…</p>;
 
@@ -153,7 +168,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
         ? `You're already on ${target!.name}${order.cycle === "yearly" ? ", billed yearly" : ""}.`
         : rel === "scheduled"
           ? `${target!.name} starts on ${sub.renewsAt ? date(sub.renewsAt) : "your renewal"}. Nothing to pay now.`
-          : `${target!.name} is a smaller plan. Switch to it from Plans: it starts when your period ends, and nothing is charged.`;
+          : `${target!.name} is a smaller plan. Switch to it from Pricing: it starts when your period ends, and nothing is charged.`;
     return <NothingToBuy line={line} />;
   }
 

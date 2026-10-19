@@ -43,7 +43,7 @@ import {
   SidebarRight01Icon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { PRICING_HREF } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
 import { Icon, type IconValue } from "./icon";
@@ -549,7 +549,7 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
   if (collapsed) {
     return (
       <Link
-        href={PLAN_PRICING_HREF}
+        href={PRICING_HREF}
         aria-label={label}
         title={label}
         className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg bg-bg-brand-subtle text-text-brand outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
@@ -560,7 +560,7 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
   }
   return (
     <Link
-      href={PLAN_PRICING_HREF}
+      href={PRICING_HREF}
       onClick={onLeave}
       className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-brand-subtle px-[12px] py-[12px] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
     >

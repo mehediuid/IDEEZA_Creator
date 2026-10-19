@@ -1,6 +1,6 @@
 "use client";
 
-// "Ask before a purchase over $X" (Settings › Plan & pricing › Credit alerts
+// "Ask before a purchase over $X" (Settings › Plan & billing › Credit alerts
 // and limits): the one extra confirm checkout and Buy credits show before the
 // wallet opens, when what is about to be paid is above the amount you set.
 

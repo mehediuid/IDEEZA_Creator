@@ -36,7 +36,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Avatar, Button, Divider, ProgressBar, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import Link from "next/link";
-import { CREDITS_HREF } from "@/lib/create/credit-pricing";
+import { BUY_CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useTheme } from "@/components/theme-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { creditTotals, levelOf, xpOf } from "@/lib/account/summary";
@@ -513,7 +513,7 @@ function BalanceCard({
   level: ReturnType<typeof levelOf>;
   onLeave: () => void;
 }) {
-  // Quiet above your "Running low at" number (Settings › Plan & pricing ›
+  // Quiet above your "Running low at" number (Settings › Plan & billing ›
   // Credit alerts and limits); the strongest thing on the card at or under it.
   const { lowAt } = useSettings().credits;
   const low = hydrated && runningLow(remaining, lowAt);
@@ -527,10 +527,10 @@ function BalanceCard({
           <span className="text-md font-semibold leading-md tracking-wide text-text-primary">Balance</span>
         </span>
         {/* Buy credits, not Upgrade: it adds credits, it doesn't change the
-            plan. As the design's profile dropdown, it goes to the Credits
-            page (Settings › Plan & pricing). */}
+            plan. As the design's profile dropdown, it goes to Buy credits
+            (Settings › Plan & billing). */}
         <Link
-          href={CREDITS_HREF}
+          href={BUY_CREDITS_HREF}
           data-nav-item
           onClick={onLeave}
           className={cn(

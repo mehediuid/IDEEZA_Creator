@@ -19,7 +19,7 @@
 // Above the amount set in "Ask before a purchase over", Pay asks once more.
 //
 // <AutoTopUp /> lives here too: with Auto top-up on (Settings › Plan &
-// pricing › Credit alerts and limits), a build that pauses for credits buys
+// billing › Credit alerts and limits), a build that pauses for credits buys
 // the chosen pack through the same wallet request, once per pause.
 
 import * as React from "react";
@@ -476,7 +476,7 @@ function AutoTopUp({ held }: { held: boolean }) {
           { label: "Credits", value: `${pack.name} pack · ${creditsLine(pack.base, pack.bonus)}` },
           { label: "Price", value: usd(price.final) },
         ],
-        note: `Auto top-up is on in Plan & pricing › Credits. Testnet demo, no real money moves. The credits last ${VALIDITY_MONTHS} months.`,
+        note: `Auto top-up is on in Plan & billing › Credit alerts and limits. Testnet demo, no real money moves. The credits last ${VALIDITY_MONTHS} months.`,
         doneLine: `${plural(credits, "credit")} added. ${name} starts now.`,
         charge: { network: "baseSepolia", lines: [{ coin, amount: String(coinAmount(price.final, coin)) }] },
       },

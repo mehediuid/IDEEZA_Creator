@@ -11,7 +11,7 @@ import { findArticle } from "../blog/article";
 import { articleHref, slugOf } from "../blog/slug";
 import type { BlogData } from "../blog/types";
 import { lotsOf, type LotLine } from "../create/credit-lots";
-import { CREDITS_HREF, PLAN_PRICING_HREF } from "../create/credit-pricing";
+import { CREDITS_HREF, PLAN_HREF } from "../create/credit-pricing";
 import type { PostComment } from "../innovations/comments";
 import { commentAnchor, postHref } from "../innovations/slug";
 import { earnHref } from "../manual/earn-route";
@@ -326,7 +326,7 @@ export function coinNotices(c: CoinInput): Notice[] {
         : p.autoRenew
           ? `Your ${p.name} plan renews on ${day}`
           : `Your ${p.name} plan ends on ${day}`,
-      href: PLAN_PRICING_HREF,
+      href: PLAN_HREF,
       at: p.renewsAt - 3 * DAY,
     });
   }

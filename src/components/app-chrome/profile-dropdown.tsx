@@ -3,7 +3,7 @@
 // ProfileDropdown — the editor's account menu: a clickable wrapper around
 // your name pill (your profile name and initials, `useMe`) in the TopBar.
 // Every row is real (settings spec 2026-10-19 §5.13): your profile, Settings,
-// Notification settings and Plan & pricing are links; the wallet row is the
+// Notification settings and Plan & billing are links; the wallet row is the
 // same WalletMenuEntry the dashboard sidebar carries (P2-MINT-2) and opens the
 // Demo wallet dialog; Sign out is shown disabled with the sidebar's reason,
 // since there is no sign-in yet. The trigger is a keyboard button, so every
@@ -144,7 +144,7 @@ export function ProfileDropdown({
 
           <LinkItem href="/settings" label="Settings" onClick={close} icon={<GearIcon />} />
           <LinkItem href="/settings/notifications" label="Notification settings" onClick={close} icon={<BellIcon />} />
-          <LinkItem href="/settings/plan" label="Plan & pricing" onClick={close} icon={<CardIcon />} />
+          <LinkItem href="/settings/plan" label="Plan & billing" onClick={close} icon={<CardIcon />} />
 
           {/* The wallet's one standing home in the editor chrome
               (P2-MINT-2). Focus goes to the pill first, so the dialog hands
