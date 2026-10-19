@@ -1,0 +1,12 @@
+# Settings
+
+The account's Settings (spec `docs/superpowers/specs/2026-10-19-settings-design.md`; Figma User Panel V2 "✅ Settings" `19140:152179`). Settings is about the person; project things stay on the project. Every page has its own URL and every row a deep link (`/settings/<page>#<row>`). Back to [README.md](README.md).
+
+## Shell
+- **Frame** (`components/settings/settings-frame.tsx`): the white sheet on the page frame with the settings side-nav, a hairline, and the page — breadcrumb Settings › Group › Page, the page title, then its cards. Below a 768 px page container the side-nav goes and a "Settings" link leads back to the list.
+- **Side-nav** (`settings-nav.tsx`): General · Preferences · Audience as accordions (the group holding the current page opens itself), then Plan & Pricing, Policy & Privacy, Activity, Report; the current page is the outlined brand pill. Pages and their order come from `lib/settings/registry.ts`.
+- **Cards and rows** (`settings-card.tsx`, `settings-choice.tsx`): a bordered card with its header action (Figma's Edit), rows of label + helper + control, link rows with a chevron, read-only fields ("No information" when empty), the Cancel / Update pair, and the Figma radio-list modal with options that can be disabled with their reason. Arriving at `#<row>` scrolls the row into view and outlines it once.
+- **Preferences store** (`lib/settings/prefs.ts`, `use-settings.ts`): one record `ideeza:settings` (v1) for notifications, language, appearance, AI, audience, blocking, privacy and credit alerts; a broken field falls back alone to its default. Data with a home of its own stays there (messages, profile, payment token, theme, PCB settings).
+- **Home** `/settings`: Find a setting (every page and row, `lib/settings/search.ts`; Enter opens the first), the four Most visited tiles (IDEEZA Pay, Blocking, AI Properties, Payment), and Looking for something else — the privacy policy and the terms read "Not available yet" because the app has neither page. On a phone the page list follows.
+- **Security** `/settings/security`: every Figma row needs accounts, so the page says sign-in isn't in the app yet, lists what will be here, and links to Download your information.
+- **Doors**: the account popover's Settings row; ⌘K "Settings", "Plan & pricing", "Wallet & tokens" (opens the wallet dialog) and, while typing, every matching settings row; the Plan & pricing breadcrumb's "Settings".

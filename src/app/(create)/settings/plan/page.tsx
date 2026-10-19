@@ -13,7 +13,7 @@ export default function PlanPricingRoute() {
   return (
     <React.Suspense
       fallback={
-        <PricingFrame crumbs={[{ label: "Settings" }, { label: "Plan & pricing" }]}>
+        <PricingFrame crumbs={[{ label: "Settings", href: "/settings" }, { label: "Plan & pricing" }]}>
           <p className="text-md leading-md text-text-tertiary">Loading plan and pricing…</p>
         </PricingFrame>
       }

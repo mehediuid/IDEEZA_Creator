@@ -428,7 +428,10 @@ export function AccountPopover({
                 <MobileAppContent titleId={`${appId}-title`} />
               </div>
             )}
-            <SoonRow icon={Settings01Icon} label="Settings" why="settings aren't open yet" />
+            <Link href="/settings" data-nav-item onClick={leave} className={cn(ROW, ROW_LIVE)}>
+              <Icon icon={Settings01Icon} size={20} />
+              <span className="min-w-0 flex-1 truncate">Settings</span>
+            </Link>
           </div>
 
           <Divider className="my-[4px]" />

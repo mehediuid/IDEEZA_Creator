@@ -35,7 +35,7 @@ export function PlanPricingPage() {
   const select = (id: Tab) => router.replace(id === "plans" ? pathname : `${pathname}?tab=${id}`, { scroll: false });
 
   return (
-    <PricingFrame crumbs={[{ label: "Settings" }, { label: "Plan & pricing" }]}>
+    <PricingFrame crumbs={[{ label: "Settings", href: "/settings" }, { label: "Plan & pricing" }]}>
       <h1 className="sr-only">Plan &amp; pricing</h1>
       <PricingTabs label="Plan and pricing sections" tabs={TABS} active={tab} onSelect={select} />
       <section id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} className="flex flex-col gap-[32px]">

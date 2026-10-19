@@ -3,14 +3,17 @@
 // CommandPalette — ⌘K modal for IDEEZA's dashboard. Opens from the
 // sidebar search row or via the global ⌘K shortcut. Flat list with
 // per-row category meta on the right (matches the Blink reference) and
-// optional keyboard shortcuts (⌘N for "Start a new project").
+// every settings row by name (lib/settings/search.ts) once you type.
 //
 // Sections covered:
-//   • Actions     — start a new project, open the quick-start tour
+//   • Actions     — start a new project
 //   • Pages       — the 7 sidebar nav destinations
-//   • Resources   — Tutorial / Tour guide / Help / Report a problem
+//   • Resources   — Report a problem (the tutorial, tour and help pages
+//                   aren't built yet, so they aren't listed)
 //   • Theme       — Light / Dark / System
-//   • Account     — Profile, Wallet, Settings, Upgrade, Sign out
+//   • Account     — Profile, Wallet, Settings, Plan & pricing
+//   • Settings    — while typing: the matching settings rows, each opening
+//                   its row (/settings/<page>#<row>) or its home elsewhere
 //
 // Keyboard:
 //   • Arrow ↑ / ↓ moves selection
@@ -24,20 +27,15 @@ import {
   Add01Icon,
   BookOpen01Icon,
   Bug01Icon,
-  Compass01Icon,
   ComputerIcon,
   CpuIcon,
-  CrownIcon,
+  CreditCardIcon,
   Folder01Icon,
   Home01Icon,
-  HelpCircleIcon,
   HistoryIcon,
-  Logout01Icon,
   Mail01Icon,
   Moon01Icon,
-  MortarboardIcon,
   News01Icon,
-  Rocket01Icon,
   Search01Icon,
   Settings01Icon,
   ShoppingBag01Icon,
@@ -48,6 +46,8 @@ import {
 import { useTheme } from "@/components/theme-provider";
 import { Icon, type IconValue } from "./icon";
 import { openReportProblem } from "@/lib/support/open-report";
+import { useWalletRequest } from "@/components/wallet/wallet-provider";
+import { searchSettings } from "@/lib/settings/search";
 
 type Command = {
   id: string;
@@ -68,6 +68,7 @@ export function CommandPalette({
 }) {
   const router = useRouter();
   const { setTheme } = useTheme();
+  const { openManage } = useWalletRequest();
   const [query, setQuery] = React.useState("");
   const [selected, setSelected] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -86,16 +87,8 @@ export function CommandPalette({
         label: "Start a new project",
         category: "Actions",
         icon: Add01Icon,
-        shortcut: "⌘N",
         primary: true,
         onActivate: go("/"),
-      },
-      {
-        id: "tour",
-        label: "Open Quick start tour",
-        category: "Actions",
-        icon: Rocket01Icon,
-        onActivate: exit(() => {}),
       },
       // Pages
       { id: "home", label: "Home", category: "Pages",
@@ -118,12 +111,6 @@ export function CommandPalette({
       { id: "messages", label: "Messages", category: "Pages",
         icon: Mail01Icon, onActivate: go("/messages") },
       // Resources
-      { id: "tutorial", label: "Open the tutorial", category: "Resources",
-        icon: MortarboardIcon, onActivate: exit(() => {}) },
-      { id: "tourguide", label: "Tour guide", category: "Resources",
-        icon: Compass01Icon, onActivate: exit(() => {}) },
-      { id: "help", label: "Help & support", category: "Resources",
-        icon: HelpCircleIcon, onActivate: exit(() => {}) },
       { id: "bug", label: "Report a problem", category: "Resources",
         icon: Bug01Icon, onActivate: exit(openReportProblem) },
       // Theme
@@ -137,25 +124,34 @@ export function CommandPalette({
       { id: "profile", label: "Profile", category: "Account",
         icon: User02Icon, onActivate: exit(() => router.push("/creators/me")) },
       { id: "wallet", label: "Wallet & tokens", category: "Account",
-        icon: Wallet01Icon, onActivate: exit(() => {}) },
+        icon: Wallet01Icon, onActivate: exit(openManage) },
       { id: "settings", label: "Settings", category: "Account",
-        icon: Settings01Icon, onActivate: exit(() => {}) },
-      { id: "upgrade", label: "Upgrade to Pro", category: "Account",
-        icon: CrownIcon, onActivate: exit(() => {}) },
-      { id: "signout", label: "Sign out", category: "Account",
-        icon: Logout01Icon, onActivate: exit(() => {}) },
+        icon: Settings01Icon, onActivate: go("/settings") },
+      { id: "plan", label: "Plan & pricing", category: "Account",
+        icon: CreditCardIcon, onActivate: go("/settings/plan") },
     ];
-  }, [router, setTheme, onClose]);
+  }, [router, setTheme, onClose, openManage]);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return commands;
-    return commands.filter(
+    const matched = commands.filter(
       (c) =>
         c.label.toLowerCase().includes(q) ||
         c.category.toLowerCase().includes(q),
     );
-  }, [commands, query]);
+    const settings: Command[] = searchSettings(q, 8).map((h) => ({
+      id: `setting:${h.href}`,
+      label: h.label,
+      category: h.rowId ? `Settings · ${h.pageLabel}` : "Settings",
+      icon: Settings01Icon,
+      onActivate: () => {
+        router.push(h.href);
+        onClose();
+      },
+    }));
+    return [...matched, ...settings];
+  }, [commands, query, router, onClose]);
 
   // Reset selection whenever the filter changes (during render, so no second pass after
   // paint), and scroll the list back to its top.

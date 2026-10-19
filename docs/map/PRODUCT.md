@@ -8,6 +8,7 @@ Start here for any code change: open the area's router, then only the files it n
 | Find a component or UI module | [src/components/README.md](../../src/components/README.md) | UI rules: [ui-ux.md](../guides/ui-ux.md) |
 | Find a store, model or algorithm | [src/lib/README.md](../../src/lib/README.md) | Stores persist to `localStorage` (`ideeza:*`) |
 | Global shell: sidebar, phone drawer, account / wallet popovers, ⌘K, theme | `src/components/dashboard/`, `theme-provider.tsx` | [features/platform-and-projects.md](../guides/features/platform-and-projects.md) › Platform & shell |
+| Settings: `/settings` and its pages, frame, side-nav, rows, Find a setting, the preferences record | `src/components/settings/`, `src/lib/settings/`, `src/app/(create)/settings/` | [features/settings.md](../guides/features/settings.md); spec `2026-10-19-settings-design.md` |
 | Report a problem: the dialog, its entry points, `/api/reports` | `src/components/support/`, `src/lib/support/`, `src/lib/server/`, `src/app/api/reports/`, `src/instrumentation-client.ts` | features/platform-and-projects.md › Platform & shell |
 | Home prompt, concept chat, build, review card, credits, history, toasts | `src/components/create/`, `src/lib/create/` | [features/ai-create-flow.md](../guides/features/ai-create-flow.md); Part 4 spec |
 | Product spec sheet | `src/lib/spec/`, `src/components/create/spec-*.tsx` | features/ai-create-flow.md; spec `2026-09-25-product-spec-sheet-design.md` |
