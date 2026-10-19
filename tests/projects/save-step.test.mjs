@@ -374,11 +374,15 @@ describe("savedNoticeOf", () => {
       publishLine: PUBLISH_LINE,
     });
   });
-  it("the editors: a Draft says draft; a published project says Saved, and no Publish line", () => {
-    assert.equal(savedNoticeOf("editor", f).title, "Saved as a draft");
+  it("the editors' Finish says the state, not an act of saving: they save as they go", () => {
+    assert.deepEqual(savedNoticeOf("editor", f), {
+      title: "Car is saved as a draft",
+      body: "Everything you make saves as you go. Only you can see it.",
+      publishLine: PUBLISH_LINE,
+    });
     assert.deepEqual(savedNoticeOf("editor", { ...f, draft: false }), {
-      title: "Saved",
-      body: "Car is in My projects.",
+      title: "Car is saved",
+      body: "Everything you make saves as you go.",
       publishLine: null,
     });
   });

@@ -18,6 +18,7 @@ import { C } from "@/lib/pcb/colors";
 import { useEditorScope } from "@/components/manual/use-step-nav";
 import { readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/editor-docs";
 import type { EditorScope } from "@/lib/manual/p2-types";
+import { reportSave } from "@/lib/manual/save-status";
 import { ModelViewer } from "./model-viewer";
 
 type Provider = "meshy" | "demo";
@@ -42,7 +43,8 @@ function loadPersisted(scope: EditorScope, headRowId: string): { saved: Persiste
 }
 
 function savePersisted(handle: DocHandle, v: Persisted) {
-  writeEditorDoc(handle, JSON.stringify(v), window.localStorage);
+  const write = () => writeEditorDoc(handle, JSON.stringify(v), window.localStorage);
+  reportSave("3d.ai", write(), write);
 }
 
 export function AiGenerateModal({

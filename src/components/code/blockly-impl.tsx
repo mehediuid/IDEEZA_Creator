@@ -21,6 +21,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { StateCard } from "@/components/ideeza";
 import { useEditorScope } from "@/components/manual/use-step-nav";
 import { editorDocKey } from "@/lib/manual/editor-scope";
+import { writeReported } from "@/lib/manual/save-status";
 import type { EditorScope } from "@/lib/manual/p2-types";
 import { CODE_EVENT, type CodeAction } from "./code-menu-strip";
 
@@ -650,7 +651,7 @@ export function BlocklyImpl() {
       } catch {}
       try {
         const xml = Blockly.Xml.workspaceToDom(newWs);
-        if (storageKey) window.localStorage.setItem(storageKey, Blockly.Xml.domToText(xml));
+        if (storageKey) writeReported("code.blocks", storageKey, Blockly.Xml.domToText(xml));
       } catch {}
     };
     regen();

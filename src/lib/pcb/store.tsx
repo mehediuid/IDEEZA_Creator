@@ -19,6 +19,7 @@ import { dropImportedGroup, type ImportedModel } from "./gltf-import";
 import { delCategoryOf } from "./del-objects";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
 import { DocSaveQueue, readEditorDoc, writeEditorDoc, type DocHandle } from "../manual/editor-docs";
+import { registerSaveFlusher, reportSave, saveNow } from "../manual/save-status";
 import { onProjectDeleted } from "../manual/events";
 import { editorDocKey } from "../manual/editor-scope";
 import type { EditorScope } from "../manual/p2-types";
@@ -758,6 +759,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           // product's has no chip left to update.
           if (heldRef.current?.handle !== handle) return;
           setState((s) => (ok ? { ...s, saveState: "saved", lastSavedAt: stamp() } : { ...s, saveState: "failed" }));
+          // The editors' one save status (lib/manual/save-status.ts); Retry writes the board again.
+          reportSave("pcb", ok, () => actions.flushDoc() === true);
         },
       ),
   );
@@ -1180,12 +1183,12 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge((s) => ({ panelSizes: { ...s.panelSizes, [which]: v } }));
       },
       saveDoc: () => {
-        const ok = actions.flushDoc();
-        if (ok === null) {
+        if (!heldRef.current) {
           actions.flashToast("Open a product to save its board");
           return;
         }
-        actions.flashToast(ok ? "Saved" : "Save failed");
+        // File › Save saves the whole product, as Ctrl+S does: every editor's pending write.
+        actions.flashToast(saveNow() ? "Saved" : "Save failed");
       },
       flushDoc: () => {
         const held = heldRef.current;
@@ -1194,6 +1197,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         const storage = docStorage();
         const ok = !!storage && writeEditorDoc(held.handle, JSON.stringify(docOf(stateRef.current)), storage);
         merge(ok ? { saveState: "saved", lastSavedAt: stamp() } : { saveState: "failed" });
+        reportSave("pcb", ok, () => actions.flushDoc() === true);
         return ok;
       },
       toggleBoardFlip: () =>
@@ -3114,6 +3118,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         }),
     };
   }, [merge, mergeWithHistory, saveQueue]);
+
+  // Saving on purpose (Ctrl+S, File › Save, Finish) writes the board now.
+  React.useEffect(() => registerSaveFlusher("pcb", () => actions.flushDoc()), [actions]);
 
   return (
     <StateCtx.Provider value={state}>

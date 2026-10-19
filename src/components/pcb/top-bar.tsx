@@ -31,6 +31,7 @@ import { useMe } from "@/lib/people/profile-store";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { ProductNameField } from "@/components/manual/product-name-field";
 import { ProductSwitcher } from "@/components/manual/product-switcher";
+import { EditorSaveStatus } from "@/components/manual/editor-save-status";
 import { EditorBannerOutlet } from "@/components/manual/bring-in-banner";
 
 const VIOLET = "var(--color-violet-600)";
@@ -163,8 +164,10 @@ export function TopBar() {
                 />
                 <ProductSwitcher />
               </div>
-              <span
-                title={activeProject.name}
+              {/* The project's name is the editor's way to its page (owner D7, 2026-10-19). */}
+              <Link
+                href={`/projects/${encodeURIComponent(activeProject.id)}`}
+                title={`Open ${activeProject.name}`}
                 style={{
                   fontSize: "var(--font-size-2xs)",
                   fontWeight: 500,
@@ -173,12 +176,16 @@ export function TopBar() {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  textDecoration: "none",
                 }}
               >
                 {activeProject.name}
-              </span>
+              </Link>
             </div>
           )}
+          {/* Draft (or the project's status) and whether the work is saved — the one save
+              readout for every editor (owner D3, 2026-10-19). */}
+          {currentStep !== "brief" && <EditorSaveStatus project={activeProject} />}
         </div>
       )}
 

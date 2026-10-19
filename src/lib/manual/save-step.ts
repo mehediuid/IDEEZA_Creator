@@ -263,8 +263,8 @@ export function savedLineOf(project: ManualProject, version: number | null): str
   return version === null ? `Saved to ${project.name}.` : `Saved to ${project.name} as version ${version}.`;
 }
 
-/** Which save the saved dialog reports: the AI flow's three modes, or the editors' Save
- *  project on a hand-made product (a project that is already in My projects). */
+/** Which save the saved dialog reports: the AI flow's three modes, or the editors' Finish on a
+ *  hand-made product (a project already in My projects, saved as it goes). */
 export type SavedKind = "new" | "join" | "version" | "editor";
 
 export type SavedNotice = { title: string; body: string; publishLine: string | null };
@@ -286,9 +286,15 @@ export function savedNoticeOf(
   const body = draft ? `${f.name} is in My projects. Only you can see it.` : `${f.name} is in My projects.`;
   const publishLine = draft ? PUBLISH_LINE : null;
   switch (kind) {
-    case "new":
     case "editor":
-      return { title: draft ? "Saved as a draft" : "Saved", body, publishLine };
+      // The editors save as they go: Finish says the state, not an act of saving (owner D2).
+      return {
+        title: draft ? `${f.name} is saved as a draft` : `${f.name} is saved`,
+        body: draft ? "Everything you make saves as you go. Only you can see it." : "Everything you make saves as you go.",
+        publishLine,
+      };
+    case "new":
+      return { title: "Saved as a draft", body, publishLine };
     case "join":
       return { title: `${f.product} was added to ${f.name}`, body, publishLine };
     case "version":
