@@ -4,8 +4,10 @@
 // on one PRODUCT (P2-EDITOR-1), so an editor step's URL is
 // /project/<slug>/products/<productId>/<step>: the product the editor holds
 // (`activeProductId`), else the one the project resumes (P2-EDITOR-2). The
-// Brief is the project's, /project/<slug>/brief. With no active project the
-// links fall back home.
+// last step, Save project, is the project's: it lands on the project page as a
+// Draft (`editorSaveHref`), where Publish keeps it private, gives it or sells
+// it — the AI flow's save, then Publish. With no active project the links
+// fall back home.
 //
 // useEditorScope — the product an editor app reads and writes its documents
 // for. ProjectWorkspace mounts an editor only once this matches its URL.
@@ -13,13 +15,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  stepHref,
   useManualProjects,
   type ManualFlowState,
   type ManualProject,
 } from "@/lib/manual/projects";
 import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
 import { productRowsOf } from "@/lib/manual/project-read";
+import { editorSaveHref } from "@/lib/manual/save-step";
 import type { EditorScope } from "@/lib/manual/p2-types";
 
 // Left-rail item key → flow step. The 3D rail item keys as "3d" while its flow
@@ -36,14 +38,15 @@ export const RAIL_KEY_TO_STEP: Partial<
   brief: "brief",
 };
 
-/** Where `step` opens for this project: the Brief is project-level; an
- *  editor step opens `productId` (the held product), else the resumed one. */
+/** Where `step` opens for this project: Save project ("brief") goes to the
+ *  project page; an editor step opens `productId` (the held product), else the
+ *  resumed one. */
 export function stepHrefFor(
   project: ManualProject,
   productId: string | null,
   step: keyof ManualFlowState,
 ): string {
-  if (step === "brief") return stepHref(project, "brief");
+  if (step === "brief") return editorSaveHref(project.id);
   return editorHref(project, productId ?? resumeProductOf(project), step);
 }
 

@@ -24,9 +24,10 @@
 // remounts every editor. Under the top bar it shows what the seed brought in
 // (P2-BUILDLOAD-12), then "Bring it in" (P2-EDITOR-5): one banner at a time.
 //
-// The Brief's old address (/project/<slug>/brief) redirects to the
-// project's mint flow, /projects/<id>/earn/mint (Build and Earn P1-2), which
-// decides what opens there.
+// The last step's address (/project/<slug>/brief) is Save project: it goes to
+// the project page as a Draft (`editorSaveHref`), where Publish keeps it
+// private, gives it or sells it — never the mint flow's "How do you want to
+// share it?" (owner, 2026-10-19: a hand-made project saves like an AI build).
 
 import * as React from "react";
 import Link from "next/link";
@@ -40,9 +41,9 @@ import { pendingNoticeOf, type SeedEditor } from "@/lib/manual/build-load";
 import { ensureSeeded, readSeed, type EnsureResult, type SeedBuilt } from "@/lib/manual/build-load-io";
 import { useManualProjects, type ManualFlowState } from "@/lib/manual/projects";
 import { buildsOf, productRowsOf, productsOfProject } from "@/lib/manual/project-read";
-import { earnMintHref } from "@/lib/manual/earn-route";
 import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
+import { editorSaveHref } from "@/lib/manual/save-step";
 import type { EditorScope, EditorStep } from "@/lib/manual/p2-types";
 import { useWriteGuard } from "@/lib/manual/use-write-guard";
 import { usePcbActions, usePcbDocScope } from "@/lib/pcb/store";
@@ -224,9 +225,9 @@ export function ProjectWorkspace({
     if (resumeHref) router.replace(resumeHref + window.location.search);
   }, [ready, project, resumeHref, router]);
 
-  // The Brief is Earn's mint flow now.
+  // Save project: the project page, as a Draft.
   React.useEffect(() => {
-    if (ready && projectId && isBrief) router.replace(earnMintHref(projectId));
+    if (ready && projectId && isBrief) router.replace(editorSaveHref(projectId));
   }, [ready, projectId, isBrief, router]);
 
   // The build a row is, read when the scope is applied — never a dependency,
@@ -321,7 +322,7 @@ export function ProjectWorkspace({
     );
   }
 
-  if (isBrief) return <BlankShell label="Opening the mint flow…" />;
+  if (isBrief) return <BlankShell label="Saving the project…" />;
 
   if (legacyRoute) return <BlankShell label="Opening product…" />;
   if (!row) {

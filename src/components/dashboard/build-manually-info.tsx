@@ -3,7 +3,7 @@
 // BuildManuallyInfo — what the home hero shows in place of the AI mode
 // textarea when the user picks "Build manually". Per spec: the user
 // can build a complete electronics project across PCB · Code · 3D ·
-// Preview · Brief stages. The panel replaces the typing field with a
+// Preview stages, then Save it as a draft and publish it from its page. The panel replaces the typing field with a
 // scannable explainer + a single primary "Create Project" CTA.
 //
 // Styling matches the AI mode prompt card exactly so swapping modes
@@ -16,7 +16,7 @@ import {
   CpuIcon,
   CubeIcon,
   EyeIcon,
-  File01Icon,
+  FloppyDiskIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "./icon";
 
@@ -29,7 +29,7 @@ const STAGES: Array<{
   { icon: CodeIcon, label: "Code", detail: "Firmware code" },
   { icon: CubeIcon, label: "3D Module", detail: "Printable enclosure" },
   { icon: EyeIcon, label: "Product Preview", detail: "Assembled view" },
-  { icon: File01Icon, label: "Brief", detail: "Save with metadata" },
+  { icon: FloppyDiskIcon, label: "Save", detail: "Draft, then publish" },
 ];
 
 export function BuildManuallyInfo({

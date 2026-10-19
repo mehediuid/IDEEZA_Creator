@@ -1448,7 +1448,7 @@ export function buildRail(_state: PcbState | null = null, activeKey: string = 'p
     { key: 'assembly', label: 'Assembly', icon: 'assembly' },
     { key: 'wiring', label: 'Peripheral Wiring', icon: 'wire' },
     { key: 'preview', label: 'Product Preview', icon: 'preview' },
-    { key: 'brief', label: 'Add Brief', icon: 'brief' },
+    { key: 'brief', label: 'Save project', icon: 'save' },
   ];
   return railDefs.map((r) => {
     const active = r.key === activeKey;

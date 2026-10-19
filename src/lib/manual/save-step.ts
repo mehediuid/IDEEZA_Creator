@@ -263,6 +263,16 @@ export function savedLineOf(project: ManualProject, version: number | null): str
   return version === null ? `Saved to ${project.name}.` : `Saved to ${project.name} as version ${version}.`;
 }
 
+/** The `?saved=` value the editors' Save project lands with. A hand-made project is a Draft
+ *  from the moment it is created, so its save names no build: it lands on the project page,
+ *  where Publish keeps it private, gives it or sells it — the AI flow's save, then Publish. */
+export const SAVED_FROM_EDITOR = "editor";
+
+/** Where the editors' Save project goes: the project page, with the "new" arrival banner. */
+export function editorSaveHref(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}?saved=${SAVED_FROM_EDITOR}`;
+}
+
 /** P2-SAVE-9: the project page's one-shot arrival banner, by mode. */
 export function arrivalOf(
   mode: "new" | "join" | "version",

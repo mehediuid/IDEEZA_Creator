@@ -6,6 +6,8 @@
 // - a new project: "Saved to My projects" · "{name} is ready for its next step.";
 // - a product joining: "{product} was added to {name}.";
 // - a rebuild: "Saved as version {n}.".
+// The editors' Save project lands with `?saved=editor` (SAVED_FROM_EDITOR): a
+// hand-made project names no build, and reads as a new project's save.
 // The parameter goes at once (history.replaceState, so `useSearchParams`
 // follows without a round trip), so a reload or Back never repeats it. The
 // banner stays until the maker leaves or presses ×. Its words go through the
@@ -22,7 +24,7 @@ import { Banner, IconButton } from "@/components/ideeza";
 import { can } from "@/lib/manual/permissions";
 import { productRowsOf } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
-import { arrivalOf } from "@/lib/manual/save-step";
+import { SAVED_FROM_EDITOR, arrivalOf } from "@/lib/manual/save-step";
 import type { ProjectView } from "@/lib/manual/project-read";
 import type { SlotProps } from "./slots";
 
@@ -34,9 +36,11 @@ const AFTER_ARRIVAL_MS = 900;
 
 type Arrival = { title: string; body?: string };
 
-/** What the save that brought the maker here did, read from the project: null
- *  when `buildId` is none of its builds (an unrelated or stale link). */
+/** What the save that brought the maker here did, read from the project: the
+ *  editors' Save project, or a save of one of its builds — null when `buildId`
+ *  is none of them (an unrelated or stale link). */
 export function arrivalFor(project: ManualProject, view: Pick<ProjectView, "refs">, buildId: string): Arrival | null {
+  if (buildId === SAVED_FROM_EDITOR) return arrivalOf("new", { name: project.name, product: "", version: 0 });
   const ref = view.refs.find((r) => r.buildId === buildId);
   if (!ref) return null;
   const row =

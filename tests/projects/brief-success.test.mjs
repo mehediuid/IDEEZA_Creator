@@ -118,7 +118,7 @@ test("Choose reads the project back from its engineering record and never edits 
   assert.match(app, /mintDraftJson\(window\.localStorage\.getItem\(key\), state, step\)/);
 });
 
-test("the old Brief addresses redirect to the mint flow; it opens per useBriefOpens (P1-2, R2-8)", () => {
+test("a build's old Brief address redirects to the mint flow; it opens per useBriefOpens (P1-2, R2-8)", () => {
   const route = readSrc("app/(create)/projects/[id]/earn/mint/page.tsx");
   assert.match(route, /<MintPage id=\{id\} \/>/);
   const page = read("mint-page.tsx");
@@ -135,10 +135,26 @@ test("the old Brief addresses redirect to the mint flow; it opens per useBriefOp
 
   const workspace = readSrc("components/manual/project-workspace.tsx");
   assert.doesNotMatch(workspace, /BriefApp|useBriefOpens/);
-  assert.match(workspace, /if \(ready && projectId && isBrief\) router\.replace\(earnMintHref\(projectId\)\);/);
 
   // Back from Choose is Earn › Sell.
   assert.match(read("brief-app.tsx"), /const leave = \(\) => router\.push\(earnHref\(projectId, "sell"\)\);/);
+});
+
+test("the editors' last step is Save project: the project page as a Draft, never the mint flow's Choose (owner 2026-10-19)", () => {
+  // The step's address and every rail / pill that opens it land on the project page with the
+  // "new" arrival banner; Publish there keeps it private, gives it or sells it.
+  const workspace = readSrc("components/manual/project-workspace.tsx");
+  assert.doesNotMatch(workspace, /earnMintHref/);
+  assert.match(workspace, /if \(ready && projectId && isBrief\) router\.replace\(editorSaveHref\(projectId\)\);/);
+  const nav = readSrc("components/manual/use-step-nav.tsx");
+  assert.match(nav, /if \(step === "brief"\) return editorSaveHref\(project\.id\);/);
+  assert.match(readSrc("components/preview/preview-app.tsx"), /isWiring \? "Continue to Preview" : "Save project"/);
+  assert.match(readSrc("lib/pcb/data.tsx"), /\{ key: 'brief', label: 'Save project', icon: 'save' \}/);
+  for (const src of [readSrc("components/preview/preview-app.tsx"), readSrc("lib/pcb/data.tsx")]) {
+    assert.doesNotMatch(src, /Continue to Brief|'Add Brief'/);
+  }
+  const banner = readSrc("components/projects/details/saved-banner.tsx");
+  assert.match(banner, /if \(buildId === SAVED_FROM_EDITOR\) return arrivalOf\("new"/);
 });
 
 test("the video step left the Brief: the review shows the gate and opens the products' videos for a missing one (P1-2, P2-VIDEO-17)", () => {

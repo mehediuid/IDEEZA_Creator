@@ -5,8 +5,10 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  SAVED_FROM_EDITOR,
   arrivalOf,
   checkSaveDraft,
+  editorSaveHref,
   coverChoicesOf,
   footerLineOf,
   holderOf,
@@ -376,6 +378,14 @@ describe("arrivalOf", () => {
     assert.deepEqual(arrivalOf("version", { name: "Car", product: "", version: 2 }), {
       title: "Saved as version 2.",
     });
+  });
+});
+
+describe("editorSaveHref", () => {
+  it("lands the editors' Save project on the project page with the arrival banner", () => {
+    assert.equal(SAVED_FROM_EDITOR, "editor");
+    assert.equal(editorSaveHref("proj_1"), "/projects/proj_1?saved=editor");
+    assert.equal(editorSaveHref("a/b"), "/projects/a%2Fb?saved=editor");
   });
 });
 
