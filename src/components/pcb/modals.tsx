@@ -22,6 +22,7 @@ import { isCombinable } from "@/lib/pcb/shape-boolean";
 import { defaultSutureConfig, planSutureVias, sutureRegions, type SutureConfig } from "@/lib/pcb/suture-vias";
 import { PX_PER_MM } from "@/lib/pcb/drc";
 import { parseGltfFile } from "@/lib/pcb/gltf-import";
+import { exportSlabTriangles } from "@/lib/pcb/board-slab";
 import { dxfLayers, dxfToObjects, parseDxf, pxPerUnit, summariseDxf, type DxfDoc, type DxfLayerMap } from "@/lib/pcb/dxf-import";
 import {
   MODULE_CATALOG,
@@ -2319,9 +2320,10 @@ function Export3DModal({ shell }: { shell?: boolean }) {
           <Button hierarchy="primary" size="md" onClick={() => {
             const m = collectPcbModel(state);
             const include = shell ? { board: true, comps: false } : { board: inc["PCB Board"] !== false, comps: inc["Component Models"] !== false };
+            const slab = include.board ? exportSlabTriangles(m) : null;
             const base = fileName.replace(/\.(stl|obj)$/i, "");
-            if (type === "OBJ") downloadBlob(`${base}.obj`, buildObj(m, include), "text/plain;charset=utf-8");
-            else downloadBlob(`${base}.stl`, buildStl(m, include), "model/stl");
+            if (type === "OBJ") downloadBlob(`${base}.obj`, buildObj(m, include, slab), "text/plain;charset=utf-8");
+            else downloadBlob(`${base}.stl`, buildStl(m, include, slab), "model/stl");
             actions.flashToast(`Exported ${base}.${type.toLowerCase()}`);
             actions.closeModal();
           }}>Export</Button>

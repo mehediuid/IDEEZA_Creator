@@ -15,6 +15,7 @@ src/lib/pcb/
   inspector-schema.ts  # schema-driven Properties inspector (panels + fields)
   icons.tsx / hicons.ts# DsIcon + icon dictionaries
   pcb-scene.ts         # 3D-tab scene: real board+tracks+vias+pads+bodies+regions from the 2D layout
+  board-slab.ts        # the board slab with outline/cutouts/mounting holes cut through (3D tab, GLB, STL/OBJ)
   exporters.ts         # real file generators (Pick&Place/DXF/SVG/PDF/PNG/STL/OBJ) + download helpers
   drc-rules-map.ts     # PCB Design-Rules dialog form → PcbDrcConfig (feeds runDrcCheck)
   del-objects.ts       # Delete-Objects dialog: object kind → category (delCategoryOf)

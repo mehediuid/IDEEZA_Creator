@@ -225,6 +225,8 @@ src/lib/pcb/
 │                       (`readPersonalModules` / `allModules`)
 ├─ tool-labels.ts       Armed-tool names (from the palette's labels) + next-step hints
 ├─ glb-export.ts        Board → three.js scene → glTF/GLB (GLTFExporter)
+├─ board-slab.ts        The board slab with outline, cutouts + mounting holes cut through
+│                       (3D tab, GLB and STL/OBJ share it)
 ├─ gltf-import.ts       glTF/GLB import: GLTFLoader parse + session-only model registry
 ├─ dxf-import.ts        ASCII-DXF parser (LINE/POLYLINE/CIRCLE/ARC/TEXT) → CanvasObjects
 ├─ kicad-export.ts      KiCad/Gerber export

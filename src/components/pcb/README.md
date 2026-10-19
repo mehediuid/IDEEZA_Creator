@@ -20,7 +20,7 @@ The schematic + PCB editor. Architecture, store and `CanvasObject` model: [docs/
 | `lib/pcb/pour.ts`, `teardrops.ts`, `suture-vias.ts`, `shape-boolean.ts` | Copper pour, teardrops, stitching vias, boolean/corner geometry | pcb-board.md; pcb-tools-menus-panels.md › Boolean |
 | `lib/pcb/exporters.ts`, `glb-export.ts`, `kicad-export.ts`, `dxf-import.ts`, `gltf-import.ts` | File generators (Pick&Place, DXF, SVG, PDF, STL, OBJ, sheet PDF, GLB, KiCad) and importers; Gerber/DRC run through `src/app/api/kicad/` | pcb-tools-menus-panels.md › Top toolbar |
 | `lib/pcb/part-catalog.ts`, `land-patterns.ts`, `board-parts.ts` | Parts + Agile-Module catalogue, personal parts; package → pad geometry; the board's placed parts | [parts-package.md](../../../docs/guides/features/parts-package.md) |
-| `lib/pcb/pcb-scene.ts`, `pcb-3d.ts` | The 3D tab's scene, derived from the 2D layout | pcb-board.md › PCB editor |
+| `lib/pcb/pcb-scene.ts`, `pcb-3d.ts`, `board-slab.ts` | The 3D tab's scene, derived from the 2D layout; the holed board slab the exports share | pcb-board.md › PCB editor |
 | `lib/pcb/icons.tsx`, `hicons.ts`, `glyphs.tsx`, `tool-labels.ts` | `DsIcon` + dictionaries; symbol glyphs (`GLYPHS`); armed-tool names + hints | [ui-ux.md](../../../docs/guides/ui-ux.md) |
 | `lib/pcb/from-build.ts` | A built product's schematic, from its parts and nets (BUILDLOAD) | spec `2026-09-28-project-details-phase2-design.md` |
 | `pcb-app.tsx`, `editor-shell.tsx`, `left-rail.tsx`, `splitter.tsx` | Shell composition, full-viewport root, module switcher, draggable panel edges | [app-map.md](../../../docs/guides/app-map.md) |

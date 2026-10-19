@@ -6,6 +6,7 @@
 
 import type { CanvasObject, PcbState } from "./types";
 import { PAD_OFFSETS } from "./schematic-to-pcb";
+import { mountingHoleDrillPx } from "./pcb-3d";
 
 // Canvas board origin (matches pcb-canvas.tsx top:60/left:60) + px→mm scale.
 const BOARD_X0 = 60;
@@ -45,6 +46,10 @@ export interface ExportVia {
 }
 export interface ExportCutout {
   x: number; y: number; w: number; h: number; // mm, Y down
+}
+/** A mounting hole: a round through-hole, centre + drill diameter. */
+export interface ExportHole {
+  x: number; y: number; d: number; // mm, Y down
 }
 /** The board's own edge when the user drew one (#122). Without it the board is
  *  the `pcbBoard` rectangle — which is what every export used to assume, so a
@@ -90,6 +95,7 @@ export interface ExportModel {
   pads: ExportPad[];
   vias: ExportVia[];
   cutouts: ExportCutout[];
+  holes: ExportHole[];
   outline: ExportOutline | null;
 }
 
@@ -115,6 +121,7 @@ export function collectPcbModel(state: PcbState, opts?: { onlySelected?: boolean
   const pads: ExportPad[] = [];
   const vias: ExportVia[] = [];
   const cutouts: ExportCutout[] = [];
+  const holes: ExportHole[] = [];
   let outline: ExportOutline | null = null;
 
   for (const o of objs) {
@@ -131,6 +138,10 @@ export function collectPcbModel(state: PcbState, opts?: { onlySelected?: boolean
     }
     if (o.kind === "cutout") {
       cutouts.push({ x: rx(o.x), y: ry(o.y), w: mm(o.width ?? 0), h: mm(o.height ?? 0) });
+      continue;
+    }
+    if (o.kind === "mountingHole") {
+      holes.push({ x: rx(o.x), y: ry(o.y), d: mm(mountingHoleDrillPx(o)) });
       continue;
     }
     if (o.kind === "track") {
@@ -162,7 +173,7 @@ export function collectPcbModel(state: PcbState, opts?: { onlySelected?: boolean
       }
     }
   }
-  return { boardWmm: mm(W), boardHmm: mm(H), thicknessMm, comps, tracks, pads, vias, cutouts, outline };
+  return { boardWmm: mm(W), boardHmm: mm(H), thicknessMm, comps, tracks, pads, vias, cutouts, holes, outline };
 }
 
 // ── downloads ────────────────────────────────────────────────────────────────
@@ -413,8 +424,13 @@ export function buildPdf(m: ExportModel, opts?: DocOptions): Blob {
 
 // ── 3D mesh (STL ASCII / OBJ) ─────────────────────────────────────────────────
 // The board sits in the XY plane (Z = thickness up); components stack on top.
+// A board with an outline, cutouts or mounting holes is not a box: the caller
+// passes its `slab` (board-slab.ts `exportSlabTriangles`), which replaces the box.
+/** One triangle: three [x, y, z] corners in mm, wound outward. */
+export type MeshTri = [[number, number, number], [number, number, number], [number, number, number]];
+type MeshInclude = { board?: boolean; comps?: boolean };
 type Box = { cx: number; cy: number; cz: number; w: number; d: number; h: number };
-function modelBoxes(m: ExportModel, include: { board?: boolean; comps?: boolean } = { board: true, comps: true }): Box[] {
+function modelBoxes(m: ExportModel, include: MeshInclude = { board: true, comps: true }): Box[] {
   const boxes: Box[] = [];
   if (include.board !== false)
     boxes.push({ cx: m.boardWmm / 2, cy: m.boardHmm / 2, cz: m.thicknessMm / 2, w: m.boardWmm, d: m.boardHmm, h: m.thicknessMm });
@@ -441,30 +457,43 @@ const BOX_TRIS: [number, number, number][] = [
   [2, 3, 7], [2, 7, 6], // back
   [3, 0, 4], [3, 4, 7], // left
 ];
+// The slab, when given and the board is wanted; the boxes then skip the board.
+function meshParts(include: MeshInclude | undefined, slab: MeshTri[] | null | undefined) {
+  const board = include?.board !== false && slab ? slab : null;
+  return { slab: board ?? [], boxes: board ? { ...include, board: false } : include };
+}
 
-export function buildStl(m: ExportModel, include?: { board?: boolean; comps?: boolean }): string {
+export function buildStl(m: ExportModel, include?: MeshInclude, slab?: MeshTri[] | null): string {
   const out: string[] = ["solid ideeza_pcb"];
-  for (const b of modelBoxes(m, include)) {
+  const facet = (p1: number[], p2: number[], p3: number[]) => {
+    const ux = p2[0] - p1[0], uy = p2[1] - p1[1], uz = p2[2] - p1[2];
+    const vx = p3[0] - p1[0], vy = p3[1] - p1[1], vz = p3[2] - p1[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1; nx /= len; ny /= len; nz /= len;
+    out.push(`facet normal ${nx.toFixed(4)} ${ny.toFixed(4)} ${nz.toFixed(4)}`, "outer loop");
+    for (const p of [p1, p2, p3]) out.push(`vertex ${p[0].toFixed(4)} ${p[1].toFixed(4)} ${p[2].toFixed(4)}`);
+    out.push("endloop", "endfacet");
+  };
+  const parts = meshParts(include, slab);
+  for (const [p1, p2, p3] of parts.slab) facet(p1, p2, p3);
+  for (const b of modelBoxes(m, parts.boxes)) {
     const v = boxCorners(b);
-    for (const [a, bb, cc] of BOX_TRIS) {
-      const p1 = v[a], p2 = v[bb], p3 = v[cc];
-      const ux = p2[0] - p1[0], uy = p2[1] - p1[1], uz = p2[2] - p1[2];
-      const vx = p3[0] - p1[0], vy = p3[1] - p1[1], vz = p3[2] - p1[2];
-      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      const len = Math.hypot(nx, ny, nz) || 1; nx /= len; ny /= len; nz /= len;
-      out.push(`facet normal ${nx.toFixed(4)} ${ny.toFixed(4)} ${nz.toFixed(4)}`, "outer loop");
-      for (const p of [p1, p2, p3]) out.push(`vertex ${p[0].toFixed(4)} ${p[1].toFixed(4)} ${p[2].toFixed(4)}`);
-      out.push("endloop", "endfacet");
-    }
+    for (const [a, bb, cc] of BOX_TRIS) facet(v[a], v[bb], v[cc]);
   }
   out.push("endsolid ideeza_pcb");
   return out.join("\n");
 }
 
-export function buildObj(m: ExportModel, include?: { board?: boolean; comps?: boolean }): string {
+export function buildObj(m: ExportModel, include?: MeshInclude, slab?: MeshTri[] | null): string {
   const out: string[] = ["# IDEEZA PCB export"];
   let base = 0;
-  for (const b of modelBoxes(m, include)) {
+  const parts = meshParts(include, slab);
+  for (const tri of parts.slab) {
+    for (const p of tri) out.push(`v ${p[0].toFixed(4)} ${p[1].toFixed(4)} ${p[2].toFixed(4)}`);
+    out.push(`f ${base + 1} ${base + 2} ${base + 3}`);
+    base += 3;
+  }
+  for (const b of modelBoxes(m, parts.boxes)) {
     for (const p of boxCorners(b)) out.push(`v ${p[0].toFixed(4)} ${p[1].toFixed(4)} ${p[2].toFixed(4)}`);
     for (const [a, bb, cc] of BOX_TRIS) out.push(`f ${base + a + 1} ${base + bb + 1} ${base + cc + 1}`);
     base += 8;

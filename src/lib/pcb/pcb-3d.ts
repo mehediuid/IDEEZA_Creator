@@ -27,6 +27,13 @@ export function componentBodyColor(desig: string | undefined): string {
   return "#181b21"; // IC / default black body
 }
 
+/** A mounting hole's drill in canvas px (10 px = 1 mm): its own Inside
+ *  Diameter when set, else 3.0 mm — the size the Tooling Hole card names.
+ *  The 3D scene and the 3D exports both read it, so they cut the same hole. */
+export function mountingHoleDrillPx(o: { drill?: number }): number {
+  return o.drill && o.drill > 0 ? o.drill : 30;
+}
+
 export const PAD_COLOR_HEX: Record<string, string> = {
   Gold: "#e0b24a",
   Goldsmith: "#d9a441",
