@@ -61,13 +61,16 @@ function micros(a: Amount): bigint {
   return negative ? -n : n;
 }
 
-/** "0.05 MATIC" · "4 IDZ". The amount is written in its normal form when it parses. */
+/** "0.05 MATIC" · "4 IDZ" · "2,000 IDZ". The amount is written in its normal
+ *  form when it parses, its whole part grouped by thousands. */
 export function formatAmount(a: Amount, coin: Coin): string {
   const t = typeof a === "string" ? a.trim() : "";
   const negative = t.startsWith("-");
   const n = toMicros(negative ? t.slice(1) : t);
-  const shown = n === null ? t : fromMicros(negative ? -n : n);
-  return `${shown} ${coin}`;
+  if (n === null) return `${t} ${coin}`;
+  const [whole, frac] = fromMicros(n).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${negative && n > BigInt(0) ? "-" : ""}${grouped}${frac ? `.${frac}` : ""} ${coin}`;
 }
 
 /** The sum, in bigint: addAmounts("0.05", "0.021") = "0.071". */

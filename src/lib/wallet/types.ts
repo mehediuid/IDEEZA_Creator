@@ -34,6 +34,9 @@ export type WalletActivity = {
   txHash?: string;
   signature?: string;
   charge?: Charge;
+  /** What the request was for. Records older than the Balance page have none
+   *  (the IDZ ledger then reads the title). */
+  purpose?: RequestPurpose;
 };
 
 export type DemoWallet = {

@@ -56,6 +56,15 @@ test("sums, differences and comparisons all run in bigint", () => {
   assert.equal(addAmounts("0.1", "0.2"), "0.3"); // 0.1 + 0.2 = 0.30000000000000004 in floats
   assert.equal(addAmounts("40", "-4"), "36");
   assert.equal(subAmounts("40", "4"), "36");
+});
+
+test("formatAmount groups the whole part by thousands and keeps the decimals", () => {
+  assert.equal(formatAmount("2000", "IDZ"), "2,000 IDZ");
+  assert.equal(formatAmount("1979.5", "IDZ"), "1,979.5 IDZ");
+  assert.equal(formatAmount("1234567.000001", "USDC"), "1,234,567.000001 USDC");
+  assert.equal(formatAmount("999", "IDZ"), "999 IDZ");
+  assert.equal(formatAmount("-1500", "IDZ"), "-1,500 IDZ");
+  assert.equal(formatAmount("-0", "IDZ"), "0 IDZ");
   assert.equal(subAmounts("0.05", "0.00125"), "0.04875");
   assert.equal(subAmounts("0.5", "1"), "-0.5");
   assert.equal(compareAmounts("0.05", "0.050"), 0);

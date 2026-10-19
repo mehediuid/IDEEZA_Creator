@@ -14,14 +14,14 @@ function ctx(wallet, market = EMPTY_MARKET) {
   return { wallet, market, now: NOW };
 }
 
-test("balancesOf('maker-1') fresh: 40 IDZ, 0.05 ETH, 0.5 MATIC", () => {
+test("balancesOf('maker-1') fresh: 2,000 IDZ, 0.05 ETH, 0.5 MATIC", () => {
   const bal = balancesOf("maker-1", ctx(undefined));
-  assert.equal(bal.idz, "40");
+  assert.equal(bal.idz, "2000");
   assert.equal(bal.native.baseSepolia.ETH, "0.05");
   assert.equal(bal.native.mumbai.MATIC, "0.5");
 });
 
-test("an instant-mint charge (4 IDZ + 0.00104 ETH) leaves 36 IDZ / 0.04896 ETH", () => {
+test("an instant-mint charge (4 IDZ + 0.00104 ETH) leaves 1,996 IDZ / 0.04896 ETH", () => {
   let w = walletConnect(defaultWallet(), "maker-1");
   w = pushActivity(w, {
     id: "act_1",
@@ -33,7 +33,7 @@ test("an instant-mint charge (4 IDZ + 0.00104 ETH) leaves 36 IDZ / 0.04896 ETH",
     charge: { network: "baseSepolia", lines: [{ coin: "IDZ", amount: "4" }, { coin: "ETH", amount: "0.00104" }] },
   });
   const bal = balancesOf("maker-1", ctx(w));
-  assert.equal(bal.idz, "36");
+  assert.equal(bal.idz, "1996");
   assert.equal(bal.native.baseSepolia.ETH, "0.04896");
 });
 

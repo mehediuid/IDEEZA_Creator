@@ -90,7 +90,7 @@ test("logLinesOf: each intent mints into its status word, with no note", () => {
     { kind: "minted", at: 2, intent: "give", network: "mumbai" },
     { kind: "minted", at: 1, intent: "save", network: "baseSepolia" },
   ]);
-  assert.equal(give.title, "Minted · Given · Mumbai Testnet (Polygon)");
+  assert.equal(give.title, "Minted · Given · Amoy Testnet (Polygon)");
   assert.equal(give.note, null);
   assert.equal(save.title, "Minted · Private · Base Sepolia (Testnet)");
   assert.equal(save.note, null);
@@ -128,7 +128,7 @@ test("logLinesOf · P2-MINT-12: lazy, instant, upgrade, settled and payout lines
       ["Payout wallet changed", "Now Demo account 2 · 0x2b10…3c00"],
       ["Minted on chain at its first sale", "Token #1"],
       ["Minted on chain", "Upgraded from the lazy mint · paid 4 IDZ + 0.00104 ETH"],
-      ["Minted on chain · Private · Mumbai Testnet (Polygon)", "Token #2 · paid 4 IDZ + 0.00104 ETH"],
+      ["Minted on chain · Private · Amoy Testnet (Polygon)", "Token #2 · paid 4 IDZ + 0.00104 ETH"],
       ["Lazy minted · Listed · Base Sepolia (Testnet)", "Token #1 — minted on chain at its first sale."],
       ["Lazy minted · Private · Base Sepolia (Testnet)", "Token #3 — nothing on chain until it's listed."],
     ],
