@@ -135,7 +135,9 @@ ideeza-creator-panel/
    │  ├─ settings/           Settings: registry (pages, crumbs, nav), rows/ (each page's
    │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings,
    │  │                      audience (who can reach you, quiet mode, hidden words, people you've met),
-   │  │                      dates (+ use-dates), voice, keys (single-key shortcuts), appearance (pre-paint)
+   │  │                      dates (+ use-dates; format and time zone), regions (date formats per region),
+   │  │                      voice, keys + shortcuts (single-key shortcuts and each editor's key table),
+   │  │                      appearance (pre-paint)
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
    │  │                      videos, comments), filter (settings, quiet hours, digest), read state
    │  ├─ account/            the account: payment token, invoices, summary, your private identity

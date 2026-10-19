@@ -25,6 +25,7 @@ import { glyphFor } from "@/components/pcb/placed-objects";
 import { buildToolLabels, toolLabel, toolHint } from "@/lib/pcb/tool-labels";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { singleKeyShortcutsAllowed } from "@/lib/settings/keys";
+import { PCB_KEYS, singleKeyOf, type ShortcutId } from "@/lib/settings/shortcuts";
 
 const DRAG_THRESHOLD = 4;
 
@@ -700,8 +701,8 @@ export function CanvasArea() {
   const [spaceHeld, setSpaceHeld] = React.useState(false);
   const handMode = state.tool === "hand" || spaceHeld;
 
-  // Global key handlers — Delete / Escape / Ctrl+C/X/V / Ctrl+A / R / Ctrl+Z/Y,
-  // plus Hand-tool toggle (H) and temporary hand-mode while Space is held.
+  // Global key handlers — Delete / Escape / Ctrl+C/X/V / Ctrl+A / Ctrl+Z/Y,
+  // the single keys of PCB_KEYS (H, V, R) and temporary hand-mode while Space is held.
   // Skips when focus is inside an editable text field so typing works normally.
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -752,15 +753,21 @@ export function CanvasArea() {
       } else if (mod && ((e.key === "y" || e.key === "Y") || ((e.key === "z" || e.key === "Z") && e.shiftKey))) {
         e.preventDefault();
         actions.redo();
-      } else if (!mod && (e.key === "h" || e.key === "H")) {
-        actions.setTool(state.tool === "hand" ? "select" : "hand");
-      } else if (!mod && (e.key === "v" || e.key === "V")) {
-        actions.setTool("select");
-      } else if (!mod && (e.key === "r" || e.key === "R")) {
-        if (state.selectedIds.length > 0) {
+      } else {
+        // The single keys, from the table Settings › Appearance lists.
+        const rotate = (deg: number) => {
+          if (state.selectedIds.length === 0) return;
           e.preventDefault();
-          actions.rotateSelectedPlaced(e.shiftKey ? -90 : 90);
-        }
+          actions.rotateSelectedPlaced(deg);
+        };
+        const run: Record<ShortcutId<typeof PCB_KEYS>, () => void> = {
+          hand: () => actions.setTool(state.tool === "hand" ? "select" : "hand"),
+          select: () => actions.setTool("select"),
+          rotate: () => rotate(90),
+          rotateBack: () => rotate(-90),
+        };
+        const id = singleKeyOf(PCB_KEYS, e);
+        if (id) run[id]();
       }
     };
     const release = (e: KeyboardEvent) => {

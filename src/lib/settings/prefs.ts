@@ -8,6 +8,8 @@
 // Reading never throws: a missing, broken or older record falls back field by
 // field to DEFAULT_SETTINGS, so one bad value never resets the rest.
 
+import { dateChoiceFrom } from "./regions";
+
 export const SETTINGS_KEY = "ideeza:settings";
 /** Fired on window after a write, so every reader in this tab re-renders. */
 export const SETTINGS_EVENT = "ideeza:settings-change";
@@ -33,8 +35,9 @@ export type Channel = (typeof CHANNELS)[number];
 export const REACHES = ["everyone", "work", "nobody"] as const;
 export type Reach = (typeof REACHES)[number];
 
-export const DATE_LOCALES = ["auto", "en-US", "en-IN", "de-AT", "nl-BE", "th-TH", "es-ES", "iso"] as const;
-export type DateLocale = (typeof DATE_LOCALES)[number];
+/** Settings › Language & region › Date and time format: "auto" (your
+ *  region), "iso", or a region code ("BD"); see regions.ts. */
+export type DateLocale = "auto" | "iso" | (string & {});
 
 export const VOICE_LANGS = [
   "auto",
@@ -228,7 +231,7 @@ export function normalizeSettings(raw: unknown): SettingsV1 {
       mutedProjects: ids(n.mutedProjects),
     },
     language: {
-      dateLocale: oneOf(l.dateLocale, DATE_LOCALES, d.language.dateLocale),
+      dateLocale: dateChoiceFrom(l.dateLocale),
       voice: oneOf(l.voice, VOICE_LANGS, d.language.voice),
     },
     appearance: {

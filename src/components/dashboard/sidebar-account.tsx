@@ -52,34 +52,6 @@ import { useMyProfile } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
 import { Icon, type IconValue } from "./icon";
 
-/** Something outside the sidebar asks for the account menu (Settings ›
- *  Appearance › Theme: the theme switch lives in it, D11). */
-const ACCOUNT_MENU_EVENT = "ideeza:open-account-menu";
-let accountMenuAskedAt = 0;
-
-export function openAccountMenu() {
-  accountMenuAskedAt = Date.now();
-  window.dispatchEvent(new Event(ACCOUNT_MENU_EVENT));
-}
-
-/** Calls `onAsk` when the account menu is asked for. With `consume`, it acts
- *  only where `canOpen()` (the sidebar on screen) and also on mount for a
- *  request a moment old: the phone drawer is opened by the request and its
- *  menu mounts after it. */
-export function useAccountMenuRequest(onAsk: () => void, canOpen: () => boolean, consume: boolean) {
-  const run = React.useEffectEvent(() => {
-    if (!canOpen()) return;
-    if (consume) accountMenuAskedAt = 0;
-    onAsk();
-  });
-  React.useEffect(() => {
-    if (consume && Date.now() - accountMenuAskedAt < 1000) run();
-    const on = () => run();
-    window.addEventListener(ACCOUNT_MENU_EVENT, on);
-    return () => window.removeEventListener(ACCOUNT_MENU_EVENT, on);
-  }, [consume]);
-}
-
 /** Who you are, as your profile says (Creators: name, Latin name for the initials, photo). */
 export function useMe(): { name: string; initials: string; photo: string | undefined } {
   const { fields } = useMyProfile();

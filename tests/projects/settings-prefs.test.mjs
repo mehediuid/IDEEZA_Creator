@@ -34,7 +34,7 @@ test("a broken field falls back alone; the rest is kept", () => {
   });
   assert.equal(s.notifications.digest, "instant");
   assert.deepEqual(s.notifications.channels.marketplace, { web: false, email: false, mobile: false });
-  assert.equal(s.language.dateLocale, "en-IN");
+  assert.equal(s.language.dateLocale, "IN", "an old stored locale reads as its region");
   assert.equal(s.language.voice, "auto");
   assert.equal(s.credits.lowAt, DEFAULT_SETTINGS.credits.lowAt);
   assert.equal(s.credits.monthlyCap, 200);

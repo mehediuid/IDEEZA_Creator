@@ -120,7 +120,7 @@ test("digest: right away is one list; a daily summary groups by day, a weekly on
   ];
   assert.deepEqual(groupNotices(list, "instant", now).map((g) => [g.label, g.notices.length]), [[null, 5]]);
   assert.deepEqual(
-    groupNotices(list, "daily", now).map((g) => [g.label, g.notices.map((n) => n.id)]),
+    groupNotices(list, "daily", now, "US").map((g) => [g.label, g.notices.map((n) => n.id)]),
     [
       ["Today", ["today"]],
       ["Yesterday", ["yesterday"]],
@@ -130,7 +130,7 @@ test("digest: right away is one list; a daily summary groups by day, a weekly on
     ],
   );
   assert.deepEqual(
-    groupNotices(list, "weekly", now).map((g) => [g.label, g.notices.map((n) => n.id)]),
+    groupNotices(list, "weekly", now, "US").map((g) => [g.label, g.notices.map((n) => n.id)]),
     [
       ["This week", ["today", "yesterday", "monday"]],
       ["Last week", ["last-week"]],

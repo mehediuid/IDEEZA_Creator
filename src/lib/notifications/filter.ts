@@ -13,6 +13,7 @@
 // with `new Date(y, m, d, h)`.
 
 import { formatDate } from "../settings/dates";
+import { DEVICE_ZONE } from "../people/time-zones";
 import { inQuietHours, type DateLocale, type SettingsV1 } from "../settings/prefs";
 import { isNoticeRead } from "./read";
 import type { Notice } from "./types";
@@ -91,7 +92,8 @@ const dayLabel = (day: number, today: number, locale?: DateLocale) => {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   if (day === yesterday.getTime()) return "Yesterday";
-  return formatDate(day, locale, { style: "weekday" });
+  // `day` is a midnight on this device's calendar: named on that calendar.
+  return formatDate(day, locale, { style: "weekday", timeZone: DEVICE_ZONE });
 };
 
 const weekLabel = (week: number, thisWeek: number, locale?: DateLocale) => {
@@ -99,7 +101,7 @@ const weekLabel = (week: number, thisWeek: number, locale?: DateLocale) => {
   const last = new Date(thisWeek);
   last.setDate(last.getDate() - 7);
   if (week === last.getTime()) return "Last week";
-  return `Week of ${formatDate(week, locale, { style: "day" })}`;
+  return `Week of ${formatDate(week, locale, { style: "day", timeZone: DEVICE_ZONE })}`;
 };
 
 /** The bell's list as the digest shows it: one list right away, else a heading per day or week.
