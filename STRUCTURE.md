@@ -139,7 +139,7 @@ ideeza-creator-panel/
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
    │  │                      videos, comments), filter (settings, quiet hours, digest), read state
    │  ├─ account/            the account: payment token, invoices, summary, your private identity
-   │  │                      (ideeza:account:identity: legal name, gender, addresses) and countries
+   │  │                      (ideeza:account:identity: the legal name) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store

@@ -6,7 +6,8 @@
 // a PDF from the browser's print dialog (the page chrome stays off paper).
 // Built from the payment itself (lib/account/invoices.ts); a testnet invoice
 // says so on its face. "Billed to" prints the Billing details saved on Plan &
-// pricing › Billing history (lib/account/billing-details.ts), as they are now.
+// pricing › Billing history (lib/account/billing-details.ts), as they are now;
+// with no name there, your legal name (Settings › Account), else your profile's.
 
 import * as React from "react";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import { useMe } from "@/components/dashboard/sidebar-account";
 import { Badge, Button, TestnetDemoBadge } from "@/components/ideeza";
 import { NARROW_COLUMN, Page } from "@/components/ideeza/page";
 import { billedTo, useBillingDetails } from "@/lib/account/billing-details";
+import { invoiceNameOf, useIdentity } from "@/lib/account/identity";
 import { invoicesOf } from "@/lib/account/invoices";
 import { usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
@@ -32,6 +34,7 @@ export function InvoiceView({ orderId }: { orderId: string }) {
   const { hydrated: planReady, sub } = useCreatePlan();
   const me = useMe();
   const billing = useBillingDetails();
+  const { identity } = useIdentity();
   const invoice = React.useMemo(() => invoicesOf(ledger, sub.orders).find((i) => i.id === orderId) ?? null, [ledger, sub.orders, orderId]);
 
   React.useEffect(() => {
@@ -65,7 +68,7 @@ export function InvoiceView({ orderId }: { orderId: string }) {
   }
 
   const renewal = invoice.status === "Not charged";
-  const to = billedTo(billing, me.name);
+  const to = billedTo(billing, invoiceNameOf({ billingName: billing.name, legalName: identity.legalName, profileName: me.name }));
   return (
     <Shell>
       <div className="flex flex-wrap items-center justify-between gap-[12px] print:hidden">
