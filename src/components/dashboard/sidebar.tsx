@@ -46,6 +46,9 @@ import {
 import { PRICING_HREF } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
+import { idzCompactOf } from "@/lib/wallet/idz";
+import { formatAmount } from "@/lib/wallet/money";
+import { useMakerIdz } from "@/components/balance/use-maker-idz";
 import { Icon, type IconValue } from "./icon";
 import { SIDEBAR_COLLAPSED_KEY } from "./sidebar-state";
 import {
@@ -722,6 +725,7 @@ function ProfileRow({
   const ids = { account: React.useId(), wallet: React.useId(), bell: React.useId() };
   const planLabel = usePlanLabel();
   const me = useMe();
+  const idz = useMakerIdz();
 
   React.useLayoutEffect(() => {
     railRef.current = rowRef.current?.closest("aside") ?? null;
@@ -799,16 +803,22 @@ function ProfileRow({
       )}
     </button>
   );
+  // Connected, the expanded footer shows the balance beside the icon (the
+  // Figma navbar's "Balance: 50 $IDZ", D2); the collapsed rail keeps the icon.
+  const showIdz = !collapsed && idz.connected && idz.idz !== null;
   const wallet = (
     <button
       ref={walletButton}
       {...trigger("wallet")}
       aria-haspopup="menu"
-      aria-label="Wallet and tokens"
-      title="Wallet and tokens"
-      className={[FOOTER_BUTTON, openPanel === "wallet" ? "bg-bg-subtle text-text-primary" : ""].join(" ")}
+      aria-label={showIdz ? `Wallet and tokens, ${formatAmount(idz.idz!, "IDZ")}` : "Wallet and tokens"}
+      title={showIdz ? `Wallet and tokens · ${formatAmount(idz.idz!, "IDZ")}` : "Wallet and tokens"}
+      className={[showIdz ? WALLET_PILL : FOOTER_BUTTON, openPanel === "wallet" ? "bg-bg-subtle text-text-primary" : ""].join(" ")}
     >
       <Icon icon={Wallet01Icon} />
+      {showIdz && (
+        <span aria-hidden className="text-sm font-semibold leading-xs tabular-nums text-text-primary">{idzCompactOf(idz.idz!)}</span>
+      )}
     </button>
   );
   // In the phone drawer the bell is left out: it lives in the phone's top bar (F25).
@@ -854,6 +864,9 @@ type Panel = "account" | "wallet" | "bell";
 // Figma A01 Button, Secondary, icon-only SM: 32 px, a 1.5 px edge, radius lg.
 const FOOTER_BUTTON =
   "relative inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg border-[length:var(--border-width-1-5)] border-solid border-[var(--color-button-secondary-border)] bg-[var(--color-button-secondary-bg)] text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)] [@media(pointer:coarse)]:size-[var(--touch-min)]";
+// FOOTER_BUTTON with the balance beside the icon: as tall, as wide as it needs.
+const WALLET_PILL =
+  "relative inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border-[length:var(--border-width-1-5)] border-solid border-[var(--color-button-secondary-border)] bg-[var(--color-button-secondary-bg)] px-[8px] text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)]";
 
 // The bell lists what the app knows needs the maker (lib/notifications: builds,
 // sales and bids, messages, credits, video takes, comments, Blog results), with

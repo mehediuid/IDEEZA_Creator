@@ -17,6 +17,7 @@ import { useEditorScope } from "@/components/manual/use-step-nav";
 import { editorDocKey } from "@/lib/manual/editor-scope";
 import { readSettings } from "@/lib/settings/prefs";
 import { useSettings } from "@/lib/settings/use-settings";
+import { saveNow, writeReported } from "@/lib/manual/save-status";
 
 // Monaco needs the browser — dynamic-import with ssr disabled.
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.default), {
@@ -244,9 +245,10 @@ function loadFiles(key: string | null): FileEntry[] {
   return DEFAULT_FILES;
 }
 
+/** Writes the files and tells the top bar's save status whether the browser kept them. */
 function persistFiles(key: string | null, files: FileEntry[]) {
   if (typeof window === "undefined" || !key) return;
-  try { window.localStorage.setItem(key, JSON.stringify(files)); } catch {}
+  writeReported("code.files", key, JSON.stringify(files));
 }
 
 type TerminalLine = { kind: "out" | "in"; text: string };
@@ -328,7 +330,12 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
     const trigger = (id: string) => ed?.getAction(id)?.run();
     switch (action) {
       case "newFile": newFile(); return;
-      case "save": setTerminal((t) => [...t, { kind: "out", text: `Saved ${activeName}.` }, { kind: "out", text: "" }]); return;
+      case "save": {
+        // The file saves as it is typed; Save writes the whole product now, as Ctrl+S does.
+        const ok = saveNow();
+        setTerminal((t) => [...t, { kind: "out", text: ok ? `Saved ${activeName}.` : `Couldn't save ${activeName}: this browser's storage is full or blocked.` }, { kind: "out", text: "" }]);
+        return;
+      }
       case "saveAll": setTerminal((t) => [...t, { kind: "out", text: `Saved ${files.length} files.` }, { kind: "out", text: "" }]); return;
       case "closeTab": if (activeFile) closeTab(activeFile.name); return;
       case "undo": trigger("undo"); return;

@@ -8,6 +8,7 @@
 // Profile dropdown hosts the Earn IDZ + Connect Wallet actions when the
 // menu bar takes the middle slot, so the user never loses access to them.
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -29,6 +30,7 @@ import { useMe } from "@/lib/people/profile-store";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { ProductNameField } from "@/components/manual/product-name-field";
 import { ProductSwitcher } from "@/components/manual/product-switcher";
+import { EditorSaveStatus } from "@/components/manual/editor-save-status";
 import { EditorBannerOutlet } from "@/components/manual/bring-in-banner";
 import { NoticeBell } from "@/components/notifications/notice-bell";
 
@@ -105,11 +107,11 @@ export function TopBar() {
         zIndex: 30,
       }}
     >
-      {/* logo + caret */}
-      <div className="ix-pill" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer", paddingRight: "var(--spacing-5)" }}>
+      {/* logo + caret — the editor's way Home (it looked clickable and did nothing) */}
+      <Link href="/" aria-label="Home" className="ix-pill" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer", paddingRight: "var(--spacing-5)", textDecoration: "none" }}>
         <IdeezaLogo height={26} />
         <HugeiconsIcon icon={ArrowDown01Icon} size={14} color={VIOLET} strokeWidth={2.5} />
-      </div>
+      </Link>
 
       {/* The product the editor holds, with its project under it — the ONLY
           place the product / project name chip lives (removed from the left
@@ -162,8 +164,10 @@ export function TopBar() {
                 />
                 <ProductSwitcher />
               </div>
-              <span
-                title={activeProject.name}
+              {/* The project's name is the editor's way to its page (owner D7, 2026-10-19). */}
+              <Link
+                href={`/projects/${encodeURIComponent(activeProject.id)}`}
+                title={`Open ${activeProject.name}`}
                 style={{
                   fontSize: "var(--font-size-2xs)",
                   fontWeight: 500,
@@ -172,12 +176,16 @@ export function TopBar() {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  textDecoration: "none",
                 }}
               >
                 {activeProject.name}
-              </span>
+              </Link>
             </div>
           )}
+          {/* Draft (or the project's status) and whether the work is saved — the one save
+              readout for every editor (owner D3, 2026-10-19). */}
+          {currentStep !== "brief" && <EditorSaveStatus project={activeProject} />}
         </div>
       )}
 

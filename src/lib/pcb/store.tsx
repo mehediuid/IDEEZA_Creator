@@ -19,6 +19,7 @@ import { dropImportedGroup, type ImportedModel } from "./gltf-import";
 import { delCategoryOf } from "./del-objects";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
 import { DocSaveQueue, readEditorDoc, writeEditorDoc, type DocHandle } from "../manual/editor-docs";
+import { registerSaveFlusher, reportSave, saveNow } from "../manual/save-status";
 import { onProjectDeleted } from "../manual/events";
 import { reportWrite } from "../storage-status";
 import {
@@ -187,6 +188,10 @@ export interface PcbActions {
   /** Drag a panel edge. Clamped by PANEL_LIMITS; view state, so no undo entry. */
   setPanelSize: (which: "left" | "right" | "bottom", px: number) => void;
   saveDoc: () => void;
+  /** The same write as saveDoc without its toast, for Save project (the editors' saved
+   *  dialog says it instead): true when the board was written, false when the write was
+   *  refused, null when no product's board is held. */
+  flushDoc: () => boolean | null;
   /** Mirror the PCB view to inspect the board from the bottom (Flip Board). */
   toggleBoardFlip: () => void;
   /** Net highlight — glow every object on `net` (null clears / Unhighlight All). */
@@ -786,6 +791,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           // product's has no chip left to update.
           if (heldRef.current?.handle !== handle) return;
           setState((s) => (ok ? { ...s, saveState: "saved", lastSavedAt: stamp() } : { ...s, saveState: "failed" }));
+          // The editors' one save status (lib/manual/save-status.ts); Retry writes the board again.
+          reportSave("pcb", ok, () => actions.flushDoc() === true);
         },
       ),
   );
@@ -1239,16 +1246,22 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge((s) => ({ panelSizes: { ...s.panelSizes, [which]: v } }));
       },
       saveDoc: () => {
-        const held = heldRef.current;
-        if (!held) {
+        if (!heldRef.current) {
           actions.flashToast("Open a product to save its board");
           return;
         }
+        // File › Save saves the whole product, as Ctrl+S does: every editor's pending write.
+        actions.flashToast(saveNow() ? "Saved" : "Save failed");
+      },
+      flushDoc: () => {
+        const held = heldRef.current;
+        if (!held) return null;
         saveQueue.cancel();
         const storage = docStorage();
         const ok = !!storage && writeEditorDoc(held.handle, JSON.stringify(docOf(stateRef.current)), storage);
         merge(ok ? { saveState: "saved", lastSavedAt: stamp() } : { saveState: "failed" });
-        actions.flashToast(ok ? "Saved" : "Save failed");
+        reportSave("pcb", ok, () => actions.flushDoc() === true);
+        return ok;
       },
       toggleBoardFlip: () =>
         merge((s) => {
@@ -3189,6 +3202,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         }),
     };
   }, [merge, mergeWithHistory, saveQueue]);
+
+  // Saving on purpose (Ctrl+S, File › Save, Finish) writes the board now.
+  React.useEffect(() => registerSaveFlusher("pcb", () => actions.flushDoc()), [actions]);
 
   return (
     <StateCtx.Provider value={state}>

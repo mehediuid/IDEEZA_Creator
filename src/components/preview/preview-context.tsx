@@ -26,6 +26,7 @@ import { usePcbState } from "@/lib/pcb/store";
 import { useEditorScope } from "@/components/manual/use-step-nav";
 import { editorDocKey } from "@/lib/manual/editor-scope";
 import { DocSaveQueue, globalTimers } from "@/lib/manual/editor-docs";
+import { registerSaveFlusher, reportSave, writeReported } from "@/lib/manual/save-status";
 import {
   derivePcb3D,
   type Pcb3DBoard,
@@ -290,12 +291,17 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
       new DocSaveQueue<string, SceneShape[]>(
         200,
         (key, shapes) => {
-          try {
-            window.localStorage.setItem(key, JSON.stringify(shapes));
-            return true;
-          } catch {
-            return false;
-          }
+          const write = () => {
+            try {
+              window.localStorage.setItem(key, JSON.stringify(shapes));
+              return true;
+            } catch {
+              return false;
+            }
+          };
+          const ok = write();
+          reportSave("preview.shapes", ok, write);
+          return ok;
         },
         globalTimers,
       ),
@@ -304,13 +310,12 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated || !keys) return;
     shapesQueue.schedule(keys.shapes, enclosureShapes);
   }, [enclosureShapes, hydrated, keys, shapesQueue]);
-  // Leaving Preview writes the last edit, as Wiring does.
+  // Leaving Preview writes the last edit, as Wiring does; so does saving on purpose.
   React.useEffect(() => () => void shapesQueue.flush(), [shapesQueue]);
+  React.useEffect(() => registerSaveFlusher("preview.shapes", () => shapesQueue.flush()), [shapesQueue]);
   React.useEffect(() => {
     if (!hydrated || !keys) return;
-    try {
-      window.localStorage.setItem(keys.canvas, JSON.stringify(canvas));
-    } catch {}
+    writeReported("preview.canvas", keys.canvas, JSON.stringify(canvas));
   }, [canvas, hydrated, keys]);
 
   const patchCanvas = React.useCallback(
@@ -321,9 +326,7 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
   // ── Mates persistence ────────────────────────────────────────────────
   React.useEffect(() => {
     if (!hydrated || !keys) return;
-    try {
-      window.localStorage.setItem(keys.mates, JSON.stringify(mates));
-    } catch {}
+    writeReported("preview.mates", keys.mates, JSON.stringify(mates));
   }, [mates, hydrated, keys]);
 
   const setMate = React.useCallback(

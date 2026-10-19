@@ -48,7 +48,6 @@ export const SETTING_DIALOGS: Record<string, DialogSpec> = {
     rows: [
       [{ k: "sel", key: "measurementUnit", label: "Measurement Unit", options: MEASUREMENT_UNITS.map((u) => MEASUREMENT_UNIT_LABELS[u]), def: MEASUREMENT_UNIT_LABELS[DEFAULT_MEASUREMENT_UNIT] }],
       [{ k: "info", label: "Language", value: "English", desc: "Other languages aren't available yet." }],
-      [{ k: "info", label: "Auto-save", value: "Always on", desc: "Every change is saved in this browser a moment after you make it." }],
       [{ k: "tog", key: "reopenLast", label: "Reopen last project on launch", def: true }],
       [{ k: "tog", key: "startupTips", label: "Show startup tips", def: false }],
     ],

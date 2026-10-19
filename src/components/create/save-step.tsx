@@ -25,14 +25,15 @@
 //
 // Saving writes ONE record (the provider's saveBuild), waits for the store's
 // write to settle (useStoreWrite: 250 ms, projectWriteRefused), and only then
-// records the build's project, clears the draft and goes to the project page
-// with `?saved=` (P2-SAVE-9). A refused write reverts the list — and puts back
+// records the build's project, clears the draft and turns into the saved
+// dialog (SavedDialog, owner 2026-10-19): the maker stays on the build and
+// picks View project, Back to chat or Back to Home, instead of being taken to
+// the project page. A refused write reverts the list — and puts back
 // a listing the pause confirm paused for it — and keeps the dialog open with
 // its text. What the maker typed is kept per build, in memory, until a save
 // or a reload.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Loading03Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, ModalFrame, Radio, SelectMenu } from "@/components/ideeza";
@@ -42,6 +43,7 @@ import {
   type ProjectDetailsFieldsHandle,
 } from "@/components/projects/project-details-fields";
 import { useStoreWrite } from "@/components/projects/details/use-store-write";
+import { ProjectRow, SavedDialog } from "@/components/projects/saved-dialog";
 import { useProjectBrief } from "@/lib/brief/project-brief";
 import { useCreateHistory, type BuildJob } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
@@ -176,7 +178,6 @@ export function SaveStep({
 }
 
 function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: SaveModeInfo; onClose: () => void }) {
-  const router = useRouter();
   const { projects, saveBuild } = useManualProjects();
   const { builds, setBuildProject, getChat } = useCreateHistory();
   const { data: market } = useMarket();
@@ -246,6 +247,8 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const [storageFull, setStorageFull] = React.useState(false);
   const [stillPaused, setStillPaused] = React.useState(false);
   const [refusal, setRefusal] = React.useState<string | null>(null);
+  // The save held: the dialog says so, with what it saved (kept from the moment it held).
+  const [saved, setSaved] = React.useState<{ projectId: string; kind: "new" | "join" | "version"; at: number } | null>(null);
   const applied = pending !== null && holderOf(job, projects)?.id === pending.projectId;
   const write = useStoreWrite(applied, () => {
     if (!pending) return;
@@ -268,7 +271,9 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
       if (network) saveNetwork(network);
     }
     DRAFTS.delete(job.id);
-    router.push(`/projects/${pending.projectId}?saved=${encodeURIComponent(job.id)}`);
+    setSaved({ projectId: pending.projectId, kind, at: Date.now() });
+    setPending(null);
+    busy.current = false;
   });
   const saving = pending !== null || write.saving;
 
@@ -401,6 +406,24 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
     patch({ mode: "join", joinId: v });
     window.requestAnimationFrame(() => changeRef.current?.focus());
   };
+
+  // The save held: the same frame's place now says so (SavedDialog). A project gone from this
+  // browser by then leaves nothing to show.
+  if (saved) {
+    const project = projects.find((p) => p.id === saved.projectId);
+    if (!project) return null;
+    return (
+      <SavedDialog
+        project={project}
+        kind={saved.kind}
+        product={single ? product : joinNames}
+        version={n}
+        savedAt={saved.at}
+        stayLabel={getChat(job.chatId) ? "Back to chat" : "Back to the build"}
+        onStay={onClose}
+      />
+    );
+  }
 
   return (
     <>
@@ -598,34 +621,6 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
 // ─────────────────────────── pieces ───────────────────────────
 
 /** The project a join or a version goes into: its cover (the box reserved), name and one fact. */
-function ProjectRow({
-  project,
-  cover,
-  meta,
-  action,
-}: {
-  project: ManualProject;
-  cover: string | null;
-  meta: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-6 rounded-xl border border-solid border-border px-6 py-5">
-      <div className="size-[48px] shrink-0 overflow-hidden rounded-lg bg-bg-subtle">
-        {cover && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover} alt="" width={48} height={48} className="size-full object-cover" />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-md font-semibold text-text-primary">{project.name}</p>
-        <p className="text-sm text-text-secondary">{meta}</p>
-      </div>
-      {action}
-    </div>
-  );
-}
-
 /** P2-SAVE-6: the diff the Versions block will show, as names. */
 function VersionChanges({
   changes,

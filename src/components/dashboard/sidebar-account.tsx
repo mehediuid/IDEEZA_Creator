@@ -44,8 +44,10 @@ import { useCredits } from "@/lib/create/credits";
 import { runningLow } from "@/lib/create/credit-limits";
 import { useSettings } from "@/lib/settings/use-settings";
 import { useCreatePlan } from "@/lib/create/plan";
-import { menuEntryOf } from "@/lib/wallet/request-view";
-import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { useMakerIdz } from "@/components/balance/use-maker-idz";
+import { shortAddress } from "@/lib/wallet/demo-wallet";
+import { idzUsdOf } from "@/lib/wallet/idz";
+import { formatAmount } from "@/lib/wallet/money";
 import { displayNameOf, initialsOf } from "@/lib/people/ids";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMyProfile } from "@/lib/people/profile-store";
@@ -496,7 +498,7 @@ function BalanceCard({
       <div className="flex items-center justify-between gap-[8px]">
         <span className="flex items-center gap-[8px]">
           <CreditRing share={share} low={low} />
-          <span className="text-md font-semibold leading-md tracking-wide text-text-primary">Balance</span>
+          <span className="text-md font-semibold leading-md tracking-wide text-text-primary">Credits</span>
         </span>
         {/* Buy credits, not Upgrade: it adds credits, it doesn't change the
             plan. As the design's profile dropdown, it goes to Buy credits
@@ -699,10 +701,12 @@ export function WalletPopover({
   onClose: (restoreFocus: boolean) => void;
   onLeave?: () => void;
 }) {
-  const wallet = useDemoWallet();
+  const me = useMakerIdz();
   const { openManage } = useWalletRequest();
-  const entry = menuEntryOf(wallet);
-  const connected = !!entry.detail;
+  const leave = () => {
+    onClose(true);
+    onLeave?.();
+  };
 
   return (
     <FloatingPanel
@@ -713,7 +717,7 @@ export function WalletPopover({
       frameRef={frameRef}
       side={side}
       inset={side === "top" ? 6 : 0}
-      width={236}
+      width={280}
       radius="lg"
       panelRef={panelRef}
       initialFocus={focusFirst ? "first" : "panel"}
@@ -730,23 +734,87 @@ export function WalletPopover({
       className="p-[4px]"
     >
       <div className="flex flex-col gap-[2px]">
-        {/* The wallet's one standing home (P2-MINT-2): the Demo wallet dialog,
-            where every identity connects. Focus goes back to the wallet button
-            first, so the dialog hands it back there when it closes. */}
-        <WalletRow
-          title={entry.title}
-          hint={connected ? entry.detail! : "Add an on-chain identity"}
-          demo={entry.demo}
-          onSelect={() => {
-            onClose(true);
-            onLeave?.();
+        {/* The Figma's navbar Balance menu (User Panel V2 41571:128125 /
+            128357): Overview with the balance, Buy $IDZ, Stake. The chip is
+            the wallet's one standing home (P2-MINT-2): Connect wallet, or the
+            connected address, both open the Demo wallet dialog. */}
+        <OverviewRow
+          connected={me.connected}
+          detail={me.connected && me.idz !== null ? [formatAmount(me.idz, "IDZ"), `= ${idzUsdOf(me.idz)}`] : []}
+          chip={me.connected && me.address ? shortAddress(me.address) : "Connect wallet"}
+          onOpen={leave}
+          onChip={() => {
+            leave();
             openManage();
           }}
         />
+        <WalletRow title="Buy $IDZ" hint="Buy IDZ in the presale" soon="Buying IDZ opens in the next step of Balance" />
+        <WalletRow title="Stake" hint="Deposit & Earn Reward" soon="Staking opens in a later step of Balance" />
         <WalletRow title="Earn IDZ tokens" hint="Free tokens to start" soon="Earning tokens isn't open yet" />
         <WalletRow title="Claim rewards" hint="See pending claims" soon="Rewards aren't open yet" />
       </div>
     </FloatingPanel>
+  );
+}
+
+/** Overview: a link to Balance › Overview, and beside it the wallet chip — two
+ *  controls side by side, never one inside the other. */
+function OverviewRow({
+  connected,
+  detail,
+  chip,
+  onOpen,
+  onChip,
+}: {
+  connected: boolean;
+  /** The Figma's two lines, "=50 $IDZ" and "=$ 5,000"; none while not connected (the chip says it). */
+  detail: string[];
+  chip: string;
+  onOpen: () => void;
+  onChip: () => void;
+}) {
+  return (
+    <div className="relative">
+      <Link
+        href="/balance"
+        role="menuitem"
+        data-nav-item
+        onClick={onOpen}
+        className="group flex w-full items-center gap-[10px] rounded-md py-[8px] pl-[10px] pr-[10px] text-left outline-none transition-colors duration-fast hover:bg-bg-surface focus-visible:bg-bg-surface focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
+          <span className="truncate text-sm font-semibold leading-xs tracking-wide text-text-primary group-hover:text-text-brand group-focus-visible:text-text-brand">
+            Overview
+          </span>
+          {connected && (
+            <span className="flex flex-col items-start gap-[2px] text-sm font-regular leading-sm text-text-tertiary">
+              {detail.map((line) => (
+                <span key={line} className="min-w-0 tabular-nums">
+                  {line}
+                </span>
+              ))}
+              <TestnetDemoBadge />
+            </span>
+          )}
+        </span>
+        {/* Room for the chip, which sits over this end of the row. */}
+        <span aria-hidden className="w-[112px] shrink-0" />
+        <span aria-hidden className="shrink-0 text-text-secondary">
+          <Icon icon={ArrowRight01Icon} />
+        </span>
+      </Link>
+      <button
+        type="button"
+        role="menuitem"
+        data-nav-item
+        aria-label={connected ? `Manage your demo wallet, ${chip}` : "Connect wallet"}
+        title={connected ? "Manage your demo wallet" : "Connect your demo wallet"}
+        onClick={onChip}
+        className="absolute right-[34px] top-1/2 inline-flex h-[24px] max-w-[112px] -translate-y-1/2 items-center rounded-full bg-bg-brand px-[8px] text-sm font-semibold leading-xs text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 max-md:h-[var(--touch-min)]"
+      >
+        <span className="truncate tabular-nums">{chip}</span>
+      </button>
+    </div>
   );
 }
 

@@ -24,9 +24,12 @@
 // remounts every editor. Under the top bar it shows what the seed brought in
 // (P2-BUILDLOAD-12), then "Bring it in" (P2-EDITOR-5): one banner at a time.
 //
-// The Brief's old address (/project/<slug>/brief) redirects to the
-// project's mint flow, /projects/<id>/earn/mint (Build and Earn P1-2), which
-// decides what opens there.
+// The open editor sits inside EditorSave: Save project (the rail's last item,
+// Product Preview's pill) saves where the maker is and asks where to go next
+// (owner, 2026-10-19). The step's own address (/project/<slug>/brief) goes to
+// the project page, where Publish keeps a Draft private, gives it or sells it —
+// never the mint flow's "How do you want to share it?" (a hand-made project
+// saves like an AI build).
 
 import * as React from "react";
 import Link from "next/link";
@@ -40,14 +43,15 @@ import { pendingNoticeOf, type SeedEditor } from "@/lib/manual/build-load";
 import { ensureSeeded, readSeed, type EnsureResult, type SeedBuilt } from "@/lib/manual/build-load-io";
 import { useManualProjects, type ManualFlowState } from "@/lib/manual/projects";
 import { buildsOf, productRowsOf, productsOfProject } from "@/lib/manual/project-read";
-import { earnMintHref } from "@/lib/manual/earn-route";
 import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
+import { resetSaveStatus } from "@/lib/manual/save-status";
 import type { EditorScope, EditorStep } from "@/lib/manual/p2-types";
 import { useWriteGuard } from "@/lib/manual/use-write-guard";
 import { usePcbActions, usePcbDocScope } from "@/lib/pcb/store";
 import { cn } from "@/lib/utils";
 import { BringInBanner, EditorBannerProvider, focusEditorBanners } from "./bring-in-banner";
+import { EditorSave } from "./editor-save";
 import { ImportNotice, SeedFailedNotice } from "./import-notice";
 
 function BlankShell({ label }: { label: string }) {
@@ -224,9 +228,9 @@ export function ProjectWorkspace({
     if (resumeHref) router.replace(resumeHref + window.location.search);
   }, [ready, project, resumeHref, router]);
 
-  // The Brief is Earn's mint flow now.
+  // Save project's address: the project page.
   React.useEffect(() => {
-    if (ready && projectId && isBrief) router.replace(earnMintHref(projectId));
+    if (ready && projectId && isBrief) router.replace(`/projects/${encodeURIComponent(projectId)}`);
   }, [ready, projectId, isBrief, router]);
 
   // The build a row is, read when the scope is applied — never a dependency,
@@ -244,6 +248,17 @@ export function ProjectWorkspace({
   // loop.
   const [seed, setSeed] = React.useState<SeedState | null>(null);
   const seededFor = React.useRef<string | null>(null);
+
+  // Another product: the top bar's save status starts afresh. This runs while the gate shows
+  // "Opening product…", before the product's editors mount and report their first writes.
+  const statusFor = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!projectId || !rowId) return;
+    const key = `${projectId}:${rowId}`;
+    if (statusFor.current === key) return;
+    statusFor.current = key;
+    resetSaveStatus();
+  }, [projectId, rowId]);
 
   // A product route applies its scope: the project and product become the
   // editor's; a built product's documents are seeded on its first open,
@@ -321,7 +336,7 @@ export function ProjectWorkspace({
     );
   }
 
-  if (isBrief) return <BlankShell label="Opening the mint flow…" />;
+  if (isBrief) return <BlankShell label="Opening the project…" />;
 
   if (legacyRoute) return <BlankShell label="Opening product…" />;
   if (!row) {
@@ -378,9 +393,11 @@ export function ProjectWorkspace({
 
   return (
     <>
-      <EditorBannerProvider banners={banners}>
-        <App key={`${scope.projectId}:${scope.productId}:${generation}`} />
-      </EditorBannerProvider>
+      <EditorSave project={project} unnamed={!row.name.trim()}>
+        <EditorBannerProvider banners={banners}>
+          <App key={`${scope.projectId}:${scope.productId}:${generation}`} />
+        </EditorBannerProvider>
+      </EditorSave>
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>

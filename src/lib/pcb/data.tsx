@@ -1443,7 +1443,8 @@ export function buildRail(_state: PcbState | null = null, activeKey: string = 'p
     { key: 'assembly', label: 'Assembly', icon: 'assembly' },
     { key: 'wiring', label: 'Peripheral Wiring', icon: 'wire' },
     { key: 'preview', label: 'Product Preview', icon: 'preview' },
-    { key: 'brief', label: 'Add Brief', icon: 'brief' },
+    // No Save item (owner D1, 2026-10-19): every editor saves as it goes and the project is a
+    // Draft from the start. The top bar says whether the work is saved; Finish ends the flow.
   ];
   return railDefs.map((r) => {
     const active = r.key === activeKey;

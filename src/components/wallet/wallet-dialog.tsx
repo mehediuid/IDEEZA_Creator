@@ -178,7 +178,7 @@ function useMovingFocus(key: string) {
   return { target, setTarget };
 }
 
-function useCopy() {
+export function useCopy() {
   const [copied, setCopied] = React.useState<{ what: string; text: string } | null>(null);
   React.useEffect(() => {
     if (!copied) return;
@@ -199,7 +199,7 @@ function useCopy() {
   return { copied, copy };
 }
 
-function CopyButton({
+export function CopyButton({
   label,
   done,
   onPress,

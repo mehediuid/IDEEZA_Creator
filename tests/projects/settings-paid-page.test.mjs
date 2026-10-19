@@ -100,7 +100,7 @@ test("payoutNotices: each method event is an urgent Coin notice that leads to th
     ["payout:removed:m1:500", "coin", true, "/settings/get-paid#methods", 500],
   ]);
   assert.equal(out[0].title, "You added a withdrawal method");
-  assert.match(out[0].body, /0x955d…ed95 on Mumbai Testnet \(Polygon\)/);
+  assert.match(out[0].body, /0x955d…ed95 on Amoy Testnet \(Polygon\)/);
   assert.match(out[0].body, /Not you\?/);
   assert.equal(out[1].title, "Withdrawals now go to Hot");
   assert.equal(out[2].title, "You removed Cold");

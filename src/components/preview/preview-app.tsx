@@ -69,7 +69,7 @@ function PreviewBody({ variant }: { variant: PreviewVariant }) {
       <PreviewToolbar />
 
       {/* Shared module-switcher rail (PCB Design / Code / 3D Module /
-          Product Preview / Add Brief). */}
+          Product Preview). */}
       <LeftRail
         topOffset={VIEWPORT_TOP}
         bottomOffset={0}
@@ -111,7 +111,7 @@ function PreviewBody({ variant }: { variant: PreviewVariant }) {
       {/* Continue — bottom-RIGHT inside the viewport area. */}
       <FlowPill
         kind="forward"
-        label={isWiring ? "Continue to Preview" : "Continue to Brief"}
+        label={isWiring ? "Continue to Preview" : "Finish"}
         onClick={() => goStep(isWiring ? "preview" : "brief")}
         style={{ right: RIGHT_PANEL_W + 20, bottom: 20 }}
       />

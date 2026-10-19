@@ -93,7 +93,7 @@ test("requestCopy: connecting and switching are busy, cancellable phases", () =>
 test("requestCopy: wrongNetwork names both networks and offers the switch", () => {
   const onMumbai = walletSwitchNetwork(walletConnect(defaultWallet(), "maker-1"), "maker-1", "mumbai");
   const c = requestCopy("wrongNetwork", makerReq, onMumbai);
-  assert.match(c.title, /Mumbai Testnet \(Polygon\)/);
+  assert.match(c.title, /Amoy Testnet \(Polygon\)/);
   assert.match(c.title, /Base Sepolia \(Testnet\)/);
   assert.equal(c.primary, "Switch to Base Sepolia (Testnet)");
 });
@@ -135,7 +135,7 @@ test("requestCopy: signing and pending", () => {
   assert.equal(signing.primary, "Waiting for your signature…");
   const pending = requestCopy("pending", buyerReq, undefined);
   assert.equal(pending.title, "Transaction submitted.");
-  assert.ok(pending.body.some((l) => l.includes("Waiting for confirmation on Mumbai Testnet (Polygon)")));
+  assert.ok(pending.body.some((l) => l.includes("Waiting for confirmation on Amoy Testnet (Polygon)")));
   assert.ok(pending.body.some((l) => l.includes("A submitted transaction can't be cancelled.")));
   assert.equal(pending.primary, undefined); // no primary — Escape does nothing here
 });

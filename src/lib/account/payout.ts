@@ -16,8 +16,9 @@
 // split by who held the project when it sold: co-owners and buyers of a
 // share take theirs), net of IDEEZA's 2.5 % fee, less every withdrawal.
 // Sales are in test coins, so dollars come from one fixed demo-rate table,
-// `DEMO_USD_RATES` (the app's one dollar rule): dollar coins and IDZ one for
-// one, test ETH and MATIC at the rates below. Nothing here is a market price;
+// `DEMO_USD_RATES` (the app's one dollar rule): dollar coins one for one, IDZ
+// at the one IDZ price the Balance page and credits use (`wallet/idz-price.ts`),
+// test ETH and MATIC at the rates below. Nothing here is a market price;
 // every page that shows these dollars says "demo rate".
 //
 // Pure apart from the guarded localStorage read and write; relative imports
@@ -25,6 +26,7 @@
 
 import type { Network } from "../brief/types";
 import type { Sale } from "../market/types";
+import { IDZ_USD_PRICE } from "../wallet/idz-price";
 import { addAmounts, compareAmounts, fromMicros, subAmounts, toMicros } from "../wallet/money";
 import type { Amount, Coin } from "../wallet/types";
 
@@ -322,13 +324,13 @@ export function withdrawStepsOf(i: { verified: boolean; methods: number }): With
 /**
  * Dollars per coin, fixed, for the demo: test coins have no market price, so a
  * balance across sales in different coins needs a stated rate. Dollar coins
- * and IDZ (the demo rate Plan & billing uses) are one for one; test ETH is the
- * rate the design's mint cost was drawn at (0.00104 ETH ≈ $3.90).
+ * are one for one; IDZ is the one IDZ price (Balance, wallet menu, credits);
+ * test ETH is the rate the design's mint cost was drawn at (0.00104 ETH ≈ $3.90).
  */
 export const DEMO_USD_RATES: Record<Coin, Amount> = {
   USDT: "1",
   USDC: "1",
-  IDZ: "1",
+  IDZ: IDZ_USD_PRICE,
   ETH: "3750",
   WETH: "3750",
   MATIC: "0.5",

@@ -38,10 +38,10 @@ const main = (pct) => ({ nft: "main", sharePct: pct });
 const project = (id, name, contributors = []) => ({ id, name, contributors });
 const coOwner = (share, addedAt) => ({ id: `c${share}`, role: "coOwner", share, addedAt });
 
-test("demo rates: dollar coins and IDZ one for one; test ETH and MATIC at fixed rates", () => {
+test("demo rates: dollar coins one for one, IDZ at the one IDZ price; test ETH and MATIC at fixed rates", () => {
   assert.equal(DEMO_USD_RATES.USDT, "1");
   assert.equal(DEMO_USD_RATES.USDC, "1");
-  assert.equal(DEMO_USD_RATES.IDZ, "1");
+  assert.equal(DEMO_USD_RATES.IDZ, "0.025065");
   assert.equal(DEMO_USD_RATES.ETH, DEMO_USD_RATES.WETH);
   assert.equal(usdOf("9.75", "USDC"), "9.75");
   assert.equal(usdOf("0.1", "ETH"), String(Number(DEMO_USD_RATES.ETH) / 10));

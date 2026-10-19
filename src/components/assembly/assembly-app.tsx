@@ -18,6 +18,7 @@ import { Button, Checkbox } from "@/components/ideeza";
 import { boardPartsOf, type BoardPart } from "@/lib/pcb/board-parts";
 import { usePcbState } from "@/lib/pcb/store";
 import { readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/editor-docs";
+import { reportSave } from "@/lib/manual/save-status";
 
 const TOP = 62; // TopBar height
 const LEFT_RAIL = 74;
@@ -58,7 +59,10 @@ export function AssemblyApp() {
   const toggle = (id: string) => {
     const next = { ...done, [id]: !done[id] };
     setDone(next);
-    if (handleRef.current) writeEditorDoc(handleRef.current, JSON.stringify(next), window.localStorage);
+    const handle = handleRef.current;
+    if (!handle) return;
+    const write = () => writeEditorDoc(handle, JSON.stringify(next), window.localStorage);
+    reportSave("assembly", write(), write);
   };
   const resetProgress = () => {
     setDone({});

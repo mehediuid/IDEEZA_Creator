@@ -24,6 +24,7 @@ import { AiGenerateModal } from "@/components/3d/ai-generate-modal";
 import { C } from "@/lib/pcb/colors";
 import { DEFAULT_SHAPES } from "@/lib/three/scene";
 import { editorDocKey } from "@/lib/manual/editor-scope";
+import { writeReported } from "@/lib/manual/save-status";
 import { fingerprintOf } from "@/lib/manual/build-load";
 import { readSeed } from "@/lib/manual/build-load-io";
 import type { EditorScope } from "@/lib/manual/p2-types";
@@ -206,11 +207,11 @@ export function ThreeApp() {
   // the deterministic SSR default on the initial render.
   React.useEffect(() => {
     if (!hydrated || !keys) return;
-    try { window.localStorage.setItem(keys.shapes, JSON.stringify(shapes)); } catch {}
+    writeReported("3d.shapes", keys.shapes, JSON.stringify(shapes));
   }, [shapes, hydrated, keys]);
   React.useEffect(() => {
     if (!hydrated || !keys) return;
-    try { window.localStorage.setItem(keys.right, JSON.stringify(right)); } catch {}
+    writeReported("3d.panel", keys.right, JSON.stringify(right));
   }, [right, hydrated, keys]);
 
   const flashToast = (msg: string) => {
