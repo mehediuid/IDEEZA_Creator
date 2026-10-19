@@ -212,7 +212,7 @@ export function useNotices(): NoticeFeed {
       hydrated: !!now && historyReady && blog.hydrated && messages.hydrated && market.hydrated && credits.hydrated && reads.hydrated,
       settings,
       list,
-      groups: groupNotices(list, settings.notifications.digest, now),
+      groups: groupNotices(list, settings.notifications.digest, now, settings.language.dateLocale),
       unread: unreadCount(visible, keys, settings, now),
       unreadList: visible.filter((n) => !isNoticeRead(n, keys)),
       isRead: (n: Notice) => isNoticeRead(n, keys),

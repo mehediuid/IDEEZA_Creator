@@ -19,6 +19,8 @@ import { demoAddress, makerId } from "@/lib/wallet/demo-wallet";
 import { identityLabelOf } from "@/lib/wallet/request-view";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { COUNTRIES, countryNameOf } from "@/lib/account/countries";
+import { formatDate, formatDateTime } from "@/lib/settings/dates";
+import { readSettings } from "@/lib/settings/prefs";
 
 export const GET_PAID = "/settings/get-paid";
 export const GET_PAID_BALANCE = "/settings/get-paid/balance";
@@ -29,17 +31,14 @@ export const KYC_HREF = "/settings/kyc";
 
 // ───────────────────────── dates ─────────────────────────
 
-/** "12 Jan 2026, 12:12 AM" (Figma's history table). */
+/** A date and time in your Date & Time Formatting choice (Settings › Language). */
 export function formatWhen(ts: number): string {
-  const d = new Date(ts);
-  const month = d.toLocaleDateString("en-US", { month: "short" });
-  const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-  return `${d.getDate()} ${month} ${d.getFullYear()}, ${time}`;
+  return formatDateTime(ts, readSettings().language.dateLocale, { style: "medium" });
 }
 
-/** "Dec 6, 2025" (Figma's "Active Dec 6, 2025"). */
+/** A date in your Date & Time Formatting choice ("Active Dec 6, 2025"). */
 export function formatDay(ts: number): string {
-  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatDate(ts, readSettings().language.dateLocale);
 }
 
 // ───────────────────────── countries ─────────────────────────

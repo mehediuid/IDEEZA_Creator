@@ -6,8 +6,8 @@
 // text routes all call Pollinations' keyless text model. Two switches: the
 // volunteer GPU pool for images (off: image requests carry `pool: "off"` and
 // are never sent to the AI Horde; without another image service they are
-// refused, and the card says why), and AI help in the editors (off hides the
-// Code editor's AI chat and the 3D editor's AI Generate).
+// refused, and the card says why), and AI help in the editors (off hides every
+// editor's AI assistant and the 3D editor's AI Generate).
 
 import * as React from "react";
 import { Toggle } from "@/components/ideeza";
@@ -90,7 +90,7 @@ export function AiPage({ images, threeD }: { images: "aihorde" | "pollinations";
         <SettingsRow
           id="editor-assist"
           label="AI help in the editors"
-          help="The AI chat in the Code editor and AI Generate in the 3D editor. Off hides both."
+          help="The AI assistant in the PCB, Code, 3D and Preview editors, and AI Generate in the 3D editor. Off hides them."
           control={
             <Toggle
               className={TOGGLE_TAP}

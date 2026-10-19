@@ -12,7 +12,8 @@
 // Pure; local wall-clock time comes from `Date`, so a test builds its times
 // with `new Date(y, m, d, h)`.
 
-import { inQuietHours, type SettingsV1 } from "../settings/prefs";
+import { formatDate } from "../settings/dates";
+import { inQuietHours, type DateLocale, type SettingsV1 } from "../settings/prefs";
 import { isNoticeRead } from "./read";
 import type { Notice } from "./types";
 
@@ -85,28 +86,34 @@ const startOfWeek = (ms: number) => {
   return d.getTime();
 };
 
-const dayLabel = (day: number, today: number) => {
+const dayLabel = (day: number, today: number, locale?: DateLocale) => {
   if (day === today) return "Today";
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   if (day === yesterday.getTime()) return "Yesterday";
-  return new Date(day).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return formatDate(day, locale, { style: "weekday" });
 };
 
-const weekLabel = (week: number, thisWeek: number) => {
+const weekLabel = (week: number, thisWeek: number, locale?: DateLocale) => {
   if (week === thisWeek) return "This week";
   const last = new Date(thisWeek);
   last.setDate(last.getDate() - 7);
   if (week === last.getTime()) return "Last week";
-  return `Week of ${new Date(week).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  return `Week of ${formatDate(week, locale, { style: "day" })}`;
 };
 
 /** The bell's list as the digest shows it: one list right away, else a heading per day or week.
  *  `list` is already newest first. */
-export function groupNotices(list: readonly Notice[], digest: SettingsV1["notifications"]["digest"], now: number): NoticeGroup[] {
+/** `locale` is the Date & Time Formatting choice (Settings › Language). */
+export function groupNotices(
+  list: readonly Notice[],
+  digest: SettingsV1["notifications"]["digest"],
+  now: number,
+  locale?: DateLocale,
+): NoticeGroup[] {
   if (digest === "instant") return [{ key: "all", label: null, notices: [...list] }];
   const of = digest === "daily" ? startOfDay : startOfWeek;
-  const label = digest === "daily" ? (k: number) => dayLabel(k, startOfDay(now)) : (k: number) => weekLabel(k, startOfWeek(now));
+  const label = digest === "daily" ? (k: number) => dayLabel(k, startOfDay(now), locale) : (k: number) => weekLabel(k, startOfWeek(now), locale);
   const groups: NoticeGroup[] = [];
   for (const n of list) {
     const k = of(n.at);

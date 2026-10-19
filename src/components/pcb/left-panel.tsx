@@ -15,6 +15,8 @@ import { PLACE_TOOLS } from "@/lib/pcb/types";
 import { buildCompPills, buildLeftTabs, buildNetPills, buildSubTabs, buildTree } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { Splitter } from "@/components/pcb/splitter";
+import { readSettings } from "@/lib/settings/prefs";
+import { useSettings } from "@/lib/settings/use-settings";
 
 // One box, four tabs — so it says what *this* tab searches. It used to read
 // "Search parts & compo.." on all four, i.e. a lie on three of them.
@@ -108,12 +110,16 @@ export function LeftPanel({
   const state = usePcbState();
   const actions = usePcbActions();
   const [query, setQuery] = React.useState("");
-  const [aiOpen, setAiOpen] = React.useState(false);
+  const [aiOpenState, setAiOpen] = React.useState(false);
+  // Settings › AI Properties › "AI help in the editors": off hides the
+  // assistant here (the PCB, 3D and Preview panels share this one).
+  const assist = useSettings().ai.editorAssist;
+  const aiOpen = aiOpenState && assist;
 
   // A cross-tab AI handoff targeting this module opens the chat immediately;
   // the panel itself consumes and auto-sends the carried message.
   React.useEffect(() => {
-    if (!hasAiHandoff(MODULE_OF_CONTEXT[aiContext])) return;
+    if (!hasAiHandoff(MODULE_OF_CONTEXT[aiContext]) || !readSettings().ai.editorAssist) return;
     const t = setTimeout(() => setAiOpen(true), 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,7 +128,9 @@ export function LeftPanel({
   // Menu rows (Design ▸ Generate Data From Chatbot) open the assistant over a
   // window event — the menu builders are pure data and can't reach this state.
   React.useEffect(() => {
-    const onOpen = () => setAiOpen(true);
+    const onOpen = () => {
+      if (readSettings().ai.editorAssist) setAiOpen(true);
+    };
     window.addEventListener("ideeza:ai:open", onOpen);
     return () => window.removeEventListener("ideeza:ai:open", onOpen);
   }, []);
@@ -243,7 +251,7 @@ export function LeftPanel({
           ))}
         </div>
 
-        <button
+        {assist && <button
           type="button"
           className="ai-orb"
           onClick={() => setAiOpen((v) => !v)}
@@ -259,7 +267,7 @@ export function LeftPanel({
           }}
         >
           {AI_BOT_ICON}
-        </button>
+        </button>}
 
         {/* Panel chrome, not a destination. A bare icon button beside a filled
             one already reads as a different job, and at this width a hairline
