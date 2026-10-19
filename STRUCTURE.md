@@ -86,7 +86,8 @@ ideeza-creator-panel/
    │  │                      listing/ (Add to marketplace, Relist, Close auction); editions/ (Physical
    │  │                      and Virtual NFT); earn/ (the Earn area; earn/sell/ the Sell copies
    │  │                      flow; earn/ladder/ the gating ladder's track, commit
-   │  │                      checks, Verify identity (demo), Choose a license, Request payout);
+   │  │                      checks, Choose a license); earn/project-earnings (Sales'
+   │  │                      Your earnings → Withdraw in Get Paid);
    │  │                      business-plan/ (chip runner + page) — see
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
@@ -96,7 +97,9 @@ ideeza-creator-panel/
    │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
-   │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages
+   │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages;
+   │  │                      kyc-page; get-paid/ (hub, balance, add-method and withdraw dialogs,
+   │  │                      history + statement, tax forms, parts)
    │  │                      (profile/: Profile and Personal Information)
    │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor)
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card

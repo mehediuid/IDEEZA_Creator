@@ -200,9 +200,9 @@ test("P0 · the engineering meta line drops what the stage line says and the own
 // The ladder's facts (lib/commerce/ladder.ts): the Earn button counts its next commit point's steps.
 const ALL = {
   built: true, walletConnected: true, ownershipConfirmed: true, videosReady: true,
-  minted: true, licenseSet: true, payoutWalletSet: true, identityVerified: true,
+  minted: true, licenseSet: true, withdrawalMethodSet: true, identityVerified: true,
 };
-const DRAFT = { ...ALL, walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false, licenseSet: false, payoutWalletSet: false, identityVerified: false };
+const DRAFT = { ...ALL, walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false, licenseSet: false, withdrawalMethodSet: false, identityVerified: false };
 const earnOf = (over = {}) =>
   earnButtonOf({ projectId: "proj_car", commercial: "none", soldSharePct: 0, facts: DRAFT, reviewPending: false, ...over });
 

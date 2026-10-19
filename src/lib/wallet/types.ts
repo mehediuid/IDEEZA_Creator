@@ -90,7 +90,9 @@ export type RequestPurpose =
   /** AI credits paid from the demo wallet (Buy credits). */
   | "buyCredits"
   /** A plan paid from the demo wallet (Plan & pricing). */
-  | "subscribe";
+  | "subscribe"
+  /** Earnings withdrawn in Settings › Get Paid: a signature, nothing charged. */
+  | "withdraw";
 
 export type WalletRequest = {
   kind: "signature" | "transaction";

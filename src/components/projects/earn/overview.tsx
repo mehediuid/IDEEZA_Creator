@@ -49,7 +49,7 @@ const TASK_WORD: Partial<Record<LadderStep["id"], string>> = {
   ownership: "Confirm you own this design",
   videos: "Make a video for each product",
   license: "Choose a license",
-  payout: "Set a payout wallet",
+  payout: "Add a withdrawal method",
 };
 
 const ACTION_LINE: Record<EarnPathStep["id"], string> = {
@@ -283,7 +283,7 @@ function LiveCard({
           <Badge tone="warning">Testnet demo</Badge>
         </div>
         <p className={EARN_LEAD}>
-          {given ? why : `${why} Money from each sale goes straight to your wallet, minus the 2.5% IDEEZA fee.`}
+          {given ? why : `${why} Your share of each sale, less the 2.5% IDEEZA fee, joins your balance in Get Paid.`}
         </p>
       </div>
       <dl className="m-0 grid grid-cols-2 gap-x-8 gap-y-6 [@container(min-width:640px)]:grid-cols-4">
