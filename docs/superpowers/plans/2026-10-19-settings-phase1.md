@@ -36,8 +36,8 @@
 Each workstream: write the failing pure-logic tests first (`tests/projects/settings-<area>-*.test.mjs`), build its pages and effects, verify in the browser, append its sections to `docs/guides/features/settings.md`, commit on its branch.
 
 ## Integration
-- [ ] Merge each branch into `feat/settings` in the order above; resolve `docs/guides/features/settings.md` by keeping every section.
-- [ ] Switch Get Paid and the notification pages' date cells to `lib/settings/dates.ts` once W5 is in.
-- [ ] Full checks: `tsc`, `test:projects`, eslint on the changed set, `next build`.
-- [ ] Walk every settings page and every door on :3050 at 1440 and 390, light and dark; screenshots for the owner.
+- [x] Merged all eight branches into `feat/settings` (in the order they finished: W6, W8, W4, W3, W1, W7, W2, W5); every docs section kept.
+- [x] Get Paid, Report and the bell's day/week headings use `lib/settings/dates.ts`; Get Paid uses the one country list; "AI help in the editors" also hides the PCB/3D/Preview assistant; "Show my location and local time" hides the location from others too.
+- [x] Full checks on 426bfb7: `tsc` clean, `test:projects` 1825/1825, eslint no errors on the changed set, `next build` ok (24 settings routes).
+- [x] Walked every settings page on :3050 at 1440 (light and dark) and 390; Find a setting, ⌘K settings search, the bell; no new console errors, no sideways scroll.
 - [ ] Owner verifies; push only after their OK.
