@@ -28,6 +28,7 @@ import { fingerprintOf } from "@/lib/manual/build-load";
 import { readSeed } from "@/lib/manual/build-load-io";
 import type { EditorScope } from "@/lib/manual/p2-types";
 import { singleKeyShortcutsAllowed } from "@/lib/settings/keys";
+import { THREE_D_KEYS, singleKeyOf, type ShortcutId } from "@/lib/settings/shortcuts";
 import { readSettings } from "@/lib/settings/prefs";
 
 type ThreeMode = "demo" | "sketch" | "fullview" | "preview";
@@ -543,17 +544,24 @@ export function ThreeApp() {
       if (!singleKeyShortcutsAllowed(e)) return;
       if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT" || (e.target as HTMLElement)?.tagName === "TEXTAREA") return;
       const mod = e.metaKey || e.ctrlKey;
-      if (e.key === "g" && !mod) setTransformMode("translate");
-      else if (e.key === "r" && !mod) setTransformMode("rotate");
-      else if (e.key === "s" && !mod) setTransformMode("scale");
-      else if (e.key === "Escape") { setTransformMode("none"); setSelectedPart(null); }
+      if (e.key === "Escape") { setTransformMode("none"); setSelectedPart(null); }
       else if (e.key === "Backspace" || e.key === "Delete") deleteSelected();
-      else if (e.key === "h" && !mod) toggleHide();
-      else if (e.key === "l" && !mod) toggleLock();
-      else if (e.key === "b" && !mod) addShape("box");
-      else if (e.key === "Y" || (e.key === "y" && !mod)) addShape("cylinder");
       else if ((e.key === "d" || e.key === "D") && mod) { e.preventDefault(); duplicateSelected(); }
-      else if (e.key === "0") setResetTick((t) => t + 1);
+      else {
+        // The single keys, from the table Settings › Appearance lists.
+        const run: Record<ShortcutId<typeof THREE_D_KEYS>, () => void> = {
+          move: () => setTransformMode("translate"),
+          rotate: () => setTransformMode("rotate"),
+          scale: () => setTransformMode("scale"),
+          hide: toggleHide,
+          lock: toggleLock,
+          box: () => addShape("box"),
+          cylinder: () => addShape("cylinder"),
+          resetView: () => setResetTick((t) => t + 1),
+        };
+        const id = singleKeyOf(THREE_D_KEYS, e);
+        if (id) run[id]();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

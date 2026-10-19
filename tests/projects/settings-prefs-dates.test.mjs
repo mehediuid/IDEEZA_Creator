@@ -1,11 +1,11 @@
-// Settings › Language › Date & Time Formatting: one formatter for every date
-// the app shows, per region (Figma 22048:34355), the browser's own, and ISO.
+// Settings › Language & region › Date and time format: one formatter for
+// every date the app shows: a region's conventions in English, Automatic (your
+// region), and ISO. The region list itself: settings-lang-regions.test.mjs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { formatDate, formatDateTime, formatTime, formatStamp, DATE_FORMATS, dateFormatOf, SAMPLE_INSTANT } = await import(
-  "../../.tmp-test/lib/settings/dates.js"
-);
+const { formatDate, formatDateTime, formatTime, formatStamp, dateFormatName } = await import("../../.tmp-test/lib/settings/dates.js");
+const { autoRegion } = await import("../../.tmp-test/lib/settings/regions.js");
 
 const T = new Date(2020, 2, 12, 18, 9, 5).getTime();
 
@@ -17,20 +17,16 @@ test("United States: month first, 12-hour clock (Figma's own example)", () => {
 });
 
 test("India: day first, 12-hour clock", () => {
-  assert.match(formatDateTime(T, "en-IN"), /^12\/0?3\/2020, 06:09 (pm|PM)$/);
-  assert.equal(formatDate(T, "en-IN"), "12 Mar 2020");
+  assert.match(formatDateTime(T, "IN"), /^12\/0?3\/2020, 06:09 (pm|PM)$/);
+  assert.equal(formatDate(T, "IN"), "12 Mar 2020");
 });
 
-test("Austria, Belgium, Español: day first, 24-hour clock", () => {
-  assert.equal(formatDateTime(T, "de-AT"), "12.3.2020, 18:09");
-  assert.match(formatDateTime(T, "nl-BE"), /^12\/0?3\/2020,? 18:09$/);
-  assert.match(formatDateTime(T, "es-ES"), /^12\/0?3\/2020,? 18:09$/);
-  assert.equal(formatTime(T, "de-AT"), "18:09");
-});
-
-test("Thailand counts years in the Buddhist era, as Thai dates do", () => {
-  assert.match(formatDate(T, "th-TH", { style: "numeric" }), /2563$/);
-  assert.equal(formatTime(T, "th-TH"), "18:09");
+test("Austria, Belgium, Spain: day first, 24-hour clock, English month words", () => {
+  assert.equal(formatDateTime(T, "AT"), "12/03/2020, 18:09");
+  assert.match(formatDateTime(T, "BE"), /^12\/0?3\/2020,? 18:09$/);
+  assert.match(formatDateTime(T, "ES"), /^12\/0?3\/2020,? 18:09$/);
+  assert.equal(formatTime(T, "de-AT"), "18:09", "an old stored locale reads as its region");
+  assert.equal(formatDate(T, "AT"), "12 Mar 2020");
 });
 
 test("ISO: year-month-day and a 24-hour clock, whatever the style", () => {
@@ -41,10 +37,13 @@ test("ISO: year-month-day and a 24-hour clock, whatever the style", () => {
   assert.equal(formatDateTime(T, "iso", { seconds: true }), "2020-03-12 18:09:05");
 });
 
-test("auto follows the browser (this runtime's default locale)", () => {
-  const browser = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(T);
-  assert.equal(formatDate(T, "auto"), browser);
-  assert.equal(formatDate(T, "not-a-locale"), browser, "an unknown value reads as auto");
+test("auto follows your region (this runtime's zone and languages)", () => {
+  const region = autoRegion(Intl.DateTimeFormat().resolvedOptions().timeZone, globalThis.navigator?.languages ?? []);
+  const expected = region
+    ? formatDate(T, region)
+    : new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(T);
+  assert.equal(formatDate(T, "auto"), expected);
+  assert.equal(formatDate(T, "not-a-locale"), expected, "an unknown value reads as auto");
 });
 
 test("styles: no year, weekday, long month", () => {
@@ -73,19 +72,12 @@ test("formatStamp: a time today, a date before", () => {
   assert.equal(formatStamp(new Date(2019, 2, 2, 9).getTime(), "en-US", now), "Mar 2, 2019");
 });
 
-test("the dialog's options: the browser first, the six Figma regions, ISO last, each with its live example", () => {
-  assert.deepEqual(
-    DATE_FORMATS.map((f) => f.value),
-    ["auto", "en-US", "en-IN", "de-AT", "nl-BE", "th-TH", "es-ES", "iso"],
-  );
-  assert.deepEqual(
-    DATE_FORMATS.slice(1, 7).map((f) => f.label),
-    ["United States", "India", "Austria", "Belgium", "Thailand", "Español"],
-  );
-  assert.equal(dateFormatOf("en-US").name, "United States (English)", "the row's value, as Figma writes it");
-  assert.equal(dateFormatOf("iso").example(), "2020-03-12 18:09");
-  assert.equal(dateFormatOf("en-US").example(), formatDateTime(SAMPLE_INSTANT, "en-US"));
-  assert.equal(dateFormatOf("bogus").value, "auto");
+test("a choice's name: the region, ISO, or Automatic with the region it found", () => {
+  assert.equal(dateFormatName("BD", null), "Bangladesh");
+  assert.equal(dateFormatName("en-US", null), "United States");
+  assert.equal(dateFormatName("iso", null), "ISO (2020-03-12)");
+  assert.equal(dateFormatName("auto", "BD"), "Automatic (Bangladesh)");
+  assert.equal(dateFormatName("auto", null), "Automatic (your browser)");
 });
 
 test("Messages, the profile's local time: dated parts follow the format, relative words stay", async () => {
@@ -97,9 +89,9 @@ test("Messages, the profile's local time: dated parts follow the format, relativ
   assert.equal(shortTimeOf(sep2, now, "iso"), "2026-09-02");
   assert.equal(shortTimeOf(sep2, now, "en-US"), "Sep 2");
   assert.equal(shortTimeOf(new Date(2025, 8, 2).getTime(), now, "en-US"), "Sep 2, 2025");
-  assert.equal(dayLabelOf(now, now, "de-AT"), "Today");
+  assert.equal(dayLabelOf(now, now, "AT"), "Today");
   assert.equal(dayLabelOf(sep2, now, "en-US"), "Wed, Sep 2");
-  assert.equal(clockOf(T, "de-AT"), "18:09");
+  assert.equal(clockOf(T, "AT"), "18:09");
   assert.equal(clockOf(T), "6:09 PM", "no format given: the fixed English form");
   assert.equal(localTimeOf("Asia/Dhaka", Date.UTC(2026, 9, 14, 15, 40), "iso"), "21:40");
   assert.equal(localTimeOf(null, 0, "iso"), null);

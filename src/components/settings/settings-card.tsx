@@ -136,7 +136,7 @@ export function SettingsField({ label, children, className }: { label: React.Rea
     <div className={cn("flex min-w-0 flex-col gap-[6px] py-[8px]", className)}>
       <span className="text-sm leading-sm text-text-tertiary">{label}</span>
       {empty ? (
-        <span className="text-md leading-md text-text-disabled">No information</span>
+        <span className="text-md leading-md text-text-tertiary">No information</span>
       ) : (
         <div className="min-w-0 text-md leading-md text-text-primary [overflow-wrap:anywhere]">{children}</div>
       )}

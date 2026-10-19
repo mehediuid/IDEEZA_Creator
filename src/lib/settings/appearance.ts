@@ -2,8 +2,8 @@
 // choices that change the whole app (spec §5.8), read by globals.css and
 // reset.css:
 //   data-text-size="large"  every type size and its line height one DS step up
-//   data-contrast="high"    secondary and tertiary text in the primary ink,
-//                           borders in the strong border
+//   data-contrast="high"    every text ink at 7:1 or more, every border and a
+//                           switch's off track at 3:1 (tokens.css)
 //   data-motion="reduce"    the app's reduced-motion rules, whatever the system says
 // APPEARANCE_PREPAINT runs in <head> before the body paints (as the sidebar's
 // SIDEBAR_PREPAINT does), so a large-text page never paints small first;

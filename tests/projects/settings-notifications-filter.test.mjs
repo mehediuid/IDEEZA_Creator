@@ -176,7 +176,7 @@ test("the bell: one list right away or paused; a heading per day once a day", ()
   assert.deepEqual(groupNotices(list, "now", now).map((g) => [g.label, g.notices.length]), [[null, 4]]);
   assert.deepEqual(groupNotices(list, "paused", now).map((g) => [g.label, g.notices.length]), [[null, 4]]);
   assert.deepEqual(
-    groupNotices(list, "daily", now).map((g) => [g.label, g.notices.map((n) => n.id)]),
+    groupNotices(list, "daily", now, "US").map((g) => [g.label, g.notices.map((n) => n.id)]),
     [
       ["Today", ["today"]],
       ["Yesterday", ["yesterday"]],

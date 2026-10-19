@@ -604,14 +604,14 @@ export function HotkeySettingsPage() {
   );
 }
 
-// ── Appearance pointer for the System page ─────────────────────────────────
-// The app's theme has one home, the account menu (and ⌘K) — settings spec
-// D11 — so the editor no longer carries its own copy of it.
+// ── Theme pointer for the System page ──────────────────────────────────────
+// The app's theme has one home, Settings › Appearance & accessibility (V8),
+// so the editor no longer carries its own copy of it.
 
 function AppearanceNote() {
   return (
     <div className="border-b border-solid border-border-subtle py-[var(--spacing-6)] text-sm leading-sm text-text-tertiary">
-      Appearance is in the account menu.
+      Theme is in Settings › Appearance &amp; accessibility.
     </div>
   );
 }

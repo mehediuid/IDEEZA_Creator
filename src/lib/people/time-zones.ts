@@ -1,7 +1,8 @@
-// The time zones Settings › Personal Information offers (spec
-// 2026-10-19-settings-design.md §5.3): every IANA zone this browser knows,
-// with this device's zone first as "(this device)". The one you choose is
-// your profile's `timeZone`, the one zone the app reads for you. Pure.
+// The time zones Settings › Language & region › Time zone offers: every IANA
+// zone this browser knows, with this device's zone first as "(this device)".
+// The one you choose is your profile's `timeZone`, the one zone the app reads
+// for you: dates and times (lib/settings/dates.ts) and your profile's local
+// time. Pure.
 
 /** The value of the first choice: follow this device. */
 export const DEVICE_ZONE = "device";
@@ -57,6 +58,11 @@ export function timeZoneChoices(device: string | null, at: number): ZoneChoice[]
 /** The select's value for a profile: the zone you chose, or "device" while it follows this device. */
 export function zoneChoiceOf(p: { timeZone: string | null; timeZoneManual: boolean }): string {
   return p.timeZoneManual && p.timeZone ? p.timeZone : DEVICE_ZONE;
+}
+
+/** The zone the app shows times in: the one you chose, or null while it follows this device. */
+export function appZoneOf(p: { timeZone: string | null; timeZoneManual: boolean }): string | null {
+  return p.timeZoneManual && p.timeZone ? p.timeZone : null;
 }
 
 /** What choosing `choice` saves: a zone you chose by hand, or this device's zone, followed. */

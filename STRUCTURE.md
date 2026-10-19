@@ -137,7 +137,9 @@ ideeza-creator-panel/
    │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings,
    │  │                      audience (who can comment, Take a break, the locked profile, hidden words
    │  │                      and their Bangla-safe matcher, people you've met),
-   │  │                      dates (+ use-dates), voice, keys (single-key shortcuts), appearance (pre-paint)
+   │  │                      dates (+ use-dates; format and time zone), regions (date formats per region),
+   │  │                      voice, keys + shortcuts (single-key shortcuts and each editor's key table),
+   │  │                      appearance (pre-paint)
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
    │  │                      videos, comments), filter (heard or quiet, count, quiet hours, pop-up
    │  │                      mode, hidden words), popups (daily summary, browser pop-ups), read state; withdrawal-method notices

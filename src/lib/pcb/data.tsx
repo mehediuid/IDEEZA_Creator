@@ -226,7 +226,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       // View reads top-to-bottom as three questions: how close am I (zoom),
       // what is the sheet doing under my cursor (grid/snap/units), and which
       // panels are up. Panels are named after what they hold, not where they
-      // sit. Theme is deliberately absent — the account menu owns it (D11).
+      // sit. Theme is deliberately absent — Settings › Appearance owns it (V8).
       items: [
         item("Zoom In", { k: "I", icon: "zoomin", onClick: () => actions.zoomIn() }),
         item("Zoom Out", { k: "O", icon: "zoomout", onClick: () => actions.zoomOut() }),
@@ -698,12 +698,12 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // had a handler behind it.
         item("Flip Board", { k: "Alt+F", icon: "flipV", onClick: () => actions.toggleBoardFlip() }),
         dv,
-        // The app's theme has one home, the account menu (settings spec D11):
-        // this row only says where it went.
-        item("Appearance is in the account menu", {
+        // The app's theme has one home, Settings › Appearance & accessibility
+        // (V8): this row only says where it is.
+        item("Theme is in Settings", {
           icon: "appearance",
           disabled: true,
-          note: "Light, dark or match system: open your name at the top right.",
+          note: "Light, dark or match system: Settings › Appearance & accessibility.",
         }),
         check("Top Toolbar"),
         check("Left-Side panel", "["),
@@ -1657,8 +1657,8 @@ export function flattenCommands(groups) {
   };
   for (const m of menus) {
     for (const it of m.items || []) {
-      // A greyed row (a reason or a pointer, like "Appearance is in the
-      // account menu") is not a command.
+      // A greyed row (a reason or a pointer, like "Theme is in Settings")
+      // is not a command.
       if (it.divider || !it.label || it.disabled) continue;
       const children = (it.sub || []).filter((s) => s && !s.divider && s.label && !s.disabled);
       if (children.length) {

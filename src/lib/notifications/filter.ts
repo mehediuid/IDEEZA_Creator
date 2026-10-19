@@ -17,6 +17,7 @@
 import { WORD_HIDDEN_FOR_OWNER } from "../innovations/comments";
 import { hasHiddenWord } from "../settings/audience";
 import { formatDate } from "../settings/dates";
+import { DEVICE_ZONE } from "../people/time-zones";
 import { inQuietHours, type DateLocale, type NoticeKind, type SettingsV1 } from "../settings/prefs";
 import { isNoticeRead } from "./read";
 import type { Notice } from "./types";
@@ -122,7 +123,8 @@ const dayLabel = (day: number, today: number, locale?: DateLocale) => {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   if (day === yesterday.getTime()) return "Yesterday";
-  return formatDate(day, locale, { style: "weekday" });
+  // `day` is a midnight on this device's calendar: named on that calendar.
+  return formatDate(day, locale, { style: "weekday", timeZone: DEVICE_ZONE });
 };
 
 /** The bell's list: one list, or once a day a heading per day. `list` is already newest first;

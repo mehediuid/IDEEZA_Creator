@@ -406,6 +406,9 @@ export interface PcbActions {
   /** The one Measurement Unit default (settings record), also applied to the
    *  open board — both Setting surfaces call this. */
   setMeasurementUnit: (u: MeasurementUnit) => void;
+  /** The default alone, for new boards and parts (Settings › Appearance &
+   *  accessibility › Default units): an open board keeps its own unit. */
+  setDefaultMeasurementUnit: (u: MeasurementUnit) => void;
   /** A 3D Setting dialog's own fields, saved into the settings record. */
   saveDialogSettings: (patch: PcbState["dialogSettings"]) => void;
   // Phase F — settings export / import + per-page reset
@@ -1778,6 +1781,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge({ measurementUnit: u });
         mergeWithHistory({ unit: docUnitOf(u) });
       },
+      setDefaultMeasurementUnit: (u) => merge({ measurementUnit: u }),
       saveDialogSettings: (patch) =>
         merge((s) => ({ dialogSettings: { ...s.dialogSettings, ...patch } })),
       // ── Phase F — Export / Import / per-page reset ───────────────────────────
