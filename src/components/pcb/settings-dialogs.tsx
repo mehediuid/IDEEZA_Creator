@@ -35,7 +35,6 @@ export const SETTING_DIALOGS: Record<string, DialogSpec> = {
         { k: "sel", key: "measurementUnit", label: "Measurement Unit", options: ["Millimeters (mm)", "Mils", "Inches"], def: "Millimeters (mm)" },
         { k: "sel", key: "language", label: "Language", options: ["English", "中文", "日本語", "Deutsch"], def: "English" },
       ],
-      [{ k: "tog", key: "autoSave", label: "Auto-save", desc: "Every 5 minutes", def: true }],
       [{ k: "tog", key: "reopenLast", label: "Reopen last project on launch", def: true }],
       [{ k: "tog", key: "startupTips", label: "Show startup tips", def: false }],
     ],

@@ -515,71 +515,6 @@ export function saveStatus(st: PcbState["saveState"], at: string | null) {
   };
 }
 
-/** The spinner the dot becomes while a write is in flight. */
-const SAVE_SPIN_CSS = `
-.save-dot--spin {
-  background: none !important;
-  border: 1.5px solid color-mix(in srgb, var(--color-bg-warning) 30%, transparent);
-  border-top-color: var(--color-bg-warning);
-  animation: save-dot-spin .7s linear infinite;
-}
-@keyframes save-dot-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .save-dot--spin { animation-duration: 0s; border-color: var(--color-bg-warning); }
-}
-`;
-
-/** Clock time of the last write — not a ticking "x ago" (see SaveChip). */
-function useSavedAt() {
-  const state = usePcbState();
-  return React.useMemo(
-    () => (state.lastSavedAt ? new Date(state.lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null),
-    [state.lastSavedAt],
-  );
-}
-
-/** The save button itself, with the state on it: green when the document is
- *  written, amber while it isn't, red when the last write failed. */
-function SaveTool({ label }: { label?: string }) {
-  const state = usePcbState();
-  const actions = usePcbActions();
-  const st = saveStatus(state.saveState, useSavedAt());
-  return (
-    <button
-      className="ix-tool"
-      onClick={() => actions.saveDoc()}
-      title={`${label ?? "Save"} — ${st.text}. ${st.tip}`}
-      aria-label={`${label ?? "Save"} — ${st.text}`}
-      style={{
-        position: "relative", width: 30, height: 30, borderRadius: "var(--radius-md)",
-        display: "inline-flex", alignItems: "center", justifyContent: "center",
-        cursor: "pointer", border: "none", background: "transparent",
-        color: "var(--color-text-primary)", flex: "0 0 auto", padding: 0,
-      }}
-    >
-      <style>{SAVE_SPIN_CSS}</style>
-      <DsIcon name="save" size={18} strokeWidth={1.7} />
-      <span
-        aria-hidden
-        className={st.spin ? "save-dot--spin" : undefined}
-        style={{
-          position: "absolute", right: 2, bottom: 2,
-          width: 8, height: 8, borderRadius: "50%",
-          background: st.color,
-          // A ring in the bar's own colour keeps the dot readable on top of the
-          // glyph it sits over.
-          boxShadow: st.spin ? undefined : "0 0 0 1.5px var(--color-bg-surface)",
-          transition: "background .16s ease-out",
-        }}
-      />
-    </button>
-  );
-}
-
-// (The `SaveChip` that used to sit beside the button — "Saved 01:16 AM" — is
-// gone. The dot on the button is the whole readout; a word plus a timestamp
-// beside it was the same fact twice, in the row where space is scarcest.)
-
 /** Icon + short label in a quietly tinted pill — findable without competing
  *  with the page's one solid CTA. */
 function LabelledTool({
@@ -743,7 +678,6 @@ const SCHEM_ESSENTIAL: Item[] = [
   // Find leads the row: it used to sit last, right after four lens/frame zoom
   // glyphs, where it read as one more zoom button.
   { kind: "icon", key: "find", action: "openFindReplace", label: "Find & Replace (Ctrl+F)" },
-  { kind: "icon", key: "save", action: "save", label: "Save (Ctrl+S)" },
   { kind: "div" },
   // ERC, not "Design Rule" — the schematic's own term (the menu and the dialog
   // both say ERC), and it carries a label so the sheet's main check is findable.
@@ -774,14 +708,11 @@ const SCHEM_ESSENTIAL: Item[] = [
 // PCB / 2D / 3D essentials — the inline set (user-approved). Every control here
 // has NO other home: Undo/Redo, view Fit, quick Grid/Snap toggles, and the
 // grid-size/unit dropdowns. Deliberately absent (each lives elsewhere, so the
-// toolbar never duplicates them): Save (Ctrl+S / File menu), DRC (bottom bar),
+// toolbar never duplicates them): Save (autosave, the top bar's status,
+// Ctrl+S / File menu), DRC (bottom bar),
 // Rotate + all arrange ops (right-sidebar Position panel), draw/place/route
 // tools (left ToolPalette).
 const PCB_ESSENTIAL: Item[] = [
-  // Save leads the row, where the schematic bar carries it, so the two toolbars
-  // line up on the one control you reach for by muscle memory (UIUX-13).
-  { kind: "icon", key: "save", action: "save", label: "Save" },
-  { kind: "div" },
   // DRC sits where the schematic bar carries ERC, and reads the same way — icon
   // + label in brand ink. It is the board's pre-fabrication check, not a utility
   // glyph, so it no longer hides in the middle of the row wearing the generic
@@ -831,9 +762,10 @@ const HOMED_KEYS = new Set([
   "alignLeft", "alignRight", "alignTop", "alignBottom", "tAlignGrid",
   "tDistH", "tDistV", "tRotLeft", "tRotRight", "tFlipH", "tFlipV", "tBringFront", "tSendBack",
   "tBoolPreserve", "tBoolMerge", "tBoolSubtract", "tBoolExclude", "tBoolSplit",
-  // `save` stays here for the PCB overflow; the schematic row lists it
-  // explicitly, next to the save-state chip that gives it a reason to be there.
-  "tSaveAll", "board", "cube",
+  // Save has no toolbar home (owner D6, 2026-10-19): every editor saves as it
+  // goes, the top bar says whether the work is saved, and Ctrl+S / File › Save
+  // save now.
+  "save", "tSaveAll", "board", "cube",
   // #107/#108 — these left the bar for their real homes (2D Library · Insert ·
   // Design · Export), so the overflow must not smuggle them back in.
   "tDevReuse", "pTable", "gerber", "tFootMgr",
@@ -930,17 +862,10 @@ export function Toolbar() {
       : null,
   );
 
-  const savedAt = React.useMemo(
-    () => (state.lastSavedAt ? new Date(state.lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null),
-    [state.lastSavedAt],
-  );
-
   // Render a single toolbar entry (icon / divider / dropdown).
   const renderItem = (it: Item, i: number) => {
     if (it.kind === "div") return <Divider key={i} />;
     if (it.kind === "grid") return <GridPicker key={i} />;
-    // The save control carries its own state dot wherever it renders.
-    if (it.kind === "icon" && it.key === "save") return <SaveTool key={i} label={it.label} />;
     if (it.kind === "dd") {
       const v = it.field === "gridSize" ? state.gridSize : state.unit;
       const set = it.field === "gridSize" ? actions.setGridSize : actions.setUnit;
@@ -962,23 +887,17 @@ export function Toolbar() {
   const renderMenuRow = (it: Item, i: number) => {
     if (it.kind !== "icon") return null;
     const onClick = it.action ? handlers[it.action] : it.tool ? () => actions.setTool(it.tool!) : undefined;
-    const save = it.key === "save" || it.key === "tSaveAll" ? saveStatus(state.saveState, savedAt) : null;
     return (
       <div
         key={i}
         className="ix-row"
         onClick={onClick}
-        title={save?.tip}
         style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-2) var(--spacing-3)", borderRadius: "var(--radius-md)", cursor: "pointer" }}
       >
         <span style={{ position: "relative", width: 24, height: 24, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-secondary)" }}>
           <DsIcon name={it.key} size={18} strokeWidth={1.7} />
-          {save && (
-            <span aria-hidden style={{ position: "absolute", right: 0, bottom: 1, width: 7, height: 7, borderRadius: "50%", background: save.color, boxShadow: "0 0 0 1.5px var(--color-bg-surface)" }} />
-          )}
         </span>
         <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>{it.label}</span>
-        {save && <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>{save.text}</span>}
       </div>
     );
   };

@@ -82,8 +82,9 @@ export function ProjectRow({
   );
 }
 
-/** The project's status as its page shows it (the save step reads it the same way). */
-function useStatusOf(project: ManualProject) {
+/** The project's status as its page shows it (the save step and the editors' top bar read it
+ *  the same way). */
+export function useStatusOf(project: ManualProject) {
   const brief = useProjectBrief(project.id);
   const { data: market } = useMarket();
   const [now] = React.useState(() => Date.now());

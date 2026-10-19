@@ -140,9 +140,9 @@ test("a build's old Brief address redirects to the mint flow; it opens per useBr
   assert.match(read("brief-app.tsx"), /const leave = \(\) => router\.push\(earnHref\(projectId, "sell"\)\);/);
 });
 
-test("the editors' last step is Save project: it saves in place, never the mint flow's Choose (owner 2026-10-19)", () => {
-  // In an open editor every rail / pill that opens the step runs EditorSave (the saved dialog);
-  // the step's own address is the project page, where Publish keeps it private, gives it or sells it.
+test("the editors end with Finish, never the mint flow's Choose; no Save step (owner 2026-10-19, autosave D1/D2)", () => {
+  // In an open editor Finish runs EditorSave (the saved dialog); the step's own address is the
+  // project page, where Publish keeps it private, gives it or sells it.
   const workspace = readSrc("components/manual/project-workspace.tsx");
   assert.doesNotMatch(workspace, /earnMintHref/);
   assert.match(workspace, /if \(ready && projectId && isBrief\) router\.replace\(`\/projects\/\$\{encodeURIComponent\(projectId\)\}`\);/);
@@ -150,17 +150,59 @@ test("the editors' last step is Save project: it saves in place, never the mint 
   const nav = readSrc("components/manual/use-step-nav.tsx");
   assert.match(nav, /if \(step === "brief"\) return `\/projects\/\$\{encodeURIComponent\(project\.id\)\}`;/);
   assert.match(nav, /if \(step === "brief" && save\) \{\s*save\(\);\s*return;\s*\}/);
-  assert.match(readSrc("components/preview/preview-app.tsx"), /isWiring \? "Continue to Preview" : "Save project"/);
-  assert.match(readSrc("lib/pcb/data.tsx"), /\{ key: 'brief', label: 'Save project', icon: 'save' \}/);
-  for (const src of [readSrc("components/preview/preview-app.tsx"), readSrc("lib/pcb/data.tsx")]) {
-    assert.doesNotMatch(src, /Continue to Brief|'Add Brief'/);
+  assert.match(readSrc("components/preview/preview-app.tsx"), /isWiring \? "Continue to Preview" : "Finish"/);
+  // D1: the rail lists the modules only.
+  const data = readSrc("lib/pcb/data.tsx");
+  assert.doesNotMatch(data, /key: 'brief'/);
+  assert.doesNotMatch(nav, /brief: "brief"/);
+  for (const src of [readSrc("components/preview/preview-app.tsx"), data]) {
+    assert.doesNotMatch(src, /Continue to Brief|'Add Brief'|'Save project'/);
   }
 });
 
-test("Save says it where the maker pressed it: the saved dialog, no ?saved= hop (owner 2026-10-19, D1–D6)", () => {
-  // The editors: flush the board, stamp the project, await the store write, then the dialog.
+test("one save status for every editor; Ctrl+S saves now; no fake toggle, no toolbar Save (owner 2026-10-19, autosave D3–D8)", () => {
+  // D3: every editor's write reports to lib/manual/save-status.ts.
+  for (const [file, source] of [
+    ["components/code/dev-editor.tsx", "code.files"],
+    ["components/code/blockly-impl.tsx", "code.blocks"],
+    ["components/3d/three-app.tsx", "3d.shapes"],
+    ["components/3d/sketch-mode.tsx", "3d.sketches"],
+    ["components/3d/ai-generate-modal.tsx", "3d.ai"],
+    ["components/preview/preview-context.tsx", "preview.shapes"],
+    ["components/wiring/wiring-context.tsx", "wiring"],
+    ["components/assembly/assembly-app.tsx", "assembly"],
+    ["lib/pcb/store.tsx", "pcb"],
+  ]) {
+    assert.match(readSrc(file), new RegExp(`(reportSave|writeReported)\\("${source.replace(".", "\\.")}"`), `${file} reports its writes`);
+  }
+  for (const file of ["components/code/dev-editor.tsx", "components/3d/three-app.tsx", "components/3d/sketch-mode.tsx"]) {
+    assert.doesNotMatch(readSrc(file), /localStorage\.setItem\([^)]*\)\s*;\s*\}\s*catch\s*\{\}/, `${file} no longer swallows a refused write`);
+  }
+  // The top bar: status chip, linked project name, the status.
+  const bar = readSrc("components/pcb/top-bar.tsx");
+  assert.match(bar, /<EditorSaveStatus project=\{activeProject\} \/>/);
+  assert.match(bar, /href=\{`\/projects\/\$\{encodeURIComponent\(activeProject\.id\)\}`\}/);
+  // D4: Ctrl+S in every editor, and File › Save, save everything now.
   const editor = readSrc("components/manual/editor-save.tsx");
-  assert.match(editor, /if \(pcb\.flushDoc\(\) === false\) \{/);
+  assert.match(editor, /window\.addEventListener\("keydown", onKey, true\)/);
+  assert.match(editor, /e\.preventDefault\(\);\s*e\.stopPropagation\(\);\s*saveNow\(\);/);
+  assert.match(readSrc("lib/pcb/store.tsx"), /actions\.flashToast\(saveNow\(\) \? "Saved" : "Save failed"\)/);
+  // D5: the auto-save toggle that did nothing is gone.
+  assert.doesNotMatch(readSrc("components/pcb/settings-dialogs.tsx"), /autoSave|Every 5 minutes/);
+  // D6: Save left the PCB and schematic toolbars (homed: autosave, the status, Ctrl+S, File › Save).
+  const toolbar = readSrc("components/pcb/toolbar.tsx");
+  assert.doesNotMatch(toolbar, /function SaveTool|<SaveTool/);
+  assert.match(toolbar, /"save", "tSaveAll", "board", "cube",/);
+  // D8: Home's Build manually has no Save stage.
+  const home = readSrc("components/dashboard/build-manually-info.tsx");
+  assert.doesNotMatch(home, /label: "Save"/);
+  assert.match(home, /Everything saves as you\s+go, as a draft only you can see\./);
+});
+
+test("Save says it where the maker pressed it: the saved dialog, no ?saved= hop (owner 2026-10-19, D1–D6)", () => {
+  // The editors' Finish: save everything now, stamp the project, await the store write, then the dialog.
+  const editor = readSrc("components/manual/editor-save.tsx");
+  assert.match(editor, /if \(!saveNow\(\)\) \{/);
   assert.match(editor, /updateProject\(project\.id, \{\}\);/);
   assert.match(editor, /<SavedDialog[\s\S]*kind="editor"[\s\S]*stayLabel="Keep editing"/);
   assert.match(editor, /<SaveFailedDialog/);

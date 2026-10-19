@@ -45,6 +45,7 @@ import { useManualProjects, type ManualFlowState } from "@/lib/manual/projects";
 import { buildsOf, productRowsOf, productsOfProject } from "@/lib/manual/project-read";
 import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
+import { resetSaveStatus } from "@/lib/manual/save-status";
 import type { EditorScope, EditorStep } from "@/lib/manual/p2-types";
 import { useWriteGuard } from "@/lib/manual/use-write-guard";
 import { usePcbActions, usePcbDocScope } from "@/lib/pcb/store";
@@ -247,6 +248,17 @@ export function ProjectWorkspace({
   // loop.
   const [seed, setSeed] = React.useState<SeedState | null>(null);
   const seededFor = React.useRef<string | null>(null);
+
+  // Another product: the top bar's save status starts afresh. This runs while the gate shows
+  // "Opening product…", before the product's editors mount and report their first writes.
+  const statusFor = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!projectId || !rowId) return;
+    const key = `${projectId}:${rowId}`;
+    if (statusFor.current === key) return;
+    statusFor.current = key;
+    resetSaveStatus();
+  }, [projectId, rowId]);
 
   // A product route applies its scope: the project and product become the
   // editor's; a built product's documents are seeded on its first open,

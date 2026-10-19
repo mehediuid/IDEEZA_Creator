@@ -1,38 +1,43 @@
 "use client";
 
-// EditorSave — the editors' Save project (the rail's last item, Product
-// Preview's pill). A hand-made project is a Draft in My projects from the
-// moment it is made, so Save doesn't move it anywhere: it makes sure the work
-// is kept and says so where the maker is (owner, 2026-10-19 — Save used to
-// jump to the project page, which felt abrupt).
+// EditorSave — saving in the manual editors (owner, 2026-10-19). There is no
+// Save step: every editor saves as it goes, and the project is a Draft in My
+// projects from the moment it is made. The top bar's status
+// (EditorSaveStatus) says whether the work is kept. What's left here:
 //
-// 1. The board's debounced write goes now (`flushDoc`). Code and 3D write on
-//    every change already.
-// 2. The project record is stamped (`updateProject`, so My projects lists it
-//    first and "Saved 12:04" is true), and the store's write is awaited
-//    (useStoreWrite: 250 ms, projectWriteRefused).
-// 3. SavedDialog: View project, Keep editing, Back to Home — and Name it while
-//    the product is "Not named yet". A refused write is SaveFailedDialog,
-//    with Try again.
+// - Ctrl+S (⌘S) anywhere in the editor writes everything now (`saveNow`):
+//   every pending write, and any refused one again. The status says "Saved"
+//   for a moment; no dialog, and never the browser's own Save page.
+// - Finish, at the end of the flow (useStepNav's "brief" step — Product
+//   Preview's pill), does the same, stamps the project record
+//   (`updateProject`, so My projects lists it first and "Saved 12:04" is
+//   true), awaits the store's write (useStoreWrite: 250 ms,
+//   projectWriteRefused), then shows SavedDialog: View project, Keep editing,
+//   Back to Home — and Name it while the product is "Not named yet". A refused
+//   write is SaveFailedDialog, with Try again.
 //
-// Mounted by ProjectWorkspace around the open editor; useStepNav's "brief"
-// step runs it. Outside an editor there is nothing to save, and the step is
-// the project page.
+// Mounted by ProjectWorkspace around the open editor. ProjectWorkspace also
+// starts the save status afresh for each product, before its editors mount.
 
 import * as React from "react";
 import { useStoreWrite } from "@/components/projects/details/use-store-write";
 import { SaveFailedDialog, SavedDialog } from "@/components/projects/saved-dialog";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { usePcbActions } from "@/lib/pcb/store";
+import { saveNow } from "@/lib/manual/save-status";
 import { requestProductRename } from "./product-name-field";
 
 type Phase = { kind: "saving"; since: number } | { kind: "saved"; at: number } | { kind: "failed" } | null;
 
 const EditorSaveContext = React.createContext<(() => void) | null>(null);
 
-/** Save project in the open editor; null outside one. */
+/** Finish in the open editor; null outside one. */
 export function useEditorSave(): (() => void) | null {
   return React.useContext(EditorSaveContext);
+}
+
+/** Ctrl+S or ⌘S, with or without Shift (Save All), never with Alt. */
+function isSaveKey(e: KeyboardEvent): boolean {
+  return (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s";
 }
 
 export function EditorSave({
@@ -45,7 +50,6 @@ export function EditorSave({
   unnamed: boolean;
   children: React.ReactNode;
 }) {
-  const pcb = usePcbActions();
   const { updateProject } = useManualProjects();
   const [phase, setPhase] = React.useState<Phase>(null);
   const busy = React.useRef(false);
@@ -53,10 +57,10 @@ export function EditorSave({
   const write = useStoreWrite(applied, () => setPhase({ kind: "saved", at: Date.now() }));
   if (phase?.kind === "saving" && write.failed) setPhase({ kind: "failed" });
 
-  const save = () => {
+  const finish = () => {
     if (busy.current) return;
     busy.current = true;
-    if (pcb.flushDoc() === false) {
+    if (!saveNow()) {
       setPhase({ kind: "failed" });
       return;
     }
@@ -65,11 +69,23 @@ export function EditorSave({
     setPhase({ kind: "saving", since });
     updateProject(project.id, {});
   };
-  const latest = React.useRef(save);
+  const latest = React.useRef(finish);
   React.useEffect(() => {
-    latest.current = save;
+    latest.current = finish;
   });
   const run = React.useCallback(() => latest.current(), []);
+
+  // Ctrl+S: capture phase, so no editor's own key handler or the browser's Save page gets it.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isSaveKey(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      saveNow();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
 
   const close = () => {
     busy.current = false;

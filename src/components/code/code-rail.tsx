@@ -1,7 +1,7 @@
 "use client";
 
 // Code page left icon rail — same five items as the PCB rail (PCB Design /
-// Code / 3D Module / Product Preview / Save project), but standalone (no PcbProvider).
+// Code / 3D Module / Product Preview), but standalone (no PcbProvider).
 // Clicking "PCB Design" navigates to /pcb; clicking "Code" is a no-op.
 
 import { DsIcon } from "@/lib/pcb/icons";
