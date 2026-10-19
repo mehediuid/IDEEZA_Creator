@@ -101,7 +101,8 @@ ideeza-creator-panel/
    │  │                      kyc-page; get-paid/ (hub, balance, add-method and withdraw dialogs,
    │  │                      history + statement, tax forms, parts)
    │  │                      (profile/: Profile and Personal Information)
-   │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor)
+   │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor),
+   │  │                      notice-popups (browser pop-ups + daily summary, root), browser-popups
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
@@ -137,7 +138,8 @@ ideeza-creator-panel/
    │  │                      audience (who can reach you, quiet mode, hidden words, people you've met),
    │  │                      dates (+ use-dates), voice, keys (single-key shortcuts), appearance (pre-paint)
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
-   │  │                      videos, comments), filter (settings, quiet hours, digest), read state
+   │  │                      videos, comments), filter (heard or quiet, count, quiet hours, pop-up
+   │  │                      mode, hidden words), popups (daily summary, browser pop-ups), read state
    │  ├─ account/            the account: payment token, invoices, summary, your private identity
    │  │                      (ideeza:account:identity: legal name, gender, addresses) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
