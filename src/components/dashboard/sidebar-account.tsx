@@ -40,7 +40,9 @@ import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useTheme } from "@/components/theme-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { creditTotals, levelOf, xpOf } from "@/lib/account/summary";
-import { BUILD_COST, useCredits } from "@/lib/create/credits";
+import { useCredits } from "@/lib/create/credits";
+import { runningLow } from "@/lib/create/credit-limits";
+import { useSettings } from "@/lib/settings/use-settings";
 import { useCreatePlan } from "@/lib/create/plan";
 import { menuEntryOf } from "@/lib/wallet/request-view";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
@@ -483,16 +485,17 @@ function BalanceCard({
   level: ReturnType<typeof levelOf>;
   onLeave: () => void;
 }) {
-  // Quiet while there is enough for a build; the strongest thing on the card
-  // once there isn't.
-  const low = hydrated && remaining < BUILD_COST;
+  // Quiet above your "Running low at" number (Settings › Plan & pricing ›
+  // Credit alerts and limits); the strongest thing on the card at or under it.
+  const { lowAt } = useSettings().credits;
+  const low = hydrated && runningLow(remaining, lowAt);
   const share = total > 0 ? remaining / total : 0;
   const xpText = level.cap === null ? `${level.xp.toLocaleString()} XP` : `${level.xp.toLocaleString()} / ${level.cap.toLocaleString()} XP`;
   return (
     <div className="flex flex-col gap-[10px] rounded-xl border border-solid border-border bg-bg-surface p-[10px]">
       <div className="flex items-center justify-between gap-[8px]">
         <span className="flex items-center gap-[8px]">
-          <CreditRing share={share} />
+          <CreditRing share={share} low={low} />
           <span className="text-md font-semibold leading-md tracking-wide text-text-primary">Balance</span>
         </span>
         {/* Buy credits, not Upgrade: it adds credits, it doesn't change the
@@ -545,8 +548,9 @@ function BalanceCard({
   );
 }
 
-/** What is left of the credits, as a ring (Figma A20 Ring SM, 16 px). */
-function CreditRing({ share }: { share: number }) {
+/** What is left of the credits, as a ring (Figma A20 Ring SM, 16 px), in the
+ *  warning ink once the balance is running low. */
+function CreditRing({ share, low }: { share: number; low: boolean }) {
   const r = 7;
   const c = 2 * Math.PI * r;
   return (
@@ -560,7 +564,7 @@ function CreditRing({ share }: { share: number }) {
         strokeWidth="2"
         strokeLinecap="round"
         strokeDasharray={`${c * Math.min(1, Math.max(0, share))} ${c}`}
-        className="[stroke:var(--color-bg-brand)]"
+        className={low ? "[stroke:var(--color-icon-warning)]" : "[stroke:var(--color-bg-brand)]"}
       />
     </svg>
   );

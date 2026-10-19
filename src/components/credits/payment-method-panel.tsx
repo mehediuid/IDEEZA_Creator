@@ -6,7 +6,8 @@
 //
 // Payments aren't on, so the one method that can be saved is Crypto from the
 // Demo wallet: it is listed once the wallet is connected, as the default,
-// with the token a checkout opens on (USDT or IDZ, switched from its menu).
+// with the token you pay with (USDT or IDZ, switched from its menu). "Pay
+// with" is the spending side; Get Paid's "Get paid in" is the earning one (D14).
 // Add new payment lists Card and PayPal as not available yet and connects the
 // Demo wallet through the wallet's own dialog.
 
@@ -48,7 +49,7 @@ export function PaymentMethodPanel() {
                 Demo wallet <span className="font-mono">{wallet.short}</span>
               </p>
               <p className="flex flex-wrap items-center gap-[8px] text-md leading-md text-text-secondary">
-                {wallet.detail} · Pays in
+                {wallet.detail} · Pay with
                 <span className="inline-flex items-center gap-[4px] text-text-primary">
                   <CoinGlyph coin={token} /> {token}
                 </span>
@@ -61,8 +62,8 @@ export function PaymentMethodPanel() {
               align="end"
               items={[
                 { id: "manage", label: "Manage wallet", onSelect: openManage },
-                { id: "idz", label: "Pay in IDZ by default", selected: token === "IDZ", onSelect: () => choose("IDZ") },
-                { id: "usdt", label: "Pay in USDT by default", selected: token === "USDT", onSelect: () => choose("USDT") },
+                { id: "idz", label: "Pay with IDZ", selected: token === "IDZ", onSelect: () => choose("IDZ") },
+                { id: "usdt", label: "Pay with USDT", selected: token === "USDT", onSelect: () => choose("USDT") },
               ]}
               trigger={(props) => (
                 <button
@@ -95,7 +96,7 @@ export function PaymentMethodPanel() {
         </p>
       )}
       <p className="text-md leading-md text-text-tertiary">
-        Checkout opens on your default token; you can pick the other one when you pay. A plan&apos;s renewal isn&apos;t charged on
+        Checkout opens on the token you pay with; you can pick the other one when you pay. A plan&apos;s renewal isn&apos;t charged on
         testnet.
       </p>
 

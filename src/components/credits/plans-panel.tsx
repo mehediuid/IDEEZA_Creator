@@ -17,6 +17,8 @@
 // checkout page) · Switch to annual · Downgrade (a dialog, from the period's
 // end) · Starts on <date>. Free under a paid plan opens Cancel subscription.
 // No plan blocks a mint, a listing or a purchase: plans set amounts only.
+// Downgrade and Cancel subscription show what the smaller plan allows against
+// what you have (projects, contributors) and say that nothing is removed.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -31,10 +33,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { useMe } from "@/components/dashboard/sidebar-account";
-import { Avatar, Badge, Banner, Button, ModalFrame, Segmented } from "@/components/ideeza";
+import { Avatar, Badge, Banner, Button, ModalFrame, ProgressBar, Segmented } from "@/components/ideeza";
 import { checkoutHref } from "@/lib/create/checkout-route";
 import { discountFor, usd, type BillingCycle } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
+import { useManualProjects } from "@/lib/manual/projects";
 import {
   HIGH_VIDEO_TIER,
   PLANS,
@@ -605,6 +608,71 @@ function Helpful({ vote, onVote }: { vote: "up" | "down" | undefined; onVote: (v
 
 // ── Downgrade and cancel ──────────────────────────────────────────────
 
+/** What you use against a plan's amounts: your projects, and the most
+ *  contributors on any one of them. */
+export function usePlanUsage(): { projects: number; mostContributors: number } {
+  const { projects } = useManualProjects();
+  return {
+    projects: projects.length,
+    mostContributors: projects.reduce((m, p) => Math.max(m, p.contributors?.length ?? 0), 0),
+  };
+}
+
+/** Used against an amount, as a bar and "3/5 created"; past the amount in the error ink. */
+export function Meter({ used, amount, verb, label }: { used: number; amount: number; verb: string; label: string }) {
+  const over = used > amount;
+  return (
+    <span className="flex items-center gap-[10px]">
+      <ProgressBar value={(used / amount) * 100} label={`${label}: ${used} of ${amount} ${verb}`} className="w-[120px]" />
+      <span className={cn("min-w-[88px] text-sm leading-sm tabular-nums", over ? "text-text-error" : "text-text-secondary")}>
+        {n(used)}/{n(amount)} {verb}
+      </span>
+    </span>
+  );
+}
+
+/** The downgrade preview: what `to` allows against what you have. Plans set
+ *  amounts and enforce none of them, so it says plainly that nothing goes. */
+function UsagePreview({ to }: { to: Plan }) {
+  const usage = usePlanUsage();
+  const rows = [
+    {
+      label: "Projects",
+      line: `You have ${n(usage.projects)}. ${to.name} allows ${n(to.projects)}.`,
+      used: usage.projects,
+      amount: to.projects,
+      verb: "created",
+    },
+    {
+      label: "Contributors",
+      line: `Up to ${n(usage.mostContributors)} on one project. ${to.name} allows ${
+        to.contributors === 0 ? "none" : n(to.contributors)
+      }.`,
+      used: usage.mostContributors,
+      amount: to.contributors,
+      verb: "added",
+    },
+  ];
+  return (
+    <section aria-label={`What you have against ${to.name}`} className="flex flex-col gap-[12px]">
+      <ul role="list" className="flex flex-col gap-[12px]">
+        {rows.map((r) => (
+          <li key={r.label} className="flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[6px]">
+            <span className="flex min-w-0 flex-col">
+              <span className="text-md font-semibold leading-md text-text-primary">{r.label}</span>
+              <span className="text-md leading-md text-text-secondary">{r.line}</span>
+            </span>
+            {r.amount > 0 && <Meter used={r.used} amount={r.amount} verb={r.verb} label={r.label} />}
+          </li>
+        ))}
+      </ul>
+      <p className="text-md leading-md text-text-primary">
+        Nothing is removed. Every project and contributor you have stays as it is.
+      </p>
+    </section>
+  );
+}
+
 /** What gets smaller after a switch or a cancel, ticked off as the design lists benefits. */
 function Losses({ from, to }: { from: Plan; to: Plan }) {
   const losses = lossesOf(from, to);
@@ -652,6 +720,7 @@ export function DowngradeDialog({ tier, cycle, onClose }: { tier: PlanTier; cycl
             ) : (
               <p className="text-md leading-md text-text-secondary">Only how you&apos;re billed: monthly instead of yearly.</p>
             )}
+            {!sameTier && <UsagePreview to={target} />}
           </section>
           <section aria-labelledby="dg-billing" className="flex flex-col gap-[16px]">
             <h3 id="dg-billing" className="text-xl font-semibold leading-xl text-text-primary">
@@ -725,6 +794,7 @@ export function CancelDialog({ onClose }: { onClose: () => void }) {
         <div className="flex flex-col gap-[16px] rounded-xl bg-bg-subtle p-[20px]">
           <p className="text-lg leading-lg text-text-primary">Your subscription stays active until {when}. After that you lose:</p>
           <Losses from={current} to={planOf("free")} />
+          <UsagePreview to={planOf("free")} />
           <div className="mt-[8px] flex flex-col gap-[8px]">
             {offerSmaller ? (
               <Button

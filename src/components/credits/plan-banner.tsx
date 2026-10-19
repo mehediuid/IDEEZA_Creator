@@ -18,14 +18,12 @@
 import * as React from "react";
 import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button, ModalFrame, ProgressBar, Toggle } from "@/components/ideeza";
+import { Button, ModalFrame, Toggle } from "@/components/ideeza";
 import { usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { creditPeriod, planOf, priceOf } from "@/lib/create/plans";
-import { useManualProjects } from "@/lib/manual/projects";
-import { cn } from "@/lib/utils";
-import { CancelDialog } from "./plans-panel";
+import { CancelDialog, Meter, usePlanUsage } from "./plans-panel";
 
 const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const n = (v: number) => v.toLocaleString("en-US");
@@ -117,23 +115,22 @@ export function PlanBanner({ onSeePlans }: { onSeePlans: () => void }) {
 function PlanDetailsDialog({ onClose }: { onClose: () => void }) {
   const { sub, plan, keep, cancel } = useCreatePlan();
   const { ledger } = useCredits();
-  const { projects } = useManualProjects();
+  const usage = usePlanUsage();
   const [cancelling, setCancelling] = React.useState(false);
   const [now] = React.useState(() => Date.now());
 
   const period = creditPeriod(sub, now);
   const granted = ledger.find((e) => e.reason === "grant" && e.orderId === `grant_${sub.id}_${period.index}`);
-  const mostContributors = projects.reduce((m, p) => Math.max(m, p.contributors?.length ?? 0), 0);
   const cancelled = sub.pending?.tier === "free";
 
   if (cancelling) return <CancelDialog onClose={onClose} />;
 
   const benefits: { label: string; meter?: { used: number; amount: number; verb: string } }[] = [
     { label: `${n(plan.credits)} AI credits every month${granted ? `, ${n(granted.delta)} added on ${date(granted.ts)}` : ""}` },
-    { label: `Create ${n(plan.projects)} projects`, meter: { used: projects.length, amount: plan.projects, verb: "created" } },
+    { label: `Create ${n(plan.projects)} projects`, meter: { used: usage.projects, amount: plan.projects, verb: "created" } },
     { label: `${n(plan.exports)} exports a month` },
     { label: plan.queue },
-    { label: `Add ${n(plan.contributors)} contributors to a project`, meter: { used: mostContributors, amount: plan.contributors, verb: "added" } },
+    { label: `Add ${n(plan.contributors)} contributors to a project`, meter: { used: usage.mostContributors, amount: plan.contributors, verb: "added" } },
     { label: "Mint, list and buy on the marketplace" },
   ];
 
@@ -189,17 +186,5 @@ function PlanDetailsDialog({ onClose }: { onClose: () => void }) {
         )}
       </div>
     </ModalFrame>
-  );
-}
-
-function Meter({ used, amount, verb, label }: { used: number; amount: number; verb: string; label: string }) {
-  const over = used > amount;
-  return (
-    <span className="flex items-center gap-[10px]">
-      <ProgressBar value={(used / amount) * 100} label={`${label}: ${used} of ${amount} ${verb}`} className="w-[120px]" />
-      <span className={cn("min-w-[88px] text-sm leading-sm tabular-nums", over ? "text-text-error" : "text-text-secondary")}>
-        {n(used)}/{n(amount)} {verb}
-      </span>
-    </span>
   );
 }
