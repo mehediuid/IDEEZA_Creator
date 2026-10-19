@@ -39,6 +39,7 @@ const NOUN_OF: Record<RequestPurpose, string> = {
   listEdition: "listing",
   buyCredits: "payment",
   subscribe: "payment",
+  withdraw: "withdrawal",
 };
 
 function resolveIdentity(req: WalletRequest, wallet: DemoWallet | undefined): IdentityId {

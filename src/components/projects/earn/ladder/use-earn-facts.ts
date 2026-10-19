@@ -2,21 +2,22 @@
 
 // The ladder's facts, live: the page's own derivation (`view`) for products
 // and readiness; the commercial axis (`commercialStateOf`, the one the Earn
-// header reads) for the mint; the Brief draft for the license; the demo wallet and
-// the demo identity check from their stores. `ready` is false until both
-// stores have hydrated, so a commit point never flashes a missing step that
-// is really in place.
+// header reads) for the mint; the Brief draft for the license; the demo wallet,
+// the demo identity check and Get Paid's withdrawal methods from their stores.
+// `ready` is false until those stores have hydrated, so a commit point never
+// flashes a missing step that is really in place.
 
 import * as React from "react";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { earnFactsOf, type EarnFacts, type EarnFactsInput } from "@/lib/commerce/ladder";
 import { commercialFactsOf, commercialStateOf } from "@/lib/commerce/state";
+import { usePayout } from "@/lib/account/use-payout";
 import { useKyc } from "@/lib/commerce/use-commerce";
 import type { ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 
-export type EarnFactsSource = Omit<EarnFactsInput, "wallet" | "kyc">;
+export type EarnFactsSource = Omit<EarnFactsInput, "wallet" | "kyc" | "withdrawalMethods">;
 
 /** The ladder's input from the project page's SlotProps. */
 export function earnSourceOf(
@@ -35,6 +36,11 @@ export function earnSourceOf(
 export function useEarnFacts(source: EarnFactsSource): { facts: EarnFacts; ready: boolean } {
   const wallet = useDemoWallet();
   const kyc = useKyc();
-  const facts = React.useMemo(() => earnFactsOf({ ...source, wallet, kyc: kyc ?? null }), [source, wallet, kyc]);
-  return { facts, ready: wallet !== undefined && kyc !== undefined };
+  const payout = usePayout();
+  const methods = payout?.methods.length ?? 0;
+  const facts = React.useMemo(
+    () => earnFactsOf({ ...source, wallet, kyc: kyc ?? null, withdrawalMethods: methods }),
+    [source, wallet, kyc, methods],
+  );
+  return { facts, ready: wallet !== undefined && kyc !== undefined && payout !== undefined };
 }

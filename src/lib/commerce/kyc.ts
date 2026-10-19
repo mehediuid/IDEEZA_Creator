@@ -1,9 +1,14 @@
-// The demo identity check (Build and Earn P1-4). "Verify identity (demo)"
-// collects nothing real: the dialog asks a name and a country, checks only
-// that both are filled in, and stores neither. What it stores, under
+// The demo identity check (Build and Earn P1-4), shown as Level 1 of Settings
+// › KYC Verification (Settings spec §5.5, D6). It collects nothing real: the
+// form asks a name, a country and the seller terms, checks only that they are
+// filled in, and stores none of them. What it stores, under
 // `ideeza:commerce:kyc`, is the outcome alone: `{ status: "verified", at, demo: true }`.
-// It gates only physical editions and the "Request payout" demo action (L4),
-// and it can be reset, which removes the key.
+// It gates only physical editions (L4) and withdrawing in Get Paid, and it
+// can be reset, which removes the key.
+//
+// Figma's two higher levels, Intermediate from $1,000 of total transactions
+// and Advanced from $5,000, need documents and a reviewer, which the app
+// doesn't have: they are shown with the live total and stay Not Submitted.
 //
 // No vendor, no document, no network. Pure apart from the guarded
 // localStorage read and writes, with relative imports only (node:test).
@@ -12,6 +17,32 @@ export const KYC_KEY = "ideeza:commerce:kyc";
 
 export type KycRecord = { status: "verified"; at: number; demo: true };
 export type KycStatus = "none" | "verified";
+
+/** Figma's thresholds, in US dollars of total transactions. */
+export const KYC_INTERMEDIATE_AT = 1000;
+export const KYC_ADVANCED_AT = 5000;
+
+export type KycLevelId = "level-1" | "intermediate" | "advanced";
+export type KycLevelStatus = "not-submitted" | "under-review" | "rejected" | "approved";
+export type KycLevel = {
+  id: KycLevelId;
+  status: KycLevelStatus;
+  /** Asked of you now: Level 1 to sell and withdraw, the others once sales pass their threshold. */
+  needed: boolean;
+  /** Dollars of total transactions it starts at; null for Level 1. */
+  threshold: number | null;
+  /** When it was approved. */
+  at: number | null;
+};
+
+/** The three levels and where you stand on each, from the demo check and your total sales in dollars. */
+export function kycLevelsOf(rec: KycRecord | null, salesUsd: number): KycLevel[] {
+  return [
+    { id: "level-1", status: rec ? "approved" : "not-submitted", needed: true, threshold: null, at: rec?.at ?? null },
+    { id: "intermediate", status: "not-submitted", needed: salesUsd >= KYC_INTERMEDIATE_AT, threshold: KYC_INTERMEDIATE_AT, at: null },
+    { id: "advanced", status: "not-submitted", needed: salesUsd >= KYC_ADVANCED_AT, threshold: KYC_ADVANCED_AT, at: null },
+  ];
+}
 
 export const KYC_NAME_MAX = 80;
 export const KYC_COUNTRY_MAX = 56;
@@ -46,15 +77,21 @@ export function verifiedKyc(at: number): KycRecord {
   return { status: "verified", at, demo: true };
 }
 
-/** The form's two fields: each must hold something, within its length. Nothing else is checked. */
-export function kycFormProblems(form: { name: string; country: string }): { name?: string; country?: string } {
-  const out: { name?: string; country?: string } = {};
+/** The form's fields: each must hold something, within its length, and the terms (when
+ *  asked) ticked. Nothing else is checked. */
+export function kycFormProblems(form: { name: string; country: string; terms?: boolean }): {
+  name?: string;
+  country?: string;
+  terms?: string;
+} {
+  const out: { name?: string; country?: string; terms?: string } = {};
   const name = form.name.trim();
   const country = form.country.trim();
-  if (!name) out.name = "Enter a name.";
+  if (!name) out.name = "Enter your full legal name.";
   else if (name.length > KYC_NAME_MAX) out.name = `Keep the name under ${KYC_NAME_MAX} characters.`;
-  if (!country) out.country = "Enter a country.";
+  if (!country) out.country = "Choose your country of residence.";
   else if (country.length > KYC_COUNTRY_MAX) out.country = `Keep the country under ${KYC_COUNTRY_MAX} characters.`;
+  if (form.terms === false) out.terms = "Tick the box to agree to the Marketplace Seller Terms.";
   return out;
 }
 

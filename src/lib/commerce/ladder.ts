@@ -5,8 +5,12 @@
 //   L1 Drafts (plan, splits)       no wallet; something built to earn from
 //   L2 Mint                        nothing more: the mint asks the rest in place
 //   L3 Sell & editions             minted, ownership confirmed, videos ready,
-//                                  license set, payout wallet set
+//                                  license set, a withdrawal method in Get Paid
 //   L4 Physical editions & payouts identity verified (demo)
+//
+// Earnings are one balance for the account, withdrawn in Settings › Get Paid
+// (Settings spec D3): the step that once asked for a payout wallet asks for a
+// withdrawal method there, and withdrawing asks the identity check there too.
 //
 // Owner, 2026-10-12: nothing stands between a built project and its mint — not
 // the videos (they're for selling and sharing), not the wallet (every signing
@@ -44,7 +48,8 @@ export type EarnFacts = {
   videosReady: boolean;
   minted: boolean;
   licenseSet: boolean;
-  payoutWalletSet: boolean;
+  /** A withdrawal method in Settings › Get Paid (`ideeza:account:payout`). */
+  withdrawalMethodSet: boolean;
   /** The demo identity check (`ideeza:commerce:kyc`). */
   identityVerified: boolean;
   /** A step's own reason in place of the default, e.g. the readiness gate's video count. */
@@ -77,7 +82,7 @@ export const EARN_LEVELS: readonly LevelInfo[] = [
   { level: 1, name: "Drafts", opens: "Write the business plan and set the splits.", gate: "No wallet" },
   { level: 2, name: "Mint", opens: "Mint your project.", gate: "Built" },
   { level: 3, name: "Sell & editions", opens: "List the project and sell virtual editions.", gate: "Minted" },
-  { level: 4, name: "Physical editions & payouts", opens: "Sell physical editions and request payouts.", gate: "Identity" },
+  { level: 4, name: "Physical editions & payouts", opens: "Sell physical editions. Withdrawing in Get Paid asks the same check.", gate: "Identity" },
 ];
 
 export const LADDER_STEPS: readonly LadderStep[] = [
@@ -120,16 +125,17 @@ export const LADDER_STEPS: readonly LadderStep[] = [
   {
     id: "payout",
     level: 3,
-    label: "Payout wallet set",
-    reason: "Set the wallet your sales pay into.",
-    fix: { kind: "payout", label: "Set payout wallet" },
+    label: "Withdrawal method added",
+    reason: "Add where your earnings go when you withdraw them in Get Paid.",
+    fix: { kind: "payout", label: "Add a withdrawal method" },
+    // Asked once there is something to sell.
     requires: "minted",
   },
   {
     id: "identity",
     level: 4,
     label: "Identity verified",
-    reason: "Verify your identity. Physical editions and payouts need it.",
+    reason: "Verify your identity. Physical editions and withdrawals need it.",
     fix: { kind: "identity", label: "Verify identity" },
   },
 ];
@@ -141,7 +147,7 @@ const FACT_OF: Record<LadderStepId, keyof Omit<EarnFacts, "reasons">> = {
   videos: "videosReady",
   minted: "minted",
   license: "licenseSet",
-  payout: "payoutWalletSet",
+  payout: "withdrawalMethodSet",
   identity: "identityVerified",
 };
 
@@ -206,7 +212,6 @@ export const COMMIT_LEVEL = {
   list: 3,
   editionVirtual: 3,
   editionPhysical: 4,
-  payout: 4,
 } as const satisfies Record<string, EarnLevel>;
 
 export type CommitPoint = keyof typeof COMMIT_LEVEL;
@@ -250,6 +255,8 @@ export type EarnFactsInput = {
   license: string | null;
   wallet: DemoWallet | undefined;
   kyc: KycRecord | null;
+  /** How many withdrawal methods Get Paid holds. */
+  withdrawalMethods: number;
 };
 
 export function earnFactsOf(i: EarnFactsInput): EarnFacts {
@@ -268,8 +275,7 @@ export function earnFactsOf(i: EarnFactsInput): EarnFacts {
     videosReady,
     minted,
     licenseSet: i.license !== null,
-    // Every mint pays a wallet: its record's, or Demo account 1 by default (`payoutAddressOf`).
-    payoutWalletSet: minted,
+    withdrawalMethodSet: i.withdrawalMethods > 0,
     identityVerified: i.kyc?.status === "verified",
     reasons,
   };
