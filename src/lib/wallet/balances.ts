@@ -102,16 +102,17 @@ export function heldBy(id: IdentityId, ctx: { market: MarketData; now: number },
 }
 
 /**
- * `id`'s balance right now: the seed, minus its own activity charges, minus
- * what it paid buying, plus what it was paid selling, minus what a live
- * auction's top bid holds. Never stored — every read walks the wallet and the
- * market fresh (C4).
+ * `id`'s balance right now: the seed, minus its own activity charges, plus
+ * its activity credits (tutorial rewards), minus what it paid buying, plus
+ * what it was paid selling, minus what a live auction's top bid holds. Never
+ * stored — every read walks the wallet and the market fresh (C4).
  */
 export function balancesOf(id: IdentityId, ctx: BalanceCtx, opts: HoldOpts = {}): Balances {
   const bal = seedBalancesOf(id);
   for (const entry of ctx.wallet?.activity ?? []) {
-    if (entry.identity !== id || !entry.charge) continue;
-    for (const line of entry.charge.lines) debit(bal, line.coin, entry.charge.network, line.amount);
+    if (entry.identity !== id) continue;
+    if (entry.charge) for (const line of entry.charge.lines) debit(bal, line.coin, entry.charge.network, line.amount);
+    if (entry.credit) for (const line of entry.credit.lines) credit(bal, line.coin, entry.credit.network, line.amount);
   }
   const address = demoAddress(id);
   for (const sale of ctx.market.sales) {

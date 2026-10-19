@@ -150,6 +150,8 @@ function sanitizeActivityEntry(raw: unknown): WalletActivity | null {
   if (typeof raw.signature === "string") entry.signature = raw.signature;
   const charge = sanitizeCharge(raw.charge);
   if (charge) entry.charge = charge;
+  const credit = sanitizeCharge(raw.credit);
+  if (credit) entry.credit = credit;
   return entry;
 }
 

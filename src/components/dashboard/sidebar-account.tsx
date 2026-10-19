@@ -36,6 +36,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Avatar, Button, Divider, ProgressBar, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useTheme } from "@/components/theme-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
@@ -694,6 +695,7 @@ export function WalletPopover({
 }) {
   const wallet = useDemoWallet();
   const { openManage } = useWalletRequest();
+  const router = useRouter();
   const entry = menuEntryOf(wallet);
   const connected = !!entry.detail;
 
@@ -736,7 +738,16 @@ export function WalletPopover({
             openManage();
           }}
         />
-        <WalletRow title="Earn IDZ tokens" hint="Free tokens to start" soon="Earning tokens isn't open yet" />
+        {/* Tutorials pay IDZ for each video watched (Tutorials plan A3). */}
+        <WalletRow
+          title="Earn IDZ tokens"
+          hint="Watch tutorial videos"
+          onSelect={() => {
+            onClose(false);
+            onLeave?.();
+            router.push("/tutorials");
+          }}
+        />
         <WalletRow title="Claim rewards" hint="See pending claims" soon="Rewards aren't open yet" />
       </div>
     </FloatingPanel>

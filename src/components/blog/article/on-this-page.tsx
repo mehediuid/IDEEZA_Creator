@@ -115,12 +115,26 @@ function Links({ headings, current, onGo, dense }: { headings: readonly Heading[
 }
 
 /** Beside the article: the list under its label, the rule down its left edge. */
-export function ContentsList({ headings, current, onGo }: { headings: readonly Heading[]; current: string | null; onGo: (a: string) => void }) {
+export function ContentsList({
+  headings,
+  current,
+  onGo,
+  label = "On this page",
+  icon,
+}: {
+  headings: readonly Heading[];
+  current: string | null;
+  onGo: (a: string) => void;
+  /** Tutorials name it "Page Content" (Figma 38577:5799), with its icon before the words. */
+  label?: string;
+  icon?: React.ReactNode;
+}) {
   const id = React.useId();
   return (
     <nav aria-labelledby={id} className="flex flex-col gap-4">
-      <h3 id={id} className="text-md font-semibold leading-md text-text-primary">
-        On this page
+      <h3 id={id} className="flex items-center gap-4 text-md font-semibold leading-md text-text-primary">
+        {icon}
+        {label}
       </h3>
       <div className="border-0 border-l border-solid border-border-subtle">
         <div className="-ml-px">
@@ -132,11 +146,21 @@ export function ContentsList({ headings, current, onGo }: { headings: readonly H
 }
 
 /** In one column: "On this page (n)", folded until asked. */
-export function ContentsDisclosure({ headings, current, onGo }: { headings: readonly Heading[]; current: string | null; onGo: (a: string) => void }) {
+export function ContentsDisclosure({
+  headings,
+  current,
+  onGo,
+  label = "On this page",
+}: {
+  headings: readonly Heading[];
+  current: string | null;
+  onGo: (a: string) => void;
+  label?: string;
+}) {
   const [open, setOpen] = React.useState(false);
   const panel = React.useId();
   return (
-    <nav aria-label="On this page" className="rounded-xl border border-solid border-border-subtle bg-bg-surface">
+    <nav aria-label={label} className="rounded-xl border border-solid border-border-subtle bg-bg-surface">
       <button
         type="button"
         aria-expanded={open}
@@ -144,7 +168,9 @@ export function ContentsDisclosure({ headings, current, onGo }: { headings: read
         onClick={() => setOpen((v) => !v)}
         className="flex min-h-[48px] w-full cursor-pointer items-center justify-between gap-4 rounded-xl px-8 text-left text-md font-semibold leading-md text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        <span>On this page ({headings.length})</span>
+        <span>
+          {label} ({headings.length})
+        </span>
         <span aria-hidden className={cn("inline-flex transition-transform duration-fast", open && "rotate-180")}>
           <Icon icon={ArrowDown01Icon} size={18} />
         </span>

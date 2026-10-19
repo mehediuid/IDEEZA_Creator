@@ -34,6 +34,8 @@ export type WalletActivity = {
   txHash?: string;
   signature?: string;
   charge?: Charge;
+  /** What the entry paid in: a tutorial reward ("Tutorial reward · …"). */
+  credit?: Charge;
 };
 
 export type DemoWallet = {

@@ -119,7 +119,7 @@ export function CommandPalette({
         icon: Mail01Icon, onActivate: go("/messages") },
       // Resources
       { id: "tutorial", label: "Open the tutorial", category: "Resources",
-        icon: MortarboardIcon, onActivate: exit(() => {}) },
+        icon: MortarboardIcon, onActivate: go("/tutorials") },
       { id: "tourguide", label: "Tour guide", category: "Resources",
         icon: Compass01Icon, onActivate: exit(() => {}) },
       { id: "help", label: "Help & support", category: "Resources",

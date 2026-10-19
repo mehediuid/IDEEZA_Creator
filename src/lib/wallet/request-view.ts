@@ -223,11 +223,14 @@ export function buyerRowOf(id: DemoBuyerId, name: string, w: DemoWallet | undefi
   return `${name} · ${shortAddress(demoAddress(id))} · ${testCoin(bal.native[network]?.[coin] ?? "0", coin)}`;
 }
 
-/** One Recent line: "Minted on chain · Car · Sep 28, 2026 · 4:12 PM", and its charge "−4 IDZ, −0.00104 ETH". */
+/** One Recent line: "Minted on chain · Car · Sep 28, 2026 · 4:12 PM", and its charge "−4 IDZ, −0.00104 ETH"
+ *  (a reward's credit reads "+2 IDZ"). */
 export function activityLineOf(a: WalletActivity): { text: string; charge: string | null } {
   const charge = a.charge?.lines.length
     ? sumCharge(a.charge).lines.map((l) => `−${formatAmount(l.amount, l.coin)}`).join(", ")
-    : null;
+    : a.credit?.lines.length
+      ? sumCharge(a.credit).lines.map((l) => `+${formatAmount(l.amount, l.coin)}`).join(", ")
+      : null;
   return { text: `${a.title} · ${formatDateTime(a.at)}`, charge };
 }
 
