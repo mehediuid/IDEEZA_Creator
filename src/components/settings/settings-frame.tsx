@@ -67,7 +67,7 @@ function SettingsCrumbs({ page }: { page: SettingsPageId }) {
   if (crumbs.length < 2) return null;
   return (
     <nav aria-label="Breadcrumb">
-      <ol className="flex flex-wrap items-center gap-[6px] text-sm leading-sm">
+      <ol className="flex flex-wrap items-center gap-[6px] text-md leading-md">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1;
           return (
@@ -89,7 +89,7 @@ function SettingsCrumbs({ page }: { page: SettingsPageId }) {
               )}
               {!last && (
                 <span aria-hidden className="text-text-tertiary">
-                  <Icon icon={ArrowRight01Icon} size={12} />
+                  <Icon icon={ArrowRight01Icon} size={14} />
                 </span>
               )}
             </li>
