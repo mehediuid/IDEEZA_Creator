@@ -97,6 +97,7 @@ ideeza-creator-panel/
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
    │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages
+   │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor)
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
@@ -130,6 +131,8 @@ ideeza-creator-panel/
    │  ├─ settings/           Settings: registry (pages, crumbs, nav), rows/ (each page's
    │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings,
    │  │                      audience (who can reach you, quiet mode, hidden words, people you've met)
+   │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
+   │  │                      videos, comments), filter (settings, quiet hours, digest), read state
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store

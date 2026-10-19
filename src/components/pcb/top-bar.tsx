@@ -3,7 +3,7 @@
 // IDEEZA Creator Panel — top bar.
 // Logo · App menu (Edit/View/Place/.../Help on flow pages, falls back to
 // Earn IDZ + Connect Wallet pills on non-flow pages like home) · right
-// cluster (help / cart / notifications / profile dropdown / collapse).
+// cluster (premium parts / notifications bell / profile dropdown / collapse).
 //
 // Profile dropdown hosts the Earn IDZ + Connect Wallet actions when the
 // menu bar takes the middle slot, so the user never loses access to them.
@@ -12,7 +12,6 @@ import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ArrowDown01Icon,
-  Notification03Icon,
   SidebarLeft01Icon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
@@ -31,6 +30,7 @@ import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { ProductNameField } from "@/components/manual/product-name-field";
 import { ProductSwitcher } from "@/components/manual/product-switcher";
 import { EditorBannerOutlet } from "@/components/manual/bring-in-banner";
+import { NoticeBell } from "@/components/notifications/notice-bell";
 
 const VIOLET = "var(--color-violet-600)";
 
@@ -214,29 +214,9 @@ export function TopBar() {
             is no store page for it to open yet — the sidebar's own "Explore
             marketplace" link has no route behind it either. It comes back the
             day that page exists, rather than sitting here as decoration. */}
-        <ToolBtn>
-          <HugeiconsIcon icon={Notification03Icon} size={21} color="currentColor" strokeWidth={1.8} />
-          <span
-            style={{
-              position: "absolute",
-              top: -2,
-              right: -2,
-              minWidth: 17,
-              height: 17,
-              padding: "0 4px",
-              borderRadius: 9,
-              background: "var(--color-text-error)",
-              color: "var(--color-text-on-brand)",
-              fontSize: "var(--font-size-2xs)",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            3
-          </span>
-        </ToolBtn>
+        {/* The account's bell: the same notices and panel as the sidebar's
+            (components/notifications), where a painted "3" used to sit. */}
+        <NoticeBell look="editor" />
 
         {/* Profile pill — clickable on flow pages to open the relocated
             Earn IDZ / Connect Wallet menu plus account actions. On non-flow
