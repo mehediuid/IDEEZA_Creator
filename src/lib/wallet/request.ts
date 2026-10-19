@@ -40,6 +40,7 @@ const NOUN_OF: Record<RequestPurpose, string> = {
   buyCredits: "payment",
   subscribe: "payment",
   withdraw: "withdrawal",
+  payoutMethod: "withdrawal method",
 };
 
 function resolveIdentity(req: WalletRequest, wallet: DemoWallet | undefined): IdentityId {

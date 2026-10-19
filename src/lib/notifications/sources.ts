@@ -7,6 +7,7 @@
 // clock, names and "does this chat still exist" come from the caller.
 
 import { blogNews, newsKicker, newsMessage } from "../blog/news";
+import { NETWORKS, type Network } from "../brief/types";
 import { findArticle } from "../blog/article";
 import { articleHref, slugOf } from "../blog/slug";
 import type { BlogData } from "../blog/types";
@@ -247,6 +248,37 @@ export function marketNotices(m: MarketInput, projects: readonly { id: string; n
     });
   }
   return out;
+}
+
+// ─────────────────────────── get paid ───────────────────────────
+
+/** A change to where withdrawals go (Settings › Get paid's method log, lib/account/payout.ts). */
+export type PayoutEventInput = {
+  id: string;
+  kind: "added" | "default" | "removed";
+  label: string;
+  address: string;
+  network: Network;
+  at: number;
+};
+
+const GET_PAID_METHODS_HREF = "/settings/get-paid#methods";
+const short = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
+const networkName = (n: Network) => NETWORKS.find((x) => x.value === n)?.label ?? n;
+
+/** Every withdrawal method added, made the default or removed: urgent, like money received, so
+ *  a change you didn't make is seen at once. */
+export function payoutNotices(events: readonly PayoutEventInput[]): Notice[] {
+  return events.map((e) => {
+    const where = `${short(e.address)} on ${networkName(e.network)}`;
+    const said =
+      e.kind === "added"
+        ? { title: "You added a withdrawal method", body: `${e.label} · ${where}. Not you? Remove it in Get paid.` }
+        : e.kind === "default"
+          ? { title: `Withdrawals now go to ${e.label}`, body: `${where} is your default withdrawal method. Not you? Change it in Get paid.` }
+          : { title: `You removed ${e.label}`, body: `${where} won't receive withdrawals any more.` };
+    return { id: `payout:${e.id}`, kind: "coin", tag: "Coin · Get paid", ...said, href: GET_PAID_METHODS_HREF, at: e.at, urgent: true };
+  });
 }
 
 // ─────────────────────────── coin ───────────────────────────

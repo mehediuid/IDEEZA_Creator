@@ -87,7 +87,7 @@ ideeza-creator-panel/
    │  │                      and Virtual NFT); earn/ (the Earn area; earn/sell/ the Sell copies
    │  │                      flow; earn/ladder/ the gating ladder's track, commit
    │  │                      checks, Choose a license); earn/project-earnings (Sales'
-   │  │                      Your earnings → Withdraw in Get Paid);
+   │  │                      Your earnings → Withdraw in Get paid);
    │  │                      business-plan/ (chip runner + page) — see
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
@@ -98,9 +98,8 @@ ideeza-creator-panel/
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
    │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages;
-   │  │                      kyc-page; get-paid/ (hub, balance, add-method and withdraw dialogs,
-   │  │                      history + statement, tax forms, parts)
-   │  │                      (profile/: Profile and Personal Information)
+   │  │                      get-paid/ (the one page, withdraw and method dialogs, identity
+   │  │                      form, history + statement, parts)
    │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor)
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
@@ -137,9 +136,9 @@ ideeza-creator-panel/
    │  │                      audience (who can reach you, quiet mode, hidden words, people you've met),
    │  │                      dates (+ use-dates), voice, keys (single-key shortcuts), appearance (pre-paint)
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
-   │  │                      videos, comments), filter (settings, quiet hours, digest), read state
+   │  │                      videos, comments, withdrawal methods), filter (settings, quiet hours, digest), read state
    │  ├─ account/            the account: payment token, invoices, summary, your private identity
-   │  │                      (ideeza:account:identity: legal name, gender, addresses) and countries
+   │  │                      (ideeza:account:identity: the legal name) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store

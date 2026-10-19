@@ -60,9 +60,9 @@ test("a fixed or stuck bar over <main> is <main>'s scroll-padding, so focus neve
 });
 
 // Pages that render nothing of their own: they send the reader on at once
-// (and the settings pages Settings v2 folded into others).
+// (and the settings pages Settings v2 folded into others, Get paid's old sub-pages too).
 const REDIRECTS = ["app/(create)/build/[jobId]/brief/page.tsx", "app/(create)/projects/[id]/business-plan/page.tsx"];
-const isRedirect = (page) => REDIRECTS.includes(page) || /^\s*redirectLegacy\(/m.test(read(page));
+const isRedirect = (page) => REDIRECTS.includes(page) || /^\s*redirect(Legacy)?\(/m.test(read(page));
 
 test("every shell page names its tab ‹Page› · IDEEZA", () => {
   const untitled = [];

@@ -200,9 +200,9 @@ test("P0 · the engineering meta line drops what the stage line says and the own
 // The ladder's facts (lib/commerce/ladder.ts): the Earn button counts its next commit point's steps.
 const ALL = {
   built: true, walletConnected: true, ownershipConfirmed: true, videosReady: true,
-  minted: true, licenseSet: true, withdrawalMethodSet: true, identityVerified: true,
+  minted: true, licenseSet: true, identityVerified: true,
 };
-const DRAFT = { ...ALL, walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false, licenseSet: false, withdrawalMethodSet: false, identityVerified: false };
+const DRAFT = { ...ALL, walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false, licenseSet: false, identityVerified: false };
 const earnOf = (over = {}) =>
   earnButtonOf({ projectId: "proj_car", commercial: "none", soldSharePct: 0, facts: DRAFT, reviewPending: false, ...over });
 
@@ -215,9 +215,9 @@ test("P1 · the Earn button: a built draft is ready to mint — no wallet, owner
 
 test("P1 · the Earn button: a minted project counts the list level's steps (L3)", () => {
   const minted = { ...ALL, licenseSet: false, identityVerified: false };
-  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: minted })), ["notReady", "5 of 6 ready to sell", false]);
-  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, videosReady: false } })), ["notReady", "4 of 6 ready to sell", false]);
-  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, walletConnected: false } })), ["notReady", "5 of 6 ready to sell", false], "the wallet is asked when signing");
+  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: minted })), ["notReady", "4 of 5 ready to sell", false]);
+  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, videosReady: false } })), ["notReady", "3 of 5 ready to sell", false]);
+  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, walletConnected: false } })), ["notReady", "4 of 5 ready to sell", false], "the wallet is asked when signing");
   assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, licenseSet: true } })), ["ready", null, true]);
 });
 

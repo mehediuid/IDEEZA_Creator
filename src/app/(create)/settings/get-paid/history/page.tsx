@@ -1,10 +1,9 @@
-// /settings/get-paid/history — Withdrawal History: totals by status, the statement download, the table.
+// /settings/get-paid/history — a Phase 1 sub-page; Settings v2 shows the withdrawal history on the one
+// Get paid page, so this sends you there, keeping the query (`?from=`).
 
-import type { Metadata } from "next";
-import { HistoryPage } from "@/components/settings/get-paid/history";
+import { redirect } from "next/navigation";
+import { getPaidHref } from "@/lib/account/get-paid-href";
 
-export const metadata: Metadata = { title: "Withdrawal History · Get Paid · Settings · IDEEZA" };
-
-export default function HistoryRoute() {
-  return <HistoryPage />;
+export default async function GetPaidSubRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirect(getPaidHref("history", await searchParams));
 }

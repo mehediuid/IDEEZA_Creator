@@ -1,12 +1,9 @@
-// /settings/get-paid/balance — the balance, Withdraw Money, withdrawal methods and "Get paid in".
-// `?from=` is the project page the Earn ladder sent you from, for the way back.
+// /settings/get-paid/balance — a Phase 1 sub-page; Settings v2 shows the balance on the one
+// Get paid page, so this sends you there, keeping the query (`?from=`).
 
-import type { Metadata } from "next";
-import { BalancePage } from "@/components/settings/get-paid/balance";
+import { redirect } from "next/navigation";
+import { getPaidHref } from "@/lib/account/get-paid-href";
 
-export const metadata: Metadata = { title: "Balance · Get Paid · Settings · IDEEZA" };
-
-export default async function BalanceRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const from = (await searchParams).from;
-  return <BalancePage from={typeof from === "string" ? from : null} />;
+export default async function GetPaidSubRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirect(getPaidHref("balance", await searchParams));
 }
