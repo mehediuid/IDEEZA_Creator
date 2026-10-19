@@ -1,7 +1,6 @@
-// Settings › Get Paid: the one pooled balance (D3) — every project's sales, your share only (net of
+// Settings › Get paid: the one pooled balance (D3) — every project's sales, your share only (net of
 // the 2.5 % fee, after co-owners and sold shares), valued in dollars at the fixed demo rates, less
-// every withdrawal; the history's stat tiles, its filters, the withdraw amount check, and the CSV
-// statement for a month or a year.
+// every withdrawal; the withdraw amount check, and the CSV statement for a month or a year.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -14,8 +13,6 @@ const {
   earningsOf,
   balanceOf,
   salesTotalUsdOf,
-  withdrawalStats,
-  filterWithdrawals,
   withdrawAmountProblem,
   statementCsv,
   statementFileName,
@@ -116,20 +113,6 @@ const W = [
   { id: "legacy-pay_x", amount: "3.5", token: "USDT", methodId: null, to: { label: "Requested in Earn", address: null }, at: at(2026, 2, 20), status: "pending" },
 ];
 
-test("withdrawalStats: the dollars in each status", () => {
-  assert.deepEqual(withdrawalStats(W), { complete: "280", "in-progress": "12", pending: "3.5" });
-  assert.deepEqual(withdrawalStats([]), { complete: "0", "in-progress": "0", pending: "0" });
-});
-
-test("filterWithdrawals: search, status and an inclusive day range; newest first", () => {
-  assert.deepEqual(filterWithdrawals(W, {}).map((w) => w.id), ["legacy-pay_x", "WD2", "WD1"]);
-  assert.deepEqual(filterWithdrawals(W, { query: "cold" }).map((w) => w.id), ["WD1"]);
-  assert.deepEqual(filterWithdrawals(W, { query: "wd2" }).map((w) => w.id), ["WD2"]);
-  assert.deepEqual(filterWithdrawals(W, { query: "280" }).map((w) => w.id), ["WD1"]);
-  assert.deepEqual(filterWithdrawals(W, { status: "pending" }).map((w) => w.id), ["legacy-pay_x"]);
-  assert.deepEqual(filterWithdrawals(W, { range: { from: "2026-02-01", to: "2026-02-03" } }).map((w) => w.id), ["WD2"]);
-});
-
 test("withdrawAmountProblem: dollars and cents, more than nothing, no more than the balance", () => {
   assert.equal(withdrawAmountProblem("50", "100"), null);
   assert.equal(withdrawAmountProblem("100.00", "100"), null);
@@ -147,7 +130,7 @@ test("statementCsv: the period's sales, fees and withdrawals, oldest first, esca
     [p],
   );
   const jan = statementCsv({ year: 2026, month: 1 }, e, W).split("\r\n");
-  assert.equal(jan[0], "Date,Type,Project,Details,Amount,Token,Amount (USD),Status,Reference");
+  assert.equal(jan[0], "\uFEFFDate,Type,Project,Details,Amount,Token,Amount (USD at demo rate),Status,Reference");
   assert.deepEqual(jan.slice(1), [
     '2026-01-05 09:30,Sale,"Rover, ""mini""",Virtual copy #1 · Rover · your share 100%,10,USDT,10,,s1',
     '2026-01-05 09:30,IDEEZA fee,"Rover, ""mini""",2.5% of the sale,-0.25,USDT,-0.25,,s1',

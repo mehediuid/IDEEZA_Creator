@@ -91,8 +91,10 @@ export type RequestPurpose =
   | "buyCredits"
   /** A plan paid from the demo wallet (Plan & pricing). */
   | "subscribe"
-  /** Earnings withdrawn in Settings › Get Paid: a signature, nothing charged. */
-  | "withdraw";
+  /** Earnings withdrawn in Settings › Get paid: a signature, nothing charged. */
+  | "withdraw"
+  /** A withdrawal method added or made the default in Settings › Get paid: a signature. */
+  | "payoutMethod";
 
 export type WalletRequest = {
   kind: "signature" | "transaction";

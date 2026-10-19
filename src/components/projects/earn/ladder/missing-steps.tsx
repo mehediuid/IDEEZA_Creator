@@ -5,9 +5,9 @@
 // a step reads and fixes the same wherever it's asked:
 // - Open products, Go to mint: links to the one place that step is done.
 //   Minting starts from Earn › Sell (the Brief entry, the mint flow's home).
-// - Add a withdrawal method, Verify identity: links into Settings › Get Paid
-//   and Settings › KYC Verification (Settings spec D3, D6), carrying the page
-//   you were on so the settings page offers the way back.
+// - Verify identity: links to Settings › Get paid › Verify your identity
+//   (Settings v2, V7), carrying the page you were on so the settings page
+//   offers the way back.
 // - Make videos: opens the products' videos in a dialog right here, where
 //   each one is generated (make-videos.tsx; owner, 2026-10-12).
 // - Connect wallet: opens the Demo wallet dialog.
@@ -25,6 +25,7 @@ import { CheckmarkCircle02Icon, CircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
+import { getPaidHref } from "@/lib/account/get-paid-href";
 import { withReturn } from "@/lib/account/return-to";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import type { LadderStep } from "@/lib/commerce/ladder";
@@ -84,15 +85,9 @@ export function StepFix({ step, project, brief, announce, onCover, describedBy }
           {label}
         </Link>
       );
-    case "payout":
-      return (
-        <Link href={withReturn("/settings/get-paid/balance#methods", pathname)} className={FIX} aria-describedby={describedBy}>
-          {label}
-        </Link>
-      );
     case "identity":
       return (
-        <Link href={withReturn("/settings/kyc", pathname)} className={FIX} aria-describedby={describedBy}>
+        <Link href={withReturn(getPaidHref("identity"), pathname)} className={FIX} aria-describedby={describedBy}>
           {label}
         </Link>
       );

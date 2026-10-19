@@ -1,26 +1,29 @@
-// Get Paid (Settings spec §5.5, decision D3): one earnings balance for the
-// whole account, withdrawn only in Settings › Get Paid. This file is its
-// record and its arithmetic.
+// Get paid (Settings v2, V7; spec §5.5, decision D3): one earnings balance
+// for the whole account, withdrawn only in Settings › Get paid. This file is
+// its record and its arithmetic.
 //
 // The record, `ideeza:account:payout` (v1): withdrawal methods (a crypto
-// wallet address is the one kind that works; bank, Payoneer and PayPal are
-// not available yet) with one default, the "Get paid in" token (D14), tax
-// residence, tax identification (only the last four digits of a TIN are ever
-// kept), and every withdrawal. A per-project payout request from before Get
-// Paid (`ideeza:commerce:payouts`) reads as a pending withdrawal, so nothing a
-// maker asked for disappears.
+// wallet address on a network) with one default, the "Get paid in" token
+// (D14), every withdrawal, and the log of every method added, made the
+// default or removed (the bell's notices). No tax data: the tax forms wait
+// for real payouts (V7), and a tax residence or SSN/EIN digits an older
+// record held are dropped on read and scrubbed on the next write. A
+// per-project payout request from before Get paid (`ideeza:commerce:payouts`)
+// reads as a pending withdrawal, so nothing a maker asked for disappears.
 //
 // The balance is derived, never stored: every sale of your projects pays you
 // your share (a share of the project you sold is all yours; a copy sale is
 // split by who held the project when it sold: co-owners and buyers of a
 // share take theirs), net of IDEEZA's 2.5 % fee, less every withdrawal.
-// Sales are in test coins, so dollars come from fixed demo rates: dollar
-// coins and IDZ one for one, test ETH and MATIC at the rates below. Nothing
-// here is a market price; the page says so.
+// Sales are in test coins, so dollars come from one fixed demo-rate table,
+// `DEMO_USD_RATES` (the app's one dollar rule): dollar coins and IDZ one for
+// one, test ETH and MATIC at the rates below. Nothing here is a market price;
+// every page that shows these dollars says "demo rate".
 //
 // Pure apart from the guarded localStorage read and write; relative imports
 // only (node:test).
 
+import type { Network } from "../brief/types";
 import type { Sale } from "../market/types";
 import { addAmounts, compareAmounts, fromMicros, subAmounts, toMicros } from "../wallet/money";
 import type { Amount, Coin } from "../wallet/types";
@@ -34,22 +37,30 @@ export type WithdrawalStatus = "complete" | "in-progress" | "pending";
 export const WITHDRAWAL_STATUSES: readonly WithdrawalStatus[] = ["complete", "in-progress", "pending"];
 export const STATUS_WORD: Record<WithdrawalStatus, string> = {
   complete: "Complete",
-  "in-progress": "In Progress",
+  "in-progress": "In progress",
   pending: "Pending",
 };
 
-export type WithdrawalMethod = { id: string; kind: "crypto"; address: string; label: string; addedAt: number };
+/** The networks a withdrawal can be sent on: the demo's two testnets. */
+export const PAYOUT_NETWORKS: readonly Network[] = ["baseSepolia", "mumbai"];
+export const DEFAULT_PAYOUT_NETWORK: Network = "baseSepolia";
 
-export type TaxResidence = { country: string; city: string; address: string; postalCode: string };
-export type TaxClassification = "individual" | "business";
-export type TinType = "ssn" | "ein";
-export type TaxIdentification = {
-  usPerson: boolean;
-  legalName: string;
-  classification: TaxClassification;
-  tinType: TinType | null;
-  tinLast4: string | null;
-  savedAt: number;
+export type WithdrawalMethod = { id: string; kind: "crypto"; address: string; label: string; network: Network; addedAt: number };
+
+/** A change to where withdrawals go: each one is a notice in the bell. */
+export type MethodEventKind = "added" | "default" | "removed";
+export type MethodEvent = {
+  /** "added:<method id>:<at>", stable, so the bell's read state holds. */
+  id: string;
+  kind: MethodEventKind;
+  methodId: string;
+  /** The method as it was then: a method removed later still reads right. */
+  label: string;
+  address: string;
+  network: Network;
+  at: number;
+  /** The demo wallet's signature that confirmed it (an add or a default change). */
+  signature?: string;
 };
 
 export type Withdrawal = {
@@ -59,7 +70,7 @@ export type Withdrawal = {
   token: PayoutToken;
   methodId: string | null;
   /** Where it went, kept as it was: a method removed later still reads right in the history. */
-  to: { label: string; address: string | null };
+  to: { label: string; address: string | null; network?: Network };
   at: number;
   status: WithdrawalStatus;
   /** The demo wallet's signature that confirmed it. */
@@ -73,9 +84,9 @@ export type PayoutStore = {
   methods: WithdrawalMethod[];
   defaultMethodId: string | null;
   getPaidIn: PayoutToken;
-  taxResidence: TaxResidence | null;
-  taxIdentification: TaxIdentification | null;
   withdrawals: Withdrawal[];
+  /** Oldest first, the newest `METHOD_LOG_MAX` kept. */
+  methodLog: MethodEvent[];
 };
 
 export const EMPTY_PAYOUT: PayoutStore = {
@@ -83,16 +94,15 @@ export const EMPTY_PAYOUT: PayoutStore = {
   methods: [],
   defaultMethodId: null,
   getPaidIn: "USDT",
-  taxResidence: null,
-  taxIdentification: null,
   withdrawals: [],
+  methodLog: [],
 };
 
 export const METHODS_MAX = 10;
 export const METHOD_LABEL_MAX = 40;
 export const DEFAULT_METHOD_LABEL = "Crypto wallet";
-export const TAX_FIELD_MAX = 120;
-export const LEGAL_NAME_MAX = 80;
+export const METHOD_LOG_MAX = 50;
+const TEXT_MAX = 120;
 
 // ───────────────────────── normalizing ─────────────────────────
 
@@ -100,7 +110,7 @@ function isDict(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
-const str = (v: unknown, max = TAX_FIELD_MAX) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+const str = (v: unknown, max = TEXT_MAX) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const time = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
 
 /** `0x` and 40 hex digits: an EVM address, which any wallet (a receive-only one too) has. */
@@ -108,31 +118,43 @@ export function isWalletAddress(s: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(s);
 }
 
+/** A stored network; an old method saved before networks were shown was on Base Sepolia. */
+const networkOf = (v: unknown): Network => PAYOUT_NETWORKS.find((n) => n === v) ?? DEFAULT_PAYOUT_NETWORK;
+
 function normalizeMethod(raw: unknown): WithdrawalMethod | null {
   if (!isDict(raw) || raw.kind !== "crypto" || typeof raw.id !== "string" || !raw.id) return null;
   const address = typeof raw.address === "string" ? raw.address : "";
   const addedAt = time(raw.addedAt);
   if (!isWalletAddress(address) || addedAt === null) return null;
-  return { id: raw.id, kind: "crypto", address, label: str(raw.label, METHOD_LABEL_MAX) || DEFAULT_METHOD_LABEL, addedAt };
+  return {
+    id: raw.id,
+    kind: "crypto",
+    address,
+    label: str(raw.label, METHOD_LABEL_MAX) || DEFAULT_METHOD_LABEL,
+    network: networkOf(raw.network),
+    addedAt,
+  };
 }
 
-function normalizeResidence(raw: unknown): TaxResidence | null {
-  if (!isDict(raw)) return null;
-  const r = { country: str(raw.country, 2).toUpperCase(), city: str(raw.city), address: str(raw.address), postalCode: str(raw.postalCode, 20) };
-  return Object.keys(taxResidenceProblems(r)).length ? null : r;
-}
+const EVENT_KINDS: readonly MethodEventKind[] = ["added", "default", "removed"];
 
-function normalizeIdentification(raw: unknown): TaxIdentification | null {
-  if (!isDict(raw) || typeof raw.usPerson !== "boolean") return null;
-  const legalName = str(raw.legalName, LEGAL_NAME_MAX);
-  const classification = raw.classification === "business" ? "business" : raw.classification === "individual" ? "individual" : null;
-  const savedAt = time(raw.savedAt);
-  if (!legalName || !classification || savedAt === null) return null;
-  if (!raw.usPerson) return { usPerson: false, legalName, classification, tinType: null, tinLast4: null, savedAt };
-  const tinType = raw.tinType === "ssn" || raw.tinType === "ein" ? raw.tinType : null;
-  const tinLast4 = typeof raw.tinLast4 === "string" && /^\d{4}$/.test(raw.tinLast4) ? raw.tinLast4 : null;
-  if (!tinType || !tinLast4) return null;
-  return { usPerson: true, legalName, classification, tinType, tinLast4, savedAt };
+function normalizeEvent(raw: unknown): MethodEvent | null {
+  if (!isDict(raw) || typeof raw.id !== "string" || !raw.id || typeof raw.methodId !== "string") return null;
+  const kind = EVENT_KINDS.find((k) => k === raw.kind);
+  const at = time(raw.at);
+  const address = typeof raw.address === "string" ? raw.address : "";
+  if (!kind || at === null || !isWalletAddress(address)) return null;
+  const e: MethodEvent = {
+    id: raw.id,
+    kind,
+    methodId: raw.methodId,
+    label: str(raw.label, METHOD_LABEL_MAX) || DEFAULT_METHOD_LABEL,
+    address,
+    network: networkOf(raw.network),
+    at,
+  };
+  if (typeof raw.signature === "string") e.signature = raw.signature;
+  return e;
 }
 
 function normalizeWithdrawal(raw: unknown): Withdrawal | null {
@@ -152,6 +174,8 @@ function normalizeWithdrawal(raw: unknown): Withdrawal | null {
     at,
     status,
   };
+  const network = PAYOUT_NETWORKS.find((n) => n === to.network);
+  if (network) w.to.network = network;
   if (typeof raw.signature === "string") w.signature = raw.signature;
   if (raw.legacy === true) w.legacy = true;
   return w;
@@ -170,10 +194,23 @@ export function normalizePayout(raw: unknown): PayoutStore {
     methods,
     defaultMethodId: named ? named.id : (methods[0]?.id ?? null),
     getPaidIn: raw.getPaidIn === "IDZ" ? "IDZ" : "USDT",
-    taxResidence: normalizeResidence(raw.taxResidence),
-    taxIdentification: normalizeIdentification(raw.taxIdentification),
     withdrawals: (Array.isArray(raw.withdrawals) ? raw.withdrawals : []).map(normalizeWithdrawal).filter((w): w is Withdrawal => w !== null),
+    methodLog: (Array.isArray(raw.methodLog) ? raw.methodLog : [])
+      .map(normalizeEvent)
+      .filter((e): e is MethodEvent => e !== null)
+      .slice(-METHOD_LOG_MAX),
   };
+}
+
+/** A stored record that still holds the tax data older versions kept: write it back without it. */
+export function payoutNeedsScrub(raw: string | null): boolean {
+  if (!raw) return false;
+  try {
+    const v: unknown = JSON.parse(raw);
+    return isDict(v) && ("taxResidence" in v || "taxIdentification" in v);
+  } catch {
+    return false;
+  }
 }
 
 export function parsePayout(raw: string | null): PayoutStore {
@@ -189,64 +226,95 @@ export function parsePayout(raw: string | null): PayoutStore {
 
 export type AddMethodResult = { ok: true; store: PayoutStore; method: WithdrawalMethod } | { ok: false; problem: "address" | "duplicate" | "full" };
 
-/** A crypto wallet by its address. The first one is the default. */
-export function addMethod(store: PayoutStore, input: { address: string; label: string }, at: number, id: string): AddMethodResult {
+function logged(store: PayoutStore, kind: MethodEventKind, m: WithdrawalMethod, at: number, signature?: string): MethodEvent[] {
+  const e: MethodEvent = { id: `${kind}:${m.id}:${at}`, kind, methodId: m.id, label: m.label, address: m.address, network: m.network, at };
+  if (signature) e.signature = signature;
+  return [...store.methodLog, e].slice(-METHOD_LOG_MAX);
+}
+
+/** A crypto wallet by its address and network. The first one is the default. Logged. */
+export function addMethod(
+  store: PayoutStore,
+  input: { address: string; label: string; network: Network },
+  at: number,
+  id: string,
+  signature?: string,
+): AddMethodResult {
   const address = input.address.trim();
   if (!isWalletAddress(address)) return { ok: false, problem: "address" };
   if (store.methods.some((m) => m.address.toLowerCase() === address.toLowerCase())) return { ok: false, problem: "duplicate" };
   if (store.methods.length >= METHODS_MAX) return { ok: false, problem: "full" };
-  const method: WithdrawalMethod = { id, kind: "crypto", address, label: input.label.trim().slice(0, METHOD_LABEL_MAX) || DEFAULT_METHOD_LABEL, addedAt: at };
-  return { ok: true, method, store: { ...store, methods: [...store.methods, method], defaultMethodId: store.defaultMethodId ?? id } };
+  const method: WithdrawalMethod = {
+    id,
+    kind: "crypto",
+    address,
+    label: input.label.trim().slice(0, METHOD_LABEL_MAX) || DEFAULT_METHOD_LABEL,
+    network: input.network,
+    addedAt: at,
+  };
+  return {
+    ok: true,
+    method,
+    store: {
+      ...store,
+      methods: [...store.methods, method],
+      defaultMethodId: store.defaultMethodId ?? id,
+      methodLog: logged(store, "added", method, at, signature),
+    },
+  };
 }
 
-/** The default moves to the first method left, if any. */
-export function removeMethod(store: PayoutStore, id: string): PayoutStore {
+/** The default moves to the first method left, if any. Logged. */
+export function removeMethod(store: PayoutStore, id: string, at: number): PayoutStore {
+  const gone = store.methods.find((m) => m.id === id);
+  if (!gone) return store;
   const methods = store.methods.filter((m) => m.id !== id);
-  if (methods.length === store.methods.length) return store;
   const defaultMethodId = store.defaultMethodId === id ? (methods[0]?.id ?? null) : store.defaultMethodId;
-  return { ...store, methods, defaultMethodId };
+  return { ...store, methods, defaultMethodId, methodLog: logged(store, "removed", gone, at) };
 }
 
-export function makeDefault(store: PayoutStore, id: string): PayoutStore {
-  if (!store.methods.some((m) => m.id === id) || store.defaultMethodId === id) return store;
-  return { ...store, defaultMethodId: id };
+/** Logged; the same record when it is already the default or isn't a method. */
+export function makeDefault(store: PayoutStore, id: string, at: number, signature?: string): PayoutStore {
+  const m = store.methods.find((x) => x.id === id);
+  if (!m || store.defaultMethodId === id) return store;
+  return { ...store, defaultMethodId: id, methodLog: logged(store, "default", m, at, signature) };
 }
 
 export function defaultMethodOf(store: PayoutStore): WithdrawalMethod | null {
   return store.methods.find((m) => m.id === store.defaultMethodId) ?? null;
 }
 
-// ───────────────────────── tax ─────────────────────────
+// ───────────────────────── the page ─────────────────────────
 
-export function taxResidenceProblems(r: TaxResidence): Partial<Record<keyof TaxResidence, string>> {
-  const out: Partial<Record<keyof TaxResidence, string>> = {};
-  if (!r.country.trim()) out.country = "Choose your country.";
-  if (!r.city.trim()) out.city = "Enter your city.";
-  if (!r.address.trim()) out.address = "Enter your address.";
-  if (!r.postalCode.trim()) out.postalCode = "Enter your postal code.";
-  return out;
+export type GetPaidStage = "setup" | "live";
+
+/**
+ * "setup" until one of your projects is listed (the Main NFT or copies) or
+ * sold: the page then only says what will happen. Anything already in the
+ * record (a method, a withdrawal) is never hidden.
+ */
+export function getPaidStageOf(i: {
+  projectIds: readonly string[];
+  listings: readonly { projectId: string }[];
+  tracks: readonly { projectId: string; listing: unknown }[];
+  sales: readonly { projectId: string }[];
+  store: PayoutStore;
+}): GetPaidStage {
+  const mine = new Set(i.projectIds);
+  const live =
+    i.listings.some((l) => mine.has(l.projectId)) ||
+    i.tracks.some((t) => mine.has(t.projectId) && t.listing != null) ||
+    i.sales.some((s) => mine.has(s.projectId)) ||
+    i.store.methods.length > 0 ||
+    i.store.withdrawals.length > 0;
+  return live ? "live" : "setup";
 }
 
-const TIN_NAME: Record<TinType, string> = { ssn: "SSN", ein: "EIN" };
+export type WithdrawStep = "identity" | "method" | "amount";
 
-/** An SSN or EIN as typed: nine digits, dashes and spaces allowed. */
-export function tinProblem(typed: string, type: TinType): string | null {
-  const t = typed.replace(/[\s-]/g, "");
-  if (!t) return `Enter your ${TIN_NAME[type]}.`;
-  if (!/^\d+$/.test(t)) return "Use digits only.";
-  if (t.length !== 9) return `Enter all 9 digits of your ${TIN_NAME[type]}.`;
-  return null;
-}
-
-/** What is stored from the form: a US person's TIN as its last four digits, nothing more. */
-export function taxIdentificationOf(
-  form: { usPerson: boolean; legalName: string; classification: TaxClassification; tinType: TinType; tin: string },
-  at: number,
-): TaxIdentification {
-  const legalName = form.legalName.trim().slice(0, LEGAL_NAME_MAX);
-  if (!form.usPerson) return { usPerson: false, legalName, classification: form.classification, tinType: null, tinLast4: null, savedAt: at };
-  const digits = form.tin.replace(/\D/g, "");
-  return { usPerson: true, legalName, classification: form.classification, tinType: form.tinType, tinLast4: digits.slice(-4), savedAt: at };
+/** The withdraw flow's steps: identity (Level 1) and where the money goes are asked the first time only. */
+export function withdrawStepsOf(i: { verified: boolean; methods: number }): WithdrawStep[] {
+  return [...(i.verified ? [] : ["identity" as const]), ...(i.methods > 0 ? [] : ["method" as const]), "amount"];
 }
 
 // ───────────────────────── dollars ─────────────────────────
@@ -254,7 +322,7 @@ export function taxIdentificationOf(
 /**
  * Dollars per coin, fixed, for the demo: test coins have no market price, so a
  * balance across sales in different coins needs a stated rate. Dollar coins
- * and IDZ (the demo rate Plan & pricing uses) are one for one; test ETH is the
+ * and IDZ (the demo rate Plan & billing uses) are one for one; test ETH is the
  * rate the design's mint cost was drawn at (0.00104 ETH ≈ $3.90).
  */
 export const DEMO_USD_RATES: Record<Coin, Amount> = {
@@ -401,7 +469,24 @@ export function balanceOf(earnings: readonly Earning[], withdrawals: readonly Wi
   return { earned, withdrawn, available: subtractWithdrawn(earned, withdrawals) };
 }
 
-/** The full price of every sale of these projects, in dollars: the KYC levels' "total transactions". */
+export type ProjectEarned = { projectId: string; projectName: string; sales: number; netUsd: Amount };
+
+/** The balance split by project: each one's net dollars and how many sales, largest first. */
+export function earnedByProject(earnings: readonly Pick<Earning, "projectId" | "projectName" | "netUsd">[]): ProjectEarned[] {
+  const out = new Map<string, ProjectEarned>();
+  for (const e of earnings) {
+    const prev = out.get(e.projectId);
+    out.set(
+      e.projectId,
+      prev
+        ? { ...prev, sales: prev.sales + 1, netUsd: addAmounts(prev.netUsd, e.netUsd) }
+        : { projectId: e.projectId, projectName: e.projectName, sales: 1, netUsd: addAmounts("0", e.netUsd) },
+    );
+  }
+  return [...out.values()].sort((a, b) => compareAmounts(b.netUsd, a.netUsd) || a.projectName.localeCompare(b.projectName));
+}
+
+/** The full price of every sale of these projects, in dollars: what the higher identity checks count. */
 export function salesTotalUsdOf(sales: readonly Pick<Sale, "projectId" | "price" | "token">[], projectIds: readonly string[]): Amount {
   const mine = new Set(projectIds);
   return addAmounts("0", ...sales.filter((s) => mine.has(s.projectId)).map((s) => usdOf(s.price, s.token)));
@@ -413,34 +498,12 @@ export function recordWithdrawal(store: PayoutStore, w: Withdrawal): PayoutStore
   return { ...store, withdrawals: [...store.withdrawals, w] };
 }
 
-export function withdrawalStats(list: readonly Withdrawal[]): Record<WithdrawalStatus, Amount> {
-  const sum = (s: WithdrawalStatus) => addAmounts("0", ...list.filter((w) => w.status === s).map((w) => w.amount));
-  return { complete: sum("complete"), "in-progress": sum("in-progress"), pending: sum("pending") };
-}
-
 const pad = (n: number) => String(n).padStart(2, "0");
 /** The local calendar day, "2026-10-19". */
-export const dayOf = (t: number) => {
+const dayOf = (t: number) => {
   const d = new Date(t);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
-
-export type WithdrawalFilter = { query?: string; status?: WithdrawalStatus | null; range?: { from: string; to: string } | null };
-
-/** Newest first: a search over the reference, where it went and the amount; a status; a day range, both days in. */
-export function filterWithdrawals(list: readonly Withdrawal[], f: WithdrawalFilter): Withdrawal[] {
-  const q = (f.query ?? "").trim().toLowerCase();
-  return list
-    .filter((w) => !f.status || w.status === f.status)
-    .filter((w) => {
-      if (!f.range) return true;
-      const day = dayOf(w.at);
-      return day >= f.range.from && day <= f.range.to;
-    })
-    .filter((w) => !q || [w.id, w.to.label, w.to.address ?? "", w.amount, w.token].some((s) => s.toLowerCase().includes(q)))
-    .slice()
-    .sort((a, b) => b.at - a.at);
-}
 
 /** "Other amount": dollars and cents, more than nothing, no more than the balance. */
 export function withdrawAmountProblem(typed: string, available: Amount): string | null {
@@ -518,10 +581,13 @@ function cell(s: string): string {
 
 const neg = (a: Amount) => (compareAmounts(a, "0") === 0 ? "0" : `-${a}`);
 
+/** A UTF-8 byte-order mark: without it a spreadsheet opens the CSV as Latin-1 and breaks Bangla names. */
+export const CSV_BOM = "\uFEFF";
+
 /**
- * The period's statement as CSV (RFC 4180, CRLF): each sale (your share of
- * it), its IDEEZA fee, and each withdrawal, oldest first, in the coin and in
- * dollars at the demo rates.
+ * The period's statement as CSV (RFC 4180, CRLF, a UTF-8 BOM first): each
+ * sale (your share of it), its IDEEZA fee, and each withdrawal, oldest
+ * first, in the coin and in dollars at the demo rates.
  */
 export function statementCsv(p: StatementPeriod, earnings: readonly Earning[], withdrawals: readonly Withdrawal[]): string {
   type Row = { at: number; order: number; cells: string[] };
@@ -538,8 +604,8 @@ export function statementCsv(p: StatementPeriod, earnings: readonly Earning[], w
     rows.push({ at: w.at, order: 2, cells: [stampOf(w.at), "Withdrawal", "", cell(to), neg(w.amount), w.token, neg(w.amount), STATUS_WORD[w.status], cell(w.id)] });
   }
   rows.sort((a, b) => a.at - b.at || a.order - b.order);
-  const header = "Date,Type,Project,Details,Amount,Token,Amount (USD),Status,Reference";
-  return [header, ...rows.map((r) => r.cells.join(","))].join("\r\n");
+  const header = "Date,Type,Project,Details,Amount,Token,Amount (USD at demo rate),Status,Reference";
+  return CSV_BOM + [header, ...rows.map((r) => r.cells.join(","))].join("\r\n");
 }
 
 // ───────────────────────── storage ─────────────────────────

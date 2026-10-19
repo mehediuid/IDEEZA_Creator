@@ -87,7 +87,7 @@ ideeza-creator-panel/
    │  │                      and Virtual NFT); earn/ (the Earn area; earn/sell/ the Sell copies
    │  │                      flow; earn/ladder/ the gating ladder's track, commit
    │  │                      checks, Choose a license); earn/project-earnings (Sales'
-   │  │                      Your earnings → Withdraw in Get Paid);
+   │  │                      Your earnings → Withdraw in Get paid);
    │  │                      business-plan/ (chip runner + page) — see
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
@@ -98,9 +98,9 @@ ideeza-creator-panel/
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
    │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages;
-   │  │                      kyc-page; data-page + data-* (AI & your data); get-paid/ (hub, balance, add-method and withdraw dialogs,
-   │  │                      history + statement, tax forms, parts)
-   │  │                      (profile/: Profile and Personal Information)
+   │  │                      data-page + data-* (AI & your data);
+   │  │                      get-paid/ (the one page, withdraw and method dialogs, identity
+   │  │                      form, history + statement, parts)
    │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor),
    │  │                      notice-popups (browser pop-ups + daily summary, root), browser-popups
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
@@ -140,7 +140,7 @@ ideeza-creator-panel/
    │  │                      dates (+ use-dates), voice, keys (single-key shortcuts), appearance (pre-paint)
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
    │  │                      videos, comments), filter (heard or quiet, count, quiet hours, pop-up
-   │  │                      mode, hidden words), popups (daily summary, browser pop-ups), read state
+   │  │                      mode, hidden words), popups (daily summary, browser pop-ups), read state; withdrawal-method notices
    │  ├─ account/            the account: payment token, invoices, credit-spend (credits by project), summary, your private identity
    │  │                      (ideeza:account:identity: the legal name) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent

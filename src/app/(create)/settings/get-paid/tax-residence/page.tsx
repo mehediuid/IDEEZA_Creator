@@ -1,10 +1,9 @@
-// /settings/get-paid/tax-residence — the address your earnings are taxed at.
+// /settings/get-paid/tax-residence — a Phase 1 tax form. Settings v2 hides the tax forms until real
+// payouts exist (V7), so this sends you to the one Get paid page, keeping the query (`?from=`).
 
-import type { Metadata } from "next";
-import { TaxResidencePage } from "@/components/settings/get-paid/tax";
+import { redirect } from "next/navigation";
+import { getPaidHref } from "@/lib/account/get-paid-href";
 
-export const metadata: Metadata = { title: "Tax Residence · Get Paid · Settings · IDEEZA" };
-
-export default function TaxResidenceRoute() {
-  return <TaxResidencePage />;
+export default async function GetPaidSubRoute({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  redirect(getPaidHref(null, await searchParams));
 }

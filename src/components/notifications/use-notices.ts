@@ -21,6 +21,7 @@ import { personOf, ME as POST_ME } from "@/lib/innovations/people";
 import { mineSlugOf, postIdOfProject } from "@/lib/innovations/slug";
 import { readStoredKey, subscribeStores } from "@/lib/key-store";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { usePayout } from "@/lib/account/use-payout";
 import { useMarket } from "@/lib/market/market-store";
 import { useMessages } from "@/lib/messages/store";
 import { useMessagePeople } from "@/lib/messages/use-people";
@@ -34,6 +35,7 @@ import {
   commentNotices,
   marketNotices,
   messageNotices,
+  payoutNotices,
   videoNotices,
   type SharedPostInput,
 } from "@/lib/notifications/sources";
@@ -143,6 +145,7 @@ export function useNotices(): NoticeFeed {
   const video = useVideoJobs();
   const shared = useSharedComments(projects);
   const reads = useNoticeReads();
+  const payout = usePayout();
 
   const { hydrated: historyReady, getChat } = history;
   const all = React.useMemo<Notice[]>(() => {
@@ -176,6 +179,7 @@ export function useNotices(): NoticeFeed {
         : []),
       ...(video.hydrated ? videoNotices(video.jobs) : []),
       ...commentNotices(shared, POST_ME.id, (id) => personOf(id).name),
+      ...(payout ? payoutNotices(payout.methodLog) : []),
     ];
   }, [
     now,
@@ -205,6 +209,7 @@ export function useNotices(): NoticeFeed {
     video.hydrated,
     video.jobs,
     shared,
+    payout,
   ]);
 
   const names = React.useMemo(() => new Map(projects.map((p) => [p.id, p.name.trim() || "Untitled project"])), [projects]);

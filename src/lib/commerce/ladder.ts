@@ -5,12 +5,13 @@
 //   L1 Drafts (plan, splits)       no wallet; something built to earn from
 //   L2 Mint                        nothing more: the mint asks the rest in place
 //   L3 Sell & editions             minted, ownership confirmed, videos ready,
-//                                  license set, a withdrawal method in Get Paid
+//                                  license set
 //   L4 Physical editions & payouts identity verified (demo)
 //
-// Earnings are one balance for the account, withdrawn in Settings › Get Paid
-// (Settings spec D3): the step that once asked for a payout wallet asks for a
-// withdrawal method there, and withdrawing asks the identity check there too.
+// Earnings are one balance for the account, withdrawn in Settings › Get paid
+// (Settings spec D3). Selling never asks where the money goes: a sale lands
+// in that balance, and the first withdrawal asks for the withdrawal method
+// and the identity check (Settings v2, V7).
 //
 // Owner, 2026-10-12: nothing stands between a built project and its mint — not
 // the videos (they're for selling and sharing), not the wallet (every signing
@@ -33,10 +34,10 @@ import type { CommercialState } from "./state";
 
 export type EarnLevel = 0 | 1 | 2 | 3 | 4;
 
-export type LadderStepId = "built" | "wallet" | "ownership" | "videos" | "minted" | "license" | "payout" | "identity";
+export type LadderStepId = "built" | "wallet" | "ownership" | "videos" | "minted" | "license" | "identity";
 
 /** What each missing step's one-tap fix does; the UI maps each to its control. */
-export type LadderFix = "products" | "wallet" | "ownership" | "media" | "mint" | "license" | "payout" | "identity";
+export type LadderFix = "products" | "wallet" | "ownership" | "media" | "mint" | "license" | "identity";
 
 export type EarnFacts = {
   /** At least one current product: Earn sells what was built. */
@@ -48,8 +49,6 @@ export type EarnFacts = {
   videosReady: boolean;
   minted: boolean;
   licenseSet: boolean;
-  /** A withdrawal method in Settings › Get Paid (`ideeza:account:payout`). */
-  withdrawalMethodSet: boolean;
   /** The demo identity check (`ideeza:commerce:kyc`). */
   identityVerified: boolean;
   /** A step's own reason in place of the default, e.g. the readiness gate's video count. */
@@ -64,8 +63,6 @@ export type LadderStep = {
   /** What to do, when it's missing. */
   reason: string;
   fix: { kind: LadderFix; label: string };
-  /** A step another step sets: listed only once that one is in place. */
-  requires?: LadderStepId;
 };
 
 export type LevelInfo = {
@@ -82,7 +79,7 @@ export const EARN_LEVELS: readonly LevelInfo[] = [
   { level: 1, name: "Drafts", opens: "Write the business plan and set the splits.", gate: "No wallet" },
   { level: 2, name: "Mint", opens: "Mint your project.", gate: "Built" },
   { level: 3, name: "Sell & editions", opens: "List the project and sell virtual editions.", gate: "Minted" },
-  { level: 4, name: "Physical editions & payouts", opens: "Sell physical editions. Withdrawing in Get Paid asks the same check.", gate: "Identity" },
+  { level: 4, name: "Physical editions & payouts", opens: "Sell physical editions. Withdrawing in Get paid asks the same check.", gate: "Identity" },
 ];
 
 export const LADDER_STEPS: readonly LadderStep[] = [
@@ -123,15 +120,6 @@ export const LADDER_STEPS: readonly LadderStep[] = [
     fix: { kind: "license", label: "Choose a license" },
   },
   {
-    id: "payout",
-    level: 3,
-    label: "Withdrawal method added",
-    reason: "Add where your earnings go when you withdraw them in Get Paid.",
-    fix: { kind: "payout", label: "Add a withdrawal method" },
-    // Asked once there is something to sell.
-    requires: "minted",
-  },
-  {
     id: "identity",
     level: 4,
     label: "Identity verified",
@@ -147,23 +135,17 @@ const FACT_OF: Record<LadderStepId, keyof Omit<EarnFacts, "reasons">> = {
   videos: "videosReady",
   minted: "minted",
   license: "licenseSet",
-  payout: "withdrawalMethodSet",
   identity: "identityVerified",
 };
 
 const stepOk = (s: LadderStep, f: EarnFacts) => f[FACT_OF[s.id]];
 
-/** The steps up to `level` that aren't in place, lower levels first; a step whose
- *  prerequisite is also missing waits for it. Reasons take the facts' overrides. */
+/** The steps up to `level` that aren't in place, lower levels first. Reasons take the facts' overrides. */
 function missingUpTo(level: EarnLevel, f: EarnFacts, from: EarnLevel = 1): LadderStep[] {
-  const open = LADDER_STEPS.filter((s) => s.level >= from && s.level <= level && !stepOk(s, f));
-  const openIds = new Set(open.map((s) => s.id));
-  return open
-    .filter((s) => !(s.requires && openIds.has(s.requires)))
-    .map((s) => {
-      const reason = f.reasons?.[s.id];
-      return reason ? { ...s, reason } : s;
-    });
+  return LADDER_STEPS.filter((s) => s.level >= from && s.level <= level && !stepOk(s, f)).map((s) => {
+    const reason = f.reasons?.[s.id];
+    return reason ? { ...s, reason } : s;
+  });
 }
 
 export type LadderNext = { level: EarnLevel; missing: LadderStep[] };
@@ -181,20 +163,13 @@ export function earnLevelOf(f: EarnFacts): { level: EarnLevel; next: LadderNext 
   return { level, next: { level: target, missing: missingUpTo(target, f, target) } };
 }
 
-/**
- * One level's own steps with their state, for showing the level whole: a step
- * whose prerequisite is missing waits (payout, until minted), as in `next`.
- */
+/** One level's own steps with their state, for showing the level whole. */
 export function levelStepsOf(level: EarnLevel, f: EarnFacts): (LadderStep & { ok: boolean })[] {
-  const own = LADDER_STEPS.filter((s) => s.level === level);
-  const missing = new Set(own.filter((s) => !stepOk(s, f)).map((s) => s.id));
-  return own
-    .filter((s) => !(s.requires && missing.has(s.requires)))
-    .map((s) => {
-      const ok = stepOk(s, f);
-      const reason = ok ? undefined : f.reasons?.[s.id];
-      return { ...s, ...(reason ? { reason } : null), ok };
-    });
+  return LADDER_STEPS.filter((s) => s.level === level).map((s) => {
+    const ok = stepOk(s, f);
+    const reason = ok ? undefined : f.reasons?.[s.id];
+    return { ...s, ...(reason ? { reason } : null), ok };
+  });
 }
 
 export type LevelCheck = { ok: true } | { ok: false; level: EarnLevel; current: EarnLevel; missing: LadderStep[] };
@@ -231,9 +206,8 @@ export function commitCheck(point: CommitPoint, f: EarnFacts, opts: { handled?: 
 
 /**
  * Every step a commit point needs, done or not, lower levels first: the
- * steps `commitCheck` asks, whole, for counting them ("3 of 4 ready"). A step
- * whose prerequisite is missing waits for it, as in `levelStepsOf`. None of
- * them missing is exactly `commitCheck(point, f).ok`.
+ * steps `commitCheck` asks, whole, for counting them ("3 of 4 ready"). None
+ * of them missing is exactly `commitCheck(point, f).ok`.
  */
 export function commitStepsOf(point: CommitPoint, f: EarnFacts): (LadderStep & { ok: boolean })[] {
   const steps: (LadderStep & { ok: boolean })[] = [];
@@ -255,8 +229,6 @@ export type EarnFactsInput = {
   license: string | null;
   wallet: DemoWallet | undefined;
   kyc: KycRecord | null;
-  /** How many withdrawal methods Get Paid holds. */
-  withdrawalMethods: number;
 };
 
 export function earnFactsOf(i: EarnFactsInput): EarnFacts {
@@ -275,7 +247,6 @@ export function earnFactsOf(i: EarnFactsInput): EarnFacts {
     videosReady,
     minted,
     licenseSet: i.license !== null,
-    withdrawalMethodSet: i.withdrawalMethods > 0,
     identityVerified: i.kyc?.status === "verified",
     reasons,
   };

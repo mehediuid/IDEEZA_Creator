@@ -9,7 +9,7 @@
 import * as React from "react";
 import { parsePayouts, PAYOUTS_KEY, readPayoutsRaw } from "../commerce/payout";
 import { reportWrite } from "../storage-status";
-import { mergeLegacy, parsePayout, PAYOUT_KEY, readRaw, writePayout, type PayoutStore } from "./payout";
+import { mergeLegacy, parsePayout, PAYOUT_KEY, payoutNeedsScrub, readRaw, writePayout, type PayoutStore } from "./payout";
 
 const EVENT = "ideeza:payout-change";
 const SERVER = "\u0000server";
@@ -54,4 +54,11 @@ export function updatePayout(change: (s: PayoutStore) => PayoutStore): boolean {
   reportWrite(PAYOUT_KEY, ok);
   window.dispatchEvent(new Event(EVENT));
   return ok;
+}
+
+/** Writes the record back without the tax data an older version kept (V7); nothing when there is none. */
+export function scrubPayout(): void {
+  if (!payoutNeedsScrub(readRaw(PAYOUT_KEY))) return;
+  reportWrite(PAYOUT_KEY, writePayout(readPayoutNow()));
+  window.dispatchEvent(new Event(EVENT));
 }

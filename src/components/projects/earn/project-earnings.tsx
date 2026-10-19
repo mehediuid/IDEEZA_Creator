@@ -1,16 +1,17 @@
 "use client";
 
 // Earn › Money › Sales: what this project's sales paid you (Settings spec D3).
-// Earnings are one balance for the account, withdrawn in Settings › Get Paid,
+// Earnings are one balance for the account, withdrawn in Settings › Get paid,
 // so this card shows the project's part of it and links there: your share of
 // each sale after IDEEZA's fee and the splits, per coin, and in dollars at the
 // demo rates. It replaced the per-project "Request payout (demo)"; requests
-// made with that read as pending withdrawals in Get Paid. One Earn card,
+// made with that read as pending withdrawals in Get paid. One Earn card,
 // under the section heading that carries the Testnet demo badge.
 
 import * as React from "react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ideeza";
+import { getPaidHref } from "@/lib/account/get-paid-href";
 import { earningsOf, formatUsd, type Earning } from "@/lib/account/payout";
 import { withReturn } from "@/lib/account/return-to";
 import { addAmounts, formatAmount } from "@/lib/wallet/money";
@@ -54,17 +55,17 @@ export function ProjectEarnings({
           <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{coins || "Nothing yet"}</dd>
         </div>
         <div className="flex flex-col gap-1">
-          <dt className="text-sm font-medium text-text-secondary">In dollars, at the demo rates</dt>
+          <dt className="text-sm font-medium text-text-secondary">In dollars, at demo rates</dt>
           <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{formatUsd(usd)}</dd>
         </div>
       </dl>
 
       <p className={EARN_LEAD}>
-        Your share of each sale, after the 2.5% IDEEZA fee and the splits. Earnings from all your projects are one balance, and you withdraw them in Get Paid.
+        Your share of each sale, after the 2.5% IDEEZA fee and the splits. Earnings from all your projects are one balance, and you withdraw them in Get paid.
       </p>
 
       <Link
-        href={withReturn("/settings/get-paid/balance", earnHref(project.id, "money"))}
+        href={withReturn(getPaidHref("withdraw"), earnHref(project.id, "money"))}
         // The reset colours every a:hover as a link; the button keeps its own text colour.
         className={cn(
           buttonVariants({ hierarchy: "secondary", size: "lg" }),
@@ -72,7 +73,7 @@ export function ProjectEarnings({
           TAP,
         )}
       >
-        Withdraw in Get Paid
+        Withdraw in Get paid
       </Link>
     </section>
   );

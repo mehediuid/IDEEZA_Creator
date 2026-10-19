@@ -184,7 +184,7 @@ test("the details: one Minting type field, never for a Save; the listing form fo
   assert.doesNotMatch(save, /label="License"/);
   // The review checks a Sell at the list level, with the steps the flow gates itself handled.
   const review0 = read("step-review.tsx");
-  assert.match(review0, /const LIST_HANDLED = \["ownership", "videos", "license", "minted", "payout"\] as const;/);
+  assert.match(review0, /const LIST_HANDLED = \["ownership", "videos", "license", "minted"\] as const;/);
   assert.match(review0, /selling \? "list" : "mint",/);
   assert.match(review0, /\{ handled: selling \? LIST_HANDLED : MINT_HANDLED \}/);
   // The gas checkbox is gone; the CTA is commitCtaLabel's, on the review.
