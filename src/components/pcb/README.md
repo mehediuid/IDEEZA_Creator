@@ -14,6 +14,7 @@ The schematic + PCB editor. Architecture, store and `CanvasObject` model: [docs/
 | `lib/pcb/types.ts` | `PcbState`, `CanvasObject`, `initialState`, `PLACE_TOOLS` / `DRAFT_TOOLS`, `nextDesignator` | pcb-architecture.md › `CanvasObject` |
 | `lib/pcb/data.tsx` | `@ts-nocheck` pure builders: `buildMenusSchematic`, `buildMenus2D`, toolbar, tree, context menu | pcb-tools-menus-panels.md |
 | `lib/pcb/inspector-schema.ts` | Schema-driven Properties inspector (panels + typed fields) | pcb-tools-menus-panels.md › Right panel |
+| `lib/pcb/app-settings.ts`, `measurement-unit.ts` | The editor's settings record `ideeza:pcb:appSettings` (Setting overlay + 3D Setting dialogs, global), the one Measurement Unit default | pcb-architecture.md › Persistence; [settings.md](../../../docs/guides/features/settings.md) › Editor settings |
 | `lib/pcb/nets.ts` | Live connectivity (`computeNets`), ERC (`runErc`), netlist (`buildNetlist`) | pcb-schematic.md › Schematic connectivity |
 | `lib/pcb/schematic-to-pcb.ts` | Native Schematic→PCB: footprints, ratsnest, auto-place, `routeRatsnest` | pcb-board.md › Native Schematic → PCB |
 | `lib/pcb/route-path.ts`, `drc.ts`, `drc-rules-map.ts` | Track path planner (`planTrackPath`); the DRC engine (`runDrc`…); rules dialog → config | pcb-board.md › routing, DRC |

@@ -22,7 +22,9 @@
 //
 // A generator is picked by what is configured, never by guesswork: a token
 // means the user chose that provider, and the Horde is the fallback because
-// it needs nothing.
+// it needs nothing. A request made with the volunteer pool switched off
+// (Settings › AI & your data) never reaches the Horde: it goes to Pollinations
+// when this deployment has a token, and is refused ("pool-off") when not.
 
 export type Rendered = {
   bytes: Uint8Array;
@@ -41,7 +43,7 @@ export type ProviderId = "aihorde" | "pollinations";
  *  we failed to keep it. Saying "could not reach the image service" there
  *  would be a false statement, and it sends whoever debugs it at the wrong
  *  system. */
-export type FailReason = "busy" | "unpaid" | "unreachable" | "storage" | "filtered";
+export type FailReason = "busy" | "unpaid" | "unreachable" | "storage" | "filtered" | "pool-off";
 
 export class RenderError extends Error {
   readonly reason: FailReason;
@@ -81,11 +83,17 @@ export type RenderProgress =
   | { status: "pending"; queuePosition?: number; waitSeconds?: number }
   | { status: "ready"; rendered: Rendered };
 
+/** What the person asked for. `volunteerPool: false` keeps the request off
+ *  the AI Horde (Settings › AI & your data › Use the volunteer GPU pool). */
+export type RenderOptions = { volunteerPool?: boolean };
+
 /** Hand the work to the provider and return at once. The caller polls. */
-export function startRender(prompt: string, seed: string): Promise<RenderJob> {
-  return activeProvider() === "pollinations"
-    ? pollinationsStart(prompt, seed)
-    : hordeStart(prompt, seed);
+export function startRender(prompt: string, seed: string, opts: RenderOptions = {}): Promise<RenderJob> {
+  if (activeProvider() === "pollinations") return pollinationsStart(prompt, seed);
+  if (opts.volunteerPool === false) {
+    return Promise.reject(new RenderError("pool-off", "the volunteer pool is off and no other image service is set up"));
+  }
+  return hordeStart(prompt, seed);
 }
 
 /** Has it landed? Throws RenderError when it never will. */
@@ -98,8 +106,8 @@ export function pollRender(job: RenderJob): Promise<RenderProgress> {
 
 /** Start and wait. Only for a caller that can block for a minute — which a
  *  serverless function cannot, so the concept route does not use this. */
-export async function generate(prompt: string, seed: string): Promise<Rendered> {
-  const job = await startRender(prompt, seed);
+export async function generate(prompt: string, seed: string, opts: RenderOptions = {}): Promise<Rendered> {
+  const job = await startRender(prompt, seed, opts);
   for (;;) {
     const step = await pollRender(job);
     if (step.status === "ready") return step.rendered;

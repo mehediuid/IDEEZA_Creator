@@ -26,6 +26,7 @@ import {
   startRefusalOf,
   teamKeyOf,
   unblock,
+  type StartPolicy,
 } from "./rules";
 import { newMessagesId, updateMessages } from "./store";
 import type {
@@ -66,6 +67,8 @@ export async function sendMessage(o: {
   cards: CardRef[];
   context: ContextRef | null;
   teamIds?: readonly PersonId[];
+  /** Ties and quiet mode for a first message's start check (Settings › Audience). */
+  policy?: StartPolicy;
 }): Promise<ActionResult<{ conversationId: string }>> {
   for (const f of o.files) {
     const err = fileError(f);
@@ -105,7 +108,7 @@ export async function sendMessage(o: {
         }).data;
         id = conversationId;
       } else {
-        const check = canStart(next, o.from.id, o.create.to.id, o.context ?? { kind: "post" });
+        const check = canStart(next, o.from.id, o.create.to.id, o.context ?? { kind: "post" }, o.policy);
         if (!check.ok) {
           failure = startRefusalOf(check.reason, o.create.to.name);
           return null;

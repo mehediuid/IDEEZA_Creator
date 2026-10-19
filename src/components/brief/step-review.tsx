@@ -63,8 +63,8 @@ const VIDEOS_OPTIONAL = "Videos are optional when you keep it private.";
 const VIDEOS_READY = "Every product has its video.";
 /** The flow's own ownership confirm and its readiness gate already ask these. */
 const MINT_HANDLED = ["ownership", "videos"] as const;
-/** A Sell's too, and Details asks its license; the commit is the mint, and every mint pays a wallet. */
-const LIST_HANDLED = ["ownership", "videos", "license", "minted", "payout"] as const;
+/** A Sell's too, and Details asks its license; the commit is the mint. */
+const LIST_HANDLED = ["ownership", "videos", "license", "minted"] as const;
 
 /** The cost box's listing row: "Listing (Buy now) · 0.05 MATIC". */
 function listingCostRow(input: ListingInput): { label: string; amount: string } | undefined {
@@ -146,7 +146,7 @@ export function StepReview({
   const headingId = React.useId();
   const input = listingInputFromBrief(briefStateOf(state));
   const listingCtx: ListingCtx = { mode: "brief", now, creatorPct };
-  // Nothing is minted until this commit, so "none" stands in; a Sell's minted and payout steps are the commit's own.
+  // Nothing is minted until this commit, so "none" stands in; a Sell's minted step is the commit's own.
   const selling = intent === "sell";
   const ladder = useCommitCheck(
     selling ? "list" : "mint",

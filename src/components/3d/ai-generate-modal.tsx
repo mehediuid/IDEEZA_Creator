@@ -20,6 +20,7 @@ import { readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/edit
 import type { EditorScope } from "@/lib/manual/p2-types";
 import { reportSave } from "@/lib/manual/save-status";
 import { ModelViewer } from "./model-viewer";
+import { readSettings } from "@/lib/settings/prefs";
 
 type Provider = "meshy" | "demo";
 type Phase = "idle" | "generating" | "ready" | "failed";
@@ -126,7 +127,8 @@ export function AiGenerateModal({
       const res = await fetch("/api/three/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text }),
+        // Settings › AI & your data: the concept image stays off the volunteer pool when it's off.
+        body: JSON.stringify(readSettings().ai.volunteerPool ? { prompt: text } : { prompt: text, pool: "off" }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "request failed");
       created = await res.json();

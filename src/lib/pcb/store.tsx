@@ -21,6 +21,17 @@ import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data"
 import { DocSaveQueue, readEditorDoc, writeEditorDoc, type DocHandle } from "../manual/editor-docs";
 import { registerSaveFlusher, reportSave, saveNow } from "../manual/save-status";
 import { onProjectDeleted } from "../manual/events";
+import { reportWrite } from "../storage-status";
+import {
+  OVERLAY_KEYS,
+  appSettingsOf,
+  appSettingsPatch,
+  normalizePcbAppSettings,
+  readPcbAppSettings,
+  writePcbAppSettings,
+  type AppSettingsFields,
+} from "./app-settings";
+import { DEFAULT_MEASUREMENT_UNIT, PCB_APP_SETTINGS_KEY, boardUnitFor, docUnitOf, type MeasurementUnit } from "./measurement-unit";
 import { editorDocKey } from "../manual/editor-scope";
 import type { EditorScope } from "../manual/p2-types";
 import { PANEL_LIMITS,
@@ -397,6 +408,14 @@ export interface PcbActions {
   selectAllToolbarItems: (scope: PcbState["toolbarCustomization"]["scope"]) => void;
   clearAllToolbarItems: (scope: PcbState["toolbarCustomization"]["scope"]) => void;
   resetToolbarCustomization: () => void;
+  /** The one Measurement Unit default (settings record), also applied to the
+   *  open board — both Setting surfaces call this. */
+  setMeasurementUnit: (u: MeasurementUnit) => void;
+  /** The default alone, for new boards and parts (Settings › Appearance &
+   *  accessibility › Default units): an open board keeps its own unit. */
+  setDefaultMeasurementUnit: (u: MeasurementUnit) => void;
+  /** A 3D Setting dialog's own fields, saved into the settings record. */
+  saveDialogSettings: (patch: PcbState["dialogSettings"]) => void;
   // Phase F — settings export / import + per-page reset
   exportSettingsJson: () => string;
   importSettingsJson: (json: string) => boolean;
@@ -563,6 +582,19 @@ function readRecentProjects(): PcbState["recentProjects"] {
   } catch {
     return [];
   }
+}
+
+/** The settings record's fields of a state: they are global, so a board
+ *  switch or a project delete never resets them. */
+function settingsFieldsOf(s: PcbState): AppSettingsFields & Pick<PcbState, "appSettingsLoaded"> {
+  const out = {} as Record<string, unknown>;
+  for (const k of OVERLAY_KEYS) out[k] = s[k];
+  return {
+    ...(out as Pick<PcbState, (typeof OVERLAY_KEYS)[number]>),
+    measurementUnit: s.measurementUnit,
+    dialogSettings: s.dialogSettings,
+    appSettingsLoaded: s.appSettingsLoaded,
+  };
 }
 
 /** The only clock read in this module — save stamps. */
@@ -773,6 +805,37 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
     if (recentProjects.length) setState((s) => ({ ...s, recentProjects }));
   }, []);
 
+  // The editor's settings record (`ideeza:pcb:appSettings`, D12): read once on
+  // mount — after hydration, so server and client render the same defaults —
+  // and written back whenever one of its fields changes. Nothing is written
+  // until it has been read, so the defaults can't overwrite a saved record;
+  // the first write after the read is what moves a v1 record to v2.
+  React.useEffect(() => {
+    const saved = readPcbAppSettings(docStorage());
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of an external store on mount
+    setState((s) => (s.appSettingsLoaded ? s : { ...s, ...appSettingsPatch(saved), appSettingsLoaded: true }));
+  }, []);
+  React.useEffect(() => {
+    if (!state.appSettingsLoaded) return;
+    const ok = writePcbAppSettings(appSettingsOf(state), docStorage());
+    reportWrite(PCB_APP_SETTINGS_KEY, ok);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the record's fields, listed one by one
+  }, [
+    state.appSettingsLoaded,
+    state.measurementUnit,
+    state.dialogSettings,
+    state.systemSettings,
+    state.propertySettings,
+    state.hotkeys,
+    state.drawings,
+    state.fonts,
+    state.saveSettings,
+    state.schemSymbolSettings,
+    state.pcbFootprintSettings,
+    state.panelLibSettings,
+    state.toolbarCustomization,
+  ]);
+
   // Debounced save — placing/dragging mutates objects frequently; one write
   // per pause keeps localStorage churn (and JSON serialization) off the
   // interaction path. Nothing is saved without a held product, and the
@@ -840,7 +903,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         loadedRef.current = null;
         historyRef.current = { past: [], future: [] };
         moveOrigRef.current = null;
-        setState((s) => ({ ...initialState, recentProjects: s.recentProjects.filter((p) => p.id !== id) }));
+        setState((s) => ({ ...initialState, ...settingsFieldsOf(s), recentProjects: s.recentProjects.filter((p) => p.id !== id) }));
         setDocScopeState(null);
       }),
     [saveQueue],
@@ -1727,12 +1790,21 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         })),
       resetToolbarCustomization: () =>
         mergeWithHistory(() => ({ toolbarCustomization: initialState.toolbarCustomization })),
+      setMeasurementUnit: (u) => {
+        merge({ measurementUnit: u });
+        mergeWithHistory({ unit: docUnitOf(u) });
+      },
+      setDefaultMeasurementUnit: (u) => merge({ measurementUnit: u }),
+      saveDialogSettings: (patch) =>
+        merge((s) => ({ dialogSettings: { ...s.dialogSettings, ...patch } })),
       // ── Phase F — Export / Import / per-page reset ───────────────────────────
       exportSettingsJson: () => {
         const s = stateRef.current;
         const payload = {
-          version: 1,
+          version: 2,
           exportedAt: "snapshot",
+          measurementUnit: s.measurementUnit,
+          dialogSettings: s.dialogSettings,
           systemSettings: s.systemSettings,
           propertySettings: s.propertySettings,
           schemSymbolSettings: s.schemSymbolSettings,
@@ -1752,28 +1824,25 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsed = JSON.parse(json);
           if (typeof parsed !== "object" || parsed === null) return false;
-          // Allow-list of fields we accept from an imported config — guards
-          // against unrelated state being clobbered if the file is malformed.
-          const patch: Partial<PcbState> = {};
-          const keys: (keyof PcbState)[] = [
-            "systemSettings",
-            "propertySettings",
-            "schemSymbolSettings",
-            "pcbFootprintSettings",
-            "panelLibSettings",
-            "toolbarCustomization",
-            "hotkeys",
-            "drawings",
-            "fonts",
-            "saveSettings",
-            "pcbLayers",
-            "pcbNets",
-          ];
-          for (const k of keys) {
-            if (k in parsed) {
-              (patch as Record<keyof PcbState, unknown>)[k] = parsed[k];
-            }
-          }
+          // An imported file now lands in the global settings record, so its
+          // settings go through the same repair as a stored record: a field
+          // that's missing or malformed keeps its current value.
+          const cur = appSettingsOf(stateRef.current);
+          const has = (k: string) => Object.prototype.hasOwnProperty.call(parsed, k);
+          const overlay = { ...cur.overlay } as Record<string, unknown>;
+          for (const k of OVERLAY_KEYS) if (has(k)) overlay[k] = parsed[k];
+          const next = normalizePcbAppSettings({
+            version: 2,
+            measurementUnit: has("measurementUnit") ? parsed.measurementUnit : cur.measurementUnit,
+            overlay,
+            dialogs: has("dialogSettings") ? { ...cur.dialogs, ...parsed.dialogSettings } : cur.dialogs,
+          });
+          const patch: Partial<PcbState> = appSettingsPatch(next);
+          // The board's own layer and net lists ride along (they belong to the
+          // board document, not the settings record).
+          if (Array.isArray(parsed.pcbLayers)) patch.pcbLayers = parsed.pcbLayers;
+          if (Array.isArray(parsed.pcbNets)) patch.pcbNets = parsed.pcbNets;
+          if (next.measurementUnit !== cur.measurementUnit) patch.unit = docUnitOf(next.measurementUnit);
           mergeWithHistory(patch);
           return true;
         } catch {
@@ -1784,7 +1853,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         mergeWithHistory(() => {
           const init = initialState;
           switch (page) {
-            case "system":    return { systemSettings: init.systemSettings };
+            case "system":
+              return { systemSettings: init.systemSettings, measurementUnit: DEFAULT_MEASUREMENT_UNIT, unit: docUnitOf(DEFAULT_MEASUREMENT_UNIT) };
             case "property":  return { propertySettings: init.propertySettings };
             case "save":      return { saveSettings: init.saveSettings };
             case "font":      return { fonts: init.fonts };
@@ -2183,10 +2253,16 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         historyRef.current = { past: [], future: [] };
         moveOrigRef.current = null;
         let fresh: PcbState;
+        // The settings record is global: it rides across the switch. When the
+        // route names a product before the provider's own mount read has run
+        // (a child's effect runs first), it is read here instead.
+        const settings = stateRef.current.appSettingsLoaded
+          ? settingsFieldsOf(stateRef.current)
+          : { ...appSettingsPatch(readPcbAppSettings(docStorage())), appSettingsLoaded: true };
         if (!next) {
           heldRef.current = null;
           loadedRef.current = null;
-          fresh = { ...initialState, recentProjects: stateRef.current.recentProjects };
+          fresh = { ...initialState, ...settings, recentProjects: stateRef.current.recentProjects };
         } else {
           // 3. The product's own document — or, on the first row, a legacy
           //    per-project board the maker changed — else the initial one.
@@ -2206,7 +2282,15 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             if (m) maxId = Math.max(maxId, Number(m[1]));
           }
           objIdCounter.current = maxId + 1;
-          fresh = { ...initialState, ...doc, recentProjects: readRecentProjects(), activeProjectId: next.projectId };
+          // A board's own unit wins; a board without one starts on the default.
+          fresh = {
+            ...initialState,
+            ...settings,
+            ...doc,
+            unit: boardUnitFor(doc?.unit, settings.measurementUnit),
+            recentProjects: readRecentProjects(),
+            activeProjectId: next.projectId,
+          };
           heldRef.current = { scope: next, handle: { key: read.key, settle: read.settle } };
           loadedRef.current = docOf(fresh);
         }

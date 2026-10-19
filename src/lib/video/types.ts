@@ -18,7 +18,7 @@ export const VIDEO_QUALITY = {
 /** The same values as the Brief's `Quality`. */
 export type VideoQuality = keyof typeof VIDEO_QUALITY;
 
-/** 720p comes with the Disruptor plan (Plan & pricing's comparison); 480p with every plan. */
+/** 720p comes with the Disruptor plan (the Pricing page's comparison); 480p with every plan. */
 export function qualityOpen(q: VideoQuality, tier: PlanTier): boolean {
   return q === "low" || tier === "disruptor";
 }

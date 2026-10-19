@@ -26,6 +26,7 @@ import { useStoredActingAs } from "@/lib/messages/identity";
 import { startHref, type StartParams } from "@/lib/messages/links";
 import { blockStateOf, canStart, startRefusalOf } from "@/lib/messages/rules";
 import { useMessages } from "@/lib/messages/store";
+import { useMessagePeople } from "@/lib/messages/use-people";
 import { ME, type Person } from "@/lib/people/ids";
 import { NOTE_MAX, REPORTS_KEY, REPORT_REASONS, normalizeReports, withReport, type ProfileReportReason } from "@/lib/people/reports";
 import { cn } from "@/lib/utils";
@@ -112,11 +113,12 @@ export function MessageButton({
 /** Why Message can't start with this person right now; null when it can. */
 export function useMessageRefusalFor(person: Pick<Person, "id" | "name">, start: StartParams | null): string | null {
   const { data, hydrated } = useMessages();
+  const { policy } = useMessagePeople();
   const from = useStoredActingAs();
   if (!hydrated) return null;
   if (!start) return `Messages start from a project or a post. ${person.name} hasn't shared one with you yet.`;
   const context = start.kind === "direct" ? start.about : { kind: "post" as const };
-  const check = canStart(data, from, person.id, context);
+  const check = canStart(data, from, person.id, context, policy);
   return check.ok ? null : startRefusalOf(check.reason, person.name);
 }
 
@@ -274,7 +276,7 @@ export function PersonMenu({
           }}
         >
           <p className="max-w-[62ch] text-md leading-md text-text-secondary">
-            {`${person.name} won't be able to message you, and won't be told. You can unblock from this page or Messages settings.`}
+            {`${person.name} won't be able to message you, and their comments on your shared projects are held. They won't be told. You can unblock them here or in Settings › Privacy & safety.`}
           </p>
         </ConfirmDialog>
       )}

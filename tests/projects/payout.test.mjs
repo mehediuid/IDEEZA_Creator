@@ -1,10 +1,9 @@
-// "Request payout" (Build and Earn P1-4): what a project's sales paid its seller, less what
-// earlier requests asked for, per chain and token; one stored request per tap, labelled demo.
+// What a project's sales paid its seller, per chain and token (Build and Earn P1-4), and the
+// per-project payout requests stored before Get Paid, read back (Settings › Get Paid folds them in).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { PAYOUTS_KEY, earnedOf, requestedOf, availableOf, payoutLinesText, payoutRequestOf, normalizePayouts, parsePayouts, appendPayoutRequest } =
-  await import("../../.tmp-test/lib/commerce/payout.js");
+const { PAYOUTS_KEY, earnedOf, payoutLinesText, normalizePayouts, parsePayouts } = await import("../../.tmp-test/lib/commerce/payout.js");
 
 const sale = (projectId, payout, token = "ETH", network = "baseSepolia") => ({ projectId, payout, token, network });
 
@@ -26,20 +25,6 @@ test("earnedOf: no sales, nothing earned", () => {
   assert.deepEqual(earnedOf([sale("q", "1")], "p"), []);
 });
 
-test("requestedOf + availableOf: what's left after earlier requests; fully requested lines drop", () => {
-  const earned = earnedOf([sale("p", "1"), sale("p", "10", "USDC")], "p");
-  const requests = [
-    payoutRequestOf("p", [{ network: "baseSepolia", token: "ETH", amount: "0.4" }], 1, "a"),
-    payoutRequestOf("p", [{ network: "baseSepolia", token: "USDC", amount: "10" }], 2, "b"),
-    payoutRequestOf("q", [{ network: "baseSepolia", token: "ETH", amount: "1" }], 3, "c"),
-  ];
-  assert.deepEqual(requestedOf(requests, "p"), [
-    { network: "baseSepolia", token: "ETH", amount: "0.4" },
-    { network: "baseSepolia", token: "USDC", amount: "10" },
-  ]);
-  assert.deepEqual(availableOf(earned, requestedOf(requests, "p")), [{ network: "baseSepolia", token: "ETH", amount: "0.6" }]);
-});
-
 test("payoutLinesText", () => {
   assert.equal(
     payoutLinesText([
@@ -50,34 +35,11 @@ test("payoutLinesText", () => {
   );
 });
 
-test("payoutRequestOf: labelled demo, lines copied", () => {
-  const lines = [{ network: "baseSepolia", token: "ETH", amount: "1" }];
-  const r = payoutRequestOf("p", lines, 5, "id1");
-  assert.deepEqual(r, { id: "id1", projectId: "p", at: 5, lines, demo: true });
-  assert.notEqual(r.lines[0], lines[0]);
-});
-
 test("normalizePayouts: malformed rows go, the rest stay", () => {
-  const good = payoutRequestOf("p", [{ network: "baseSepolia", token: "ETH", amount: "1" }], 5, "a");
+  const good = { id: "a", projectId: "p", at: 5, lines: [{ network: "baseSepolia", token: "ETH", amount: "1" }], demo: true };
   assert.deepEqual(normalizePayouts({ requests: [good, { id: "x" }, { ...good, demo: false }, { ...good, lines: [] }] }), [good]);
   assert.deepEqual(normalizePayouts(null), []);
   assert.deepEqual(parsePayouts("{bad"), []);
   assert.deepEqual(parsePayouts(null), []);
-});
-
-test("appendPayoutRequest: re-reads what's stored and appends; a refused write says false", () => {
-  const map = new Map();
-  const prev = globalThis.window;
-  globalThis.window = { localStorage: { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => map.set(k, v) } };
-  try {
-    const a = payoutRequestOf("p", [{ network: "baseSepolia", token: "ETH", amount: "1" }], 1, "a");
-    const b = payoutRequestOf("p", [{ network: "baseSepolia", token: "ETH", amount: "2" }], 2, "b");
-    assert.equal(appendPayoutRequest(a), true);
-    assert.equal(appendPayoutRequest(b), true);
-    assert.deepEqual(parsePayouts(map.get(PAYOUTS_KEY)), [a, b]);
-    globalThis.window = { localStorage: { getItem: () => null, setItem: () => { throw new Error("full"); } } };
-    assert.equal(appendPayoutRequest(a), false);
-  } finally {
-    globalThis.window = prev;
-  }
+  assert.deepEqual(parsePayouts(JSON.stringify({ v: 1, requests: [good] })), [good]);
 });

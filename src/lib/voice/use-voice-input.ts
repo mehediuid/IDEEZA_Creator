@@ -17,6 +17,7 @@
 // ("denied"), or the session died ("failed").
 
 import * as React from "react";
+import { currentVoiceLang } from "@/lib/settings/voice";
 
 export type VoiceStatus =
   | "idle"
@@ -249,7 +250,8 @@ export function useVoiceInput(opts: { onFinal: (text: string) => void }): {
     const r = new Ctor();
     r.continuous = true;
     r.interimResults = true;
-    r.lang = "en-US";
+    // Settings › Language › Voice typing; the app's language by default.
+    r.lang = currentVoiceLang();
     finalRef.current = "";
     interimRef.current = "";
     deliveredRef.current = false;

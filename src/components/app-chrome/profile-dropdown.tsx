@@ -1,16 +1,13 @@
 "use client";
 
-// ProfileDropdown — clickable wrapper around your name pill (your profile
-// name and initials, `useMe`) in the TopBar. Click opens a menu that hosts the Earn IDZ Tokens and Connect
-// Wallet actions (relocated from the TopBar middle slot) plus the usual
-// account / settings / sign-out items.
-//
-// Items show a small icon + label + optional secondary line (e.g., wallet
-// status). The account items are still stubs — they emit a toast so the
-// dropdown feels alive. The wallet row is real (P2-MINT-2): it is the same
-// WalletMenuEntry the dashboard sidebar carries, and it opens the Demo
-// wallet dialog. The trigger is a keyboard button, so the entry — and the
-// dialog behind it — can be reached without a mouse.
+// ProfileDropdown — the editor's account menu: a clickable wrapper around
+// your name pill (your profile name and initials, `useMe`) in the TopBar.
+// Every row is real (settings spec 2026-10-19 §5.13): your profile, Settings,
+// Notification settings and Plan & billing are links; the wallet row is the
+// same WalletMenuEntry the dashboard sidebar carries (P2-MINT-2) and opens the
+// Demo wallet dialog; Sign out is shown disabled with the sidebar's reason,
+// since there is no sign-in yet. The trigger is a keyboard button, so every
+// row — and the dialog behind the wallet — can be reached without a mouse.
 
 import * as React from "react";
 import Link from "next/link";
@@ -24,7 +21,6 @@ export function ProfileDropdown({
 }) {
   const [open, setOpen] = React.useState(false);
   const me = useMe();
-  const [toast, setToast] = React.useState<string | null>(null);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLDivElement>(null);
 
@@ -49,16 +45,7 @@ export function ProfileDropdown({
     };
   }, [open]);
 
-  React.useEffect(() => {
-    if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), 1800);
-    return () => window.clearTimeout(id);
-  }, [toast]);
-
-  const fire = (text: string) => {
-    setToast(text);
-    setOpen(false);
-  };
+  const close = () => setOpen(false);
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
@@ -140,7 +127,7 @@ export function ProfileDropdown({
               </div>
               <Link
                 href="/creators/me"
-                onClick={() => setOpen(false)}
+                onClick={close}
                 style={{
                   fontSize: 11,
                   color: "var(--color-text-link)",
@@ -155,33 +142,9 @@ export function ProfileDropdown({
 
           <Separator />
 
-          {/* Featured row — Earn IDZ Tokens (relocated from TopBar) */}
-          <FeaturedItem
-            icon={
-              <span
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  background:
-                    "radial-gradient(circle at 35% 30%, #b06be0, #7c2db9)",
-                  color: "var(--color-text-on-brand)",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flex: "0 0 24px",
-                }}
-              >
-                i
-              </span>
-            }
-            label="Earn IDZ Tokens"
-            sub="Daily quests · referrals · contributions"
-            accent
-            onClick={() => fire("Earn IDZ (will open the rewards page)")}
-          />
+          <LinkItem href="/settings" label="Settings" onClick={close} icon={<GearIcon />} />
+          <LinkItem href="/settings/notifications" label="Notification settings" onClick={close} icon={<BellIcon />} />
+          <LinkItem href="/settings/plan" label="Plan & billing" onClick={close} icon={<CardIcon />} />
 
           {/* The wallet's one standing home in the editor chrome
               (P2-MINT-2). Focus goes to the pill first, so the dialog hands
@@ -196,71 +159,12 @@ export function ProfileDropdown({
 
           <Separator />
 
-          <Item
-            label="Account"
-            onClick={() => fire("Account settings")}
-            icon={<UserIcon />}
-          />
-          <Item
-            label="Notifications"
-            onClick={() => fire("Notification settings")}
-            badge={3}
-            icon={<BellIcon />}
-          />
-          <Item
-            label="Billing & plan"
-            onClick={() => fire("Billing")}
-            icon={<CardIcon />}
-          />
-          <Item
-            label="Switch organization"
-            onClick={() => fire("Organization switcher")}
-            icon={<TeamIcon />}
-          />
-
-          <Separator />
-
-          <Item
-            label="Sign out"
-            destructive
-            onClick={() => fire("Sign out (clears session)")}
-            icon={<SignOutIcon />}
-          />
+          <SoonItem label="Sign out" why={SIGN_OUT_WHY} icon={<SignOutIcon />} />
 
           <style>{`
             @keyframes ix-profile-in {
               from { opacity: 0; transform: translateY(-4px); }
               to   { opacity: 1; transform: translateY(0); }
-            }
-          `}</style>
-        </div>
-      )}
-
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: "fixed",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 120,
-            padding: "10px 18px",
-            background: "var(--color-bg-inverse, #1E1E1E)",
-            color: "var(--color-text-on-brand, #FFFFFF)",
-            borderRadius: 999,
-            boxShadow: "0 12px 32px -8px rgba(0,0,0,.3)",
-            fontSize: 13,
-            fontWeight: 500,
-            animation: "ix-prof-toast .18s ease-out",
-          }}
-        >
-          {toast}
-          <style>{`
-            @keyframes ix-prof-toast {
-              from { opacity: 0; transform: translate(-50%, 8px); }
-              to   { opacity: 1; transform: translate(-50%, 0); }
             }
           `}</style>
         </div>
@@ -281,170 +185,90 @@ function Separator() {
   );
 }
 
-function FeaturedItem({
-  icon,
+const ROW_STYLE: React.CSSProperties = {
+  width: "100%",
+  padding: "8px 12px",
+  background: "transparent",
+  border: "none",
+  borderRadius: "var(--radius-md)",
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  fontSize: 13,
+  fontFamily: "inherit",
+  fontWeight: 500,
+  transition: "background .12s",
+  textAlign: "left",
+};
+const ICON_STYLE: React.CSSProperties = {
+  width: 18,
+  height: 18,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flex: "0 0 18px",
+};
+// 44 px rows on a phone, like the wallet row beside them.
+const ROW_CLASS = "max-md:min-h-[var(--touch-min)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus";
+
+/** The sidebar account popover's own reason (dashboard/sidebar-account.tsx). */
+const SIGN_OUT_WHY = "there is no sign-in yet; your work stays in this browser";
+
+function LinkItem({
+  href,
   label,
-  sub,
-  accent,
   onClick,
+  icon,
 }: {
+  href: string;
+  label: string;
+  onClick: () => void;
   icon: React.ReactNode;
-  label: string;
-  sub: string;
-  accent?: boolean;
-  onClick: () => void;
 }) {
   return (
-    <button
+    <Link
+      href={href}
       role="menuitem"
       onClick={onClick}
-      style={{
-        width: "100%",
-        padding: "10px 12px",
-        background: "transparent",
-        border: "none",
-        borderRadius: "var(--radius-md)",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        cursor: "pointer",
-        fontFamily: "inherit",
-        transition: "background .12s",
-        textAlign: "left",
-      }}
+      className={ROW_CLASS}
+      style={{ ...ROW_STYLE, color: "var(--color-text-primary)", cursor: "pointer", textDecoration: "none" }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background =
-          "var(--color-bg-surface-raised)";
+        e.currentTarget.style.background = "var(--color-bg-surface-raised)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+        e.currentTarget.style.background = "transparent";
       }}
     >
-      {icon}
-      <span style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: accent
-              ? "var(--color-violet-600)"
-              : "var(--color-text-primary)",
-          }}
-        >
-          {label}
-        </span>
-        <span
-          style={{
-            fontSize: 11,
-            color: "var(--color-text-secondary)",
-            marginTop: 1,
-          }}
-        >
-          {sub}
-        </span>
-      </span>
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="var(--color-text-tertiary)"
-        strokeWidth="2"
-      >
-        <path d="M9 6l6 6-6 6" />
-      </svg>
-    </button>
-  );
-}
-
-function Item({
-  label,
-  onClick,
-  icon,
-  badge,
-  destructive,
-}: {
-  label: string;
-  onClick: () => void;
-  icon?: React.ReactNode;
-  badge?: number;
-  destructive?: boolean;
-}) {
-  return (
-    <button
-      role="menuitem"
-      onClick={onClick}
-      style={{
-        width: "100%",
-        padding: "8px 12px",
-        background: "transparent",
-        border: "none",
-        borderRadius: "var(--radius-md)",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        fontSize: 13,
-        cursor: "pointer",
-        fontFamily: "inherit",
-        color: destructive
-          ? "var(--color-text-error)"
-          : "var(--color-text-primary)",
-        fontWeight: 500,
-        transition: "background .12s",
-        textAlign: "left",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background =
-          "var(--color-bg-surface-raised)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-      }}
-    >
-      <span
-        style={{
-          width: 18,
-          height: 18,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: destructive
-            ? "var(--color-text-error)"
-            : "var(--color-text-secondary)",
-          flex: "0 0 18px",
-        }}
-      >
-        {icon}
-      </span>
+      <span style={{ ...ICON_STYLE, color: "var(--color-text-secondary)" }}>{icon}</span>
       <span style={{ flex: 1 }}>{label}</span>
-      {badge !== undefined && (
-        <span
-          style={{
-            minWidth: 18,
-            height: 18,
-            padding: "0 6px",
-            background: "var(--color-text-error)",
-            color: "var(--color-text-on-brand)",
-            fontSize: 11,
-            fontWeight: 700,
-            borderRadius: 9,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {badge}
-        </span>
-      )}
+    </Link>
+  );
+}
+
+/** A row that isn't open yet: in the menu, disabled, with why (as the sidebar's SoonRow). */
+function SoonItem({ label, why, icon }: { label: string; why: string; icon: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled
+      aria-label={`${label}, not available yet: ${why}`}
+      title={why}
+      className={ROW_CLASS}
+      style={{ ...ROW_STYLE, color: "var(--color-text-disabled)", cursor: "not-allowed" }}
+    >
+      <span style={{ ...ICON_STYLE, color: "var(--color-text-disabled)" }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      <span style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>Soon</span>
     </button>
   );
 }
 
-function UserIcon() {
+function GearIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
@@ -463,17 +287,6 @@ function CardIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="6" width="20" height="13" rx="2" />
       <path d="M2 11h20" />
-    </svg>
-  );
-}
-
-function TeamIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="9" r="3" />
-      <circle cx="17" cy="11" r="2.5" />
-      <path d="M3 19c0-3 3-5 6-5s6 2 6 5" />
-      <path d="M15 18c1-2 3-3 5-3" />
     </svg>
   );
 }

@@ -93,6 +93,9 @@ import {
   type SheetProduct,
   type SheetRequest,
 } from "./spec-sheet";
+import { motionReduced } from "@/lib/settings/appearance";
+import { readSettings } from "@/lib/settings/prefs";
+import { askForPopupsAtBuild } from "@/components/notifications/browser-popups";
 
 const POLL_MS = 2_500;
 /** Longer than the generator’s own budget, so the server is what gives up
@@ -333,7 +336,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // regenerate alike. `canAfford` gates the three controls that start one;
   // the charge itself happens in `runGeneration`, the single funnel all
   // three go through, so there is one place money can move.
-  const { canAfford, charge, refund } = useCredits();
+  const { canAfford, charge, overCap, refund } = useCredits();
   const canRender = canAfford(CONCEPT_COST);
 
   const chat = getChat(chatId);
@@ -686,13 +689,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // controls are already disabled without the balance for it; this
         // catches a balance that ran out between the click and here, and
         // it throws so the one catch below handles both ways to fail.
+        // The monthly spending limit is asked first: credits bought
+        // wouldn't let this one through.
+        if (overCap(CONCEPT_COST)) throw new FailedRender("cap");
         if (!charge(turnId, CONCEPT_COST, "concept")) {
           throw new FailedRender("credits");
         }
         const res = await fetch("/api/concept/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
+          // Settings › AI & your data: with the volunteer pool off the route
+          // never sends the render to the AI Horde.
+          body: JSON.stringify(readSettings().ai.volunteerPool ? input : { ...input, pool: "off" }),
         });
         // The route says why it could not render, and each reason needs
         // different words on the card, so the reason is carried rather than
@@ -727,6 +735,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [
       charge,
+      overCap,
       refund,
       setTurnJob,
       resolveAssistantTurn,
@@ -1001,7 +1010,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       requestAnimationFrame(() => {
         const ring = document.getElementById(land.ring);
         if (!ring) return;
-        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const still = motionReduced();
         // The canvas alone scrolls — never the page around it.
         const near = land.near ? document.getElementById(land.focus) : null;
         if (near) scrollWithin(near, "nearest", still ? "auto" : "smooth");
@@ -1644,6 +1653,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const handleConfirmBuild = React.useCallback(
     async (concept: ConceptSummary) => {
       if (!confirmFor) return;
+      // Inside the click, before anything awaits: browsers prompt only from one. Once, ever, so
+      // a finished build can pop up while the maker is in another tab or app.
+      askForPopupsAtBuild();
       // Busy on the click itself. Reading each product's concept back is a
       // round-trip per product, and `startBuildFor` — which used to be the
       // first thing to set this — only runs once they have all answered. So

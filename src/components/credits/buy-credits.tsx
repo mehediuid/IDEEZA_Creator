@@ -16,6 +16,11 @@
 // Payments aren't on: the Demo wallet pays in test USDT or IDZ through its
 // own request flow, and the credits land in the same commit as its debit.
 // Each dialog is one order id, so a double press adds once (purchaseState).
+// Above the amount set in "Ask before a purchase over", Pay asks once more.
+//
+// <AutoTopUp /> lives here too: with Auto top-up on (Settings › Plan &
+// billing › Credit alerts and limits), a build that pauses for credits buys
+// the chosen pack through the same wallet request, once per pause.
 
 import * as React from "react";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
@@ -23,6 +28,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { Badge, Button, ModalFrame } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { useDefaultToken } from "@/lib/account/payment";
+import { autoTopUpDecision, needsConfirm, rememberTried } from "@/lib/create/credit-limits";
 import {
   CREDIT_PACKS,
   VALIDITY_MONTHS,
@@ -36,11 +42,13 @@ import {
   type PackId,
 } from "@/lib/create/credit-pricing";
 import { BUILD_COST, CONCEPT_COST, buildCost, useCredits } from "@/lib/create/credits";
-import { productsOf, useCreateHistory } from "@/lib/create/history";
+import { productsOf, useCreateHistory, type BuildJob } from "@/lib/create/history";
+import { useSettings } from "@/lib/settings/use-settings";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
 import { OrderSummary, PaymentResult } from "./order-summary";
 import { CHOICE, CHOICE_OFF, CHOICE_ON, PaymentPicker, useWalletStatus, type PayCoin } from "./payment-picker";
+import { PurchaseConfirm } from "./purchase-confirm";
 
 /** What is being bought: a pack, or a custom number of credits. */
 export type CreditPick = { kind: "pack"; id: PackId } | { kind: "custom"; credits: number };
@@ -68,6 +76,7 @@ export function BuyCreditsProvider({ children }: { children: React.ReactNode }) 
     <BuyContext.Provider value={value}>
       {children}
       {args && <BuyCreditsDialog need={args.need} pick={args.pick} onClose={() => setArgs(null)} />}
+      <AutoTopUp held={args !== null} />
     </BuyContext.Provider>
   );
 }
@@ -119,6 +128,8 @@ type Step = "choose" | "pay" | "done" | "failed";
 
 function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose: () => void }) {
   const { hydrated, balance, purchase } = useCredits();
+  const { confirmAbove } = useSettings().credits;
+  const [asking, setAsking] = React.useState(false);
   const { plan } = useCreatePlan();
   const { attentionBuilds } = useCreateHistory();
   const { request } = useWalletRequest();
@@ -147,11 +158,16 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
     if (step === "pay") coinRef.current?.focus();
   }, [step]);
 
-  const pay = async () => {
+  const pay = async (confirmed = false) => {
     if (!hydrated || paying) return;
+    if (!confirmed && needsConfirm(order.price.final, confirmAbove)) {
+      setAsking(true);
+      return;
+    }
     // The paused build this is for, read before the credits land: once they
-    // cover it the simulator starts it and it leaves the attention list.
-    const paused = attentionBuilds.find((a) => a.reason === "credits")?.job ?? null;
+    // cover it the simulator starts it and it leaves the attention list. A
+    // build held by the monthly limit isn't one credits can start.
+    const paused = attentionBuilds.find((a) => a.job.blocked === "credits")?.job ?? null;
     const credits = order.base + order.bonus;
     setPaying(true);
     setNote(null);
@@ -222,7 +238,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
     <ModalFrame
       open
       onClose={onClose}
-      covered={paying}
+      covered={paying || asking}
       closeUnavailable={paying}
       title={title}
       description={
@@ -345,7 +361,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
               total={usd(order.price.final)}
               cta={{
                 label: `Pay ${usd(order.price.final)}`,
-                onClick: pay,
+                onClick: () => pay(),
                 loading: paying,
                 disabled: !hydrated || !wallet.connected,
                 hint: !wallet.connected ? "Connect your wallet to pay." : undefined,
@@ -353,8 +369,137 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
               note={note && <p role="status">{note}</p>}
             />
           </div>
+          {confirmAbove !== null && (
+            <PurchaseConfirm
+              open={asking}
+              amount={order.price.final}
+              limit={confirmAbove}
+              what={order.pack ? `The ${order.pack} pack` : "This custom amount"}
+              onCancel={() => setAsking(false)}
+              onConfirm={() => {
+                setAsking(false);
+                void pay(true);
+              }}
+            />
+          )}
         </div>
       )}
     </ModalFrame>
   );
+}
+
+// ─────────────────────────────── auto top-up ──────────────────────────────
+
+/** Which pauses auto top-up has already tried, in this browser: a reload
+ *  while the build is still paused must not ask the wallet again. */
+const TRIED_KEY = "ideeza:credits:auto-top-up";
+
+function readTried(): string[] {
+  try {
+    const raw = window.localStorage.getItem(TRIED_KEY);
+    const tried = raw ? (JSON.parse(raw) as { tried?: unknown }).tried : null;
+    return Array.isArray(tried) ? tried.filter((k): k is string => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeTried(tried: string[]): boolean {
+  try {
+    window.localStorage.setItem(TRIED_KEY, JSON.stringify({ v: 1, tried }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The build the queue is waiting on for credits: the oldest one parked for them. */
+function pausedForCredits(builds: BuildJob[]): BuildJob | null {
+  let next: BuildJob | null = null;
+  for (const b of builds) {
+    if (b.status !== "queued" || b.blocked !== "credits") continue;
+    if (!next || b.createdAt < next.createdAt) next = b;
+  }
+  return next;
+}
+
+/** Auto top-up: when a build pauses for credits and Auto top-up is on, buy the
+ *  chosen pack from the Demo wallet through its signing dialog — once per
+ *  pause, only when the build would then start within the monthly limit. The
+ *  simulator sees the balance and starts the build (the same path as Buy
+ *  credits). `held`: the Buy credits dialog is open, so the maker is already
+ *  buying; nothing is asked on top of it. Renders nothing. */
+function AutoTopUp({ held }: { held: boolean }) {
+  const { autoTopUp, monthlyCap } = useSettings().credits;
+  const { hydrated, balance, ledger, purchase } = useCredits();
+  const { builds, hydrated: historyReady } = useCreateHistory();
+  const { request } = useWalletRequest();
+  const discount = useCreditDiscount();
+  const coin = useDefaultToken();
+  const busy = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!hydrated || !historyReady || held || busy.current) return;
+    const job = pausedForCredits(builds);
+    const pack = CREDIT_PACKS.find((p) => p.id === autoTopUp.pack) ?? CREDIT_PACKS[0];
+    const cost = job ? buildCost(productsOf(job).length) : 0;
+    const tried = readTried();
+    const decision = autoTopUpDecision({
+      on: autoTopUp.on,
+      packCredits: pack.base + pack.bonus,
+      // A build parked before pauses were dated counts from its last change.
+      pause: job ? { buildId: job.id, blockedAt: job.blockedAt ?? job.updatedAt, cost } : null,
+      balance,
+      ledger,
+      cap: monthlyCap,
+      now: Date.now(),
+      tried,
+    });
+    if (!decision.buy || !job) return;
+    // Remembered before the wallet opens: one try per pause, whatever the
+    // answer, even if the page reloads while the dialog is up.
+    writeTried(rememberTried(tried, decision.key));
+    busy.current = true;
+    const price = packPrice(pack, discount);
+    const credits = pack.base + pack.bonus;
+    const name = job.projectChoiceName?.trim() || job.title;
+    const orderId = newOrderId();
+    void request(
+      {
+        kind: "transaction",
+        purpose: "buyCredits",
+        identity: "maker",
+        network: "baseSepolia",
+        title: "Auto top-up: pay for AI credits",
+        summary: [
+          { label: "Why", value: `${name} paused: it needs ${plural(cost, "credit")}, you have ${balance}` },
+          { label: "Credits", value: `${pack.name} pack · ${creditsLine(pack.base, pack.bonus)}` },
+          { label: "Price", value: usd(price.final) },
+        ],
+        note: `Auto top-up is on in Plan & billing › Credit alerts and limits. Testnet demo, no real money moves. The credits last ${VALIDITY_MONTHS} months.`,
+        doneLine: `${plural(credits, "credit")} added. ${name} starts now.`,
+        charge: { network: "baseSepolia", lines: [{ coin, amount: String(coinAmount(price.final, coin)) }] },
+      },
+      {
+        commit: (proof) => {
+          purchase({
+            orderId,
+            base: pack.base,
+            bonus: pack.bonus,
+            pack: pack.name,
+            price: price.final,
+            listPrice: price.base,
+            paidWith: `${coin} · demo wallet · auto top-up`,
+            txHash: proof.txHash,
+            payer: proof.address,
+          });
+          return { ok: true };
+        },
+      },
+    ).finally(() => {
+      busy.current = false;
+    });
+  }, [hydrated, historyReady, held, builds, autoTopUp.on, autoTopUp.pack, monthlyCap, balance, ledger, discount, coin, request, purchase]);
+
+  return null;
 }

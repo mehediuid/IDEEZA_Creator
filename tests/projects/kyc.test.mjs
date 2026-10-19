@@ -71,7 +71,7 @@ test("kycStatusOf", () => {
 
 test("kycFormProblems: both fields must hold something; blanks are trimmed", () => {
   assert.deepEqual(kycFormProblems({ name: "Ada", country: "Bangladesh" }), {});
-  assert.deepEqual(kycFormProblems({ name: "  ", country: "" }), { name: "Enter a name.", country: "Enter a country." });
+  assert.deepEqual(kycFormProblems({ name: "  ", country: "" }), { name: "Enter your full legal name.", country: "Choose your country of residence." });
   assert.equal(kycFormProblems({ name: "x".repeat(KYC_NAME_MAX + 1), country: "UK" }).name?.startsWith("Keep the name"), true);
 });
 

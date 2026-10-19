@@ -61,6 +61,7 @@ import {
   NoShowcaseState,
 } from "./project-card";
 import { Pagination } from "./pagination";
+import { motionReduced } from "@/lib/settings/appearance";
 
 const PANEL_ID = "projects-panel";
 const tabId = (tab: ListTab) => `projects-tab-${tab}`;
@@ -299,7 +300,7 @@ export function MyProjects() {
   const resultsRef = React.useRef<HTMLDivElement>(null);
   const changePage = (page: number) => {
     write({ ...view, page });
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = motionReduced();
     resultsRef.current?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
     headingRef.current?.focus({ preventScroll: true });
   };

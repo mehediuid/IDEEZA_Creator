@@ -36,6 +36,8 @@ import type {
 import { LinkPanel, PROTOCOL_OPTIONS } from "./link-panel";
 import { MapCanvas, type Selection, type Tool } from "./map-canvas";
 import { btn } from "./ui";
+import { singleKeyShortcutsAllowed } from "@/lib/settings/keys";
+import { MAP_KEYS, singleKeyOf, type ShortcutId } from "@/lib/settings/shortcuts";
 
 export type MapDoc = { nodes: MapNode[]; links: MapLink[]; masterId: string | null };
 
@@ -184,6 +186,8 @@ export function MapEditor({
   // opens. Escape stays with focus (below): outside the editor it belongs to
   // the dialog around it.
   const onToolKey = React.useEffectEvent((e: KeyboardEvent) => {
+    // Settings › Appearance › Single-key shortcuts off: V and L do nothing.
+    if (!singleKeyShortcutsAllowed(e)) return;
     if (e.defaultPrevented || isTyping(e.target)) return;
     const mod = e.metaKey || e.ctrlKey;
     if (mod && e.key.toLowerCase() === "z") {
@@ -198,12 +202,18 @@ export function MapEditor({
       return;
     }
     if (mod || e.altKey) return;
-    if (e.key === "v" || e.key === "V") setTool("select");
-    else if (e.key === "l" || e.key === "L") setTool("draw");
-    else if ((e.key === "Delete" || e.key === "Backspace") && selectedLink) {
+    if ((e.key === "Delete" || e.key === "Backspace") && selectedLink) {
       e.preventDefault();
       deleteLink(selectedLink.id);
+      return;
     }
+    // The single keys, from the table Settings › Appearance lists.
+    const run: Record<ShortcutId<typeof MAP_KEYS>, () => void> = {
+      select: () => setTool("select"),
+      draw: () => setTool("draw"),
+    };
+    const id = singleKeyOf(MAP_KEYS, e);
+    if (id) run[id]();
   });
   React.useEffect(() => {
     if (!keysActive) return;

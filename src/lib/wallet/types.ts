@@ -92,8 +92,12 @@ export type RequestPurpose =
   | "listEdition"
   /** AI credits paid from the demo wallet (Buy credits). */
   | "buyCredits"
-  /** A plan paid from the demo wallet (Plan & pricing). */
-  | "subscribe";
+  /** A plan paid from the demo wallet (Plan & billing). */
+  | "subscribe"
+  /** Earnings withdrawn in Settings › Get paid: a signature, nothing charged. */
+  | "withdraw"
+  /** A withdrawal method added or made the default in Settings › Get paid: a signature. */
+  | "payoutMethod";
 
 export type WalletRequest = {
   kind: "signature" | "transaction";

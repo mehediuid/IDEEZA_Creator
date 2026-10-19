@@ -1,15 +1,17 @@
-// "Request payout" (Build and Earn P1-4), a demo action gated at L4 (identity
-// verified). Every sale already pays the seller's payout wallet in the demo
-// (`Sale.payout`, the price less IDEEZA's fee); a payout request asks for what
-// a project has earned and not yet requested, per chain and token, and stores
-// the request under `ideeza:commerce:payouts`. Nothing is sent anywhere.
+// What a project's sales paid its seller, per chain and token (Build and Earn
+// P1-4): the Earn overview's "earned" fact. Every sale pays the seller's
+// payout wallet in the demo (`Sale.payout`, the price less IDEEZA's fee).
 //
-// A project with a sale can't be deleted, so a request never outlives its project.
+// Earnings are withdrawn from one account balance in Settings › Get Paid
+// (Settings spec D3, lib/account/payout.ts). The per-project "Request payout"
+// that came before it stored its requests under `ideeza:commerce:payouts`;
+// nothing writes that key now, and Get Paid reads each request there as a
+// pending withdrawal, so none is lost.
 //
-// Pure apart from the guarded localStorage read and write; relative imports only.
+// Pure apart from the guarded localStorage read; relative imports only.
 
 import type { Sale } from "../market/types";
-import { addAmounts, compareAmounts, formatAmount, subAmounts } from "../wallet/money";
+import { addAmounts, compareAmounts, formatAmount } from "../wallet/money";
 import type { Amount } from "../wallet/types";
 
 export const PAYOUTS_KEY = "ideeza:commerce:payouts";
@@ -39,26 +41,9 @@ export function earnedOf(sales: readonly Earning[], projectId: string): PayoutLi
   );
 }
 
-/** What earlier requests for the project already asked for. */
-export function requestedOf(requests: readonly PayoutRequest[], projectId: string): PayoutLine[] {
-  return sumLines(requests.filter((r) => r.projectId === projectId).flatMap((r) => r.lines));
-}
-
-/** Earned less requested, per chain and token; only what's left over. */
-export function availableOf(earned: readonly PayoutLine[], requested: readonly PayoutLine[]): PayoutLine[] {
-  const asked = new Map(requested.map((l) => [keyOf(l), l.amount]));
-  return earned
-    .map((l) => ({ ...l, amount: subAmounts(l.amount, asked.get(keyOf(l)) ?? "0") }))
-    .filter((l) => compareAmounts(l.amount, "0") > 0);
-}
-
 /** "0.975 ETH · 9.75 USDC" */
 export function payoutLinesText(lines: readonly PayoutLine[]): string {
   return lines.map((l) => formatAmount(l.amount, l.token)).join(" · ");
-}
-
-export function payoutRequestOf(projectId: string, lines: readonly PayoutLine[], at: number, id: string): PayoutRequest {
-  return { id, projectId, at, lines: lines.map((l) => ({ ...l })), demo: true };
 }
 
 function isDict(v: unknown): v is Record<string, unknown> {
@@ -95,17 +80,5 @@ export function readPayoutsRaw(): string | null {
     return typeof window === "undefined" ? null : window.localStorage.getItem(PAYOUTS_KEY);
   } catch {
     return null;
-  }
-}
-
-/** Appends one request to what's stored now. `false`: the browser refused it. */
-export function appendPayoutRequest(req: PayoutRequest): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const next = [...parsePayouts(readPayoutsRaw()), req];
-    window.localStorage.setItem(PAYOUTS_KEY, JSON.stringify({ v: 1, requests: next }));
-    return true;
-  } catch {
-    return false;
   }
 }

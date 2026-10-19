@@ -211,7 +211,7 @@ export function earnNextOf(projectId: string, commercial: CommercialState, copie
     case "given":
       return live("Given to the community", "It's free for everyone, so there is nothing to sell.", "See it in Sell", sell);
     case "soldPartial":
-      return live("Part of your project is sold", "Each sale paid your payout wallet. You can still sell the share you hold.", "See sales and payouts", customers);
+      return live("Part of your project is sold", "You can still sell the share you hold.", "See sales and payouts", customers);
     case "soldOut":
       return live("Sold in full", "It belongs to whoever bought it now, so the project is read-only.", "See sales and payouts", customers);
   }

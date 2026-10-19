@@ -275,6 +275,8 @@ const ACTIVITY_VERB: Record<RequestPurpose, string> = {
   listEdition: "Signed an edition listing",
   buyCredits: "Bought AI credits",
   subscribe: "Paid for a plan",
+  withdraw: "Withdrew earnings",
+  payoutMethod: "Signed a withdrawal method",
 };
 
 /** "Minted on chain · Car": the verb for the purpose, then the request's "Project" row (else its title). */

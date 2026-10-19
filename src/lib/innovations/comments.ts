@@ -10,9 +10,19 @@
 //   visitor on someone else's Copy link · Report; the post's maker adds
 //   Hide · Delete there;
 // - a deleted comment with replies stays as "Comment deleted" so the thread
-//   holds; one without replies goes.
+//   holds; one without replies goes;
+// - Settings › Privacy & safety (spec 2026-10-19 §5.10): on a post whose
+//   maker hides words, someone else's comment that uses one reads as hidden to
+//   everyone but its writer, and the count leaves it out. The same goes for a
+//   comment the maker's "who can comment" leaves out right now (a break
+//   narrows it; someone they blocked is always out): it is held, and is back
+//   once the rule lets its writer in again. Anyone the viewer blocked reads as
+//   "From someone you blocked" on every post, and nobody comments on a post
+//   whose maker they blocked or who blocked them.
 //
 // Pure: every write returns a new list. Relative imports only.
+
+import { hasHiddenWord } from "../settings/audience";
 
 export type PostComment = {
   id: string;
@@ -55,8 +65,25 @@ export const CLAMP_CHARS = 280;
 
 export type CommentAction = "edit" | "copy" | "delete" | "hide" | "unhide" | "report" | "reported";
 
-/** Who is looking: this browser's maker, and whether they made the post. */
-export type CommentViewer = { meId: string; isPostOwner: boolean };
+/** The post maker's own rules, when they are known (this browser's own post): the words they
+ *  hide, and whether someone may comment now (`canComment` over their settings and ties). */
+export type MakerRules = { ownerId: string; words: readonly string[]; mayComment?: (authorId: string) => boolean };
+
+/** Who is looking: this browser's maker, whether they made the post, its maker's rules, and the
+ *  people the viewer blocked. */
+export type CommentViewer = {
+  meId: string;
+  isPostOwner: boolean;
+  makerRules?: MakerRules;
+  blocked?: (authorId: string) => boolean;
+};
+
+/** What the maker reads in place of a comment their hidden words hide. */
+export const WORD_HIDDEN_FOR_OWNER = "Hidden: it uses a word you hide";
+/** …in place of a comment their "who can comment" leaves out right now. */
+export const HELD_FOR_OWNER = "Held: its writer can't comment under your rule right now";
+/** What a viewer reads in place of a comment by someone they blocked. */
+export const BLOCKED_FOR_VIEWER = "From someone you blocked";
 
 const byIdOf = (list: readonly PostComment[]) => new Map(list.map((c) => [c.id, c]));
 
@@ -98,9 +125,19 @@ export function isCounted(c: PostComment): boolean {
   return c.hiddenAt === null && c.deletedAt === null;
 }
 
+/** Someone else's comment that uses a word the post's maker hides. */
+export function isWordHidden(c: PostComment, rules: MakerRules | undefined): boolean {
+  return !!rules && rules.words.length > 0 && c.authorId !== rules.ownerId && c.deletedAt === null && hasHiddenWord(c.body, rules.words);
+}
+
+/** Someone else's comment whose writer the maker's rule doesn't let comment right now. */
+export function isHeld(c: PostComment, rules: MakerRules | undefined): boolean {
+  return !!rules?.mayComment && c.authorId !== rules.ownerId && c.deletedAt === null && !rules.mayComment(c.authorId);
+}
+
 /** The one comment count (plan §7): card, post and project page all read this. */
-export function commentCount(list: readonly PostComment[]): number {
-  return list.filter(isCounted).length;
+export function commentCount(list: readonly PostComment[], rules?: MakerRules): number {
+  return list.filter((c) => isCounted(c) && !isWordHidden(c, rules) && !isHeld(c, rules)).length;
 }
 
 export function likesOf(c: PostComment): number {
@@ -153,15 +190,29 @@ export function actionsFor(c: PostComment, viewer: CommentViewer, reported: read
 /** What the viewer reads in a comment's place, or null when they read the comment itself. */
 export function placeholderOf(c: PostComment, viewer: CommentViewer): string | null {
   if (c.deletedAt !== null) return "Comment deleted";
-  if (c.hiddenAt !== null && !viewer.isPostOwner && c.authorId !== viewer.meId) return "Hidden by the maker";
+  if (c.authorId === viewer.meId) return null;
+  if (viewer.blocked?.(c.authorId)) return BLOCKED_FOR_VIEWER;
+  if (isHeld(c, viewer.makerRules)) return viewer.isPostOwner ? HELD_FOR_OWNER : "Hidden by the maker";
+  if (isWordHidden(c, viewer.makerRules)) return viewer.isPostOwner ? WORD_HIDDEN_FOR_OWNER : "Hidden by the maker";
+  if (c.hiddenAt !== null && !viewer.isPostOwner) return "Hidden by the maker";
   return null;
 }
 
-/** People someone can @mention here: everyone who wrote in this conversation, but the viewer. */
-export function mentionablesOf(list: readonly PostComment[], meId: string): string[] {
+/** Why the viewer can't comment on this post (blocked either way between them and its maker),
+ *  or null when they can. */
+export function writeRefusalOf(block: "none" | "byMe" | "byThem", makerName: string): string | null {
+  if (block === "byMe") return `You blocked ${makerName}, so you can't comment on their projects.`;
+  if (block === "byThem") return "You can't comment on this project.";
+  return null;
+}
+
+/** People someone can @mention here: everyone who wrote in this conversation, but the viewer and
+ *  anyone they blocked. */
+export function mentionablesOf(list: readonly PostComment[], meId: string, blocked?: (authorId: string) => boolean): string[] {
   const out: string[] = [];
   for (const c of list) {
-    if (c.authorId !== meId && c.deletedAt === null && c.hiddenAt === null && !out.includes(c.authorId)) out.push(c.authorId);
+    if (c.authorId === meId || c.deletedAt !== null || c.hiddenAt !== null || out.includes(c.authorId)) continue;
+    if (!blocked?.(c.authorId)) out.push(c.authorId);
   }
   return out;
 }

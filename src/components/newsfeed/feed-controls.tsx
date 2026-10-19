@@ -1,7 +1,7 @@
 "use client";
 
-// FeedControls — the top controls block: scoped search, Discover/Following
-// modes, "Popular" category chips, and a sort control. Every change is pushed
+// FeedControls — the top controls block: scoped search, Discover / Following /
+// Saved / Appreciated modes, "Popular" category chips, and a sort control. Every change is pushed
 // up via onChange (the parent writes it to the URL so the view is shareable).
 
 import * as React from "react";
@@ -25,10 +25,12 @@ export function FeedControls({
 }) {
   const [query, setQuery] = React.useState(params.q);
 
-  // Keep the input in sync when q changes elsewhere (e.g. Clear filters).
-  React.useEffect(() => {
+  // Keep the input in sync when q changes elsewhere (e.g. Clear filters), during render.
+  const [seenQ, setSeenQ] = React.useState(params.q);
+  if (seenQ !== params.q) {
+    setSeenQ(params.q);
     setQuery(params.q);
-  }, [params.q]);
+  }
 
   // Debounce typing into the URL so the grid doesn't refetch per keystroke.
   React.useEffect(() => {

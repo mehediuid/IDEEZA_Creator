@@ -24,6 +24,8 @@ import { editorDocKey } from "@/lib/manual/editor-scope";
 import { writeReported } from "@/lib/manual/save-status";
 import type { EditorScope } from "@/lib/manual/p2-types";
 import { CODE_EVENT, type CodeAction } from "./code-menu-strip";
+import { readSettings } from "@/lib/settings/prefs";
+import { useSettings } from "@/lib/settings/use-settings";
 
 Blockly.setLocale(En as unknown as { [key: string]: string });
 
@@ -203,7 +205,7 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
-function LibTabs({ value, onChange }: { value: LibTab; onChange: (v: LibTab) => void }) {
+function LibTabs({ value, onChange, withAi }: { value: LibTab; onChange: (v: LibTab) => void; withAi: boolean }) {
   const tabs: { id: LibTab; label: React.ReactNode; w?: number }[] = [
     { id: "common", label: "Common Library" },
     {
@@ -224,7 +226,7 @@ function LibTabs({ value, onChange }: { value: LibTab; onChange: (v: LibTab) => 
         </svg>
       ),
     },
-    { id: "ai", label: AI_BOT_ICON },
+    ...(withAi ? [{ id: "ai" as const, label: AI_BOT_ICON }] : []),
   ];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
@@ -597,13 +599,15 @@ export function BlocklyImpl() {
   const [generated, setGenerated] = React.useState("");
 
   const [libTab, setLibTab] = React.useState<LibTab>("common");
+  // Settings › AI & your data › AI help in the editors: off hides the AI tab.
+  const assist = useSettings().ai.editorAssist;
   const [openCats, setOpenCats] = React.useState<Record<string, boolean>>({ Logic: true });
   const [search, setSearch] = React.useState("");
 
   // A cross-tab AI handoff for the Code module opens the AI tab right away;
   // the chat panel consumes and auto-sends the carried message.
   React.useEffect(() => {
-    if (!hasAiHandoff("code")) return;
+    if (!hasAiHandoff("code") || !readSettings().ai.editorAssist) return;
     const t = setTimeout(() => setLibTab("ai"), 0);
     return () => clearTimeout(t);
   }, []);
@@ -842,8 +846,8 @@ export function BlocklyImpl() {
           flex: "0 0 270px",
         }}
       >
-        <LibTabs value={libTab} onChange={setLibTab} />
-        {libTab === "ai" ? (
+        <LibTabs value={libTab} onChange={setLibTab} withAi={assist} />
+        {assist && libTab === "ai" ? (
           // AI assistant tab — chat panel replaces the block library body.
           <AiChatPanel
             context="blockly"

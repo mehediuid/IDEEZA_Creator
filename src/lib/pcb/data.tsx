@@ -226,7 +226,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       // View reads top-to-bottom as three questions: how close am I (zoom),
       // what is the sheet doing under my cursor (grid/snap/units), and which
       // panels are up. Panels are named after what they hold, not where they
-      // sit. Theme is deliberately absent — it lives in Setting ▸ System.
+      // sit. Theme is deliberately absent — Settings › Appearance owns it (V8).
       items: [
         item("Zoom In", { k: "I", icon: "zoomin", onClick: () => actions.zoomIn() }),
         item("Zoom Out", { k: "O", icon: "zoomout", onClick: () => actions.zoomOut() }),
@@ -497,6 +497,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
     icon: o.icon || "blank",
     sub: o.sub || [],
     flagged: !!o.flagged,
+    disabled: !!o.disabled,
     note: o.note,
     onClick: o.sub ? noop : o.onClick || close,
   });
@@ -697,21 +698,12 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // had a handler behind it.
         item("Flip Board", { k: "Alt+F", icon: "flipV", onClick: () => actions.toggleBoardFlip() }),
         dv,
-        // Phase 8 — Appearance (IT-550). Dark / Light / System theme picker.
-        item("Appearance", {
+        // The app's theme has one home, Settings › Appearance & accessibility
+        // (V8): this row only says where it is.
+        item("Theme is in Settings", {
           icon: "appearance",
-          sub: [
-            // Real theme switches — the ThemeProvider listens on this event
-            // (these rows are pure data, so they can't reach its context).
-            ...[["Light Mode", "light", "sun"], ["Dark Mode", "dark", "moon"], ["System Default", "system", "sys"]].map(([label, mode, ic]) =>
-              su(label, "", {
-                icon: (typeof localStorage !== "undefined" && (localStorage.getItem("ideeza-theme") ?? "system") === mode) ? "check" : ic,
-                onClick: () => { window.dispatchEvent(new CustomEvent("ideeza:set-theme", { detail: mode })); actions.closeAll(); },
-              }),
-            ),
-            dv,
-            su("Open Theme Settings…", "", { icon: "appearance", onClick: () => actions.openSettings("system") }),
-          ],
+          disabled: true,
+          note: "Light, dark or match system: Settings › Appearance & accessibility.",
         }),
         check("Top Toolbar"),
         check("Left-Side panel", "["),
@@ -1082,12 +1074,13 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       key: "I",
       items: [
         item("System", { icon: "sys", sub: [su("General", "", { icon: "sys", onClick: () => actions.openModal("set3dSysGeneral") }), su("Common", "", { icon: "prop", onClick: () => actions.openModal("set3dSysCommon") }), su("Common Library", "", { icon: "doc", onClick: () => actions.openModal("set3dSysLib") })] }),
-        item("Schematic/Symbol", { icon: "symbol", sub: [su("General", "", { icon: "sys", onClick: () => actions.openSettings("symbol") }), su("Theme", "", { icon: "appearance", onClick: () => actions.openSettings("symbol") })] }),
+        // "Canvas theme": the sheet's and board's own colours, not the app's theme.
+        item("Schematic/Symbol", { icon: "symbol", sub: [su("General", "", { icon: "sys", onClick: () => actions.openSettings("symbol") }), su("Canvas theme", "", { icon: "appearance", onClick: () => actions.openSettings("symbol") })] }),
         item("PCB/Footprint", {
           icon: "foot",
           sub: [
             su("General", "", { icon: "sys", onClick: () => actions.openSettings("footprint") }),
-            su("Theme", "", { icon: "appearance", onClick: () => actions.openSettings("footprint") }),
+            su("Canvas theme", "", { icon: "appearance", onClick: () => actions.openSettings("footprint") }),
             // UIUX-20 — our own wording; the old rows were EasyEDA's
             // "Common … setting" labels verbatim.
             su("Grid & snap defaults", "", { icon: "grid", onClick: () => actions.openSettings("footprint") }),
@@ -1096,12 +1089,14 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
             su("Snap", "", { icon: "snap", onClick: () => actions.toggleSnap() }),
           ],
         }),
-        item("Panel/Panel Lib", { icon: "panel", sub: [su("General", "", { icon: "sys", onClick: () => actions.openModal("set3dPanelGeneral") }), su("Theme", "", { icon: "appearance", onClick: () => actions.openModal("set3dPanelTheme") })] }),
+        item("Panel/Panel Lib", { icon: "panel", sub: [su("General", "", { icon: "sys", onClick: () => actions.openModal("set3dPanelGeneral") }), su("Canvas theme", "", { icon: "appearance", onClick: () => actions.openModal("set3dPanelTheme") })] }),
         item("Common Font Family", { icon: "font", onClick: () => actions.openModal("set3dFont") }),
         item("Drawing", { icon: "draw", onClick: () => actions.openModal("set3dDrawing") }),
         item("Property", { icon: "prop", onClick: () => actions.openModal("set3dProperty") }),
-        item("Hotkey", { icon: "key", onClick: () => actions.openModal("set3dHotkey") }),
-        item("Top toolbar", { icon: "grid", onClick: () => actions.openModal("set3dTopToolbar") }),
+        // One hotkey list and one toolbar list for the whole editor: these open
+        // the Settings overlay's own pages, the same ones the 2D Setting menu reaches.
+        item("Hotkey", { icon: "key", onClick: () => actions.openSettings("hotkey") }),
+        item("Top toolbar", { icon: "grid", onClick: () => actions.openSettings("toptools") }),
         item("Save", { icon: "save", onClick: () => actions.saveDoc() }),
       ],
     },
@@ -1663,8 +1658,10 @@ export function flattenCommands(groups) {
   };
   for (const m of menus) {
     for (const it of m.items || []) {
-      if (it.divider || !it.label) continue;
-      const children = (it.sub || []).filter((s) => s && !s.divider && s.label);
+      // A greyed row (a reason or a pointer, like "Theme is in Settings")
+      // is not a command.
+      if (it.divider || !it.label || it.disabled) continue;
+      const children = (it.sub || []).filter((s) => s && !s.divider && s.label && !s.disabled);
       if (children.length) {
         for (const s of children) push(m.label, it.label, s.label, s.icon, s.onClick);
       } else {

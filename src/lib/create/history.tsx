@@ -52,7 +52,10 @@ export type ConceptFailReason =
   | "storage"
   | "parent-lost"
   | "credits"
-  | "filtered";
+  // It would have taken this month past the monthly spending limit.
+  | "cap"
+  | "filtered"
+  | "pool-off";
 
 /** What the flow asks before it spends anything.
  *
@@ -288,8 +291,13 @@ export type BuildJob = {
   failure?: "system";
   // Why a queued build isn't starting. "credits" means its turn came up
   // but the balance couldn't cover it, so it went back in the queue
-  // rather than running unpaid.
-  blocked?: "credits";
+  // rather than running unpaid. "cap" means it would have taken this
+  // month past the monthly spending limit (Settings › Plan & billing ›
+  // Credit alerts and limits); buying credits can't start it.
+  blocked?: BuildBlock;
+  // When it was parked, for that reason: one pause. Auto top-up tries
+  // once per pause (lib/create/credit-limits.ts `pauseKey`).
+  blockedAt?: number;
   // Set by Save Project / Open in editor once the build becomes a real
   // ManualProject.
   projectId?: string;
@@ -310,6 +318,8 @@ export type BuildJob = {
    *  offers a retry, instead of a spinner that turns forever. */
   modelFailed?: boolean;
 };
+
+export type BuildBlock = "credits" | "cap";
 
 // What "needs attention" means for a build (spec §7b):
 //   • ready, not yet saved as a project — user must review it
@@ -627,10 +637,14 @@ function normalizeJob(raw: BuildJob): BuildJob {
     creditsCharged: stored.creditsCharged ?? false,
     creditsRefunded: stored.creditsRefunded ?? false,
     modelFailed: stored.modelFailed === true ? true : undefined,
-    // Only a queued build can be waiting on credits.
+    // Only a queued build can be waiting on credits or the limit.
     blocked:
-      status === "queued" && stored.blocked === "credits"
-        ? "credits"
+      status === "queued" && (stored.blocked === "credits" || stored.blocked === "cap")
+        ? stored.blocked
+        : undefined,
+    blockedAt:
+      status === "queued" && typeof stored.blockedAt === "number" && Number.isFinite(stored.blockedAt)
+        ? stored.blockedAt
         : undefined,
   };
 }
@@ -802,9 +816,10 @@ type Ctx = {
   // Records that the ledger has actually put this build's credits back.
   // Same rule: called only once the refund is really on the ledger.
   markRefunded: (buildId: string) => void;
-  // Its turn came up but the balance couldn't cover it: back to the
-  // queue, flagged, rather than running unpaid.
-  blockForCredits: (buildId: string) => void;
+  // Its turn came up but the balance couldn't cover it ("credits"), or
+  // the monthly spending limit wouldn't ("cap"): back to the queue,
+  // flagged, rather than running unpaid.
+  blockForCredits: (buildId: string, why?: BuildBlock) => void;
   // Starts the oldest queued build when nothing is running. Called by
   // the simulator on each tick.
   promoteQueued: () => void;
@@ -822,6 +837,8 @@ type Ctx = {
   // there's nothing the user needs to act on right now.
   topAttention: BuildAttention | null;
   dismissAttention: (buildId: string) => void;
+  /** Deletes a chat from this browser, with the builds in `dropBuilds` (history-delete.ts decides which). */
+  deleteChat: (chatId: string, dropBuilds: readonly string[]) => void;
 };
 
 const CreateHistoryContext = React.createContext<Ctx | null>(null);
@@ -1506,6 +1523,7 @@ export function CreateHistoryProvider({
           status: busy ? "queued" : "running",
           failure: undefined,
           blocked: undefined,
+          blockedAt: undefined,
           startedAt: busy ? undefined : now,
           endedAt: undefined,
           // The failed run was refunded, so the retry is charged again.
@@ -1544,6 +1562,7 @@ export function CreateHistoryProvider({
           status: "failed" as const,
           failure: "system" as const,
           blocked: undefined,
+          blockedAt: undefined,
           endedAt: now,
           // An artifact that had already reached "ready" was really
           // produced — the failure stopped the rest, it didn't undo
@@ -1565,7 +1584,7 @@ export function CreateHistoryProvider({
     setBuilds((arr) =>
       arr.map((b) =>
         b.id === buildId
-          ? { ...b, creditsCharged: true, blocked: undefined }
+          ? { ...b, creditsCharged: true, blocked: undefined, blockedAt: undefined }
           : b,
       ),
     );
@@ -1581,19 +1600,21 @@ export function CreateHistoryProvider({
     );
   }, []);
 
-  const blockForCredits = React.useCallback((buildId: string) => {
+  const blockForCredits = React.useCallback((buildId: string, why: BuildBlock = "credits") => {
     setBuilds((arr) => {
       const b = arr.find((x) => x.id === buildId);
-      // Not found, or already parked — return the same array reference
-      // (find-before-map, like promoteQueued) so this is a true no-op:
-      // nothing re-renders and nothing re-persists to localStorage.
-      if (!b || (b.status === "queued" && b.blocked === "credits")) return arr;
+      // Not found, or already parked for this reason — return the same
+      // array reference (find-before-map, like promoteQueued) so this is a
+      // true no-op: nothing re-renders and nothing re-persists to
+      // localStorage.
+      if (!b || (b.status === "queued" && b.blocked === why)) return arr;
       return arr.map((x) =>
         x.id === buildId
           ? {
               ...x,
               status: "queued" as const,
-              blocked: "credits" as const,
+              blocked: why,
+              blockedAt: Date.now(),
               startedAt: undefined,
               endedAt: undefined,
               // Whatever was in flight goes back to waiting; a finished
@@ -1649,6 +1670,7 @@ export function CreateHistoryProvider({
               ...startPendingItems(b),
               status: "running" as const,
               blocked: undefined,
+              blockedAt: undefined,
               startedAt: now,
               updatedAt: now,
             }
@@ -1701,6 +1723,12 @@ export function CreateHistoryProvider({
           : b,
       ),
     );
+  }, []);
+
+  const deleteChat = React.useCallback((chatId: string, dropBuilds: readonly string[]) => {
+    const drop = new Set(dropBuilds);
+    setChats((arr) => arr.filter((c) => c.id !== chatId));
+    if (drop.size) setBuilds((arr) => arr.filter((b) => !drop.has(b.id)));
   }, []);
 
   const getBuild = React.useCallback(
@@ -1773,6 +1801,7 @@ export function CreateHistoryProvider({
     attentionBuilds,
     topAttention,
     dismissAttention,
+    deleteChat,
   };
 
   return (
@@ -1842,6 +1871,14 @@ export function buildAttention(job: BuildJob): BuildAttention | null {
       job,
       reason: "credits",
       message: `${name} is paused — buy credits to start it`,
+    };
+  }
+  // Paused by the monthly spending limit: the same pause, its own reason.
+  if (job.blocked === "cap") {
+    return {
+      job,
+      reason: "credits",
+      message: `${name} is paused: you reached your monthly limit`,
     };
   }
   if (job.failure === "system") {

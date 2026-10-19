@@ -78,7 +78,7 @@ export function StartView() {
   if (!resolved || existingId) return <PaneLoading />;
   if (!resolved.ok) return <PaneState title={resolved.title} body={resolved.body} back />;
   if (resolved.other) {
-    const check = canStart(data, me, resolved.other.id, resolved.context);
+    const check = canStart(data, me, resolved.other.id, resolved.context, people.policy);
     if (!check.ok) return <PaneState title="Can't start this conversation" body={startRefusalOf(check.reason, resolved.other.name)} back />;
   }
   return (

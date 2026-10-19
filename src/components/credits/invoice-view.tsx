@@ -5,7 +5,9 @@
 // how it was paid and the transaction — readable here, and printed or saved as
 // a PDF from the browser's print dialog (the page chrome stays off paper).
 // Built from the payment itself (lib/account/invoices.ts); a testnet invoice
-// says so on its face.
+// says so on its face. "Billed to" prints the Billing details saved on Plan &
+// billing (lib/account/billing-details.ts), as they are now; with no name
+// there, your legal name (Settings › Account), else your profile's.
 
 import * as React from "react";
 import Link from "next/link";
@@ -13,20 +15,24 @@ import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { useMe } from "@/components/dashboard/sidebar-account";
 import { Badge, Button, TestnetDemoBadge } from "@/components/ideeza";
 import { NARROW_COLUMN, Page } from "@/components/ideeza/page";
+import { billedTo, useBillingDetails } from "@/lib/account/billing-details";
+import { invoiceNameOf, useIdentity } from "@/lib/account/identity";
 import { invoicesOf } from "@/lib/account/invoices";
-import { usd } from "@/lib/create/credit-pricing";
+import { INVOICES_HREF, usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
-
-const BILLING_HREF = "/settings/plan?tab=billing";
-const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+import { useDates } from "@/lib/settings/use-dates";
 
 export function InvoiceView({ orderId }: { orderId: string }) {
+  // Settings › Language › Date & Time Formatting.
+  const date = useDates().date;
   const { hydrated: creditsReady, ledger } = useCredits();
   const { hydrated: planReady, sub } = useCreatePlan();
   const me = useMe();
+  const billing = useBillingDetails();
+  const { identity } = useIdentity();
   const invoice = React.useMemo(() => invoicesOf(ledger, sub.orders).find((i) => i.id === orderId) ?? null, [ledger, sub.orders, orderId]);
 
   React.useEffect(() => {
@@ -35,10 +41,10 @@ export function InvoiceView({ orderId }: { orderId: string }) {
 
   const back = (
     <Link
-      href={BILLING_HREF}
+      href={INVOICES_HREF}
       className="text-md font-semibold leading-md text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
     >
-      ← Billing history
+      ← Invoices
     </Link>
   );
 
@@ -60,6 +66,7 @@ export function InvoiceView({ orderId }: { orderId: string }) {
   }
 
   const renewal = invoice.status === "Not charged";
+  const to = billedTo(billing, invoiceNameOf({ billingName: billing.name, legalName: identity.legalName, profileName: me.name }));
   return (
     <Shell>
       <div className="flex flex-wrap items-center justify-between gap-[12px] print:hidden">
@@ -93,7 +100,12 @@ export function InvoiceView({ orderId }: { orderId: string }) {
             <h2 id="billed-to" className="text-sm font-medium leading-sm text-text-tertiary">
               Billed to
             </h2>
-            <p className="font-semibold text-text-primary">{me.name}</p>
+            <p className="font-semibold text-text-primary">{to.name}</p>
+            {to.lines.map((l, i) => (
+              <p key={`${i}-${l}`} className="text-text-secondary [overflow-wrap:anywhere]">
+                {l}
+              </p>
+            ))}
             {invoice.payer && <p className="font-mono text-text-secondary">{shortAddress(invoice.payer)}</p>}
           </section>
           <section aria-labelledby="order-details" className="flex flex-col gap-[4px] text-md leading-md">

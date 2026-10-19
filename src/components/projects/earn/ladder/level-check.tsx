@@ -8,7 +8,7 @@
 // renders it.
 //
 // The one shared helper every commit point uses: mint (L2), list (L3),
-// virtual editions (L3), physical editions and Request payout (L4). A step
+// virtual editions (L3), physical editions (L4). A step
 // the call site already gates on its own screen goes in `handled`, so it is
 // never asked twice there.
 

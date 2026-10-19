@@ -8,10 +8,11 @@
 //   warning, Add contributor and its add/edit dialog, removal, and Preview as
 //   a contributor, which opens the project page as that contributor (the
 //   Earn area is the owner's alone).
-// - Customers (`#customers`): once the project has a sale, Payouts and its
-//   "Request payout (demo)" (Build and Earn P1-4, gated at the ladder's L4),
-//   then the Customers panel, project scope; it reads `?sale=` once on
-//   arrival and opens that sale, so the deep links keep working.
+// - Customers (`#customers`): once the project has a sale, Your earnings
+//   (what its sales paid you, with "Withdraw in Get Paid": one balance for
+//   the account, Settings spec D3), then the Customers panel, project scope;
+//   it reads `?sale=` once on arrival and opens that sale, so the deep links
+//   keep working.
 // - Rights (`#rights`): the legal block's body (patent, copyright,
 //   trademark, its inline edit) and, for a project given under a license,
 //   the license.
@@ -31,7 +32,7 @@ import { ContributorsTab } from "../details/contributors-tab";
 import { RailFact, RailFacts, RailStackScope } from "../details/rail-block";
 import { LegalBody, legalRows } from "../details/rail-legal";
 import type { SlotProps } from "../details/slots";
-import { RequestPayout } from "./ladder/request-payout";
+import { ProjectEarnings } from "./project-earnings";
 import { EARN_LEAD, EARN_STACK, EarnBlock, TAP } from "./surface";
 
 /** The sections after the first sit under a hairline. */
@@ -67,7 +68,7 @@ function EarnSplits(props: SlotProps) {
   );
 }
 
-function EarnCustomers({ project, view, viewer, brief, now, announce }: SlotProps) {
+function EarnCustomers({ project, view, viewer, now, announce }: SlotProps) {
   if (!can(viewer, "customers.see")) return null;
   const status = view.summary.status;
   const empty = view.customers.rows.length === 0;
@@ -81,7 +82,7 @@ function EarnCustomers({ project, view, viewer, brief, now, announce }: SlotProp
       aside={<TestnetDemoBadge />}
       className={NEXT}
     >
-      {view.sales.length > 0 && <RequestPayout project={project} view={view} brief={brief} now={now} announce={announce} />}
+      {view.sales.length > 0 && <ProjectEarnings project={project} view={view} />}
       <CustomersPanel
         customers={view.customers}
         scope={{ kind: "project" }}
