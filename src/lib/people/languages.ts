@@ -1,4 +1,4 @@
-// The languages Settings › Personal Information offers for "Language" (the
+// The languages Edit profile offers for "Languages you speak" (the
 // ones you speak, Figma Select Language 22048:30021): Figma's six first, then
 // other widely spoken ones, each named in English by `Intl` rather than typed
 // in. Pure, no imports.

@@ -292,7 +292,7 @@ export type BuildJob = {
   // Why a queued build isn't starting. "credits" means its turn came up
   // but the balance couldn't cover it, so it went back in the queue
   // rather than running unpaid. "cap" means it would have taken this
-  // month past the monthly spending limit (Settings › Plan & pricing ›
+  // month past the monthly spending limit (Settings › Plan & billing ›
   // Credit alerts and limits); buying credits can't start it.
   blocked?: BuildBlock;
   // When it was parked, for that reason: one pause. Auto top-up tries

@@ -1,6 +1,6 @@
 "use client";
 
-// Billing details (Settings › Plan & pricing › Billing history, spec §5.11):
+// Billing details (Settings › Plan & billing › Billing details, spec §5.11):
 // the name or company, tax ID, address and billing email every invoice prints
 // under "Billed to" (credits/invoice-view.tsx). One versioned record in this
 // browser, `ideeza:account:billing`. Reading never throws: a missing or broken

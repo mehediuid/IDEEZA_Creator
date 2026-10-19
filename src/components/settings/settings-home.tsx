@@ -5,6 +5,8 @@
 //   - This browser: your work lives only here; back it up or restore it.
 //   - Plan and credits: your plan, what's left, Buy credits.
 //   - Privacy at a glance: open or locked, who can message you, location.
+//   - Get paid: only once something of yours is listed or sold (until then
+//     there is nothing to stand on): what's available and the way to it.
 // The Phase 1 "Most visited" tiles went (nothing counts visits, so the title
 // wasn't true) and so did the two legal cards that led nowhere. On a phone
 // the side-nav isn't beside the page, so the page list comes right after the
@@ -14,11 +16,14 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge, buttonVariants, SearchInput } from "@/components/ideeza";
+import { balanceOf, formatUsd } from "@/lib/account/payout";
 import { creditTotals } from "@/lib/account/summary";
+import { usePayout } from "@/lib/account/use-payout";
 import { runningLow } from "@/lib/create/credit-limits";
 import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
+import { useLastBackup, useStorageStatus } from "@/lib/data/backup";
 import { allowNewOf } from "@/lib/messages/rules";
 import { useMessages } from "@/lib/messages/store";
 import { ME, type AllowNew } from "@/lib/messages/types";
@@ -28,6 +33,7 @@ import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { SettingsCard } from "./settings-card";
 import { SettingsFrame } from "./settings-frame";
+import { useGetPaidData } from "./get-paid/parts";
 import { SettingsNav } from "./settings-nav";
 
 const SECTION_TITLE = "m-0 text-lg font-semibold leading-lg text-text-primary";
@@ -49,6 +55,7 @@ export function SettingsHome() {
         <ThisBrowserCard />
         <PlanCard />
         <PrivacyCard />
+        <GetPaidCard />
       </section>
     </SettingsFrame>
   );
@@ -76,14 +83,29 @@ function Actions({ children }: { children: React.ReactNode }) {
 }
 
 function ThisBrowserCard() {
+  const backup = useLastBackup();
+  const storage = useStorageStatus();
+  const { date } = useDates();
+  const kept =
+    !storage.ready || !storage.supported || storage.persisted === null
+      ? null
+      : storage.persisted
+        ? "Yes, the browser won't clear it on its own"
+        : "The browser may clear it when space runs low";
   return (
     <SettingsCard
       id="this-browser"
       title="This browser"
       description="Everything you make is kept in this browser only. Clearing its data, or opening IDEEZA in another browser, starts empty unless you restore a backup."
     >
+      <Facts
+        items={[
+          { term: "Last backup", value: backup.hydrated ? (backup.at === null ? "Never" : date(backup.at)) : "—" },
+          ...(kept ? [{ term: "Kept safe", value: kept }] : []),
+        ]}
+      />
       <Actions>
-        <Link href="/settings/data#download" className={ACTION("secondary")}>
+        <Link href="/settings/data#download" className={ACTION(backup.hydrated && backup.at === null ? "outline-brand" : "secondary")}>
           Download a backup
         </Link>
         <Link href="/settings/data#restore" className={ACTION("ghost")}>
@@ -221,5 +243,33 @@ function FindSetting() {
           ))}
       </div>
     </section>
+  );
+}
+
+/** Shown once something of yours is listed or sold; before that Get paid only says what will happen. */
+function GetPaidCard() {
+  const store = usePayout();
+  const data = useGetPaidData();
+  if (!store || !data.ready || data.stageOf(store) === "setup") return null;
+  const balance = balanceOf(data.earnings, store.withdrawals);
+  return (
+    <SettingsCard id="get-paid-glance" title="Get paid">
+      <Facts
+        items={[
+          { term: "Available to withdraw", value: <span className="tabular-nums">{formatUsd(balance.available)}</span> },
+          { term: "Withdrawn so far", value: <span className="tabular-nums">{formatUsd(balance.withdrawn)}</span> },
+          { term: "Withdrawal methods", value: store.methods.length ? String(store.methods.length) : "None yet, asked at your first withdrawal" },
+        ]}
+      />
+      <p className="m-0 mt-[8px] text-sm leading-sm text-text-tertiary">In dollars at demo rates.</p>
+      <Actions>
+        <Link href="/settings/get-paid#withdraw" className={ACTION("secondary")}>
+          Withdraw
+        </Link>
+        <Link href="/settings/get-paid" className={ACTION("ghost")}>
+          Get paid
+        </Link>
+      </Actions>
+    </SettingsCard>
   );
 }

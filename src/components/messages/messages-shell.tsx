@@ -8,7 +8,7 @@
 // conversation anywhere under it, where the title steps aside for its
 // ‹ Messages. Under the title: the line that says this tab acts as someone
 // else, and the one error a store that can't be read leaves. The gear opens
-// Settings › Profile & Share at "Who can message you", the rule's one home
+// Settings › Privacy & safety at "Who can message you", the rule's one home
 // (settings spec D13); the blocked list lives in Settings › Blocking.
 //
 // The old support requests become conversations here, once the market and the

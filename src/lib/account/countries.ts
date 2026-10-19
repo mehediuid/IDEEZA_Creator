@@ -1,4 +1,4 @@
-// The countries an address can be in (Settings › Personal Information, spec
+// The countries an address can be in (the identity check and billing details, spec
 // 2026-10-19-settings-design.md §5.3): every current ISO 3166 two-letter
 // region code this runtime can name in English, worked out from `Intl` at
 // load rather than typed in. A retired code ("YU", "BU") is left out, since

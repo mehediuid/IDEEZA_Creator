@@ -104,7 +104,7 @@ export type Report = {
   evidence?: ReportEvidence;
 };
 
-/** Who can start a conversation with someone (Settings › Profile & Share, D13): Anyone ·
+/** Who can start a conversation with someone (Settings › Privacy & safety, D13): Anyone ·
  *  people they work with or who own a copy or hold a share · no one new. */
 export type AllowNew = "everyone" | "known" | "nobody";
 

@@ -55,7 +55,7 @@ export type AttentionInput = {
     createdAt: number;
     updatedAt: number;
     endedAt?: number;
-    /** Why a queued build waits: "credits", or "cap" — the monthly spending limit (Plan & pricing
+    /** Why a queued build waits: "credits", or "cap" — the monthly spending limit (Plan & billing
      *  › Credits). Any other value reads as credits. */
     blocked?: string;
   };
