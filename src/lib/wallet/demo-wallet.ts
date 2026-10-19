@@ -23,6 +23,7 @@ import type {
   DemoWallet,
   IdentityId,
   MakerId,
+  RequestPurpose,
   WalletActivity,
 } from "./types";
 
@@ -31,6 +32,23 @@ export const DEMO_WALLET_KEY = "ideeza:wallet:demo";
 const ACCOUNT_INDEXES: readonly AccountIndex[] = [1, 2, 3];
 const BUYER_IDS: readonly DemoBuyerId[] = ["buyer-mira", "buyer-leo", "buyer-sam"];
 const NETWORK_IDS: readonly Network[] = ["baseSepolia", "mumbai"];
+// Every `RequestPurpose`, so a stored activity's `purpose` is kept only when it is one.
+const REQUEST_PURPOSES: readonly RequestPurpose[] = [
+  "lazyMint",
+  "instantMint",
+  "upgradeMint",
+  "list",
+  "editListing",
+  "removeListing",
+  "relist",
+  "changePayout",
+  "purchase",
+  "bid",
+  "createEditions",
+  "listEdition",
+  "buyCredits",
+  "subscribe",
+];
 const DEFAULT_NETWORK: Network = "baseSepolia";
 
 /** The seed each buyer's address is derived from (§3.5.3: `"ideeza:testnet-demo:buyer:" + name`). */
@@ -150,6 +168,7 @@ function sanitizeActivityEntry(raw: unknown): WalletActivity | null {
   if (typeof raw.signature === "string") entry.signature = raw.signature;
   const charge = sanitizeCharge(raw.charge);
   if (charge) entry.charge = charge;
+  if (REQUEST_PURPOSES.includes(raw.purpose as RequestPurpose)) entry.purpose = raw.purpose as RequestPurpose;
   return entry;
 }
 

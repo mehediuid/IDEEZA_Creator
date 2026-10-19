@@ -168,7 +168,7 @@ test("commerceOf: minted give → given, with the licence and its one-line terms
     mint: "legacy",
     record: null,
     mintedAt: MINTED,
-    network: { id: "mumbai", label: "Mumbai Testnet (Polygon)" },
+    network: { id: "mumbai", label: "Amoy Testnet (Polygon)" },
     license: { id: "mit", label: "MIT License", info: "Permissive; keep the notice, no warranty." },
   });
 });
@@ -206,7 +206,7 @@ test("commerceOf: a MintRecord wins over the draft — its axis, record, network
     mint: "lazyMinted",
     record: lazy,
     mintedAt: MINTED,
-    network: { id: "mumbai", label: "Mumbai Testnet (Polygon)" },
+    network: { id: "mumbai", label: "Amoy Testnet (Polygon)" },
     collection: "Garden Lab",
   });
   // With no draft at all, a record still reads minted (Private, intent unknown).

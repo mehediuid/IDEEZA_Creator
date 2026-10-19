@@ -9,9 +9,11 @@
 // computed from it ($20 at 35% is $13).
 //
 // Payments aren't on. In this demo a purchase is paid from the Demo wallet
-// on testnet: USDT one for one, IDZ at the demo rate below.
+// on testnet: USDT one for one, IDZ at the one IDZ price (`IDZ_PER_USD`).
 //
-// Pure, no imports.
+// Pure; its only import is that price.
+
+import { IDZ_USD_PRICE } from "../wallet/idz-price";
 
 /** Settings › Plan & pricing: its Plans tab, and its Credits tab. */
 export const PLAN_PRICING_HREF = "/settings/plan";
@@ -43,8 +45,8 @@ export const CUSTOM_MAX = 100_000;
 /** Bought credits expire this many months after the purchase. */
 export const VALIDITY_MONTHS = 12;
 
-/** The demo rate for paying in IDZ: IDZ per US dollar. */
-export const IDZ_PER_USD = 1;
+/** Paying in IDZ: IDZ per US dollar, at the one IDZ price ($0.025065 → about 39.9 IDZ a dollar). */
+export const IDZ_PER_USD = 1 / Number(IDZ_USD_PRICE);
 
 export type PlanTierKey = "free" | "tinkerer" | "builder" | "disruptor";
 export type BillingCycle = "monthly" | "yearly";
@@ -122,7 +124,7 @@ export function usd(n: number): string {
   return `$${cents(n).toFixed(2)}`;
 }
 
-/** What a dollar price costs in a coin: USDT one for one, IDZ at the demo rate. */
+/** What a dollar price costs in a coin: USDT one for one, IDZ at the one IDZ price. */
 export function coinAmount(dollars: number, coin: "USDT" | "IDZ"): number {
   return cents(coin === "IDZ" ? dollars * IDZ_PER_USD : dollars);
 }

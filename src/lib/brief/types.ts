@@ -47,7 +47,7 @@ export type Network = "baseSepolia" | "mumbai";
 
 export const NETWORKS: { value: Network; label: string }[] = [
   { value: "baseSepolia", label: "Base Sepolia (Testnet)" },
-  { value: "mumbai", label: "Mumbai Testnet (Polygon)" },
+  { value: "mumbai", label: "Amoy Testnet (Polygon)" },
 ];
 
 export type ListingType = "buyNow" | "auction";
