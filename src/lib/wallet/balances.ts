@@ -1,7 +1,7 @@
 // Balances, derived — never stored (Phase 2 spec §3.5.3, C4). What an
-// identity has is the seed, minus its wallet activity's charges, minus what
-// it spent buying, plus what it was paid as a seller, minus what a live
-// auction's top bid holds of its own. Repeated debits never drift: every sum
+// identity has is the seed, minus its wallet activity's charges, plus the IDZ
+// of its claimed presale purchases, minus what it spent buying, plus what it
+// was paid as a seller, minus what a live auction's top bid holds of its own. Repeated debits never drift: every sum
 // runs in bigint (`money.ts`).
 //
 // Pure, relative imports only.
@@ -11,6 +11,7 @@ import type { Network, Token } from "../brief/types";
 import { addAmounts, compareAmounts, subAmounts } from "./money";
 import { demoAddress } from "./demo-wallet";
 import { SEED_BALANCES } from "./identities";
+import { claimedIdzOf } from "./presale-records";
 import type { Amount, Charge, Coin, DemoWallet, IdentityId } from "./types";
 
 export type Balances = { idz: Amount; native: Partial<Record<Network, Partial<Record<Token, Amount>>>> };
@@ -102,10 +103,10 @@ export function heldBy(id: IdentityId, ctx: { market: MarketData; now: number },
 }
 
 /**
- * `id`'s balance right now: the seed, minus its own activity charges, minus
- * what it paid buying, plus what it was paid selling, minus what a live
- * auction's top bid holds. Never stored — every read walks the wallet and the
- * market fresh (C4).
+ * `id`'s balance right now: the seed, minus its own activity charges, plus
+ * the IDZ its presale claims released, minus what it paid buying, plus what
+ * it was paid selling, minus what a live auction's top bid holds. Never
+ * stored — every read walks the wallet and the market fresh (C4).
  */
 export function balancesOf(id: IdentityId, ctx: BalanceCtx, opts: HoldOpts = {}): Balances {
   const bal = seedBalancesOf(id);
@@ -113,6 +114,7 @@ export function balancesOf(id: IdentityId, ctx: BalanceCtx, opts: HoldOpts = {})
     if (entry.identity !== id || !entry.charge) continue;
     for (const line of entry.charge.lines) debit(bal, line.coin, entry.charge.network, line.amount);
   }
+  credit(bal, "IDZ", "baseSepolia", claimedIdzOf(ctx.wallet, id));
   const address = demoAddress(id);
   for (const sale of ctx.market.sales) {
     if (sale.buyerId === id) {

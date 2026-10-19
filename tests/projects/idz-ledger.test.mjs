@@ -125,7 +125,7 @@ test("the ledger reconciles: the starting balance less every Out row is the deri
   assert.equal(idz.idzHoldingsOf(w, "maker-1", ctx(w)).available, "1979.5");
 });
 
-test("holdings: Staked, Ready to claim and Pending are 0 until staking and buying exist", () => {
+test("holdings: Staked, Ready to claim and Pending are 0 with nothing staked or bought", () => {
   const h = idz.idzHoldingsOf(defaultWallet(), "maker-1", ctx(defaultWallet()));
   assert.deepEqual(h, { available: "2000", staked: "0", claimable: "0", pending: "0" });
 });
@@ -139,7 +139,7 @@ test("filters: by network (the starting row has none, so it shows only under eve
   assert.equal(idz.filterIdzLedger(rows, { network: "baseSepolia", type: "all" }).length, 2);
   assert.equal(idz.filterIdzLedger(rows, { network: "mumbai", type: "all" }).length, 0);
   assert.deepEqual(idz.filterIdzLedger(rows, { network: "all", type: "reward" }).map((r) => r.id), ["seed"]);
-  assert.deepEqual(idz.TRANSFER_TYPES.map((t) => t.label), ["Reward", "Project Create", "Credits"]);
+  assert.deepEqual(idz.TRANSFER_TYPES.map((t) => t.label), ["Reward", "Project Create", "Credits", "Buy", "Claim"]);
 });
 
 test("a confirmed request now records its purpose, and a stored purpose survives a reload", () => {

@@ -23,6 +23,7 @@ import type {
   DemoWallet,
   IdentityId,
   MakerId,
+  PresaleBuy,
   RequestPurpose,
   WalletActivity,
 } from "./types";
@@ -48,6 +49,8 @@ const REQUEST_PURPOSES: readonly RequestPurpose[] = [
   "listEdition",
   "buyCredits",
   "subscribe",
+  "buyIdz",
+  "claimIdz",
 ];
 const DEFAULT_NETWORK: Network = "baseSepolia";
 
@@ -146,6 +149,21 @@ export function sanitizeCharge(raw: unknown): Charge | undefined {
   return { network: raw.network as Network, lines };
 }
 
+function isAmount(v: unknown): v is string {
+  return typeof v === "string" && /^\d+(\.\d{1,6})?$/.test(v);
+}
+
+/** A stored presale purchase, or undefined when any part of it doesn't read. */
+function sanitizePresale(raw: unknown): PresaleBuy | undefined {
+  if (!isDict(raw)) return undefined;
+  const paid = sanitizeChargeLine(raw.paid);
+  if (!paid || !isAmount(paid.amount)) return undefined;
+  if (!isAmount(raw.idz) || !isAmount(raw.usd) || !isAmount(raw.price)) return undefined;
+  if (typeof raw.round !== "string" || typeof raw.whitelisted !== "boolean") return undefined;
+  if (typeof raw.unlocksAt !== "number" || !Number.isFinite(raw.unlocksAt)) return undefined;
+  return { idz: raw.idz, paid, usd: raw.usd, price: raw.price, round: raw.round, whitelisted: raw.whitelisted, unlocksAt: raw.unlocksAt };
+}
+
 function sanitizeActivityEntry(raw: unknown): WalletActivity | null {
   if (!isDict(raw)) return null;
   if (typeof raw.id !== "string" || typeof raw.at !== "number" || !Number.isFinite(raw.at)) return null;
@@ -169,6 +187,9 @@ function sanitizeActivityEntry(raw: unknown): WalletActivity | null {
   const charge = sanitizeCharge(raw.charge);
   if (charge) entry.charge = charge;
   if (REQUEST_PURPOSES.includes(raw.purpose as RequestPurpose)) entry.purpose = raw.purpose as RequestPurpose;
+  const presale = sanitizePresale(raw.presale);
+  if (presale) entry.presale = presale;
+  if (typeof raw.claims === "string") entry.claims = raw.claims;
   return entry;
 }
 

@@ -47,7 +47,7 @@ ideeza-creator-panel/
    │  │   ├─ marketplace/                 "/marketplace" — Explore marketplace
    │  │   │   └─ [id]/                    the buyer view (+ products/[productId]/)
    │  │   ├─ history/                 "/history"  — past generations
-   │  │   ├─ balance/                 "/balance"  — Balance › Overview (IDZ)
+   │  │   ├─ balance/                 "/balance"  — Balance › Overview (IDZ); buy/ "/balance/buy" — Buy IDZ Token (demo presale)
    │  │   ├─ chat/[chatId]/           concept chat
    │  │   └─ build/[jobId]/           AI build job (status → outputs)
    │  ├─ project/[projectSlug]/products/[productId]/[step]/   the product-scoped editor (PCB/Code/3D/…)
@@ -96,7 +96,7 @@ ideeza-creator-panel/
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, settings + report dialogs
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
-   │  ├─ balance/            Balance › Overview: balance card, Transaction Activity, Import token dialog, tip buttons
+   │  ├─ balance/            Balance › Overview and Buy IDZ Token: the shared balance card, Transaction Activity, Import token dialog, tip buttons, the purchase table, the presale dialog and its buy form
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
    │  │                      network-settings-dialog, dialogs (frame, confirm, how-to-draw,

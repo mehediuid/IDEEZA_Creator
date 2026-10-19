@@ -36,6 +36,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Avatar, Button, Divider, ProgressBar, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useTheme } from "@/components/theme-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
@@ -45,6 +46,7 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { useMakerIdz } from "@/components/balance/use-maker-idz";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
 import { idzUsdOf } from "@/lib/wallet/idz";
+import { BUY_IDZ_NOW_HREF } from "@/lib/wallet/presale";
 import { formatAmount } from "@/lib/wallet/money";
 import { displayNameOf, initialsOf } from "@/lib/people/ids";
 import { useMyPhoto } from "@/lib/people/photo-store";
@@ -696,6 +698,7 @@ export function WalletPopover({
 }) {
   const me = useMakerIdz();
   const { openManage } = useWalletRequest();
+  const router = useRouter();
   const leave = () => {
     onClose(true);
     onLeave?.();
@@ -741,7 +744,15 @@ export function WalletPopover({
             openManage();
           }}
         />
-        <WalletRow title="Buy $IDZ" hint="Buy IDZ in the presale" soon="Buying IDZ opens in the next step of Balance" />
+        <WalletRow
+          title="Buy $IDZ"
+          hint="Buy IDZ in the presale"
+          demo
+          onSelect={() => {
+            leave();
+            router.push(BUY_IDZ_NOW_HREF);
+          }}
+        />
         <WalletRow title="Stake" hint="Deposit & Earn Reward" soon="Staking opens in a later step of Balance" />
         <WalletRow title="Earn IDZ tokens" hint="Free tokens to start" soon="Earning tokens isn't open yet" />
         <WalletRow title="Claim rewards" hint="See pending claims" soon="Rewards aren't open yet" />

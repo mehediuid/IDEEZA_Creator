@@ -2,8 +2,9 @@
 // 2026-10-19-balance-overview-design.md; Figma User Panel V2 › Balance →
 // Overview 41571:126259). One price for every dollar figure (D5), the demo
 // contract address per network, and the ledger: the identity's starting
-// balance and every wallet activity line that moved IDZ. The ledger is read
-// from the same records `balancesOf` debits, so the two always agree.
+// balance, every wallet activity line that moved IDZ, and the presale's
+// purchases and claims (Phase 2). The ledger is read from the same records
+// `balancesOf` debits and credits, so the two always agree.
 //
 // Pure, relative imports only.
 
@@ -11,7 +12,8 @@ import type { Network } from "../brief/types";
 import { balancesOf, seedBalancesOf, type BalanceCtx } from "./balances";
 import { demoAddress, demoHex } from "./demo-wallet";
 import { IDZ_USD_PRICE } from "./idz-price";
-import { addAmounts, compareAmounts, toMicros } from "./money";
+import { addAmounts, compareAmounts, formatAmount, toMicros } from "./money";
+import { purchaseStatusOf, purchasesOf } from "./presale-records";
 import type { Amount, DemoWallet, IdentityId, RequestPurpose, WalletActivity } from "./types";
 
 export { IDZ_USD_PRICE };
@@ -46,13 +48,15 @@ export function idzCompactOf(amount: Amount): string {
 
 // ── the ledger ──────────────────────────────────────────────────────────
 
-/** D11. Buy, Stake, Withdraw and Claim join when Buy IDZ and Stake are built. */
-export type TransferType = "reward" | "projectCreate" | "credits";
+/** D11. Stake and Withdraw join when Stake is built. */
+export type TransferType = "reward" | "projectCreate" | "credits" | "buy" | "claim";
 
 export const TRANSFER_TYPES: readonly { value: TransferType; label: string }[] = [
   { value: "reward", label: "Reward" },
   { value: "projectCreate", label: "Project Create" },
   { value: "credits", label: "Credits" },
+  { value: "buy", label: "Buy" },
+  { value: "claim", label: "Claim" },
 ];
 
 export function transferTypeLabel(t: TransferType): string {
@@ -74,6 +78,9 @@ export type IdzRow = {
   /** The identity's own address: the wallet the IDZ left or reached. */
   address: string;
   projectId?: string;
+  /** A presale Buy: the IDZ is the buyer's but the presale holds it until it is claimed, so it
+   *  isn't in the balance yet — the Claim row is when it arrives. */
+  held?: { unlocksAt: number; claimed: boolean };
 };
 
 const PURPOSE_TYPE: Partial<Record<RequestPurpose, TransferType>> = {
@@ -98,12 +105,40 @@ function idzOut(a: WalletActivity): Amount | null {
   return compareAmounts(sum, "0") > 0 ? sum : null;
 }
 
-/** Every IDZ movement of `id`, newest first; the starting balance last. */
+/** Every IDZ movement of `id`, newest first; the starting balance last. A presale purchase is a
+ *  held Buy row, and its claim (the first) a Claim row. */
 export function idzLedgerOf(w: DemoWallet | undefined, id: IdentityId): IdzRow[] {
   const address = demoAddress(id);
   const rows: IdzRow[] = [];
+  for (const p of purchasesOf(w, id)) {
+    rows.push({
+      id: p.id,
+      at: p.at,
+      network: p.network,
+      type: "buy",
+      direction: "in",
+      amount: p.buy.idz,
+      title: `Presale ${p.buy.round} · paid ${formatAmount(p.buy.paid.amount, p.buy.paid.coin)}`,
+      txHash: p.txHash,
+      address,
+      held: { unlocksAt: p.buy.unlocksAt, claimed: !!p.claim },
+    });
+    if (p.claim) {
+      rows.push({
+        id: p.claim.id,
+        at: p.claim.at,
+        network: p.network,
+        type: "claim",
+        direction: "in",
+        amount: p.buy.idz,
+        title: `Presale ${p.buy.round} · claimed`,
+        txHash: p.claim.txHash,
+        address,
+      });
+    }
+  }
   for (const a of w?.activity ?? []) {
-    if (a.identity !== id) continue;
+    if (a.identity !== id || a.purpose === "buyIdz" || a.purpose === "claimIdz") continue;
     const amount = idzOut(a);
     if (!amount) continue;
     const row: IdzRow = {
@@ -136,9 +171,22 @@ export function filterIdzLedger(rows: readonly IdzRow[], f: IdzLedgerFilter): Id
 
 export type IdzHoldings = { available: Amount; staked: Amount; claimable: Amount; pending: Amount };
 
-/** N1: what is free to use, and what staking and buying hold — 0 until they exist. */
+/** N1: what is free to use, and what the presale holds — Pending while a purchase is locked,
+ *  Ready to claim once it unlocks. Staked stays 0 until staking exists. */
 export function idzHoldingsOf(w: DemoWallet | undefined, id: IdentityId, ctx: BalanceCtx): IdzHoldings {
-  return { available: balancesOf(id, { ...ctx, wallet: w }).idz, staked: "0", claimable: "0", pending: "0" };
+  const claimable: Amount[] = [];
+  const pending: Amount[] = [];
+  for (const p of purchasesOf(w, id)) {
+    const status = purchaseStatusOf(p, ctx.now);
+    if (status === "claimable") claimable.push(p.buy.idz);
+    else if (status === "locked") pending.push(p.buy.idz);
+  }
+  return {
+    available: balancesOf(id, { ...ctx, wallet: w }).idz,
+    staked: "0",
+    claimable: addAmounts(...claimable),
+    pending: addAmounts(...pending),
+  };
 }
 
 /** "13 Aug 2024, 2:08 PM" — a day, a short month and four digits never read two ways. */

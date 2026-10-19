@@ -39,6 +39,8 @@ const NOUN_OF: Record<RequestPurpose, string> = {
   listEdition: "listing",
   buyCredits: "payment",
   subscribe: "payment",
+  buyIdz: "purchase",
+  claimIdz: "claim",
 };
 
 function resolveIdentity(req: WalletRequest, wallet: DemoWallet | undefined): IdentityId {
@@ -83,7 +85,8 @@ const FAIL_TEXT: Record<Exclude<FailReason, "recheck">, string> = {
 /** The confirmed heading, by what went through (MINT-3's table, MARKETPLACE-14). */
 function confirmedTitleOf(req: WalletRequest): string {
   if (req.kind === "signature") return "Signed.";
-  if (req.purpose === "purchase") return "Purchase successful";
+  if (req.purpose === "purchase" || req.purpose === "buyIdz") return "Purchase successful";
+  if (req.purpose === "claimIdz") return "Claimed.";
   if (req.purpose === "buyCredits" || req.purpose === "subscribe") return "Payment successful";
   if (req.purpose === "instantMint" || req.purpose === "upgradeMint") return "Minted on chain.";
   return "Confirmed.";
