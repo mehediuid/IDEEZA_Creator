@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { BIO_MAX, HEADLINE_MAX, LINKS_MAX, LOCATION_MAX, NAME_MAX, OPEN_TO_WORDS, linkOf, type OpenTo } from "@/lib/people/fields";
 import { displayNameOf, initialsOf } from "@/lib/people/ids";
 import { deleteCover, deletePhoto, putCover, putPhoto, resizeCover, resizePhoto } from "@/lib/people/photo-store";
-import { saveProfile } from "@/lib/people/profile-store";
+import { readProfileFields, saveProfile } from "@/lib/people/profile-store";
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const LABEL = "text-md font-semibold text-text-primary";
@@ -234,8 +234,9 @@ export function EditProfileDialog({
       headline,
       bio,
       location,
-      // Your local time shows only next to where you are, so the zone goes with a location.
-      timeZone: location.trim() ? deviceZone() : null,
+      // Your local time shows only next to where you are, so the zone goes with a location,
+      // unless you chose your time zone in Settings: that one stays.
+      ...(readProfileFields().timeZoneManual ? {} : { timeZone: location.trim() ? deviceZone() : null }),
       links: links.flatMap((l) => {
         const url = linkOf(l.value);
         return url ? [url] : [];

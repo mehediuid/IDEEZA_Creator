@@ -11,17 +11,16 @@ import { displayNameOf, initialsOf } from "./ids";
 
 const isProfileShape = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
 
-function readProfile(): ProfileFields {
+/** The stored profile as it is now, outside React. */
+export function readProfileFields(): ProfileFields {
   return normalizeProfile(parseStored(readStoredKey(PROFILE_KEY)).value);
 }
 
-export type ProfilePatch = Partial<
-  Pick<ProfileFields, "name" | "latinName" | "headline" | "pins" | "bio" | "location" | "timeZone" | "links" | "openTo">
->;
+export type ProfilePatch = Partial<Omit<ProfileFields, "v" | "since">>;
 
 export function saveProfile(patch: ProfilePatch): WriteResult {
   if (storedUnreadable(PROFILE_KEY, isProfileShape)) return { ok: false };
-  const current = readProfile();
+  const current = readProfileFields();
   return writeStoredKey(PROFILE_KEY, normalizeProfile({ ...current, ...patch, since: current.since ?? Date.now() }));
 }
 
@@ -35,7 +34,7 @@ export function useMyProfile(): {
   const { hydrated, raw } = useStoredKey(PROFILE_KEY);
   const fields = React.useMemo(() => normalizeProfile(parseStored(raw).value), [raw]);
   const togglePin = React.useCallback((projectId: string, valid?: readonly string[]) => {
-    const { fields: next, refused } = pinToggled(readProfile(), projectId, valid);
+    const { fields: next, refused } = pinToggled(readProfileFields(), projectId, valid);
     if (refused) return { ok: true, refused: true };
     return { ok: saveProfile({ pins: next.pins }).ok, refused: false };
   }, []);

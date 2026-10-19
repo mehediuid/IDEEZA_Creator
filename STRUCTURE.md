@@ -95,6 +95,7 @@ ideeza-creator-panel/
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, settings + report dialogs
    │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages
+   │  │                      (profile/: Profile and Personal Information)
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
@@ -127,6 +128,8 @@ ideeza-creator-panel/
    │  ├─ pcb/                ★ PCB engine (see below)
    │  ├─ settings/           Settings: registry (pages, crumbs, nav), rows/ (each page's
    │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings
+   │  ├─ account/            the account: payment token, invoices, summary, your private identity
+   │  │                      (ideeza:account:identity: legal name, gender, addresses) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store
@@ -183,7 +186,8 @@ ideeza-creator-panel/
    │  ├─ blog/               Blog: the model (doc, statuses, actions, demo review, list, slugs, cover),
    │  │                      the local store (ideeza:blog + rev'd bodies), IndexedDB files (ideeza-blog)
    │  ├─ people/             the creator profile's people layer: one person id and handles, profile
-   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt
+   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt,
+   │  │                      your handle's rules, time zones and spoken languages (Settings)
    │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration, demo seed),
    │  │                      the local store (ideeza:messages), IndexedDB files, acting-as, actions
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)
