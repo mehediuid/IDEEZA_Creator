@@ -37,6 +37,7 @@ import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./avatar";
 import { useMessagesView } from "./messages-context";
+import { useDates } from "@/lib/settings/use-dates";
 
 const FILTERS: { value: ListFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -53,6 +54,7 @@ const SIDE_THEIRS = "side:theirs";
 
 function Row({ row, current }: { row: ListRow; current: boolean }) {
   const { now, me, people } = useMessagesView();
+  const { locale } = useDates();
   const c = row.conversation;
   const team = c.kind === "team";
   const subjectName = subjectNameOf(c.subject);
@@ -83,7 +85,7 @@ function Row({ row, current }: { row: ListRow; current: boolean }) {
               {title}
             </span>
             <span className="ml-auto shrink-0 pl-2 text-md leading-md text-text-tertiary">
-              <time dateTime={new Date(row.lastAt).toISOString()}>{shortTimeOf(row.lastAt, now)}</time>
+              <time dateTime={new Date(row.lastAt).toISOString()}>{shortTimeOf(row.lastAt, now, locale)}</time>
             </span>
           </span>
           <span className="truncate text-md leading-md text-text-secondary">

@@ -7,6 +7,7 @@
 import * as React from "react";
 import { SORTS, type CommentSort } from "@/lib/innovations/comments";
 import { commentAnchor } from "@/lib/innovations/slug";
+import { motionReduced } from "@/lib/settings/appearance";
 
 // ─────────────────────────── hooks ───────────────────────────
 
@@ -66,7 +67,7 @@ export function useCommentSort(): [CommentSort, (next: CommentSort) => void] {
 
 // ─────────────────────────── focus & scroll ───────────────────────────
 
-const reduced = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reduced = () => motionReduced();
 
 export function commentEl(id: string): HTMLElement | null {
   return document.getElementById(commentAnchor(id));

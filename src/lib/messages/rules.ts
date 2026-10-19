@@ -30,6 +30,8 @@ import {
   type ReportEvidence,
   type Subject,
 } from "./types";
+import { formatDate, formatTime } from "../settings/dates";
+import type { DateLocale } from "../settings/prefs";
 
 export type Result<T> = { ok: true; value: T } | { ok: false; reason: string };
 
@@ -572,30 +574,39 @@ function startOfDay(at: number): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+// With a `locale` (Settings › Language › Date & Time Formatting) the dates and
+// the clock are written in that format; the relative words ("now", "5m",
+// "Today") stay. Without one, the fixed English forms below.
+
 /** The list's time: "now", "5m", "2h" today, "Mon" this week, "12 Oct" this year, "12 Oct 2025". */
-export function shortTimeOf(at: number, now: number): string {
+export function shortTimeOf(at: number, now: number, locale?: DateLocale): string {
   const ms = Math.max(0, now - at);
   if (ms < 60_000) return "now";
   if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
   if (startOfDay(at) === startOfDay(now)) return `${Math.floor(ms / 3_600_000)}h`;
   const d = new Date(at);
   if (startOfDay(now) - startOfDay(at) < 6 * 86_400_000) return DAYS[d.getDay()];
+  const thisYear = d.getFullYear() === new Date(now).getFullYear();
+  if (locale) return formatDate(at, locale, { style: thisYear ? "day" : "medium" });
   const md = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  return d.getFullYear() === new Date(now).getFullYear() ? md : `${md} ${d.getFullYear()}`;
+  return thisYear ? md : `${md} ${d.getFullYear()}`;
 }
 
 /** A day divider: "Today", "Yesterday", "Mon, 12 Oct", "12 Oct 2025". */
-export function dayLabelOf(at: number, now: number): string {
+export function dayLabelOf(at: number, now: number, locale?: DateLocale): string {
   const days = Math.round((startOfDay(now) - startOfDay(at)) / 86_400_000);
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
   const d = new Date(at);
+  const thisYear = d.getFullYear() === new Date(now).getFullYear();
+  if (locale) return formatDate(at, locale, { style: thisYear ? "weekday" : "medium" });
   const md = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  return d.getFullYear() === new Date(now).getFullYear() ? `${DAYS[d.getDay()]}, ${md}` : `${md} ${d.getFullYear()}`;
+  return thisYear ? `${DAYS[d.getDay()]}, ${md}` : `${md} ${d.getFullYear()}`;
 }
 
 /** "10:42 AM" under a group of bubbles. */
-export function clockOf(at: number): string {
+export function clockOf(at: number, locale?: DateLocale): string {
+  if (locale) return formatTime(at, locale) ?? "";
   const d = new Date(at);
   const h = d.getHours();
   return `${h % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;

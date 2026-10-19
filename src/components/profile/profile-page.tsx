@@ -57,6 +57,7 @@ import { ChipRow, CoverBand, IdentityHead, LinkList, OpenToLine, SideSection, St
 import { OwnerFacts } from "./owner-line";
 import { FollowButton, MessageButton, PersonMenu, useBlocked, useMessageRefusalFor, type PersonNotice } from "./person-actions";
 import { WorkTabs } from "./work";
+import { useDates } from "@/lib/settings/use-dates";
 
 const CONTENT = cn(PAGE_CONTENT, "flex flex-col gap-8 max-md:pb-[104px]");
 
@@ -275,6 +276,7 @@ function OwnProfile({
   const editions = useProjectsEditions(ids);
   const journeys = useJourneysRaw(ids);
   const now = useMinuteClock();
+  const { locale: dateLocale } = useDates();
   const [editing, setEditing] = React.useState(false);
   const [followingOpen, setFollowingOpen] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
@@ -456,7 +458,7 @@ function OwnProfile({
               // (off by default): others see neither until it's on; you
               // always see the location you typed, and the time only when on.
               location={fields.location && (owner || audience.showLocalTime) ? fields.location : null}
-              localTime={fields.location && audience.showLocalTime ? localTimeOf(fields.timeZone, now) : null}
+              localTime={fields.location && audience.showLocalTime ? localTimeOf(fields.timeZone, now, dateLocale) : null}
               since={since}
               relation={null}
             />
@@ -543,6 +545,7 @@ function OtherProfile({ person }: { person: Person }) {
   const { hydrated: reactionsReady, reactions } = useReactions();
   const blocks = useBlocked(person.id);
   const now = useMinuteClock();
+  const { locale: dateLocale } = useDates();
   const reasonId = React.useId();
   const [notice, setNotice] = React.useState<PersonNotice>(null);
   const ready = projectsReady && marketReady && reactionsReady && blocks.hydrated && now > 0;
@@ -644,7 +647,7 @@ function OtherProfile({ person }: { person: Person }) {
               headline={about?.headline ?? null}
               demo
               location={about?.location ?? null}
-              localTime={about ? localTimeOf(about.timeZone, now) : null}
+              localTime={about ? localTimeOf(about.timeZone, now, dateLocale) : null}
               since={since}
               relation={blocked ? null : tie}
               phoneMenu={menu}

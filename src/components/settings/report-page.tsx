@@ -21,13 +21,13 @@ import {
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
-import { dayDateTime } from "@/lib/blog/dates";
 import { parseStored, useStoredKey } from "@/lib/key-store";
 import { MESSAGES_KEY } from "@/lib/messages/types";
 import { normalizeMessages } from "@/lib/messages/normalize";
 import { directory, personById, profileHrefOf } from "@/lib/people/ids";
 import { REPORTS_KEY, normalizeReports } from "@/lib/people/reports";
 import { normalizeSentReports, reportsYouMade, SENT_REPORTS_KEY, type MadeKind, type ReportRow } from "@/lib/data/reports";
+import { useDates } from "@/lib/settings/use-dates";
 import { SettingsCard } from "./settings-card";
 import { SettingsFrame } from "./settings-frame";
 import { usePostLookup, useStoredThreads } from "./use-data-reads";
@@ -105,6 +105,7 @@ export function ReportPage() {
 }
 
 function ReportItem({ row }: { row: ReportRow }) {
+  const dates = useDates();
   const [open, setOpen] = React.useState(false);
   const panelId = React.useId();
   return (
@@ -122,7 +123,7 @@ function ReportItem({ row }: { row: ReportRow }) {
         <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
           <span className="text-md font-medium leading-md text-text-primary [overflow-wrap:anywhere]">{row.what}</span>
           <span className="text-sm leading-sm text-text-tertiary">
-            {row.at !== null ? dayDateTime(row.at) : "Date not kept"} · {row.status}
+            {row.at !== null ? dates.dateTime(row.at) : "Date not kept"} · {row.status}
           </span>
         </span>
         <span aria-hidden className="mt-[6px] shrink-0 text-text-tertiary">

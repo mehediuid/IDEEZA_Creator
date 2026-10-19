@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { useContextInfo } from "./context-card";
 import { MessageItem } from "./message-item";
 import { useMessagesView } from "./messages-context";
+import type { DateLocale } from "@/lib/settings/prefs";
+import { useDates } from "@/lib/settings/use-dates";
 
 const GROUP_MS = 5 * 60 * 1000;
 const NEAR_BOTTOM_PX = 96;
@@ -25,14 +27,14 @@ type Row =
   | { kind: "context"; entry: ContextEntry }
   | { kind: "group"; key: string; from: string; items: MessageEntry[] };
 
-function rowsOf(entries: readonly Entry[], now: number): Row[] {
+function rowsOf(entries: readonly Entry[], now: number, locale: DateLocale): Row[] {
   const rows: Row[] = [];
   let day = "";
   for (const e of entries) {
     const d = new Date(e.at).toDateString();
     if (d !== day) {
       day = d;
-      rows.push({ kind: "day", key: `day-${e.id}`, label: dayLabelOf(e.at, now) });
+      rows.push({ kind: "day", key: `day-${e.id}`, label: dayLabelOf(e.at, now, locale) });
     }
     if (e.kind === "context") {
       rows.push({ kind: "context", entry: e });
@@ -73,7 +75,9 @@ export function Timeline({
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const atBottom = React.useRef(true);
-  const rows = React.useMemo(() => rowsOf(entries, now), [entries, now]);
+  // Settings › Language › Date & Time Formatting.
+  const { locale } = useDates();
+  const rows = React.useMemo(() => rowsOf(entries, now, locale), [entries, now, locale]);
   const last = entries[entries.length - 1];
 
   const toBottom = () => {
@@ -150,7 +154,7 @@ export function Timeline({
                 <MessageItem key={e.id} entry={e} mine={mine} readOnly={readOnly} onReport={onReport} />
               ))}
               <p className="px-1 text-md leading-md text-text-tertiary">
-                <time dateTime={new Date(tail.at).toISOString()}>{clockOf(tail.at)}</time>
+                <time dateTime={new Date(tail.at).toISOString()}>{clockOf(tail.at, locale)}</time>
               </p>
             </div>
           );

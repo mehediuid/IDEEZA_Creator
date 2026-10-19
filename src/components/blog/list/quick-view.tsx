@@ -20,7 +20,7 @@ import { StatusBadges } from "@/components/blog/status-badges";
 import { useNow } from "@/components/innovations/comments/comment-dom";
 import { reasonPanel, statusView } from "@/lib/blog/article-view";
 import { categoryLabel } from "@/lib/blog/categories";
-import { dayDateTime } from "@/lib/blog/dates";
+import { useDates } from "@/lib/settings/use-dates";
 import { isEmptyDoc } from "@/lib/blog/doc";
 import { articleHref, previewHref, slugOf } from "@/lib/blog/slug";
 import { statusOf, updateRejected } from "@/lib/blog/status";
@@ -35,6 +35,7 @@ export function QuickView({ article, onClose, onEdit }: { article: BlogArticle |
   const { hydrated, body } = useBody(article?.id ?? null, "doc");
   const titleId = React.useId();
   const now = useNow(15_000);
+  const dates = useDates();
   if (!article) return <Drawer open={false} onClose={onClose} title="Quick view">{null}</Drawer>;
 
   const meta = article.draft;
@@ -74,7 +75,7 @@ export function QuickView({ article, onClose, onEdit }: { article: BlogArticle |
             <span className={category ? "text-text-primary" : "text-text-tertiary"}>{category ?? "No category"}</span>
             <span className="text-text-secondary">
               Last edited{" "}
-              <time dateTime={new Date(article.updatedAt).toISOString()}>{dayDateTime(article.updatedAt)}</time>
+              <time dateTime={new Date(article.updatedAt).toISOString()}>{`${dates.date(article.updatedAt)} ${dates.time(article.updatedAt)}`}</time>
             </span>
           </div>
           <p className="m-0 text-sm leading-sm text-text-secondary">{view.sentence}</p>

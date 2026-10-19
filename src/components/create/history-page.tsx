@@ -33,7 +33,7 @@ import {
   type ChatSession,
 } from "@/lib/create/history";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { formatRelativeTime } from "@/lib/utils";
+import { useDates } from "@/lib/settings/use-dates";
 import { HistoryTable, type HistoryRow } from "./history-table";
 import { HistoryRowDetail, generateSubSteps } from "./history-row-detail";
 import { Pagination, HISTORY_PAGE_SIZE } from "./pagination";
@@ -256,6 +256,7 @@ function ChatRow({
   chat: ChatSession;
   buildCount: number;
 }) {
+  const dates = useDates();
   const assistantImage = [...chat.turns]
     .reverse()
     .find((t) => t.role === "assistant" && t.status === "ready") as
@@ -293,7 +294,7 @@ function ChatRow({
           </p>
         </div>
         <span className="text-sm text-text-tertiary">
-          {formatRelativeTime(chat.updatedAt)}
+          {dates.stamp(chat.updatedAt)}
         </span>
       </Link>
     </li>

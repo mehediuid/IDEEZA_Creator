@@ -1,6 +1,8 @@
 // /api/concept/generate — concept image generation, free and non-blocking.
 //
-//   POST { prompt, kind: "fresh" | "refine", parentImageUrl? }
+//   POST { prompt, kind: "fresh" | "refine", parentImageUrl?, pool?: "off" }
+//        pool "off" = Settings › AI Properties › Use the volunteer GPU pool is
+//        off: the render never goes to the AI Horde (image-gen.ts).
 //        → { job }                  hands the work to the generator, returns at once
 //   GET  ?job=<token>
 //        → { status: "pending", queuePosition?, waitSeconds? }
@@ -95,6 +97,12 @@ const COPY: Record<
     reason: "filtered",
     status: 502,
   },
+  "pool-off": {
+    error:
+      "Images are off: the volunteer GPU pool is switched off in Settings › AI Properties, and this app has no other image service.",
+    reason: "pool-off",
+    status: 409,
+  },
 };
 
 function failed(err: unknown) {
@@ -141,7 +149,9 @@ export async function POST(req: Request) {
     prompt?: unknown;
     kind?: unknown;
     parentImageUrl?: unknown;
+    pool?: unknown;
   };
+  const volunteerPool = obj.pool !== "off";
   const prompt = String(obj.prompt ?? "").trim();
   const kind = obj.kind === "refine" ? "refine" : "fresh";
   const parentImageUrl =
@@ -188,7 +198,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const job = await startRender(finalPrompt, seed);
+    const job = await startRender(finalPrompt, seed, { volunteerPool });
     return NextResponse.json({ job: encodeJob(job) });
   } catch (err) {
     return failed(err);

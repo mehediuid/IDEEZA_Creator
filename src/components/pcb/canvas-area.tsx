@@ -24,6 +24,7 @@ import { pinsOf } from "@/lib/pcb/nets";
 import { glyphFor } from "@/components/pcb/placed-objects";
 import { buildToolLabels, toolLabel, toolHint } from "@/lib/pcb/tool-labels";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { singleKeyShortcutsAllowed } from "@/lib/settings/keys";
 
 const DRAG_THRESHOLD = 4;
 
@@ -704,6 +705,8 @@ export function CanvasArea() {
   // Skips when focus is inside an editable text field so typing works normally.
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Settings › Appearance › Single-key shortcuts off: H, V, R… do nothing.
+      if (!singleKeyShortcutsAllowed(e)) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       const mod = e.ctrlKey || e.metaKey;

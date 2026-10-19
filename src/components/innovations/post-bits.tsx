@@ -15,6 +15,7 @@ import { parseStored, readStoredKey, useStoredKey, writeStoredKey } from "@/lib/
 import { LOCKED_PIECES, OPEN_PIECES, PIECE_LABEL, type PostProduct } from "@/lib/innovations/types";
 import { cn } from "@/lib/utils";
 import { usePostToast } from "./toast";
+import { motionReduced } from "@/lib/settings/appearance";
 
 /** A control a thumb can hit on a phone or a touch screen. */
 export const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
@@ -247,6 +248,6 @@ export function useStickyTop(gap: number) {
 export function scrollToComments(behavior: ScrollBehavior = "smooth") {
   const el = document.getElementById("comments");
   if (!el) return;
-  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const still = motionReduced();
   el.scrollIntoView({ behavior: still ? "auto" : behavior, block: "start" });
 }

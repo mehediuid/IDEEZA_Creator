@@ -15,6 +15,8 @@ import { C } from "@/lib/pcb/colors";
 import { DEFAULT_FILES, langForFile, type FileEntry } from "@/lib/code/files";
 import { useEditorScope } from "@/components/manual/use-step-nav";
 import { editorDocKey } from "@/lib/manual/editor-scope";
+import { readSettings } from "@/lib/settings/prefs";
+import { useSettings } from "@/lib/settings/use-settings";
 
 // Monaco needs the browser — dynamic-import with ssr disabled.
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.default), {
@@ -264,11 +266,13 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
   const [showTerminal, setShowTerminal] = React.useState(true);
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [showAi, setShowAi] = React.useState(false);
+  // Settings › AI Properties › AI help in the editors: off hides the AI tab and panel.
+  const assist = useSettings().ai.editorAssist;
 
   // A cross-tab AI handoff for the Code module opens the AI side panel;
   // the chat consumes and auto-sends the carried message.
   React.useEffect(() => {
-    if (!hasAiHandoff("code")) return;
+    if (!hasAiHandoff("code") || !readSettings().ai.editorAssist) return;
     const t = setTimeout(() => setShowAi(true), 0);
     return () => clearTimeout(t);
   }, []);
@@ -509,14 +513,16 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 21,12 5,21" /></svg>
             </button>
-            <button
-              onClick={() => setShowAi((v) => !v)}
-              title="AI assistant"
-              aria-label="AI assistant"
-              style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: showAi ? C.primary : "var(--color-text-tertiary)" }}
-            >
-              {AI_BOT_ICON}
-            </button>
+            {assist && (
+              <button
+                onClick={() => setShowAi((v) => !v)}
+                title="AI assistant"
+                aria-label="AI assistant"
+                style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: showAi ? C.primary : "var(--color-text-tertiary)" }}
+              >
+                {AI_BOT_ICON}
+              </button>
+            )}
             <div style={{ flex: 1 }} />
             <button
               onClick={() => setShowTerminal((v) => !v)}
@@ -575,7 +581,7 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
           )}
 
           {/* AI assistant side panel — activity-bar tab, VSCode-style */}
-          {showAi && (
+          {assist && showAi && (
             <div
               style={{
                 width: 280,

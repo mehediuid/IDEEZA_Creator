@@ -54,7 +54,8 @@ export type ConceptFailReason =
   | "credits"
   // It would have taken this month past the monthly spending limit.
   | "cap"
-  | "filtered";
+  | "filtered"
+  | "pool-off";
 
 /** What the flow asks before it spends anything.
  *

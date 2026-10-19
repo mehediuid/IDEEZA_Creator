@@ -6,7 +6,8 @@
 // starts with its video), the other products' videos next, then the images.
 // A shared project's video plays in the app's own player (its clip read from
 // this browser's clip store); a sample post's video is a file, in the
-// browser's player, never autoplaying. An image opens the media lightbox,
+// browser's player, never autoplaying (with Data saver on it doesn't even
+// preload). An image opens the media lightbox,
 // which steps through the post's images. Nothing renders when the post has no
 // media.
 
@@ -17,6 +18,7 @@ import { MediaLightbox, type MediaTile } from "@/components/projects/details/med
 import { useClipUrl, VideoPlayer } from "@/components/video-jobs/video-player";
 import type { InnovationPost, PostMedia, PostVideo } from "@/lib/innovations/types";
 import type { VideoTake } from "@/lib/video/types";
+import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { WatchRecorder } from "@/components/settings/watch-recorder";
 import { durationLabel, ImageGone, PostImg } from "./post-bits";
@@ -94,8 +96,15 @@ export function PostVideoStage({ post, mine, video }: { post: InnovationPost; mi
   return <WatchRecorder post={post} video={video.label}>{video.kind === "clip" ? <ClipStage post={post} mine={mine} media={video} /> : <FileVideoStage video={video} />}</WatchRecorder>;
 }
 
+const noSubscribe = () => () => {};
+
 function FileVideoStage({ video }: { video: Extract<PostVideo, { kind: "video" }> }) {
   const [failed, setFailed] = React.useState(false);
+  // Settings › Appearance › Data saver: not a byte until Play is pressed. The
+  // server's HTML can't know the setting, so the first paint never preloads;
+  // with Data saver off, metadata loads once the page is running.
+  const dataSaver = useSettings().appearance.dataSaver;
+  const running = React.useSyncExternalStore(noSubscribe, () => true, () => false);
   if (failed) {
     return (
       <div className={cn(STAGE, "flex flex-col items-center justify-center gap-4 px-8 text-center")}>
@@ -114,7 +123,7 @@ function FileVideoStage({ video }: { video: Extract<PostVideo, { kind: "video" }
         poster={video.poster ?? undefined}
         controls
         playsInline
-        preload="metadata"
+        preload={running && !dataSaver ? "metadata" : "none"}
         aria-label={video.alt}
         onError={() => setFailed(true)}
         className="absolute inset-0 h-full w-full object-cover"

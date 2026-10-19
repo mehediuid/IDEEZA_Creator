@@ -754,3 +754,51 @@
     --elevation-4: 0px 8px 16px 0px rgba(0, 0, 0, 0.75);
   }
 }
+
+/* ============================================================
+ * Settings › Appearance & accessibility (lib/settings/appearance.ts)
+ * ============================================================ */
+
+/* Text size: Large. Each size takes the next DS size's value and keeps its
+   line height paired with it (the next pair). 5xl and up have no larger line
+   height to pair with, so the display sizes stay as they are. */
+:root[data-text-size="large"] {
+  --font-size-2xs: 11px;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 32px;
+  --line-height-2xs: 16px;
+  --line-height-xs: 18px;
+  --line-height-sm: 20px;
+  --line-height-md: 24px;
+  --line-height-lg: 26px;
+  --line-height-xl: 28px;
+  --line-height-2xl: 32px;
+  --line-height-3xl: 36px;
+  --line-height-4xl: 40px;
+}
+@media (max-width: 767px) {
+  /* The phone scale's own next steps (its xl is 16, so lg stays 16). */
+  :root[data-text-size="large"] {
+    --font-size-lg: 16px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 20px;
+    --font-size-3xl: 24px;
+    --font-size-4xl: 28px;
+  }
+}
+
+/* High contrast: the lighter inks take the primary text token and every
+   border the strong border token, in either theme. After the theme blocks
+   and as specific as `:root:not([data-theme])`, so it wins in both. */
+:root[data-contrast="high"] {
+  --color-text-secondary: var(--color-text-primary);
+  --color-text-tertiary: var(--color-text-primary);
+  --color-border-default: var(--color-border-strong);
+  --color-border-subtle: var(--color-border-strong);
+}

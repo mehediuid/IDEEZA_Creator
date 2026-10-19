@@ -36,6 +36,7 @@ import type {
 import { LinkPanel, PROTOCOL_OPTIONS } from "./link-panel";
 import { MapCanvas, type Selection, type Tool } from "./map-canvas";
 import { btn } from "./ui";
+import { singleKeyShortcutsAllowed } from "@/lib/settings/keys";
 
 export type MapDoc = { nodes: MapNode[]; links: MapLink[]; masterId: string | null };
 
@@ -184,6 +185,8 @@ export function MapEditor({
   // opens. Escape stays with focus (below): outside the editor it belongs to
   // the dialog around it.
   const onToolKey = React.useEffectEvent((e: KeyboardEvent) => {
+    // Settings › Appearance › Single-key shortcuts off: V and L do nothing.
+    if (!singleKeyShortcutsAllowed(e)) return;
     if (e.defaultPrevented || isTyping(e.target)) return;
     const mod = e.metaKey || e.ctrlKey;
     if (mod && e.key.toLowerCase() === "z") {
