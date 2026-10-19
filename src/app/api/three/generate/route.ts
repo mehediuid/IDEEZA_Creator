@@ -3,7 +3,7 @@
 //   POST  { prompt?, imageUrl?, seed?, pool?: "off" }
 //         → { provider, taskId, imageUrl }   (kicks off generation)
 //         pool "off": a prompt's concept image never goes to the volunteer
-//         GPU pool (Settings › AI Properties); 409 when nothing else can draw it.
+//         GPU pool (Settings › AI & your data); 409 when nothing else can draw it.
 //   GET   ?provider=&taskId=
 //         → { status, progress, glbUrl? }    (poll until ready/failed)
 //
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Images are off: the volunteer GPU pool is switched off in Settings › AI Properties, and this app has no other image service.",
+            "Images are off: the volunteer GPU pool is switched off in Settings › AI & your data, and this app has no other image service.",
           reason: "pool-off",
         },
         { status: 409 },

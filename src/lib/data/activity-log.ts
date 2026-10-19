@@ -1,19 +1,20 @@
-// Your activity's own log (Settings › Your activity, spec §5.12): the searches
-// you ran — ⌘K queries you acted on, Innovations and Explore marketplace
-// searches — and the post videos you watched (played for 3 seconds or more).
-// One versioned key, `ideeza:activity`, newest first. Both lists keep 90 days
-// and at most 200 lines; older lines go on every read and write. Typing one
-// search is one line: a longer or shorter form of the last query from the same
-// place within a few minutes replaces it. Nothing here leaves this browser.
+// Search history (Settings › AI & your data): the searches you ran — ⌘K
+// queries you acted on, Innovations and Explore marketplace searches — kept
+// only while "Keep my search history" is on (`privacy.keepSearchHistory`, off
+// by default). One versioned key, `ideeza:activity`, newest first: 90 days and
+// at most 200 lines; older lines go on every read and write. Typing one search
+// is one line: a longer or shorter form of the last query from the same place
+// within a few minutes replaces it. Nothing here leaves this browser.
 //
-// Appreciations and comments are not copied here: they are read from the
-// Innovations stores where they live.
+// Older versions also logged the post videos you watched; that log is gone,
+// and reading a record drops what is left of it.
 //
 // Relative imports only (node:test loads the pure part).
 
 import * as React from "react";
-import { parseStored, storedUnreadable, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
+import { parseStored, readStoredKey, storedUnreadable, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
 import { dayDate } from "../blog/dates";
+import { readSettings } from "../settings/prefs";
 
 export const ACTIVITY_KEY = "ideeza:activity";
 export const KEEP_DAYS = 90;
@@ -21,8 +22,6 @@ export const MAX_ENTRIES = 200;
 /** Within this, a longer or shorter form of the last query is the same search being typed. */
 export const COALESCE_MS = 3 * 60 * 1000;
 export const QUERY_MAX = 200;
-/** A video counts as watched once it has played this long. */
-export const WATCHED_SECONDS = 3;
 
 export const SEARCH_SOURCES = ["palette", "innovations", "explore"] as const;
 export type SearchSource = (typeof SEARCH_SOURCES)[number];
@@ -34,10 +33,9 @@ export const SEARCH_SOURCE_LABEL: Record<SearchSource, string> = {
 };
 
 export type SearchEntry = { id: string; at: number; source: SearchSource; query: string; opened: string | null };
-export type WatchEntry = { id: string; at: number; postId: string; postTitle: string; href: string; video: string };
-export type ActivityLog = { v: 1; searches: SearchEntry[]; watches: WatchEntry[] };
+export type ActivityLog = { v: 1; searches: SearchEntry[] };
 
-export const EMPTY_LOG: ActivityLog = Object.freeze({ v: 1, searches: [], watches: [] }) as ActivityLog;
+export const EMPTY_LOG: ActivityLog = Object.freeze({ v: 1, searches: [] }) as ActivityLog;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -54,17 +52,6 @@ function searchIn(v: unknown): SearchEntry | null {
   return { id, at, source, query, opened: str(v.opened, 120) };
 }
 
-function watchIn(v: unknown): WatchEntry | null {
-  if (!isObj(v)) return null;
-  const id = str(v.id, 64);
-  const at = time(v.at);
-  const postId = str(v.postId, 200);
-  const href = str(v.href, 400);
-  if (!id || !at || !postId || !href || !href.startsWith("/")) return null;
-  const postTitle = str(v.postTitle, 200) ?? "Untitled post";
-  return { id, at, postId, postTitle, href, video: str(v.video, 200) ?? postTitle };
-}
-
 const newestFirst = <T extends { at: number }>(list: T[]) => list.slice().sort((a, b) => b.at - a.at);
 
 function keep<T extends { at: number }>(list: readonly T[], now: number): T[] {
@@ -75,17 +62,16 @@ function keep<T extends { at: number }>(list: readonly T[], now: number): T[] {
 /** Drops what is past 90 days or past 200 lines. Returns the same log when nothing goes. */
 export function pruneLog(log: ActivityLog, now: number): ActivityLog {
   const searches = keep(log.searches, now);
-  const watches = keep(log.watches, now);
-  const same = (a: { id: string }[], b: { id: string }[]) => a.length === b.length && a.every((x, i) => x.id === b[i].id);
-  return same(searches, log.searches) && same(watches, log.watches) ? log : { v: 1, searches, watches };
+  const same = searches.length === log.searches.length && searches.every((x, i) => x.id === log.searches[i].id);
+  return same ? log : { v: 1, searches };
 }
 
+/** The stored log, checked. An older record's `watches` are dropped. */
 export function normalizeActivityLog(raw: unknown, now: number): ActivityLog {
   if (!isObj(raw) || raw.v !== 1) return EMPTY_LOG;
   const searches = Array.isArray(raw.searches) ? raw.searches.map(searchIn).filter((s): s is SearchEntry => s !== null) : [];
-  const watches = Array.isArray(raw.watches) ? raw.watches.map(watchIn).filter((w): w is WatchEntry => w !== null) : [];
-  if (!searches.length && !watches.length) return EMPTY_LOG;
-  return { v: 1, searches: keep(searches, now), watches: keep(watches, now) };
+  if (!searches.length) return EMPTY_LOG;
+  return { v: 1, searches: keep(searches, now) };
 }
 
 const sameTyping = (a: string, b: string) => {
@@ -115,20 +101,6 @@ export function withSearch(
 export function dayKey(at: number): string {
   const d = new Date(at);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** One video more. The same video again on the same day moves up instead of repeating. */
-export function withWatch(
-  log: ActivityLog,
-  input: { postId: string; postTitle: string; href: string; video: string },
-  now: number,
-  id: string,
-): ActivityLog {
-  const today = dayKey(now);
-  const again = log.watches.find((w) => w.postId === input.postId && w.video === input.video && dayKey(w.at) === today);
-  const rest = again ? log.watches.filter((w) => w.id !== again.id) : log.watches;
-  const entry: WatchEntry = { id: again ? again.id : id, at: now, ...input };
-  return pruneLog({ ...log, watches: [entry, ...rest] }, now);
 }
 
 export type DayGroup<T> = { key: string; label: string; items: T[] };
@@ -187,15 +159,11 @@ function updateLog(fn: (log: ActivityLog, now: number) => ActivityLog): WriteRes
   return writeStoredKey(ACTIVITY_KEY, next);
 }
 
-/** Keeps a search you ran. Called by ⌘K (when you open a result), Innovations and Explore. */
+/** Keeps a search you ran, only while "Keep my search history" is on. Called by ⌘K (when you
+ *  open a result), Innovations and Explore. */
 export function recordSearch(source: SearchSource, query: string, opened?: string | null): void {
-  if (!query.trim()) return;
+  if (!query.trim() || !readSettings().privacy.keepSearchHistory) return;
   updateLog((log, now) => withSearch(log, { source, query, opened }, now, newId()));
-}
-
-/** Keeps a post video you watched for 3 seconds or more. */
-export function recordWatch(input: { postId: string; postTitle: string; href: string; video: string }): void {
-  updateLog((log, now) => withWatch(log, input, now, newId()));
 }
 
 /** ⌘K's results, each keeping the query when it is opened. Only a typed query is kept. */
@@ -210,12 +178,15 @@ export function logActivations<T extends { label: string; onActivate: () => void
   }));
 }
 
-export function clearSearchHistory(): WriteResult {
-  return writeStoredKey(ACTIVITY_KEY, { ...readLog(Date.now()), searches: [] });
+/** Rewrites a stored log that still holds the old video watch log, without it. */
+export function dropOldWatchLog(): void {
+  const { value, unreadable } = parseStored(readStoredKey(ACTIVITY_KEY));
+  if (unreadable || !isObj(value) || !("watches" in value)) return;
+  writeStoredKey(ACTIVITY_KEY, normalizeActivityLog(value, Date.now()));
 }
 
-export function clearWatchHistory(): WriteResult {
-  return writeStoredKey(ACTIVITY_KEY, { ...readLog(Date.now()), watches: [] });
+export function clearSearchHistory(): WriteResult {
+  return writeStoredKey(ACTIVITY_KEY, EMPTY_LOG);
 }
 
 const MINUTE = 60_000;

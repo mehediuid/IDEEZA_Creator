@@ -1,6 +1,6 @@
 "use client";
 
-// Reads Your activity and Report share: every post's stored comments (one key
+// Reads the Report page uses: every post's stored comments (one key
 // per post, so they are found by prefix and re-read when any store changes),
 // and a post's title, address and maker from its id — a sample post from the
 // sample set, your own from your projects. Read-only.

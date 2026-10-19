@@ -698,7 +698,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         const res = await fetch("/api/concept/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // Settings › AI Properties: with the volunteer pool off the route
+          // Settings › AI & your data: with the volunteer pool off the route
           // never sends the render to the AI Horde.
           body: JSON.stringify(readSettings().ai.volunteerPool ? input : { ...input, pool: "off" }),
         });

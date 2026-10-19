@@ -1,4 +1,4 @@
-// A .zip writer with no dependency (Settings › Personal Data, spec §5.12):
+// A .zip writer with no dependency (Settings › AI & your data › Download):
 // every file is "stored" (method 0, no compression), which every unzip tool,
 // Finder and Windows Explorer open. Names are UTF-8 (general-purpose flag bit
 // 11), so a Bangla project name survives. No ZIP64: the archive is refused

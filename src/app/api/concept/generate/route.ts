@@ -1,7 +1,7 @@
 // /api/concept/generate — concept image generation, free and non-blocking.
 //
 //   POST { prompt, kind: "fresh" | "refine", parentImageUrl?, pool?: "off" }
-//        pool "off" = Settings › AI Properties › Use the volunteer GPU pool is
+//        pool "off" = Settings › AI & your data › Use the volunteer GPU pool is
 //        off: the render never goes to the AI Horde (image-gen.ts).
 //        → { job }                  hands the work to the generator, returns at once
 //   GET  ?job=<token>
@@ -99,7 +99,7 @@ const COPY: Record<
   },
   "pool-off": {
     error:
-      "Images are off: the volunteer GPU pool is switched off in Settings › AI Properties, and this app has no other image service.",
+      "Images are off: the volunteer GPU pool is switched off in Settings › AI & your data, and this app has no other image service.",
     reason: "pool-off",
     status: 409,
   },

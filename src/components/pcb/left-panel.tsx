@@ -111,7 +111,7 @@ export function LeftPanel({
   const actions = usePcbActions();
   const [query, setQuery] = React.useState("");
   const [aiOpenState, setAiOpen] = React.useState(false);
-  // Settings › AI Properties › "AI help in the editors": off hides the
+  // Settings › AI & your data › "AI help in the editors": off hides the
   // assistant here (the PCB, 3D and Preview panels share this one).
   const assist = useSettings().ai.editorAssist;
   const aiOpen = aiOpenState && assist;

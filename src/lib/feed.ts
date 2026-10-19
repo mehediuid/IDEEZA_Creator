@@ -14,7 +14,7 @@
 
 import { GENERATED_IMAGES } from "./feed-image-manifest";
 
-export type FeedMode = "discover" | "following";
+export type FeedMode = "discover" | "following" | "saved" | "appreciated";
 export type SortKey = "noteworthy" | "appreciated" | "views" | "newest";
 export type CategoryId = "all" | "robotics" | "iot" | "wearables" | "power" | "audio";
 export type ProjectCategory = Exclude<CategoryId, "all">;
@@ -65,7 +65,12 @@ export type FeedResponse = {
 export const MODES: { id: FeedMode; label: string }[] = [
   { id: "discover", label: "Discover" },
   { id: "following", label: "Following" },
+  { id: "saved", label: "Saved" },
+  { id: "appreciated", label: "Appreciated" },
 ];
+
+/** Saved and Appreciated are this browser's own lists (lib/innovations/reactions.ts). */
+export const isOwnList = (mode: FeedMode): mode is "saved" | "appreciated" => mode === "saved" || mode === "appreciated";
 
 export const CATEGORIES: { id: CategoryId; label: string }[] = [
   { id: "all", label: "All" },
@@ -254,11 +259,23 @@ export function parseFollowParam(raw: string | null): FollowOverrides {
   return out;
 }
 
-export function getFeedPage(params: FeedParams, cursor: string | null, follow: FollowOverrides = {}): FeedResponse {
+/** "p1,p2" ⇄ ["p1", "p2"] — the projects this browser saved or appreciated, for /api/feed. */
+export function parseIdsParam(raw: string | null): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => /^[a-z0-9_-]{1,64}$/i.test(s));
+}
+
+export function getFeedPage(params: FeedParams, cursor: string | null, follow: FollowOverrides = {}, ids: readonly string[] = []): FeedResponse {
   let list = PROJECTS.slice();
 
   if (params.mode === "following") {
     list = list.filter((p) => follow[p.creator.id] ?? p.creator.following);
+  }
+  if (isOwnList(params.mode)) {
+    const wanted = new Set(ids);
+    list = list.filter((p) => wanted.has(p.id));
   }
   if (params.category !== "all") {
     list = list.filter((p) => p.category === params.category);
@@ -304,7 +321,8 @@ export function getFeedPage(params: FeedParams, cursor: string | null, follow: F
 type Getter = { get(key: string): string | null };
 
 export function parseFeedParams(sp: Getter): FeedParams {
-  const mode: FeedMode = sp.get("mode") === "following" ? "following" : "discover";
+  const rawMode = sp.get("mode");
+  const mode: FeedMode = MODES.find((m) => m.id === rawMode)?.id ?? "discover";
   const rawCat = (sp.get("category") || "all") as CategoryId;
   const category = CATEGORIES.some((c) => c.id === rawCat) ? rawCat : "all";
   const rawSort = (sp.get("sort") || "noteworthy") as SortKey;
@@ -329,11 +347,13 @@ export async function fetchFeed(
   params: FeedParams,
   cursor: string | null,
   follow: FollowOverrides = {},
+  ids: readonly string[] = [],
 ): Promise<FeedResponse> {
   const sp = new URLSearchParams();
   sp.set("mode", params.mode);
   const followParam = followParamOf(follow);
   if (params.mode === "following" && followParam) sp.set("follow", followParam);
+  if (isOwnList(params.mode) && ids.length) sp.set("ids", ids.join(","));
   sp.set("category", params.category);
   sp.set("sort", params.sort);
   if (params.q.trim()) sp.set("q", params.q.trim());

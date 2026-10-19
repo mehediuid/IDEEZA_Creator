@@ -1,5 +1,5 @@
-// The readable pages inside a "Download your information" zip in HTML format:
-// one index.html per category and one at the root. A stored record is drawn
+// The readable pages inside a "Download your information" zip: one
+// index.html per category and one at the root. A stored record is drawn
 // as headings, label/value lists and plain lists; every string from storage
 // is escaped, so nothing stored can become markup. These pages are files on
 // the person's disk, not app screens, so their small stylesheet is their own.
@@ -85,14 +85,14 @@ export function categoryPage(title: string, meta: string, records: readonly Html
       `<h2>Files</h2><ul class="files">${files.map((f) => `<li><a href="${escapeHtml(encodeURI(f))}">${escapeHtml(f)}</a></li>`).join("")}</ul>`,
     );
   }
-  if (!parts.length) parts.push(`<p class="none">Nothing in this category for the dates you chose.</p>`);
+  if (!parts.length) parts.push(`<p class="none">Nothing in this category yet.</p>`);
   return page(title, meta, parts.join("\n"));
 }
 
-/** The root index.html: what the file holds, with a link to each category. */
+/** The root index.html: what the file holds, with a link to each category, and what the backup
+ *  folder is for. */
 export function rootPage(meta: string, cats: readonly { label: string; href: string; note: string }[]): string {
-  const list = cats.length
-    ? `<ul class="cats">${cats.map((c) => `<li><a href="${escapeHtml(encodeURI(c.href))}">${escapeHtml(c.label)}</a> <span class="none">${escapeHtml(c.note)}</span></li>`).join("")}</ul>`
-    : `<p class="none">Nothing was chosen.</p>`;
-  return page("Your IDEEZA information", meta, list);
+  const list = `<ul class="cats">${cats.map((c) => `<li><a href="${escapeHtml(encodeURI(c.href))}">${escapeHtml(c.label)}</a> <span class="none">${escapeHtml(c.note)}</span></li>`).join("")}</ul>`;
+  const backup = `<h2>Backup</h2><p>The <code>ideeza-backup</code> folder holds all of it as IDEEZA stores it. To bring it back, open IDEEZA, go to Settings › AI &amp; your data › Restore from a backup and choose this zip, as it is.</p>`;
+  return page("Your IDEEZA information", meta, list + backup);
 }

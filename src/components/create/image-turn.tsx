@@ -581,7 +581,7 @@ const FAIL_COPY: Record<NonNullable<ConceptFailReason>, string> = {
   filtered:
     "The image service's safety filter blocked this render by mistake, so there is no picture. Nothing was charged — trying again usually works.",
   "pool-off":
-    "Images are off: you switched off the volunteer GPU pool in Settings › AI Properties, and this app has no other image service. Switch it back on to draw concepts. Nothing was charged.",
+    "Images are off: you switched off the volunteer GPU pool in Settings › AI & your data, and this app has no other image service. Switch it back on to draw concepts. Nothing was charged.",
 };
 
 const FAIL_FALLBACK =

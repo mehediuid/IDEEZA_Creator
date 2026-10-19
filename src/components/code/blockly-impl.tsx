@@ -598,7 +598,7 @@ export function BlocklyImpl() {
   const [generated, setGenerated] = React.useState("");
 
   const [libTab, setLibTab] = React.useState<LibTab>("common");
-  // Settings › AI Properties › AI help in the editors: off hides the AI tab.
+  // Settings › AI & your data › AI help in the editors: off hides the AI tab.
   const assist = useSettings().ai.editorAssist;
   const [openCats, setOpenCats] = React.useState<Record<string, boolean>>({ Logic: true });
   const [search, setSearch] = React.useState("");

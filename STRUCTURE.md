@@ -98,7 +98,7 @@ ideeza-creator-panel/
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
    │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages;
-   │  │                      kyc-page; get-paid/ (hub, balance, add-method and withdraw dialogs,
+   │  │                      kyc-page; data-page + data-* (AI & your data); get-paid/ (hub, balance, add-method and withdraw dialogs,
    │  │                      history + statement, tax forms, parts)
    │  │                      (profile/: Profile and Personal Information)
    │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor),
@@ -146,9 +146,11 @@ ideeza-creator-panel/
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store
-   │  ├─ data/               Your data: activity log (searches, watched videos), Download
-   │  │                      Your Information (export plan, HTML pages, zip writer), reports
-   │  │                      you made, blog reuse
+   │  ├─ data/               Your data: search history, Download your information (export plan,
+   │  │                      HTML pages, zip writer), the backup inside it + zip reader +
+   │  │                      restore plan, last download + storage status (backup.ts), the
+   │  │                      browser's IDEEZA storage as a whole (dump, erase, restore),
+   │  │                      reports you made, blog reuse
    │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
    │  │                      units), store, wizard (24 families), kicad parsers,
    │  │                      library (save/publish, version lock)

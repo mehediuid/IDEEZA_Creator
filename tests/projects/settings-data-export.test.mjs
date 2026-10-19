@@ -1,25 +1,14 @@
-// Settings › Personal Data › Download your information: which stored key goes
-// in which category, the date ranges, what a range keeps, project files
-// (.kicad_pcb, firmware, wiring, 3D), media requests by quality, and the
-// HTML / JSON files the zip is made of.
+// Settings › AI & your data › Download your information: which stored key goes
+// in which category, project files (.kicad_pcb, firmware, wiring, 3D), where
+// each stored photo, attachment and clip goes, and the readable pages the zip
+// is made of.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const {
-  CATEGORY_IDS,
-  classifyKey,
-  rangeBounds,
-  lastTouched,
-  filterByRange,
-  planExport,
-  finishExport,
-  summarize,
-  exportFileName,
-} = await import("../../.tmp-test/lib/data/export.js");
+const { classifyKey, planExport, finishExport, mediaContext, mediaPlace, extOf, summarize, exportFileName } = await import("../../.tmp-test/lib/data/export.js");
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date(2026, 9, 19, 12, 0).getTime();
-const ALL = { from: null, to: null };
 
 test("every stored key lands in its category; UI state and backups stay out", () => {
   const cases = {
@@ -61,37 +50,6 @@ test("every stored key lands in its category; UI state and backups stay out", ()
   for (const key of ["ideeza:sidebar:collapsed", "ideeza:blog:probe", "ideeza:migrations", "ideeza:pcb:doc:proj_a:p1:prev", "ideeza:editor:seed:proj_a:p1", "ideeza:manual:active", "other-app:thing"]) {
     assert.equal(classifyKey(key), null, key);
   }
-});
-
-test("date ranges: all time is open; the rest count back from now; custom is whole local days", () => {
-  assert.deepEqual(rangeBounds("all", NOW), ALL);
-  assert.deepEqual(rangeBounds("week", NOW), { from: NOW - 7 * DAY, to: null });
-  assert.equal(rangeBounds("year", NOW).from, new Date(2025, 9, 19, 12, 0).getTime());
-  assert.equal(rangeBounds("6m", NOW).from, new Date(2026, 3, 19, 12, 0).getTime());
-  assert.equal(rangeBounds("3m", NOW).from, new Date(2026, 6, 19, 12, 0).getTime());
-  assert.equal(rangeBounds("1m", NOW).from, new Date(2026, 8, 19, 12, 0).getTime());
-  assert.deepEqual(rangeBounds("custom", NOW, { from: "2026-10-01", to: "2026-10-05" }), {
-    from: new Date(2026, 9, 1).getTime(),
-    to: new Date(2026, 9, 6).getTime() - 1,
-  });
-  assert.equal(rangeBounds("custom", NOW, { from: "2026-10-05", to: "2026-10-01" }), null);
-  assert.equal(rangeBounds("custom", NOW, { from: "", to: "2026-10-01" }), null);
-});
-
-test("a thing's date is the last time it was touched; undated things are always kept", () => {
-  assert.equal(lastTouched({ createdAt: 5e12, updatedAt: 6e12 }), 6e12);
-  assert.equal(lastTouched({ at: 1.7e12 }), 1.7e12);
-  assert.equal(lastTouched({ name: "x" }), null);
-  assert.equal(lastTouched("x"), null);
-  const b = { from: NOW - 7 * DAY, to: null };
-  const v = {
-    v: 1,
-    entries: [{ at: NOW - DAY }, { at: NOW - 30 * DAY }, { text: "no date" }],
-    settings: { a: 1 },
-  };
-  assert.deepEqual(filterByRange(v, b), { v: 1, entries: [{ at: NOW - DAY }, { text: "no date" }], settings: { a: 1 } });
-  assert.deepEqual(filterByRange([{ updatedAt: NOW - 100 * DAY }, { updatedAt: NOW }], b), [{ updatedAt: NOW }]);
-  assert.equal(filterByRange(v, ALL), v);
 });
 
 const projects = [
@@ -149,42 +107,28 @@ const snapshot = {
   "ideeza:sidebar:collapsed": "1",
 };
 
-const opts = (over = {}) => ({ categories: CATEGORY_IDS, bounds: ALL, format: "json", media: "medium", now: NOW, ...over });
-
-test("only the chosen categories are planned", () => {
-  const plan = planExport(snapshot, opts({ categories: ["profile"] }));
-  assert.deepEqual([...new Set(plan.records.map((r) => r.category))], ["profile"]);
-  assert.deepEqual(plan.records.map((r) => r.key).sort(), ["ideeza-theme", "ideeza:profile"]);
-  assert.equal(plan.projectFiles.length, 0);
-  // A text value that isn't JSON is kept as text.
+test("every IDEEZA key but interface state is on a page; a text value that isn't JSON stays text", () => {
+  const plan = planExport(snapshot);
+  const keys = plan.records.map((r) => r.key);
+  assert.ok(keys.includes("ideeza:profile") && keys.includes("ideeza:manual:projects") && keys.includes("ideeza:messages"));
+  assert.ok(!keys.includes("ideeza:sidebar:collapsed") && !keys.includes("ideeza:manual:active"));
   assert.equal(plan.records.find((r) => r.key === "ideeza-theme").value, "dark");
 });
 
+test("the old video watch log never reaches a page", () => {
+  const plan = planExport({ "ideeza:activity": JSON.stringify({ v: 1, searches: [{ id: "s1", query: "lamp" }], watches: [{ id: "w1", postTitle: "Lamp" }] }) });
+  assert.deepEqual(plan.records[0].value, { searches: [{ id: "s1", query: "lamp" }] });
+});
+
 test("someone else's comment never leaves in your download; your own and what you reported do", () => {
-  const plan = planExport(snapshot, opts({ categories: ["newsfeed"] }));
+  const plan = planExport(snapshot);
   const rec = plan.records.find((r) => r.key === "ideeza:innovations:comments:sample:1");
   assert.deepEqual(rec.value, { postId: "sample:1", yourComments: [{ id: "c1", postId: "sample:1", authorId: "you", body: "Mine", createdAt: NOW - DAY }], commentsYouReported: ["c2"] });
   assert.ok(!JSON.stringify(plan.records).includes("Someone else's words"));
 });
 
-test("a date range drops old projects, their keys and files, and old lines inside a record", () => {
-  const plan = planExport(snapshot, opts({ bounds: rangeBounds("1m", NOW) }));
-  const keys = plan.records.map((r) => r.key);
-  assert.ok(keys.includes("ideeza:project:journey:proj_new_1"));
-  assert.ok(!keys.includes("ideeza:project:journey:proj_old_2"), "an old project's keys go with it");
-  assert.ok(!keys.includes("ideeza:blog:doc:art_old"), "an old blog's body goes with it");
-  const projectsRec = plan.records.find((r) => r.key === "ideeza:manual:projects");
-  assert.deepEqual(projectsRec.value.map((p) => p.id), ["proj_new_1"]);
-  const credits = plan.records.find((r) => r.key === "ideeza:create:credits");
-  assert.equal(credits.value.lines.length, 1);
-  assert.ok(plan.projectFiles.every((f) => f.path.startsWith("project-files/desk-lamp")), "only the recent project's files");
-  // All time keeps both.
-  const all = planExport(snapshot, opts());
-  assert.ok(all.projectFiles.some((f) => f.path.startsWith("project-files/old-bot")));
-});
-
 test("project files: the board as .kicad_pcb, firmware as files, wiring and 3D as JSON; backups and unsafe names left out", () => {
-  const plan = planExport(snapshot, opts({ categories: ["files"] }));
+  const plan = planExport(snapshot);
   const paths = plan.projectFiles.map((f) => f.path).sort();
   assert.deepEqual(paths, [
     "project-files/desk-lamp-proj_new_1/base-prd_base/wiring.json",
@@ -198,36 +142,26 @@ test("project files: the board as .kicad_pcb, firmware as files, wiring and 3D a
   assert.match(kicad, /^\(kicad_pcb/);
   assert.match(kicad, /"VCC"/);
   assert.equal(plan.projectFiles.find((f) => f.path.endsWith("main.cpp")).text, "int main() { return 0; }");
-  assert.equal(plan.records.length, 0, "project files are files, not records");
+  assert.ok(!plan.records.some((r) => r.category === "files"), "project files are files, not records");
 });
 
-test("media by quality: low asks for none; medium no videos; high everything", () => {
-  const low = planExport(snapshot, opts({ media: "low" }));
-  assert.equal(low.media.length, 0);
-  const med = planExport(snapshot, opts({ media: "medium" }));
-  const kinds = (p) => p.media.map((m) => `${m.db}:${m.key ?? m.projectId}`).sort();
-  assert.deepEqual(kinds(med), ["blog:file_cover", "blog:file_img", "media:proj_new_1", "media:proj_old_2", "messages:mf1", "profile:cover", "profile:photo"]);
-  const high = planExport(snapshot, opts({ media: "high" }));
-  assert.deepEqual(kinds(high), ["blog:file_cover", "blog:file_img", "blog:file_vid", "media:proj_new_1", "media:proj_old_2", "messages:mf1", "profile:cover", "profile:photo", "video:proj_new_1", "video:proj_old_2"]);
-  // An old blog's or project's media isn't asked for in a short range.
-  const week = planExport(snapshot, opts({ media: "high", bounds: rangeBounds("week", NOW) }));
-  assert.ok(!kinds(week).includes("media:proj_old_2"));
+test("each stored photo, attachment and clip goes in its category's folder, named by what it is", () => {
+  const ctx = mediaContext(snapshot);
+  assert.deepEqual(mediaPlace("ideeza-profile", new Blob(), "photo", "file", "image/jpeg", ctx), { category: "profile", path: "profile/photo.jpg" });
+  assert.deepEqual(mediaPlace("ideeza-blog", { key: "file_img", articleId: "art_1" }, undefined, "blob", "image/png", ctx), { category: "blog", path: "blog/files/file_img.png" });
+  assert.deepEqual(mediaPlace("ideeza-messages", { key: "mf1" }, undefined, "blob", "image/png", ctx), { category: "message", path: "messages/files/board.png" });
+  assert.deepEqual(mediaPlace("ideeza-messages", { key: "mf9" }, undefined, "blob", "application/pdf", ctx), { category: "message", path: "messages/files/mf9.pdf" });
+  assert.deepEqual(mediaPlace("ideeza-media", { key: "m1", projectId: "proj_new_1" }, undefined, "blob", "image/webp", ctx), { category: "product", path: "products/media/desk-lamp-proj_new_1/m1.webp" });
+  const take = { takeId: "t1", projectId: "proj_old_2" };
+  assert.equal(mediaPlace("ideeza-video", take, undefined, "video", "video/webm;codecs=vp9", ctx).path, "products/videos/old-bot-proj_old_2/t1.webm");
+  assert.equal(mediaPlace("ideeza-video", take, undefined, "poster", "image/jpeg", ctx).path, "products/videos/old-bot-proj_old_2/t1-poster.jpg");
+  assert.equal(mediaPlace("ideeza-media", { key: "../../x", projectId: "gone" }, undefined, "blob", "", ctx).path, "products/media/project-gone/x.bin", "no climbing out of the folder");
+  assert.equal(extOf("image/svg+xml"), "svg");
 });
 
-test("JSON: one file per record and a manifest; HTML: one readable index per category and a root index", () => {
-  const plan = planExport(snapshot, opts());
-  const json = finishExport(plan, [{ category: "profile", path: "profile/photo.jpg" }], opts());
-  const jpaths = json.map((f) => f.path);
-  assert.ok(jpaths.includes("manifest.json"));
-  assert.ok(jpaths.includes("profile/profile.json"));
-  assert.ok(jpaths.includes("products/projects.json"));
-  assert.ok(!jpaths.some((p) => p.endsWith(".html")));
-  const manifest = JSON.parse(json.find((f) => f.path === "manifest.json").text);
-  assert.equal(manifest.dateRange, "All time");
-  assert.ok(manifest.categories.includes("Profile Information"));
-  assert.ok(JSON.parse(json.find((f) => f.path === "profile/profile.json").text).name === "Rumi");
-
-  const html = finishExport(plan, [{ category: "profile", path: "profile/photo.jpg" }], opts({ format: "html" }));
+test("one readable index per category and a root index that explains the backup", () => {
+  const plan = planExport(snapshot);
+  const html = finishExport(plan, [{ category: "profile", path: "profile/photo.jpg" }], NOW);
   const hpaths = html.map((f) => f.path);
   assert.ok(hpaths.includes("index.html"));
   assert.ok(hpaths.includes("profile/index.html"));
@@ -238,17 +172,16 @@ test("JSON: one file per record and a manifest; HTML: one readable index per cat
   assert.match(profile, /href="photo.jpg"/);
   const root = html.find((f) => f.path === "index.html").text;
   assert.match(root, /href="profile\/index.html"/);
+  assert.match(root, /Restore from a backup/);
   // Text from storage is escaped, never markup.
-  const evil = planExport({ "ideeza:profile": JSON.stringify({ name: "<script>alert(1)</script>" }) }, opts({ categories: ["profile"] }));
-  const page = finishExport(evil, [], opts({ format: "html", categories: ["profile"] })).find((f) => f.path === "profile/index.html").text;
+  const evil = planExport({ "ideeza:profile": JSON.stringify({ name: "<script>alert(1)</script>" }) });
+  const page = finishExport(evil, [], NOW).find((f) => f.path === "profile/index.html").text;
   assert.ok(!page.includes("<script>alert"));
   assert.match(page, /&lt;script&gt;/);
-  // Every path is unique.
   assert.equal(new Set(hpaths).size, hpaths.length);
-  assert.equal(new Set(jpaths).size, jpaths.length);
 });
 
-test("the wizard's counts say what each category holds", () => {
+test("the counts say what each category holds", () => {
   const s = summarize(snapshot);
   assert.equal(s.product, "2 projects");
   assert.equal(s.blog, "2 blogs");

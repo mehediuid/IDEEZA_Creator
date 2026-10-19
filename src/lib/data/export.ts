@@ -1,28 +1,24 @@
-// Download your information (Settings › Personal Data, spec §5.12; Figma
-// "Download Your Information" 22048:35288 → 27458:55889 → 27435:53319 →
-// 27435:53571): what goes in the zip, worked out from a copy of this
-// browser's storage. Nothing is written anywhere; the stores are only read.
+// Download your information (Settings › AI & your data): what goes in the
+// zip, worked out from a copy of this browser's storage. Nothing is written
+// anywhere; the stores are only read.
 //
-// - Every `ideeza…` key lands in one category (classifyKey). Interface state
-//   (the sidebar, scroll places, the active project), the editors' one-slot
-//   `:prev` backups and their build seeds stay out. A key nobody has named yet
-//   goes with Profile Information, so "everything" really is everything.
-// - A date range keeps the dated lines of each record (a line's date is the
-//   last time it was touched) and leaves undated things — a profile, settings —
-//   whole. A project outside the range takes its own keys and files with it,
-//   and an old blog its body.
-// - Someone else's comments on a post are theirs: only your own comments and
-//   the ids you reported leave in the file.
+// - Every `ideeza…` key lands in one category (classifyKey) and is drawn as a
+//   readable page. Interface state (the sidebar, scroll places, the active
+//   project), the editors' one-slot `:prev` backups and their build seeds stay
+//   off the pages (the backup beside them keeps every key, backup-format.ts).
+//   A key nobody has named yet goes with Profile Information, so "everything"
+//   really is everything.
+// - Someone else's comments on a post are theirs: the pages show only your
+//   own comments and the ids you reported.
 // - Project files: each product's board as a real `.kicad_pcb` (the PCB
 //   editor's exporter) beside the editor's own document, the firmware files as
 //   files, and wiring, 3D, assembly and preview as JSON.
-// - Media (photos, attachments, project media, videos) live in IndexedDB, so
-//   the plan only names what to fetch; Medium asks for no videos, Low for none.
+// - Photos, attachments, project media and clips live in IndexedDB; each goes
+//   in its category's folder (mediaPlace), full size.
 //
 // Pure; relative imports only (node:test loads it).
 
 import { buildKicadPcb, type KicadExportDoc } from "../pcb/kicad-export";
-import { dayDate } from "../blog/dates";
 import { categoryPage, rootPage, type HtmlRecord } from "./export-html";
 
 export const CATEGORY_IDS = ["product", "marketplace", "coin", "newsfeed", "blog", "message", "activity", "profile", "files"] as const;
@@ -30,8 +26,7 @@ export type CategoryId = (typeof CATEGORY_IDS)[number];
 
 export type CategoryInfo = { id: CategoryId; label: string; hint: string; folder: string };
 
-/** Figma's list (27458:55889), less its second "Marketplace Information", "Send to Manufacturer"
- *  (no such data) and "Security & Login" (no accounts yet), plus Project files. */
+/** The kinds of information, each a folder of the zip with its own readable page. */
 export const CATEGORIES: readonly CategoryInfo[] = [
   { id: "product", label: "Product Information", hint: "Your projects, builds, AI chats, briefs, networks and videos", folder: "products" },
   { id: "marketplace", label: "Marketplace Information", hint: "Listings, sales, bids, copies and mints", folder: "marketplace" },
@@ -39,86 +34,12 @@ export const CATEGORIES: readonly CategoryInfo[] = [
   { id: "newsfeed", label: "Newsfeed Information", hint: "Innovations: what you appreciated, saved and followed, and your comments", folder: "newsfeed" },
   { id: "blog", label: "Blog Information", hint: "Your blogs, their drafts and reviews", folder: "blog" },
   { id: "message", label: "Message Information", hint: "Your conversations, the people you blocked and message reports", folder: "messages" },
-  { id: "activity", label: "Activity Information", hint: "Searches, videos you watched and reports you made", folder: "activity" },
+  { id: "activity", label: "Activity Information", hint: "Searches you kept and reports you made", folder: "activity" },
   { id: "profile", label: "Profile Information", hint: "Your profile, photo and settings", folder: "profile" },
   { id: "files", label: "Project files", hint: "Each product's PCB as .kicad_pcb, firmware files, wiring and 3D", folder: "project-files" },
 ];
 
 export const categoryInfo = (id: CategoryId): CategoryInfo => CATEGORIES.find((c) => c.id === id) as CategoryInfo;
-
-// ─────────────────────────── options ───────────────────────────
-
-export const RANGE_IDS = ["all", "year", "6m", "3m", "1m", "week", "custom"] as const;
-export type RangeId = (typeof RANGE_IDS)[number];
-
-export const RANGES: readonly { id: RangeId; label: string }[] = [
-  { id: "all", label: "All Time" },
-  { id: "year", label: "Last Year" },
-  { id: "6m", label: "Last 6 Months" },
-  { id: "3m", label: "Last 3 Months" },
-  { id: "1m", label: "Last Month" },
-  { id: "week", label: "Last Week" },
-  { id: "custom", label: "Custom" },
-];
-
-export type Format = "html" | "json";
-export const FORMATS: readonly { id: Format; label: string; hint: string }[] = [
-  { id: "html", label: "HTML", hint: "Pages you can open in any browser" },
-  { id: "json", label: "JSON", hint: "Data another app can read" },
-];
-
-export type MediaQuality = "high" | "medium" | "low";
-export const MEDIA_QUALITIES: readonly { id: MediaQuality; label: string; hint: string }[] = [
-  { id: "high", label: "High", hint: "Photos and files at full size, and your videos. It will require more time to download data." },
-  { id: "medium", label: "Medium", hint: "Photos made smaller, files as they are, no videos" },
-  { id: "low", label: "Low", hint: "No photos, files or videos" },
-];
-
-/** null on either side = open. */
-export type Bounds = { from: number | null; to: number | null };
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function monthsBack(now: number, n: number): number {
-  const d = new Date(now);
-  d.setMonth(d.getMonth() - n);
-  return d.getTime();
-}
-
-function localDay(s: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (!m) return null;
-  const t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
-  return Number.isFinite(t) ? t : null;
-}
-
-/** The range's bounds; null for a custom range that isn't two dates in order. */
-export function rangeBounds(id: RangeId, now: number, custom?: { from: string; to: string }): Bounds | null {
-  switch (id) {
-    case "all":
-      return { from: null, to: null };
-    case "year":
-      return { from: monthsBack(now, 12), to: null };
-    case "6m":
-      return { from: monthsBack(now, 6), to: null };
-    case "3m":
-      return { from: monthsBack(now, 3), to: null };
-    case "1m":
-      return { from: monthsBack(now, 1), to: null };
-    case "week":
-      return { from: now - 7 * DAY_MS, to: null };
-    case "custom": {
-      const from = custom ? localDay(custom.from) : null;
-      const to = custom ? localDay(custom.to) : null;
-      if (from === null || to === null || to < from) return null;
-      const end = new Date(to);
-      end.setDate(end.getDate() + 1);
-      return { from, to: end.getTime() - 1 };
-    }
-  }
-}
-
-const open = (b: Bounds) => b.from === null && b.to === null;
 
 // ─────────────────────────── keys ───────────────────────────
 
@@ -139,7 +60,8 @@ const PRODUCT_PREFIXES = ["ideeza:brief:draft", "ideeza:network:", "ideeza:proje
 const MARKET_PREFIXES = ["ideeza:market:", "ideeza:commerce:", "ideeza:project:editions:", "ideeza:project:edition-terms:"];
 const COIN_KEYS = new Set(["ideeza:create:credits", "ideeza:create:plan"]);
 const COIN_PREFIXES = ["ideeza:account:", "ideeza:wallet:"];
-const ACTIVITY_KEYS = new Set(["ideeza:activity", "ideeza:people:reports", "ideeza:support:sent", "ideeza:report-draft", "ideeza:pricing:faq-helpful"]);
+const ACTIVITY_KEY = "ideeza:activity";
+const ACTIVITY_KEYS = new Set([ACTIVITY_KEY, "ideeza:people:reports", "ideeza:support:sent", "ideeza:report-draft", "ideeza:pricing:faq-helpful"]);
 const PROFILE_KEYS = new Set(["ideeza:profile", "ideeza:account:identity", "ideeza:commerce:kyc", "ideeza:settings", "ideeza-theme", "ideeza:pcb:appSettings"]);
 
 const starts = (key: string, list: readonly string[]) => list.some((p) => key.startsWith(p));
@@ -160,59 +82,13 @@ export function classifyKey(key: string): CategoryId | null {
   return "profile";
 }
 
-// ─────────────────────────── dates ───────────────────────────
-
-const DATE_FIELDS = ["at", "createdAt", "updatedAt", "lastAt", "editedAt", "sharedAt"] as const;
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const plausible = (v: unknown): v is number => typeof v === "number" && v > 1e11 && v < 1e14;
-
-/** The last time a stored thing was touched (the latest of its own dates); null when it has none. */
-export function lastTouched(v: unknown): number | null {
-  if (!isRec(v)) return null;
-  let best: number | null = null;
-  for (const f of DATE_FIELDS) {
-    const t = v[f];
-    if (plausible(t) && (best === null || t > best)) best = t;
-  }
-  return best;
-}
-
-const within = (t: number | null, b: Bounds) => t === null || ((b.from === null || t >= b.from) && (b.to === null || t <= b.to));
-
-/** Keeps the lines of a record whose date is in range: the record's own list, or each list
- *  directly under it. Undated lines and everything else stay. */
-export function filterByRange(value: unknown, b: Bounds): unknown {
-  if (open(b)) return value;
-  const keepList = (list: unknown[]) => list.filter((x) => within(lastTouched(x), b));
-  if (Array.isArray(value)) return keepList(value);
-  if (!isRec(value)) return value;
-  const out: Record<string, unknown> = {};
-  for (const [k, x] of Object.entries(value)) out[k] = Array.isArray(x) ? keepList(x) : x;
-  return out;
-}
 
 // ─────────────────────────── the plan ───────────────────────────
 
-export type ExportOptions = {
-  categories: readonly CategoryId[];
-  bounds: Bounds;
-  format: Format;
-  media: MediaQuality;
-  now: number;
-};
-
 export type ExportRecord = { category: CategoryId; key: string; name: string; value: unknown };
 export type ProjectFile = { path: string; text: string };
-
-/** What the browser fetches from IndexedDB. `path` is the folder or the name without its
- *  extension; the browser adds the extension and keeps every path unique. */
-export type MediaRequest =
-  | { category: CategoryId; db: "profile"; key: "photo" | "cover"; path: string }
-  | { category: CategoryId; db: "blog"; key: string; kind: "image" | "video"; path: string }
-  | { category: CategoryId; db: "messages"; key: string; name: string; type: string; path: string }
-  | { category: CategoryId; db: "media" | "video"; projectId: string; path: string };
-
-export type ExportPlan = { records: ExportRecord[]; projectFiles: ProjectFile[]; media: MediaRequest[] };
+export type ExportPlan = { records: ExportRecord[]; projectFiles: ProjectFile[] };
 
 const NAMES: Record<string, string> = {
   "ideeza:manual:projects": "projects",
@@ -229,7 +105,7 @@ const NAMES: Record<string, string> = {
   "ideeza:blog": "blogs",
   "ideeza:innovations:reactions": "reactions",
   "ideeza:innovations:reported-posts": "posts-you-reported",
-  "ideeza:activity": "searches-and-videos",
+  "ideeza:activity": "searches",
   "ideeza:people:reports": "profiles-you-reported",
   "ideeza:support:sent": "problem-reports",
 };
@@ -262,7 +138,7 @@ function parse(raw: string): unknown {
   }
 }
 
-type ProjectLite = { id: string; name: string; touched: number | null; rows: { id: string; name: string }[] };
+type ProjectLite = { id: string; name: string; rows: { id: string; name: string }[] };
 
 function projectsIn(snapshot: Readonly<Record<string, string>>): ProjectLite[] {
   const raw = snapshot["ideeza:manual:projects"];
@@ -276,7 +152,7 @@ function projectsIn(snapshot: Readonly<Record<string, string>>): ProjectLite[] {
     const rows = products.length
       ? products.filter((r) => typeof r.id === "string").map((r) => ({ id: r.id as string, name: typeof r.name === "string" ? r.name : "" }))
       : [{ id: "p1", name: typeof p.productName === "string" ? p.productName : "" }];
-    out.push({ id: p.id, name, touched: lastTouched(p), rows });
+    out.push({ id: p.id, name, rows });
   }
   return out;
 }
@@ -292,18 +168,6 @@ function commentsTransform(key: string, value: unknown): unknown {
   const yours = comments.filter((c) => isRec(c) && c.authorId === "you");
   if (!yours.length && !reported.length) return undefined;
   return { postId, yourComments: yours, commentsYouReported: reported };
-}
-
-/** Every `fileKey` inside a blog body (images and videos). */
-function blogFileKeys(value: unknown, out: { key: string; kind: "image" | "video" }[] = []) {
-  if (Array.isArray(value)) value.forEach((x) => blogFileKeys(x, out));
-  else if (isRec(value)) {
-    if ((value.type === "image" || value.type === "video") && isRec(value.attrs) && typeof value.attrs.fileKey === "string") {
-      out.push({ key: value.attrs.fileKey, kind: value.type });
-    }
-    for (const x of Object.values(value)) if (typeof x === "object") blogFileKeys(x, out);
-  }
-  return out;
 }
 
 const PROJECT_FILE_NAMES: Record<string, string> = {
@@ -345,36 +209,16 @@ function editorFiles(doc: string, raw: string, productName: string): ProjectFile
   return [{ path: PROJECT_FILE_NAMES[doc] ?? `${doc.replace(/:/g, "-")}.json`, text: typeof value === "string" ? value : JSON.stringify(value, null, 2) }];
 }
 
-/** What the zip will hold, from a copy of this browser's storage. */
-export function planExport(snapshot: Readonly<Record<string, string>>, opts: ExportOptions): ExportPlan {
-  const chosen = new Set(opts.categories);
-  const b = opts.bounds;
-  const projects = projectsIn(snapshot);
-  const byId = new Map(projects.map((p) => [p.id, p]));
-  const projectOut = (id: string) => {
-    const p = byId.get(id);
-    return !!p && !within(p.touched, b);
-  };
-  const keyOfOldProject = (key: string) => key.split(":").some((seg) => projectOut(seg));
-
-  const blogRaw = snapshot["ideeza:blog"];
-  const blogValue = blogRaw ? parse(blogRaw) : null;
-  const articles = isRec(blogValue) && Array.isArray(blogValue.articles) ? blogValue.articles.filter(isRec) : [];
-  const keptArticles = new Set(articles.filter((a) => within(lastTouched(a), b)).map((a) => String(a.id)));
-  const allArticles = new Set(articles.map((a) => String(a.id)));
-  const oldBlogBody = (key: string) => {
-    const m = /^ideeza:blog:(?:doc|live):(.+)$/.exec(key);
-    return !!m && allArticles.has(m[1]) && !keptArticles.has(m[1]);
-  };
-
+/** The records and project files the zip holds, from a copy of this browser's storage. */
+export function planExport(snapshot: Readonly<Record<string, string>>): ExportPlan {
+  const byId = new Map(projectsIn(snapshot).map((p) => [p.id, p]));
   const records: ExportRecord[] = [];
   const projectFiles: ProjectFile[] = [];
   const editorKeys: { doc: string; projectId: string | null; rowId: string | null; raw: string }[] = [];
 
   for (const key of Object.keys(snapshot).sort()) {
     const category = classifyKey(key);
-    if (!category || !chosen.has(category)) continue;
-    if (keyOfOldProject(key) || oldBlogBody(key)) continue;
+    if (!category) continue;
     if (category === "files") {
       const m = EDITOR_DOC.exec(key);
       if (m) editorKeys.push({ doc: m[1], projectId: m[2] ?? null, rowId: m[3] ?? null, raw: snapshot[key] });
@@ -382,8 +226,9 @@ export function planExport(snapshot: Readonly<Record<string, string>>, opts: Exp
     }
     let value: unknown = parse(snapshot[key]);
     if (key.startsWith("ideeza:innovations:comments:")) value = commentsTransform(key, value);
+    if (key === ACTIVITY_KEY && isRec(value)) value = { searches: Array.isArray(value.searches) ? value.searches : [] };
     if (value === undefined) continue;
-    records.push({ category, key, name: recordName(key), value: filterByRange(value, b) });
+    records.push({ category, key, name: recordName(key), value });
   }
 
   // Project files: a product's own documents, else (first row only) the project's older one.
@@ -407,123 +252,115 @@ export function planExport(snapshot: Readonly<Record<string, string>>, opts: Exp
     }
     for (const f of editorFiles(k.doc, k.raw, productName)) projectFiles.push({ path: `project-files/${folder}/${f.path}`, text: f.text });
   }
+  return { records, projectFiles };
+}
 
-  // Media from IndexedDB.
-  const media: MediaRequest[] = [];
-  if (opts.media !== "low") {
-    if (chosen.has("profile")) {
-      media.push({ category: "profile", db: "profile", key: "photo", path: "profile/photo" });
-      media.push({ category: "profile", db: "profile", key: "cover", path: "profile/cover" });
-    }
-    if (chosen.has("blog")) {
-      const seen = new Set<string>();
-      for (const a of articles) {
-        const id = String(a.id);
-        if (!keptArticles.has(id)) continue;
-        const found: { key: string; kind: "image" | "video" }[] = [];
-        for (const side of [a.draft, a.live]) {
-          if (isRec(side) && isRec(side.cover) && typeof side.cover.fileKey === "string") found.push({ key: side.cover.fileKey, kind: "image" });
-        }
-        for (const which of ["doc", "live"]) {
-          const raw = snapshot[`ideeza:blog:${which}:${id}`];
-          if (raw) blogFileKeys(parse(raw), found);
-        }
-        for (const f of found) {
-          if (seen.has(f.key) || (f.kind === "video" && opts.media !== "high")) continue;
-          seen.add(f.key);
-          media.push({ category: "blog", db: "blog", key: f.key, kind: f.kind, path: `blog/files/${f.key}` });
-        }
-      }
-    }
-    if (chosen.has("message")) {
-      const msgs = records.find((r) => r.key === "ideeza:messages")?.value;
-      const entries = isRec(msgs) && Array.isArray(msgs.entries) ? msgs.entries.filter(isRec) : [];
-      for (const e of entries) {
-        if (!Array.isArray(e.files) || e.deletedAt) continue;
-        for (const f of e.files) {
-          if (!isRec(f) || typeof f.key !== "string") continue;
-          const type = typeof f.type === "string" ? f.type : "";
-          media.push({ category: "message", db: "messages", key: f.key, name: safeFileName(typeof f.name === "string" ? f.name : f.key), type, path: "messages/files" });
-        }
-      }
-    }
-    if (chosen.has("product")) {
-      for (const p of projects) {
-        if (projectOut(p.id)) continue;
-        media.push({ category: "product", db: "media", projectId: p.id, path: `products/media/${projectFolder(p)}` });
-        if (opts.media === "high") media.push({ category: "product", db: "video", projectId: p.id, path: `products/videos/${projectFolder(p)}` });
-      }
+// ─────────────────────────── photos, files and videos ───────────────────────────
+
+const EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/svg+xml": "svg",
+  "image/avif": "avif",
+  "application/pdf": "pdf",
+  "video/webm": "webm",
+  "video/mp4": "mp4",
+};
+
+export const extOf = (type: string): string => EXT[type.split(";")[0].trim()] ?? "bin";
+
+/** What naming a stored file needs from storage: each project's folder, each attachment's name. */
+export type MediaContext = { projectFolder: (projectId: string) => string; attachmentName: (key: string) => string | null };
+
+export function mediaContext(snapshot: Readonly<Record<string, string>>): MediaContext {
+  const folders = new Map(projectsIn(snapshot).map((p) => [p.id, projectFolder(p)]));
+  const names = new Map<string, string>();
+  const msgs = parse(snapshot["ideeza:messages"] ?? "null");
+  const entries = isRec(msgs) && Array.isArray(msgs.entries) ? msgs.entries.filter(isRec) : [];
+  for (const e of entries) {
+    for (const f of Array.isArray(e.files) ? e.files : []) {
+      if (isRec(f) && typeof f.key === "string" && typeof f.name === "string") names.set(f.key, safeFileName(f.name, f.key));
     }
   }
-  return { records, projectFiles, media };
+  return {
+    projectFolder: (id) => folders.get(id) ?? `project-${safeFileName(id, "unknown")}`,
+    attachmentName: (key) => names.get(key) ?? null,
+  };
+}
+
+const str = (v: unknown, fallback: string) => (typeof v === "string" && v ? safeFileName(v, fallback) : fallback);
+
+/** Where one stored file goes in the zip: the photo and cover under Profile, a blog's images and
+ *  videos under Blog, a message's attachments under Messages, a project's media and clips under
+ *  Products. `key` is the record's own key when its store keeps keys apart (the profile's); `field`
+ *  is the name the file sits under in the record. The browser makes each path unique. */
+export function mediaPlace(
+  db: string,
+  record: unknown,
+  key: unknown,
+  field: string,
+  type: string,
+  ctx: MediaContext,
+): { category: CategoryId; path: string } {
+  const r = isRec(record) ? record : {};
+  const ext = extOf(type);
+  switch (db) {
+    case "ideeza-profile":
+      return { category: "profile", path: `profile/${str(key, "file")}.${ext}` };
+    case "ideeza-blog":
+      return { category: "blog", path: `blog/files/${str(r.key, "file")}.${ext}` };
+    case "ideeza-messages": {
+      const k = str(r.key, "file");
+      return { category: "message", path: `messages/files/${ctx.attachmentName(k) ?? `${k}.${ext}`}` };
+    }
+    case "ideeza-media":
+      return { category: "product", path: `products/media/${ctx.projectFolder(str(r.projectId, "unknown"))}/${str(r.key, "file")}.${ext}` };
+    case "ideeza-video": {
+      const take = str(r.takeId, "clip");
+      return { category: "product", path: `products/videos/${ctx.projectFolder(str(r.projectId, "unknown"))}/${field === "video" ? take : `${take}-${field}`}.${ext}` };
+    }
+    default:
+      return { category: "profile", path: `profile/other/${safeFileName(db, "store")}/${str(field, "file")}.${ext}` };
+  }
 }
 
 // ─────────────────────────── the files ───────────────────────────
 
 const ZIP_DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
-function rangeLabel(b: Bounds): string {
-  if (open(b)) return "All time";
-  return `${b.from !== null ? dayDate(b.from) : "the start"} to ${b.to !== null ? dayDate(b.to) : "today"}`;
-}
-
-/** The text files of the zip: the records (one JSON each, or one index.html per category), the
- *  project files, and the root index.html or manifest.json. `media` are the paths the browser
- *  wrote for what it fetched. */
-export function finishExport(plan: ExportPlan, media: readonly { category: CategoryId; path: string }[], opts: ExportOptions): ProjectFile[] {
+/** The text files of the zip: one readable index.html per category, the project files, and the
+ *  root index.html. `media` are the paths the browser wrote for each stored file. */
+export function finishExport(plan: ExportPlan, media: readonly { category: CategoryId; path: string }[], now: number): ProjectFile[] {
   const out: ProjectFile[] = [];
-  const meta = `Made ${ZIP_DATE.format(opts.now)} in this browser. Dates: ${rangeLabel(opts.bounds)}.`;
-  const chosen = CATEGORIES.filter((c) => opts.categories.includes(c.id));
+  const meta = `Made ${ZIP_DATE.format(now)} in this browser.`;
   const notes: { label: string; href: string; note: string }[] = [];
 
-  for (const c of chosen) {
+  for (const c of CATEGORIES) {
     const records = plan.records.filter((r) => r.category === c.id);
     const files = [...(c.id === "files" ? plan.projectFiles.map((f) => f.path) : []), ...media.filter((m) => m.category === c.id).map((m) => m.path)].map((p) =>
       p.slice(c.folder.length + 1),
     );
     const used = new Set<string>();
-    const named = records.map((r) => {
+    const html: HtmlRecord[] = records.map((r) => {
       let name = r.name;
       for (let i = 2; used.has(name); i++) name = `${r.name}-${i}`;
       used.add(name);
-      return { ...r, name };
+      return { name, value: r.value };
     });
-    if (opts.format === "json") {
-      for (const r of named) out.push({ path: `${c.folder}/${r.name}.json`, text: JSON.stringify(r.value, null, 2) });
-    } else {
-      const html: HtmlRecord[] = named.map((r) => ({ name: r.name, value: r.value }));
-      out.push({ path: `${c.folder}/index.html`, text: categoryPage(c.label, meta, html, files) });
-    }
+    out.push({ path: `${c.folder}/index.html`, text: categoryPage(c.label, meta, html, files) });
     const parts: string[] = [];
     if (records.length) parts.push(`${records.length} ${records.length === 1 ? "record" : "records"}`);
     if (files.length) parts.push(`${files.length} ${files.length === 1 ? "file" : "files"}`);
-    notes.push({ label: c.label, href: `${c.folder}/index.html`, note: parts.join(", ") || "nothing for these dates" });
+    notes.push({ label: c.label, href: `${c.folder}/index.html`, note: parts.join(", ") || "nothing yet" });
   }
   out.push(...plan.projectFiles);
-
-  if (opts.format === "json") {
-    out.push({
-      path: "manifest.json",
-      text: JSON.stringify(
-        {
-          madeAt: new Date(opts.now).toISOString(),
-          madeIn: "this browser",
-          dateRange: rangeLabel(opts.bounds),
-          categories: chosen.map((c) => c.label),
-          media: opts.media,
-          contents: notes.map((n) => ({ category: n.label, folder: n.href.replace(/\/index\.html$/, ""), holds: n.note })),
-        },
-        null,
-        2,
-      ),
-    });
-  } else {
-    out.push({ path: "index.html", text: rootPage(meta, notes) });
-  }
+  out.push({ path: "index.html", text: rootPage(meta, notes) });
   return out;
 }
 
-// ─────────────────────────── the wizard's counts ───────────────────────────
+// ─────────────────────────── the counts ───────────────────────────
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const listIn = (snapshot: Readonly<Record<string, string>>, key: string, field?: string): unknown[] => {
@@ -535,7 +372,7 @@ const listIn = (snapshot: Readonly<Record<string, string>>, key: string, field?:
 };
 const join = (parts: (string | null)[]) => parts.filter(Boolean).join(" · ") || "Nothing yet";
 
-/** One short line per category for "Choose Information": what this browser holds of it. */
+/** One short line per category: what a storage copy holds of it. */
 export function summarize(snapshot: Readonly<Record<string, string>>): Record<CategoryId, string> {
   const keys = Object.keys(snapshot);
   const has = (cat: CategoryId) => keys.some((k) => classifyKey(k) === cat);
@@ -551,7 +388,6 @@ export function summarize(snapshot: Readonly<Record<string, string>>): Record<Ca
     }, 0);
   const activity = parse(snapshot["ideeza:activity"] ?? "null");
   const searches = isRec(activity) && Array.isArray(activity.searches) ? activity.searches.length : 0;
-  const watches = isRec(activity) && Array.isArray(activity.watches) ? activity.watches.length : 0;
   const products = new Set(
     keys
       .map((k) => (classifyKey(k) === "files" ? EDITOR_DOC.exec(k) : null))
@@ -568,7 +404,7 @@ export function summarize(snapshot: Readonly<Record<string, string>>): Record<Ca
     newsfeed: join([appreciated ? count(appreciated, "post appreciated", "posts appreciated") : null, myComments ? count(myComments, "comment", "comments") : null]),
     blog: join([articleCount(snapshot)]),
     message: join([conversationCount(snapshot)]),
-    activity: join([searches ? count(searches, "search", "searches") : null, watches ? count(watches, "video watched", "videos watched") : null, reportCount(snapshot)]),
+    activity: join([searches ? count(searches, "search", "searches") : null, reportCount(snapshot)]),
     profile: profileName(snapshot) ?? (has("profile") ? "Kept in this browser" : "Nothing yet"),
     files: products ? count(products, "product with editor files", "products with editor files") : "Nothing yet",
   };

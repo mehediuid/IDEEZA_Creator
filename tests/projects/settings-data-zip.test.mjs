@@ -1,4 +1,4 @@
-// Settings › Personal Data: the stored (uncompressed) zip writer and its CRC-32.
+// Settings › AI & your data › Download: the stored (uncompressed) zip writer and its CRC-32.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
