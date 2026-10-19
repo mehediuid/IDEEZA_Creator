@@ -322,7 +322,7 @@ export function withdrawStepsOf(i: { verified: boolean; methods: number }): With
 /**
  * Dollars per coin, fixed, for the demo: test coins have no market price, so a
  * balance across sales in different coins needs a stated rate. Dollar coins
- * and IDZ (the demo rate Plan & pricing uses) are one for one; test ETH is the
+ * and IDZ (the demo rate Plan & billing uses) are one for one; test ETH is the
  * rate the design's mint cost was drawn at (0.00104 ETH ≈ $3.90).
  */
 export const DEMO_USD_RATES: Record<Coin, Amount> = {
