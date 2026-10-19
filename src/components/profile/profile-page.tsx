@@ -14,10 +14,12 @@
 // your social accounts with your links, your local time only when you chose to show it, and
 // your profile as others see it (`?view=public`, or while this tab acts as someone else), which
 // shows only your name, photo and "This profile is locked" when you locked it.
+// `?edit=1` on your own profile opens Edit profile on arrival (Settings ›
+// Account's Edit profile); closing it takes the parameter off the address.
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ImageAdd01Icon, SquareLock02Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, Skeleton, StateCard, buttonVariants } from "@/components/ideeza";
@@ -229,7 +231,7 @@ function VisitorBar({ visitor, href }: { visitor: Visitor; href: string }) {
   );
 }
 
-/** Skills · Top specialties · Languages, under About (Settings › Personal Information). */
+/** Skills · Top specialties · Languages, under About (set in Edit profile). */
 function Abilities({ fields }: { fields: ProfileFields }) {
   return (
     <>
@@ -259,6 +261,7 @@ function OwnProfile({
   coverUrl,
   togglePin,
   visitor,
+  editOnArrival,
 }: {
   person: Person;
   fields: ProfileFields;
@@ -268,6 +271,8 @@ function OwnProfile({
   togglePin: (projectId: string, valid?: readonly string[]) => { ok: boolean; refused: boolean };
   /** Someone else is looking: no owner controls, and a locked profile shows only who you are. */
   visitor: Visitor | null;
+  /** `?edit=1`: Edit profile opens as the page does. */
+  editOnArrival: boolean;
 }) {
   const { hydrated: projectsReady, projects } = useManualProjects();
   const { hydrated: buildsReady, builds } = useCreateHistory();
@@ -277,7 +282,9 @@ function OwnProfile({
   const journeys = useJourneysRaw(ids);
   const now = useMinuteClock();
   const { locale: dateLocale } = useDates();
-  const [editing, setEditing] = React.useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const [editing, setEditing] = React.useState(editOnArrival && visitor === null);
   const [followingOpen, setFollowingOpen] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
   const following = useFollowing();
@@ -404,6 +411,7 @@ function OwnProfile({
   const openEdit = () => setEditing(true);
   const closeEdit = () => {
     setEditing(false);
+    if (editOnArrival) router.replace(pathname, { scroll: false });
     requestAnimationFrame(() => editButton.current?.focus());
   };
 
@@ -524,6 +532,10 @@ function OwnProfile({
             location: fields.location,
             links: fields.links,
             openTo: fields.openTo,
+            skills: fields.skills,
+            specialities: fields.specialities,
+            languages: fields.languages,
+            social: fields.social,
           }}
           photoUrl={photoUrl}
           coverUrl={coverUrl}
@@ -711,7 +723,9 @@ export function ProfilePage({ handle }: { handle: string }) {
   const { hydrated, fields, togglePin } = useMyProfile();
   const photo = useMyPhoto();
   const cover = useMyCover();
-  const publicView = useSearchParams().get("view") === "public";
+  const params = useSearchParams();
+  const publicView = params.get("view") === "public";
+  const editOnArrival = params.get("edit") === "1";
   const acting = useStoredActingAs();
   const dir = React.useMemo(
     () => directory({ name: fields.name, latinName: fields.latinName, handle: fields.handle }),
@@ -725,7 +739,7 @@ export function ProfilePage({ handle }: { handle: string }) {
   const person = personByHandle(dir, decodeURIComponent(handle));
   if (!person) return <NotHere />;
   if (person.kind === "me") {
-    return <OwnProfile person={person} fields={fields} photoUrl={photo.url} coverUrl={cover.url} togglePin={togglePin} visitor={visitor} />;
+    return <OwnProfile person={person} fields={fields} photoUrl={photo.url} coverUrl={cover.url} togglePin={togglePin} visitor={visitor} editOnArrival={editOnArrival} />;
   }
   return <OtherProfile person={person} />;
 }

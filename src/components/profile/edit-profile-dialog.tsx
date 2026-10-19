@@ -1,22 +1,50 @@
 "use client";
 
 // Edit profile (spec 2026-10-14-creator-profile-design.md): the one home of
-// your profile's own words — cover (owner, 2026-10-14), photo, name in any
-// script, the name in English letters, a one-line headline, and (Portfolio,
-// 2026-10-14) About, where you are, up to five links (Add link adds one, ✕
-// takes one away) and what you are open to. "Suggest from my work" (owner
-// decision D7) drafts the headline from your shared projects only; the draft
-// sits under the field, labelled, until you press Use this, and nothing is
-// saved before Save profile. Cancel with changes asks "Discard changes?".
+// your profile's own words, and the only editor of the public profile
+// (Settings v2, owner V1, 2026-10-20: Settings › Account links here) — cover
+// (owner, 2026-10-14), photo, name in any script, the name in English letters,
+// a one-line headline, and (Portfolio, 2026-10-14) About, where you are, your
+// skills with up to three top specialties, the languages you speak, up to five
+// links (Add link adds one, ✕ takes one away), your social accounts, and what
+// you are open to. The time zone is not here: Settings › Language & region
+// holds it. "Suggest from my work" (owner decision D7) drafts the headline from
+// your shared projects only; the draft sits under the field, labelled, until
+// you press Use this, and nothing is saved before Save profile. Cancel with
+// changes asks "Discard changes?".
 
 import * as React from "react";
 import { Add01Icon, AiMagicIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Avatar, Button, IconButton, ModalFrame, TextInput, Textarea } from "@/components/ideeza";
+import { Avatar, Button, Checkbox, IconButton, ModalFrame, SelectMenu, Tag, TextInput, Textarea } from "@/components/ideeza";
 import { RadioRow } from "@/components/messages/choice";
 import { cn } from "@/lib/utils";
-import { BIO_MAX, HEADLINE_MAX, LINKS_MAX, LOCATION_MAX, NAME_MAX, OPEN_TO_WORDS, linkOf, type OpenTo } from "@/lib/people/fields";
+import {
+  BIO_MAX,
+  HEADLINE_MAX,
+  LANGUAGES_MAX,
+  LINKS_MAX,
+  LOCATION_MAX,
+  NAME_MAX,
+  OPEN_TO_WORDS,
+  SKILLS_MAX,
+  SOCIAL_NETWORKS,
+  SOCIAL_WORDS,
+  SPECIALITIES_MAX,
+  YEARS,
+  YEARS_WORDS,
+  cleanLanguages,
+  cleanSkills,
+  linkOf,
+  socialUrlOf,
+  type OpenTo,
+  type Social,
+  type SocialNetwork,
+  type Speciality,
+  type Years,
+} from "@/lib/people/fields";
 import { displayNameOf, initialsOf } from "@/lib/people/ids";
+import { spokenLanguageOptions } from "@/lib/people/languages";
 import { deleteCover, deletePhoto, putCover, putPhoto, resizeCover, resizePhoto } from "@/lib/people/photo-store";
 import { readProfileFields, saveProfile } from "@/lib/people/profile-store";
 
@@ -48,6 +76,22 @@ type LinkRow = { key: number; value: string; bad: boolean };
 
 const LINK_PLACEHOLDERS = ["yoursite.com", "github.com/you", "linkedin.com/in/you", "youtube.com/@you", "x.com/you"];
 
+const YEAR_OPTIONS = YEARS.map((y) => ({ value: y, label: YEARS_WORDS[y] }));
+
+const SOCIAL_PLACEHOLDER: Record<SocialNetwork, string> = {
+  facebook: "facebook.com/yourname",
+  x: "x.com/yourname",
+  instagram: "instagram.com/yourname",
+  linkedin: "linkedin.com/in/yourname",
+};
+
+const SOCIAL_HOST: Record<SocialNetwork, string> = { facebook: "facebook.com", x: "x.com", instagram: "instagram.com", linkedin: "linkedin.com" };
+
+const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** Skills typed into the field, split at commas. */
+const typedSkills = (typed: string) => typed.split(",").map((w) => w.trim()).filter(Boolean);
+
 type Photo = { kind: "keep" } | { kind: "new"; blob: Blob; url: string } | { kind: "remove" };
 type Suggest = { kind: "idle" } | { kind: "running" } | { kind: "draft"; text: string } | { kind: "failed" };
 
@@ -60,7 +104,19 @@ export function EditProfileDialog({
   onClose,
   onSaved,
 }: {
-  initial: { name: string; latinName: string; headline: string; bio: string; location: string; links: readonly string[]; openTo: OpenTo };
+  initial: {
+    name: string;
+    latinName: string;
+    headline: string;
+    bio: string;
+    location: string;
+    links: readonly string[];
+    openTo: OpenTo;
+    skills: readonly string[];
+    specialities: readonly Speciality[];
+    languages: readonly string[];
+    social: Social;
+  };
   photoUrl: string | null;
   /** The cover you uploaded; null when you haven't. */
   coverUrl: string | null;
@@ -80,6 +136,10 @@ export function EditProfileDialog({
   const locationId = React.useId();
   const linksId = React.useId();
   const openToId = React.useId();
+  const skillId = React.useId();
+  const specialitiesId = React.useId();
+  const languagesId = React.useId();
+  const socialId = React.useId();
   const photoHelpId = React.useId();
   const coverHelpId = React.useId();
   const nameRef = React.useRef<HTMLInputElement>(null);
@@ -99,6 +159,15 @@ export function EditProfileDialog({
   const nextLinkKey = React.useRef(Math.max(1, initial.links.length));
   const focusLink = React.useRef<number | null>(null);
   const [openTo, setOpenTo] = React.useState<OpenTo>(initial.openTo);
+  const [skills, setSkills] = React.useState<string[]>([...initial.skills]);
+  const [typedSkill, setTypedSkill] = React.useState("");
+  const [skillNote, setSkillNote] = React.useState<string | null>(null);
+  const [specialities, setSpecialities] = React.useState<Speciality[]>([...initial.specialities]);
+  const [languages, setLanguages] = React.useState<string[]>([...initial.languages]);
+  const [social, setSocial] = React.useState<Social>(initial.social);
+  const [socialBad, setSocialBad] = React.useState<Partial<Record<SocialNetwork, boolean>>>({});
+  const skillRef = React.useRef<HTMLInputElement>(null);
+  const languageOptions = React.useMemo(() => spokenLanguageOptions(), []);
   const linkRefs = React.useRef(new Map<number, HTMLInputElement>());
   React.useEffect(() => {
     if (focusLink.current === null) return;
@@ -131,6 +200,11 @@ export function EditProfileDialog({
     location.trim() !== initial.location.trim() ||
     links.flatMap((l) => (l.value.trim() ? [l.value.trim()] : [])).join("\n") !== initial.links.join("\n") ||
     openTo !== initial.openTo ||
+    typedSkill.trim() !== "" ||
+    !sameList(skills, initial.skills) ||
+    specialities.map((x) => `${x.skill}\n${x.years}`).join("\n") !== initial.specialities.map((x) => `${x.skill}\n${x.years}`).join("\n") ||
+    !sameList(languages, initial.languages) ||
+    SOCIAL_NETWORKS.some((n) => social[n].trim() !== initial.social[n]) ||
     photo.kind !== "keep" ||
     cover.kind !== "keep";
 
@@ -155,6 +229,36 @@ export function EditProfileDialog({
       return next;
     });
   };
+
+  const addSkills = () => {
+    const words = typedSkills(typedSkill);
+    if (!words.length) return;
+    const next = cleanSkills([...skills, ...words]);
+    const added = next.length - skills.length;
+    setSkillNote(
+      added < words.length ? (next.length >= SKILLS_MAX ? `${SKILLS_MAX} skills is the most. Remove one to add another.` : "You already have that skill.") : null,
+    );
+    setSkills(next);
+    setTypedSkill("");
+  };
+  const removeSkill = (skill: string) => {
+    setSkills((prev) => prev.filter((x) => x !== skill));
+    setSpecialities((prev) => prev.filter((x) => x.skill !== skill));
+    setSkillNote(null);
+    requestAnimationFrame(() => skillRef.current?.focus());
+  };
+  const toggleSpeciality = (skill: string) =>
+    setSpecialities((prev) =>
+      prev.some((x) => x.skill === skill)
+        ? prev.filter((x) => x.skill !== skill)
+        : prev.length >= SPECIALITIES_MAX
+          ? prev
+          : [...prev, { skill, years: "1-2" }],
+    );
+  const skillsFull = skills.length >= SKILLS_MAX;
+  const specialitiesFull = specialities.length >= SPECIALITIES_MAX;
+  const languagesFull = languages.length >= LANGUAGES_MAX;
+  const languageChoices = languageOptions.filter((l) => !languages.includes(l)).map((l) => ({ value: l, label: l }));
 
   const shownPhoto = photo.kind === "new" ? photo.url : photo.kind === "remove" ? null : photoUrl;
   const ownCover = cover.kind === "new" ? cover.url : cover.kind === "remove" ? null : coverUrl;
@@ -226,6 +330,20 @@ export function EditProfileDialog({
       linkRefs.current.get(firstBad.key)?.focus();
       return;
     }
+    const socialUrls = { ...social };
+    const wrong: Partial<Record<SocialNetwork, boolean>> = {};
+    for (const n of SOCIAL_NETWORKS) {
+      const url = socialUrlOf(n, social[n]);
+      if (url === null) wrong[n] = true;
+      else socialUrls[n] = url;
+    }
+    const firstWrong = SOCIAL_NETWORKS.find((n) => wrong[n]);
+    if (firstWrong) {
+      setSocialBad(wrong);
+      document.getElementById(`${socialId}-${firstWrong}`)?.focus();
+      return;
+    }
+    const savedSkills = typedSkill.trim() ? cleanSkills([...skills, ...typedSkills(typedSkill)]) : skills;
     setSaving(true);
     setFailed(false);
     const wrote = saveProfile({
@@ -242,6 +360,10 @@ export function EditProfileDialog({
         return url ? [url] : [];
       }),
       openTo,
+      skills: savedSkills,
+      specialities: specialities.filter((x) => savedSkills.includes(x.skill)),
+      languages: cleanLanguages(languages),
+      social: socialUrls,
     });
     let photoOk = true;
     if (wrote.ok && photo.kind === "new") photoOk = (await putPhoto(photo.blob)).ok;
@@ -527,6 +649,131 @@ export function EditProfileDialog({
           <p className={HELP}>A city is enough. Your local time shows next to it.</p>
         </div>
 
+        <div className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-4">
+            <label htmlFor={skillId} className={LABEL}>
+              Skills <span className="font-regular text-text-secondary">(optional)</span>
+            </label>
+            <span aria-hidden className={QUIET}>{`${skills.length}/${SKILLS_MAX}`}</span>
+          </div>
+          <div className="flex gap-3">
+            <TextInput
+              ref={skillRef}
+              id={skillId}
+              size="lg"
+              value={typedSkill}
+              maxLength={120}
+              onValueChange={(v) => {
+                setTypedSkill(v);
+                setSkillNote(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault();
+                  addSkills();
+                }
+              }}
+              disabled={skillsFull}
+              placeholder={skillsFull ? "Remove a skill to add another" : "PCB design, firmware, 3D modelling"}
+              aria-describedby={`${skillId}-help`}
+              autoComplete="off"
+              containerClassName={cn(TAP, "min-w-0 flex-1")}
+            />
+            <Button type="button" hierarchy="secondary" size="lg" onClick={addSkills} disabled={skillsFull || !typedSkill.trim()} className={TAP}>
+              Add
+            </Button>
+          </div>
+          <p id={`${skillId}-help`} aria-live="polite" className={HELP}>
+            {skillNote ?? "Press Enter to add one. A comma separates several."}
+          </p>
+          {skills.length > 0 && (
+            <ul role="list" aria-label="Your skills" className="m-0 flex list-none flex-wrap gap-3 p-0">
+              {skills.map((x) => (
+                <li key={x}>
+                  <Tag size="md" selected onDismiss={() => removeSkill(x)} dismissLabel={`Remove ${x}`}>
+                    {x}
+                  </Tag>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {skills.length > 0 && (
+          <fieldset className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0" aria-describedby={`${specialitiesId}-help`}>
+            <legend className={cn(LABEL, "mb-2 p-0")}>
+              Top specialties <span className="font-regular text-text-secondary">(optional)</span>
+            </legend>
+            <p id={`${specialitiesId}-help`} aria-live="polite" className={cn(HELP, "mb-1")}>
+              {specialitiesFull
+                ? `${SPECIALITIES_MAX} chosen. Untick one to choose another.`
+                : `Tick up to ${SPECIALITIES_MAX} of your skills and say how long you have practised each.`}
+            </p>
+            <ul role="list" className="m-0 flex list-none flex-col p-0">
+              {skills.map((skill) => {
+                const chosen = specialities.find((x) => x.skill === skill);
+                const off = !chosen && specialitiesFull;
+                return (
+                  <li
+                    key={skill}
+                    className="flex min-h-[48px] flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-solid border-border py-1 last:border-b-0"
+                  >
+                    <label
+                      className={cn(
+                        "relative flex min-h-[44px] min-w-0 flex-1 items-center gap-4 rounded-lg has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus",
+                        off ? "cursor-not-allowed" : "cursor-pointer",
+                      )}
+                    >
+                      <input type="checkbox" checked={!!chosen} disabled={off} onChange={() => toggleSpeciality(skill)} className="sr-only" />
+                      <Checkbox checked={!!chosen} disabled={off} decorative />
+                      <span className={cn("min-w-0 text-md [overflow-wrap:anywhere]", off ? "text-text-disabled" : "text-text-primary")}>{skill}</span>
+                    </label>
+                    {chosen && (
+                      <div className="w-[150px] shrink-0">
+                        <SelectMenu<Years>
+                          ariaLabel={`Years of ${skill}`}
+                          placeholder="Years"
+                          options={YEAR_OPTIONS}
+                          value={chosen.years}
+                          onChange={(v) => setSpecialities((prev) => prev.map((x) => (x.skill === skill ? { ...x, years: v } : x)))}
+                        />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </fieldset>
+        )}
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-4">
+            <span id={languagesId} className={LABEL}>
+              Languages you speak <span className="font-regular text-text-secondary">(optional)</span>
+            </span>
+            <span aria-hidden className={QUIET}>{`${languages.length}/${LANGUAGES_MAX}`}</span>
+          </div>
+          {languages.length > 0 && (
+            <ul role="list" aria-labelledby={languagesId} className="m-0 flex list-none flex-wrap gap-3 p-0">
+              {languages.map((l) => (
+                <li key={l}>
+                  <Tag size="md" selected onDismiss={() => setLanguages((prev) => prev.filter((x) => x !== l))} dismissLabel={`Remove ${l}`}>
+                    {l}
+                  </Tag>
+                </li>
+              ))}
+            </ul>
+          )}
+          <SelectMenu
+            ariaLabel="Add a language you speak"
+            placeholder={languagesFull ? `${LANGUAGES_MAX} is the most` : "Add a language"}
+            options={languageChoices}
+            value={null}
+            disabled={languagesFull || languageChoices.length === 0}
+            onChange={(v) => setLanguages((prev) => (prev.includes(v) || prev.length >= LANGUAGES_MAX ? prev : [...prev, v]))}
+          />
+        </div>
+
         <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
           <legend id={linksId} className={cn(LABEL, "mb-2 p-0")}>
             Links <span className="font-regular text-text-secondary">(optional)</span>
@@ -586,6 +833,49 @@ export function EditProfileDialog({
           ) : (
             <p className={QUIET}>{`Up to ${LINKS_MAX} links.`}</p>
           )}
+        </fieldset>
+
+        <fieldset className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0" aria-describedby={`${socialId}-help`}>
+          <legend className={cn(LABEL, "mb-2 p-0")}>
+            Social accounts <span className="font-regular text-text-secondary">(optional)</span>
+          </legend>
+          <p id={`${socialId}-help`} className={cn(HELP, "-mt-2")}>
+            Your profile address or username on each. They show with your links.
+          </p>
+          {SOCIAL_NETWORKS.map((n) => {
+            const id = `${socialId}-${n}`;
+            const bad = socialBad[n];
+            return (
+              <div key={n} className="flex flex-col gap-1">
+                <label htmlFor={id} className="w-fit text-sm text-text-secondary">
+                  {SOCIAL_WORDS[n]}
+                </label>
+                <TextInput
+                  id={id}
+                  size="lg"
+                  value={social[n]}
+                  invalid={!!bad}
+                  aria-invalid={bad || undefined}
+                  aria-describedby={bad ? `${id}-error` : undefined}
+                  onValueChange={(v) => {
+                    setSocial((prev) => ({ ...prev, [n]: v }));
+                    if (bad) setSocialBad((prev) => ({ ...prev, [n]: false }));
+                  }}
+                  placeholder={SOCIAL_PLACEHOLDER[n]}
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  spellCheck={false}
+                  containerClassName={TAP}
+                />
+                {bad && (
+                  <p id={`${id}-error`} className="text-md text-text-error">
+                    {`Enter your ${SOCIAL_HOST[n]} address, or just your username.`}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </fieldset>
 
         {/* relative: the rows' visually hidden inputs are placed in here, so focusing one scrolls
