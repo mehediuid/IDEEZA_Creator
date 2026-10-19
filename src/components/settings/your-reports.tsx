@@ -1,13 +1,12 @@
 "use client";
 
-// /settings/report (User Panel V2 Policy & Privacy | Report 22550:48543,
-// expanded 22550:48600). The Figma lists notices about reports against your
-// work, each opening to its reasons and an Appeal. Nobody reviews reports in
-// the app yet, so that list would always be empty and Appeal would go
-// nowhere (Phase 2): the page says so plainly. What does exist is every
-// report you made — profiles, posts, comments, messages and problem reports —
-// shown in the Figma's opening rows, each with what, when, why and its status
-// (lib/data/reports.ts).
+// Settings › Privacy & safety › Your reports (from Phase 1's Report page,
+// Figma 22550:48543 / 48600): every report you made — profiles, posts,
+// comments, messages and problem reports — each opening to what, when, why and
+// its status (lib/data/reports.ts). Nobody reviews reports in the app yet, so
+// each reads received, not reviewed; the Figma's "Reports about your work"
+// and Appeal wait until reviews exist. A short line says what to do when
+// someone is in danger: IDEEZA can't act in real time.
 
 import * as React from "react";
 import Link from "next/link";
@@ -29,7 +28,6 @@ import { REPORTS_KEY, normalizeReports } from "@/lib/people/reports";
 import { normalizeSentReports, reportsYouMade, SENT_REPORTS_KEY, type MadeKind, type ReportRow } from "@/lib/data/reports";
 import { useDates } from "@/lib/settings/use-dates";
 import { SettingsCard } from "./settings-card";
-import { SettingsFrame } from "./settings-frame";
 import { usePostLookup, useStoredThreads } from "./use-data-reads";
 
 const REPORTED_POSTS_KEY = "ideeza:innovations:reported-posts";
@@ -73,34 +71,29 @@ function useReportsYouMade(): ReportRow[] | null {
   }, [ready, threads, posts.raw, profiles.raw, messages.raw, problems.raw, post]);
 }
 
-export function ReportPage() {
+export function YourReportsCard() {
   const rows = useReportsYouMade();
   return (
-    <SettingsFrame page="report">
-      <SettingsCard
-        id="made"
-        title="Reports you made"
-        description="Every report you sent from this browser. Nobody reviews reports in the app yet, so each one is received and not reviewed."
-      >
-        {rows === null ? null : rows.length === 0 ? (
-          <p className={`${NOTE} pt-[8px]`}>
-            You haven&apos;t reported anything from this browser. To report a profile, a post, a comment or a message, use its ⋯ menu.
-          </p>
-        ) : (
-          <ul role="list" className="m-0 flex flex-col pl-0">
-            {rows.map((r) => (
-              <ReportItem key={r.id} row={r} />
-            ))}
-          </ul>
-        )}
-      </SettingsCard>
-
-      <SettingsCard
-        id="about-you"
-        title="Reports about your work"
-        description="Nobody reviews reports in the app yet, so nothing has been decided about your projects, posts or blogs. When reviews start, each decision will show here with its reasons and a way to appeal."
-      />
-    </SettingsFrame>
+    <SettingsCard
+      id="reports"
+      title="Your reports"
+      description="Every report you sent from this browser. Nobody reviews reports in the app yet, so each one is received and not reviewed."
+    >
+      <p className="m-0 max-w-[62ch] pt-[8px] text-md font-medium leading-md text-text-primary">
+        If you or someone else is in danger, contact your local emergency services now. IDEEZA can&apos;t act in real time.
+      </p>
+      {rows === null ? null : rows.length === 0 ? (
+        <p className={`${NOTE} pt-[8px]`}>
+          You haven&apos;t reported anything from this browser. To report a profile, a post, a comment or a message, use its ⋯ menu.
+        </p>
+      ) : (
+        <ul role="list" className="m-0 mt-[8px] flex flex-col pl-0">
+          {rows.map((r) => (
+            <ReportItem key={r.id} row={r} />
+          ))}
+        </ul>
+      )}
+    </SettingsCard>
   );
 }
 

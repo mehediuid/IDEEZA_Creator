@@ -1,200 +1,205 @@
 "use client";
 
-// /settings/privacy (User Panel V2 Policy & Privacy › Privacy 22048:35155).
-// Figma's card "Social Share" held two Facebook rows and "Link with search
-// engine"; the Facebook rows wait for connected accounts (D15), so the card
-// keeps the one row and is called "Search". Off (the default) puts
-// <meta name="robots" content="noindex"> on your profile page
-// (profile-robots.tsx). Two cards the interviews asked for follow: the blogs
-// where you gave IDEEZA "future use", each with Revoke and a Revoke all, and
-// a plain statement of what this app keeps and where (spec §5.12).
+// /settings/privacy — Privacy & safety (Settings v2, owner-approved
+// 2026-10-20). Phase 1's Profile locking, Profile & Share, Blocking and Report
+// in one page, keeping only the rows that change something today (V4 hides
+// the five "who can" rows nothing reads yet; their fields stay in the record):
+// - Your profile: View as public, Lock your profile (and what stays public),
+//   Show my location and local time, Search engines.
+// - Who can reach you: Who can message you (Messages' own store, D13), Who can
+//   comment on your shared projects, Take a break.
+// - Blocked people (one list, their conversations named), Hidden words, and
+//   Your reports.
+// Every row saves at once and its effect shows where it bites: the profile
+// (locked, location, robots), Messages' start check and Requests, and the
+// comments on Innovations posts (lib/innovations/comments.ts).
 
 import * as React from "react";
 import Link from "next/link";
-import { CookieIcon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Button, ConfirmDialog, Toggle, buttonVariants } from "@/components/ideeza";
-import { REUSE_SCOPE, supportTopic } from "@/lib/blog/consent";
-import { dayDate } from "@/lib/blog/dates";
-import { updateBlog, useBlog } from "@/lib/blog/store";
-import { askBlogSupport } from "@/lib/blog/support";
-import { reuseGrants, revokeReuse, type ReuseGrant } from "@/lib/data/blog-reuse";
-import { updateSettings } from "@/lib/settings/prefs";
-import { cn } from "@/lib/utils";
+import { Toggle } from "@/components/ideeza";
+import { setAllowNewFor } from "@/lib/messages/actions";
+import { allowNewOf } from "@/lib/messages/rules";
+import { useMessages } from "@/lib/messages/store";
+import { ME, type AllowNew } from "@/lib/messages/types";
+import { useMyProfile } from "@/lib/people/profile-store";
+import { quietUntilFor, type QuietChoice } from "@/lib/settings/audience";
+import { quietModeOn, updateSettings, type Reach } from "@/lib/settings/prefs";
+import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
+import { ChoiceSettingRow, TOUCH_AREA, ToggleSettingRow, reachOptions } from "./audience-controls";
+import { BlockedPeopleCard } from "./blocked-people";
+import { HiddenWordsCard } from "./hidden-words";
 import { SAVE_FAILED, SettingsCard, SettingsRow } from "./settings-card";
+import type { ChoiceOption } from "./settings-choice";
 import { SettingsFrame } from "./settings-frame";
+import { YourReportsCard } from "./your-reports";
 
-const NOTE = "m-0 max-w-[62ch] text-md leading-md text-text-secondary";
+const INLINE_LINK =
+  "rounded-sm font-medium text-text-brand underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus";
 
 export function PrivacyPage() {
   return (
     <SettingsFrame page="privacy">
-      <SearchCard />
-      <BlogReuseCard />
-      <CookiesCard />
+      <ProfileCard />
+      <ReachCard />
+      <BlockedPeopleCard />
+      <HiddenWordsCard />
+      <YourReportsCard />
     </SettingsFrame>
   );
 }
 
-function SearchCard() {
-  const on = useSettings().privacy.searchEngines;
-  const [failed, setFailed] = React.useState(false);
+function ProfileCard() {
+  const { audience, privacy } = useSettings();
+  const { hydrated, fields } = useMyProfile();
+  const [lockFailed, setLockFailed] = React.useState(false);
+  const noCity = hydrated && !fields.location.trim();
+
   return (
-    <SettingsCard id="search" title="Search">
+    <SettingsCard title="Your profile">
       <SettingsRow
-        id="search-engines"
-        label="Link with search engine"
-        help="When this setting is on, search engines may link to your profile in their results."
+        id="view-public"
+        label="View as public"
+        help="See your profile the way people who don't work with you see it."
+        href="/creators/me?view=public"
+      />
+      <SettingsRow
+        id="lock"
+        label="Lock your profile"
+        help={
+          <>
+            <span className="block">
+              People who don&apos;t work with you on a project see only your name, your photo and “This profile is locked”. Your project
+              teams still see all of it.
+            </span>
+            <span className="mt-[4px] block">
+              Still public while it&apos;s locked: the projects you shared on Innovations, your marketplace listings and your comments.
+              People can still message you if your message rule lets them.
+            </span>
+            {lockFailed && (
+              <span role="alert" className="mt-[4px] block text-text-error">
+                {SAVE_FAILED}
+              </span>
+            )}
+          </>
+        }
         control={
           <Toggle
-            checked={on}
-            aria-label="Link with search engine"
-            onChange={() => setFailed(!updateSettings("privacy", { searchEngines: !on }))}
+            checked={audience.locked}
+            aria-label="Lock your profile"
+            className={TOUCH_AREA}
+            onChange={() => setLockFailed(!updateSettings("audience", { locked: !audience.locked }))}
           />
         }
       />
-      {failed && (
-        <p role="alert" className="m-0 pt-[8px] text-md leading-md text-text-error">
-          {SAVE_FAILED}
-        </p>
-      )}
-    </SettingsCard>
-  );
-}
-
-function BlogReuseCard() {
-  const { hydrated, data, unreadable } = useBlog();
-  const grants = React.useMemo(() => reuseGrants(data), [data]);
-  const open = grants.filter((g) => !g.sharedOn);
-  const [confirmAll, setConfirmAll] = React.useState(false);
-  const [said, setSaid] = React.useState<{ text: string; error: boolean } | null>(null);
-
-  const revoke = (list: readonly ReuseGrant[]) => {
-    const res = updateBlog((d) => revokeReuse(d, list.map((g) => g.id), Date.now()));
-    if (!res.ok) {
-      setSaid({
-        text: res.cause === "unreadable" ? "Your blogs can't be read in this browser, so nothing was changed." : SAVE_FAILED,
-        error: true,
-      });
-      return;
-    }
-    setSaid({
-      text:
-        list.length === 1
-          ? `IDEEZA can no longer reuse “${list[0].title}”.`
-          : `IDEEZA can no longer reuse your ${list.length} blogs.`,
-      error: false,
-    });
-  };
-
-  return (
-    <SettingsCard
-      id="blog-reuse"
-      title="Blog reuse"
-      description={`The blogs where you chose “Give access to IDEEZA to future use”. ${REUSE_SCOPE}`}
-      action={
-        open.length > 1 ? (
-          <Button type="button" hierarchy="secondary" size="sm" onClick={() => setConfirmAll(true)}>
-            Revoke all
-          </Button>
-        ) : null
-      }
-    >
-      {!hydrated ? null : unreadable ? (
-        <p className={NOTE}>Your blogs can&apos;t be read in this browser, so nothing here can change.</p>
-      ) : grants.length === 0 ? (
-        <div className="flex flex-col items-start gap-[8px] pt-[8px]">
-          <p className={NOTE}>No blog gives IDEEZA access for future use. You choose it when you publish a blog, and you can take it back here.</p>
-          <Link href="/blog" className={buttonVariants({ hierarchy: "ghost", size: "sm", className: "-ml-[12px]" })}>
-            Go to your blogs
-          </Link>
-        </div>
-      ) : (
-        <div className="flex flex-col">
-          {grants.map((g) => (
-          <SettingsRow
-            key={g.id}
-            label={
-              <Link href={g.href} className="rounded-sm text-text-primary outline-none hover:text-text-brand focus-visible:ring-2 focus-visible:ring-border-focus">
-                {g.title}
+      <ToggleSettingRow
+        id="local-time"
+        label="Show my location and local time"
+        help={
+          noCity ? (
+            <>
+              Others see your city and the time where you are under your name. Add your city first with Edit profile on{" "}
+              <Link href="/creators/me" className={INLINE_LINK}>
+                your profile
               </Link>
-            }
-            help={
-              g.sharedOn
-                ? `Shared on ${g.sharedOn.where} · ${dayDate(g.sharedOn.at)}. This can't be taken back here. Contact support to change it.`
-                : g.at
-                  ? `Access given ${dayDate(g.at)}`
-                  : "Access given"
-            }
-            control={
-              g.sharedOn ? (
-                <Button type="button" hierarchy="ghost" size="sm" onClick={() => askBlogSupport(supportTopic(g.title))}>
-                  Contact support
-                </Button>
-              ) : (
-                <Button type="button" hierarchy="secondary" size="sm" aria-label={`Revoke access to “${g.title}”`} onClick={() => revoke([g])}>
-                  Revoke
-                </Button>
-              )
-            }
-          />
-          ))}
-        </div>
-      )}
-      <p
-        role="status"
-        aria-live="polite"
-        className={said ? cn("m-0 pt-[8px] text-md leading-md", said.error ? "text-text-error" : "text-text-secondary") : "sr-only"}
-      >
-        {said?.text ?? ""}
-      </p>
-      <ConfirmDialog
-        open={confirmAll}
-        title="Revoke access for all your blogs?"
-        confirmLabel="Revoke all"
-        onCancel={() => setConfirmAll(false)}
-        onConfirm={() => {
-          setConfirmAll(false);
-          revoke(open);
-        }}
-      >
-        <p className="m-0">
-          IDEEZA won&apos;t reuse these {open.length} blogs. To give access again, tick “Give access to IDEEZA to future use” when you next publish or
-          update a blog.
-          {grants.length > open.length && " A blog IDEEZA has already shared stays as it is."}
-        </p>
-      </ConfirmDialog>
+              .
+            </>
+          ) : (
+            "Others see your city and the time where you are under your name. While it's off, only you see your city."
+          )
+        }
+        checked={audience.showLocalTime}
+        onChange={(showLocalTime) => updateSettings("audience", { showLocalTime })}
+      />
+      <ToggleSettingRow
+        id="search-engines"
+        label="Search engines"
+        help="Let search engines link to your profile. While it's off, your profile page asks them not to list it."
+        checked={privacy.searchEngines}
+        onChange={(searchEngines) => updateSettings("privacy", { searchEngines })}
+      />
     </SettingsCard>
   );
 }
 
-const COOKIE_LINES: React.ReactNode[] = [
-  "IDEEZA sets no cookies of its own, and the app has no analytics or advertising trackers.",
-  <>
-    Your theme, your settings and your work are kept in this browser&apos;s storage, not in cookies. Clearing this browser&apos;s site data removes
-    them, so keep a copy with{" "}
-    <Link href="/settings/personal-data" className="rounded-sm text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-      Download your information
-    </Link>
-    .
-  </>,
-  "The last few errors on a page are kept in that tab only. They are sent only when you send a problem report with “Send page and device details” ticked.",
+const MESSAGE_OPTIONS: ChoiceOption<AllowNew>[] = [
+  { value: "everyone", label: "Anyone", hint: "People you haven't worked with land in your Requests." },
+  {
+    value: "known",
+    label: "People you work with or who own a copy or hold a share",
+    hint: "No one else can start a conversation with you. Questions about your listings still reach you.",
+  },
+  { value: "nobody", label: "No one new", hint: "Only people you already have a conversation with can write to you." },
 ];
 
-function CookiesCard() {
+type BreakPick = QuietChoice | "keep";
+
+/** A clock, so "On until …" reads Off once the break ends. */
+function useNow(everyMs: number): number {
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), everyMs);
+    return () => window.clearInterval(id);
+  }, [everyMs]);
+  return now;
+}
+
+function ReachCard() {
+  const settings = useSettings();
+  const a = settings.audience;
+  const messages = useMessages();
+  const dates = useDates();
+  const now = useNow(30_000);
+  const until = quietModeOn(settings, now) ? a.quietUntil : null;
+  const end = (at: number) => dates.dateTime(at);
+
+  const breakOptions: ChoiceOption<BreakPick>[] = [
+    ...(until !== null ? [{ value: "keep" as const, label: "Keep the break", hint: `Until ${end(until)}` }] : []),
+    { value: "24h", label: "24 hours", hint: `Until ${end(quietUntilFor("24h", now) ?? now)}` },
+    { value: "7d", label: "7 days", hint: `Until ${end(quietUntilFor("7d", now) ?? now)}` },
+    { value: "off", label: "Off", hint: "Requests and comments follow your rules above." },
+  ];
+
   return (
-    <SettingsCard id="cookies" title="Cookies and analytics">
-      <ul role="list" className="m-0 flex flex-col gap-[10px] pl-0 pt-[8px]">
-        {COOKIE_LINES.map((line, i) => (
-          <li key={i} className="flex items-start gap-[10px] text-md leading-md text-text-secondary">
-            <span aria-hidden className="mt-[2px] shrink-0 text-text-tertiary">
-              <Icon icon={CookieIcon} size={16} />
-            </span>
-            <span className="max-w-[62ch]">{line}</span>
-          </li>
-        ))}
-      </ul>
+    <SettingsCard title="Who can reach you">
+      <ChoiceSettingRow
+        id="message"
+        label="Who can message you"
+        help="Who can start a new conversation with you. People you already talk to can always reply."
+        dialogTitle="Who can message you?"
+        options={MESSAGE_OPTIONS}
+        value={allowNewOf(messages.data, ME)}
+        disabled={!messages.hydrated || messages.unreadable}
+        onSave={(v) => setAllowNewFor(ME, v).ok}
+      />
+      <ChoiceSettingRow
+        id="comment"
+        label="Who can comment on your shared projects"
+        help="On the projects you share on Innovations. A comment from someone this leaves out is held off your post, and comes back if you change this."
+        dialogTitle="Who can comment on your shared projects?"
+        options={reachOptions({
+          everyone: "Anyone on IDEEZA can comment",
+          work: "Only people on your project teams can comment",
+          nobody: "Only you can comment",
+        })}
+        value={a.comment}
+        onSave={(v: Reach) => updateSettings("audience", { comment: v })}
+      />
+      <ChoiceSettingRow<BreakPick>
+        id="take-a-break"
+        label="Take a break"
+        help={
+          until !== null
+            ? "New message requests are paused, and on your shared projects only people you work with can comment."
+            : "Pause new message requests, and hold comments on your shared projects from people you don't work with."
+        }
+        dialogTitle="Take a break"
+        dialogDescription="For a while, no new message requests reach you, and comments on your shared projects from people you don't work with are held. People you work with or already talk to, and questions about your listings, still reach you."
+        options={breakOptions}
+        value={until !== null ? "keep" : "off"}
+        valueLabel={until !== null ? `On until ${end(until)}` : "Off"}
+        onSave={(v) => (v === "keep" ? true : updateSettings("audience", { quietUntil: quietUntilFor(v, Date.now()) }))}
+      />
     </SettingsCard>
   );
 }

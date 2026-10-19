@@ -1,17 +1,19 @@
-// Settings › Audience — the rules behind Profile locking, Profile & Share and
-// Blocking (spec docs/superpowers/specs/2026-10-19-settings-design.md §5.10;
-// D9 maps Figma's friends and groups to our model: Anyone · People you work
-// with · Only me). Every rule reads your settings record and how the other
-// person stands to you (`Tie`), so Messages, comments, the profile and follow
-// all answer the same way. Who can message you lives in Messages' own store
-// (D13, lib/messages/rules.ts `canStart`).
+// Settings › Privacy & safety — the rules behind its rows (spec
+// docs/superpowers/specs/2026-10-19-settings-design.md §5.10; D9 maps Figma's
+// friends and groups to our model: Anyone · People you work with · Only me).
+// Every rule reads your settings record and how the other person stands to you
+// (`Tie`), so the profile and comments answer the same way. Who can message
+// you lives in Messages' own store (D13, lib/messages/rules.ts `canStart`).
+// The "who can" rows v2 hides (follow, see who you follow, add you to a team,
+// invite you to a team conversation, save and link, V4) keep their fields in
+// the record and have no rule here until a feature reads them.
 //
 // Pure, relative imports only.
 
 import { HIDDEN_WORDS_MAX, cleanWords, quietModeOn, type Reach, type SettingsV1 } from "./prefs";
 
-/** How someone stands to you beyond one conversation: on one of your project
- *  teams, holding a share of one of your projects, or owning a copy. */
+/** How someone stands to you beyond one conversation: on one of your project teams, holding a
+ *  share of one of your projects, or owning a copy. */
 export type Tie = "team" | "share" | "copy" | null;
 
 /** The other person, as a rule sees them. */
@@ -28,7 +30,7 @@ export function stricterReach(a: Reach, b: Reach): Reach {
   return STRICTNESS[a] >= STRICTNESS[b] ? a : b;
 }
 
-/** Who may comment on your shared projects now: quiet mode narrows it to people you work with. */
+/** Who may comment on your shared projects now: a break narrows it to people you work with. */
 export function commentRuleOf(s: SettingsV1, now: number): Reach {
   return quietModeOn(s, now) ? stricterReach(s.audience.comment, "work") : s.audience.comment;
 }
@@ -36,27 +38,6 @@ export function commentRuleOf(s: SettingsV1, now: number): Reach {
 export function canComment(s: SettingsV1, o: Audience & { isOwner: boolean }, now: number): boolean {
   if (o.isOwner) return true;
   return !o.blocked && reachAllows(commentRuleOf(s, now), o.tie);
-}
-
-export function canFollow(s: SettingsV1, o: Audience): boolean {
-  return !o.blocked && reachAllows(s.audience.follow, o.tie);
-}
-
-export function canAddToTeam(s: SettingsV1, o: Audience): boolean {
-  return !o.blocked && reachAllows(s.audience.addToTeam, o.tie);
-}
-
-export function canInviteToTeamConversation(s: SettingsV1, o: Audience): boolean {
-  return !o.blocked && reachAllows(s.audience.teamConversation, o.tie);
-}
-
-export function canSeeFollowing(s: SettingsV1, o: Audience & { isOwner: boolean }): boolean {
-  return o.isOwner || (!o.blocked && reachAllows(s.audience.seeFollowing, o.tie));
-}
-
-/** Saving your shared project or copying its link. */
-export function canSaveOrLink(s: SettingsV1, o: { isOwner: boolean; blocked: boolean }): boolean {
-  return o.isOwner || (!o.blocked && s.audience.allowLinkSave);
 }
 
 /** A locked profile shows people you don't work with your name, photo and "This profile is locked". */
@@ -87,8 +68,18 @@ export function quietEndLabel(at: number): string {
 
 const WORD_CHAR = "[\\p{L}\\p{N}\\p{M}_]";
 const patterns = new Map<string, RegExp>();
+/** Zero-width space, non-joiner, joiner, word joiner and BOM: invisible, and typed or not
+ *  depending on the keyboard (Bangla conjuncts often carry a ZWJ or ZWNJ). */
+const ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/g;
 
-function patternOf(word: string): RegExp {
+/** The one form text and words are compared in: NFC (so "ো" typed as one sign or as "ে" + "া"
+ *  is the same), without zero-width characters. */
+export function matchForm(text: string): string {
+  return text.normalize("NFC").replace(ZERO_WIDTH, "");
+}
+
+function patternOf(raw: string): RegExp {
+  const word = matchForm(raw);
   let re = patterns.get(word);
   if (re) return re;
   const tag = word.startsWith("#");
@@ -104,10 +95,11 @@ function patternOf(word: string): RegExp {
 }
 
 /** The first hidden word `text` uses, or null. Whole words in any case; a plain word also
- *  matches its #tag. */
+ *  matches its #tag; both sides compared in `matchForm`. */
 export function hiddenWordIn(text: string, words: readonly string[]): string | null {
   if (!text) return null;
-  for (const w of words) if (w && patternOf(w).test(text)) return w;
+  const form = matchForm(text);
+  for (const w of words) if (w && patternOf(w).test(form)) return w;
   return null;
 }
 
@@ -115,9 +107,15 @@ export function hasHiddenWord(text: string, words: readonly string[]): boolean {
   return hiddenWordIn(text, words) !== null;
 }
 
-/** "tree, #Tree\nNFT" → ["tree", "#tree", "nft"]: commas or new lines, a bare "#" dropped. */
+/** "tree, #Tree\nNFT" → ["tree", "#tree", "nft"]: commas or new lines, each in `matchForm`, a
+ *  bare "#" dropped. */
 export function wordsFromInput(input: string): string[] {
-  return cleanWords(input.split(/[,\n]/).filter((w) => w.trim().replace(/^#+/, "").trim() !== ""));
+  return cleanWords(
+    input
+      .split(/[,\n]/)
+      .map(matchForm)
+      .filter((w) => w.trim().replace(/^#+/, "").trim() !== ""),
+  );
 }
 
 /** `current` with what was typed added; `over` = how many didn't fit under the limit. */
@@ -135,7 +133,7 @@ export function wordsRemaining(words: readonly string[]): number {
 
 export type MetWhere = "messages" | "comments" | "marketplace";
 
-/** Someone Blocking › Add Blocked User can find: a person you've met, and where. */
+/** Someone Privacy & safety › Block someone can find: a person you've met, and where. */
 export type MetPerson = { id: string; where: MetWhere[] };
 
 /**

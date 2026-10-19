@@ -1,7 +1,8 @@
 "use client";
 
-// Who Settings › Blocking can name: the people you've met (Messages, comment
-// threads you took part in or on your posts, people who bought from you),
+// Who Settings › Privacy & safety › Blocked people can name: the people you've
+// met (Messages, comment threads you took part in or on your posts, people who
+// bought from you),
 // each with a name and initials from the one people directory, else from
 // Messages. Read live from the stores that already hold them.
 

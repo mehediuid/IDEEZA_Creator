@@ -8,7 +8,8 @@
 // the DS order: Reply · ♥ n · ⋯.
 //
 // In place of a comment the viewer may not read: "Comment deleted" (deleted
-// with replies, so the thread holds) or "Hidden by the maker". The maker
+// with replies, so the thread holds), "From someone you blocked", or "Hidden
+// by the maker" (the maker reads why: a word they hide, or held). The maker
 // reads what they hid, under a note with Unhide; its author reads it under a
 // note that says the maker hid it.
 
@@ -169,17 +170,19 @@ export function CommentItem({ c, depth }: { c: PostComment; depth: number }) {
               </button>
             ) : null}
             <div className="flex flex-wrap items-center pt-3">
-              <Button
-                type="button"
-                hierarchy="ghost"
-                size="sm"
-                data-part="reply"
-                aria-label={mine ? `Reply to ${whose}` : `Reply to ${person.name}`}
-                className={ACTION}
-                onClick={(e) => ui.startReply(c, e.currentTarget)}
-              >
-                Reply
-              </Button>
+              {ui.canReply ? (
+                <Button
+                  type="button"
+                  hierarchy="ghost"
+                  size="sm"
+                  data-part="reply"
+                  aria-label={mine ? `Reply to ${whose}` : `Reply to ${person.name}`}
+                  className={ACTION}
+                  onClick={(e) => ui.startReply(c, e.currentTarget)}
+                >
+                  Reply
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 hierarchy="ghost"

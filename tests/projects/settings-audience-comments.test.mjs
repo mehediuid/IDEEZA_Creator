@@ -28,10 +28,10 @@ test("someone else's comment with a hidden word is hidden; yours never is", () =
 });
 
 test("the owner reads a line in its place, a visitor reads it as hidden, its writer reads it", () => {
-  assert.equal(placeholderOf(a, { meId: "you", isPostOwner: true, hiddenWords: words }), WORD_HIDDEN_FOR_OWNER);
-  assert.equal(placeholderOf(a, { meId: "k3", isPostOwner: false, hiddenWords: words }), "Hidden by the maker");
-  assert.equal(placeholderOf(a, { meId: "k1", isPostOwner: false, hiddenWords: words }), null);
-  assert.equal(placeholderOf(b, { meId: "you", isPostOwner: true, hiddenWords: words }), null);
+  assert.equal(placeholderOf(a, { meId: "you", isPostOwner: true, makerRules: words }), WORD_HIDDEN_FOR_OWNER);
+  assert.equal(placeholderOf(a, { meId: "k3", isPostOwner: false, makerRules: words }), "Hidden by the maker");
+  assert.equal(placeholderOf(a, { meId: "k1", isPostOwner: false, makerRules: words }), null);
+  assert.equal(placeholderOf(b, { meId: "you", isPostOwner: true, makerRules: words }), null);
   assert.equal(placeholderOf(a, { meId: "you", isPostOwner: true }), null, "no words, nothing hidden");
 });
 
