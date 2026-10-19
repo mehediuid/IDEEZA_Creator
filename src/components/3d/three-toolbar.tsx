@@ -6,6 +6,7 @@
 
 import { C } from "@/lib/pcb/colors";
 import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
+import { useSettings } from "@/lib/settings/use-settings";
 
 type Tool = { id: ThreeAction | "sketch"; title: string; path: string; fill?: boolean };
 
@@ -69,6 +70,7 @@ function ToolIcon({ tool, isLabel }: { tool: Tool; isLabel?: boolean }) {
 }
 
 export function ThreeToolbar({ onSketchClick }: { onSketchClick?: () => void }) {
+  const assist = useSettings().ai.editorAssist;
   return (
     <div
       style={{
@@ -89,33 +91,38 @@ export function ThreeToolbar({ onSketchClick }: { onSketchClick?: () => void }) 
         overflowX: "auto",
       }}
     >
-      <button
-        onClick={() => dispatchThreeAction("ai:generate")}
-        className="ix-tool"
-        title="Generate a 3D model with AI"
-        style={{
-          height: 30,
-          padding: "0 var(--spacing-4)",
-          borderRadius: "var(--radius-md)",
-          background: C.primary,
-          color: "var(--color-text-on-brand)",
-          border: "none",
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--spacing-2)",
-          cursor: "pointer",
-          fontWeight: 600,
-          fontSize: "var(--font-size-sm)",
-          flexShrink: 0,
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 15l-1.7-4.1L6 9.2l4.3-1.7z" />
-          <path d="M18.5 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" />
-        </svg>
-        AI Generate
-      </button>
-      <div style={{ width: 1, height: 18, background: "var(--color-border-subtle)", margin: "0 var(--spacing-3)" }} />
+      {/* Settings › AI Properties › AI help in the editors: off hides AI Generate. */}
+      {assist && (
+        <>
+          <button
+            onClick={() => dispatchThreeAction("ai:generate")}
+            className="ix-tool"
+            title="Generate a 3D model with AI"
+            style={{
+              height: 30,
+              padding: "0 var(--spacing-4)",
+              borderRadius: "var(--radius-md)",
+              background: C.primary,
+              color: "var(--color-text-on-brand)",
+              border: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--spacing-2)",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "var(--font-size-sm)",
+              flexShrink: 0,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 15l-1.7-4.1L6 9.2l4.3-1.7z" />
+              <path d="M18.5 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" />
+            </svg>
+            AI Generate
+          </button>
+          <div style={{ width: 1, height: 18, background: "var(--color-border-subtle)", margin: "0 var(--spacing-3)" }} />
+        </>
+      )}
       <button
         onClick={onSketchClick}
         className="ix-tool"

@@ -27,6 +27,7 @@ import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { moveTab, revealDelta } from "@/lib/ui/tab-keys";
 import { cn } from "@/lib/utils";
+import { motionReduced } from "@/lib/settings/appearance";
 
 /** `icon` is a picture before the label (the Innovations post's locked pieces wear a lock); the label stays the name. */
 export type TabDef<T extends string> = { id: T; label: string; icon?: React.ReactNode };
@@ -97,14 +98,14 @@ export function TabStrip<T extends string>({
     if (!strip || !tab) return;
     const delta = revealDelta(tab.getBoundingClientRect(), strip.getBoundingClientRect(), REVEAL_PAD);
     if (delta === 0) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = motionReduced();
     strip.scrollBy({ left: delta, behavior: still ? "auto" : "smooth" });
   }, [active]);
 
   const page = (dir: 1 | -1) => {
     const strip = stripRef.current;
     if (!strip) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = motionReduced();
     strip.scrollBy({ left: dir * Math.round(strip.clientWidth * 0.7), behavior: still ? "auto" : "smooth" });
   };
 

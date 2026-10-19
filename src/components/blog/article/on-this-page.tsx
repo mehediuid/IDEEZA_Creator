@@ -15,12 +15,13 @@ import { Icon } from "@/components/dashboard/icon";
 import { currentHeading } from "@/lib/blog/article-view";
 import type { Heading } from "@/lib/blog/doc";
 import { cn } from "@/lib/utils";
+import { motionReduced } from "@/lib/settings/appearance";
 
 /** The reading line, as a share of the scrolling box from its top. */
 const LINE = 0.3;
 
 const scroller = () => document.getElementById("main-content");
-const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reduceMotion = () => motionReduced();
 
 /** The anchor being read, following the scroll of <main>. `endRef` is the page's last element. */
 export function useScrollSpy(anchors: readonly string[], endRef: React.RefObject<HTMLElement | null>): [string | null, (a: string) => void] {

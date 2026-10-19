@@ -52,7 +52,8 @@ export type ConceptFailReason =
   | "storage"
   | "parent-lost"
   | "credits"
-  | "filtered";
+  | "filtered"
+  | "pool-off";
 
 /** What the flow asks before it spends anything.
  *

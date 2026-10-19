@@ -18,19 +18,17 @@ import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
 import { CoinGlyph } from "./payment-picker";
+import { useDates } from "@/lib/settings/use-dates";
 
 const PER_PAGE = 10;
 const ALL = "all";
 
 export const invoiceHref = (id: string) => `/settings/plan/invoice/${encodeURIComponent(id)}`;
 
-/** "30/09/2024 | 12:41:22 PM" */
-function stamp(ts: number): string {
-  const d = new Date(ts);
-  return `${d.toLocaleDateString("en-GB")} | ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
-}
-
 export function BillingHistory() {
+  // "30/09/2024 | 12:41:22 PM", in Settings › Language › Date & Time Formatting.
+  const dates = useDates();
+  const stamp = (ts: number) => `${dates.date(ts, { style: "numeric" })} | ${dates.time(ts, { seconds: true })}`;
   const { hydrated: creditsReady, ledger } = useCredits();
   const { hydrated: planReady, sub } = useCreatePlan();
   const [query, setQuery] = React.useState("");

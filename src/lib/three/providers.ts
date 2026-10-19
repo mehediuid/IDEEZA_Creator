@@ -15,7 +15,7 @@
 // That image is then fed to image-to-3D. Image-to-3D is one reliable call (vs. Meshy's two-step
 // text-to-3D), so this path is simpler AND keeps the image step free.
 
-import { generate } from "@/lib/create/image-gen";
+import { generate, type RenderOptions } from "@/lib/create/image-gen";
 import { put } from "@/lib/create/image-store";
 
 export type ThreeProvider = "meshy" | "demo";
@@ -48,10 +48,11 @@ function enhanceForModel(prompt: string): string {
 /** Render a concept image and keep it. Returns the app-relative URL, the same
  *  shape the concept chat stores — see image-store.ts for why the bytes are
  *  ours rather than the provider's link. */
-export async function renderConceptImage(prompt: string): Promise<string> {
+export async function renderConceptImage(prompt: string, opts: RenderOptions = {}): Promise<string> {
   const rendered = await generate(
     enhanceForModel(prompt),
     String(Math.floor(Math.random() * 1_000_000_000)),
+    opts,
   );
   const stored = await put(rendered.bytes, {
     prompt,
@@ -179,12 +180,14 @@ export async function createTask(input: {
   seed?: number;
   /** Where this app is reachable, for the provider that fetches the image. */
   origin?: string;
+  /** False: the concept image stays off the volunteer pool (image-gen.ts). */
+  volunteerPool?: boolean;
 }): Promise<CreateResult> {
   let imageUrl = input.imageUrl?.trim() || "";
   if (!imageUrl) {
     const prompt = (input.prompt ?? "").trim();
     if (!prompt) throw new Error("need a prompt or an image");
-    imageUrl = await renderConceptImage(prompt);
+    imageUrl = await renderConceptImage(prompt, { volunteerPool: input.volunteerPool });
   }
 
   const provider = activeProvider();

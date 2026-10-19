@@ -27,6 +27,8 @@ import { editorDocKey } from "@/lib/manual/editor-scope";
 import { fingerprintOf } from "@/lib/manual/build-load";
 import { readSeed } from "@/lib/manual/build-load-io";
 import type { EditorScope } from "@/lib/manual/p2-types";
+import { singleKeyShortcutsAllowed } from "@/lib/settings/keys";
+import { readSettings } from "@/lib/settings/prefs";
 
 type ThreeMode = "demo" | "sketch" | "fullview" | "preview";
 type ModalId =
@@ -477,7 +479,7 @@ export function ThreeApp() {
       if (shape) { addShape(shape); return; }
       switch (action) {
         // AI
-        case "ai:generate":      setAiOpen(true); return;
+        case "ai:generate":      if (readSettings().ai.editorAssist) setAiOpen(true); return;
         // shapes & misc
         case "shape:sketch":     setMode("sketch"); return;
         case "shape:spline":     flashToast("Add spline (sketch mode)"); setMode("sketch"); return;
@@ -538,6 +540,8 @@ export function ThreeApp() {
   // Keyboard shortcuts — match the menu labels.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Settings › Appearance › Single-key shortcuts off: G, R, S, B… do nothing.
+      if (!singleKeyShortcutsAllowed(e)) return;
       if ((e.target as HTMLElement)?.tagName === "INPUT" || (e.target as HTMLElement)?.tagName === "SELECT" || (e.target as HTMLElement)?.tagName === "TEXTAREA") return;
       const mod = e.metaKey || e.ctrlKey;
       if (e.key === "g" && !mod) setTransformMode("translate");

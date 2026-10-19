@@ -19,11 +19,13 @@ import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
+import { useDates } from "@/lib/settings/use-dates";
 
 const BILLING_HREF = "/settings/plan?tab=billing";
-const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
 export function InvoiceView({ orderId }: { orderId: string }) {
+  // Settings › Language › Date & Time Formatting.
+  const date = useDates().date;
   const { hydrated: creditsReady, ledger } = useCredits();
   const { hydrated: planReady, sub } = useCreatePlan();
   const me = useMe();

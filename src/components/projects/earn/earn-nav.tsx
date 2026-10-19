@@ -17,6 +17,7 @@ import { EARN_SECTION_LABEL, EARN_SECTIONS, earnHref, type EarnSection } from "@
 import { revealDelta } from "@/lib/ui/tab-keys";
 import { cn } from "@/lib/utils";
 import { FADE, TAB, TAB_OFF, TAB_ON } from "../details/tab-strip";
+import { motionReduced } from "@/lib/settings/appearance";
 
 /** A revealed tab clears the fade with room to spare. */
 const REVEAL_PAD = 44;
@@ -48,7 +49,7 @@ export function EarnNav({ projectId, section }: { projectId: string; section: Ea
     if (!strip || !tab) return;
     const delta = revealDelta(tab.getBoundingClientRect(), strip.getBoundingClientRect(), REVEAL_PAD);
     if (delta === 0) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = motionReduced();
     strip.scrollBy({ left: delta, behavior: still ? "auto" : "smooth" });
   }, [section]);
 

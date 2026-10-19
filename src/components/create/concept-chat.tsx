@@ -93,6 +93,8 @@ import {
   type SheetProduct,
   type SheetRequest,
 } from "./spec-sheet";
+import { motionReduced } from "@/lib/settings/appearance";
+import { readSettings } from "@/lib/settings/prefs";
 
 const POLL_MS = 2_500;
 /** Longer than the generator’s own budget, so the server is what gives up
@@ -692,7 +694,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         const res = await fetch("/api/concept/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
+          // Settings › AI Properties: with the volunteer pool off the route
+          // never sends the render to the AI Horde.
+          body: JSON.stringify(readSettings().ai.volunteerPool ? input : { ...input, pool: "off" }),
         });
         // The route says why it could not render, and each reason needs
         // different words on the card, so the reason is carried rather than
@@ -1001,7 +1005,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       requestAnimationFrame(() => {
         const ring = document.getElementById(land.ring);
         if (!ring) return;
-        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const still = motionReduced();
         // The canvas alone scrolls — never the page around it.
         const near = land.near ? document.getElementById(land.focus) : null;
         if (near) scrollWithin(near, "nearest", still ? "auto" : "smooth");

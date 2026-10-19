@@ -50,6 +50,7 @@ import { Icon, type IconValue } from "./icon";
 import { SIDEBAR_COLLAPSED_KEY } from "./sidebar-state";
 import {
   AccountPopover,
+  useAccountMenuRequest,
   FloatingPanel,
   WalletPopover,
   moveFocus,
@@ -159,6 +160,8 @@ export function DashboardSidebar({
   const [openOn, setOpenOn] = React.useState<string | null>(null);
   const drawerOpen = openOn === pathname;
   const setDrawerOpen = (open: boolean) => setOpenOn(open ? pathname : null);
+  // On a phone the account menu is in the drawer: asking for it opens that first.
+  useAccountMenuRequest(() => setDrawerOpen(true), () => !window.matchMedia("(min-width: 768px)").matches, false);
   // The Blog's demo review decides about a minute after sending, on every page.
   useReviewClock();
 
@@ -734,6 +737,15 @@ function ProfileRow({
   const ids = { account: React.useId(), wallet: React.useId(), bell: React.useId() };
   const planLabel = usePlanLabel();
   const me = useMe();
+  // Opened from elsewhere (Settings › Appearance): only the row on screen opens.
+  useAccountMenuRequest(
+    () => {
+      setByKeyboard(true);
+      setOpenPanel("account");
+    },
+    () => rowRef.current?.offsetParent != null,
+    true,
+  );
 
   React.useLayoutEffect(() => {
     railRef.current = rowRef.current?.closest("aside") ?? null;

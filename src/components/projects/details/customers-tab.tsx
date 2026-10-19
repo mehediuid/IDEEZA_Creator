@@ -49,13 +49,13 @@ import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { cn } from "@/lib/utils";
 import { Pagination } from "../pagination";
 import { When } from "../product/when";
+import { motionReduced } from "@/lib/settings/appearance";
 
 /** A quiet link at reading size; 44 px at phone width and on a coarse pointer. */
 const QUIET_LINK =
   "inline-flex min-h-[24px] items-center self-start rounded-sm text-md font-medium leading-md text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
-const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
-const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia(REDUCED_MOTION).matches;
+const prefersReducedMotion = () => motionReduced();
 
 export function CustomersPanel({
   customers,
