@@ -53,6 +53,7 @@ import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
 import { ListingCard, ListingCardSkeleton } from "./listing-card";
+import { recordSearch } from "@/lib/data/activity-log";
 
 type Tab = MarketQuery["tab"];
 
@@ -127,6 +128,7 @@ export function MarketplacePage() {
   );
   const changeView = (patch: Partial<Omit<MarketQuery, "page">>) => write({ ...view, ...patch, page: 1 });
   const changeQuery = (next: string) => {
+    recordSearch("explore", next);
     setText(next);
     write({ ...view, q: next.trim(), page: 1 });
   };
