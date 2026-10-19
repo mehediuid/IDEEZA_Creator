@@ -14,7 +14,8 @@
 // - Custom amount: at least 50 credits at $0.10 each, the price and the
 //   rate (and your discount), Purchase credits; when a pack gives as many for
 //   less, "Better deal available!" with Switch to pack.
-// Purchase goes to the checkout page (checkout-page.tsx).
+// Purchase goes to the checkout page (checkout-page.tsx). Under them, Credit
+// alerts and limits (credit-alerts.tsx, #credit-alerts).
 
 import * as React from "react";
 import Link from "next/link";
@@ -42,6 +43,7 @@ import { useCredits, type CreditEntry } from "@/lib/create/credits";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
+import { CreditAlertsCard } from "./credit-alerts";
 import { PLAN_CARDS } from "./pricing-frame";
 
 const pct = (d: number) => `${Math.round(d * 100)}%`;
@@ -157,6 +159,8 @@ export function CreditsPanel() {
       </ul>
 
       <CustomAmount discount={discount} />
+
+      <CreditAlertsCard />
 
       {history && <CreditHistoryDialog onClose={() => setHistory(false)} />}
       {compare && <DiscountsDialog onClose={() => setCompare(false)} />}

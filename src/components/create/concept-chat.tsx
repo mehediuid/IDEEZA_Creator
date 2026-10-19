@@ -333,7 +333,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // regenerate alike. `canAfford` gates the three controls that start one;
   // the charge itself happens in `runGeneration`, the single funnel all
   // three go through, so there is one place money can move.
-  const { canAfford, charge, refund } = useCredits();
+  const { canAfford, charge, overCap, refund } = useCredits();
   const canRender = canAfford(CONCEPT_COST);
 
   const chat = getChat(chatId);
@@ -686,6 +686,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // controls are already disabled without the balance for it; this
         // catches a balance that ran out between the click and here, and
         // it throws so the one catch below handles both ways to fail.
+        // The monthly spending limit is asked first: credits bought
+        // wouldn't let this one through.
+        if (overCap(CONCEPT_COST)) throw new FailedRender("cap");
         if (!charge(turnId, CONCEPT_COST, "concept")) {
           throw new FailedRender("credits");
         }
@@ -727,6 +730,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [
       charge,
+      overCap,
       refund,
       setTurnJob,
       resolveAssistantTurn,

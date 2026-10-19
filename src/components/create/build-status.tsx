@@ -35,6 +35,7 @@ import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, type BannerTone } from "@/components/ideeza";
 import { CREDITS_HREF } from "@/lib/create/credit-pricing";
+import { CAP_REASON, CREDIT_ALERTS_HREF } from "@/lib/create/credit-limits";
 import { buildCost } from "@/lib/create/credits";
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
 import {
@@ -155,6 +156,25 @@ export function stateRowFor(
       actions: "cancelQueued",
       footer: "Your place in the queue is kept — nothing else is needed from you.",
       footerLink: { label: "Buy credits →", href: CREDITS_HREF, buyFor: cost },
+    };
+  }
+
+  // Its turn came up and it would take this month past the monthly
+  // spending limit the maker set. Buying credits can't start it; raising
+  // or removing the limit (or the next month) does.
+  if (status === "queued" && job.blocked === "cap") {
+    return {
+      badge: { text: "Paused — monthly limit", tone: "warning" },
+      sectionLabel: "Build paused",
+      banner: {
+        tone: "warning",
+        title: CAP_REASON,
+        body: `This build needs ${cost} credits, which would go over the monthly spending limit you set. Raise or remove the limit and it starts by itself. Nothing is charged until it does.`,
+      },
+      meta: "Waiting for your monthly limit",
+      actions: "cancelQueued",
+      footer: "Your place in the queue is kept. A new month also starts it.",
+      footerLink: { label: "Change your limit →", href: CREDIT_ALERTS_HREF },
     };
   }
 

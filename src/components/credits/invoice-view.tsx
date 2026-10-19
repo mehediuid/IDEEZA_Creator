@@ -5,7 +5,8 @@
 // how it was paid and the transaction — readable here, and printed or saved as
 // a PDF from the browser's print dialog (the page chrome stays off paper).
 // Built from the payment itself (lib/account/invoices.ts); a testnet invoice
-// says so on its face.
+// says so on its face. "Billed to" prints the Billing details saved on Plan &
+// pricing › Billing history (lib/account/billing-details.ts), as they are now.
 
 import * as React from "react";
 import Link from "next/link";
@@ -13,6 +14,7 @@ import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { useMe } from "@/components/dashboard/sidebar-account";
 import { Badge, Button, TestnetDemoBadge } from "@/components/ideeza";
 import { NARROW_COLUMN, Page } from "@/components/ideeza/page";
+import { billedTo, useBillingDetails } from "@/lib/account/billing-details";
 import { invoicesOf } from "@/lib/account/invoices";
 import { usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
@@ -27,6 +29,7 @@ export function InvoiceView({ orderId }: { orderId: string }) {
   const { hydrated: creditsReady, ledger } = useCredits();
   const { hydrated: planReady, sub } = useCreatePlan();
   const me = useMe();
+  const billing = useBillingDetails();
   const invoice = React.useMemo(() => invoicesOf(ledger, sub.orders).find((i) => i.id === orderId) ?? null, [ledger, sub.orders, orderId]);
 
   React.useEffect(() => {
@@ -60,6 +63,7 @@ export function InvoiceView({ orderId }: { orderId: string }) {
   }
 
   const renewal = invoice.status === "Not charged";
+  const to = billedTo(billing, me.name);
   return (
     <Shell>
       <div className="flex flex-wrap items-center justify-between gap-[12px] print:hidden">
@@ -93,7 +97,12 @@ export function InvoiceView({ orderId }: { orderId: string }) {
             <h2 id="billed-to" className="text-sm font-medium leading-sm text-text-tertiary">
               Billed to
             </h2>
-            <p className="font-semibold text-text-primary">{me.name}</p>
+            <p className="font-semibold text-text-primary">{to.name}</p>
+            {to.lines.map((l, i) => (
+              <p key={`${i}-${l}`} className="text-text-secondary [overflow-wrap:anywhere]">
+                {l}
+              </p>
+            ))}
             {invoice.payer && <p className="font-mono text-text-secondary">{shortAddress(invoice.payer)}</p>}
           </section>
           <section aria-labelledby="order-details" className="flex flex-col gap-[4px] text-md leading-md">

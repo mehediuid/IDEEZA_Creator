@@ -21,6 +21,8 @@
 
 import * as React from "react";
 import { expiredLines } from "./credit-lots";
+import { withinCap } from "./credit-limits";
+import { readSettings } from "../settings/prefs";
 import { VALIDITY_MONTHS, addMonths } from "./credit-pricing";
 
 /** What building ONE product costs. A build covers every product in the
@@ -183,15 +185,19 @@ export function openCharges(ledger: CreditEntry[], buildId: string): number {
 // state unchanged with ok:true (it IS charged — callers don't need to
 // distinguish "just now" from "already"). Once refunded, the same
 // buildId can be charged again. Returns ok:false, state unchanged, when
-// the balance can't cover the cost.
+// the balance can't cover the cost (`why: "balance"`) or, given `limit`,
+// when the charge would take this calendar month past the monthly
+// spending limit (`why: "cap"`, credit-limits.ts).
 export function chargeState(
   state: CreditsState,
   buildId: string,
   cost: number = BUILD_COST,
   reason: ChargeReason = "build",
-): { state: CreditsState; ok: boolean } {
+  limit?: { cap: number | null; now: number },
+): { state: CreditsState; ok: boolean; why?: "balance" | "cap" } {
   if (openCharges(state.ledger, buildId) > 0) return { state, ok: true };
-  if (state.balance < cost) return { state, ok: false };
+  if (limit && !withinCap(state.ledger, limit.cap, cost, limit.now)) return { state, ok: false, why: "cap" };
+  if (state.balance < cost) return { state, ok: false, why: "balance" };
   const entry: CreditEntry = {
     id: makeId(),
     delta: -cost,
@@ -336,7 +342,10 @@ type Ctx = {
   balance: number;
   ledger: CreditEntry[];
   canAfford: (cost?: number) => boolean;
+  /** False when the balance can't cover it or it would cross the monthly spending limit. */
   charge: (buildId: string, cost?: number, reason?: ChargeReason) => boolean;
+  /** Whether spending `cost` now would take this month past the monthly spending limit. */
+  overCap: (cost: number) => boolean;
   refund: (buildId: string) => boolean;
   /** Adds a paid order's credits once per `orderId`; false when it already did. */
   purchase: (order: CreditOrder) => boolean;
@@ -422,14 +431,24 @@ export function CreditsProvider({
       cost: number = BUILD_COST,
       reason: ChargeReason = "build",
     ) => {
-      // A lot that ran out of time since the page loaded can't pay for it.
-      const result = chargeState(expireState(stateRef.current, Date.now()), buildId, cost, reason);
+      // A lot that ran out of time since the page loaded can't pay for it,
+      // and no charge takes this month past the monthly spending limit.
+      const now = Date.now();
+      const result = chargeState(expireState(stateRef.current, now), buildId, cost, reason, {
+        cap: readSettings().credits.monthlyCap,
+        now,
+      });
       if (result.state !== stateRef.current) {
         stateRef.current = result.state;
         setState(result.state);
       }
       return result.ok;
     },
+    [],
+  );
+
+  const overCap = React.useCallback(
+    (cost: number) => !withinCap(stateRef.current.ledger, readSettings().credits.monthlyCap, cost, Date.now()),
     [],
   );
 
@@ -467,6 +486,7 @@ export function CreditsProvider({
     ledger: state.ledger,
     canAfford,
     charge,
+    overCap,
     refund,
     purchase,
     grant,

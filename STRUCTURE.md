@@ -61,7 +61,9 @@ ideeza-creator-panel/
    │  │                      breadcrumb, pill tabs), plan-pricing-page, plans-panel, credits-panel,
    │  │                      billing-history, payment-method-panel, plan-banner (+ plan details),
    │  │                      checkout-page + order-summary + payment-picker (the checkout page),
-   │  │                      buy-credits (the in-place shortfall dialog), invoice-view
+   │  │                      buy-credits (the in-place shortfall dialog + auto top-up), invoice-view,
+   │  │                      credit-alerts (Credit alerts and limits card), billing-details (card),
+   │  │                      purchase-confirm (the "ask before a purchase over" confirm)
    │  ├─ support/            report-problem (the one Report a problem dialog + host)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
@@ -138,7 +140,8 @@ ideeza-creator-panel/
    │  │                      AI-answer validation), geometry, products, store,
    │  │                      from-concept (the concept network as the saved Network)
    │  ├─ create/             history.tsx (chats + build jobs), credits.tsx, credit-pricing.ts, credit-lots.ts
-   │  │                      (credits ledger), plans.ts + plan.tsx (the account's plan:
+   │  │                      (credits ledger), credit-limits.ts (monthly spending, the limit, running low,
+   │  │                      next expiry, confirm-above, auto top-up's decision), plans.ts + plan.tsx (the account's plan:
    │  │                      subscription, renewals, monthly credit grants), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
    │  │                      plan.tsx (build-plan data)

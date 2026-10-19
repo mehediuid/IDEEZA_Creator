@@ -33,6 +33,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { buildCost } from "@/lib/create/credits";
+import { CREDIT_ALERTS_HREF } from "@/lib/create/credit-limits";
 import { productsOf, useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
 // "PCB" · "PCB and Firmware code" — the build page's own join rule, so
@@ -119,6 +120,9 @@ export function BuildAttentionBanner() {
   // grammar
   // ("…the 3D model, PCB, Firmware code, Wiring and Parts step failed").
   const systemFailure = job.failure === "system";
+  // Paused by the monthly spending limit rather than the balance: its way
+  // out is the limit, not Buy credits.
+  const capped = job.blocked === "cap";
   const tone: "brand" | "warning" | "error" = systemFailure
     ? "error"
     : reason === "review"
@@ -146,7 +150,9 @@ export function BuildAttentionBanner() {
           return `${name} · the ${joinLabels(labels)} ${step} failed`;
         })()
       : reason === "credits"
-        ? `${name} is paused — buy credits to start it`
+        ? capped
+          ? `${name} is paused: you reached your monthly limit`
+          : `${name} is paused — buy credits to start it`
         : `${name} is ready`;
 
   // The build's home is the chat it was started from — that is where its
@@ -192,7 +198,12 @@ export function BuildAttentionBanner() {
           {message}
         </p>
       </div>
-      {reason === "credits" ? (
+      {reason === "credits" && capped ? (
+        <Link href={CREDIT_ALERTS_HREF} className={ctaClass}>
+          Change limit
+          <Icon icon={ArrowRight01Icon} />
+        </Link>
+      ) : reason === "credits" ? (
         <BuyCreditsButton need={buildCost(productsOf(job).length)} className={ctaClass}>
           Buy credits
           <Icon icon={ArrowRight01Icon} />

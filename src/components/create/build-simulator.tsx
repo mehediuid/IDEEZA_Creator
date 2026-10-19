@@ -15,7 +15,8 @@
 //   • the tick that advances each running build's artifacts,
 //   • promotion of the oldest queued build once the worker is free,
 //   • the credit charge when a build actually starts (and parking it
-//     back in the queue when the balance can't cover it),
+//     back in the queue when the balance can't cover it, or when it would
+//     take this month past the monthly spending limit),
 //   • the refund after a system failure,
 //   • the dev-only failure hooks.
 //
@@ -36,6 +37,8 @@ import {
   useCredits,
   type CreditEntry,
 } from "@/lib/create/credits";
+import { buildGate, type BuildGate } from "@/lib/create/credit-limits";
+import { useSettings } from "@/lib/settings/use-settings";
 
 // Per-tick increment per item (synthetic; a real backend will push real
 // progress). 6% / tick * 800ms ≈ 13s per fresh item — close enough to
@@ -100,6 +103,7 @@ export function BuildSimulator() {
     ledger,
     hydrated: creditsHydrated,
   } = useCredits();
+  const { monthlyCap } = useSettings().credits;
   // Both stores hydrate in their own mount effect. Until the ledger has
   // read storage its balance is 0, so acting before then would park
   // every running build as unaffordable on page load.
@@ -108,10 +112,14 @@ export function BuildSimulator() {
   // the provider refreshes in its OWN effect, and a provider's effects
   // run after its children's — so from here the ref is a render behind.
   // Asked per build, because the price is per product: a balance that
-  // covers a one-product build does not cover a three-product one.
-  const affordable = React.useCallback(
-    (job: BuildJob) => balance >= costOf(job),
-    [balance],
+  // covers a one-product build does not cover a three-product one. The
+  // monthly spending limit is asked first: buying credits can't start a
+  // build it holds. Raising the limit (or a new month) re-renders this,
+  // and the next tick starts the build.
+  const gateOf = React.useCallback(
+    (job: BuildJob): BuildGate =>
+      buildGate({ balance, cost: costOf(job), ledger, cap: monthlyCap, now: Date.now() }),
+    [balance, ledger, monthlyCap],
   );
 
   // The tick reads the latest builds without restarting the interval.
@@ -135,10 +143,11 @@ export function BuildSimulator() {
         markCharged(b.id);
         continue;
       }
-      // Its turn came up but the balance can't cover it — back to the
-      // queue, flagged, rather than building unpaid.
-      if (!affordable(b)) {
-        blockForCredits(b.id);
+      // Its turn came up but the balance or the limit can't cover it —
+      // back to the queue, flagged, rather than building unpaid.
+      const gate = gateOf(b);
+      if (gate !== "go") {
+        blockForCredits(b.id, gate);
         continue;
       }
       // Idempotent per open charge, so a re-run before the ledger has
@@ -147,7 +156,7 @@ export function BuildSimulator() {
     }
   }, [
     ready,
-    affordable,
+    gateOf,
     builds,
     ledger,
     charge,
@@ -214,17 +223,18 @@ export function BuildSimulator() {
       const next = oldestQueued(buildsRef.current);
       if (!next) return;
       // A build that has already paid (a partial build queued for a
-      // single retry) owes nothing more, so an empty balance must not
-      // park it — retrying a piece costs no extra credits.
-      if (affordable(next) || next.creditsCharged) promoteQueued();
+      // single retry) owes nothing more, so an empty balance or the
+      // limit must not park it — retrying a piece costs no extra credits.
+      const gate = next.creditsCharged ? "go" : gateOf(next);
+      if (gate === "go") promoteQueued();
       // Already parked for the same reason — don't re-issue the action
       // every tick, which is what kept re-rendering the provider and
       // rewriting localStorage while a credits-blocked build just sat
       // there.
-      else if (next.blocked !== "credits") blockForCredits(next.id);
+      else if (next.blocked !== gate) blockForCredits(next.id, gate);
     }, TICK_MS);
     return () => window.clearInterval(t);
-  }, [ready, affordable, updateBuildItem, promoteQueued, blockForCredits]);
+  }, [ready, gateOf, updateBuildItem, promoteQueued, blockForCredits]);
 
   React.useEffect(() => {
     if (process.env.NODE_ENV === "production") return;

@@ -4,12 +4,15 @@
 // sheet with the breadcrumb and four tabs: Available plan, Credits, Billing
 // history (every payment, each with its invoice) and Payment method. Your
 // plan sits over Billing history and Payment method, as the design puts it.
+// Billing history ends with the Billing details card (#billing-details) the
+// invoices print; Credits ends with Credit alerts and limits (#credit-alerts).
 //
 // The tab is in the URL (?tab=credits, ?tab=billing, ?tab=payment), so a link
 // lands on it and a refresh keeps it.
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { BillingDetailsCard } from "./billing-details";
 import { BillingHistory } from "./billing-history";
 import { CreditsPanel } from "./credits-panel";
 import { PaymentMethodPanel } from "./payment-method-panel";
@@ -41,6 +44,7 @@ export function PlanPricingPage() {
       <section id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} className="flex flex-col gap-[32px]">
         {(tab === "billing" || tab === "payment") && <PlanBanner onSeePlans={() => select("plans")} />}
         {tab === "plans" ? <PlansPanel /> : tab === "credits" ? <CreditsPanel /> : tab === "billing" ? <BillingHistory /> : <PaymentMethodPanel />}
+        {tab === "billing" && <BillingDetailsCard />}
       </section>
     </PricingFrame>
   );

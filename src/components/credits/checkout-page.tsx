@@ -12,6 +12,8 @@
 // wallet's own request (review, sign) and lands the plan or the credits in the same
 // commit as its debit. Then "Upgrade completed" / "Payment successful", or
 // "Payment failed" with Try again. Payments aren't on: it is all testnet.
+// Above the amount set in "Ask before a purchase over" (Credit alerts and
+// limits), the button asks once more before the wallet opens.
 
 import * as React from "react";
 import Link from "next/link";
@@ -23,17 +25,20 @@ import { NARROW_COLUMN, NARROW_WITH_RAIL } from "@/components/ideeza/page";
 import { PageHeader } from "@/components/ideeza/page-header";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { useDefaultToken } from "@/lib/account/payment";
+import { needsConfirm } from "@/lib/create/credit-limits";
 import { PLAN_PRICING_HREF, VALIDITY_MONTHS, addMonths, coinAmount, usd } from "@/lib/create/credit-pricing";
 import { checkoutOrderOf, type CheckoutOrder } from "@/lib/create/checkout-route";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { YEARLY_OFF, planOf, priceOf, quoteUpgrade, relationOf } from "@/lib/create/plans";
+import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { invoiceHref } from "./billing-history";
 import { creditsLine, orderOf } from "./buy-credits";
 import { OrderSummary, PaymentResult } from "./order-summary";
 import { PaymentPicker, useWalletStatus, type PayCoin } from "./payment-picker";
 import { PricingFrame } from "./pricing-frame";
+import { PurchaseConfirm } from "./purchase-confirm";
 
 const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const n = (v: number) => v.toLocaleString("en-US");
@@ -86,6 +91,8 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   const [phase, setPhase] = React.useState<Phase>({ kind: "form" });
   const [paying, setPaying] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
+  const { confirmAbove } = useSettings().credits;
+  const [asking, setAsking] = React.useState(false);
   const [orderId, setOrderId] = React.useState(() => newOrderId(order.kind === "plan" ? "plan" : "order"));
   const [now] = React.useState(() => Date.now());
 
@@ -163,9 +170,13 @@ function Checkout({ order }: { order: CheckoutOrder }) {
     if (!autoRenew) cancel();
   };
 
-  const pay = async () => {
+  const pay = async (confirmed = false) => {
     if (paying) return;
     setNote(null);
+    if (!confirmed && due > 0 && needsConfirm(due, confirmAbove)) {
+      setAsking(true);
+      return;
+    }
     if (isPlan && due === 0) {
       finishPlan({ paidWith: "Covered by unused time" });
       setPhase({ kind: "done", id: orderId, line: `You're all set on ${target!.name}. ${n(target!.credits)} AI credits are added for this month.` });
@@ -257,7 +268,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
       total={usd(due)}
       cta={{
         label: fromPaid ? "Confirm upgrade" : `Upgrade to ${target!.name}`,
-        onClick: pay,
+        onClick: () => pay(),
         loading: paying,
         disabled: due > 0 && !wallet.connected,
         hint: due > 0 && !wallet.connected ? "Connect your wallet to pay." : undefined,
@@ -281,7 +292,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
       total={usd(due)}
       cta={{
         label: `Pay ${usd(due)}`,
-        onClick: pay,
+        onClick: () => pay(),
         loading: paying,
         disabled: !wallet.connected,
         hint: !wallet.connected ? "Connect your wallet to pay." : undefined,
@@ -328,6 +339,19 @@ function Checkout({ order }: { order: CheckoutOrder }) {
         </div>
         <div className={NARROW_COLUMN}>{summary}</div>
       </div>
+      {confirmAbove !== null && (
+        <PurchaseConfirm
+          open={asking}
+          amount={due}
+          limit={confirmAbove}
+          what={isPlan ? `${target!.name}, billed ${cycle === "yearly" ? "yearly" : "monthly"},` : credits!.pack ? `The ${credits!.pack} pack` : "This custom amount"}
+          onCancel={() => setAsking(false)}
+          onConfirm={() => {
+            setAsking(false);
+            void pay(true);
+          }}
+        />
+      )}
     </div>
   );
 }
