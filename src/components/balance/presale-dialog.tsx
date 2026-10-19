@@ -245,7 +245,7 @@ function PresaleSteps({ onClose, onViewLog }: { onClose: () => void; onViewLog: 
           </h2>
           <div className="flex items-start gap-[12px] text-left">
             <IdeezaLogo mark height={48} decorative className="shrink-0" />
-            <p className="text-lg leading-lg text-text-primary">
+            <p className="text-md leading-md text-text-primary">
               IDEEZA Wallet is a beginner-friendly app that makes it easy to buy our presale token. Follow the steps
               below to get started.
             </p>
@@ -345,7 +345,7 @@ function Success({
       <span aria-hidden className="inline-flex size-[64px] items-center justify-center rounded-full bg-bg-success-subtle text-text-success">
         <Icon icon={Tick02Icon} size={32} />
       </span>
-      <h2 id={headingId} tabIndex={-1} className="text-2xl font-semibold leading-2xl text-text-brand outline-none">
+      <h2 id={headingId} tabIndex={-1} className="text-3xl font-semibold leading-3xl text-text-brand outline-none">
         Purchase Successful
       </h2>
       {purchase && (

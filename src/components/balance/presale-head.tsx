@@ -60,7 +60,7 @@ export function PresaleHead({ headingId, now, raised }: { headingId: string; now
         <h2 id={headingId} tabIndex={-1} className="text-3xl font-semibold leading-3xl text-text-brand outline-none">
           Buy $IDZ Token
         </h2>
-        <p className="text-xl font-semibold leading-xl text-text-primary">
+        <p className="text-lg font-semibold leading-lg text-text-primary">
           {open ? `In Presale Now! · ${PRESALE.round}` : `${PRESALE.round} has ended`}
         </p>
       </div>
@@ -108,8 +108,8 @@ export function RateLine({ price, whitelisted, coin }: { price: Amount; whitelis
 /** C2f: no white paper exists yet, so the link says Soon instead of downloading nothing. */
 export function WhitePaperLink() {
   return (
-    <p className="flex items-center justify-center gap-[8px] text-lg leading-lg text-text-disabled">
-      <Icon icon={Download04Icon} size={20} />
+    <p className="flex items-center justify-center gap-[8px] text-md leading-md text-text-disabled">
+      <Icon icon={Download04Icon} size={18} />
       <span>Download White Paper</span>
       <span className="text-sm leading-sm text-text-tertiary">Soon</span>
     </p>

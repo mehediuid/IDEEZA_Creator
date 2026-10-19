@@ -36,7 +36,7 @@ import { RateLine } from "./presale-head";
 const BOX =
   "flex flex-col gap-[8px] rounded-xl bg-bg-subtle px-[16px] py-[12px] text-left focus-within:ring-2 focus-within:ring-border-focus";
 const INPUT =
-  "min-w-0 flex-1 bg-transparent text-xl font-semibold leading-xl tabular-nums text-text-primary outline-none placeholder:font-regular placeholder:text-text-tertiary";
+  "min-w-0 flex-1 bg-transparent text-lg font-semibold leading-lg tabular-nums text-text-primary outline-none placeholder:font-regular placeholder:text-text-tertiary";
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 export type BuyArgs = { idz: Amount; pay: Amount; coin: PayCoin; price: Amount; whitelisted: boolean };
