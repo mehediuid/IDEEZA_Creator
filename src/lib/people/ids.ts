@@ -5,6 +5,8 @@
 // bare "c3" ids; they are mapped here on read and never rewritten in storage.
 // Names an owner typed into a project team belong to nobody yet, so they have
 // no profile. Every person but you is a demo person until there are accounts.
+// Your address is `/creators/<your handle>` once you choose one in Settings ›
+// Profile; `/creators/me` stays an alias that always opens you.
 //
 // Relative imports only (node:test loads the compiled module).
 
@@ -12,6 +14,7 @@ import { CREATORS } from "../feed";
 import { SAMPLE_PEOPLE_IDS, personOf as innovationsPersonOf } from "../innovations/people";
 import { slugify } from "../innovations/slug";
 import { DEMO_BUYERS } from "../wallet/identities";
+import { cleanHandle, handleFormatProblem } from "./handle";
 
 export type PersonId = string;
 
@@ -66,23 +69,11 @@ export function displayNameOf(name: string): string {
   return name.trim() || "You";
 }
 
-/** Everyone who can have a profile: you first, then the feed creators, the sample commenters and
- *  the demo creators, each with a handle unique among them. */
-export function directory(me: { name: string; latinName: string }): Person[] {
-  const name = displayNameOf(me.name);
-  const latin = me.latinName.trim();
-  const people: Person[] = [
-    {
-      id: ME,
-      kind: "me",
-      handle: "me",
-      name,
-      latinName: latin && latin !== name ? latin : null,
-      initials: initialsOf(name, latin || null),
-      color: null,
-    },
-  ];
-  const taken = new Set<string>(["me"]);
+/** The feed creators, the sample commenters and the demo creators, each with a handle unique
+ *  among them and never "me". The same in every browser. */
+function sampleDirectory(): Person[] {
+  const people: Person[] = [];
+  const taken = new Set<string>([ME]);
   const handleFor = (n: string): string => {
     const base = slugify(n) || "creator";
     let handle = base;
@@ -109,8 +100,48 @@ export function directory(me: { name: string; latinName: string }): Person[] {
   return people;
 }
 
+const SAMPLE_DIRECTORY: readonly Person[] = sampleDirectory();
+
+/** Every handle a sample person holds; none of them can be yours. */
+export const SAMPLE_HANDLES: readonly string[] = SAMPLE_DIRECTORY.map((p) => p.handle);
+
+/** Why `raw` can't be your handle (its form, or a sample creator has it); null when it can. */
+export function handleProblem(raw: string): string | null {
+  const handle = cleanHandle(raw);
+  const form = handleFormatProblem(handle);
+  if (form) return form;
+  if (SAMPLE_HANDLES.includes(handle)) return "Another creator has this handle. Try another.";
+  return null;
+}
+
+/** Your handle as the address uses it: the one you chose, or "me" while it is unset or unusable. */
+export function ownHandleOf(handle: string | null | undefined): string {
+  return handle && handleProblem(handle) === null ? cleanHandle(handle) : ME;
+}
+
+/** Everyone who can have a profile: you first, then the feed creators, the sample commenters and
+ *  the demo creators, each with a handle unique among them. */
+export function directory(me: { name: string; latinName: string; handle?: string }): Person[] {
+  const name = displayNameOf(me.name);
+  const latin = me.latinName.trim();
+  return [
+    {
+      id: ME,
+      kind: "me",
+      handle: ownHandleOf(me.handle),
+      name,
+      latinName: latin && latin !== name ? latin : null,
+      initials: initialsOf(name, latin || null),
+      color: null,
+    },
+    ...SAMPLE_DIRECTORY,
+  ];
+}
+
+/** The person at `/creators/<handle>`; "me" always finds you. */
 export function personByHandle(dir: readonly Person[], handle: string): Person | null {
   const h = handle.toLowerCase();
+  if (h === ME) return dir.find((p) => p.kind === "me") ?? null;
   return dir.find((p) => p.handle === h) ?? null;
 }
 
@@ -122,13 +153,12 @@ export function profileHref(person: Pick<Person, "handle">): string {
   return `/creators/${person.handle}`;
 }
 
-const SAMPLE_DIRECTORY: readonly Person[] = directory({ name: "", latinName: "" }).slice(1);
-
-/** Where a person's name links: `/creators/me` for you, a sample person's handle, or null for
- *  someone with no profile (a name typed into a project team). Takes either id scheme. */
-export function profileHrefOf(raw: string, from: "innovations" | "messages" = "messages"): string | null {
+/** Where a person's name links: your handle's address for you (`/creators/me` until you have
+ *  one), a sample person's handle, or null for someone with no profile (a name typed into a
+ *  project team). Takes either id scheme. */
+export function profileHrefOf(raw: string, from: "innovations" | "messages" = "messages", myHandle?: string): string | null {
   const id = canonicalId(raw, from);
-  if (id === ME) return "/creators/me";
+  if (id === ME) return `/creators/${ownHandleOf(myHandle)}`;
   const p = SAMPLE_DIRECTORY.find((x) => x.id === id);
   return p ? profileHref(p) : null;
 }

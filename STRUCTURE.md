@@ -97,6 +97,7 @@ ideeza-creator-panel/
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
    │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages
+   │  │                      (profile/: Profile and Personal Information)
    │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor)
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
@@ -133,6 +134,8 @@ ideeza-creator-panel/
    │  │                      audience (who can reach you, quiet mode, hidden words, people you've met)
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
    │  │                      videos, comments), filter (settings, quiet hours, digest), read state
+   │  ├─ account/            the account: payment token, invoices, summary, your private identity
+   │  │                      (ideeza:account:identity: legal name, gender, addresses) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store
@@ -190,7 +193,8 @@ ideeza-creator-panel/
    │  ├─ blog/               Blog: the model (doc, statuses, actions, demo review, list, slugs, cover),
    │  │                      the local store (ideeza:blog + rev'd bodies), IndexedDB files (ideeza-blog)
    │  ├─ people/             the creator profile's people layer: one person id and handles, profile
-   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt
+   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt,
+   │  │                      your handle's rules, time zones and spoken languages (Settings)
    │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration, demo seed),
    │  │                      the local store (ideeza:messages), IndexedDB files, acting-as, actions
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)

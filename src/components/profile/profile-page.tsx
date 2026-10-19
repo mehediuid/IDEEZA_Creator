@@ -9,13 +9,18 @@
 // and the rest) and Activity. Your own adds Edit profile, a prompt where a
 // field is empty, and one owner-only line. Every count and chip is read from
 // work already public; nothing is typed in for you or guessed. A skeleton holds the place until the
-// stores are read, so Follow never flashes on your own page.
+// stores are read, so Follow never flashes on your own page. Settings adds (spec
+// 2026-10-19-settings-design.md §5.3, §5.10): your skills, top specialties and languages under About,
+// your social accounts with your links, your local time only when you chose to show it, and
+// your profile as others see it (`?view=public`, or while this tab acts as someone else), which
+// shows only your name, photo and "This profile is locked" when you locked it.
 
 import * as React from "react";
 import Link from "next/link";
-import { ImageAdd01Icon, UserIcon } from "@hugeicons/core-free-icons";
+import { useSearchParams } from "next/navigation";
+import { ImageAdd01Icon, SquareLock02Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Banner, Button, Skeleton, StateCard } from "@/components/ideeza";
+import { Banner, Button, Skeleton, StateCard, buttonVariants } from "@/components/ideeza";
 import { PAGE_CONTAINER, PAGE_CONTENT } from "@/components/projects/details/frame";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { cn } from "@/lib/utils";
@@ -34,9 +39,10 @@ import { useProjectsEditions } from "@/lib/market/editions-store";
 import { useMarket } from "@/lib/market/market-store";
 import { teamOf } from "@/lib/manual/contributors";
 import { unblockPerson } from "@/lib/messages/actions";
+import { setActingAs, useStoredActingAs } from "@/lib/messages/identity";
 import type { StartParams } from "@/lib/messages/links";
-import { OPEN_TO_WORDS, type ProfileFields } from "@/lib/people/fields";
-import { ME, directory, personByHandle, type Person } from "@/lib/people/ids";
+import { OPEN_TO_WORDS, SOCIAL_NETWORKS, type ProfileFields } from "@/lib/people/fields";
+import { ME, canonicalId, directory, personByHandle, profileHref, type Person } from "@/lib/people/ids";
 import { listingFactsOf } from "@/lib/people/listing-facts";
 import { madeOfMine, madeOfSample, ownerCounts, type MadeItem, type MineInput } from "@/lib/people/made";
 import { useMyCover, useMyPhoto } from "@/lib/people/photo-store";
@@ -44,6 +50,7 @@ import { activityOf, builtWithOf, featuredOf, inProduction, localTimeOf, worksOn
 import { useMyProfile } from "@/lib/people/profile-store";
 import { SAMPLE_PROFILES } from "@/lib/people/sample-profiles";
 import { tiesOf } from "@/lib/people/ties";
+import { useSettings } from "@/lib/settings/use-settings";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { FollowingDialog, useFollowing } from "./following-dialog";
 import { ChipRow, CoverBand, IdentityHead, LinkList, OpenToLine, SideSection, StatList } from "./identity";
@@ -196,12 +203,61 @@ function useJourneysRaw(ids: readonly string[]): (string | null)[] | null {
   return React.useMemo(() => (snapshot ? (JSON.parse(snapshot) as (string | null)[]) : null), [snapshot]);
 }
 
+/** Your profile as someone else sees it: a stranger (`?view=public`) or the person this tab acts as. */
+type Visitor = { kind: "public" } | { kind: "acting"; id: string };
+
+/** "You're seeing your profile as others see it", with the way back. */
+function VisitorBar({ visitor, href }: { visitor: Visitor; href: string }) {
+  return (
+    <Banner
+      tone="info"
+      action={
+        visitor.kind === "public" ? (
+          <Link href={href} className={buttonVariants({ hierarchy: "secondary", size: "md" })}>
+            Back to your view
+          </Link>
+        ) : (
+          <Button type="button" hierarchy="secondary" size="md" onClick={() => setActingAs(ME)}>
+            Back to your view
+          </Button>
+        )
+      }
+    >
+      You&apos;re seeing your profile as others see it
+    </Banner>
+  );
+}
+
+/** Skills · Top specialties · Languages, under About (Settings › Personal Information). */
+function Abilities({ fields }: { fields: ProfileFields }) {
+  return (
+    <>
+      {fields.skills.length > 0 && (
+        <SideSection title="Skills">
+          <ChipRow chips={fields.skills} />
+        </SideSection>
+      )}
+      {fields.specialities.length > 0 && (
+        <SideSection title="Top specialties">
+          <ChipRow chips={fields.specialities.map((s) => `${s.skill} · ${s.years} years`)} />
+        </SideSection>
+      )}
+      {fields.languages.length > 0 && (
+        <SideSection title="Languages">
+          <ChipRow chips={fields.languages} />
+        </SideSection>
+      )}
+    </>
+  );
+}
+
 function OwnProfile({
   person,
   fields,
   photoUrl,
   coverUrl,
   togglePin,
+  visitor,
 }: {
   person: Person;
   fields: ProfileFields;
@@ -209,6 +265,8 @@ function OwnProfile({
   /** The cover you uploaded; null when you haven't. */
   coverUrl: string | null;
   togglePin: (projectId: string, valid?: readonly string[]) => { ok: boolean; refused: boolean };
+  /** Someone else is looking: no owner controls, and a locked profile shows only who you are. */
+  visitor: Visitor | null;
 }) {
   const { hydrated: projectsReady, projects } = useManualProjects();
   const { hydrated: buildsReady, builds } = useCreateHistory();
@@ -223,8 +281,19 @@ function OwnProfile({
   const following = useFollowing();
   const editButton = React.useRef<HTMLButtonElement>(null);
 
+  const { audience } = useSettings();
+
   const ready = projectsReady && buildsReady && marketReady && editions.hydrated && journeys !== null && now > 0;
   const titleRef = useArrivalFocus(ready);
+
+  // Locked (Settings › Profile locking): people you don't work with on a project see who you are
+  // and nothing more.
+  const worksWithYou = React.useMemo(() => {
+    if (visitor?.kind !== "acting") return false;
+    const id = canonicalId(visitor.id, "messages");
+    return projects.some((p) => teamOf(p.contributors ?? []).some((m) => canonicalId(m.id, "messages") === id));
+  }, [visitor, projects]);
+  const locked = visitor !== null && audience.locked && !worksWithYou;
 
   // Each project once: its journey, its current products (a later version's drops left out)
   // and their parts, read the way the project page reads them.
@@ -285,6 +354,46 @@ function OwnProfile({
 
   if (!ready) return <ProfileSkeleton />;
 
+  const bar = visitor && <VisitorBar visitor={visitor} href={profileHref(person)} />;
+  // "You" is your own word for yourself; someone else sees a profile with no name as unnamed.
+  const shownName = visitor && !fields.name.trim() ? "Unnamed creator" : person.name;
+
+  if (locked) {
+    return (
+      <div className={PAGE_CONTAINER}>
+        <div className={CONTENT}>
+          {bar}
+          <CoverBand src={null} />
+          <div className={GRID}>
+            <div className={ID_TOP}>
+              <IdentityHead
+                titleRef={titleRef}
+                avatar={{ initials: person.initials, color: null, src: photoUrl }}
+                name={shownName}
+                latinName={person.latinName}
+                headline={null}
+                demo={false}
+                location={null}
+                localTime={null}
+                since={null}
+                relation={null}
+              />
+            </div>
+            <div className={WORK}>
+              <StateCard
+                tone="empty"
+                icon={<Icon icon={SquareLock02Icon} size={36} />}
+                title="This profile is locked"
+                body={`Only people who work with ${fields.name.trim() ? firstNameOf(person.name) : "this creator"} on a project can see their projects and activity.`}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const owner = visitor === null;
   const counts = ownerCounts(projects, made);
   const firstProject = projects.reduce<number | null>((at, p) => (at === null || p.createdAt < at ? p.createdAt : at), null);
   const since = [fields.since, firstProject].filter((v): v is number => v !== null).reduce<number | null>((a, b) => (a === null || b < a ? b : a), null);
@@ -304,28 +413,34 @@ function OwnProfile({
 
   const fallbackCover = featuredOf(made)?.featured.cover ?? null;
 
-  const prompt = (words: string) => (
-    <button type="button" onClick={openEdit} className={PROMPT}>
-      {words}
-    </button>
-  );
+  const prompt = (words: string) =>
+    owner ? (
+      <button type="button" onClick={openEdit} className={PROMPT}>
+        {words}
+      </button>
+    ) : null;
+
+  const links = [...new Set([...fields.links, ...SOCIAL_NETWORKS.map((n) => fields.social[n]).filter(Boolean)])];
 
   return (
     <div className={PAGE_CONTAINER}>
       <div className={CONTENT}>
+        {bar}
         <CoverBand
           src={coverUrl ?? fallbackCover}
           action={
-            <Button
-              type="button"
-              hierarchy="secondary"
-              size="md"
-              onClick={openEdit}
-              iconLeading={<Icon icon={ImageAdd01Icon} size={16} />}
-              className="max-md:min-h-[var(--touch-min)]"
-            >
-              {coverUrl ? "Change cover" : "Add cover"}
-            </Button>
+            owner && (
+              <Button
+                type="button"
+                hierarchy="secondary"
+                size="md"
+                onClick={openEdit}
+                iconLeading={<Icon icon={ImageAdd01Icon} size={16} />}
+                className="max-md:min-h-[var(--touch-min)]"
+              >
+                {coverUrl ? "Change cover" : "Add cover"}
+              </Button>
+            )
           }
         />
         <div className={GRID}>
@@ -333,50 +448,66 @@ function OwnProfile({
             <IdentityHead
               titleRef={titleRef}
               avatar={{ initials: person.initials, color: null, src: photoUrl }}
-              name={person.name}
+              name={shownName}
               latinName={person.latinName}
               headline={fields.headline || prompt(hasName ? "Add what you build" : "Add your name and what you build")}
               demo={false}
               location={fields.location || null}
-              localTime={fields.location ? localTimeOf(fields.timeZone, now) : null}
+              localTime={fields.location && audience.showLocalTime ? localTimeOf(fields.timeZone, now) : null}
               since={since}
               relation={null}
             />
-            <div className="max-md:hidden">
-              <Button ref={editButton} type="button" hierarchy="secondary" size="lg" onClick={openEdit} className="w-full">
-                Edit profile
-              </Button>
-            </div>
-            <OwnerFacts
-              shown={counts.shown}
-              hidden={counts.hidden}
-              following={following.hydrated ? following.people.length : null}
-              onFollowing={() => setFollowingOpen(true)}
-            />
+            {owner && (
+              <>
+                <div className="max-md:hidden">
+                  <Button ref={editButton} type="button" hierarchy="secondary" size="lg" onClick={openEdit} className="w-full">
+                    Edit profile
+                  </Button>
+                </div>
+                <OwnerFacts
+                  shown={counts.shown}
+                  hidden={counts.hidden}
+                  following={following.hydrated ? following.people.length : null}
+                  onFollowing={() => setFollowingOpen(true)}
+                />
+              </>
+            )}
             {fields.openTo && <OpenToLine words={OPEN_TO_WORDS[fields.openTo]} />}
             <StatList stats={statsOf(made, 0)} />
-            <SideSection title="About">
-              {fields.bio ? <p className={BODY}>{fields.bio}</p> : <div>{prompt("Add a few lines about your work")}</div>}
-            </SideSection>
+            {(owner || fields.bio) && (
+              <SideSection title="About">
+                {fields.bio ? <p className={BODY}>{fields.bio}</p> : <div>{prompt("Add a few lines about your work")}</div>}
+              </SideSection>
+            )}
+            <Abilities fields={fields} />
           </div>
           <div className={WORK}>
-            <WorkTabs items={made} activity={portfolio.activity} own ownerName={person.name} onTogglePin={onTogglePin} pinNotice={notice} />
+            <WorkTabs
+              items={made}
+              activity={portfolio.activity}
+              own={owner}
+              ownerName={shownName}
+              onTogglePin={owner ? onTogglePin : undefined}
+              pinNotice={owner ? notice : null}
+            />
           </div>
           <div className={ID_MORE}>
             <MoreAbout
               builtWith={portfolio.builtWith}
-              builtWithNote="From the parts lists of your shared projects"
+              builtWithNote={owner ? "From the parts lists of your shared projects" : `From the parts lists of ${fields.name.trim() ? `${firstNameOf(person.name)}'s` : "this creator's"} shared projects`}
               worksOn={[]}
-              links={fields.links}
+              links={links}
             />
           </div>
         </div>
       </div>
-      <div role="group" aria-label="Profile actions" className={PHONE_BAR}>
-        <Button type="button" hierarchy="secondary" size="xl" onClick={openEdit} className="h-[48px] flex-1">
-          Edit profile
-        </Button>
-      </div>
+      {owner && (
+        <div role="group" aria-label="Profile actions" className={PHONE_BAR}>
+          <Button type="button" hierarchy="secondary" size="xl" onClick={openEdit} className="h-[48px] flex-1">
+            Edit profile
+          </Button>
+        </div>
+      )}
       {followingOpen && <FollowingDialog onClose={() => setFollowingOpen(false)} />}
       {editing && (
         <EditProfileDialog
@@ -574,10 +705,21 @@ export function ProfilePage({ handle }: { handle: string }) {
   const { hydrated, fields, togglePin } = useMyProfile();
   const photo = useMyPhoto();
   const cover = useMyCover();
-  const dir = React.useMemo(() => directory({ name: fields.name, latinName: fields.latinName }), [fields.name, fields.latinName]);
+  const publicView = useSearchParams().get("view") === "public";
+  const acting = useStoredActingAs();
+  const dir = React.useMemo(
+    () => directory({ name: fields.name, latinName: fields.latinName, handle: fields.handle }),
+    [fields.name, fields.latinName, fields.handle],
+  );
+  const visitor: Visitor | null = React.useMemo(
+    () => (publicView ? { kind: "public" } : acting !== ME ? { kind: "acting", id: acting } : null),
+    [publicView, acting],
+  );
   if (!hydrated || !photo.hydrated || !cover.hydrated) return <ProfileSkeleton />;
   const person = personByHandle(dir, decodeURIComponent(handle));
   if (!person) return <NotHere />;
-  if (person.kind === "me") return <OwnProfile person={person} fields={fields} photoUrl={photo.url} coverUrl={cover.url} togglePin={togglePin} />;
+  if (person.kind === "me") {
+    return <OwnProfile person={person} fields={fields} photoUrl={photo.url} coverUrl={cover.url} togglePin={togglePin} visitor={visitor} />;
+  }
   return <OtherProfile person={person} />;
 }
