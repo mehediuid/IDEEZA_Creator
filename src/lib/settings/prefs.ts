@@ -147,7 +147,9 @@ export const DEFAULT_SETTINGS: SettingsV1 = Object.freeze({
   blocking: { hiddenWords: [] },
   privacy: { searchEngines: false },
   credits: {
-    lowAt: 10,
+    // "Running low" at or under 3: less than one product build (4), the rule
+    // the account popover always used, so a new account isn't warned at once.
+    lowAt: 3,
     expiryReminderDays: 14,
     monthlyCap: null,
     confirmAbove: null,

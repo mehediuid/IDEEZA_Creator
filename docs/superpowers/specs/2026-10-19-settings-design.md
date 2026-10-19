@@ -83,7 +83,7 @@ export interface SettingsV1 {
   audience: { locked: boolean; addToTeam: Reach; seeFollowing: Reach; allowLinkSave: boolean; follow: Reach; teamConversation: Reach; showLocalTime: boolean; comment: Reach; quietUntil: number | null };
   blocking: { hiddenWords: string[] };                      // ≤ 500 words (Figma limit)
   privacy: { searchEngines: boolean };                      // false
-  credits: { lowAt: number; expiryReminderDays: number; monthlyCap: number | null; confirmAbove: number | null; autoTopUp: { on: boolean; pack: CreditPack } }; // 10, 14, null, null, off/"starter"
+  credits: { lowAt: number; expiryReminderDays: number; monthlyCap: number | null; confirmAbove: number | null; autoTopUp: { on: boolean; pack: CreditPack } }; // 3, 14, null, null, off/"starter"
 }
 ```
 API: `readSettings(): SettingsV1`, `useSettings(): SettingsV1`, `updateSettings<K extends keyof SettingsV1>(section: K, patch: Partial<SettingsV1[K]>): boolean` (false = refused write), `normalizeSettings(raw: unknown): SettingsV1`, `DEFAULT_SETTINGS`, `SETTINGS_KEY`, and a window event `ideeza:settings-change`. Data with an existing home stays there: who can message (`ideeza:messages`), profile fields (`ideeza:profile`), payment token (`ideeza:account:payment`), theme (`ideeza-theme`), PCB editor settings (`ideeza:pcb:appSettings`).

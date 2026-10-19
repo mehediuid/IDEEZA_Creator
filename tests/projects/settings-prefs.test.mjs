@@ -36,7 +36,7 @@ test("a broken field falls back alone; the rest is kept", () => {
   assert.deepEqual(s.notifications.channels.marketplace, { web: false, email: false, mobile: false });
   assert.equal(s.language.dateLocale, "en-IN");
   assert.equal(s.language.voice, "auto");
-  assert.equal(s.credits.lowAt, 10);
+  assert.equal(s.credits.lowAt, DEFAULT_SETTINGS.credits.lowAt);
   assert.equal(s.credits.monthlyCap, 200);
   assert.equal(s.credits.confirmAbove, null);
   assert.equal(s.audience.comment, "work");

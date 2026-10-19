@@ -21,8 +21,10 @@ import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza";
 import { cn } from "@/lib/utils";
 
+// Kept out of cn(): tailwind-merge folds `outline` into `outline-2` and drops
+// it, so the outline never drew. Appended as a plain string instead.
 const ARRIVED =
-  "scroll-mt-24 data-[arrived]:rounded-lg data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus";
+  " scroll-mt-24 data-[arrived]:rounded-lg data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus";
 
 export function SettingsCard({
   id,
@@ -44,7 +46,7 @@ export function SettingsCard({
     <section
       id={id}
       aria-labelledby={titleId}
-      className={cn("flex flex-col rounded-xl border border-solid border-border bg-bg-surface px-[16px] py-[16px]", ARRIVED, className)}
+      className={cn("flex flex-col rounded-xl border border-solid border-border bg-bg-surface px-[16px] py-[16px]", className) + ARRIVED}
     >
       <div className="flex flex-wrap items-start justify-between gap-x-[16px] gap-y-[8px]">
         <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
@@ -102,9 +104,8 @@ export function SettingsRow({
   const linkClass = cn(
     ROW_BOX,
     "-mx-[8px] rounded-lg px-[8px] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
-    ARRIVED,
     className,
-  );
+  ) + ARRIVED;
   if (!control && href && !disabled) {
     return (
       <Link id={id} href={href} className={linkClass}>
@@ -122,7 +123,7 @@ export function SettingsRow({
     );
   }
   return (
-    <div id={id} role="group" aria-labelledby={labelId} className={cn(ROW_BOX, ARRIVED, className)}>
+    <div id={id} role="group" aria-labelledby={labelId} className={cn(ROW_BOX, className) + ARRIVED}>
       {text}
       {control != null && <div className="flex shrink-0 items-center gap-[8px]">{control}</div>}
     </div>
