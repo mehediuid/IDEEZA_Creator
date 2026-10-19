@@ -837,6 +837,8 @@ type Ctx = {
   // there's nothing the user needs to act on right now.
   topAttention: BuildAttention | null;
   dismissAttention: (buildId: string) => void;
+  /** Deletes a chat from this browser, with the builds in `dropBuilds` (history-delete.ts decides which). */
+  deleteChat: (chatId: string, dropBuilds: readonly string[]) => void;
 };
 
 const CreateHistoryContext = React.createContext<Ctx | null>(null);
@@ -1723,6 +1725,12 @@ export function CreateHistoryProvider({
     );
   }, []);
 
+  const deleteChat = React.useCallback((chatId: string, dropBuilds: readonly string[]) => {
+    const drop = new Set(dropBuilds);
+    setChats((arr) => arr.filter((c) => c.id !== chatId));
+    if (drop.size) setBuilds((arr) => arr.filter((b) => !drop.has(b.id)));
+  }, []);
+
   const getBuild = React.useCallback(
     (buildId: string) => builds.find((b) => b.id === buildId) ?? null,
     [builds],
@@ -1793,6 +1801,7 @@ export function CreateHistoryProvider({
     attentionBuilds,
     topAttention,
     dismissAttention,
+    deleteChat,
   };
 
   return (
