@@ -38,7 +38,7 @@ export function BillingDetailsCard() {
     <SettingsCard
       id={PLAN_SECTIONS.billingDetails}
       title="Billing details"
-      description="Optional. Printed under “Billed to” on every invoice. Until you add a name, invoices use your profile name."
+      description="Optional. Printed under “Billed to” on every invoice. Until you add a name, invoices use your legal name from Account, else your profile name."
       action={!editing ? <EditButton onClick={() => setEditing(true)} aria-label={EDIT_LABEL} /> : undefined}
     >
       {editing ? (

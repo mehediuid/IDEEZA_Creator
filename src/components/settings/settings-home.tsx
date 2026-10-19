@@ -90,8 +90,8 @@ function ThisBrowserCard() {
     !storage.ready || !storage.supported || storage.persisted === null
       ? null
       : storage.persisted
-        ? "Yes, the browser won't clear it on its own"
-        : "The browser may clear it when space runs low";
+        ? "Until you clear it"
+        : "Until space runs low";
   return (
     <SettingsCard
       id="this-browser"
@@ -101,7 +101,7 @@ function ThisBrowserCard() {
       <Facts
         items={[
           { term: "Last backup", value: backup.hydrated ? (backup.at === null ? "Never" : date(backup.at)) : "—" },
-          ...(kept ? [{ term: "Kept safe", value: kept }] : []),
+          ...(kept ? [{ term: "The browser keeps it", value: kept }] : []),
         ]}
       />
       <Actions>

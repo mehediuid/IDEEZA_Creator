@@ -66,7 +66,8 @@ function SettingsCrumbs({ page }: { page: SettingsPageId }) {
   const crumbs = settingsCrumbs(page);
   if (crumbs.length < 2) return null;
   return (
-    <nav aria-label="Breadcrumb">
+    // On a phone the "Settings" back link above the title already leads home.
+    <nav aria-label="Breadcrumb" className="hidden [@container(min-width:768px)]:block">
       <ol className="flex flex-wrap items-center gap-[6px] text-md leading-md">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1;
