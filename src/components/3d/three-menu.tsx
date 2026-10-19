@@ -71,7 +71,6 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "Grid…", action: "settings:grid" },
     { label: "Snap…", action: "settings:snap" },
     { label: "", divider: true },
-    { label: "Theme: Light / Dark", action: "settings:theme" },
     { label: "Reset View", action: "settings:resetView", shortcut: "0" },
     { label: "Reset Scene", action: "settings:resetScene" },
   ],

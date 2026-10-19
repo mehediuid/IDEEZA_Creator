@@ -13,6 +13,7 @@ src/lib/pcb/
   nets.ts              # live schematic connectivity (pins + union-find netlist) + ERC
   shape-boolean.ts     # boolean/Combine geometry (rasterize + marching-squares)
   inspector-schema.ts  # schema-driven Properties inspector (panels + fields)
+  app-settings.ts      # the editor's global settings record (ideeza:pcb:appSettings) + measurement-unit.ts
   icons.tsx / hicons.ts# DsIcon + icon dictionaries
   pcb-scene.ts         # 3D-tab scene: real board+tracks+vias+pads+bodies+regions from the 2D layout
   exporters.ts         # real file generators (Pick&Place/DXF/SVG/PDF/PNG/STL/OBJ) + download helpers
@@ -41,7 +42,8 @@ src/components/pcb/
 - **`stateRef.current`** — read latest state inside async/event actions.
 - **`setToolAs(tool, text)`** — arms a place tool whose object carries a given name (`state.placeText`, consumed + cleared by `placeObject`). Lets several menu rows share one symbol kind honestly: Insert ▸ Power & Ground places `vcc5v` as **VCC / +5V / -5V**, and the supply glyph draws `obj.text`.
 - Actions may call `actions.<other>()` (safe — invoked on events, not during render).
-- **Persistence:** the *document* (`objects, pcbBoard, twoD, threeD, gridSize, gridType, unit, snapEnabled, designRules, pcbDrcConfig, pcbLayers, pcbNets, pcbDefaults, boardSettings`) auto-saves (debounced) to `localStorage` under `ideeza:pcb:doc:<projectId>:<productId>`, one document per product: the store holds none until an editor route names one (`setDocScope`, `usePcbDocScope`) and never reads `ideeza:manual:active` for it. So layer colours/visibility/lock, net colours, place defaults, grid style and DRC rule-tuning now survive reload. UI flags (zoom, panels, menus, sheets) are session-only. `saveDoc()` force-writes; `sanitizePcbDoc()` shape-checks every key on load.
+- **Persistence:** the *document* (`objects, pcbBoard, twoD, threeD, gridSize, gridType, unit, snapEnabled, designRules, pcbDrcConfig, pcbLayers, pcbNets, pcbDefaults, boardSettings`) auto-saves (debounced) to `localStorage` under `ideeza:pcb:doc:<projectId>:<productId>`, one document per product: the store holds none until an editor route names one (`setDocScope`, `usePcbDocScope`) and never reads `ideeza:manual:active` for it. So layer colours/visibility/lock, net colours, place defaults, grid style and DRC rule-tuning now survive reload. UI flags (zoom, panels, menus, sheets) are session-only. `saveDoc()` force-writes; `sanitizePcbDoc()` shape-checks every key on load. A board without its own `unit` opens on the Measurement Unit default (`boardUnitFor`).
+- **Editor settings** (global, not per product): `ideeza:pcb:appSettings`, v2 `{ version, measurementUnit, overlay, dialogs }` (`lib/pcb/app-settings.ts`) — the Setting overlay's ten pages (`systemSettings`, `propertySettings`, `hotkeys`, `drawings`, `fonts`, `saveSettings`, `schemSymbolSettings`, `pcbFootprintSettings`, `panelLibSettings`, `toolbarCustomization`), the one Measurement Unit default and the 3D Setting dialogs' own values. Read once on mount (`appSettingsLoaded`), written on every change, carried across `setDocScope` and a project delete; v1 (the 3D dialogs' flat map) migrates on the first read, keeping every value. A new field goes in `PcbState`, `OVERLAY_KEYS` (or `dialogs`) and the repair in `normalizePcbAppSettings`.
 
 ## `CanvasObject` — the universal placed-object model
 

@@ -74,7 +74,7 @@ import {
 } from "@/lib/pcb/exporters";
 import { ProjectInfoModal } from "@/components/dashboard/project-info-modal";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
-import { SettingDialog, HotkeyDialog, TopToolbarDialog } from "@/components/pcb/settings-dialogs";
+import { SettingDialog } from "@/components/pcb/settings-dialogs";
 import {
   ModalTabBar,
   nextSeverity,
@@ -4495,10 +4495,6 @@ export function Modals() {
     case "set3dDrawing":
     case "set3dProperty":
       return <SettingDialog id={state.modal} />;
-    case "set3dHotkey":
-      return <HotkeyDialog />;
-    case "set3dTopToolbar":
-      return <TopToolbarDialog />;
     case "convertConfirm":
       return <ConvertConfirmModal />;
     case "importChanges":

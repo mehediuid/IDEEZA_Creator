@@ -6,7 +6,7 @@ UI grouped by module; logic and data for the same module live in [src/lib/](../l
 |---|---|---|
 | `ideeza/` | In-house design-system atoms (Button, Select, Segmented, Checkbox, Banner, TextInput, Slider, ProgressBar…), exported from `index.ts` | [ui-ux.md](../../docs/guides/ui-ux.md) — the component notes |
 | `ui/` | shadcn-style primitives (badge, button, card, input) | ui-ux.md |
-| `theme-provider.tsx`, `theme-toggle.tsx`, `brand/`, `app-chrome/` | Light/dark theme, logo, profile dropdown | [features/platform-and-projects.md](../../docs/guides/features/platform-and-projects.md) |
+| `theme-provider.tsx`, `brand/`, `app-chrome/` | Light/dark theme, logo, the editor account menu | [features/platform-and-projects.md](../../docs/guides/features/platform-and-projects.md) |
 | `support/` | `report-problem.tsx`: the one Report a problem dialog and its host, mounted in the root layout | features/platform-and-projects.md › Platform & shell |
 | `dashboard/` | Global sidebar (+ phone drawer, footer account / wallet popovers), home `workspace-prompt`, ⌘K `command-palette` | features/platform-and-projects.md; [features/ai-create-flow.md](../../docs/guides/features/ai-create-flow.md) |
 | `create/` | AI flow: concept chat + rail + thread, setup turn, image turns, spec sheet, build gate, build rail/status/shell, `review-outputs`, credits, history, toasts, the mounted `build-simulator` | features/ai-create-flow.md; Part 4 spec |

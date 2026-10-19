@@ -217,7 +217,7 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
         </p>
       </div>
       {!canRender && (
-        <a href="/history#credits" className="self-start text-md font-medium text-text-brand underline underline-offset-2">
+        <a href="/settings/plan?tab=credits" className="self-start text-md font-medium text-text-brand underline underline-offset-2">
           Top up credits
         </a>
       )}
