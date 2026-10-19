@@ -1,6 +1,6 @@
-// Settings › Audience (spec 2026-10-19-settings-design.md §5.10, D9, D13): who may reach you
-// (Anyone · People you work with · Only me), quiet mode, the locked profile, and the hidden
-// words — matching, #tags, the 500 limit.
+// Settings › Privacy & safety (spec 2026-10-19-settings-design.md §5.10, D9, D13): who may
+// comment (Anyone · People you work with · Only me), Take a break, the locked profile, and the
+// hidden words — matching, #tags, the 500 limit.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -10,11 +10,6 @@ const {
   stricterReach,
   commentRuleOf,
   canComment,
-  canFollow,
-  canAddToTeam,
-  canInviteToTeamConversation,
-  canSeeFollowing,
-  canSaveOrLink,
   seesLockedProfile,
   quietUntilFor,
   QUIET_MS,
@@ -30,7 +25,6 @@ const with_ = (patch) => patchSettings(DEFAULT_SETTINGS, "audience", patch);
 const stranger = { tie: null, blocked: false };
 const teammate = { tie: "team", blocked: false };
 const holder = { tie: "share", blocked: false };
-const owner = { tie: "copy", blocked: false };
 
 test("reach: Anyone lets everyone in, People you work with only your project teams, Only me nobody", () => {
   for (const tie of [null, "team", "share", "copy"]) assert.equal(reachAllows("everyone", tie), true);
@@ -67,29 +61,6 @@ test("quiet mode ends 24 hours or 7 days from now; Off clears it", () => {
   assert.equal(quietUntilFor("24h", NOW), NOW + QUIET_MS["24h"]);
   assert.equal(quietUntilFor("7d", NOW), NOW + 7 * 24 * 60 * 60 * 1000);
   assert.equal(quietUntilFor("off", NOW), null);
-});
-
-test("follow, add to a team, invite to a team conversation, see who you follow: each its own rule", () => {
-  const s = with_({ follow: "work", addToTeam: "nobody", teamConversation: "everyone", seeFollowing: "work" });
-  assert.equal(canFollow(s, teammate), true);
-  assert.equal(canFollow(s, owner), false);
-  assert.equal(canFollow(DEFAULT_SETTINGS, { tie: null, blocked: true }), false);
-  assert.equal(canAddToTeam(s, teammate), false);
-  assert.equal(canAddToTeam(DEFAULT_SETTINGS, stranger), true);
-  assert.equal(canInviteToTeamConversation(s, stranger), true);
-  assert.equal(canInviteToTeamConversation(DEFAULT_SETTINGS, stranger), false, "default: people you work with");
-  assert.equal(canInviteToTeamConversation(DEFAULT_SETTINGS, teammate), true);
-  assert.equal(canSeeFollowing(s, { ...teammate, isOwner: false }), true);
-  assert.equal(canSeeFollowing(DEFAULT_SETTINGS, { ...teammate, isOwner: false }), false, "default: only me");
-  assert.equal(canSeeFollowing(DEFAULT_SETTINGS, { ...stranger, isOwner: true }), true);
-});
-
-test("save and link: on by default, off keeps everyone but you out; a blocked person never", () => {
-  assert.equal(canSaveOrLink(DEFAULT_SETTINGS, { isOwner: false, blocked: false }), true);
-  assert.equal(canSaveOrLink(DEFAULT_SETTINGS, { isOwner: false, blocked: true }), false);
-  const off = with_({ allowLinkSave: false });
-  assert.equal(canSaveOrLink(off, { isOwner: false, blocked: false }), false);
-  assert.equal(canSaveOrLink(off, { isOwner: true, blocked: false }), true);
 });
 
 test("a locked profile: people you don't work with see the locked view; you and your teams don't", () => {

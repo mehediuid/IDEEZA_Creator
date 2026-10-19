@@ -27,6 +27,8 @@ export type CommentsUi = {
   unhide: (c: PostComment) => void;
   openPhoto: (c: PostComment) => void;
 
+  /** False on a post whose maker the viewer blocked, or who blocked them: no Reply anywhere. */
+  canReply: boolean;
   /** The comment whose Reply opened the composer, in which thread. */
   reply: { rootId: string; targetId: string } | null;
   startReply: (c: PostComment, opener: HTMLElement) => void;

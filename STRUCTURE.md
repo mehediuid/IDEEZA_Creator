@@ -134,7 +134,8 @@ ideeza-creator-panel/
    │  ├─ pcb/                ★ PCB engine (see below)
    │  ├─ settings/           Settings: registry (pages, crumbs, nav), rows/ (each page's
    │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings,
-   │  │                      audience (who can reach you, quiet mode, hidden words, people you've met),
+   │  │                      audience (who can comment, Take a break, the locked profile, hidden words
+   │  │                      and their Bangla-safe matcher, people you've met),
    │  │                      dates (+ use-dates), voice, keys (single-key shortcuts), appearance (pre-paint)
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
    │  │                      videos, comments), filter (settings, quiet hours, digest), read state

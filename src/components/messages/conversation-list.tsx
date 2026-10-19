@@ -233,7 +233,7 @@ export function ConversationList() {
         )}
         {tab === "requests" && quietUntil !== null && (
           <p className="text-md leading-md text-text-secondary">
-            Quiet mode is on until {quietEndLabel(quietUntil)}. New requests are paused.{" "}
+            You&apos;re taking a break until {quietEndLabel(quietUntil)}. New requests are paused.{" "}
             <Link href={QUIET_MODE_HREF} className={INLINE_LINK}>
               Change
             </Link>

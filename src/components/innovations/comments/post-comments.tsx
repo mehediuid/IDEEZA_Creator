@@ -19,10 +19,15 @@
 // - focus never drops to <body>: after a delete it goes to what stands in the
 //   comment's place, or its neighbour, or the heading; after an edit or an
 //   Unhide to the comment's ⋯; after a reply is cancelled to its Reply;
-// - on your own post your Settings apply (settings spec §5.10): someone
-//   else's comment that uses a word you hide stands as a line saying so and
-//   leaves the count, and a line above the composer says who can comment now
-//   (quiet mode narrows it), with Change → Settings › Profile & Share.
+// - your Settings › Privacy & safety apply (settings spec §5.10). On your own
+//   post, someone else's comment that uses a word you hide, or whose writer
+//   your "who can comment" leaves out right now (a break narrows it; someone
+//   you blocked is always out), stands as a line saying so and leaves the
+//   count; a line above the composer says who can comment now, with Change.
+//   On any post, a comment by someone you blocked reads "From someone you
+//   blocked" and they aren't offered to @mention; on a post whose maker you
+//   blocked, or who blocked you, a line says why in place of the composer and
+//   no comment offers Reply.
 
 import * as React from "react";
 import Link from "next/link";
@@ -54,10 +59,17 @@ import {
   SORTS,
   toggleLike,
   topLevelOf,
+  writeRefusalOf,
   type CommentAction,
   type PostComment,
 } from "@/lib/innovations/comments";
-import { useHiddenWordsFor, usePostComments, type CommentSeed } from "@/lib/innovations/comments-store";
+import {
+  useBlockedAuthors,
+  useBlockWith,
+  useMakerRulesFor,
+  usePostComments,
+  type CommentSeed,
+} from "@/lib/innovations/comments-store";
 import { ME, personOf } from "@/lib/innovations/people";
 import { commentAnchor, postHref } from "@/lib/innovations/slug";
 import { ME_ID, type InnovationPost } from "@/lib/innovations/types";
@@ -140,9 +152,12 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
   React.useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
   const settings = useSettings();
-  const ownWords = useHiddenWordsFor(post.id);
-  const hiddenWords = owner ? ownWords : undefined;
-  const viewer = React.useMemo(() => ({ meId: ME_ID, isPostOwner: owner, hiddenWords }), [owner, hiddenWords]);
+  const ownRules = useMakerRulesFor(post.id);
+  const makerRules = owner ? ownRules : undefined;
+  const blocked = useBlockedAuthors();
+  const viewer = React.useMemo(() => ({ meId: ME_ID, isPostOwner: owner, makerRules, blocked }), [owner, makerRules, blocked]);
+  const blockWith = useBlockWith(post.creator.id);
+  const refusal = owner ? null : writeRefusalOf(blockWith, post.creator.name);
   const tops = React.useMemo(() => topLevelOf(comments, sort, pinned), [comments, sort, pinned]);
 
   // The thread a link points into: its page, its thread open, enough replies loaded.
@@ -165,7 +180,7 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
   const pagesShown = Math.max(pages, deepPage);
   const visibleTops = tops.slice(0, pagesShown * COMMENTS_PAGE);
   const remaining = tops.length - visibleTops.length;
-  const count = commentCount(comments, hiddenWords);
+  const count = commentCount(comments, makerRules);
   const empty = tops.length === 0;
 
   /** The first thread opens on its own; once the order is about to change, that becomes a choice it keeps. */
@@ -342,6 +357,7 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
       focusCommentSoon(c.id, "menu");
     },
     openPhoto: setPhoto,
+    canReply: refusal === null,
     reply,
     startReply: (c, opener) => {
       const root = rootOf(c, comments);
@@ -455,18 +471,29 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
 
           {owner ? <CommentRuleLine settings={settings} now={now} /> : null}
 
-          <CommentComposer
-            mode="comment"
-            id="comment-composer"
-            textareaId={composerFieldId}
-            me={ME}
-            label="Write a comment"
-            placeholder="Write a comment…"
-            mentionables={mentionablesOf(comments, ME_ID)}
-            onSubmit={postComment}
-          />
+          {refusal ? (
+            <p id="comment-composer" className="m-0 text-md leading-md text-text-secondary">
+              {refusal}{" "}
+              {blockWith === "byMe" ? (
+                <Link href="/settings/privacy#blocked" className={cn(linkVariants({ color: "brand", size: "sm" }), "text-md font-medium leading-md", TAP)}>
+                  Blocked people
+                </Link>
+              ) : null}
+            </p>
+          ) : (
+            <CommentComposer
+              mode="comment"
+              id="comment-composer"
+              textareaId={composerFieldId}
+              me={ME}
+              label="Write a comment"
+              placeholder="Write a comment…"
+              mentionables={mentionablesOf(comments, ME_ID, blocked)}
+              onSubmit={postComment}
+            />
+          )}
 
-          {empty ? (
+          {empty && !refusal ? (
             <div className="flex flex-col items-center gap-2 py-6 text-center">
               <p className="text-lg leading-lg text-text-secondary">Be the first to comment</p>
               <p className="text-md leading-md text-text-tertiary">Share what you think about this project.</p>
@@ -503,16 +530,16 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
 
 const RULE_WORD: Record<Reach, string> = { everyone: "Anyone", work: "People you work with", nobody: "Only you" };
 
-/** On your own post: who can comment now, from Settings › Profile & Share. */
+/** On your own post: who can comment now, from Settings › Privacy & safety. */
 function CommentRuleLine({ settings, now }: { settings: SettingsV1; now: number }) {
   const rule = commentRuleOf(settings, now);
   const quiet = quietModeOn(settings, now) && rule !== settings.audience.comment;
   return (
     <p className="m-0 text-md leading-md text-text-secondary">
       {quiet && settings.audience.quietUntil !== null
-        ? `Quiet mode is on until ${quietEndLabel(settings.audience.quietUntil)}, so only people you work with can comment.`
+        ? `You're taking a break until ${quietEndLabel(settings.audience.quietUntil)}, so only people you work with can comment.`
         : `Who can comment: ${RULE_WORD[rule]}.`}{" "}
-      <Link href="/settings/profile-share#comment" className={cn(linkVariants({ color: "brand", size: "sm" }), "text-md font-medium leading-md", TAP)}>
+      <Link href="/settings/privacy#comment" className={cn(linkVariants({ color: "brand", size: "sm" }), "text-md font-medium leading-md", TAP)}>
         Change
       </Link>
     </p>

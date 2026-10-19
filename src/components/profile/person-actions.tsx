@@ -276,7 +276,7 @@ export function PersonMenu({
           }}
         >
           <p className="max-w-[62ch] text-md leading-md text-text-secondary">
-            {`${person.name} won't be able to message you, and won't be told. You can unblock from this page or Messages settings.`}
+            {`${person.name} won't be able to message you, and their comments on your shared projects are held. They won't be told. You can unblock them here or in Settings › Privacy & safety.`}
           </p>
         </ConfirmDialog>
       )}

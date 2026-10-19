@@ -5,12 +5,12 @@
 import type { ContextRef, PersonId } from "./types";
 
 export const MESSAGES_HREF = "/messages";
-/** "Who can message you" and quiet mode, in Settings › Profile & Share (settings spec D13). */
-export const MESSAGE_SETTINGS_HREF = "/settings/profile-share#message";
-/** Quiet mode, in Settings › Profile & Share. */
-export const QUIET_MODE_HREF = "/settings/profile-share#quiet-mode";
-/** Hidden words, in Settings › Blocking. */
-export const HIDDEN_WORDS_HREF = "/settings/blocking#hide-words";
+/** "Who can message you", in Settings › Privacy & safety (settings spec D13). */
+export const MESSAGE_SETTINGS_HREF = "/settings/privacy#message";
+/** Take a break (quiet mode), in Settings › Privacy & safety. */
+export const QUIET_MODE_HREF = "/settings/privacy#take-a-break";
+/** Hidden words, in Settings › Privacy & safety. */
+export const HIDDEN_WORDS_HREF = "/settings/privacy#hidden-words";
 
 export type StartParams =
   | { kind: "direct"; to: PersonId; projectId: string; about: ContextRef }

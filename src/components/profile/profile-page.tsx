@@ -52,6 +52,7 @@ import { activityOf, builtWithOf, featuredOf, inProduction, localTimeOf, worksOn
 import { useMyProfile } from "@/lib/people/profile-store";
 import { SAMPLE_PROFILES } from "@/lib/people/sample-profiles";
 import { tiesOf } from "@/lib/people/ties";
+import { seesLockedProfile } from "@/lib/settings/audience";
 import { useSettings } from "@/lib/settings/use-settings";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { FollowingDialog, useFollowing } from "./following-dialog";
@@ -290,19 +291,20 @@ function OwnProfile({
   const following = useFollowing();
   const editButton = React.useRef<HTMLButtonElement>(null);
 
-  const { audience } = useSettings();
+  const settings = useSettings();
+  const { audience } = settings;
 
   const ready = projectsReady && buildsReady && marketReady && editions.hydrated && journeys !== null && now > 0;
   const titleRef = useArrivalFocus(ready);
 
-  // Locked (Settings › Profile locking): people you don't work with on a project see who you are
+  // Locked (Settings › Privacy & safety): people you don't work with on a project see who you are
   // and nothing more.
   const worksWithYou = React.useMemo(() => {
     if (visitor?.kind !== "acting") return false;
     const id = canonicalId(visitor.id, "messages");
     return projects.some((p) => teamOf(p.contributors ?? []).some((m) => canonicalId(m.id, "messages") === id));
   }, [visitor, projects]);
-  const locked = visitor !== null && audience.locked && !worksWithYou;
+  const locked = visitor !== null && seesLockedProfile(settings, { tie: worksWithYou ? "team" : null, isOwner: false });
 
   // Each project once: its journey, its current products (a later version's drops left out)
   // and their parts, read the way the project page reads them.
@@ -462,7 +464,7 @@ function OwnProfile({
               latinName={person.latinName}
               headline={fields.headline || prompt(hasName ? "Add what you build" : "Add your name and what you build")}
               demo={false}
-              // Settings › Profile & Share › "Show my location and local time"
+              // Settings › Privacy & safety › "Show my location and local time"
               // (off by default): others see neither until it's on; you
               // always see the location you typed, and the time only when on.
               location={fields.location && (owner || audience.showLocalTime) ? fields.location : null}
