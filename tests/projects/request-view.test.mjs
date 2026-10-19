@@ -112,7 +112,7 @@ test("chargeRowsOf labels the mint fee and the network fee, and totals the charg
   assert.equal(out.total, "4 IDZ + 0.00104 ETH");
   assert.equal(rv.chargeRowsOf(SIGN), null);
   const buy = { ...MINT, purpose: "purchase", network: "mumbai", charge: { network: "mumbai", lines: [{ coin: "MATIC", amount: "0.05" }, { coin: "MATIC", amount: "0.021" }] } };
-  assert.deepEqual(rv.chargeRowsOf(buy).rows.map((r) => r.label), ["Price", "Network fee (Mumbai)"]);
+  assert.deepEqual(rv.chargeRowsOf(buy).rows.map((r) => r.label), ["Price", "Network fee (Amoy)"]);
   assert.equal(rv.chargeRowsOf(buy).total, "0.071 MATIC");
 });
 

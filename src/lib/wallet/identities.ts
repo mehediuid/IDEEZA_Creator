@@ -41,7 +41,7 @@ export function activeBuyerOf(raw: string | null | undefined): DemoBuyer {
 
 /**
  * Every identity's starting balance (P2-MINT-1): the maker gets 40 IDZ, 0.05
- * test ETH on Base Sepolia and 0.5 test MATIC on Mumbai, 0 of the others. A
+ * test ETH on Base Sepolia and 0.5 test MATIC on Amoy, 0 of the others. A
  * demo buyer gets 0 IDZ and a spread of test tokens on both networks, so a
  * purchase or a bid always has something to spend.
  */

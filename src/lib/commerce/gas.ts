@@ -34,7 +34,7 @@ const RATES: Record<Network, GasEstimate> = {
   mumbai: {
     native: "MATIC",
     fee: 0.021,
-    label: "Network fee (Mumbai)",
+    label: "Network fee (Amoy)",
     note: "test MATIC — no real cost",
   },
 };

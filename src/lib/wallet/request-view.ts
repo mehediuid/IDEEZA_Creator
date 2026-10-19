@@ -201,7 +201,7 @@ export function balanceAfterOf(req: WalletRequest, identity: IdentityId, ctx: Ba
 
 // ── balances, for the manage view ───────────────────────────────────────
 
-/** "40 IDZ · 0.05 test ETH": IDZ, then the network's own coin (test MATIC on Mumbai). */
+/** "40 IDZ · 0.05 test ETH": IDZ, then the network's own coin (test MATIC on Amoy). */
 export function balanceLineOf(id: IdentityId, network: Network, ctx: BalanceCtx): string {
   const bal = balancesOf(id, ctx);
   const coin = estimateGas(network).native;
@@ -298,6 +298,7 @@ export function activityOf(req: WalletRequest, proof: Proof, id: string, project
     network: req.network,
     kind: req.kind,
     title: activityTitleOf(req),
+    purpose: req.purpose,
   };
   if (projectId) entry.projectId = projectId;
   if (proof.txHash) entry.txHash = proof.txHash;
