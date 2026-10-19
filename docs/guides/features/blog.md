@@ -114,7 +114,8 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
   - **Blog · Approved / Rejected / Featured / Removed**.
   - On phones the bell sits in the top bar at 44 px, with its count.
   - A decided review is announced politely.
-  - Opening a result marks it seen and lands on the blog's details.
+  - Opening a result marks it seen and lands on the blog's details; read results stay listed (the notice model, [settings.md](settings.md) › Notification).
+  - The announcement follows Settings › Notification: none during a daily or weekly summary, quiet hours or with Blog notices off; with "Keep notices until I close them" it stays and has a close button.
 - **Blog details** (`/blog/[slug]`, `components/blog/article/`, Figma frames 21–22).
   - **The Reject reason panel** sits under the title and byline (a notice never sits above the page's title), grouped by review.
     - "Latest review" opens, with a count caption, the Demo note and three lines per reason: title, what was found, how to fix.

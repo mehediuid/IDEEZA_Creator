@@ -6,8 +6,11 @@
 // credits.
 //
 // The banner:
-//   • Reads `topAttention` from the create-history store (the first
-//     not-yet-dismissed attention item, prioritised by build order).
+//   • Shows the first not-yet-dismissed attention item (by build order)
+//     that the Notification settings let toast: none while a daily or
+//     weekly summary is chosen, during quiet hours, for a muted project,
+//     or with Product notices switched off (lib/notifications/filter.ts).
+//     The bell still lists it.
 //   • Auto-hides when the user is already on the target build page —
 //     no point telling them about something they're already looking at.
 //   • Renders a primary CTA ("Open build" / "Buy credits") + a ×
@@ -34,6 +37,8 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import { buildCost } from "@/lib/create/credits";
 import { productsOf, useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
+import { buildNotices } from "@/lib/notifications/sources";
+import { useToastGate } from "@/components/notifications/use-notices";
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
 // "PCB" · "PCB and Firmware code" — the build page's own join rule, so
 // the two surfaces can't word one list two ways.
@@ -72,7 +77,13 @@ function useLayerOverMain() {
 
 export function BuildAttentionBanner() {
   const pathname = usePathname();
-  const { topAttention, dismissAttention } = useCreateHistory();
+  const { attentionBuilds, dismissAttention, getChat } = useCreateHistory();
+  const allowed = useToastGate();
+  const topAttention = React.useMemo(
+    () =>
+      attentionBuilds.find((a) => !a.job.attentionDismissedAt && allowed(buildNotices([a], (id) => !!getChat(id))[0])) ?? null,
+    [attentionBuilds, allowed, getChat],
+  );
   useLayerOverMain();
 
   // Re-plays the enter transition each time a new attention item takes
