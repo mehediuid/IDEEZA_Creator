@@ -130,6 +130,9 @@ ideeza-creator-panel/
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store
+   │  ├─ data/               Your data: activity log (searches, watched videos), Download
+   │  │                      Your Information (export plan, HTML pages, zip writer), reports
+   │  │                      you made, blog reuse
    │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
    │  │                      units), store, wizard (24 families), kicad parsers,
    │  │                      library (save/publish, version lock)

@@ -12,6 +12,7 @@ import { FeedControls } from "./feed-controls";
 import { ProjectGrid } from "./project-grid";
 import { SharedByYou } from "./shared-by-you";
 import { parseFeedParams, toUrlQuery, type FeedParams } from "@/lib/feed";
+import { recordSearch } from "@/lib/data/activity-log";
 
 export function Newsfeed() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export function Newsfeed() {
 
   const updateParams = React.useCallback(
     (patch: Partial<FeedParams>) => {
+      if (patch.q !== undefined) recordSearch("innovations", patch.q);
       const next: FeedParams = { ...params, ...patch };
       const qs = toUrlQuery(next);
       router.replace(qs ? `/innovations?${qs}` : "/innovations", { scroll: false });

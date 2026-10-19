@@ -6,6 +6,7 @@
 import type { Metadata } from "next";
 import * as React from "react";
 import { ProfilePage, ProfileSkeleton } from "@/components/profile/profile-page";
+import { ProfileRobots } from "@/components/settings/profile-robots";
 import { directory, personByHandle } from "@/lib/people/ids";
 
 type Props = { params: Promise<{ handle: string }> };
@@ -21,6 +22,7 @@ export default async function CreatorProfileRoute({ params }: Props) {
   const { handle } = await params;
   return (
     <React.Suspense fallback={<ProfileSkeleton />}>
+      <ProfileRobots handle={handle} />
       <ProfilePage handle={handle} />
     </React.Suspense>
   );

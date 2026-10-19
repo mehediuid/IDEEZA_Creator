@@ -48,6 +48,7 @@ import { Icon, type IconValue } from "./icon";
 import { openReportProblem } from "@/lib/support/open-report";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { searchSettings } from "@/lib/settings/search";
+import { logActivations } from "@/lib/data/activity-log";
 
 type Command = {
   id: string;
@@ -150,7 +151,7 @@ export function CommandPalette({
         onClose();
       },
     }));
-    return [...matched, ...settings];
+    return logActivations([...matched, ...settings], query);
   }, [commands, query, router, onClose]);
 
   // Reset selection whenever the filter changes (during render, so no second pass after

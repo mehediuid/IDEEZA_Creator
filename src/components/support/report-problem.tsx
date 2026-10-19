@@ -24,6 +24,7 @@ import { Banner, Button, Checkbox, IconButton, ModalFrame, Segmented, SelectMenu
 import { useTheme } from "@/components/theme-provider";
 import { useManualProjects } from "@/lib/manual/projects";
 import { REPORT_EVENT, type ReportPrefill } from "@/lib/support/open-report";
+import { rememberSentReport } from "@/lib/data/reports";
 import { deviceOf, namesFor, pageRefFor, placeLine } from "@/lib/support/page-context";
 import {
   DETAILS_COUNTER_FROM,
@@ -415,6 +416,7 @@ function ReportDialog({
       if (!r.ref) throw new Error(`status ${r.status}`);
       setTried(false);
       slots.current = 0;
+      rememberSentReport({ ref: r.ref, kind, title: payload.title, at: Date.now() });
       onSent(r.ref);
     } catch {
       setSendError("Couldn't send your report. Nothing was lost, so try again.");
