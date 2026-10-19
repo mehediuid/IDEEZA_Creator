@@ -4,21 +4,13 @@
 
 import type { Metadata } from "next";
 import * as React from "react";
-import { CheckoutPage } from "@/components/credits/checkout-page";
-import { PricingFrame } from "@/components/credits/pricing-frame";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { CheckoutFallback, CheckoutPage } from "@/components/credits/checkout-page";
 
 export const metadata: Metadata = { title: "Payment details · IDEEZA" };
 
 export default function CheckoutRoute() {
   return (
-    <React.Suspense
-      fallback={
-        <PricingFrame crumbs={[{ label: "Plan & pricing", href: PLAN_PRICING_HREF }, { label: "Payment details" }]}>
-          <p className="text-md leading-md text-text-tertiary">Loading payment details…</p>
-        </PricingFrame>
-      }
-    >
+    <React.Suspense fallback={<CheckoutFallback />}>
       <CheckoutPage />
     </React.Suspense>
   );

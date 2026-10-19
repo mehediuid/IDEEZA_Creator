@@ -1,24 +1,12 @@
-// /settings/plan — Plan & pricing: Credits (default) and Billing history
-// (?tab=billing). `useSearchParams` inside needs a Suspense boundary so the
-// route shell pre-renders before the query is known.
+// /settings/plan — Plan & billing: your plan, credits, buying credits, credit
+// alerts and limits, how you pay, billing details and invoices, one section
+// each (#your-plan … #invoices). Plans to choose from are on ./pricing.
 
-import * as React from "react";
-import { PlanPricingPage } from "@/components/credits/plan-pricing-page";
-import { PricingFrame } from "@/components/credits/pricing-frame";
 import type { Metadata } from "next";
+import { PlanBillingPage } from "@/components/credits/plan-billing-page";
 
-export const metadata: Metadata = { title: "Plan & pricing · IDEEZA" };
+export const metadata: Metadata = { title: "Plan & billing · IDEEZA" };
 
-export default function PlanPricingRoute() {
-  return (
-    <React.Suspense
-      fallback={
-        <PricingFrame crumbs={[{ label: "Settings", href: "/settings" }, { label: "Plan & pricing" }]}>
-          <p className="text-md leading-md text-text-tertiary">Loading plan and pricing…</p>
-        </PricingFrame>
-      }
-    >
-      <PlanPricingPage />
-    </React.Suspense>
-  );
+export default function PlanBillingRoute() {
+  return <PlanBillingPage />;
 }

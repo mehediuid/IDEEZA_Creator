@@ -7,7 +7,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { PRICING_HREF } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 
 const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -33,7 +33,7 @@ export function QuotaCard() {
         </p>
       </div>
       <Link
-        href={PLAN_PRICING_HREF}
+        href={PRICING_HREF}
         className="shrink-0 text-md font-semibold leading-md text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         See plans

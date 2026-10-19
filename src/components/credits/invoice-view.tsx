@@ -6,8 +6,8 @@
 // a PDF from the browser's print dialog (the page chrome stays off paper).
 // Built from the payment itself (lib/account/invoices.ts); a testnet invoice
 // says so on its face. "Billed to" prints the Billing details saved on Plan &
-// pricing › Billing history (lib/account/billing-details.ts), as they are now;
-// with no name there, your legal name (Settings › Account), else your profile's.
+// billing (lib/account/billing-details.ts), as they are now; with no name
+// there, your legal name (Settings › Account), else your profile's.
 
 import * as React from "react";
 import Link from "next/link";
@@ -18,14 +18,12 @@ import { NARROW_COLUMN, Page } from "@/components/ideeza/page";
 import { billedTo, useBillingDetails } from "@/lib/account/billing-details";
 import { invoiceNameOf, useIdentity } from "@/lib/account/identity";
 import { invoicesOf } from "@/lib/account/invoices";
-import { usd } from "@/lib/create/credit-pricing";
+import { INVOICES_HREF, usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
 import { useDates } from "@/lib/settings/use-dates";
-
-const BILLING_HREF = "/settings/plan?tab=billing";
 
 export function InvoiceView({ orderId }: { orderId: string }) {
   // Settings › Language › Date & Time Formatting.
@@ -43,10 +41,10 @@ export function InvoiceView({ orderId }: { orderId: string }) {
 
   const back = (
     <Link
-      href={BILLING_HREF}
+      href={INVOICES_HREF}
       className="text-md font-semibold leading-md text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
     >
-      ← Billing history
+      ← Invoices
     </Link>
   );
 

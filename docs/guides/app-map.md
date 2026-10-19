@@ -28,9 +28,10 @@ editors have their own top bar, with the editor account menu.
 - `/settings/personal-data` · `/settings/activity` (`?list=appreciated|comments|videos|searches`) — **Personal Data** (Download Your Information: a .zip made in the browser), **Your activity** (appreciated, comments, watched videos, searches); see [features/settings.md](features/settings.md).
 - `/settings/kyc` (`?from=<project page>` adds Back to {project}) — **KYC Verification**: the three levels; Level 1 is the demo identity check, with Reset.
 - `/settings/get-paid` — **Get Paid**: the balance and the tax rows; `/settings/get-paid/balance` (`?from=`) Balance Details, Withdraw Money, withdrawal methods, Get paid in; `/settings/get-paid/history` Withdrawal History and Download Statement (CSV); `/settings/get-paid/tax-residence`, `/settings/get-paid/tax-identification` the tax forms.
-- `/settings/plan` — **Plan & pricing** (User Panel V2 layouts on the DS): Available plan (the default: Tinkerer · Builder · Disruptor cards and a wide Free card, monthly or annual, Compare plans, Pricing FAQs) · Credits (`?tab=credits`: packs, custom amount, balance → credit history) · Billing history (`?tab=billing`: every payment, each with its invoice) · Payment method (`?tab=payment`: the demo wallet and the default token). Your plan banner (View details) over Billing history and Payment method.
-- `/settings/plan/checkout` (`?plan=builder&cycle=monthly`, `?pack=pro`, `?credits=80`) — **Payment details**: how to pay | the order, then Upgrade completed / Payment successful / Payment failed.
-- `/settings/plan/invoice/[orderId]` — one payment's **invoice**, printable or saved as PDF.
+- `/settings/plan` — **Plan & billing** (in the settings frame): Your plan (renewal, Auto-renew, usage, Change plan) · Credits (balance, lots, where they went by project) · Buy credits (packs, custom amount) · Credit alerts and limits · Pay with · Billing details · Invoices, each a `#section`; older `?tab=credits|billing|payment` links land on their section.
+- `/settings/plan/pricing` — **Pricing**: the plan cards (monthly or annual), Compare plans (rows not in the app yet say *Coming later*) and Pricing FAQs.
+- `/settings/plan/checkout` (`?plan=builder&cycle=monthly`, `?pack=pro`, `?credits=80`) — **Payment details** (Settings › Plan & billing › [Pricing ›] Payment details): how to pay | the order, then Upgrade completed / Payment successful / Payment failed.
+- `/settings/plan/invoice/[orderId]` — one payment's **invoice**, printable or saved as PDF; *← Invoices* goes back to Plan & billing.
 - `/parts` — **Parts & Agile Module**: the catalogue, captured Agile Modules, and the packages you have authored.
 - `/parts/new` — **New Package flow**: Package → Symbol → Footprint → 3D Place → Finalize (full-viewport).
 - `/parts/[id]` — one part, with its land pattern.
@@ -44,6 +45,6 @@ editors have their own top bar, with the editor account menu.
 **Per-project editor** — `/project/[projectSlug]/products/[productId]/[step]` (the editor opens one product; `/project/[projectSlug]/[step]` redirects to the product last opened, and `/project/[projectSlug]/brief` redirects to the project's mint flow); the left rail switches
 modules in `FLOW_STEPS` order (`src/lib/manual/projects.tsx`): **PCB Design · Code · 3D Module · Assembly · Peripheral Wiring · Product Preview · Add Brief**.
 
-**Monetization:** **minting** (Utility NFT, Lazy or Instant), the Explore marketplace with a 2.5 % IDEEZA fee, all on a local **demo wallet** (Testnet demo, nothing touches a chain); plans and AI credits paid from the same wallet (Settings › Plan & pricing).
+**Monetization:** **minting** (Utility NFT, Lazy or Instant), the Explore marketplace with a 2.5 % IDEEZA fee, all on a local **demo wallet** (Testnet demo, nothing touches a chain); plans and AI credits paid from the same wallet (Settings › Plan & billing, Pricing).
 
 **API:** `/api/business-plan/section` writes one business-plan section (keyless text model; 503 on failure, never filler). `/api/reports` keeps a problem report from the Report a problem dialog (private Blob store, or disk locally; 400 for a body that isn't a report, idempotent per report id).

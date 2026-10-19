@@ -86,7 +86,8 @@ test("every shell page names its tab ‹Page› · IDEEZA", () => {
   for (const [page, title] of [
     ["app/(dashboard)/page.tsx", "Home · IDEEZA"],
     ["app/(create)/history/page.tsx", "History · IDEEZA"],
-    ["app/(create)/settings/plan/page.tsx", "Plan & pricing · IDEEZA"],
+    ["app/(create)/settings/plan/page.tsx", "Plan & billing · IDEEZA"],
+    ["app/(create)/settings/plan/pricing/page.tsx", "Pricing · IDEEZA"],
   ]) {
     assert.match(read(page), new RegExp(`title: "${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   }
