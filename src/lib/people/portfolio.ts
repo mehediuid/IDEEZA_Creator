@@ -6,6 +6,8 @@
 // imports only.
 
 import { labelOf, type ProjectJourney } from "../manual/journey";
+import { formatTime } from "../settings/dates";
+import type { DateLocale } from "../settings/prefs";
 
 export type StageTone = "neutral" | "blue" | "warning" | "success";
 
@@ -86,9 +88,12 @@ export function activityOf(
   return items.sort((a, b) => b.at - a.at).slice(0, limit);
 }
 
-/** "9:40 pm" where they are; null without a readable time zone. */
-export function localTimeOf(timeZone: string | null, now: number): string | null {
+/** "9:40 pm" where they are; null without a readable time zone. With a
+ *  `locale` (Settings › Language › Date & Time Formatting) the clock is
+ *  written in that format. */
+export function localTimeOf(timeZone: string | null, now: number, locale?: DateLocale): string | null {
   if (!timeZone) return null;
+  if (locale) return formatTime(now, locale, { timeZone });
   try {
     return new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit", hour12: true })
       .format(new Date(now))
