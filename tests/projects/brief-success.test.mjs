@@ -140,21 +140,45 @@ test("a build's old Brief address redirects to the mint flow; it opens per useBr
   assert.match(read("brief-app.tsx"), /const leave = \(\) => router\.push\(earnHref\(projectId, "sell"\)\);/);
 });
 
-test("the editors' last step is Save project: the project page as a Draft, never the mint flow's Choose (owner 2026-10-19)", () => {
-  // The step's address and every rail / pill that opens it land on the project page with the
-  // "new" arrival banner; Publish there keeps it private, gives it or sells it.
+test("the editors' last step is Save project: it saves in place, never the mint flow's Choose (owner 2026-10-19)", () => {
+  // In an open editor every rail / pill that opens the step runs EditorSave (the saved dialog);
+  // the step's own address is the project page, where Publish keeps it private, gives it or sells it.
   const workspace = readSrc("components/manual/project-workspace.tsx");
   assert.doesNotMatch(workspace, /earnMintHref/);
-  assert.match(workspace, /if \(ready && projectId && isBrief\) router\.replace\(editorSaveHref\(projectId\)\);/);
+  assert.match(workspace, /if \(ready && projectId && isBrief\) router\.replace\(`\/projects\/\$\{encodeURIComponent\(projectId\)\}`\);/);
+  assert.match(workspace, /<EditorSave project=\{project\} unnamed=\{!row\.name\.trim\(\)\}>/);
   const nav = readSrc("components/manual/use-step-nav.tsx");
-  assert.match(nav, /if \(step === "brief"\) return editorSaveHref\(project\.id\);/);
+  assert.match(nav, /if \(step === "brief"\) return `\/projects\/\$\{encodeURIComponent\(project\.id\)\}`;/);
+  assert.match(nav, /if \(step === "brief" && save\) \{\s*save\(\);\s*return;\s*\}/);
   assert.match(readSrc("components/preview/preview-app.tsx"), /isWiring \? "Continue to Preview" : "Save project"/);
   assert.match(readSrc("lib/pcb/data.tsx"), /\{ key: 'brief', label: 'Save project', icon: 'save' \}/);
   for (const src of [readSrc("components/preview/preview-app.tsx"), readSrc("lib/pcb/data.tsx")]) {
     assert.doesNotMatch(src, /Continue to Brief|'Add Brief'/);
   }
-  const banner = readSrc("components/projects/details/saved-banner.tsx");
-  assert.match(banner, /if \(buildId === SAVED_FROM_EDITOR\) return arrivalOf\("new"/);
+});
+
+test("Save says it where the maker pressed it: the saved dialog, no ?saved= hop (owner 2026-10-19, D1–D6)", () => {
+  // The editors: flush the board, stamp the project, await the store write, then the dialog.
+  const editor = readSrc("components/manual/editor-save.tsx");
+  assert.match(editor, /if \(pcb\.flushDoc\(\) === false\) \{/);
+  assert.match(editor, /updateProject\(project\.id, \{\}\);/);
+  assert.match(editor, /<SavedDialog[\s\S]*kind="editor"[\s\S]*stayLabel="Keep editing"/);
+  assert.match(editor, /<SaveFailedDialog/);
+  assert.match(editor, /requestProductRename\(\)/);
+  // The AI flow: the save step turns into the same dialog instead of going to the project page.
+  const step = readSrc("components/create/save-step.tsx");
+  assert.doesNotMatch(step, /router\.push|\?saved=/);
+  assert.match(step, /stayLabel=\{getChat\(job\.chatId\) \? "Back to chat" : "Back to the build"\}/);
+  // One dialog: View project (primary, no ?saved=), the way back, Back to Home; never Publish.
+  const dialog = readSrc("components/projects/saved-dialog.tsx");
+  assert.match(dialog, /router\.push\(`\/projects\/\$\{encodeURIComponent\(project\.id\)\}`\)/);
+  assert.match(dialog, /router\.push\("\/"\)/);
+  assert.doesNotMatch(dialog, />\s*Publish\s*</);
+  // D6: the project page has no arrival banner any more.
+  assert.equal(existsSync(new URL("../../src/components/projects/details/saved-banner.tsx", import.meta.url)), false);
+  assert.doesNotMatch(readSrc("components/projects/details/project-page.tsx"), /SavedBanner/);
+  // D5: the editor logo is the way Home.
+  assert.match(readSrc("components/pcb/top-bar.tsx"), /<Link href="\/" aria-label="Home" className="ix-pill"/);
 });
 
 test("the video step left the Brief: the review shows the gate and opens the products' videos for a missing one (P1-2, P2-VIDEO-17)", () => {

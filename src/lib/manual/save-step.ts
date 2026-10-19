@@ -263,28 +263,36 @@ export function savedLineOf(project: ManualProject, version: number | null): str
   return version === null ? `Saved to ${project.name}.` : `Saved to ${project.name} as version ${version}.`;
 }
 
-/** The `?saved=` value the editors' Save project lands with. A hand-made project is a Draft
- *  from the moment it is created, so its save names no build: it lands on the project page,
- *  where Publish keeps it private, gives it or sells it — the AI flow's save, then Publish. */
-export const SAVED_FROM_EDITOR = "editor";
+/** Which save the saved dialog reports: the AI flow's three modes, or the editors' Save
+ *  project on a hand-made product (a project that is already in My projects). */
+export type SavedKind = "new" | "join" | "version" | "editor";
 
-/** Where the editors' Save project goes: the project page, with the "new" arrival banner. */
-export function editorSaveHref(projectId: string): string {
-  return `/projects/${encodeURIComponent(projectId)}?saved=${SAVED_FROM_EDITOR}`;
-}
+export type SavedNotice = { title: string; body: string; publishLine: string | null };
 
-/** P2-SAVE-9: the project page's one-shot arrival banner, by mode. */
-export function arrivalOf(
-  mode: "new" | "join" | "version",
-  f: { name: string; product: string; version: number },
-): { title: string; body?: string } {
-  switch (mode) {
+/** Where a Draft goes next — said, not offered: Publish has one home, the project page. */
+export const PUBLISH_LINE = "When it’s ready, publish it from the project page: keep it private, give it away or sell it.";
+
+/**
+ * What the saved dialog says (owner, 2026-10-19: Save stays where the maker is and asks
+ * where to go next, instead of jumping to the project page). A new project is always a
+ * Draft; the others say "Only you can see it" and where to publish only while their
+ * project is one.
+ */
+export function savedNoticeOf(
+  kind: SavedKind,
+  f: { name: string; product: string; version: number; draft: boolean },
+): SavedNotice {
+  const draft = kind === "new" || f.draft;
+  const body = draft ? `${f.name} is in My projects. Only you can see it.` : `${f.name} is in My projects.`;
+  const publishLine = draft ? PUBLISH_LINE : null;
+  switch (kind) {
     case "new":
-      return { title: "Saved to My projects", body: `${f.name} is ready for its next step.` };
+    case "editor":
+      return { title: draft ? "Saved as a draft" : "Saved", body, publishLine };
     case "join":
-      return { title: `${f.product} was added to ${f.name}.` };
+      return { title: `${f.product} was added to ${f.name}`, body, publishLine };
     case "version":
-      return { title: `Saved as version ${f.version}.` };
+      return { title: `Saved as version ${f.version}`, body, publishLine };
   }
 }
 

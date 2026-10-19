@@ -8,6 +8,7 @@
 // Profile dropdown hosts the Earn IDZ + Connect Wallet actions when the
 // menu bar takes the middle slot, so the user never loses access to them.
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -105,11 +106,11 @@ export function TopBar() {
         zIndex: 30,
       }}
     >
-      {/* logo + caret */}
-      <div className="ix-pill" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer", paddingRight: "var(--spacing-5)" }}>
+      {/* logo + caret — the editor's way Home (it looked clickable and did nothing) */}
+      <Link href="/" aria-label="Home" className="ix-pill" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer", paddingRight: "var(--spacing-5)", textDecoration: "none" }}>
         <IdeezaLogo height={26} />
         <HugeiconsIcon icon={ArrowDown01Icon} size={14} color={VIOLET} strokeWidth={2.5} />
-      </div>
+      </Link>
 
       {/* The product the editor holds, with its project under it — the ONLY
           place the product / project name chip lives (removed from the left

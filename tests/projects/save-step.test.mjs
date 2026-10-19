@@ -5,10 +5,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  SAVED_FROM_EDITOR,
-  arrivalOf,
+  PUBLISH_LINE,
   checkSaveDraft,
-  editorSaveHref,
   coverChoicesOf,
   footerLineOf,
   holderOf,
@@ -18,6 +16,7 @@ import {
   saveDefaultsOf,
   saveModeOf,
   savedLineOf,
+  savedNoticeOf,
   versionChangesOf,
 } from "../../.tmp-test/lib/manual/save-step.js";
 import { DAY, T, build, chat, companion, project, row } from "./fixtures/projects.mjs";
@@ -366,26 +365,30 @@ describe("savedLineOf", () => {
   });
 });
 
-describe("arrivalOf", () => {
-  it("new / join / version", () => {
-    assert.deepEqual(arrivalOf("new", { name: "Car", product: "", version: 0 }), {
-      title: "Saved to My projects",
-      body: "Car is ready for its next step.",
-    });
-    assert.deepEqual(arrivalOf("join", { name: "Garden", product: "Sprinkler", version: 0 }), {
-      title: "Sprinkler was added to Garden.",
-    });
-    assert.deepEqual(arrivalOf("version", { name: "Car", product: "", version: 2 }), {
-      title: "Saved as version 2.",
+describe("savedNoticeOf", () => {
+  const f = { name: "Car", product: "Remote", version: 2, draft: true };
+  it("a new project is always a Draft: who sees it and where to publish", () => {
+    assert.deepEqual(savedNoticeOf("new", { ...f, draft: false }), {
+      title: "Saved as a draft",
+      body: "Car is in My projects. Only you can see it.",
+      publishLine: PUBLISH_LINE,
     });
   });
-});
-
-describe("editorSaveHref", () => {
-  it("lands the editors' Save project on the project page with the arrival banner", () => {
-    assert.equal(SAVED_FROM_EDITOR, "editor");
-    assert.equal(editorSaveHref("proj_1"), "/projects/proj_1?saved=editor");
-    assert.equal(editorSaveHref("a/b"), "/projects/a%2Fb?saved=editor");
+  it("the editors: a Draft says draft; a published project says Saved, and no Publish line", () => {
+    assert.equal(savedNoticeOf("editor", f).title, "Saved as a draft");
+    assert.deepEqual(savedNoticeOf("editor", { ...f, draft: false }), {
+      title: "Saved",
+      body: "Car is in My projects.",
+      publishLine: null,
+    });
+  });
+  it("join and version name what they did", () => {
+    assert.equal(savedNoticeOf("join", f).title, "Remote was added to Car");
+    assert.equal(savedNoticeOf("version", f).title, "Saved as version 2");
+    assert.equal(savedNoticeOf("version", { ...f, draft: false }).publishLine, null);
+  });
+  it("never offers Publish, only says where it is", () => {
+    assert.match(PUBLISH_LINE, /from the project page/);
   });
 });
 

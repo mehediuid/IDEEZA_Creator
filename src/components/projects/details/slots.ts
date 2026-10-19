@@ -67,7 +67,8 @@ export type ProjectSlots = {
   banner?: React.ComponentType<SlotProps>;
   /** Each returns null unless it applies (buyer, contributor, demo buyer). */
   banners?: React.ComponentType<SlotProps>[];
-  /** Above the tab strip: SAVE's "Saved to My projects". */
+  /** Above the tab strip. None today: SAVE's "Saved to My projects" banner went when Save
+   *  started saying it in a dialog where the maker pressed it (owner, 2026-10-19). */
   notice?: React.ComponentType<SlotProps>;
   /** Everything between the breadcrumb and the tab strip (COR-8…18, CNT-1…7). */
   header: React.ComponentType<HeaderSlotProps>;

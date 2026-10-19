@@ -13,6 +13,9 @@
 // (P2-LISTING-13, lib/manual/use-write-guard.tsx): on a live Buy now listing
 // it asks to pause the listing first; during an auction it's refused, with
 // the reason on the control.
+//
+// Save project's "Name it" (the editors' saved dialog) opens it from outside,
+// through requestProductRename().
 
 import * as React from "react";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -20,6 +23,13 @@ import { productRowsOf } from "@/lib/manual/project-read";
 import { useWriteGuard } from "@/lib/manual/use-write-guard";
 
 export const UNNAMED_PRODUCT = "Not named yet";
+
+const RENAME_EVENT = "ideeza:product-rename";
+
+/** Opens the editor's product name field, as a click on it would. */
+export function requestProductRename() {
+  window.dispatchEvent(new Event(RENAME_EVENT));
+}
 
 export function ProductNameField({
   fontSize = 15,
@@ -48,6 +58,18 @@ export function ProductNameField({
     activeProject && activeProductId
       ? productRowsOf(activeProject).find((r) => r.id === activeProductId)
       : undefined;
+  const heldName = row ? row.name.trim() : null;
+  const heldRefused = row ? gate.reasonOf("editProduct") : null;
+  React.useEffect(() => {
+    if (heldName === null) return;
+    const open = () => {
+      if (heldRefused) return;
+      setDraft(heldName);
+      setEditing(true);
+    };
+    window.addEventListener(RENAME_EVENT, open);
+    return () => window.removeEventListener(RENAME_EVENT, open);
+  }, [heldName, heldRefused]);
   if (!activeProject || !row) return null;
 
   const name = row.name.trim();
