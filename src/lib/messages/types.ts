@@ -89,6 +89,10 @@ export type Block = { by: PersonId; who: PersonId; at: number };
 
 export type ReportReason = "spam" | "scam" | "harassment" | "other";
 
+/** A reported message as it was when it was reported: the reporter keeps reading it, and it
+ *  stays with the report, whatever its sender edits or deletes afterwards. */
+export type ReportEvidence = { from: PersonId; at: number; text: string; files: FileRef[]; cards: CardRef[] };
+
 export type Report = {
   id: string;
   by: PersonId;
@@ -97,9 +101,12 @@ export type Report = {
   reason: ReportReason;
   note: string;
   at: number;
+  evidence?: ReportEvidence;
 };
 
-export type AllowNew = "everyone" | "known";
+/** Who can start a conversation with someone (Settings › Profile & Share, D13): Anyone ·
+ *  people they work with or who own a copy or hold a share · no one new. */
+export type AllowNew = "everyone" | "known" | "nobody";
 
 export type MessagesData = {
   v: 1;

@@ -5,6 +5,7 @@
 // reader's side. Read live from what the app already stores, with a
 // conversation's name snapshot as the fallback. Pure, relative imports.
 
+import type { Tie } from "../settings/audience";
 import { DEMO_BUYERS } from "../wallet/identities";
 import { formatDate } from "../manual/project-summary";
 import { subjectNameOf } from "./rules";
@@ -106,6 +107,19 @@ export function relationOf(
   if (copies.length > 1) return { short: `owns ${copies.length} copies`, long: `Owns ${copies.length} copies from ${name}` };
   if (o.askedListing && owner === viewer) return { short: null, long: "Asked about your listing" };
   return { short: null, long: null };
+}
+
+/**
+ * How `person` works with you across your projects (every project in this browser is yours):
+ * on a team first, then holding a share of the Main NFT, then owning a copy. Settings ›
+ * Audience reads it for who can message you (D13) and the "People you work with" rules.
+ */
+export function workTieOf(person: PersonId, ctx: Pick<RelationCtx, "sales" | "teams">): Tie {
+  if (person === ME) return null;
+  if (ctx.teams.some((t) => t.members.some((m) => m.id === person))) return "team";
+  const theirs = ctx.sales.filter((s) => s.buyerId === person);
+  if (theirs.some((s) => s.item.nft === "main" && s.item.sharePct > 0)) return "share";
+  return theirs.length ? "copy" : null;
 }
 
 /** Whose side a subject is on for `viewer`: their own project or post, or someone else's. */

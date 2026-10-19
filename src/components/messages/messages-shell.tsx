@@ -7,27 +7,29 @@
 // rail); below it one shows at a time — the list on /messages, the
 // conversation anywhere under it, where the title steps aside for its
 // ‹ Messages. Under the title: the line that says this tab acts as someone
-// else, and the one error a store that can't be read leaves.
+// else, and the one error a store that can't be read leaves. The gear opens
+// Settings › Profile & Share at "Who can message you", the rule's one home
+// (settings spec D13); the blocked list lives in Settings › Blocking.
 //
 // The old support requests become conversations here, once the market and the
 // projects have been read.
 
 import * as React from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Banner, IconButton, PAGE_CONTAINER, PageHeader } from "@/components/ideeza";
+import { Banner, PAGE_CONTAINER, PageHeader, iconButtonVariants } from "@/components/ideeza";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useMarket } from "@/lib/market/market-store";
 import { migrateSupportOnce } from "@/lib/messages/actions";
 import { useActingAs } from "@/lib/messages/identity";
-import { MESSAGES_HREF } from "@/lib/messages/links";
+import { MESSAGE_SETTINGS_HREF, MESSAGES_HREF } from "@/lib/messages/links";
 import { countsFor } from "@/lib/messages/rules";
 import { cn } from "@/lib/utils";
 import { ActingBanner } from "./acting-as";
 import { ConversationList } from "./conversation-list";
 import { MessagesViewProvider, useMessagesView } from "./messages-context";
-import { SettingsDialog } from "./settings-dialog";
 
 /** A pane's surface: the list and the conversation are two of them, side by side on the page. */
 const PANE = "min-h-0 flex-col overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface";
@@ -56,10 +58,9 @@ function useMessagesTitle() {
 }
 
 function Panes({ children }: { children: React.ReactNode }) {
-  const { ready, unreadable } = useMessagesView();
+  const { unreadable } = useMessagesView();
   const pathname = usePathname();
   const open = pathname !== MESSAGES_HREF;
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
   useSupportMigration();
   useMessagesTitle();
   return (
@@ -70,15 +71,14 @@ function Panes({ children }: { children: React.ReactNode }) {
           description="Demo · messages stay in this browser."
           descriptionClassName="text-md leading-md text-text-tertiary"
           actions={
-            <IconButton
+            <Link
+              href={MESSAGE_SETTINGS_HREF}
               aria-label="Message settings"
-              hierarchy="ghost"
-              size="lg"
-              icon={<Icon icon={Settings02Icon} size={20} />}
-              onClick={() => setSettingsOpen(true)}
-              disabled={!ready}
-              className="max-md:size-[var(--touch-min)]"
-            />
+              title="Message settings"
+              className={cn(iconButtonVariants({ hierarchy: "ghost", size: "lg" }), "max-md:size-[var(--touch-min)]")}
+            >
+              <Icon icon={Settings02Icon} size={20} />
+            </Link>
           }
           className={cn("shrink-0", open && "hidden [@container(min-width:768px)]:flex")}
         />
@@ -105,7 +105,6 @@ function Panes({ children }: { children: React.ReactNode }) {
           </section>
         </div>
       </div>
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

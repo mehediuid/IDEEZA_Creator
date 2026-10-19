@@ -60,7 +60,7 @@ export function Composer({
   autoFocus?: boolean;
   onSent: (conversationId: string) => void;
 }) {
-  const { me, meAs, unreadable } = useMessagesView();
+  const { me, meAs, unreadable, people } = useMessagesView();
   const [text, setText] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [cards, setCards] = React.useState<CardRef[]>([]);
@@ -116,6 +116,7 @@ export function Composer({
       cards,
       context: pending,
       teamIds,
+      policy: people.policy,
     });
     setSending(false);
     if (!r.ok) {

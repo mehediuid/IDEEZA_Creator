@@ -161,14 +161,14 @@ test("unread follows lastReadAt; the badge skips muted and archived; Requests co
   assert.deepEqual(countsFor(sent.value.data, "feed:c1", noTeam), { unread: 0, requests: 1 });
 });
 
-test("a new message brings an archived conversation back; replying accepts a request", () => {
+test("a new message brings an archived conversation back; replying keeps a request in Requests (Settings §5.10)", () => {
   const { data, c } = miraAsks();
   const archived = patchMember(data, c.id, ME, { archived: true });
   const back = send(archived, { conversationId: c.id, from: MIRA.id, draft: draft("Hello again"), context: null, now: T0 + 5, id: "m9", contextId: "c9" });
   assert.equal(back.value.data.conversations[0].state[ME].archived, false);
   const req = createDirect(EMPTY_MESSAGES, { id: "cnv_r", subject: POST, from: YOU, to: { id: "feed:c1", name: "Nadia" }, folder: "requests", now: T0 });
   const reply = send(req.data, { conversationId: "cnv_r", from: "feed:c1", draft: draft("Thanks!"), context: null, now: T0 + 9, id: "m", contextId: "x" });
-  assert.equal(reply.value.data.conversations[0].state["feed:c1"].folder, "inbox");
+  assert.equal(reply.value.data.conversations[0].state["feed:c1"].folder, "requests");
 });
 
 test("a deleted request disappears for its recipient only", () => {
