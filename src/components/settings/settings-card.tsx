@@ -62,7 +62,7 @@ export function SettingsCard({
   );
 }
 
-const ROW_BOX = "flex items-center justify-between gap-[16px] border-b border-solid border-border py-[14px] last:border-b-0";
+const ROW_BOX = "flex items-center justify-between gap-[16px] border-b border-solid border-border py-[12px] last:border-b-0";
 
 export function SettingsRow({
   id,
@@ -89,16 +89,16 @@ export function SettingsRow({
   const labelId = React.useId();
   const text = (
     <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-      <span id={labelId} className={cn("text-lg font-medium leading-lg", disabled ? "text-text-disabled" : "text-text-primary")}>
+      <span id={labelId} className={cn("text-md font-medium leading-md", disabled ? "text-text-disabled" : "text-text-primary")}>
         {label}
       </span>
-      {help != null && <span className="text-md leading-md text-text-tertiary">{help}</span>}
-      {disabled && reason && <span className="text-md leading-md text-text-tertiary">{reason}</span>}
+      {help != null && <span className="text-sm leading-sm text-text-tertiary">{help}</span>}
+      {disabled && reason && <span className="text-sm leading-sm text-text-tertiary">{reason}</span>}
     </span>
   );
   const chevron = (
     <span aria-hidden className="shrink-0 text-text-tertiary">
-      <Icon icon={ArrowRight01Icon} size={20} />
+      <Icon icon={ArrowRight01Icon} size={16} />
     </span>
   );
   const linkClass = cn(
@@ -134,7 +134,7 @@ export function SettingsField({ label, children, className }: { label: React.Rea
   const empty = children == null || children === "" || (Array.isArray(children) && children.length === 0);
   return (
     <div className={cn("flex min-w-0 flex-col gap-[6px] py-[8px]", className)}>
-      <span className="text-md leading-md text-text-tertiary">{label}</span>
+      <span className="text-sm leading-sm text-text-tertiary">{label}</span>
       {empty ? (
         <span className="text-md leading-md text-text-disabled">No information</span>
       ) : (

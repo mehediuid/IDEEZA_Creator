@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { GROUP_ICON, PAGE_ICON } from "./nav-icons";
 
 const ITEM =
-  "flex min-h-[44px] w-full items-center gap-[10px] rounded-lg border border-solid px-[12px] text-left text-lg leading-lg outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
+  "flex min-h-[36px] w-full items-center gap-[12px] rounded-md border border-solid px-[10px] text-left text-md leading-md outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
 
 export function SettingsNav({ current, onNavigate }: { current: SettingsPageId; onNavigate?: () => void }) {
   const currentGroup = settingsPage(current).group;
@@ -36,7 +36,7 @@ export function SettingsNav({ current, onNavigate }: { current: SettingsPageId; 
     });
 
   return (
-    <ul role="list" className="flex flex-col gap-[4px]">
+    <ul role="list" className="flex flex-col gap-[2px]">
       {settingsNav().map((entry) => {
         if (entry.kind === "page") {
           return (
@@ -48,7 +48,7 @@ export function SettingsNav({ current, onNavigate }: { current: SettingsPageId; 
         const isOpen = open.has(entry.group);
         const listId = `settings-nav-${entry.group.toLowerCase().replace(/[^a-z]+/g, "-")}`;
         return (
-          <li key={entry.group} className="flex flex-col gap-[4px]">
+          <li key={entry.group} className="flex flex-col gap-[2px]">
             <button
               type="button"
               aria-expanded={isOpen}
@@ -56,14 +56,14 @@ export function SettingsNav({ current, onNavigate }: { current: SettingsPageId; 
               onClick={() => toggle(entry.group)}
               className={cn(ITEM, "border-transparent font-medium text-text-primary hover:bg-bg-subtle")}
             >
-              <Icon icon={GROUP_ICON[entry.group]} size={20} />
+              <Icon icon={GROUP_ICON[entry.group]} size={16} />
               <span className="min-w-0 flex-1">{entry.group}</span>
               <span aria-hidden className={cn("shrink-0 transition-transform duration-fast", isOpen && "rotate-180")}>
-                <Icon icon={ArrowDown01Icon} size={20} />
+                <Icon icon={ArrowDown01Icon} size={16} />
               </span>
             </button>
             {isOpen && (
-              <ul id={listId} role="list" className="ml-[22px] flex flex-col gap-[4px] border-l border-solid border-border pl-[10px]">
+              <ul id={listId} role="list" className="ml-[17px] flex flex-col gap-[2px] border-l border-solid border-border pl-[8px]">
                 {entry.pages.map((p) => (
                   <li key={p.id}>
                     <PageLink page={p} current={current} onNavigate={onNavigate} />
@@ -92,7 +92,7 @@ function PageLink({ page, current, onNavigate }: { page: SettingsPage; current: 
           : "border-transparent text-text-primary hover:bg-bg-subtle",
       )}
     >
-      <Icon icon={PAGE_ICON[page.id]} size={20} />
+      <Icon icon={PAGE_ICON[page.id]} size={16} />
       <span className="min-w-0 flex-1">{page.label}</span>
     </Link>
   );

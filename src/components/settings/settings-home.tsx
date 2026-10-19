@@ -83,14 +83,14 @@ function LegalCard({ id, icon, title, body }: { id: string; icon: IconValue; tit
   return (
     <li
       id={id}
-      className="flex items-start gap-[16px] rounded-xl border border-solid border-border px-[24px] py-[20px] data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus"
+      className="flex items-start gap-[12px] rounded-xl border border-solid border-border px-[16px] py-[14px] data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus"
     >
       <span className="mt-[2px] shrink-0 text-text-tertiary">
-        <Icon icon={icon} size={24} />
+        <Icon icon={icon} size={20} />
       </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-[4px]">
-        <span className="text-lg font-semibold leading-lg text-text-disabled">{title}</span>
-        <span className="text-md leading-md text-text-tertiary">{body}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
+        <span className="text-md font-semibold leading-md text-text-disabled">{title}</span>
+        <span className="text-sm leading-sm text-text-tertiary">{body}</span>
       </span>
       <span className="shrink-0 text-sm leading-sm text-text-tertiary">Not available yet</span>
     </li>

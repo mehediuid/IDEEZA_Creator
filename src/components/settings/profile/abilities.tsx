@@ -46,8 +46,8 @@ export function AbilitiesCard() {
                 <ul role="list" className="m-0 flex list-none flex-col p-0">
                   {fields.specialities.map((s) => (
                     <li key={s.skill} className="flex items-baseline justify-between gap-[16px] py-[6px]">
-                      <span className="min-w-0 text-lg leading-lg text-text-primary [overflow-wrap:anywhere]">{s.skill}</span>
-                      <span className="shrink-0 text-lg leading-lg text-text-secondary">{YEARS_WORDS[s.years]}</span>
+                      <span className="min-w-0 text-md leading-md text-text-primary [overflow-wrap:anywhere]">{s.skill}</span>
+                      <span className="shrink-0 text-md leading-md text-text-secondary">{YEARS_WORDS[s.years]}</span>
                     </li>
                   ))}
                 </ul>

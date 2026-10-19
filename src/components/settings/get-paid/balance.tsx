@@ -120,8 +120,8 @@ export function BalancePage({ from }: { from: string | null }) {
 
               <div id={store.methods.length ? undefined : "methods"} className={cn("flex flex-wrap items-center justify-between gap-[12px] border-b border-solid border-border pb-[16px]", ARRIVED)}>
                 <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
-                  <span className="text-lg font-medium leading-lg text-text-primary">Add Withdrawal Method</span>
-                  <span className="text-md leading-md text-text-tertiary">Add how you want to receive your IDEEZA balance</span>
+                  <span className="text-md font-medium leading-md text-text-primary">Add Withdrawal Method</span>
+                  <span className="text-sm leading-sm text-text-tertiary">Add how you want to receive your IDEEZA balance</span>
                 </div>
                 <Button type="button" hierarchy="secondary" size="md" aria-haspopup="dialog" className={TAP} onClick={() => setDialog("add")}>
                   Add Method
@@ -260,8 +260,8 @@ function MethodRow({
         <Icon icon={Wallet02Icon} size={22} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
-        <span className="truncate text-lg font-medium leading-lg text-text-primary">{method.label}</span>
-        <span className="text-md leading-md text-text-tertiary">
+        <span className="truncate text-md font-medium leading-md text-text-primary">{method.label}</span>
+        <span className="text-sm leading-sm text-text-tertiary">
           Crypto wallet · <span className="font-mono">{shortAddress(method.address)}</span> · Added {formatDay(method.addedAt)}
         </span>
       </div>

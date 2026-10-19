@@ -115,7 +115,7 @@ export function HistoryPage() {
 
       {all.length === 0 ? (
         <div className="flex flex-col items-start gap-[12px] rounded-xl border border-solid border-border p-[20px]">
-          <p className="m-0 text-lg font-medium leading-lg text-text-primary">No withdrawals yet</p>
+          <p className="m-0 text-md font-semibold leading-md text-text-primary">No withdrawals yet</p>
           <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
             When you withdraw from your balance, each withdrawal shows here with its reference and status.
           </p>

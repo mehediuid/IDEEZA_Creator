@@ -144,8 +144,8 @@ export function ValueLinkRow({ id, href, label, help, value }: { id: string; hre
       )}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-        <span className="text-lg font-medium leading-lg text-text-primary">{label}</span>
-        <span className="text-md leading-md text-text-tertiary">{help}</span>
+        <span className="text-md font-medium leading-md text-text-primary">{label}</span>
+        <span className="text-sm leading-sm text-text-tertiary">{help}</span>
       </span>
       {value != null && <span className="shrink-0 text-xl font-semibold leading-xl tabular-nums text-text-primary">{value}</span>}
       <span aria-hidden className="shrink-0 text-text-tertiary">

@@ -194,7 +194,7 @@ function LevelOne({ level, onSay }: { level: KycLevel; onSay: (s: string) => voi
     return (
       <div className="flex flex-col gap-[16px]">
         <PanelHeading icon={CheckmarkCircle02Icon} title="Verification complete" aside={<TestnetDemoBadge />} />
-        <p className="m-0 max-w-[62ch] text-lg leading-lg text-text-primary">
+        <p className="m-0 max-w-[62ch] text-md leading-md text-text-primary">
           Your identity is verified for this demo. You can sell physical copies and withdraw your earnings.
         </p>
         {level.at !== null && <p className="m-0 text-md leading-md text-text-secondary">Verified on {formatDay(level.at)}</p>}

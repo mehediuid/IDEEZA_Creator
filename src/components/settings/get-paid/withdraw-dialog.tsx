@@ -139,7 +139,7 @@ function WithdrawBody({ store, earned, onClose, onDone }: Props) {
           <span aria-hidden className="text-text-success">
             <Icon icon={CheckmarkCircle02Icon} size={32} />
           </span>
-          <p className="m-0 text-lg leading-lg text-text-primary">
+          <p className="m-0 text-md leading-md text-text-primary">
             {formatUsd(sent.amount)} as {formatAmount(sent.amount, sent.token)} to {sent.to.label} is recorded as complete.
           </p>
           <p className="m-0 flex flex-wrap items-center gap-[8px] text-md leading-md text-text-secondary">
@@ -263,7 +263,7 @@ function WithdrawBody({ store, earned, onClose, onDone }: Props) {
             <dt className="text-text-secondary">You receive</dt>
             <dd className="m-0 tabular-nums text-text-primary">{amount ? formatAmount(amount, token) : "—"}</dd>
           </div>
-          <div className={cn(ROW, "text-lg leading-lg")}>
+          <div className={ROW}>
             <dt className="font-semibold text-text-primary">Total Amount</dt>
             <dd className="m-0 font-semibold tabular-nums text-text-primary">{amount ? formatUsd(amount) : "—"}</dd>
           </div>

@@ -198,8 +198,8 @@ function KindRow({
           className="-mx-[8px] flex w-[calc(100%+16px)] min-h-[44px] items-center justify-between gap-[16px] rounded-lg px-[8px] py-[14px] text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-            <span className="text-lg font-medium leading-lg text-text-primary">{label}</span>
-            <span className="text-md font-regular leading-md text-text-tertiary">{web ? "Web Notification" : "Off"}</span>
+            <span className="text-md font-medium leading-md text-text-primary">{label}</span>
+            <span className="text-sm font-regular leading-sm text-text-tertiary">{web ? "Web Notification" : "Off"}</span>
           </span>
           <span aria-hidden className={cn("shrink-0 text-text-secondary transition-transform duration-fast", open && "rotate-180")}>
             <Icon icon={ArrowDown01Icon} size={20} />
