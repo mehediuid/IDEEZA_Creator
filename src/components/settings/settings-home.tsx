@@ -1,72 +1,42 @@
 "use client";
 
-// /settings (User Panel V2 "Settings" 22048:28753): "Find a setting" over
-// every page and row, the four "Most visited settings" tiles, and "Looking
-// for something else" — the privacy policy and the terms, which the app
-// doesn't have yet, so both say so instead of linking nowhere. On a phone the
-// side-nav isn't beside the page, so the page list follows.
+// /settings (Settings v2): "Find a setting", then where you stand, as status
+// cards that each lead to the page that changes them:
+//   - This browser: your work lives only here; back it up or restore it.
+//   - Plan and credits: your plan, what's left, Buy credits.
+//   - Privacy at a glance: open or locked, who can message you, location.
+// The Phase 1 "Most visited" tiles went (nothing counts visits, so the title
+// wasn't true) and so did the two legal cards that led nowhere. On a phone
+// the side-nav isn't beside the page, so the page list comes right after the
+// search, before the cards.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  AiBrain01Icon,
-  Agreement02Icon,
-  CreditCardIcon,
-  NoteIcon,
-  UserBlock01Icon,
-  Wallet03Icon,
-} from "@hugeicons/core-free-icons";
-import { Icon, type IconValue } from "@/components/dashboard/icon";
-import { SearchInput } from "@/components/ideeza";
+import { Badge, buttonVariants, SearchInput } from "@/components/ideeza";
+import { creditTotals } from "@/lib/account/summary";
+import { runningLow } from "@/lib/create/credit-limits";
+import { CREDITS_HREF } from "@/lib/create/credit-pricing";
+import { useCredits } from "@/lib/create/credits";
+import { useCreatePlan } from "@/lib/create/plan";
+import { allowNewOf } from "@/lib/messages/rules";
+import { useMessages } from "@/lib/messages/store";
+import { ME, type AllowNew } from "@/lib/messages/types";
+import { quietModeOn } from "@/lib/settings/prefs";
 import { searchSettings } from "@/lib/settings/search";
+import { useDates } from "@/lib/settings/use-dates";
+import { useSettings } from "@/lib/settings/use-settings";
+import { SettingsCard } from "./settings-card";
 import { SettingsFrame } from "./settings-frame";
 import { SettingsNav } from "./settings-nav";
 
-const TILES: { label: string; href: string; icon: IconValue }[] = [
-  { label: "IDEEZA Pay", href: "/settings/get-paid", icon: Wallet03Icon },
-  { label: "Blocking", href: "/settings/blocking", icon: UserBlock01Icon },
-  { label: "AI Properties", href: "/settings/ai", icon: AiBrain01Icon },
-  { label: "Payment", href: "/settings/plan?tab=payment", icon: CreditCardIcon },
-];
-
 const SECTION_TITLE = "m-0 text-lg font-semibold leading-lg text-text-primary";
+const ACTION = (hierarchy: "secondary" | "outline-brand" | "ghost") => buttonVariants({ hierarchy, size: "md" });
 
 export function SettingsHome() {
   return (
     <SettingsFrame page="home">
       <FindSetting />
-
-      <section aria-labelledby="most-visited" className="flex flex-col gap-[16px]">
-        <h2 id="most-visited" className={SECTION_TITLE}>
-          Most visited settings
-        </h2>
-        <ul role="list" className="grid grid-cols-2 gap-[16px] [@container(min-width:900px)]:grid-cols-4">
-          {TILES.map((t) => (
-            <li key={t.label}>
-              <Link
-                href={t.href}
-                className="flex min-h-[96px] flex-col items-center justify-center gap-[10px] rounded-xl bg-bg-subtle px-[12px] py-[20px] text-center text-md font-medium leading-md text-text-primary outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <span className="text-text-brand">
-                  <Icon icon={t.icon} size={24} />
-                </span>
-                {t.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section aria-labelledby="something-else" className="flex flex-col gap-[16px]">
-        <h2 id="something-else" className={SECTION_TITLE}>
-          Looking for something else
-        </h2>
-        <ul role="list" className="flex flex-col gap-[16px]">
-          <LegalCard id="privacy-policy" icon={NoteIcon} title="IDEEZA Privacy & Policy" body="View IDEEZA updated privacy & Policy" />
-          <LegalCard id="terms" icon={Agreement02Icon} title="Terms & Conditions" body="View IDEEZA updated terms & conditions" />
-        </ul>
-      </section>
 
       <section aria-labelledby="all-settings" className="flex flex-col gap-[12px] [@container(min-width:768px)]:hidden">
         <h2 id="all-settings" className={SECTION_TITLE}>
@@ -74,26 +44,128 @@ export function SettingsHome() {
         </h2>
         <SettingsNav current="home" />
       </section>
+
+      <section aria-label="Where you stand" className="grid grid-cols-1 gap-[16px] [@container(min-width:900px)]:grid-cols-2">
+        <ThisBrowserCard />
+        <PlanCard />
+        <PrivacyCard />
+      </section>
     </SettingsFrame>
   );
 }
 
-/** A legal page the app doesn't have yet: the card stays, says so, and links nowhere. */
-function LegalCard({ id, icon, title, body }: { id: string; icon: IconValue; title: string; body: string }) {
+/** A status card's facts: a term and its value per line. */
+function Facts({ items }: { items: { term: string; value: React.ReactNode }[] }) {
   return (
-    <li
-      id={id}
-      className="flex items-start gap-[12px] rounded-xl border border-solid border-border px-[16px] py-[14px] data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus"
+    <dl className="m-0 flex flex-col">
+      {items.map((it) => (
+        <div
+          key={it.term}
+          className="flex items-center justify-between gap-[16px] border-b border-solid border-border py-[10px] last:border-b-0"
+        >
+          <dt className="text-md leading-md text-text-secondary">{it.term}</dt>
+          <dd className="m-0 text-right text-md font-medium leading-md text-text-primary">{it.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function Actions({ children }: { children: React.ReactNode }) {
+  return <div className="mt-[12px] flex flex-wrap gap-[8px]">{children}</div>;
+}
+
+function ThisBrowserCard() {
+  return (
+    <SettingsCard
+      id="this-browser"
+      title="This browser"
+      description="Everything you make is kept in this browser only. Clearing its data, or opening IDEEZA in another browser, starts empty unless you restore a backup."
     >
-      <span className="mt-[2px] shrink-0 text-text-tertiary">
-        <Icon icon={icon} size={20} />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-        <span className="text-md font-semibold leading-md text-text-disabled">{title}</span>
-        <span className="text-sm leading-sm text-text-tertiary">{body}</span>
-      </span>
-      <span className="shrink-0 text-sm leading-sm text-text-tertiary">Not available yet</span>
-    </li>
+      <Actions>
+        <Link href="/settings/data#download" className={ACTION("secondary")}>
+          Download a backup
+        </Link>
+        <Link href="/settings/data#restore" className={ACTION("ghost")}>
+          Restore
+        </Link>
+      </Actions>
+    </SettingsCard>
+  );
+}
+
+function PlanCard() {
+  const { hydrated: planReady, plan, sub } = useCreatePlan();
+  const { hydrated: creditsReady, ledger } = useCredits();
+  const { lowAt } = useSettings().credits;
+  const { date } = useDates();
+  const remaining = creditTotals(ledger).remaining;
+  const low = creditsReady && runningLow(remaining, lowAt);
+  const renews = sub.renewsAt === null ? "No renewal on Free" : `${sub.autoRenew ? "Renews" : "Ends"} ${date(sub.renewsAt)}`;
+  return (
+    <SettingsCard id="plan-credits" title="Plan and credits">
+      <Facts
+        items={[
+          { term: "Plan", value: planReady ? plan.name : "—" },
+          { term: "Renewal", value: planReady ? renews : "—" },
+          {
+            term: "Credits left",
+            value: creditsReady ? (
+              <span className="inline-flex items-center gap-[8px]">
+                {low && <Badge tone="warning">Running low</Badge>}
+                <span className="tabular-nums">{remaining}</span>
+              </span>
+            ) : (
+              "—"
+            ),
+          },
+        ]}
+      />
+      <Actions>
+        <Link href={CREDITS_HREF} className={ACTION(low ? "outline-brand" : "secondary")}>
+          Buy credits
+        </Link>
+        <Link href="/settings/plan" className={ACTION("ghost")}>
+          Plan and billing
+        </Link>
+      </Actions>
+    </SettingsCard>
+  );
+}
+
+const MESSAGE_REACH: Record<AllowNew, string> = {
+  everyone: "Anyone",
+  known: "People you work with",
+  nobody: "No one new",
+};
+
+function PrivacyCard() {
+  const settings = useSettings();
+  const a = settings.audience;
+  const messages = useMessages();
+  const { dateTime } = useDates();
+  // Read once per visit; a break ends on its own and the next visit shows it.
+  const [now] = React.useState(() => Date.now());
+  const breakUntil = quietModeOn(settings, now) ? a.quietUntil : null;
+  return (
+    <SettingsCard id="privacy-glance" title="Privacy at a glance">
+      <Facts
+        items={[
+          { term: "Your profile", value: a.locked ? "Locked" : "Open to everyone" },
+          { term: "Who can message you", value: messages.hydrated ? MESSAGE_REACH[allowNewOf(messages.data, ME)] : "—" },
+          { term: "Location and local time", value: a.showLocalTime ? "Shown" : "Hidden" },
+          ...(breakUntil !== null ? [{ term: "Taking a break", value: `Until ${dateTime(breakUntil)}` }] : []),
+        ]}
+      />
+      <Actions>
+        <Link href="/settings/privacy" className={ACTION("secondary")}>
+          Privacy and safety
+        </Link>
+        <Link href="/creators/me?view=public" className={ACTION("ghost")}>
+          View as public
+        </Link>
+      </Actions>
+    </SettingsCard>
   );
 }
 
@@ -143,7 +215,9 @@ function FindSetting() {
               ))}
             </ul>
           ) : (
-            <p className="m-0 text-md leading-md text-text-secondary">No setting matches “{trimmed}”. Try a shorter word.</p>
+            <p className="m-0 text-md leading-md text-text-secondary">
+              No setting matches “{trimmed}”. Try one word, like “theme”, “messages” or “backup”.
+            </p>
           ))}
       </div>
     </section>
