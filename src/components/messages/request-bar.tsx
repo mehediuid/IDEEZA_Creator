@@ -2,7 +2,8 @@
 
 // A conversation in my Requests (spec §5, §6): Accept moves it to the Inbox,
 // Delete hides it from me (the sender isn't told) and goes back to the list,
-// Block blocks the sender. Replying accepts too, through the send rule.
+// Block blocks the sender. Only Accept accepts (settings spec §5.10): a reply
+// stays in Requests and tells the sender nothing more than the reply itself.
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ideeza";
@@ -34,9 +35,12 @@ export function RequestBar({
       aria-label="Message request"
       className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 border-b border-solid border-border bg-bg-subtle px-4 py-4 md:px-8"
     >
-      <p className="min-w-[200px] flex-1 text-md leading-md text-text-primary">
-        {other.name} wants to message you about {subjectName}.
-      </p>
+      <div className="flex min-w-[200px] flex-1 flex-col">
+        <p className="text-md leading-md text-text-primary">
+          {other.name} wants to message you about {subjectName}.
+        </p>
+        <p className="text-md leading-md text-text-secondary">Replying keeps it here. Accept moves it to your Inbox.</p>
+      </div>
       <div className="flex flex-wrap gap-3">
         <Button
           type="button"

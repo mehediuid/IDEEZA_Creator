@@ -18,9 +18,14 @@
 //   brings the composer into view and focuses it once the thread is read;
 // - focus never drops to <body>: after a delete it goes to what stands in the
 //   comment's place, or its neighbour, or the heading; after an edit or an
-//   Unhide to the comment's ⋯; after a reply is cancelled to its Reply.
+//   Unhide to the comment's ⋯; after a reply is cancelled to its Reply;
+// - on your own post your Settings apply (settings spec §5.10): someone
+//   else's comment that uses a word you hide stands as a line saying so and
+//   leaves the count, and a line above the composer says who can comment now
+//   (quiet mode narrows it), with Change → Settings › Profile & Share.
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ArrowDown01Icon,
   Delete02Icon,
@@ -52,10 +57,13 @@ import {
   type CommentAction,
   type PostComment,
 } from "@/lib/innovations/comments";
-import { usePostComments, type CommentSeed } from "@/lib/innovations/comments-store";
+import { useHiddenWordsFor, usePostComments, type CommentSeed } from "@/lib/innovations/comments-store";
 import { ME, personOf } from "@/lib/innovations/people";
 import { commentAnchor, postHref } from "@/lib/innovations/slug";
 import { ME_ID, type InnovationPost } from "@/lib/innovations/types";
+import { commentRuleOf, quietEndLabel } from "@/lib/settings/audience";
+import { quietModeOn, type Reach, type SettingsV1 } from "@/lib/settings/prefs";
+import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { ReportDialog } from "../report-dialog";
 import { usePostToast } from "../toast";
@@ -131,7 +139,10 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
 
   React.useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
-  const viewer = React.useMemo(() => ({ meId: ME_ID, isPostOwner: owner }), [owner]);
+  const settings = useSettings();
+  const ownWords = useHiddenWordsFor(post.id);
+  const hiddenWords = owner ? ownWords : undefined;
+  const viewer = React.useMemo(() => ({ meId: ME_ID, isPostOwner: owner, hiddenWords }), [owner, hiddenWords]);
   const tops = React.useMemo(() => topLevelOf(comments, sort, pinned), [comments, sort, pinned]);
 
   // The thread a link points into: its page, its thread open, enough replies loaded.
@@ -154,7 +165,7 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
   const pagesShown = Math.max(pages, deepPage);
   const visibleTops = tops.slice(0, pagesShown * COMMENTS_PAGE);
   const remaining = tops.length - visibleTops.length;
-  const count = commentCount(comments);
+  const count = commentCount(comments, hiddenWords);
   const empty = tops.length === 0;
 
   /** The first thread opens on its own; once the order is about to change, that becomes a choice it keeps. */
@@ -442,6 +453,8 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
             </Button>
           ) : null}
 
+          {owner ? <CommentRuleLine settings={settings} now={now} /> : null}
+
           <CommentComposer
             mode="comment"
             id="comment-composer"
@@ -485,6 +498,24 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
         ) : null}
       </ModalFrame>
     </section>
+  );
+}
+
+const RULE_WORD: Record<Reach, string> = { everyone: "Anyone", work: "People you work with", nobody: "Only you" };
+
+/** On your own post: who can comment now, from Settings › Profile & Share. */
+function CommentRuleLine({ settings, now }: { settings: SettingsV1; now: number }) {
+  const rule = commentRuleOf(settings, now);
+  const quiet = quietModeOn(settings, now) && rule !== settings.audience.comment;
+  return (
+    <p className="m-0 text-md leading-md text-text-secondary">
+      {quiet && settings.audience.quietUntil !== null
+        ? `Quiet mode is on until ${quietEndLabel(settings.audience.quietUntil)}, so only people you work with can comment.`
+        : `Who can comment: ${RULE_WORD[rule]}.`}{" "}
+      <Link href="/settings/profile-share#comment" className={cn(linkVariants({ color: "brand", size: "sm" }), "text-md font-medium leading-md", TAP)}>
+        Change
+      </Link>
+    </p>
   );
 }
 

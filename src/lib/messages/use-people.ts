@@ -1,13 +1,19 @@
 // The people Messages reads, live (spec §3): every project's team, the
 // Innovations creators and the market's sales, so a name, how someone stands
 // to a project, or a team's members are never copied into a conversation
-// beyond its snapshot.
+// beyond its snapshot. With your settings it also gives the start rules what
+// they can't read from the messages (Settings › Audience): who works with you
+// and whether your quiet mode is on.
 
 import * as React from "react";
 import { PROJECTS } from "../feed";
 import { teamOf } from "../manual/contributors";
 import { useManualProjects } from "../manual/projects";
 import { useMarket } from "../market/market-store";
+import type { Tie } from "../settings/audience";
+import { quietModeOn } from "../settings/prefs";
+import { useSettings } from "../settings/use-settings";
+import type { StartPolicy } from "./rules";
 import {
   feedPersonId,
   personOf,
@@ -16,6 +22,7 @@ import {
   type Person,
   type Relation,
   type TeamSource,
+  workTieOf,
 } from "./people";
 import { ME, type Participant, type PersonId, type Subject } from "./types";
 
@@ -41,11 +48,16 @@ export type MessagePeople = {
   ownerOf: (subject: Subject) => PersonId | null;
   /** How `other` stands to `subject`, seen by `viewer`. */
   relationOf: (viewer: PersonId, other: PersonId, subject: Subject, o?: { askedListing?: boolean }) => Relation;
+  /** How someone works with you across your projects. */
+  tieOf: (id: PersonId) => Tie;
+  /** What `canStart` needs beyond the messages: ties to you, and your quiet mode. */
+  policy: StartPolicy;
 };
 
 export function useMessagePeople(): MessagePeople {
   const { projects, hydrated } = useManualProjects();
   const { data: market, hydrated: marketHydrated } = useMarket();
+  const settings = useSettings();
   const teams = React.useMemo<TeamSource[]>(
     () =>
       projects.map((p) => ({
@@ -60,6 +72,11 @@ export function useMessagePeople(): MessagePeople {
     const teamIdsOf = (projectId: string) => teams.find((t) => t.projectId === projectId)?.members.map((m) => m.id) ?? [];
     const of = (id: PersonId, snapshots: readonly Participant[] = []) => personOf(id, sources, snapshots);
     const ctx = { sales: market.sales, teams, ownerOf: ownerOfSubject };
+    const tieOf = (id: PersonId) => workTieOf(id, ctx);
+    const policy: StartPolicy = {
+      tied: (a, b) => (a === ME ? tieOf(b) : b === ME ? tieOf(a) : null) !== null,
+      quiet: (person) => person === ME && quietModeOn(settings, Date.now()),
+    };
     return {
       hydrated: hydrated && marketHydrated,
       sources,
@@ -68,6 +85,8 @@ export function useMessagePeople(): MessagePeople {
       nameOf: (id: PersonId) => of(id).name,
       ownerOf: ownerOfSubject,
       relationOf: (viewer, other, subject, o) => relationOf(viewer, other, subject, ctx, o),
+      tieOf,
+      policy,
     };
-  }, [teams, hydrated, marketHydrated, market.sales]);
+  }, [teams, hydrated, marketHydrated, market.sales, settings]);
 }

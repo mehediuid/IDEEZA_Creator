@@ -10,7 +10,9 @@
 
 import * as React from "react";
 import { parseStored, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
-import { commentCount, storedCommentsIn, type PostComment, type StoredComments } from "./comments";
+import { useSettings } from "../settings/use-settings";
+import { commentCount, storedCommentsIn, type HiddenWords, type PostComment, type StoredComments } from "./comments";
+import { ME_ID } from "./types";
 
 export const COMMENTS_KEY = (postId: string) => `ideeza:innovations:comments:${postId}`;
 
@@ -50,8 +52,16 @@ export function usePostComments(
   return { hydrated, comments, reported, write };
 }
 
+/** On this browser's own post ("mine:…"), the hidden words of Settings › Blocking; a sample
+ *  post's maker has none we know of. */
+export function useHiddenWordsFor(postId: string | null): HiddenWords | undefined {
+  const words = useSettings().blocking.hiddenWords;
+  return React.useMemo(() => (postId?.startsWith("mine:") ? { ownerId: ME_ID, words } : undefined), [postId, words]);
+}
+
 /** The one count (plan §7) for a card or a page that doesn't show the thread; null until read. */
 export function useCommentCount(postId: string | null, seed: CommentSeed): number | null {
   const { hydrated, comments } = usePostComments(postId, seed);
-  return hydrated ? commentCount(comments) : null;
+  const hidden = useHiddenWordsFor(postId);
+  return hydrated ? commentCount(comments, hidden) : null;
 }

@@ -93,7 +93,7 @@ ideeza-creator-panel/
    │  │                      renderer, preview), send/ (Send for review, cover picker, Change cover)
    │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
-   │  │                      timeline, composer), start view, settings + report dialogs
+   │  │                      timeline, composer), start view, report dialog
    │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
@@ -126,7 +126,8 @@ ideeza-creator-panel/
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
    │  ├─ settings/           Settings: registry (pages, crumbs, nav), rows/ (each page's
-   │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings
+   │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings,
+   │  │                      audience (who can reach you, quiet mode, hidden words, people you've met)
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store

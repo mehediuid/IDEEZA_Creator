@@ -4,6 +4,7 @@ The platform's one place for people to talk to people. Built on the demo identit
 
 - **Plan the owner approved:** https://claude.ai/artifact/GEezBYDQhL7V3YHjN7hs8i. Owner, 2026-10-13: "Figma is a totally different style — don't look at it; go with your plan, we'll correct after. Finalize everything and start. There's no real backend, so work with demo users." Every decision D1–D10 takes the recommended option.
 - **Branch:** `feat/messages`, cut from `feat/activity-everywhere` (b55030c).
+- **Changed by Settings (spec `2026-10-19-settings-design.md` §5.10, D13):** replying to a request no longer accepts it (only Accept does); the Message settings dialog is gone: who can message you (Anyone · people you work with or who own a copy or hold a share · no one new) and quiet mode live in Settings › Profile & Share, the blocked list and hidden words in Settings › Blocking; a reported message is kept with its report. The current behaviour is in `docs/guides/features/messages.md`.
 
 ## 1. Decisions (final)
 

@@ -10,9 +10,14 @@
 //   visitor on someone else's Copy link · Report; the post's maker adds
 //   Hide · Delete there;
 // - a deleted comment with replies stays as "Comment deleted" so the thread
-//   holds; one without replies goes.
+//   holds; one without replies goes;
+// - Settings › Blocking › Hide specific words (spec 2026-10-19 §5.10): on a
+//   post whose maker hides words, someone else's comment that uses one reads
+//   as hidden to everyone but its writer, and the count leaves it out.
 //
 // Pure: every write returns a new list. Relative imports only.
+
+import { hasHiddenWord } from "../settings/audience";
 
 export type PostComment = {
   id: string;
@@ -55,8 +60,14 @@ export const CLAMP_CHARS = 280;
 
 export type CommentAction = "edit" | "copy" | "delete" | "hide" | "unhide" | "report" | "reported";
 
-/** Who is looking: this browser's maker, and whether they made the post. */
-export type CommentViewer = { meId: string; isPostOwner: boolean };
+/** The post maker's hidden words, when they are known (this browser's own post). */
+export type HiddenWords = { ownerId: string; words: readonly string[] };
+
+/** Who is looking: this browser's maker, whether they made the post, and its maker's hidden words. */
+export type CommentViewer = { meId: string; isPostOwner: boolean; hiddenWords?: HiddenWords };
+
+/** What the maker reads in place of a comment their hidden words hide. */
+export const WORD_HIDDEN_FOR_OWNER = "Hidden: it uses a word you hide";
 
 const byIdOf = (list: readonly PostComment[]) => new Map(list.map((c) => [c.id, c]));
 
@@ -98,9 +109,14 @@ export function isCounted(c: PostComment): boolean {
   return c.hiddenAt === null && c.deletedAt === null;
 }
 
+/** Someone else's comment that uses a word the post's maker hides. */
+export function isWordHidden(c: PostComment, hidden: HiddenWords | undefined): boolean {
+  return !!hidden && hidden.words.length > 0 && c.authorId !== hidden.ownerId && c.deletedAt === null && hasHiddenWord(c.body, hidden.words);
+}
+
 /** The one comment count (plan §7): card, post and project page all read this. */
-export function commentCount(list: readonly PostComment[]): number {
-  return list.filter(isCounted).length;
+export function commentCount(list: readonly PostComment[], hidden?: HiddenWords): number {
+  return list.filter((c) => isCounted(c) && !isWordHidden(c, hidden)).length;
 }
 
 export function likesOf(c: PostComment): number {
@@ -153,7 +169,9 @@ export function actionsFor(c: PostComment, viewer: CommentViewer, reported: read
 /** What the viewer reads in a comment's place, or null when they read the comment itself. */
 export function placeholderOf(c: PostComment, viewer: CommentViewer): string | null {
   if (c.deletedAt !== null) return "Comment deleted";
-  if (c.hiddenAt !== null && !viewer.isPostOwner && c.authorId !== viewer.meId) return "Hidden by the maker";
+  if (c.authorId === viewer.meId) return null;
+  if (isWordHidden(c, viewer.hiddenWords)) return viewer.isPostOwner ? WORD_HIDDEN_FOR_OWNER : "Hidden by the maker";
+  if (c.hiddenAt !== null && !viewer.isPostOwner) return "Hidden by the maker";
   return null;
 }
 

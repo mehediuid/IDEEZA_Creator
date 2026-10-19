@@ -1,8 +1,12 @@
 // Messages' rules (spec §5): who may start, which folder a conversation lands
 // in, sending, edit and delete, blocks, unread and the conversation list. Every
 // function takes the data and returns new data; ids and the clock come from the
-// caller, so node:test runs them as they are. Pure, relative imports.
+// caller, so node:test runs them as they are. Settings › Audience (spec
+// 2026-10-19 §5.10) adds who can message you (D13), quiet mode, hidden words on
+// Requests, a reply that doesn't accept, and a reported message kept with its
+// report. Pure, relative imports.
 
+import { hasHiddenWord } from "../settings/audience";
 import {
   EDIT_WINDOW_MS,
   FILE_BYTES_MAX,
@@ -23,6 +27,7 @@ import {
   type Participant,
   type PersonId,
   type Report,
+  type ReportEvidence,
   type Subject,
 } from "./types";
 
@@ -132,21 +137,51 @@ export function isKnown(data: MessagesData, from: PersonId, to: PersonId, contex
   return context.kind !== "post" || hasWrittenTo(data, to, from);
 }
 
-export type StartCheck = { ok: true; folder: Folder } | { ok: false; reason: "self" | "blocked" | "knownOnly" };
+/** What the rules can't read from the messages alone (Settings › Audience): the ties between
+ *  two people, and whether someone's quiet mode is on. */
+export type StartPolicy = {
+  /** One works on the other's project team, holds a share of it, or owns a copy. */
+  tied?: (a: PersonId, b: PersonId) => boolean;
+  /** Quiet mode: no new requests reach this person. */
+  quiet?: (person: PersonId) => boolean;
+};
 
-export function canStart(data: MessagesData, from: PersonId, to: PersonId, context: ContextRef): StartCheck {
+/** Whether `person` already has a conversation with `other` in their Inbox (accepted or started). */
+export function talksWith(data: MessagesData, person: PersonId, other: PersonId): boolean {
+  return data.conversations.some(
+    (c) =>
+      c.kind === "direct" &&
+      c.participants.some((p) => p.id === person) &&
+      c.participants.some((p) => p.id === other) &&
+      stateOf(c, person).folder === "inbox" &&
+      !stateOf(c, person).declined,
+  );
+}
+
+export type StartRefusal = "self" | "blocked" | "knownOnly" | "closed" | "quiet";
+
+export type StartCheck = { ok: true; folder: Folder } | { ok: false; reason: StartRefusal };
+
+export function canStart(data: MessagesData, from: PersonId, to: PersonId, context: ContextRef, policy: StartPolicy = {}): StartCheck {
   if (from === to) return { ok: false, reason: "self" };
   if (blockStateOf(data, from, to) !== "none") return { ok: false, reason: "blocked" };
-  const known = isKnown(data, from, to, context);
-  if (!known && allowNewOf(data, to) === "known") return { ok: false, reason: "knownOnly" };
+  const allow = allowNewOf(data, to);
+  if (allow === "nobody" && !talksWith(data, to, from)) return { ok: false, reason: "closed" };
+  const known = isKnown(data, from, to, context) || policy.tied?.(from, to) === true;
+  if (!known && allow === "known") return { ok: false, reason: "knownOnly" };
+  if (!known && policy.quiet?.(to) === true) return { ok: false, reason: "quiet" };
   return { ok: true, folder: known ? "inbox" : "requests" };
 }
 
-/** The line an impossible start shows. */
-export function startRefusalOf(reason: "self" | "blocked" | "knownOnly", name: string): string {
+/** The line an impossible start shows. This browser's account reads "You" to itself only. */
+export function startRefusalOf(reason: StartRefusal, name: string): string {
+  const mine = name === "You";
+  const who = mine ? "This creator" : name;
   if (reason === "self") return "You can't start a conversation with yourself.";
-  if (reason === "blocked") return `You can't message ${name}.`;
-  return `${name} only takes messages from people they work with.`;
+  if (reason === "blocked") return `You can't message ${mine ? "this creator" : name}.`;
+  if (reason === "closed") return `${who} only takes messages from people they already talk to.`;
+  if (reason === "quiet") return `${who} has paused new message requests for now.`;
+  return `${who} only takes messages from people they work with or who own a copy or hold a share.`;
 }
 
 // ─────────────────────────── creating ───────────────────────────
@@ -258,8 +293,8 @@ export function send(
   const next = patchConversation({ ...data, entries: [...data.entries, ...added] }, c.id, (conv) => {
     const state: Record<string, MemberState> = {};
     for (const [id, s] of Object.entries(conv.state)) state[id] = s.archived ? { ...s, archived: false } : s;
-    // Writing is answering: a request the sender holds becomes their Inbox.
-    state[o.from] = { ...stateOf(conv, o.from), folder: "inbox", lastReadAt: o.now, archived: false, declined: false };
+    // A reply is not an Accept: a request the sender holds stays in their Requests.
+    state[o.from] = { ...stateOf(conv, o.from), lastReadAt: o.now, archived: false, declined: false };
     return { ...conv, lastAt: Math.max(conv.lastAt, o.now), state };
   });
   return { ok: true, value: { data: next, entry } };
@@ -297,11 +332,12 @@ export function remove(
   const e = messageById(data, o.entryId);
   if (!e || !canEdit(e, o.by, o.now)) return { ok: false, reason: "This message can't be deleted any more." };
   const gone: MessageEntry = { ...e, text: "", files: [], cards: [], deletedAt: o.now };
+  const kept = new Set(data.reports.flatMap((r) => r.evidence?.files.map((f) => f.key) ?? []));
   return {
     ok: true,
     value: {
       data: { ...data, entries: data.entries.map((x) => (x.id === e.id ? gone : x)) },
-      fileKeys: e.files.map((f) => f.key),
+      fileKeys: e.files.map((f) => f.key).filter((k) => !kept.has(k)),
     },
   };
 }
@@ -344,8 +380,23 @@ export function unblock(data: MessagesData, by: PersonId, who: PersonId): Messag
   return { ...data, blocks: data.blocks.filter((b) => !(b.by === by && b.who === who)) };
 }
 
+/** Saves a report. A reported message is copied into it as it is now, so the reporter keeps
+ *  reading it and the report keeps it, whatever its sender edits or deletes afterwards. */
 export function addReport(data: MessagesData, report: Report): MessagesData {
-  return { ...data, reports: [...data.reports, { ...report, note: report.note.trim().slice(0, 500) }] };
+  const e = report.entryId ? messageById(data, report.entryId) : null;
+  const evidence: ReportEvidence | undefined =
+    e && e.deletedAt === undefined ? { from: e.from, at: e.at, text: e.text, files: e.files, cards: e.cards } : undefined;
+  const saved: Report = { ...report, note: report.note.trim().slice(0, 500), ...(evidence ? { evidence } : {}) };
+  return { ...data, reports: [...data.reports, saved] };
+}
+
+/** The message `reader` reported, as it was then; null when they didn't report it. */
+export function reportEvidenceOf(data: MessagesData, entryId: string, reader: PersonId): ReportEvidence | null {
+  for (let i = data.reports.length - 1; i >= 0; i--) {
+    const r = data.reports[i];
+    if (r.by === reader && r.entryId === entryId && r.evidence) return r.evidence;
+  }
+  return null;
 }
 
 export function setAllowNew(data: MessagesData, person: PersonId, allowNew: AllowNew): MessagesData {
@@ -374,6 +425,8 @@ export type ListRow = {
   unread: boolean;
   muted: boolean;
   archived: boolean;
+  /** A request that uses a word the reader hides (shown only when asked for). */
+  wordHidden: boolean;
   preview: string;
   lastAt: number;
 };
@@ -390,7 +443,19 @@ type ListOpts = {
   q?: string;
   teamIdsOf: (projectId: string) => PersonId[];
   nameOf: (id: PersonId) => string;
+  /** The reader's hidden words (Settings › Blocking): requests that use one leave the list… */
+  hiddenWords?: readonly string[];
+  /** …unless asked for. */
+  showHidden?: boolean;
 };
+
+/** A request in `reader`'s Requests whose other person wrote a word the reader hides. */
+export function requestHidden(data: MessagesData, c: Conversation, reader: PersonId, words: readonly string[]): boolean {
+  if (!words.length || c.kind !== "direct" || stateOf(c, reader).folder !== "requests") return false;
+  return data.entries.some(
+    (e) => e.conversationId === c.id && e.kind === "message" && e.from !== reader && e.deletedAt === undefined && hasHiddenWord(e.text, words),
+  );
+}
 
 function sideFor(subject: Subject, person: PersonId, ownerOf: (subject: Subject) => PersonId | null): Side {
   return ownerOf(subject) === person ? "mine" : "theirs";
@@ -427,6 +492,8 @@ export function listFor(data: MessagesData, person: PersonId, o: ListOpts): List
     if (o.subjectKey && subjectKeyOf(c.subject) !== o.subjectKey) continue;
     if (o.side && o.ownerOf && sideFor(c.subject, person, o.ownerOf) !== o.side) continue;
     const s = stateOf(c, person);
+    const wordHidden = requestHidden(data, c, person, o.hiddenWords ?? []);
+    if (wordHidden && !o.showHidden) continue;
     const unread = isUnread(data, c, person);
     if (o.filter === "archived" ? !s.archived : s.archived) continue;
     if (o.filter === "unread" && !unread) continue;
@@ -445,6 +512,7 @@ export function listFor(data: MessagesData, person: PersonId, o: ListOpts): List
       unread,
       muted: s.muted,
       archived: s.archived,
+      wordHidden,
       preview: previewOf(lastMessageOf(data, c.id), person, c.kind === "team", o.nameOf),
       lastAt: c.lastAt,
     });
@@ -452,21 +520,30 @@ export function listFor(data: MessagesData, person: PersonId, o: ListOpts): List
   return rows.sort((a, b) => b.lastAt - a.lastAt);
 }
 
-/** The sidebar badge (unread Inbox conversations, not archived or muted) and the Requests count. */
+/** The sidebar badge (unread Inbox conversations, not archived or muted) and the Requests
+ *  count, without the requests that use one of `hiddenWords`. */
 export function countsFor(
   data: MessagesData,
   person: PersonId,
   teamIdsOf: (projectId: string) => PersonId[],
+  hiddenWords: readonly string[] = [],
 ): { unread: number; requests: number } {
   let unread = 0;
   let requests = 0;
   for (const c of data.conversations) {
     if (!visibleTo(c, person, teamIdsFor(c, teamIdsOf))) continue;
     const s = stateOf(c, person);
-    if (folderFor(c, person) === "requests") requests += 1;
-    else if (!s.archived && !s.muted && isUnread(data, c, person)) unread += 1;
+    if (folderFor(c, person) === "requests") {
+      if (!requestHidden(data, c, person, hiddenWords)) requests += 1;
+    } else if (!s.archived && !s.muted && isUnread(data, c, person)) unread += 1;
   }
   return { unread, requests };
+}
+
+/** How many of `person`'s requests their hidden words keep out of Requests. */
+export function hiddenRequestCount(data: MessagesData, person: PersonId, hiddenWords: readonly string[]): number {
+  if (!hiddenWords.length) return 0;
+  return data.conversations.filter((c) => visibleTo(c, person) && requestHidden(data, c, person, hiddenWords)).length;
 }
 
 /** The subjects of a person's conversations, for the Project filter: their own first, then other creators'. */

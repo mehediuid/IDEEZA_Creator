@@ -5,6 +5,8 @@
 // "Edited", "Message deleted", and the scam hint under a risky message I
 // received. ⋯ holds Edit · Delete on my own message within its 15 minutes and
 // Report message on someone else's; Edit opens in place with Save and Cancel.
+// A message you reported stays readable to you as it was when you reported it
+// (settings spec §5.10), even after its sender edits or deletes it.
 
 import * as React from "react";
 import { Alert02Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
@@ -12,7 +14,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { Button, ConfirmDialog, Textarea } from "@/components/ideeza";
 import { deleteMessage, editMessage } from "@/lib/messages/actions";
 import { isRisky, RISK_NOTE } from "@/lib/messages/risk";
-import { canEdit } from "@/lib/messages/rules";
+import { canEdit, reportEvidenceOf } from "@/lib/messages/rules";
 import { TEXT_MAX, type MessageEntry } from "@/lib/messages/types";
 import { cn } from "@/lib/utils";
 import { ProjectCard } from "./context-card";
@@ -95,7 +97,7 @@ export function MessageItem({
   readOnly: boolean;
   onReport: (entryId: string) => void;
 }) {
-  const { me, now } = useMessagesView();
+  const { me, now, data, people } = useMessagesView();
   const [editing, setEditing] = React.useState(false);
   const [confirming, setConfirming] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -103,6 +105,8 @@ export function MessageItem({
   const wasEditing = React.useRef(false);
   const deleted = entry.deletedAt !== undefined;
   const editable = !readOnly && canEdit(entry, me, now);
+  const evidence = mine ? null : reportEvidenceOf(data, entry.id, me);
+  const changedSince = !!evidence && !deleted && evidence.text !== entry.text;
 
   const items: MenuItem[] = editable
     ? [
@@ -133,7 +137,16 @@ export function MessageItem({
   return (
     <div ref={rowRef} className={cn("group/msg flex w-full items-start gap-2", mine ? "flex-row-reverse" : "flex-row")}>
       <div className={cn("flex min-w-0 max-w-[85%] flex-col gap-2 md:max-w-[75%]", mine ? "items-end" : "items-start")}>
-        {deleted ? (
+        {deleted && evidence ? (
+          <>
+            {evidence.text && (
+              <p className="whitespace-pre-wrap break-words rounded-xl bg-bg-subtle px-6 py-3 text-md leading-md text-text-primary [overflow-wrap:anywhere]">
+                {evidence.text}
+              </p>
+            )}
+            <MessageFiles files={evidence.files} mine={false} />
+          </>
+        ) : deleted ? (
           <p className="rounded-xl border border-dashed border-border px-6 py-3 text-md leading-md text-text-tertiary">
             Message deleted
           </p>
@@ -152,6 +165,22 @@ export function MessageItem({
         {!deleted && <MessageFiles files={entry.files} mine={mine} />}
         {!deleted && entry.cards.map((c) => <ProjectCard key={c.projectId} projectId={c.projectId} name={c.name} />)}
         {!deleted && entry.editedAt !== undefined && <p className="px-1 text-md leading-md text-text-tertiary">Edited</p>}
+        {evidence && (
+          <div className="flex max-w-[62ch] flex-col gap-1 px-1 text-md leading-md text-text-secondary">
+            <p>
+              {deleted
+                ? `${people.nameOf(entry.from)} deleted this message. You still see it because you reported it; it's kept with your report.`
+                : changedSince
+                  ? "You reported this message before it was edited. Your report keeps it as it was:"
+                  : "You reported this message."}
+            </p>
+            {changedSince && evidence.text && (
+              <p className="whitespace-pre-wrap break-words border-l-2 border-solid border-border pl-3 text-text-primary [overflow-wrap:anywhere]">
+                {evidence.text}
+              </p>
+            )}
+          </div>
+        )}
         {!mine && !deleted && isRisky(entry.text) && (
           <p className="flex max-w-[62ch] items-start gap-2 px-1 text-md leading-md text-text-warning">
             <Icon icon={Alert02Icon} size={16} className="mt-[2px] shrink-0" />

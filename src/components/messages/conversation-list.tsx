@@ -6,6 +6,10 @@
 // settings are the page's header (messages-shell.tsx). It lives in the
 // Messages layout, so its tab, search and filters hold while conversations
 // open beside it.
+//
+// Your Settings reach in here (settings spec §5.10): a request that uses one
+// of your hidden words leaves Requests and its count, with a line that can
+// show it again, and while quiet mode is on Requests says new ones are paused.
 
 import * as React from "react";
 import Link from "next/link";
@@ -13,9 +17,10 @@ import { usePathname } from "next/navigation";
 import { NotificationOff01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ButtonGroup, SearchInput, SelectMenu } from "@/components/ideeza";
-import { conversationHref } from "@/lib/messages/links";
+import { HIDDEN_WORDS_HREF, QUIET_MODE_HREF, conversationHref } from "@/lib/messages/links";
 import {
   countsFor,
+  hiddenRequestCount,
   listFor,
   shortTimeOf,
   subjectNameOf,
@@ -25,6 +30,10 @@ import {
   type Side,
   type Tab,
 } from "@/lib/messages/rules";
+import { ME } from "@/lib/messages/types";
+import { quietEndLabel } from "@/lib/settings/audience";
+import { quietModeOn } from "@/lib/settings/prefs";
+import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./avatar";
 import { useMessagesView } from "./messages-context";
@@ -36,6 +45,9 @@ const FILTERS: { value: ListFilter; label: string }[] = [
 ];
 
 const ALL_PROJECTS = "all";
+const NO_WORDS: readonly string[] = [];
+const INLINE_LINK =
+  "cursor-pointer whitespace-nowrap rounded-sm font-medium text-text-brand underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:inline-flex max-md:min-h-[var(--touch-min)] max-md:items-center";
 const SIDE_MINE = "side:mine";
 const SIDE_THEIRS = "side:theirs";
 
@@ -99,6 +111,7 @@ function Row({ row, current }: { row: ListRow; current: boolean }) {
               </>
             )}
           </span>
+          {row.wordHidden && <span className="text-md leading-md text-text-tertiary">Uses a word you hide</span>}
         </span>
       </Link>
     </li>
@@ -115,14 +128,20 @@ function Empty({ title, body }: { title: string; body: string }) {
 }
 
 export function ConversationList() {
-  const { ready, data, me, people } = useMessagesView();
+  const { ready, data, me, people, now } = useMessagesView();
   const pathname = usePathname();
+  const settings = useSettings();
   const [tab, setTab] = React.useState<Tab>("inbox");
   const [q, setQ] = React.useState("");
   const [filter, setFilter] = React.useState<ListFilter>("all");
   const [subjectPick, setSubjectPick] = React.useState(ALL_PROJECTS);
+  const [showHidden, setShowHidden] = React.useState(false);
 
-  const counts = React.useMemo(() => countsFor(data, me, people.teamIdsOf), [data, me, people.teamIdsOf]);
+  // Your settings are yours: a demo creator this tab acts as has none.
+  const hiddenWords = me === ME ? settings.blocking.hiddenWords : NO_WORDS;
+  const quietUntil = me === ME && quietModeOn(settings, now) ? settings.audience.quietUntil : null;
+  const counts = React.useMemo(() => countsFor(data, me, people.teamIdsOf, hiddenWords), [data, me, people.teamIdsOf, hiddenWords]);
+  const hiddenCount = React.useMemo(() => hiddenRequestCount(data, me, hiddenWords), [data, me, hiddenWords]);
   const subjects = React.useMemo(
     () => subjectsFor(data, me, people.teamIdsOf, people.ownerOf),
     [data, me, people.teamIdsOf, people.ownerOf],
@@ -155,8 +174,10 @@ export function ConversationList() {
         q,
         teamIdsOf: people.teamIdsOf,
         nameOf: people.nameOf,
+        hiddenWords,
+        showHidden,
       }),
-    [data, me, tab, filter, subjectKey, side, q, people.ownerOf, people.teamIdsOf, people.nameOf],
+    [data, me, tab, filter, subjectKey, side, q, people.ownerOf, people.teamIdsOf, people.nameOf, hiddenWords, showHidden],
   );
   const narrowed = q.trim() !== "" || filter !== "all" || subjectKey !== null || side !== null;
 
@@ -207,6 +228,26 @@ export function ConversationList() {
             options={projectOptions}
             onChange={setSubjectPick}
           />
+        )}
+        {tab === "requests" && quietUntil !== null && (
+          <p className="text-md leading-md text-text-secondary">
+            Quiet mode is on until {quietEndLabel(quietUntil)}. New requests are paused.{" "}
+            <Link href={QUIET_MODE_HREF} className={INLINE_LINK}>
+              Change
+            </Link>
+          </p>
+        )}
+        {tab === "requests" && hiddenCount > 0 && (
+          <p className="text-md leading-md text-text-secondary">
+            {hiddenCount === 1 ? "1 request uses" : `${hiddenCount} requests use`} a word you hide.{" "}
+            <button type="button" aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)} className={INLINE_LINK}>
+              {showHidden ? "Hide again" : "Show"}
+            </button>
+            {" · "}
+            <Link href={HIDDEN_WORDS_HREF} className={INLINE_LINK}>
+              Hidden words
+            </Link>
+          </p>
         )}
       </div>
       <div className="border-t border-solid border-border md:min-h-0 md:flex-1 md:overflow-y-auto">
