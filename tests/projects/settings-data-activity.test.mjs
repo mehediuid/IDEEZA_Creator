@@ -1,5 +1,5 @@
-// Settings › Your activity: the search and watch log (`ideeza:activity`) — caps,
-// 90-day retention, typing coalesced into one search, a rewatch moving up, and
+// Settings › AI & your data › Search history (`ideeza:activity`): caps, 90-day
+// retention, typing coalesced into one search, the old watch log dropped, and
 // lists grouped by day.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -10,7 +10,6 @@ const {
   MAX_ENTRIES,
   normalizeActivityLog,
   withSearch,
-  withWatch,
   pruneLog,
   groupByDay,
   searchHref,
@@ -36,12 +35,17 @@ test("bad entries are dropped, good ones kept, newest first", () => {
         { id: "s4", at: "today", source: "explore", query: "x" },
         { id: "s5", at: NOW, source: "explore", query: "   " },
       ],
-      watches: [{ id: "w1", at: NOW - 5, postId: "sample:1", postTitle: "Lamp", href: "/innovations/lamp", video: "Lamp" }, { id: "w2" }],
     },
     NOW,
   );
   assert.deepEqual(log.searches.map((s) => s.id), ["s2", "s1"]);
-  assert.deepEqual(log.watches.map((w) => w.id), ["w1"]);
+});
+
+test("the video watch log older versions kept is dropped on read", () => {
+  const watches = [{ id: "w1", at: NOW - 5, postId: "sample:1", postTitle: "Lamp", href: "/innovations/lamp", video: "Lamp" }];
+  const log = normalizeActivityLog({ v: 1, searches: [{ id: "s1", at: NOW, source: "explore", query: "lamp", opened: null }], watches }, NOW);
+  assert.deepEqual(Object.keys(log).sort(), ["searches", "v"]);
+  assert.equal(normalizeActivityLog({ v: 1, searches: [], watches }, NOW), EMPTY_LOG, "a log of only watches reads as empty");
 });
 
 test("a search is trimmed, kept newest first, and an empty one is ignored", () => {
@@ -78,20 +82,10 @@ test("at most 200 searches; the oldest go first", () => {
 test("anything older than 90 days goes, on read and on write", () => {
   const old = { id: "o", at: NOW - (KEEP_DAYS + 1) * DAY, source: "explore", query: "old", opened: null };
   const fresh = { id: "f", at: NOW - (KEEP_DAYS - 1) * DAY, source: "explore", query: "fresh", opened: null };
-  const log = normalizeActivityLog({ v: 1, searches: [old, fresh], watches: [] }, NOW);
+  const log = normalizeActivityLog({ v: 1, searches: [old, fresh] }, NOW);
   assert.deepEqual(log.searches.map((s) => s.id), ["f"]);
-  const pruned = pruneLog({ v: 1, searches: [fresh, old], watches: [] }, NOW);
+  const pruned = pruneLog({ v: 1, searches: [fresh, old] }, NOW);
   assert.deepEqual(pruned.searches.map((s) => s.id), ["f"]);
-});
-
-test("a video watched again the same day moves up instead of repeating; another day is a new line", () => {
-  const v = { postId: "sample:7", postTitle: "Plant monitor", href: "/innovations/plant", video: "Plant monitor" };
-  let log = withWatch(EMPTY_LOG, v, NOW, id());
-  log = withWatch(log, { ...v, postId: "sample:8", postTitle: "Lamp", video: "Lamp" }, NOW + 1000, id());
-  log = withWatch(log, v, NOW + 2000, id());
-  assert.deepEqual(log.watches.map((w) => [w.postId, w.at]), [["sample:7", NOW + 2000], ["sample:8", NOW + 1000]]);
-  log = withWatch(log, v, NOW + DAY, id());
-  assert.equal(log.watches.length, 3);
 });
 
 test("lists group by local day: Today, Yesterday, then the date", () => {

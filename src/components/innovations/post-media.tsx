@@ -20,7 +20,6 @@ import type { InnovationPost, PostMedia, PostVideo } from "@/lib/innovations/typ
 import type { VideoTake } from "@/lib/video/types";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
-import { WatchRecorder } from "@/components/settings/watch-recorder";
 import { durationLabel, ImageGone, PostImg } from "./post-bits";
 import type { MinePostFacts } from "./use-post";
 
@@ -93,7 +92,7 @@ const mediaKey = (m: PostMedia) => (m.kind === "clip" ? m.takeId : m.src);
 
 /** A product's video in the 16:9 stage: a shared project's clip in the app's player, a sample's file in the browser's. */
 export function PostVideoStage({ post, mine, video }: { post: InnovationPost; mine: MinePostFacts | null; video: PostVideo }) {
-  return <WatchRecorder post={post} video={video.label}>{video.kind === "clip" ? <ClipStage post={post} mine={mine} media={video} /> : <FileVideoStage video={video} />}</WatchRecorder>;
+  return video.kind === "clip" ? <ClipStage post={post} mine={mine} media={video} /> : <FileVideoStage video={video} />;
 }
 
 const noSubscribe = () => () => {};

@@ -91,7 +91,7 @@ export function ThreeToolbar({ onSketchClick }: { onSketchClick?: () => void }) 
         overflowX: "auto",
       }}
     >
-      {/* Settings › AI Properties › AI help in the editors: off hides AI Generate. */}
+      {/* Settings › AI & your data › AI help in the editors: off hides AI Generate. */}
       {assist && (
         <>
           <button

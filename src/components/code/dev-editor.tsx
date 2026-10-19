@@ -266,7 +266,7 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
   const [showTerminal, setShowTerminal] = React.useState(true);
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [showAi, setShowAi] = React.useState(false);
-  // Settings › AI Properties › AI help in the editors: off hides the AI tab and panel.
+  // Settings › AI & your data › AI help in the editors: off hides the AI tab and panel.
   const assist = useSettings().ai.editorAssist;
 
   // A cross-tab AI handoff for the Code module opens the AI side panel;

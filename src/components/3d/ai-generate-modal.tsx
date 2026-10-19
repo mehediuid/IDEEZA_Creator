@@ -125,7 +125,7 @@ export function AiGenerateModal({
       const res = await fetch("/api/three/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Settings › AI Properties: the concept image stays off the volunteer pool when it's off.
+        // Settings › AI & your data: the concept image stays off the volunteer pool when it's off.
         body: JSON.stringify(readSettings().ai.volunteerPool ? { prompt: text } : { prompt: text, pool: "off" }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "request failed");

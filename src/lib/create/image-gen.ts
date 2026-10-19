@@ -23,7 +23,7 @@
 // A generator is picked by what is configured, never by guesswork: a token
 // means the user chose that provider, and the Horde is the fallback because
 // it needs nothing. A request made with the volunteer pool switched off
-// (Settings › AI Properties) never reaches the Horde: it goes to Pollinations
+// (Settings › AI & your data) never reaches the Horde: it goes to Pollinations
 // when this deployment has a token, and is refused ("pool-off") when not.
 
 export type Rendered = {
@@ -84,7 +84,7 @@ export type RenderProgress =
   | { status: "ready"; rendered: Rendered };
 
 /** What the person asked for. `volunteerPool: false` keeps the request off
- *  the AI Horde (Settings › AI Properties › Use the volunteer GPU pool). */
+ *  the AI Horde (Settings › AI & your data › Use the volunteer GPU pool). */
 export type RenderOptions = { volunteerPool?: boolean };
 
 /** Hand the work to the provider and return at once. The caller polls. */
