@@ -157,13 +157,15 @@ export function searchSettings(query: string, limit = SEARCH_LIMIT): SettingsHit
       });
     }
     for (const row of SETTINGS_ROWS[page.id] ?? []) {
-      const r = rate(terms, [
+      const own: [string[], number][] = [
         [wordsOf(row.label), 4],
         [wordsOf((row.keywords ?? []).join(" ")), 3],
         [wordsOf(row.help ?? ""), 2],
-        [pageWords, 1],
-      ]);
-      if (!r.matched) continue;
+      ];
+      // A row the query reaches only through its page's name adds nothing
+      // the page hit doesn't already say ("emails" lists Notifications once).
+      if (!rate(terms, own).matched) continue;
+      const r = rate(terms, [...own, [pageWords, 1]]);
       scored.push({
         hit: {
           page: page.id,

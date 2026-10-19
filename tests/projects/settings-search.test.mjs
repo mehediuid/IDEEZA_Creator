@@ -74,6 +74,13 @@ test("search: one stray word doesn't empty the list; best matches only", () => {
   assert.deepEqual(searchSettings("zebra"), []);
 });
 
+test("search: a page's name alone lists the page, not each of its rows", () => {
+  const hits = searchSettings("notifications");
+  assert.equal(hits[0].href, "/settings/notifications");
+  assert.ok(hits.every((h) => h.href !== "/settings/notifications#builds"));
+  assert.ok(searchSettings("notifications sales").some((h) => h.href === "/settings/notifications#sales"));
+});
+
 test("search: short words match whole words only", () => {
   assert.ok(searchSettings("ai").every((h) => h.page !== "notifications"));
 });
