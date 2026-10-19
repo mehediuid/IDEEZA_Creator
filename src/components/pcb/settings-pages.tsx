@@ -9,7 +9,7 @@ import * as React from "react";
 import { Button, Checkbox, Select, Toggle } from "@/components/ideeza";
 import { Icon } from "@/lib/pcb/icons";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
-import { useTheme } from "@/components/theme-provider";
+import { MEASUREMENT_UNITS, MEASUREMENT_UNIT_LABELS, type MeasurementUnit } from "@/lib/pcb/measurement-unit";
 
 const PAD_X = "var(--spacing-12)";
 const ROW_PAD = "var(--spacing-6) var(--spacing-0)";
@@ -479,7 +479,7 @@ export function HotkeySettingsPage() {
   }, [editingId, actions]);
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: `var(--spacing-4) ${PAD_X} var(--spacing-4)` }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: `var(--spacing-4) ${PAD_X} var(--spacing-4)`, minHeight: 0 }}>
       {/* search */}
       <div
         style={{
@@ -604,23 +604,15 @@ export function HotkeySettingsPage() {
   );
 }
 
-// ── Theme select for System page (used by SettingsBody dispatch) ─────────────
+// ── Appearance pointer for the System page ─────────────────────────────────
+// The app's theme has one home, the account menu (and ⌘K) — settings spec
+// D11 — so the editor no longer carries its own copy of it.
 
-export function ThemeRow() {
-  const { theme, setTheme } = useTheme();
+function AppearanceNote() {
   return (
-    <Row label="Theme" hint="Editor color scheme.">
-      <Select
-        value={theme}
-        options={[
-          { label: "Light", value: "light" },
-          { label: "Dark", value: "dark" },
-          { label: "System", value: "system" },
-        ]}
-        minWidth={150}
-        onChange={(v) => setTheme(v as "light" | "dark" | "system")}
-      />
-    </Row>
+    <div className="border-b border-solid border-border-subtle py-[var(--spacing-6)] text-sm leading-sm text-text-tertiary">
+      Appearance is in the account menu.
+    </div>
   );
 }
 
@@ -736,43 +728,55 @@ export function SystemSettingsPage() {
               minWidth={170}
             />
           </Row>
+          <Row
+            label="Measurement unit"
+            hint="Sets this board's unit and the default for new sheets, boards and parts."
+          >
+            <Select
+              aria-label="Measurement unit"
+              value={state.measurementUnit}
+              options={MEASUREMENT_UNITS.map((u) => ({ label: MEASUREMENT_UNIT_LABELS[u], value: u }))}
+              onChange={(v) => actions.setMeasurementUnit(v as MeasurementUnit)}
+              minWidth={170}
+            />
+          </Row>
           {T("showWelcomeScreen", "Show Welcome Screen on launch")}
           {T("enableExtension", "Enable plugin extensions")}
-          <ThemeRow />
+          <AppearanceNote />
 
           <GroupHeader title="Canvas & Interaction" />
           <Row label="Canvas Zooming Type" hint="How the scroll wheel zooms the canvas.">
             <Select
-              value="Scroll"
+              value={ss.canvasZoomType}
               options={[
                 { label: "Scroll", value: "Scroll" },
                 { label: "Ctrl + Scroll", value: "Ctrl + Scroll" },
               ]}
-              onChange={() => {}}
+              onChange={(v) => actions.setSystemSettings({ canvasZoomType: v })}
               minWidth={170}
             />
           </Row>
           <Row label="Auto Panning" hint="Edge-pan behaviour while dragging near the viewport border.">
             <Select
-              value="Uniform"
+              value={ss.autoPanning}
               options={[
                 { label: "Disable", value: "Disable" },
                 { label: "Uniform", value: "Uniform" },
                 { label: "Variable Speed", value: "Variable Speed" },
               ]}
-              onChange={() => {}}
+              onChange={(v) => actions.setSystemSettings({ autoPanning: v })}
               minWidth={170}
             />
           </Row>
           <Row label="Side Panel Auto Hide" hint="Which side panels collapse automatically.">
             <Select
-              value="Right"
+              value={ss.sidePanelAutoHide}
               options={[
                 { label: "Left", value: "Left" },
                 { label: "Right", value: "Right" },
                 { label: "Bottom", value: "Bottom" },
               ]}
-              onChange={() => {}}
+              onChange={(v) => actions.setSystemSettings({ sidePanelAutoHide: v })}
               minWidth={170}
             />
           </Row>
@@ -812,7 +816,7 @@ export function SystemSettingsPage() {
         <>
           <GroupHeader title="Library Categories" />
           <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginBottom: "var(--spacing-3)" }}>
-            Toggle which categories appear in the left-panel library filter.
+            Pick the part categories you work with most.
           </div>
           {ss.categories.map((c) => (
             <div
@@ -849,13 +853,13 @@ export function SystemSettingsPage() {
           {T("libDeviceAutoLoad", "Auto-load devices on project open")}
           <Row label="Default Device Source" hint="Where new devices are pulled from.">
             <Select
-              value="Cloud + Local"
+              value={ss.libDeviceSource}
               options={[
                 { label: "Local only", value: "Local only" },
                 { label: "Cloud only", value: "Cloud only" },
                 { label: "Cloud + Local", value: "Cloud + Local" },
               ]}
-              onChange={() => { }}
+              onChange={(v) => actions.setSystemSettings({ libDeviceSource: v })}
               minWidth={170}
             />
           </Row>
@@ -869,13 +873,13 @@ export function SystemSettingsPage() {
           {T("libPanelAutoLoad", "Auto-load panels on project open")}
           <Row label="Panel Library Format">
             <Select
-              value="IDEEZA Panel"
+              value={ss.libPanelFormat}
               options={[
                 { label: "IDEEZA Panel", value: "IDEEZA Panel" },
                 { label: "KiCad Panel", value: "KiCad Panel" },
                 { label: "Altium PCB Panel", value: "Altium PCB Panel" },
               ]}
-              onChange={() => { }}
+              onChange={(v) => actions.setSystemSettings({ libPanelFormat: v })}
               minWidth={170}
             />
           </Row>
@@ -908,7 +912,7 @@ export function PropertySettingsPage() {
   const canMoveDown = selectedIdx >= 0 && selectedIdx < rows.length - 1;
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: `var(--spacing-4) ${PAD_X} var(--spacing-4)` }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: `var(--spacing-4) ${PAD_X} var(--spacing-4)`, minHeight: 0 }}>
       {/* Toolbar above table */}
       <div
         style={{

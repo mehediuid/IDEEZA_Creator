@@ -4,9 +4,11 @@ Moved verbatim from `CLAUDE.md` §3 on 2026-09-29. Keep it current: [AGENTS.md �
 
 **Global shell** (`components/app-chrome`, `components/dashboard/sidebar`):
 left sidebar nav — **Home · History · My projects · Parts & agile module ·
-Explore marketplace · Innovations · Blog · Messages**; top bar — Search + **⌘K
-command palette**, Tutorial / Tour guide / Help / Report, the sidebar's
-**Upgrade to Builder / Disruptor** card, the profile popover (name, plan).
+Explore marketplace · Innovations · Blog · Messages**; in the same sidebar —
+Search + **⌘K command palette**, the **Upgrade to Builder / Disruptor** card,
+the **Support** block (Help Center · Tutorial · Tour Guide · Report a problem)
+and the account row (profile popover with name and plan, wallet, bell). The
+editors have their own top bar, with the editor account menu.
 
 **Platform routes:**
 - `/` — **Dashboard home**: "What will you build today?" AI prompt (Generate with AI / Build manually) + Browse Project cards.

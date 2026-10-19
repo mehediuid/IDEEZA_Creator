@@ -511,7 +511,6 @@ export function ThreeApp() {
         case "settings:units":       setModal("units"); return;
         case "settings:grid":        setModal("grid"); return;
         case "settings:snap":        setModal("snap"); return;
-        case "settings:theme":       flashToast("Theme follows IDEEZA system"); return;
         case "settings:resetView":   setResetTick((t) => t + 1); setTransformMode("none"); return;
         case "settings:resetScene": {
           try { if (keys) { window.localStorage.removeItem(keys.shapes); window.localStorage.removeItem(keys.right); window.localStorage.removeItem(keys.sketches); } } catch {}

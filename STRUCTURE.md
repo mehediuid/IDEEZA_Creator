@@ -123,7 +123,7 @@ ideeza-creator-panel/
    │  │                      avatar, tag, skeleton, menu…)
    │  ├─ ui/                 shadcn-style primitives (badge, button, card, input)
    │  ├─ brand/              ideeza-logo
-   │  └─ theme-provider.tsx · theme-toggle.tsx
+   │  └─ theme-provider.tsx
    │
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
@@ -228,6 +228,10 @@ src/lib/pcb/
 │                       user-authored parts (`readPersonalParts`) + captured modules
 │                       (`readPersonalModules` / `allModules`)
 ├─ tool-labels.ts       Armed-tool names (from the palette's labels) + next-step hints
+├─ app-settings.ts      The editor's one settings record `ideeza:pcb:appSettings` (v2): overlay
+│                       pages + 3D dialog values, v1 migration, field-by-field repair, what each page does
+├─ measurement-unit.ts  The one Measurement Unit default (mm/mil/inch) + who wins over it; read by
+│                       the board, the schematic and Parts › New Package
 ├─ glb-export.ts        Board → three.js scene → glTF/GLB (GLTFExporter)
 ├─ gltf-import.ts       glTF/GLB import: GLTFLoader parse + session-only model registry
 ├─ dxf-import.ts        ASCII-DXF parser (LINE/POLYLINE/CIRCLE/ARC/TEXT) → CanvasObjects
@@ -255,7 +259,7 @@ src/components/pcb/
 ├─ bottom-bar.tsx + bottom-content.tsx         Logs/Parts Audit/DRC/Find/Property List
 ├─ modals.tsx · modal-kit.tsx · pcb-manager-modals.tsx
 ├─ device-manager.tsx · footprint-manager.tsx
-├─ settings-overlay.tsx · settings-pages.tsx · settings-pages-deep.tsx
+├─ settings-overlay.tsx · settings-pages.tsx · settings-pages-deep.tsx · settings-dialogs.tsx
 └─ color-picker.tsx
 ```
 

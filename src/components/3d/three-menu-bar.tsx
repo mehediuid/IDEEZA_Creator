@@ -20,7 +20,7 @@ export type ThreeAction =
   // Transformation & Utilities
   | "xform:move" | "xform:rotate" | "xform:scale" | "xform:copy" | "xform:align" | "xform:group" | "xform:measure" | "xform:section" | "xform:hide" | "xform:lock"
   // Settings
-  | "settings:preferences" | "settings:units" | "settings:grid" | "settings:snap" | "settings:theme" | "settings:resetView" | "settings:resetScene"
+  | "settings:preferences" | "settings:units" | "settings:grid" | "settings:snap" | "settings:resetView" | "settings:resetScene"
   // Help
   | "help:docs" | "help:shortcuts" | "help:about";
 
@@ -83,7 +83,6 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "Grid…", action: "settings:grid" },
     { label: "Snap…", action: "settings:snap" },
     { label: "", divider: true },
-    { label: "Theme: Light / Dark", action: "settings:theme" },
     { label: "Reset View", action: "settings:resetView", shortcut: "0" },
     { label: "Reset Scene", action: "settings:resetScene" },
   ],

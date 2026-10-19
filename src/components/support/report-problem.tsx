@@ -77,7 +77,9 @@ type Draft = {
 // getRandomValues, not randomUUID: randomUUID exists only on secure origins,
 // and a phone testing the dev server over the LAN is plain http.
 const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
-const emptyDraft = (): Draft => ({ id: newId(), kind: null, impact: null, details: "", includeContext: true, images: [] });
+// "Send page and device details" starts unticked: what leaves this browser is
+// the maker's choice (settings spec 2026-10-19 §5.13).
+const emptyDraft = (): Draft => ({ id: newId(), kind: null, impact: null, details: "", includeContext: false, images: [] });
 const isBlank = (d: Draft) => !d.kind && !d.impact && !d.details.trim() && d.images.length === 0;
 
 /** The text of an unsent draft. Images stay in memory: they would crowd
@@ -92,7 +94,7 @@ function loadDraft(): Draft {
         kind: isKind(d.kind) ? d.kind : null,
         impact: isImpact(d.impact) ? d.impact : null,
         details: typeof d.details === "string" ? d.details.slice(0, DETAILS_MAX) : "",
-        includeContext: d.includeContext !== false,
+        includeContext: d.includeContext === true,
         images: [],
       };
     }
