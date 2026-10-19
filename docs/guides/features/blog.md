@@ -51,6 +51,7 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
     - Unsent edits also add Discard changes.
   - **Confirmations:** Delete, Take offline and Discard changes confirm in alertdialogs that say where the blog goes and what is lost. Their toast offers **Undo**.
   - **Quick view:** a DS Drawer with the thumbnail, the status, the reasons grouped by review, and the body.
+  - The list's Date & time and Quick view's "Last edited" follow Settings › Language › Date & Time Formatting; the byline and reasons keep the Figma form (`lib/blog/dates.ts`).
   - **First visit:** it teaches the three steps and "What the IDEEZA team looks for", and says blogs live in this browser (demo).
 - **The editor** (`/blog/new`, `/blog/[slug]/edit`, `components/blog/editor/`, Figma frames 10–13). TipTap v3 loads only here.
   - **Layout:** the card fills the page frame; the details and the writing sit in the narrow column (at most 720) on the left edge, never centred.

@@ -126,7 +126,8 @@ ideeza-creator-panel/
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
    │  ├─ settings/           Settings: registry (pages, crumbs, nav), rows/ (each page's
-   │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings
+   │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings,
+   │  │                      dates (+ use-dates), voice, keys (single-key shortcuts), appearance (pre-paint)
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store
