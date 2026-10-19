@@ -7,7 +7,7 @@ export const notificationsRows: SettingsRowEntry[] = [
   { id: "browser-popups", label: "Pop-ups outside this tab", keywords: ["browser notification", "desktop notification", "push", "permission", "allow"] },
   { id: "sales", label: "Sales and bids", help: "With a minimum bid", keywords: ["sale", "sold", "bid", "offer", "auction", "marketplace", "threshold"] },
   { id: "builds", label: "Builds and videos", keywords: ["build", "ready", "failed", "video", "render"] },
-  { id: "credits", label: "Credits and plan", keywords: ["credits", "low", "expire", "renewal", "plan"] },
+  { id: "credits", label: "Credits and plan", keywords: ["credits", "low", "expire", "renewal", "plan", "withdrawal method"] },
   { id: "messages", label: "Messages and requests", keywords: ["message", "dm", "request", "chat"] },
   { id: "comments", label: "Comments and replies", keywords: ["comment", "reply", "mention"] },
   { id: "teams", label: "Team conversations", keywords: ["team", "group"] },

@@ -294,7 +294,7 @@ const COVERS: Record<ShownKind, React.ReactNode> = {
   product: "A build ready to review, needing a retry or paused, and a video take that's ready.",
   coin: (
     <>
-      Credits at or under your low mark, bought credits about to expire, and your plan renewing.{" "}
+      Credits at or under your low mark, bought credits about to expire, your plan renewing, and a withdrawal method added, removed or made your default.{" "}
       <Link href={CREDIT_ALERTS_HREF} className={LINK}>
         Set the low mark
       </Link>
