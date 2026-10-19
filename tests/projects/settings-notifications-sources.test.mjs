@@ -216,18 +216,22 @@ test("marketplace: a sale of your listing is urgent money received; a sale elsew
   assert.deepEqual(marketNotices({ listings: [], sales: [sale({ projectId: "elsewhere" })], bids: [] }, projects, NOW), []);
 });
 
-test("marketplace: a bid on yours carries its dollar amount when the coin has one", () => {
-  const out = marketNotices({ listings: [listing({ endsAt: NOW + 5 * HOUR })], sales: [], bids: [bid(), bid({ id: "bd2", amount: "0.5", token: "ETH" })] }, projects, NOW);
+test("marketplace: a bid on yours is valued at Get paid's demo rates; a dollar figure says so", () => {
+  const bids = [bid(), bid({ id: "bd2", amount: "0.5", token: "ETH" }), bid({ id: "bd3", amount: "30", token: "MATIC" })];
+  const out = marketNotices({ listings: [listing({ endsAt: NOW + 5 * HOUR })], sales: [], bids }, projects, NOW);
   const usdt = out.find((n) => n.id === "bid:bd1");
   assert.equal(usdt.tag, "Marketplace · Bid");
   assert.equal(usdt.title, "Leo (demo creator) bid on Smart Lamp");
-  assert.equal(usdt.body, "120 USDT ($120)");
+  assert.equal(usdt.body, "120 USDT", "a dollar coin is its own dollar figure");
   assert.deepEqual(usdt.bid, { usd: 120 });
   assert.equal(usdt.href, "/projects/p1/earn/sell");
   assert.equal(usdt.urgent, undefined);
   const eth = out.find((n) => n.id === "bid:bd2");
-  assert.equal(eth.body, "0.5 ETH");
-  assert.deepEqual(eth.bid, { usd: null }, "test ETH has no dollar value");
+  assert.equal(eth.body, "0.5 ETH (about $1,875 at the demo rate)");
+  assert.deepEqual(eth.bid, { usd: 1875 }, "test ETH at $3,750");
+  const matic = out.find((n) => n.id === "bid:bd3");
+  assert.equal(matic.body, "30 MATIC (about $15 at the demo rate)");
+  assert.deepEqual(matic.bid, { usd: 15 });
   assert.deepEqual(marketNotices({ listings: [listing({ projectId: "x" })], sales: [], bids: [bid()] }, projects, NOW), [], "a bid on someone else's");
 });
 

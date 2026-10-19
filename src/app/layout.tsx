@@ -18,6 +18,7 @@ import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
 import { ReportProblemHost } from "@/components/support/report-problem";
 import { AppShell } from "@/components/dashboard/app-shell";
+import { NoticePopups } from "@/components/notifications/notice-popups";
 import { SIDEBAR_PREPAINT } from "@/components/dashboard/sidebar-state";
 import { APPEARANCE_PREPAINT } from "@/lib/settings/appearance";
 import { AppearanceSync } from "@/components/settings/appearance-sync";
@@ -156,6 +157,9 @@ export default function RootLayout({
                               worker lives here rather than on the build
                               page. Renders nothing. */}
                           <BuildSimulator />
+                          {/* The notices' pop-ups outside a hidden tab and
+                              the once-a-day summary, editors included. */}
+                          <NoticePopups />
                           {/* The plan's credits for each monthly period. */}
                           <PlanCredits />
                           <GlobalRenderIndicator />

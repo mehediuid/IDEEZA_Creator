@@ -95,6 +95,7 @@ import {
 } from "./spec-sheet";
 import { motionReduced } from "@/lib/settings/appearance";
 import { readSettings } from "@/lib/settings/prefs";
+import { askForPopupsAtBuild } from "@/components/notifications/browser-popups";
 
 const POLL_MS = 2_500;
 /** Longer than the generator’s own budget, so the server is what gives up
@@ -1652,6 +1653,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const handleConfirmBuild = React.useCallback(
     async (concept: ConceptSummary) => {
       if (!confirmFor) return;
+      // Inside the click, before anything awaits: browsers prompt only from one. Once, ever, so
+      // a finished build can pop up while the maker is in another tab or app.
+      askForPopupsAtBuild();
       // Busy on the click itself. Reading each product's concept back is a
       // round-trip per product, and `startBuildFor` — which used to be the
       // first thing to set this — only runs once they have all answered. So

@@ -6,6 +6,7 @@
 // Pure, relative imports only (node:test loads the compiled module). The
 // clock, names and "does this chat still exist" come from the caller.
 
+import { DEMO_USD_RATES, centsFloor, usdOf } from "../account/payout";
 import { blogNews, newsKicker, newsMessage } from "../blog/news";
 import { findArticle } from "../blog/article";
 import { articleHref, slugOf } from "../blog/slug";
@@ -22,6 +23,7 @@ import { entriesOf, isUnread, stateOf, subjectNameOf, visibleTo } from "../messa
 import { ME, type Conversation, type MessageEntry, type MessagesData } from "../messages/types";
 import type { VideoJob } from "../video/jobs";
 import { formatAmount } from "../wallet/money";
+import type { Token } from "../brief/types";
 import { buyerLabel } from "../wallet/identities";
 import type { Notice } from "./types";
 
@@ -176,19 +178,22 @@ export type MarketInput = {
   bids: readonly Pick<Bid, "id" | "listingId" | "bidderId" | "amount" | "token" | "at">[];
 };
 
-/** Coins pegged to the dollar; the test coins (ETH, WETH, MATIC) have no dollar value here. */
-const DOLLAR_COINS = new Set(["USDT", "USDC"]);
-
-function usdOf(amount: string, token: string): number | null {
-  if (!DOLLAR_COINS.has(token)) return null;
-  const n = Number(amount);
+/** A bid in dollars at Get paid's demo rates (one rule for the app); null when it can't be read. */
+function bidUsd(amount: string, token: Token): number | null {
+  if (!Number.isFinite(Number(amount))) return null;
+  const n = Number(centsFloor(usdOf(amount, token)));
   return Number.isFinite(n) ? n : null;
 }
 
-const usdLabel = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+/** "0.5 ETH (about $1,875 at the demo rate)"; a dollar coin is its own dollar figure. */
+function bidLabel(amount: string, token: Token, usd: number | null): string {
+  const coin = formatAmount(amount, token);
+  if (usd === null || DEMO_USD_RATES[token] === "1") return coin;
+  return `${coin} (about $${usd.toLocaleString("en-US", { minimumFractionDigits: usd % 1 ? 2 : 0, maximumFractionDigits: 2 })} at the demo rate)`;
+}
 
-/** A sale of your listing or of a copy (money received: urgent), a bid on your auction with its
- *  dollar amount, and your auction ending within the hour. "Yours" is a project in this browser. */
+/** A sale of your listing or of a copy (money received: urgent), a bid on your auction valued at
+ *  the demo rate, and your auction ending within the hour. "Yours" is a project in this browser. */
 export function marketNotices(m: MarketInput, projects: readonly { id: string; name: string }[], now: number): Notice[] {
   const nameOf = new Map(projects.map((p) => [p.id, p.name.trim() || "Untitled project"]));
   const out: Notice[] = [];
@@ -215,13 +220,13 @@ export function marketNotices(m: MarketInput, projects: readonly { id: string; n
     const l = listingOf.get(b.listingId);
     const project = l && nameOf.get(l.projectId);
     if (!l || !project) continue;
-    const usd = usdOf(b.amount, b.token);
+    const usd = bidUsd(b.amount, b.token);
     out.push({
       id: `bid:${b.id}`,
       kind: "marketplace",
       tag: "Marketplace · Bid",
       title: `${buyerLabel(b.bidderId)} bid on ${project}`,
-      body: usd === null ? formatAmount(b.amount, b.token) : `${formatAmount(b.amount, b.token)} (${usdLabel(usd)})`,
+      body: bidLabel(b.amount, b.token, usd),
       href: earnHref(l.projectId, "sell"),
       at: b.at,
       projectId: l.projectId,

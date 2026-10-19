@@ -14,9 +14,9 @@ import { cn } from "@/lib/utils";
 import { NoticePanelBody, onPanelKeyDown } from "./notice-panel";
 import { useNotices, type NoticeFeed } from "./use-notices";
 
-/** The bell's name: how many notices wait unread. */
+/** The bell's name: its count, which leaves out messages and what the settings quiet. */
 export function bellLabelOf(feed: NoticeFeed): string {
-  if (feed.unread > 0) return `Notifications, ${feed.unread} unread`;
+  if (feed.unread > 0) return `Notifications, ${feed.unread} new`;
   return feed.list.length ? "Notifications" : "No notifications yet";
 }
 

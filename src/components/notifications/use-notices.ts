@@ -1,9 +1,11 @@
 "use client";
 
-// The bell's notices, live (spec §5.6): every source in lib/notifications read
-// from the stores this browser keeps, with the Notification settings applied
-// and the read state merged. The sidebar's bell, the phone's, the editor's and
-// the two toasts read this one list, so they never disagree.
+// The bell's notices, live (spec §5.6, V5): every source in lib/notifications
+// read from the stores this browser keeps, with the read state merged. The
+// bell lists every one; the Notification settings decide only what counts and
+// what pops up (lib/notifications/filter.ts), and hidden words mask a notice's
+// text. The sidebar's bell, the phone's, the editor's, the two toasts and the
+// pop-ups (notice-popups.tsx) read this one list, so they never disagree.
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
@@ -22,7 +24,7 @@ import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { useMarket } from "@/lib/market/market-store";
 import { useMessages } from "@/lib/messages/store";
 import { useMessagePeople } from "@/lib/messages/use-people";
-import { bellNotices, filterNotices, groupNotices, toastAllowed, unreadCount, type NoticeGroup } from "@/lib/notifications/filter";
+import { bellNotices, groupNotices, maskNotice, popupModeOf, toastAllowed, unreadCount, type NoticeGroup } from "@/lib/notifications/filter";
 import { isNoticeRead } from "@/lib/notifications/read";
 import { markNoticesRead, useNoticeReads } from "@/lib/notifications/read-store";
 import {
@@ -111,13 +113,15 @@ export type NoticeFeed = {
   /** False until every store has been read: the count waits, so it never flickers. */
   hydrated: boolean;
   settings: SettingsV1;
-  /** What the bell lists: the settings applied, newest first. */
+  /** Every notice the sources hold, as they wrote it (before the bell trims and masks). */
+  all: Notice[];
+  /** What the bell lists: newest first, hidden words masked. Nothing is left out by a setting. */
   list: Notice[];
-  /** `list` under the digest's headings (one group with no heading right away). */
+  /** `list` under a heading per day once a day (one group with no heading otherwise). */
   groups: NoticeGroup[];
-  /** The bell's count (quiet hours hold back what comes in during them). */
+  /** The bell's count: what is heard and unread, but messages (quiet hours hold back what comes in). */
   unread: number;
-  /** Every unread notice the settings let show — what Mark all as read marks. */
+  /** Every unread notice: what Mark all as read marks. */
   unreadList: Notice[];
   isRead: (n: Notice) => boolean;
   projectName: (projectId: string) => string | null;
@@ -206,22 +210,52 @@ export function useNotices(): NoticeFeed {
   const names = React.useMemo(() => new Map(projects.map((p) => [p.id, p.name.trim() || "Untitled project"])), [projects]);
   return React.useMemo(() => {
     const keys = reads.keys;
-    const visible = filterNotices(all, settings);
-    const list = bellNotices(visible, keys, now);
+    const words = settings.blocking.hiddenWords;
+    const list = bellNotices(all, keys, now).map((n) => maskNotice(n, words));
     return {
-      hydrated: !!now && historyReady && blog.hydrated && messages.hydrated && market.hydrated && credits.hydrated && reads.hydrated,
+      hydrated:
+        !!now &&
+        historyReady &&
+        blog.hydrated &&
+        seen.hydrated &&
+        messages.hydrated &&
+        people.hydrated &&
+        market.hydrated &&
+        projectsReady &&
+        credits.hydrated &&
+        plan.hydrated &&
+        video.hydrated &&
+        reads.hydrated,
       settings,
+      all,
       list,
-      groups: groupNotices(list, settings.notifications.digest, now, settings.language.dateLocale),
-      unread: unreadCount(visible, keys, settings, now),
-      unreadList: visible.filter((n) => !isNoticeRead(n, keys)),
+      groups: groupNotices(list, popupModeOf(settings), now, settings.language.dateLocale),
+      unread: unreadCount(all, keys, settings, now),
+      unreadList: all.filter((n) => !isNoticeRead(n, keys)),
       isRead: (n: Notice) => isNoticeRead(n, keys),
       projectName: (id: string) => names.get(id) ?? null,
     };
-  }, [all, settings, reads.keys, reads.hydrated, now, historyReady, blog.hydrated, messages.hydrated, market.hydrated, credits.hydrated, names]);
+  }, [
+    all,
+    settings,
+    reads.keys,
+    reads.hydrated,
+    now,
+    historyReady,
+    blog.hydrated,
+    seen.hydrated,
+    messages.hydrated,
+    people.hydrated,
+    market.hydrated,
+    projectsReady,
+    credits.hydrated,
+    plan.hydrated,
+    video.hydrated,
+    names,
+  ]);
 }
 
-/** Whether a toast may show for `n` now (digest, quiet hours, the kind's toggle, mutes). */
+/** Whether a toast may show for `n` now (pop-ups, quiet hours, the kind's switch, mutes, hidden words). */
 export function useToastGate(): (n: Notice) => boolean {
   const settings = useSettings();
   const now = useNoticeClock();
