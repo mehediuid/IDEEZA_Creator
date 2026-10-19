@@ -1,19 +1,23 @@
-// What the Notification settings do to the notices (spec §5.6):
-// - a kind's Web notification off hides its notices (email and mobile arrive
-//   with sign-in, so they decide nothing in the app);
-// - the bid threshold hides bids and offers under it (a coin with no dollar
-//   value is never hidden by it: better shown than guessed);
-// - a muted project's notices are hidden;
-// - quiet hours: no toasts, and the bell's count doesn't grow with what comes
-//   in during the window, except urgent notices (money received) when they
-//   are let through;
-// - a daily or weekly summary sends no toasts and groups the bell by day or
-//   by week.
+// What the Notification settings do to the notices (V5). The bell never deletes
+// a record: every notice is listed. The settings decide only whether one is
+// heard, that is whether it pops up and adds to the bell's count:
+// - a kind switched off (its `web` channel; email and mobile arrive with
+//   sign-in, so they decide nothing in the app) isn't heard;
+// - nor is a muted project's notice, a bid under the threshold, or a notice
+//   that uses one of your hidden words (the bell masks its text too);
+// - messages and team conversations count on the Messages badge, never on the
+//   bell, though they are listed and may pop up;
+// - quiet hours: no pop-ups, and the bell's count doesn't grow with what comes
+//   in during the window, except a sale when "Let sales through" is on;
+// - pop-ups: right away, once a day (one summary, popups.ts, and the bell
+//   grouped by day) or paused (none at all; the count still grows).
 // Pure; local wall-clock time comes from `Date`, so a test builds its times
 // with `new Date(y, m, d, h)`.
 
+import { WORD_HIDDEN_FOR_OWNER } from "../innovations/comments";
+import { hasHiddenWord } from "../settings/audience";
 import { formatDate } from "../settings/dates";
-import { inQuietHours, type DateLocale, type SettingsV1 } from "../settings/prefs";
+import { inQuietHours, type DateLocale, type NoticeKind, type SettingsV1 } from "../settings/prefs";
 import { isNoticeRead } from "./read";
 import type { Notice } from "./types";
 
@@ -23,18 +27,37 @@ export const RECENT_MS = 30 * DAY;
 /** The most notices the bell lists. */
 export const BELL_MAX = 50;
 
-/** Whether the settings let `n` show at all. */
-export function passesPrefs(n: Notice, s: SettingsV1): boolean {
+/** The kinds the Messages badge counts: the bell lists them but never counts them. */
+export const MESSAGES_KINDS: ReadonlySet<NoticeKind> = new Set<NoticeKind>(["message", "teams"]);
+
+/** What the bell shows in place of text that uses a hidden word (the comments' own words). */
+export const WORD_HIDDEN = WORD_HIDDEN_FOR_OWNER;
+
+export function usesHiddenWord(n: Notice, words: readonly string[]): boolean {
+  if (!words.length) return false;
+  return hasHiddenWord(n.title, words) || (!!n.body && hasHiddenWord(n.body, words));
+}
+
+/** `n` as the bell shows it: a title that uses a hidden word is masked with its body; a body alone
+ *  is masked on its own. Untouched (the same object) otherwise. */
+export function maskNotice(n: Notice, words: readonly string[]): Notice {
+  if (!words.length) return n;
+  if (hasHiddenWord(n.title, words)) return { ...n, title: WORD_HIDDEN, body: undefined };
+  if (n.body && hasHiddenWord(n.body, words)) return { ...n, body: WORD_HIDDEN };
+  return n;
+}
+
+/** Whether the settings let `n` make itself heard: a pop-up, and (but for messages) the count. */
+export function isHeard(n: Notice, s: SettingsV1): boolean {
   const p = s.notifications;
   if (!p.channels[n.kind].web) return false;
   if (n.projectId && p.mutedProjects.includes(n.projectId)) return false;
   if (n.bid && p.bidThreshold !== null && n.bid.usd !== null && n.bid.usd < p.bidThreshold) return false;
-  return true;
+  return !usesHiddenWord(n, s.blocking.hiddenWords);
 }
 
-export function filterNotices(list: readonly Notice[], s: SettingsV1): Notice[] {
-  return list.filter((n) => passesPrefs(n, s));
-}
+/** Whether `n`, unread, adds to the bell's count (quiet hours aside). */
+export const countsOnBell = (n: Notice, s: SettingsV1) => !MESSAGES_KINDS.has(n.kind) && isHeard(n, s);
 
 /** Newest first; read notices older than RECENT_MS dropped; at most BELL_MAX. */
 export function bellNotices(list: readonly Notice[], readKeys: ReadonlySet<string>, now: number): Notice[] {
@@ -56,18 +79,33 @@ export function quietWindowStart(s: SettingsV1, now: number): number | null {
   return start.getTime();
 }
 
-/** An urgent notice the settings let through quiet hours. */
+/** A sale, with "Let sales through" on: it counts and pops up in quiet hours. */
 export const breaksThrough = (n: Notice, s: SettingsV1) => !!n.urgent && s.notifications.quietHours.urgentBreaksThrough;
 
-/** The bell's count: unread notices, less what came in during the current quiet hours. */
+/** The bell's count: unread notices that count on it, less what came in during the current quiet hours. */
 export function unreadCount(list: readonly Notice[], readKeys: ReadonlySet<string>, s: SettingsV1, now: number): number {
   const since = quietWindowStart(s, now);
-  return list.filter((n) => !isNoticeRead(n, readKeys) && (since === null || n.at < since || breaksThrough(n, s))).length;
+  return list.filter(
+    (n) => !isNoticeRead(n, readKeys) && countsOnBell(n, s) && (since === null || n.at < since || breaksThrough(n, s)),
+  ).length;
 }
 
-/** Whether `n` may show as a toast now. */
+export type PopupMode = "now" | "daily" | "paused";
+
+export function popupModeOf(s: SettingsV1): PopupMode {
+  if (s.notifications.popupsPaused) return "paused";
+  return s.notifications.digest === "instant" ? "now" : "daily";
+}
+
+/** The settings patch that chooses `mode`. Pausing keeps the digest, so unpausing is a choice again. */
+export function popupModePatch(mode: PopupMode): Partial<SettingsV1["notifications"]> {
+  if (mode === "paused") return { popupsPaused: true };
+  return { popupsPaused: false, digest: mode === "now" ? "instant" : "daily" };
+}
+
+/** Whether `n` may pop up now: heard, pop-ups right away, and outside quiet hours (or a sale let through). */
 export function toastAllowed(n: Notice, s: SettingsV1, now: number): boolean {
-  if (!passesPrefs(n, s) || s.notifications.digest !== "instant") return false;
+  if (!isHeard(n, s) || popupModeOf(s) !== "now") return false;
   return quietWindowStart(s, now) === null || breaksThrough(n, s);
 }
 
@@ -79,13 +117,6 @@ const startOfDay = (ms: number) => {
   return d.getTime();
 };
 
-/** Monday 00:00 of the week holding `ms`. */
-const startOfWeek = (ms: number) => {
-  const d = new Date(startOfDay(ms));
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d.getTime();
-};
-
 const dayLabel = (day: number, today: number, locale?: DateLocale) => {
   if (day === today) return "Today";
   const yesterday = new Date(today);
@@ -94,33 +125,18 @@ const dayLabel = (day: number, today: number, locale?: DateLocale) => {
   return formatDate(day, locale, { style: "weekday" });
 };
 
-const weekLabel = (week: number, thisWeek: number, locale?: DateLocale) => {
-  if (week === thisWeek) return "This week";
-  const last = new Date(thisWeek);
-  last.setDate(last.getDate() - 7);
-  if (week === last.getTime()) return "Last week";
-  return `Week of ${formatDate(week, locale, { style: "day" })}`;
-};
-
-/** The bell's list as the digest shows it: one list right away, else a heading per day or week.
- *  `list` is already newest first. */
-/** `locale` is the Date & Time Formatting choice (Settings › Language). */
-export function groupNotices(
-  list: readonly Notice[],
-  digest: SettingsV1["notifications"]["digest"],
-  now: number,
-  locale?: DateLocale,
-): NoticeGroup[] {
-  if (digest === "instant") return [{ key: "all", label: null, notices: [...list] }];
-  const of = digest === "daily" ? startOfDay : startOfWeek;
-  const label = digest === "daily" ? (k: number) => dayLabel(k, startOfDay(now), locale) : (k: number) => weekLabel(k, startOfWeek(now), locale);
+/** The bell's list: one list, or once a day a heading per day. `list` is already newest first;
+ *  `locale` is the Date & Time Formatting choice (Settings › Language). */
+export function groupNotices(list: readonly Notice[], mode: PopupMode, now: number, locale?: DateLocale): NoticeGroup[] {
+  if (mode !== "daily") return [{ key: "all", label: null, notices: [...list] }];
+  const today = startOfDay(now);
   const groups: NoticeGroup[] = [];
   for (const n of list) {
-    const k = of(n.at);
+    const k = startOfDay(n.at);
     const key = String(k);
     const last = groups[groups.length - 1];
     if (last && last.key === key) last.notices.push(n);
-    else groups.push({ key, label: label(k), notices: [n] });
+    else groups.push({ key, label: dayLabel(k, today, locale), notices: [n] });
   }
   return groups;
 }

@@ -7,10 +7,10 @@
 //
 // The banner:
 //   • Shows the first not-yet-dismissed attention item (by build order)
-//     that the Notification settings let toast: none while a daily or
-//     weekly summary is chosen, during quiet hours, for a muted project,
-//     or with Product notices switched off (lib/notifications/filter.ts).
-//     The bell still lists it.
+//     that the Notification settings let toast: none once a day or with
+//     pop-ups paused, during quiet hours, for a muted project, or with
+//     Builds and videos switched off (lib/notifications/filter.ts). The
+//     bell still lists it.
 //   • Auto-hides when the user is already on the target build page —
 //     no point telling them about something they're already looking at.
 //   • Renders a primary CTA ("Open build" / "Buy credits") + a ×

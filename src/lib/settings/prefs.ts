@@ -63,7 +63,12 @@ export interface SettingsV1 {
   v: 1;
   notifications: {
     channels: Record<NoticeKind, Record<Channel, boolean>>;
-    digest: "instant" | "daily" | "weekly";
+    /** Right away, or once a day (the bell grouped by day, one summary pop-up). A weekly summary
+     *  from an older record reads as once a day. */
+    digest: "instant" | "daily";
+    /** Pop-ups paused: nothing pops up, whatever the digest; the bell still lists and counts. */
+    popupsPaused: boolean;
+    /** `urgentBreaksThrough` is "Let sales through": a sale (the one urgent notice) still counts and pops up. */
     quietHours: { on: boolean; from: string; to: string; urgentBreaksThrough: boolean };
     /** In USD; null = every bid and offer. */
     bidThreshold: number | null;
@@ -123,6 +128,7 @@ export const DEFAULT_SETTINGS: SettingsV1 = Object.freeze({
   notifications: {
     channels: channelDefaults(),
     digest: "instant",
+    popupsPaused: false,
     quietHours: { on: false, from: "22:00", to: "07:00", urgentBreaksThrough: false },
     bidThreshold: null,
     mutedProjects: [],
@@ -217,7 +223,8 @@ export function normalizeSettings(raw: unknown): SettingsV1 {
     v: 1,
     notifications: {
       channels,
-      digest: oneOf(n.digest, ["instant", "daily", "weekly"] as const, d.notifications.digest),
+      digest: n.digest === "weekly" ? "daily" : oneOf(n.digest, ["instant", "daily"] as const, d.notifications.digest),
+      popupsPaused: bool(n.popupsPaused, d.notifications.popupsPaused),
       quietHours: {
         on: bool(q.on, d.notifications.quietHours.on),
         from: clock(q.from, d.notifications.quietHours.from),
