@@ -6,7 +6,11 @@
 //
 // Pure, types and constants only.
 
-export type ShapeType = "box" | "sphere" | "cylinder" | "cone" | "torus" | "plane";
+import type { EnclosureSpec } from "./enclosure";
+
+/** `enclosure` is the hollow case or its lid (Assembly plan D6); its size is
+ *  `enclosure`'s millimetres, not the unit cube's. */
+export type ShapeType = "box" | "sphere" | "cylinder" | "cone" | "torus" | "plane" | "enclosure";
 
 export type SceneShape = {
   id: string;
@@ -20,7 +24,12 @@ export type SceneShape = {
    *  ("Enclosure base", "U1 · ESP32"). A shape the maker drew has none, and
    *  the shape list falls back to its type. */
   name?: string;
+  /** An enclosure shape's case or lid — present exactly when type is "enclosure". */
+  enclosure?: EnclosureSpec;
 };
+
+/** Scene units per millimetre in the 3D Module: 1 unit is 10 mm. */
+export const SCENE_UNIT_MM = 10;
 
 /** The scene a new document opens on: one 2-unit cube at the origin — the
  *  same value three-app.tsx starts from. */
