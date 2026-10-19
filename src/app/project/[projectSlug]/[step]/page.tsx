@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { ProjectWorkspace } from "@/components/manual/project-workspace";
 import type { ManualFlowState } from "@/lib/manual/projects";
 
-// /project/<slug>/<step>. `brief` redirects to the project's mint flow in
-// Earn (Build and Earn P1-2). Every editor step here is a legacy address
+// /project/<slug>/<step>. `brief` is Save project: it redirects to the
+// project page as a Draft, where Publish takes it on. Every editor step here is a legacy address
 // (P2-EDITOR-2): ProjectWorkspace, given no product, replaces it with
 // /project/<slug>/products/<productId>/<step> for the product the project
 // resumes.
@@ -28,7 +28,7 @@ const TITLES: Record<string, string> = {
   assembly: "Assembly",
   wiring: "Peripheral Wiring",
   preview: "Product Preview",
-  brief: "Add Brief",
+  brief: "Save project",
 };
 
 export async function generateMetadata({

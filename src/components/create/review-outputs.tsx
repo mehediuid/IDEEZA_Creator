@@ -581,7 +581,16 @@ function ReviewPanel({
       {saveInfo && (
         // Opened only on an unsaved build, then kept open through its own
         // save: the build reads as saved a render before the write settles.
-        <SaveStep open={stepOpen && !building} job={job} info={saveInfo} onClose={() => setStepOpen(false)} />
+        <SaveStep
+          open={stepOpen && !building}
+          job={job}
+          info={saveInfo}
+          onClose={() => {
+            setStepOpen(false);
+            // After a save, the button that opened the step is Open project: focus lands there.
+            window.requestAnimationFrame(() => document.getElementById(REVIEW_PRIMARY_ID)?.focus());
+          }}
+        />
       )}
     </section>
   );

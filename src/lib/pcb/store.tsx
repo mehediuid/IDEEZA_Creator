@@ -176,6 +176,10 @@ export interface PcbActions {
   /** Drag a panel edge. Clamped by PANEL_LIMITS; view state, so no undo entry. */
   setPanelSize: (which: "left" | "right" | "bottom", px: number) => void;
   saveDoc: () => void;
+  /** The same write as saveDoc without its toast, for Save project (the editors' saved
+   *  dialog says it instead): true when the board was written, false when the write was
+   *  refused, null when no product's board is held. */
+  flushDoc: () => boolean | null;
   /** Mirror the PCB view to inspect the board from the bottom (Flip Board). */
   toggleBoardFlip: () => void;
   /** Net highlight — glow every object on `net` (null clears / Unhighlight All). */
@@ -1176,16 +1180,21 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge((s) => ({ panelSizes: { ...s.panelSizes, [which]: v } }));
       },
       saveDoc: () => {
-        const held = heldRef.current;
-        if (!held) {
+        const ok = actions.flushDoc();
+        if (ok === null) {
           actions.flashToast("Open a product to save its board");
           return;
         }
+        actions.flashToast(ok ? "Saved" : "Save failed");
+      },
+      flushDoc: () => {
+        const held = heldRef.current;
+        if (!held) return null;
         saveQueue.cancel();
         const storage = docStorage();
         const ok = !!storage && writeEditorDoc(held.handle, JSON.stringify(docOf(stateRef.current)), storage);
         merge(ok ? { saveState: "saved", lastSavedAt: stamp() } : { saveState: "failed" });
-        actions.flashToast(ok ? "Saved" : "Save failed");
+        return ok;
       },
       toggleBoardFlip: () =>
         merge((s) => {

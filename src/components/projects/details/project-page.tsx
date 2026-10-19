@@ -44,7 +44,6 @@ import { RailLegal } from "./rail-legal";
 import { RailLog } from "./rail-log";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
-import { SavedBanner } from "./saved-banner";
 import { DescriptionCoachmark } from "./description-coachmark";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 import { useProjectPageData } from "./use-project-page-data";
@@ -157,7 +156,6 @@ export const SLOTS: ProjectSlots = {
     PreviewBannerSlot,
     ContributorPreviewBannerSlot,
   ],
-  notice: SavedBanner,
   header: HeaderSlot,
   headerParts: {
     statusRow: [
