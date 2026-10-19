@@ -452,7 +452,10 @@ function OwnProfile({
               latinName={person.latinName}
               headline={fields.headline || prompt(hasName ? "Add what you build" : "Add your name and what you build")}
               demo={false}
-              location={fields.location || null}
+              // Settings › Profile & Share › "Show my location and local time"
+              // (off by default): others see neither until it's on; you
+              // always see the location you typed, and the time only when on.
+              location={fields.location && (owner || audience.showLocalTime) ? fields.location : null}
               localTime={fields.location && audience.showLocalTime ? localTimeOf(fields.timeZone, now) : null}
               since={since}
               relation={null}
