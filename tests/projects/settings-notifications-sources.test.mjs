@@ -51,6 +51,17 @@ test("builds: today's three attention reasons, with the bell's own words and lin
   assert.equal(paused.at, T0 + 5 * MIN, "no end yet: the last change");
 });
 
+test("builds: a build paused at the monthly limit says so and opens the credit alerts", () => {
+  const [cap] = buildNotices([att("credits", { blocked: "cap" })], () => true);
+  assert.equal(cap.tag, "Paused — monthly limit reached");
+  assert.equal(cap.href, "/settings/plan?tab=credits#credit-alerts");
+  const [credits] = buildNotices([att("credits", { blocked: "credits" })], () => true);
+  assert.equal(credits.tag, "Paused — needs credits");
+  assert.equal(credits.href, "/settings/plan?tab=credits");
+  const [other] = buildNotices([att("credits", { blocked: "something-new" })], () => true);
+  assert.equal(other.tag, "Paused — needs credits", "only \"cap\" is the limit");
+});
+
 test("builds: the project a build was meant for counts as its project", () => {
   const [n] = buildNotices([att("review", { projectId: undefined, projectChoiceId: "p9" })], () => true);
   assert.equal(n.projectId, "p9");
@@ -241,23 +252,24 @@ test("marketplace: your auction ending within an hour, once", () => {
 const line = (id, delta, reason, ts, x = {}) => ({ id, delta, reason, ts, ...x });
 const coin = (x = {}) => ({ balance: 8, ledger: [line("seed", 8, "seed", T0)], lowAt: 10, expiryReminderDays: 14, plan: null, now: NOW, ...x });
 
-test("coin: credits under your low mark, from the line that took them under", () => {
+test("coin: credits at or under your low mark (the popover's rule), from the line that took them there", () => {
   const [n] = coinNotices(coin());
   assert.deepEqual(n, {
     id: "coin:low:seed",
     kind: "coin",
     tag: "Coin · Credits",
     title: "You have 8 credits left",
-    body: "That's under your low mark of 10. Buy credits to keep building.",
+    body: "Your low mark is 10. Buy credits to keep building.",
     href: "/settings/plan?tab=credits",
     at: T0,
   });
-  assert.deepEqual(coinNotices(coin({ balance: 10, ledger: [line("seed", 10, "seed", T0)] })), [], "at the mark is not under it");
+  assert.equal(coinNotices(coin({ balance: 10, ledger: [line("seed", 10, "seed", T0)] })).length, 1, "at the mark is running low");
+  assert.deepEqual(coinNotices(coin({ balance: 11, ledger: [line("seed", 11, "seed", T0)] })), []);
   const ledger = [line("seed", 8, "seed", T0), line("buy", 50, "purchase", T0 + DAY, { expiresAt: T0 + 400 * DAY }), line("b1", -48, "build", T0 + 2 * DAY, { buildId: "x" }), line("b2", -4, "build", T0 + 3 * DAY, { buildId: "y" })];
   const [low] = coinNotices(coin({ balance: 6, ledger }));
-  assert.equal(low.id, "coin:low:b2", "58 → 10 is at the mark; 10 → 6 took them under");
+  assert.equal(low.id, "coin:low:b1", "58 → 10 reached the mark; staying low after it is the same notice");
   assert.equal(low.title, "You have 6 credits left");
-  assert.equal(low.at, T0 + 3 * DAY);
+  assert.equal(low.at, T0 + 2 * DAY);
 });
 
 test("coin: purchased credits expiring within your reminder days", () => {
@@ -277,7 +289,8 @@ test("coin: purchased credits expiring within your reminder days", () => {
   assert.deepEqual(coinNotices(coin({ balance: 358, ledger, now: exp - 5 * DAY, expiryReminderDays: 3 })), []);
   assert.deepEqual(coinNotices(coin({ balance: 358, ledger, now: exp + 1 })), [], "already expired");
   const spent = [...ledger.slice(0, 2), line("b", -58, "build", T0 + 1, { buildId: "z" })];
-  assert.equal(coinNotices(coin({ balance: 0, ledger: spent, now: exp - 5 * DAY, lowAt: 0 })).length, 0, "nothing left in the lot");
+  const left = coinNotices(coin({ balance: 0, ledger: spent, now: exp - 5 * DAY }));
+  assert.equal(left.filter((n) => n.id.startsWith("coin:expiry:")).length, 0, "nothing left in the lot");
 });
 
 test("coin: the plan renewing, changing or ending within three days", () => {

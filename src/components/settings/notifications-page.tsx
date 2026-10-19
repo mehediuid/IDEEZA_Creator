@@ -39,10 +39,10 @@ type Prefs = SettingsV1["notifications"];
 /** What each kind carries in this app, said plainly (D7). */
 const COVERS: Record<NoticeKind, React.ReactNode> = {
   marketplace: "A sale of your listing or a copy of it, a bid or offer on yours, and your auction ending within an hour.",
-  product: "A build that is ready to review, needs a retry or is paused for credits, and a video take that is ready.",
+  product: "A build that is ready to review, needs a retry, or is paused for credits or at your monthly limit, and a video take that is ready.",
   coin: (
     <>
-      Credits under your low mark, bought credits close to expiring, and your plan renewing within three days. Set the
+      Credits at or under your low mark, bought credits close to expiring, and your plan renewing within three days. Set the
       low mark and the reminder in{" "}
       <Link href={CREDITS_HREF} className="font-medium text-text-link underline-offset-2 hover:text-text-link-hover hover:underline">
         Plan &amp; pricing

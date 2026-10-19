@@ -52,6 +52,9 @@ export type AttentionInput = {
     createdAt: number;
     updatedAt: number;
     endedAt?: number;
+    /** Why a queued build waits: "credits", or "cap" — the monthly spending limit (Plan & pricing
+     *  › Credits). Any other value reads as credits. */
+    blocked?: string;
   };
   reason: "review" | "retry" | "credits";
   message: string;
@@ -64,23 +67,33 @@ const BUILD_TAG: Record<AttentionInput["reason"], string> = {
   credits: "Paused — needs credits",
 };
 
-/** Builds ready to review, needing a retry, or paused for credits. A paused build opens the
- *  Credits tab; the others open the chat they were started from, or their own page when this
- *  browser no longer holds that chat. */
+/** Where a build paused at the monthly limit sends you: the credit alerts and limits. */
+const CREDIT_ALERTS_HREF = `${CREDITS_HREF}#credit-alerts`;
+
+/** Builds ready to review, needing a retry, or paused for credits or at the monthly limit. A
+ *  paused build opens the Credits tab (the limit, its alerts card); the others open the chat they
+ *  were started from, or their own page when this browser no longer holds that chat. */
 export function buildNotices(atts: readonly AttentionInput[], hasChat: (chatId: string) => boolean): Notice[] {
-  return atts.map(({ job, reason, message }) =>
-    withProject(
+  return atts.map(({ job, reason, message }) => {
+    const cap = reason === "credits" && job.blocked === "cap";
+    return withProject(
       {
-        id: `build:${job.id}:${reason}`,
+        id: `build:${job.id}:${cap ? "cap" : reason}`,
         kind: "product",
-        tag: BUILD_TAG[reason],
+        tag: cap ? "Paused — monthly limit reached" : BUILD_TAG[reason],
         title: message,
-        href: reason === "credits" ? CREDITS_HREF : hasChat(job.chatId) ? `/chat/${job.chatId}` : `/build/${job.id}`,
+        href: cap
+          ? CREDIT_ALERTS_HREF
+          : reason === "credits"
+            ? CREDITS_HREF
+            : hasChat(job.chatId)
+              ? `/chat/${job.chatId}`
+              : `/build/${job.id}`,
         at: job.endedAt ?? job.updatedAt,
       },
       job.projectId ?? job.projectChoiceId,
-    ),
-  );
+    );
+  });
 }
 
 // ─────────────────────────── blog ───────────────────────────
@@ -252,32 +265,33 @@ export type CoinInput = {
 
 const credits = (n: number) => `${n} credit${n === 1 ? "" : "s"}`;
 
-/** The ledger line that last took the balance under `lowAt`. */
+/** The ledger line that last took the balance to `lowAt` or under. */
 function crossingOf(ledger: readonly LotLine[], lowAt: number): LotLine | null {
   let sum = 0;
   let under = false;
   let crossing: LotLine | null = null;
   for (const line of ledger) {
     sum += line.delta;
-    const now = sum < lowAt;
+    const now = sum <= lowAt;
     if (now && !under) crossing = line;
     under = now;
   }
   return crossing ?? ledger[ledger.length - 1] ?? null;
 }
 
-/** Credits under your low mark, purchased credits expiring within your reminder days, and the
- *  plan renewing, changing or ending within three days. */
+/** Credits at or under your low mark (the account popover's "Running low" rule), purchased
+ *  credits expiring within your reminder days, and the plan renewing, changing or ending within
+ *  three days. */
 export function coinNotices(c: CoinInput): Notice[] {
   const out: Notice[] = [];
-  if (c.balance < c.lowAt) {
+  if (c.balance <= c.lowAt) {
     const line = crossingOf(c.ledger, c.lowAt);
     out.push({
       id: line ? `coin:low:${line.id}` : "coin:low",
       kind: "coin",
       tag: "Coin · Credits",
       title: `You have ${credits(c.balance)} left`,
-      body: `That's under your low mark of ${c.lowAt}. Buy credits to keep building.`,
+      body: `Your low mark is ${c.lowAt}. Buy credits to keep building.`,
       href: CREDITS_HREF,
       at: line?.ts ?? c.now,
     });
