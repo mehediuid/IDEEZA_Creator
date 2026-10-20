@@ -68,7 +68,7 @@ ideeza-creator-panel/
    │  ├─ support/            report-problem (the one Report a problem dialog + host)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog,
-   │  │                      history-page, image-editor/turn, prompt-bar,
+   │  │                      history-page + history-builds, image-editor/turn, prompt-bar,
    │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived),
    │  │                      spec-panel.tsx (the card's facts + Edit spec button),
    │  │                      spec-sheet.tsx + spec-sections.tsx (the part editor,

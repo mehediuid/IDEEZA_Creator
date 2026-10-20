@@ -53,7 +53,7 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
 
   switch (a) {
     case "history":
-      return { page: "History", route: "/history" };
+      return { page: q.get("tab") === "builds" ? "History · Builds" : "History", route: "/history" };
     case "chat":
       return { page: "AI chat", route: "/chat/[chatId]" };
     case "build":

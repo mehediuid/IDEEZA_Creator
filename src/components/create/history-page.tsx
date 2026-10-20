@@ -1,32 +1,30 @@
 "use client";
 
-// History (/history): one list of everything the maker started, one row per
-// concept chat, newest first. The build runs inside its chat and the chat
-// opens on its newest build, so a row reads that build's status. Plans and
-// credits live in Settings › Plan & billing, not here.
+// History (/history): two lists, kept apart because they answer different
+// questions.
+//
+//   Prompts — what you asked for: one row per concept chat, opening it.
+//   Builds  — what was made: one row per build, opening onto its steps
+//             (history-builds.tsx), live while it runs.
+//
+// Plans and credits live in Settings › Plan & billing, not here.
 //
 // URL state survives refresh and share:
-//   ?filter=progress|ready|attention   ?q=<search>   ?page=2
+//   ?tab=builds   ?filter=progress|ready|attention   ?q=<search>
+//   ?row=<buildId> (the open build)   ?page=2
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ActivityIcon,
-  AlertCircleIcon,
-  CheckmarkBadge01Icon,
-  Clock01Icon,
-  Delete02Icon,
-  Idea01Icon,
-  PauseIcon,
-  Refresh01Icon,
-} from "@hugeicons/core-free-icons";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { Page } from "@/components/ideeza/page";
 import { PageHeader } from "@/components/ideeza/page-header";
 import {
+  queuedAhead,
   rollupBuild,
   statusOf,
   useCreateHistory,
+  type BuildItemKind,
   type BuildJob,
   type ChatSession,
 } from "@/lib/create/history";
@@ -34,18 +32,24 @@ import { chatDeletePlan, projectBuildIds } from "@/lib/create/history-delete";
 import {
   HISTORY_DESCRIPTION,
   HISTORY_FILTERS,
+  buildEntries,
   filterCounts,
-  historyEntries,
-  narrowHistory,
+  narrowBuilds,
+  narrowPrompts,
   parseFilter,
-  type HistoryEntry,
+  parseTab,
+  promptEntries,
+  type BuildEntry,
   type HistoryFilter,
+  type HistoryTab,
+  type PromptEntry,
 } from "@/lib/create/history-list";
 import { useManualProjects } from "@/lib/manual/projects";
 import { Icon } from "@/components/dashboard/icon";
 import { ConfirmDialog, IconButton, SearchInput } from "@/components/ideeza";
 import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
+import { BuildsTable } from "./history-builds";
 import { Pagination, HISTORY_PAGE_SIZE } from "./pagination";
 
 /** What the maker first typed: the setup question's prompt, else the first message. */
@@ -65,11 +69,18 @@ function chatImage(chat: ChatSession): string | undefined {
   return undefined;
 }
 
+const TABS: { id: HistoryTab; label: string }[] = [
+  { id: "prompts", label: "Prompts" },
+  { id: "builds", label: "Builds" },
+];
+
 export function HistoryListPage() {
   const router = useRouter();
   const params = useSearchParams();
+  const tab = parseTab(params.get("tab"));
   const filter = parseFilter(params.get("filter"));
   const rawPage = Math.max(1, Number(params.get("page") ?? "1") || 1);
+  const openRow = params.get("row");
   const [text, setText] = React.useState(() => params.get("q") ?? "");
   const searchRef = React.useRef<HTMLInputElement>(null);
   const {
@@ -84,37 +95,48 @@ export function HistoryListPage() {
   const [deleting, setDeleting] = React.useState<ChatSession | null>(null);
   const { projects } = useManualProjects();
 
-  const entries = React.useMemo(() => {
+  const { prompts, buildRows } = React.useMemo(() => {
     const projectName = new Map(projects.map((p) => [p.id, p.name]));
     const attention = new Set(attentionBuilds.map((a) => a.job.id));
-    return historyEntries(
-      chats.map((c) => ({
-        id: c.id,
-        title: c.title,
-        prompt: chatPrompt(c),
-        imageUrl: chatImage(c),
-        updatedAt: c.updatedAt,
-      })),
-      builds.map((b) => {
-        const rollup = rollupBuild(b);
-        return {
-          id: b.id,
-          chatId: b.chatId,
-          title: b.title,
-          prompt: b.conceptPrompt,
-          imageUrl: b.conceptImageUrl,
-          createdAt: b.createdAt,
-          updatedAt: b.updatedAt,
-          queued: b.status === "queued",
-          blocked: !!b.blocked,
-          rollup: rollup.status,
-          progress: rollup.progress,
-          projectId: b.projectId,
-          projectName: b.projectId ? projectName.get(b.projectId) : undefined,
-          attention: attention.has(b.id),
-        };
-      }),
-    );
+    const inputs = builds.map((b) => {
+      const rollup = rollupBuild(b);
+      return {
+        id: b.id,
+        chatId: b.chatId,
+        title: b.title,
+        prompt: b.conceptPrompt,
+        imageUrl: b.conceptImageUrl,
+        createdAt: b.createdAt,
+        updatedAt: b.updatedAt,
+        startedAt: b.startedAt,
+        endedAt: b.endedAt,
+        queued: b.status === "queued",
+        blocked: !!b.blocked,
+        rollup: rollup.status,
+        progress: rollup.progress,
+        projectId: b.projectId,
+        projectName: b.projectId ? projectName.get(b.projectId) : undefined,
+        attention: attention.has(b.id),
+        ahead: queuedAhead(b, builds),
+        products: [
+          { id: "primary", name: b.title, items: b.items },
+          ...(b.companions ?? []).map((c) => ({ id: c.id, name: c.name, items: c.items })),
+        ],
+      };
+    });
+    return {
+      prompts: promptEntries(
+        chats.map((c) => ({
+          id: c.id,
+          title: c.title,
+          prompt: chatPrompt(c),
+          imageUrl: chatImage(c),
+          updatedAt: c.updatedAt,
+        })),
+        inputs,
+      ),
+      buildRows: buildEntries(inputs, new Set(chats.map((c) => c.id))),
+    };
   }, [chats, builds, projects, attentionBuilds]);
 
   const setUrl = React.useCallback(
@@ -124,27 +146,30 @@ export function HistoryListPage() {
         if (v === null) sp.delete(k);
         else sp.set(k, v);
       }
-      // The two tabs and the expanded row are gone; their links land on All.
-      sp.delete("tab");
-      sp.delete("row");
       const qs = sp.toString();
       router.replace(qs ? `/history?${qs}` : "/history", { scroll: false });
     },
     [params, router],
   );
 
+  const setTab = (next: HistoryTab) => {
+    setText("");
+    setUrl({ tab: next === "builds" ? "builds" : null, filter: null, q: null, row: null, page: null });
+  };
   const setFilter = (next: HistoryFilter) =>
-    setUrl({ filter: next === "all" ? null : next, page: null });
+    setUrl({ filter: next === "all" ? null : next, row: null, page: null });
   const setQuery = (next: string) => {
     setText(next);
-    setUrl({ q: next.trim() ? next : null, page: null });
+    setUrl({ q: next.trim() ? next : null, row: null, page: null });
   };
 
-  const counts = filterCounts(entries);
-  const shown = narrowHistory(entries, filter, text);
-  const pageCount = Math.max(1, Math.ceil(shown.length / HISTORY_PAGE_SIZE));
+  const counts = filterCounts(buildRows);
+  const shownPrompts = narrowPrompts(prompts, text);
+  const shownBuilds = narrowBuilds(buildRows, filter, text);
+  const total = tab === "builds" ? shownBuilds.length : shownPrompts.length;
+  const pageCount = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
   const page = Math.min(rawPage, pageCount);
-  const rows = shown.slice((page - 1) * HISTORY_PAGE_SIZE, page * HISTORY_PAGE_SIZE);
+  const slice = <T,>(list: T[]) => list.slice((page - 1) * HISTORY_PAGE_SIZE, page * HISTORY_PAGE_SIZE);
 
   const buildById = React.useMemo(() => new Map(builds.map((b) => [b.id, b])), [builds]);
   // The same retry the build's own card offers: a build a system error
@@ -158,6 +183,18 @@ export function HistoryListPage() {
     for (const c of job.companions ?? [])
       for (const it of c.items) if (it.status === "failed") retryBuildItem(job.id, it.kind, c.id);
   };
+  const retryRow = (row: BuildEntry) => {
+    const job = buildById.get(row.id);
+    if (job) retry(job);
+  };
+  const retryStep = (row: BuildEntry, productId: string, kind: string) => {
+    const job = buildById.get(row.id);
+    if (!job) return;
+    if (statusOf(job) === "failed") retryBuild(job.id);
+    else retryBuildItem(job.id, kind as BuildItemKind, productId);
+  };
+
+  const nothingYet = hydrated && prompts.length === 0 && buildRows.length === 0;
 
   return (
     <Page className="flex flex-col">
@@ -165,11 +202,42 @@ export function HistoryListPage() {
 
       {!hydrated ? (
         <p className="text-md text-text-tertiary">Loading…</p>
-      ) : entries.length === 0 ? (
-        <EmptyState />
+      ) : nothingYet ? (
+        <EmptyState
+          title="Nothing here yet"
+          body="Describe a project from the Home prompt. Its chat lands in Prompts and its build in Builds, so you can come back to either any time."
+        />
       ) : (
         <>
-          <div className="flex flex-col gap-[12px] [@container(min-width:880px)]:flex-row [@container(min-width:880px)]:items-center">
+          <div role="tablist" aria-label="History sections" className="flex items-center gap-[8px] border-b border-solid border-border">
+            {TABS.map((t) => {
+              const on = tab === t.id;
+              const n = t.id === "builds" ? buildRows.length : prompts.length;
+              const dot = t.id === "builds" && counts.attention > 0;
+              return (
+                <button
+                  key={t.id}
+                  role="tab"
+                  type="button"
+                  aria-selected={on}
+                  aria-label={dot ? `${t.label}, ${counts.attention} need${counts.attention === 1 ? "s" : ""} attention` : undefined}
+                  onClick={() => setTab(t.id)}
+                  className={cn(
+                    "relative inline-flex h-[44px] items-center gap-[8px] border-b-2 border-solid px-[8px] text-md outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+                    on
+                      ? "border-violet-600 font-semibold text-text-primary"
+                      : "border-transparent font-regular text-text-secondary hover:text-text-primary",
+                  )}
+                >
+                  {t.label}
+                  <span className="font-regular tabular-nums text-text-tertiary">{n}</span>
+                  {dot && <span aria-hidden className="inline-flex size-[8px] rounded-full bg-bg-error" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-[16px] flex flex-col gap-[12px] [@container(min-width:880px)]:flex-row [@container(min-width:880px)]:items-center">
             <form
               role="search"
               onSubmit={(e) => e.preventDefault()}
@@ -186,63 +254,52 @@ export function HistoryListPage() {
                     setQuery("");
                   }
                 }}
-                placeholder="Search by name, prompt or project"
-                aria-label="Search history"
+                placeholder={tab === "builds" ? "Search builds by prompt, product or project" : "Search prompts"}
+                aria-label={tab === "builds" ? "Search builds" : "Search prompts"}
                 enterKeyHint="search"
                 className="text-[length:var(--font-size-md)]"
                 containerClassName="min-h-[44px] [&>button]:before:-inset-[15.5px]"
               />
             </form>
-            <div role="group" aria-label="Show" className="flex flex-wrap gap-[8px]">
-              {HISTORY_FILTERS.map((f) => {
-                const on = filter === f.id;
-                const dot = f.id === "attention" && counts.attention > 0;
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setFilter(f.id)}
-                    className={cn(
-                      "inline-flex min-h-[44px] items-center gap-[8px] rounded-[var(--radius-lg)] border border-solid px-[var(--spacing-6)] text-md font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none",
-                      on
-                        ? "border-transparent bg-bg-brand-subtle text-text-brand"
-                        : "border-border bg-bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
-                    )}
-                  >
-                    {dot && <span aria-hidden className="inline-flex size-[8px] rounded-full bg-bg-error" />}
-                    {f.label}
-                    <span className="font-medium tabular-nums">{counts[f.id]}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {tab === "builds" && (
+              <div role="group" aria-label="Show" className="flex flex-wrap gap-[8px]">
+                {HISTORY_FILTERS.map((f) => {
+                  const on = filter === f.id;
+                  const dot = f.id === "attention" && counts.attention > 0;
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setFilter(f.id)}
+                      className={cn(
+                        "inline-flex min-h-[44px] items-center gap-[8px] rounded-[var(--radius-lg)] border border-solid px-[var(--spacing-6)] text-md font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none",
+                        on
+                          ? "border-transparent bg-bg-brand-subtle text-text-brand"
+                          : "border-border bg-bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
+                      )}
+                    >
+                      {dot && <span aria-hidden className="inline-flex size-[8px] rounded-full bg-bg-error" />}
+                      {f.label}
+                      <span className="font-medium tabular-nums">{counts[f.id]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {rows.length === 0 ? (
-            <NoMatch
-              query={text.trim()}
-              filter={filter}
-              onClear={() => {
-                if (text.trim()) {
-                  setQuery("");
-                  searchRef.current?.focus();
-                } else {
-                  setFilter("all");
-                }
-              }}
-            />
-          ) : (
-            <>
+          {tab === "prompts" ? (
+            prompts.length === 0 ? (
+              <EmptyState title="No prompts yet" body="Describe a project from the Home prompt and its chat lands here, so you can return to it any time." />
+            ) : shownPrompts.length === 0 ? (
+              <NoMatch label={`No results for “${text.trim()}”`} action="Clear search" onClick={() => { setQuery(""); searchRef.current?.focus(); }} />
+            ) : (
               <ul role="list" className="mt-[16px] flex flex-col gap-[8px]">
-                {rows.map((e) => (
-                  <HistoryRow
-                    key={e.key}
+                {slice(shownPrompts).map((e) => (
+                  <PromptRow
+                    key={e.chatId}
                     entry={e}
-                    onRetry={() => {
-                      const job = e.buildId ? buildById.get(e.buildId) : undefined;
-                      if (job) retry(job);
-                    }}
                     onDelete={() => {
                       const chat = chats.find((c) => c.id === e.chatId);
                       if (chat) setDeleting(chat);
@@ -250,15 +307,31 @@ export function HistoryListPage() {
                   />
                 ))}
               </ul>
-              <div className="mt-[16px]">
-                <Pagination
-                  page={page}
-                  pageCount={pageCount}
-                  onPage={(p) => setUrl({ page: p > 1 ? String(p) : null })}
-                />
-              </div>
-            </>
+            )
+          ) : buildRows.length === 0 ? (
+            <EmptyState
+              title="No builds yet"
+              body="When you confirm a concept with “Use this”, its build (3D model, PCB, firmware, wiring and parts) runs here."
+            />
+          ) : shownBuilds.length === 0 ? (
+            text.trim() ? (
+              <NoMatch label={`No results for “${text.trim()}”`} action="Clear search" onClick={() => { setQuery(""); searchRef.current?.focus(); }} />
+            ) : (
+              <NoMatch label={NOTHING[filter]} action="Show all" onClick={() => setFilter("all")} />
+            )
+          ) : (
+            <BuildsTable
+              rows={slice(shownBuilds)}
+              expandedId={openRow}
+              onToggle={(id) => setUrl({ row: openRow === id ? null : id })}
+              onRetry={retryRow}
+              onRetryStep={retryStep}
+            />
           )}
+
+          <div className="mt-[16px]">
+            <Pagination page={page} pageCount={pageCount} onPage={(p) => setUrl({ page: p > 1 ? String(p) : null, row: null })} />
+          </div>
         </>
       )}
 
@@ -275,27 +348,17 @@ export function HistoryListPage() {
   );
 }
 
-// ───────────────────────────── a row ──────────────────────────────
+// ─────────────────────────── a prompt row ──────────────────────────
 
-// Below an 800 px page the row folds to two lines: the name and its prompt,
-// then the status, the date and Try again. Wider, they sit on one line with
-// the status and date in fixed columns, Try again before them. The name's
-// link covers the card; the project link, Try again and Delete sit above it.
-function HistoryRow({
-  entry: e,
-  onRetry,
-  onDelete,
-}: {
-  entry: HistoryEntry;
-  onRetry: () => void;
-  onDelete: () => void;
-}) {
+// Below a 640 px page the row folds to two lines. The name's link covers
+// the card; the project link and Delete sit above it.
+function PromptRow({ entry: e, onDelete }: { entry: PromptEntry; onDelete: () => void }) {
   const dates = useDates();
   return (
-    <li className="relative grid grid-cols-[64px_minmax(0,1fr)_36px] items-center gap-x-[12px] gap-y-[6px] rounded-xl border border-solid border-border bg-bg-surface p-[12px] transition-colors duration-fast hover:border-border-strong [@container(min-width:800px)]:grid-cols-[84px_minmax(0,1fr)_auto_36px] [@container(min-width:800px)]:gap-x-[16px] [@container(min-width:800px)]:p-[16px]">
+    <li className="relative grid grid-cols-[64px_minmax(0,1fr)_36px] items-center gap-x-[12px] gap-y-[6px] rounded-xl border border-solid border-border bg-bg-surface p-[12px] transition-colors duration-fast hover:border-border-strong [@container(min-width:640px)]:grid-cols-[84px_minmax(0,1fr)_auto_36px] [@container(min-width:640px)]:gap-x-[16px] [@container(min-width:640px)]:p-[16px]">
       <div
         aria-hidden
-        className="row-span-2 h-[48px] w-[64px] self-start overflow-hidden rounded-lg bg-bg-surface-raised [@container(min-width:800px)]:row-span-1 [@container(min-width:800px)]:h-[64px] [@container(min-width:800px)]:w-[84px] [@container(min-width:800px)]:self-center"
+        className="row-span-2 h-[48px] w-[64px] self-start overflow-hidden rounded-lg bg-bg-surface-raised [@container(min-width:640px)]:row-span-1 [@container(min-width:640px)]:h-[64px] [@container(min-width:640px)]:w-[84px] [@container(min-width:640px)]:self-center"
       >
         {e.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -310,7 +373,7 @@ function HistoryRow({
         >
           {e.name}
         </Link>
-        <p className="mt-[2px] truncate text-sm text-text-tertiary" title={e.projectName ? undefined : e.prompt}>
+        <p className="mt-[2px] truncate text-sm text-text-tertiary" title={e.prompt}>
           {e.projectId && e.projectName ? (
             <>
               In{" "}
@@ -320,62 +383,27 @@ function HistoryRow({
               >
                 {e.projectName}
               </Link>
+              {" · "}
             </>
-          ) : (
-            e.prompt
-          )}
+          ) : null}
+          {e.prompt}
         </p>
       </div>
 
-      <div className="col-start-2 row-start-2 flex flex-wrap items-center gap-[8px] [@container(min-width:800px)]:col-start-3 [@container(min-width:800px)]:row-start-1 [@container(min-width:800px)]:flex-nowrap [@container(min-width:800px)]:gap-[16px]">
-        <span className="[@container(min-width:800px)]:w-[128px]">
-          <StatusPill entry={e} />
-        </span>
-        <span className="text-sm tabular-nums text-text-tertiary [@container(min-width:800px)]:w-[80px] [@container(min-width:800px)]:text-right">
-          {dates.stamp(e.ts)}
-        </span>
-        {e.status === "failed" && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="relative z-[1] inline-flex h-[36px] w-fit items-center gap-[8px] rounded-lg bg-bg-error-subtle px-[14px] text-sm font-semibold text-text-error outline-none transition-colors duration-fast hover:bg-[color-mix(in_srgb,var(--color-bg-error-subtle)_72%,var(--color-bg-surface))] focus-visible:ring-2 focus-visible:ring-border-focus [@container(min-width:800px)]:order-first"
-          >
-            <Icon icon={Refresh01Icon} size={16} />
-            Try again
-          </button>
-        )}
-      </div>
+      <p className="col-start-2 row-start-2 flex gap-[12px] text-sm tabular-nums text-text-tertiary [@container(min-width:640px)]:col-start-3 [@container(min-width:640px)]:row-start-1">
+        <span>{e.builds ? `${e.builds} build${e.builds === 1 ? "" : "s"}` : "No build yet"}</span>
+        <span>{dates.stamp(e.ts)}</span>
+      </p>
 
-      {e.deletable && (
-        <IconButton
-          size="md"
-          aria-label={`Delete “${e.name}”`}
-          icon={<Icon icon={Delete02Icon} size={18} />}
-          onClick={onDelete}
-          className="relative z-[1] col-start-3 row-span-2 row-start-1 [@container(min-width:800px)]:col-start-4 [@container(min-width:800px)]:row-span-1 [@media(pointer:coarse)]:size-[var(--touch-min)]"
-        />
-      )}
+      <IconButton
+        size="md"
+        aria-label={`Delete “${e.name}”`}
+        icon={<Icon icon={Delete02Icon} size={18} />}
+        onClick={onDelete}
+        className="relative z-[1] col-start-3 row-span-2 row-start-1 [@container(min-width:640px)]:col-start-4 [@container(min-width:640px)]:row-span-1 [@media(pointer:coarse)]:size-[var(--touch-min)]"
+      />
     </li>
   );
-}
-
-const PILL = "inline-flex h-[28px] items-center gap-[6px] rounded-full px-[12px] text-2xs font-bold uppercase tracking-wider tabular-nums";
-
-function StatusPill({ entry: e }: { entry: HistoryEntry }) {
-  switch (e.status) {
-    case "ready":
-      return <span className={cn(PILL, "bg-bg-success-subtle text-text-success")}><Icon icon={CheckmarkBadge01Icon} size={14} />Ready</span>;
-    case "failed":
-      return <span className={cn(PILL, "bg-bg-error-subtle text-text-error")}><Icon icon={AlertCircleIcon} size={14} />Failed</span>;
-    case "paused":
-      return <span className={cn(PILL, "bg-bg-warning-subtle text-text-warning")}><Icon icon={PauseIcon} size={14} />Paused</span>;
-    case "waiting":
-      return <span className={cn(PILL, "bg-bg-brand-subtle text-text-brand")}><Icon icon={Clock01Icon} size={14} />Waiting</span>;
-    case "building":
-      return <span className={cn(PILL, "bg-bg-brand-subtle text-text-brand")}><Icon icon={ActivityIcon} size={14} />Building {e.progress ?? 0}%</span>;
-    default:
-      return <span className={cn(PILL, "bg-bg-subtle text-text-secondary")}><Icon icon={Idea01Icon} size={14} />Concept</span>;
-  }
 }
 
 // ───────────────────────── delete a chat ───────────────────────────
@@ -423,13 +451,11 @@ function DeleteChatDialog({
 
 const EMPTY_BOX = "mt-[16px] rounded-2xl border border-solid border-border bg-bg-surface px-[24px] py-[48px] text-center";
 
-function EmptyState() {
+function EmptyState({ title, body }: { title: string; body: string }) {
   return (
     <div className={EMPTY_BOX}>
-      <p className="text-md font-semibold text-text-primary">Nothing here yet</p>
-      <p className="mx-auto mt-[8px] max-w-[420px] text-sm text-text-secondary">
-        Describe a project from the Home prompt. Its chat and its build land here, so you can come back to it any time.
-      </p>
+      <p className="text-md font-semibold text-text-primary">{title}</p>
+      <p className="mx-auto mt-[8px] max-w-[420px] text-sm text-text-secondary">{body}</p>
       <Link
         href="/"
         className="mt-[16px] inline-flex h-[36px] items-center rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
@@ -441,24 +467,22 @@ function EmptyState() {
 }
 
 const NOTHING: Record<HistoryFilter, string> = {
-  all: "Nothing here yet",
+  all: "No builds yet",
   progress: "Nothing is building right now",
   ready: "Nothing is ready yet",
   attention: "Nothing needs your attention",
 };
 
-function NoMatch({ query, filter, onClear }: { query: string; filter: HistoryFilter; onClear: () => void }) {
+function NoMatch({ label, action, onClick }: { label: string; action: string; onClick: () => void }) {
   return (
     <div className={EMPTY_BOX}>
-      <p className="text-md font-semibold text-text-primary">
-        {query ? `No results for “${query}”` : NOTHING[filter]}
-      </p>
+      <p className="text-md font-semibold text-text-primary">{label}</p>
       <button
         type="button"
-        onClick={onClear}
+        onClick={onClick}
         className="mt-[16px] inline-flex h-[36px] items-center rounded-lg border border-solid border-border bg-bg-surface px-[16px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        {query ? "Clear search" : "Show all"}
+        {action}
       </button>
     </div>
   );
