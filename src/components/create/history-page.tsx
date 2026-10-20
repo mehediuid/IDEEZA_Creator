@@ -7,7 +7,7 @@
 //   Builds  — what was made: one row per build, opening onto its steps
 //             (history-builds.tsx), live while it runs.
 //
-// Plans and credits live in Settings › Plan & billing, not here.
+// Plans and credits live in Settings › Plan & pricing, not here.
 //
 // URL state survives refresh and share:
 //   ?tab=builds   ?filter=progress|ready|attention   ?q=<search>

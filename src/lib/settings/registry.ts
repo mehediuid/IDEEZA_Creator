@@ -61,7 +61,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   page("language", "Language & region", "/settings/language"),
   page("appearance", "Appearance & accessibility", "/settings/appearance"),
   page("data", "AI & your data", "/settings/data"),
-  page("plan", "Plan & billing", "/settings/plan"),
+  page("plan", "Plan & pricing", "/settings/plan"),
   page("get-paid", "Get paid", "/settings/get-paid"),
   // legacy → where their rows went
   page("profile", "Profile", "/settings/profile", false, "/settings/account"),

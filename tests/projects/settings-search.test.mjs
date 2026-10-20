@@ -23,7 +23,7 @@ test("every nav page has rows with unique ids; legacy pages point to a nav page"
 test("the nav is one flat list of eight pages, labels = page titles", () => {
   assert.deepEqual(
     NAV_PAGES.map((p) => p.label),
-    ["Account", "Notifications", "Privacy & safety", "Language & region", "Appearance & accessibility", "AI & your data", "Plan & billing", "Get paid"],
+    ["Account", "Notifications", "Privacy & safety", "Language & region", "Appearance & accessibility", "AI & your data", "Plan & pricing", "Get paid"],
   );
   for (const p of NAV_PAGES) assert.equal(p.label, p.title);
 });

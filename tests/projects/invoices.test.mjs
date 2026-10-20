@@ -94,6 +94,7 @@ test("what a cancel or a smaller plan takes away", () => {
   const disruptor = P.planOf("disruptor");
   assert.deepEqual(P.lossesOf(builder, free), [
     "AI credits: 300 → 10 a month",
+    "AI queue: Priority → Basic",
     "Projects: 20 → 1",
     "Exports: 50 → 2 a month",
     "Contributors: 20 → none",

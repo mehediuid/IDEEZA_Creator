@@ -11,7 +11,7 @@
 //   • Resources   — the tutorial, Report a problem (the tour and help pages
 //                   aren't built yet, so they aren't listed)
 //   • Theme       — Light / Dark / System
-//   • Account     — Profile, Wallet, Settings, Plan & billing, Pricing
+//   • Account     — Profile, Wallet, Settings, Plan & pricing
 //   • Settings    — while typing: the matching settings rows, each opening
 //                   its row (/settings/<page>#<row>) or its home elsewhere
 //
@@ -49,7 +49,6 @@ import { Icon, type IconValue } from "./icon";
 import { openReportProblem } from "@/lib/support/open-report";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { searchSettings } from "@/lib/settings/search";
-import { PLAN_HREF, PRICING_HREF } from "@/lib/create/credit-pricing";
 import { logActivations } from "@/lib/data/activity-log";
 
 type Command = {
@@ -132,10 +131,8 @@ export function CommandPalette({
         icon: Wallet01Icon, onActivate: exit(openManage) },
       { id: "settings", label: "Settings", category: "Account",
         icon: Settings01Icon, onActivate: go("/settings") },
-      { id: "plan", label: "Plan & billing", category: "Account",
-        icon: CreditCardIcon, onActivate: go(PLAN_HREF) },
-      { id: "pricing", label: "Pricing", category: "Account",
-        icon: CreditCardIcon, onActivate: go(PRICING_HREF) },
+      { id: "plan", label: "Plan & pricing", category: "Account",
+        icon: CreditCardIcon, onActivate: go("/settings/plan") },
     ];
   }, [router, setTheme, onClose, openManage]);
 

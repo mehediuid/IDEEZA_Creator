@@ -1,17 +1,25 @@
 "use client";
 
-// Billing details — a section of Settings › Plan & billing (spec §5.11),
-// deep-linked as #billing-details: Name or company, Tax ID (VAT / GST / EIN),
-// Address and Billing email, which every invoice prints under "Billed to"
-// (invoice-view.tsx). Optional: without a name, invoices use your profile
-// name. Stored in this browser (lib/account/billing-details). It reads as
-// fields; Edit turns it into a form and Update saves.
+// Billing details — a card on the Billing history tab of Plan & pricing (spec
+// §5.11), deep-linked as #billing-details: Name or company, Tax ID (VAT / GST /
+// EIN), Address and Billing email, which every invoice prints under "Billed
+// to" (invoice-view.tsx). Stored in this browser (lib/account/billing-details).
+// It reads as fields; Edit turns it into a form and Update saves.
 
 import * as React from "react";
 import { TextInput, Textarea } from "@/components/ideeza";
-import { CardFormActions, EditButton, SAVE_FAILED, SettingsCard, SettingsField } from "@/components/settings/settings-card";
+import { CardFormActions, EditButton, SAVE_FAILED, SettingsField } from "@/components/settings/settings-card";
+import { useArrivalHighlight } from "@/components/settings/use-arrival-highlight";
 import { billingErrors, saveBilling, useBillingDetails, type BillingFields } from "@/lib/account/billing-details";
-import { PLAN_SECTIONS } from "@/lib/create/credit-pricing";
+
+export const BILLING_DETAILS_ID = "billing-details";
+
+const CARD = "flex flex-col gap-[16px] rounded-2xl border border-solid border-border bg-bg-surface p-[24px]";
+
+/** The arrival outline (use-arrival-highlight.ts) on the card's own radius. Not
+ *  through cn(): tailwind-merge drops `data-[arrived]:outline` as a clash with `outline-2`. */
+const ARRIVED =
+  "scroll-mt-24 data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus";
 
 const LABELS: Record<keyof BillingFields, string> = {
   name: "Name or company",
@@ -23,24 +31,36 @@ const LABELS: Record<keyof BillingFields, string> = {
 const EDIT_LABEL = "Edit billing details";
 
 export function BillingDetailsCard() {
+  useArrivalHighlight();
   const details = useBillingDetails();
   const [editing, setEditing] = React.useState(false);
+  const sectionRef = React.useRef<HTMLElement>(null);
   // Leaving the form (Update or Cancel) puts the keyboard back on Edit.
   const done = () => {
     setEditing(false);
-    window.setTimeout(
-      () => document.getElementById(PLAN_SECTIONS.billingDetails)?.querySelector<HTMLButtonElement>(`button[aria-label="${EDIT_LABEL}"]`)?.focus(),
-      0,
-    );
+    window.setTimeout(() => sectionRef.current?.querySelector<HTMLButtonElement>(`button[aria-label="${EDIT_LABEL}"]`)?.focus(), 0);
   };
+  const titleId = React.useId();
 
   return (
-    <SettingsCard
-      id={PLAN_SECTIONS.billingDetails}
-      title="Billing details"
-      description="Optional. Printed under “Billed to” on every invoice. Until you add a name, invoices use your legal name from Account, else your profile name."
-      action={!editing ? <EditButton onClick={() => setEditing(true)} aria-label={EDIT_LABEL} /> : undefined}
+    <section
+      ref={sectionRef}
+      id={BILLING_DETAILS_ID}
+      aria-labelledby={titleId}
+      className={`${CARD} ${ARRIVED}`}
     >
+      <div className="flex flex-wrap items-start justify-between gap-[16px]">
+        <div className="flex max-w-[62ch] flex-col gap-[4px]">
+          <h2 id={titleId} className="text-xl font-semibold leading-xl text-text-primary">
+            Billing details
+          </h2>
+          <p className="text-md leading-md text-text-secondary">
+            Printed under &ldquo;Billed to&rdquo; on every invoice. Without a name here, invoices use your legal name from Settings › Account, else your profile name.
+          </p>
+        </div>
+        {!editing && <EditButton onClick={() => setEditing(true)} aria-label={EDIT_LABEL} />}
+      </div>
+
       {editing ? (
         <BillingForm initial={details} onDone={done} />
       ) : (
@@ -53,7 +73,7 @@ export function BillingDetailsCard() {
           <SettingsField label={LABELS.email}>{details.email}</SettingsField>
         </div>
       )}
-    </SettingsCard>
+    </section>
   );
 }
 
@@ -108,7 +128,7 @@ function BillingForm({ initial, onDone }: { initial: BillingFields; onDone: () =
           <TextInput
             ref={firstRef}
             id={ids.name}
-            size="lg"
+            size="xl"
             autoComplete="organization"
             value={form.name}
             onValueChange={set("name")}
@@ -124,7 +144,7 @@ function BillingForm({ initial, onDone }: { initial: BillingFields; onDone: () =
           </label>
           <TextInput
             id={ids.taxId}
-            size="lg"
+            size="xl"
             value={form.taxId}
             onValueChange={set("taxId")}
             invalid={!!errors.taxId}
@@ -155,7 +175,7 @@ function BillingForm({ initial, onDone }: { initial: BillingFields; onDone: () =
           </label>
           <TextInput
             id={ids.email}
-            size="lg"
+            size="xl"
             type="email"
             autoComplete="email"
             value={form.email}

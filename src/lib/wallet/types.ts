@@ -119,7 +119,7 @@ export type RequestPurpose =
   | "listEdition"
   /** AI credits paid from the demo wallet (Buy credits). */
   | "buyCredits"
-  /** A plan paid from the demo wallet (Plan & billing). */
+  /** A plan paid from the demo wallet (Plan & pricing). */
   | "subscribe"
   /** Earnings withdrawn in Settings › Get paid: a signature, nothing charged. */
   | "withdraw"

@@ -13,7 +13,7 @@ import { findArticle } from "../blog/article";
 import { articleHref, slugOf } from "../blog/slug";
 import type { BlogData } from "../blog/types";
 import { lotsOf, type LotLine } from "../create/credit-lots";
-import { CREDITS_HREF, PLAN_HREF } from "../create/credit-pricing";
+import { CREDITS_HREF, PLAN_PRICING_HREF } from "../create/credit-pricing";
 import type { PostComment } from "../innovations/comments";
 import { commentAnchor, postHref } from "../innovations/slug";
 import { earnHref } from "../manual/earn-route";
@@ -55,7 +55,7 @@ export type AttentionInput = {
     createdAt: number;
     updatedAt: number;
     endedAt?: number;
-    /** Why a queued build waits: "credits", or "cap" — the monthly spending limit (Plan & billing
+    /** Why a queued build waits: "credits", or "cap" — the monthly spending limit (Plan & pricing
      *  › Credits). Any other value reads as credits. */
     blocked?: string;
   };
@@ -363,7 +363,7 @@ export function coinNotices(c: CoinInput): Notice[] {
         : p.autoRenew
           ? `Your ${p.name} plan renews on ${day}`
           : `Your ${p.name} plan ends on ${day}`,
-      href: PLAN_HREF,
+      href: PLAN_PRICING_HREF,
       at: p.renewsAt - 3 * DAY,
     });
   }
