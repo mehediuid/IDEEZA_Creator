@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # IDEEZA Creator — Project Guide
 
-`ideeza-creator-panel` — a browser-based **AI-driven hardware-creation platform**. A maker describes an electronics idea; AI drafts the **schematic, parts list and build steps**, refined in editor modules (PCB, Code, 3D, Assembly, Wiring, Preview, Brief), then **minted on-chain (Utility NFT)** and shared/sold via the community feed and marketplace. The deepest module is an **EasyEDA-inspired schematic + PCB editor** with a native (KiCad-less) Schematic→PCB pipeline. This is a **real product, not a prototype** — every control must do real, verified work. This file is the one guide for every agent (Claude Code loads it via `CLAUDE.md`).
+`ideeza-creator-panel` — a browser-based **AI-driven hardware-creation platform**. A maker describes an electronics idea; AI drafts the **schematic, parts list and build steps**, refined in editor modules (PCB, Code, 3D, Assembly with its Wiring mode, Preview, Brief), then **minted on-chain (Utility NFT)** and shared/sold via the community feed and marketplace. The deepest module is an **EasyEDA-inspired schematic + PCB editor** with a native (KiCad-less) Schematic→PCB pipeline. This is a **real product, not a prototype** — every control must do real, verified work. This file is the one guide for every agent (Claude Code loads it via `CLAUDE.md`).
 
 ## Read first
 1. This file. 2. The router for the task under [docs/map/](docs/map/PRODUCT.md), then only the files it links.

@@ -35,7 +35,6 @@ export const RAIL_KEY_TO_STEP: Partial<
   code: "code",
   "3d": "three",
   assembly: "assembly",
-  wiring: "wiring",
   preview: "preview",
 };
 

@@ -25,7 +25,7 @@ const TITLES: Record<string, string> = {
   code: "Code",
   "3d": "3D Module",
   assembly: "Assembly",
-  wiring: "Peripheral Wiring",
+  wiring: "Wiring",
   preview: "Product Preview",
 };
 

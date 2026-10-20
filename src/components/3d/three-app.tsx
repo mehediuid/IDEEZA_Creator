@@ -22,7 +22,9 @@ import { SketchMode, type Sketch } from "@/components/3d/sketch-mode";
 import { ThreeModals } from "@/components/3d/three-modals";
 import { AiGenerateModal } from "@/components/3d/ai-generate-modal";
 import { C } from "@/lib/pcb/colors";
-import { DEFAULT_SHAPES } from "@/lib/three/scene";
+import { DEFAULT_SHAPES, SCENE_UNIT_MM } from "@/lib/three/scene";
+import { newEnclosurePair, normalizeEnclosure, ENCLOSURE_DEFAULTS, type EnclosureSpec } from "@/lib/three/enclosure";
+import { EnclosurePanel } from "@/components/3d/enclosure-panel";
 import { editorDocKey } from "@/lib/manual/editor-scope";
 import { writeReported } from "@/lib/manual/save-status";
 import { fingerprintOf } from "@/lib/manual/build-load";
@@ -447,10 +449,73 @@ export function ThreeApp() {
     mutateSelected((s) => ({ ...s, scale: [s.scale[0] * 0.9, s.scale[1], s.scale[2] * 0.9] as [number, number, number] }));
     flashToast("Chamfered");
   });
+  // Shell (Assembly plan D6): a box becomes a hollow case of the same outer
+  // size — floor, walls, bosses — with its lid on top.
   const shellSelected = () => requireSel(() => {
-    mutateSelected((s) => ({ ...s, scale: [s.scale[0] * 0.85, s.scale[1] * 0.85, s.scale[2] * 0.85] as [number, number, number] }));
-    flashToast("Shelled");
+    const src = shapes.find((s) => s.id === selectedPart);
+    if (!src || src.type !== "box") { flashToast("Shell turns a box into a hollow case. Select a box first."); return; }
+    const group = `enc-${Math.floor(Math.random() * 1e9).toString(36)}`;
+    const [w, h, d] = src.scale.map((v) => Math.abs(v) * 2 * SCENE_UNIT_MM);
+    const pair = newEnclosurePair(group, { w, h, d });
+    const base = normalizeEnclosure(pair.base);
+    const lid = normalizeEnclosure(pair.lid);
+    const lidShape: SceneShape = {
+      ...makeShape("enclosure", [src.position[0], src.position[1] + (base.h / 2 + lid.h / 2) / SCENE_UNIT_MM, src.position[2]]),
+      rotation: src.rotation,
+      name: "Lid",
+      enclosure: lid,
+    };
+    setShapes((arr) => [
+      ...arr.map((s) => (s.id === src.id ? { ...s, type: "enclosure" as const, scale: [1, 1, 1] as [number, number, number], name: s.name ?? "Case", enclosure: base } : s)),
+      lidShape,
+    ]);
+    flashToast(`Shelled: a hollow case with ${base.wall} mm walls, and its lid`);
   });
+
+  // A new case and its lid, standing on the grid (y = −1.5 units).
+  const addEnclosure = () => {
+    const group = `enc-${Math.floor(Math.random() * 1e9).toString(36)}`;
+    const { base, lid } = newEnclosurePair(group);
+    const ground = -1.5;
+    const baseShape: SceneShape = { ...makeShape("enclosure", [0, ground + base.h / 2 / SCENE_UNIT_MM, 0]), name: "Case", enclosure: base };
+    const lidShape: SceneShape = { ...makeShape("enclosure", [0, ground + (base.h + lid.h / 2) / SCENE_UNIT_MM, 0]), name: "Lid", enclosure: lid };
+    setShapes((arr) => [...arr, baseShape, lidShape]);
+    setSelectedPart(baseShape.id);
+    if (transformMode === "none") setTransformMode("translate");
+    flashToast(`Added an enclosure: ${ENCLOSURE_DEFAULTS.w} × ${ENCLOSURE_DEFAULTS.d} × ${ENCLOSURE_DEFAULTS.h} mm, with its lid`);
+  };
+
+  // A case and its lid share width and depth; a case that grows keeps its
+  // bottom where it was and carries a lid that sat on its rim.
+  const updateEnclosure = (id: string, next: EnclosureSpec) => {
+    setShapes((arr) => {
+      const target = arr.find((s) => s.id === id);
+      if (!target?.enclosure) return arr;
+      const prev = target.enclosure;
+      const base = arr.find((s) => s.enclosure?.group === prev.group && s.enclosure.part === "base");
+      const baseBefore = base?.enclosure;
+      return arr.map((s) => {
+        if (s.id === id) {
+          if (next.part === "base" && prev.h !== next.h) {
+            const y = s.position[1] - prev.h / 2 / SCENE_UNIT_MM + next.h / 2 / SCENE_UNIT_MM;
+            return { ...s, enclosure: next, position: [s.position[0], y, s.position[2]] };
+          }
+          return { ...s, enclosure: next };
+        }
+        if (s.enclosure?.group !== prev.group) return s;
+        const linked = { ...s.enclosure, w: next.w, d: next.d };
+        if (next.part === "base" && s.enclosure.part === "lid" && base && baseBefore) {
+          const rimBefore = base.position[1] + (baseBefore.h / 2 + s.enclosure.h / 2) / SCENE_UNIT_MM;
+          const onRim = Math.abs(s.position[1] - rimBefore) < 0.05 && Math.abs(s.position[0] - base.position[0]) < 0.05 && Math.abs(s.position[2] - base.position[2]) < 0.05;
+          if (onRim && baseBefore.h !== next.h) {
+            const bottom = base.position[1] - baseBefore.h / 2 / SCENE_UNIT_MM;
+            return { ...s, enclosure: linked, position: [s.position[0], bottom + (next.h + s.enclosure.h / 2) / SCENE_UNIT_MM, s.position[2]] };
+          }
+        }
+        return { ...s, enclosure: linked };
+      });
+    });
+  };
 
   // Boolean ops — for now, simulate. Union = no-op + flash; Subtract = remove
   // a partner shape if there are ≥2; Intersect = keep only selected.
@@ -486,6 +551,7 @@ export function ThreeApp() {
         case "shape:sketch":     setMode("sketch"); return;
         case "shape:spline":     flashToast("Add spline (sketch mode)"); setMode("sketch"); return;
         case "shape:import":     setModal("docs"); return;
+        case "shape:enclosure":  addEnclosure(); return;
         // Modeling
         case "model:extrude":    extrudeSelected(); return;
         case "model:revolve":    revolveSelected(); return;
@@ -603,6 +669,10 @@ export function ThreeApp() {
             mouseInfo={mouse}
             transformMode={transformMode}
             onTransformMode={setTransformMode}
+            selectedSlot={(() => {
+              const sel = shapes.find((s) => s.id === selectedPart);
+              return sel?.enclosure ? <EnclosurePanel key={sel.id} spec={sel.enclosure} onChange={(next) => updateEnclosure(sel.id, next)} /> : null;
+            })()}
           />
         </>
       )}

@@ -56,7 +56,7 @@ const LEFT_OUT = new Set([
 ]);
 
 const PRODUCT_KEYS = new Set(["ideeza:manual:projects", "ideeza:create:chats", "ideeza:create:builds", "ideeza:videoJobs", "ideeza:package:draft", "ideeza:brief:handoff-kept"]);
-const PRODUCT_PREFIXES = ["ideeza:brief:draft", "ideeza:network:", "ideeza:project:journey:", "ideeza:project:bizplan:", "ideeza:video:", "ideeza:pcb:personal", "ideeza:pcb:part"];
+const PRODUCT_PREFIXES = ["ideeza:brief:draft", "ideeza:network:", "ideeza:project:journey:", "ideeza:project:bizplan:", "ideeza:project:snapshots:", "ideeza:video:", "ideeza:pcb:personal", "ideeza:pcb:part"];
 const MARKET_PREFIXES = ["ideeza:market:", "ideeza:commerce:", "ideeza:project:editions:", "ideeza:project:edition-terms:"];
 const COIN_KEYS = new Set(["ideeza:create:credits", "ideeza:create:plan"]);
 const COIN_PREFIXES = ["ideeza:account:", "ideeza:wallet:"];

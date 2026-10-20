@@ -30,8 +30,9 @@ import type { EditorDoc, EditorScope, EditorStep } from "./p2-types";
 // ───────────────────────────── steps ─────────────────────────────
 
 /** Every editor step, in the module order (UIUX-80) — every `ProjectStep`
- *  but Brief, which is project-level, not a product step. */
-export const EDITOR_STEPS: readonly EditorStep[] = ["pcb", "code", "three", "assembly", "wiring", "preview"];
+ *  but Brief, which is project-level, not a product step, and Wiring, which
+ *  is a mode of Assembly now (D1): its address opens Assembly in that mode. */
+export const EDITOR_STEPS: readonly EditorStep[] = ["pcb", "code", "three", "assembly", "preview"];
 
 // ───────────────────────────── URLs ─────────────────────────────
 
@@ -199,16 +200,16 @@ export function rowOfBuildProduct(p: ManualProject, buildId: string, productId: 
 /** Every document's base key. The product-scoped key is `<base>:<projectId>:<productId>`. */
 const DOC_BASE: Record<EditorDoc, string> = {
   pcb: "ideeza:pcb:doc", // pcb/store.tsx PCB_DOC_PREFIX
-  wiring: "ideeza:wiring:doc", // wiring-context.tsx docKey()
-  assembly: "ideeza:assembly", // assembly-app.tsx PROGRESS_PREFIX
+  wiring: "ideeza:wiring:doc", // the retired 2D Wiring; read by Assembly's Wiring mode banner
+  assembly: "ideeza:assembly", // assembly-store.tsx (AsmDoc v1; the old checklist reads as empty)
   "three.ai": "ideeza:three:aimodel", // ai-generate-modal.tsx storeKey()
   "three.shapes": "ideeza:3d:shapes", // three-app.tsx SHAPES_KEY
   "three.right": "ideeza:3d:right", // three-app.tsx RIGHT_KEY
   "three.sketches": "ideeza:3d:sketches", // sketch-mode.tsx
   "code.files": "ideeza:code:files", // dev-editor.tsx STORAGE_KEY
   "code.blockly": "ideeza:code:blockly-workspace", // blockly-impl.tsx
-  "preview.canvas": "ideeza:preview:canvas", // preview-context.tsx CANVAS_KEY
-  "preview.mates": "ideeza:preview:mates", // preview-context.tsx MATES_KEY
+  "preview.canvas": "ideeza:preview:canvas", // the old Preview's view; no longer written
+  "preview.mates": "ideeza:preview:mates", // the old Preview's mates; no longer written
 };
 
 /** The 4 docs that had a per-project (not global) key before P2, so the

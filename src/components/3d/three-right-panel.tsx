@@ -229,6 +229,7 @@ export function ThreeRightPanel({
   mouseInfo,
   transformMode = "none",
   onTransformMode,
+  selectedSlot,
 }: {
   topOffset?: number;
   width?: number;
@@ -237,6 +238,8 @@ export function ThreeRightPanel({
   mouseInfo?: { x: number; y: number; z: number; distance: number } | null;
   transformMode?: "none" | "translate" | "rotate" | "scale";
   onTransformMode?: (m: "none" | "translate" | "rotate" | "scale") => void;
+  /** The selected shape's own settings (an Enclosure's size), above the scene's. */
+  selectedSlot?: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState({ canvas: true, scene: true, materials: false, effects: true });
   const toggle = (k: keyof typeof open) => setOpen((s) => ({ ...s, [k]: !s[k] }));
@@ -275,6 +278,7 @@ export function ThreeRightPanel({
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
+        {selectedSlot}
         {/* Canvas Settings */}
         <Section title="Canvas Settings" open={open.canvas} onToggle={() => toggle("canvas")}>
           <Field label="View Option">

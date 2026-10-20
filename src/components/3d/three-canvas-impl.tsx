@@ -20,6 +20,7 @@ import {
 import * as THREE from "three";
 import type { ViewportProps, SceneShape } from "./three-canvas";
 import { getGridStep, getResolutionSegments } from "./grid-settings";
+import { EnclosureMesh } from "./enclosure-mesh";
 
 const MAT_PARAMS: Record<"antimony" | "tin" | "iron", {
   color: string; metalness: number; roughness: number;
@@ -286,6 +287,19 @@ function SceneContents(props: ViewportProps) {
       <axesHelper args={[1.2]} />
 
       {shapes.map((s) => (
+        s.type === "enclosure" ? (
+          <EnclosureMesh
+            key={s.id}
+            shape={s}
+            selected={selectedId === s.id}
+            color={MAT_PARAMS[material].color}
+            onSelect={onSelect}
+            onTransform={onTransform}
+            transformMode={transformMode}
+            snap={snap}
+            gridStep={gridStep}
+          />
+        ) : (
         <ShapeMesh
           key={s.id}
           shape={s}
@@ -299,6 +313,7 @@ function SceneContents(props: ViewportProps) {
           effects={effects}
           segments={segments}
         />
+        )
       ))}
 
       {envPreset && (

@@ -53,6 +53,7 @@ import type { ProductVideoStatus, VideoTake } from "@/lib/video/types";
 import { actionLabel, resolutionOf, statusCopy, videosGroupMeta } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { useStoreWrite } from "./use-store-write";
+import { SnapshotsGroup } from "./snapshots-group";
 
 // ─────────────────────────── tiles (CNT-9) ───────────────────────────
 
@@ -177,6 +178,7 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
       </h2>
 
       <VideosGroup project={project} products={products} viewer={viewer} ctx={ctx} />
+      {ownerFacts && <SnapshotsGroup projectId={project.id} canRemove={showCoverControl} />}
 
       {tiles.length === 0 ? (
         <EmptyMedia />

@@ -3,8 +3,9 @@
 // BuildManuallyInfo — what the home hero shows in place of the AI mode
 // textarea when the user picks "Build manually". Per spec: the user
 // can build a complete electronics project across PCB · Code · 3D ·
-// Preview stages. Everything saves as it goes, as a draft only the maker
-// sees, and is published from the project page (owner D8, 2026-10-19). The panel replaces the typing field with a
+// Assembly (with its Wiring mode) · Preview stages. Everything saves as it
+// goes, as a draft only the maker sees, and is published from the project
+// page (owner D8, 2026-10-19). The panel replaces the typing field with a
 // scannable explainer + a single primary "Create Project" CTA.
 //
 // Styling matches the AI mode prompt card exactly so swapping modes
@@ -17,6 +18,7 @@ import {
   CpuIcon,
   CubeIcon,
   EyeIcon,
+  Package01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "./icon";
 
@@ -28,6 +30,7 @@ const STAGES: Array<{
   { icon: CpuIcon, label: "PCB Design", detail: "Schematic + layout" },
   { icon: CodeIcon, label: "Code", detail: "Firmware code" },
   { icon: CubeIcon, label: "3D Module", detail: "Printable enclosure" },
+  { icon: Package01Icon, label: "Assembly", detail: "Board, case and wires" },
   { icon: EyeIcon, label: "Product Preview", detail: "Assembled view" },
 ];
 
@@ -45,7 +48,7 @@ export function BuildManuallyInfo({
         id="manual-info-label"
         className="text-2xs font-bold uppercase tracking-wider text-text-tertiary"
       >
-        Four stages, one project
+        Five stages, one project
       </p>
       <p className="mt-[6px] text-md leading-relaxed text-text-secondary">
         Design every piece yourself — no AI prompts. Everything saves as you
@@ -56,10 +59,11 @@ export function BuildManuallyInfo({
         role="list"
         className="mt-[16px] grid gap-[8px] sm:grid-cols-2"
       >
-        {STAGES.map((stage) => (
+        {STAGES.map((stage, i) => (
           <li
             key={stage.label}
-            className="flex items-center gap-[12px] rounded-lg border border-border bg-bg-page px-[12px] py-[10px]"
+            // An odd last stage spans the row rather than sit alone.
+            className={`flex items-center gap-[12px] rounded-lg border border-border bg-bg-page px-[12px] py-[10px]${i === STAGES.length - 1 && STAGES.length % 2 === 1 ? " sm:col-span-2" : ""}`}
           >
             <span
               aria-hidden

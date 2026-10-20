@@ -45,6 +45,8 @@ test("every stored key lands in its category; UI state and backups stay out", ()
     "ideeza:code:files:proj_a:p1": "files",
     "ideeza:wiring:doc:proj_a:prd_x": "files",
     "ideeza:3d:shapes:proj_a:p1": "files",
+    "ideeza:assembly:proj_a:p1": "files",
+    "ideeza:project:snapshots:proj_a": "product",
   };
   for (const [key, cat] of Object.entries(cases)) assert.equal(classifyKey(key), cat, key);
   for (const key of ["ideeza:sidebar:collapsed", "ideeza:blog:probe", "ideeza:migrations", "ideeza:pcb:doc:proj_a:p1:prev", "ideeza:editor:seed:proj_a:p1", "ideeza:manual:active", "other-app:thing"]) {

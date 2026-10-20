@@ -123,9 +123,10 @@ ideeza-creator-panel/
    │  ├─ pcb/                ★ PCB module (schematic + PCB editor) — see below
    │  ├─ code/               Code module: Monaco dev-editor + Blockly + AI chat
    │  ├─ 3d/                 3D module: model-viewer, AI generate, sketch, three canvas
-   │  ├─ assembly/           Assembly module: the board's placed parts as a check-off list
-   │  ├─ preview/            Product Preview: three.js assembly, mates, instances
-   │  ├─ wiring/             Wiring module: canvas, library, right panel, menu
+   │  ├─ assembly/           Assembly module: one 3D scene (board + 3D shapes + off-board
+   │  │                      parts) — bring in, place, mates, fit check, Wiring mode, GLB
+   │  ├─ preview/            Product Preview: a read-only view of the assembly (explode,
+   │  │                      section, views, snapshot)
    │  ├─ voice/              voice-listening (what a composer becomes while the mic is
    │  │                      open — dot, live waveform, Cancel / Stop & review)
    │  ├─ ideeza/             In-house design-system primitives (button, select, toggle,
@@ -173,7 +174,8 @@ ideeza-creator-panel/
    │  ├─ three/              providers.ts (image→3D), assembly.ts (the build as
    │  │                      an assembly of its parts: systems, placement,
    │  │                      explode, inventory), use-tokens.ts (DS colours for
-   │  │                      three.js scenes)
+   │  │                      three.js scenes), enclosure.ts (the 3D Module's hollow
+   │  │                      case + lid: walls, bosses, openings)
    │  ├─ spec/               The product spec sheet — part bodies, packs,
    │  │                      size/board/power math, hint and snapshot checks, the
    │  │                      menu copy and part/radio/MCU tables, edit helpers and
@@ -198,6 +200,8 @@ ideeza-creator-panel/
    │  │                      registry), record-hooks.ts, engineering-state.ts, public.ts (commerce's
    │  │                      one import of engineering)
    │  ├─ wiring/             types.ts, from-build.ts (a build's wiring document)
+   │  ├─ assembly/           Assembly's pure logic: doc, model-pcb/three, library, solve
+   │  │                      (mates), fit (SAT), place, route (3D A*), wires, wiring, scene
    │  ├─ code/               files.ts (Code's file model + a build's firmware)
    │  ├─ commerce/           the commerce layer (Build and Earn P1-1): guards, edit-gate, state
    │  │                      (commercialStateOf), record + migrate (ideeza:commerce:<id>,
@@ -277,7 +281,7 @@ src/components/pcb/
 ├─ splitter.tsx         Draggable panel edges (left/right/bottom → state.panelSizes)
 ├─ schem-canvas.tsx · pcb-canvas.tsx           schematic / PCB backdrops
 ├─ pcb-three-view*.tsx · pcb-meshes.tsx        3D board view (three.js)
-├─ left-rail.tsx        module switcher (PCB/Code/3D/Assembly/Wiring/Preview/Brief)
+├─ left-rail.tsx        module switcher (PCB/Code/3D/Assembly/Preview; Wiring is a mode of Assembly)
 ├─ left-panel.tsx + project-navigator.tsx      Sheets/Nets/Parts/Objects + Library
 ├─ library-panel.tsx    Common Library + All Library marketplace
 ├─ right-panel.tsx + schem-properties.tsx / pcb-properties.tsx   Properties/Filter/Layer

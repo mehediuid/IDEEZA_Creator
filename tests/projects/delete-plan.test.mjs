@@ -76,15 +76,15 @@ test("editor work is listed step by step and asks for the typed name", () => {
         ...NOTHING,
         pcb: { state: "work", text: "42 objects · 12 on the board" },
         wiring: { state: "work", text: "6 parts · 9 wires" },
-        assembly: { state: "work", text: "8 of 12 parts checked" },
+        assembly: { state: "work", text: "8 of 12 placed · Fit OK" },
         three: { state: "work", text: "AI model generated" },
       },
     }),
   );
   assert.deepEqual(plan.goes.slice(1), [
     "The PCB board — 42 objects · 12 on the board",
-    "Wiring — 6 parts · 9 wires",
-    "Assembly checks — 8 of 12 parts checked",
+    "The old 2D wiring — 6 parts · 9 wires",
+    "The assembly — 8 of 12 placed · Fit OK",
     "The 3D model — AI model generated",
   ]);
   assert.equal(plan.typed, true);
@@ -100,7 +100,7 @@ test("a store that holds nothing yet loses nothing: not listed, no typed name", 
       work: {
         ...NOTHING,
         pcb: { state: "work", text: "0 objects · 0 on the board" },
-        assembly: { state: "work", text: "0 of 2 parts checked" },
+        assembly: { state: "work", text: "0 of 2 placed · Fit OK" },
       },
     }),
   );
@@ -217,21 +217,21 @@ test("every product row's editor work is listed, named once more than one row ha
     ...NOTHING,
     code: { state: "work", text: "2 files" },
     three: { state: "work", text: "3 shapes · AI model generated" },
-    preview: { state: "work", text: "4 mates set" },
+    preview: { state: "work", text: "4 parts to view" },
   };
   const plan = deletePlanOf(input({ products: 2, rows: [{ name: "Car", work: car }, { name: "Remote", work: remote }] }));
   assert.deepEqual(plan.goes.slice(1), [
     "The PCB board — 42 objects · 12 on the board (Car)",
     "Code — 2 files (Remote)",
     "The 3D model — 3 shapes · AI model generated (Remote)",
-    "Preview — 4 mates set (Remote)",
   ]);
   assert.equal(plan.typed, true);
   // One row with work reads as before, without a name.
   const one = deletePlanOf(input({ rows: [{ name: "Car", work: NOTHING }, { name: "Remote", work: remote }] }));
-  assert.deepEqual(one.goes.slice(1), ["Code — 2 files", "The 3D model — 3 shapes · AI model generated", "Preview — 4 mates set"]);
-  // Code, 3D and Preview alone ask for the typed name too.
-  for (const step of ["code", "three", "preview"]) {
+  assert.deepEqual(one.goes.slice(1), ["Code — 2 files", "The 3D model — 3 shapes · AI model generated"]);
+  // Code and 3D alone ask for the typed name too; Preview only shows the assembly, so it loses nothing.
+  assert.equal(deletePlanOf(input({ rows: [{ name: "Car", work: { ...NOTHING, preview: { state: "work", text: "3 parts to view" } } }] })).typed, false);
+  for (const step of ["code", "three"]) {
     assert.equal(deletePlanOf(input({ rows: [{ name: "Car", work: { ...NOTHING, [step]: { state: "work", text: "3 things" } } }] })).typed, true, step);
   }
 });

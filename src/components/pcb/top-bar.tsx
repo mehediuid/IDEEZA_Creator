@@ -23,7 +23,6 @@ import {
 import { MenuBar } from "@/components/pcb/menu-bar";
 import { CodeMenu } from "@/components/code/code-menu";
 import { ThreeMenu } from "@/components/3d/three-menu";
-import { WiringMenu } from "@/components/wiring/wiring-menu";
 import { ProfileDropdown } from "@/components/app-chrome/profile-dropdown";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useMe } from "@/lib/people/profile-store";
@@ -72,8 +71,6 @@ function pickMenu(step: FlowStep | null): React.ReactNode | null {
       return <CodeMenu />;
     case "three":
       return <ThreeMenu />;
-    case "wiring":
-      return <WiringMenu />;
     default:
       return null;
   }
@@ -81,7 +78,7 @@ function pickMenu(step: FlowStep | null): React.ReactNode | null {
 
 // The toolbar row each module keeps under this bar: PCB's tools, 3D's shape
 // toolbar, Code's Blockly strip. The banner slot sits below it.
-const MODULE_ROW_H: Partial<Record<FlowStep, number>> = { pcb: 46, three: 38, code: 36 };
+const MODULE_ROW_H: Partial<Record<FlowStep, number>> = { pcb: 46, three: 38, code: 36, assembly: 44, preview: 44 };
 
 export function TopBar() {
   const me = useMe();

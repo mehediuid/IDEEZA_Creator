@@ -33,7 +33,7 @@ export const FLOW_LABELS: Record<FlowStep, string> = {
   code: STEP_LABELS.code,
   three: "3D",
   assembly: "Assembly",
-  wiring: "Peripheral Wiring",
+  wiring: "Wiring",
   preview: "Preview",
   brief: "Brief",
 };

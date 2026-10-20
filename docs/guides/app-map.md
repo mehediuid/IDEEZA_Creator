@@ -44,7 +44,7 @@ editors have their own top bar, with the editor account menu.
 - `/(create)/projects/[id]/earn/mint` — **the mint flow** (the Brief, Build and Earn P1-2; `earnMintHref`): Choose · Details · Review and sign · Success, opened from Earn › Overview and Earn › Sell (Start mint · Continue mint · Open the mint summary). A static segment, so it wins over `earn/[section]`. A minted Brief opens read-only on its success step; a project minted from its page says it is already minted.
 
 **Per-project editor** — `/project/[projectSlug]/products/[productId]/[step]` (the editor opens one product; `/project/[projectSlug]/[step]` redirects to the product last opened, and `/project/[projectSlug]/brief` redirects to the project's mint flow); the left rail switches
-modules in `FLOW_STEPS` order (`src/lib/manual/projects.tsx`): **PCB Design · Code · 3D Module · Assembly · Peripheral Wiring · Product Preview · Add Brief**.
+modules in `FLOW_STEPS` order (`src/lib/manual/projects.tsx`): **PCB Design · Code · 3D Module · Assembly · Product Preview** (Wiring is a mode inside Assembly; the old `…/wiring` step redirects to `…/assembly?mode=wiring`), then **Finish** to the project.
 
 **Monetization:** **minting** (Utility NFT, Lazy or Instant), the Explore marketplace with a 2.5 % IDEEZA fee, all on a local **demo wallet** (Testnet demo, nothing touches a chain); plans and AI credits paid from the same wallet (Settings › Plan & billing, Pricing).
 

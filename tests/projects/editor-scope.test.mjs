@@ -44,8 +44,8 @@ const row = (id, name, source) => ({ id, name, description: "", ...(source ? { s
 
 // ───────────────────────────── EDITOR_STEPS ─────────────────────────────
 
-test("EDITOR_STEPS is every ProjectStep but Brief, in the module order", () => {
-  assert.deepEqual(EDITOR_STEPS, ["pcb", "code", "three", "assembly", "wiring", "preview"]);
+test("EDITOR_STEPS is every ProjectStep but Brief and Wiring (a mode inside Assembly), in the module order", () => {
+  assert.deepEqual(EDITOR_STEPS, ["pcb", "code", "three", "assembly", "preview"]);
 });
 
 // ───────────────────────────── editorHref ─────────────────────────────
@@ -151,7 +151,7 @@ test("openInEditorOf: unstamped reads the bare label; stamped names the step", (
   const p = project({ editorOpened: { prd_b: { step: "wiring", at: 900 } } });
   assert.deepEqual(openInEditorOf(project(), "prd_a"), { label: "Open in editor", href: "/project/car/products/prd_a/pcb" });
   assert.deepEqual(openInEditorOf(p, "prd_b"), {
-    label: "Open in editor · Peripheral Wiring",
+    label: "Open in editor · Wiring",
     href: "/project/car/products/prd_b/wiring",
   });
 });
