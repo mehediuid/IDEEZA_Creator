@@ -123,8 +123,7 @@ export default function RootLayout({
                         hero (in the dashboard layout) can mint a new chat
                         session and route to it, AND the (create) routes
                         can read/mutate the same store. CreatePlanProvider
-                        powers the QuotaCard on /history; CreditsProvider
-                        powers the Credits card beside it and is where a
+                        holds the plan; CreditsProvider is where a
                         full-product build charges/refunds credits. */}
                     <CreatePlanProvider>
                       <CreditsProvider>
