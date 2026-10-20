@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { derivePcbScene, type Pcb3DScene } from "./pcb-scene";
+import { boardSlabGeometry } from "./board-slab";
 import type { PcbState } from "./types";
 
 function mesh(geo: THREE.BufferGeometry, color: string, opts: { metalness?: number; roughness?: number } = {}) {
@@ -29,12 +30,15 @@ export function buildBoardScene(s: Pcb3DScene): THREE.Scene {
   const b = s.board;
   const halfT = b.thickness / 2;
 
-  const slab = mesh(new THREE.BoxGeometry(b.width, b.thickness, b.depth), b.color, {
+  // The 3D tab's slab: outline, cutouts and mounting holes cut through it.
+  const holed = boardSlabGeometry(b);
+  const slab = mesh(holed ?? new THREE.BoxGeometry(b.width, b.thickness, b.depth), b.color, {
     metalness: b.metalness,
     roughness: b.roughness,
   });
   slab.name = "Board";
-  slab.position.set(0, b.yOffset, 0);
+  slab.position.set(0, b.yOffset + (holed ? halfT : 0), 0);
+  if (holed) slab.rotation.x = Math.PI / 2;
   scene.add(slab);
 
   const copper = new THREE.Group();
@@ -62,7 +66,7 @@ export function buildBoardScene(s: Pcb3DScene): THREE.Scene {
     const pad = mesh(new THREE.BoxGeometry(p.w, 0.03, p.d), s.padColor, { metalness: 0.9, roughness: 0.25 });
     pad.name = `Pad_${p.id}`;
     pad.position.set(p.x, b.yOffset + halfT + s.expose, p.z);
-    pad.rotation.y = (-p.rot * Math.PI) / 180;
+    pad.rotation.y = -p.rot;
     copper.add(pad);
   }
   for (const r of s.regions) {
@@ -83,7 +87,7 @@ export function buildBoardScene(s: Pcb3DScene): THREE.Scene {
     const body = mesh(new THREE.BoxGeometry(c.w, c.h, c.d), c.color, { roughness: 0.55 });
     body.name = c.label ? `Part_${c.label}` : `Part_${c.id}`;
     body.position.set(c.x, b.yOffset + halfT + c.h / 2, c.z);
-    body.rotation.y = (-c.rot * Math.PI) / 180;
+    body.rotation.y = -c.rot;
     parts.add(body);
   }
   if (parts.children.length) scene.add(parts);

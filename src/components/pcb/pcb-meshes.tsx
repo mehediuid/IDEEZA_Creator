@@ -18,6 +18,7 @@ import type {
   Pcb3DSilk,
 } from "@/lib/pcb/pcb-scene";
 import { PAD_GOLD, VIA_HOLE } from "@/lib/pcb/pcb-scene";
+import { boardSlabGeometry } from "@/lib/pcb/board-slab";
 
 const PCB_TRACE = "#22d3a6";
 const COMPONENT_COLOR = "#1f2937";
@@ -161,53 +162,20 @@ const EPS = 0.012; // copper offset above/below the board surface
 // y = thickness, centred on the origin. Finish (roughness/metalness) comes from
 // the Board Material selection.
 export function PcbSlabMesh({ board }: { board: Pcb3DScene["board"] }) {
-  // With cutouts the slab stops being a box: the outline becomes a shape with
-  // real holes, extruded through the thickness — so a cutout is a hole you can
-  // see through, not a decal on the surface. No cutouts → keep the cheap box.
-  const holed = React.useMemo(() => {
-    if (!board.cutouts?.length && !board.outline) return null;
-    const outline = new THREE.Shape();
-    const hw = board.width / 2, hd = board.depth / 2;
-    // Shape space is XY and the slab is rotated onto XZ below (Rx(90°) maps
-    // shape-Y → world +Z), so a world z maps to shape-y directly.
-    const o = board.outline;
-    if (o?.shape === "circle") {
-      outline.absarc(o.x, o.z, o.r, 0, Math.PI * 2, false);
-    } else if (o?.shape === "poly" && o.pts.length > 2) {
-      outline.moveTo(o.pts[0][0], o.pts[0][1]);
-      for (const [qx, qz] of o.pts.slice(1)) outline.lineTo(qx, qz);
-      outline.closePath();
-    } else if (o?.shape === "rect") {
-      outline.moveTo(o.x - o.w / 2, o.z - o.d / 2);
-      outline.lineTo(o.x + o.w / 2, o.z - o.d / 2);
-      outline.lineTo(o.x + o.w / 2, o.z + o.d / 2);
-      outline.lineTo(o.x - o.w / 2, o.z + o.d / 2);
-      outline.closePath();
-    } else {
-      outline.moveTo(-hw, -hd);
-      outline.lineTo(hw, -hd);
-      outline.lineTo(hw, hd);
-      outline.lineTo(-hw, hd);
-      outline.closePath();
-    }
-    for (const c of board.cutouts) {
-      const hole = new THREE.Path();
-      const x1 = c.x - c.w / 2, x2 = c.x + c.w / 2;
-      // Rx(90°) maps shape-Y → world +Z (no flip): the same mapping
-      // PcbRegionMesh uses, which is the known-good path.
-      const y1 = c.z - c.d / 2, y2 = c.z + c.d / 2;
-      hole.moveTo(x1, y1);
-      hole.lineTo(x1, y2);
-      hole.lineTo(x2, y2);
-      hole.lineTo(x2, y1);
-      hole.closePath();
-      outline.holes.push(hole);
-    }
-    return new THREE.ExtrudeGeometry(outline, { depth: board.thickness, bevelEnabled: false });
-  }, [board.cutouts, board.outline, board.width, board.depth, board.thickness]);
+  // With an outline, cutouts or mounting holes the slab stops being a box: the
+  // outline becomes a shape with real holes, extruded through the thickness —
+  // so a hole is one you can see through, not a decal on the surface. Nothing
+  // to cut → keep the cheap box. The GLB and STL/OBJ exports cut the same slab.
+  const { width, depth, thickness, outline, cutouts, holes } = board;
+  const holed = React.useMemo(
+    () => boardSlabGeometry({ width, depth, thickness, outline, cutouts, holes }),
+    [width, depth, thickness, outline, cutouts, holes],
+  );
 
   React.useEffect(() => () => holed?.dispose(), [holed]);
 
+  // Rx(90°) lays the shape plane onto XZ (shape-y → world +z) and the
+  // extrusion then runs down from y = thickness to the board's underside.
   if (holed) {
     return (
       <mesh receiveShadow geometry={holed} rotation={[Math.PI / 2, 0, 0]} position={[0, board.thickness, 0]}>

@@ -265,6 +265,8 @@ src/lib/pcb/
 ├─ measurement-unit.ts  The one Measurement Unit default (mm/mil/inch) + who wins over it; read by
 │                       the board, the schematic and Parts › New Package
 ├─ glb-export.ts        Board → three.js scene → glTF/GLB (GLTFExporter)
+├─ board-slab.ts        The board slab with outline, cutouts + mounting holes cut through
+│                       (3D tab, GLB and STL/OBJ share it)
 ├─ gltf-import.ts       glTF/GLB import: GLTFLoader parse + session-only model registry
 ├─ dxf-import.ts        ASCII-DXF parser (LINE/POLYLINE/CIRCLE/ARC/TEXT) → CanvasObjects
 ├─ kicad-export.ts      KiCad/Gerber export

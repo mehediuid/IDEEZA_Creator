@@ -13,7 +13,7 @@
 // camera framing is board-size-independent.
 
 import type { CanvasObject, PcbState } from "./types";
-import { BOARD_COLOR_HEX, PAD_COLOR_HEX, componentBodyColor as bodyColor } from "./pcb-3d";
+import { BOARD_COLOR_HEX, PAD_COLOR_HEX, componentBodyColor as bodyColor, mountingHoleDrillPx } from "./pcb-3d";
 import { PAD_OFFSETS } from "./schematic-to-pcb";
 
 // Board canvas origin — matches pcb-canvas.tsx (top:60, left:60).
@@ -93,6 +93,8 @@ export type Pcb3DScene = {
     depth: number;
     /** Board cutouts — real holes in the slab, scene units, centred coords. */
     cutouts: Array<{ x: number; z: number; w: number; d: number }>;
+    /** Mounting holes — round through-holes in the slab, scene units. */
+    holes: Array<{ x: number; z: number; r: number }>;
     /** The board's own edge when the user drew one (Board Outline tool):
      *  `rect` uses width/depth, `circle` uses `r`, `poly` its ring. Without one
      *  the slab stays the `pcbBoard` rectangle. */
@@ -154,6 +156,9 @@ export function derivePcbScene(state: PcbState): Pcb3DScene {
       return { x: px(o.x + w / 2), z: pz(o.y + h / 2), w: sz(w), d: sz(h) };
     })
     .filter((c) => c.w > 0.001 && c.d > 0.001);
+  const holes = (state.objects ?? [])
+    .filter((o) => o.kind === "mountingHole" && (o.scope ?? "schematic") === "pcb")
+    .map((o) => ({ x: px(o.x), z: pz(o.y), r: sz(mountingHoleDrillPx(o) / 2) }));
   // #122 — a drawn board outline is the real board edge, so the slab follows it
   // (it used to be ignored: a circular board still rendered as a rectangle).
   const outlineObj = (state.objects ?? []).find(
@@ -181,6 +186,7 @@ export function derivePcbScene(state: PcbState): Pcb3DScene {
     width: W / scale,
     depth: H / scale,
     cutouts,
+    holes,
     outline,
     thickness,
     color,
