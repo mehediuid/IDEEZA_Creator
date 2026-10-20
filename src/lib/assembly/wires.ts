@@ -4,7 +4,7 @@
 // for "this wire passes through a part". Millimetres; pure and
 // dependency-free, so it runs in node:test as in the browser.
 
-import { type Aabb, type Vec3, add, dist, dot, norm, scale, sub } from "./math";
+import { type Aabb, type Vec3, add, cross, dist, dot, len, norm, scale, sub } from "./math";
 
 export type AwgSpec = {
   awg: number;
@@ -36,7 +36,7 @@ export function odOf(awg: number): number {
 export const minBendRadius = (awg: number): number => 4 * odOf(awg);
 
 /** Length to cut, with `slackPct` percent extra for service loops and strain relief. */
-export const cutLength = (length: number, slackPct: number): number => length * (1 + slackPct / 100);
+export const cutLength = (length: number, slackPct: number): number => length + (length * slackPct) / 100;
 
 // ───────────────────────────── fillets ─────────────────────────────
 
@@ -87,21 +87,25 @@ export function filletPath(points: readonly Vec3[], radius: number): FilletResul
   for (let i = 1; i < n - 1; i++) {
     const u = norm(sub(pts[i], pts[i - 1]));
     const v = norm(sub(pts[i + 1], pts[i]));
-    const theta = Math.acos(Math.max(-1, Math.min(1, dot(u, v))));
+    const cos = dot(u, v);
+    const sin = len(cross(u, v));
+    const theta = Math.atan2(sin, cos);
     if (theta < STRAIGHT) continue;
-    // A full reversal has an infinite tangent distance: nothing fits.
-    const allowed = theta > Math.PI - STRAIGHT ? 0 : Math.min(seg[i - 1], seg[i]) / 2 / Math.tan(theta / 2);
+    // tan(θ/2) = sin θ / (1 + cos θ): exact at 90°, unlike Math.tan(π/4). A full
+    // reversal has an infinite tangent distance, so nothing fits there.
+    const tanHalf = sin / (1 + cos);
+    const allowed = theta > Math.PI - STRAIGHT ? 0 : Math.min(seg[i - 1], seg[i]) / 2 / tanHalf;
     const used = Math.min(r, allowed);
     corners.push({ index: src[i], allowed, used });
     allowedMin = Math.min(allowedMin, allowed);
     if (used <= 0) continue;
 
-    const d = used * Math.tan(theta / 2);
+    const d = used * tanHalf;
     trim[i] = d;
     const t1 = sub(pts[i], scale(u, d));
     const t2 = add(pts[i], scale(v, d));
     // The arc's centre sits `used` from t1, perpendicular to u, toward v.
-    const w = norm(sub(v, scale(u, dot(u, v))));
+    const w = norm(sub(v, scale(u, cos)));
     const centre = add(t1, scale(w, used));
     const steps = Math.max(1, Math.ceil(theta / ARC_STEP - 1e-9));
     const arc: Vec3[] = [t1];

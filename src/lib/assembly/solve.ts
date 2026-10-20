@@ -187,8 +187,24 @@ function jacobian(terms: Term[], t: Pose, pivot: Vec3, r0: number[]): number[][]
   return r0.map((_, i) => cols.map((c) => c[i])); // m × 6
 }
 
-/** Fits one part's pose to its terms (Levenberg–Marquardt). */
+/** Fits one part's pose to its terms. An angle mate that starts exactly at its
+ *  extreme (two faces parallel, asked for 60°) has no slope to follow, so a fit
+ *  that stays stuck is retried from small fixed turns about each axis. */
 export function fitPose(terms: Term[], start: Pose, pivot: Vec3): { pose: Pose; cost: number; rank: number } {
+  let best = fitFrom(terms, start, pivot);
+  if (best.cost <= SOLVE_TOL * SOLVE_TOL) return best;
+  for (const axis of [[1, 0, 0], [0, 0, 1], [0, 1, 0]] as Vec3[]) {
+    for (const a of [0.3, -0.3]) {
+      const nudged = perturb(start, [axis[0] * a, axis[1] * a, axis[2] * a, 0, 0, 0], pivot);
+      const tryIt = fitFrom(terms, nudged, pivot);
+      if (tryIt.cost < best.cost - 1e-12) best = tryIt;
+      if (best.cost <= SOLVE_TOL * SOLVE_TOL) return best;
+    }
+  }
+  return best;
+}
+
+function fitFrom(terms: Term[], start: Pose, pivot: Vec3): { pose: Pose; cost: number; rank: number } {
   let t = start;
   let r = residualsAt(terms, t);
   let cost = norm2(r);
