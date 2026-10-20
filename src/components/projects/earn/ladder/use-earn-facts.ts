@@ -2,10 +2,10 @@
 
 // The ladder's facts, live: the page's own derivation (`view`) for products
 // and readiness; the commercial axis (`commercialStateOf`, the one the Earn
-// header reads) for the mint; the Brief draft for the license; the demo wallet and
-// the demo identity check from their stores. `ready` is false until both
-// stores have hydrated, so a commit point never flashes a missing step that
-// is really in place.
+// header reads) for the mint; the Brief draft for the license; the demo wallet
+// and the demo identity check from their stores.
+// `ready` is false until those stores have hydrated, so a commit point never
+// flashes a missing step that is really in place.
 
 import * as React from "react";
 import type { StoredDraft } from "@/lib/brief/project-brief";

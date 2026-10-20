@@ -21,6 +21,7 @@ import { useTokens } from "@/lib/three/use-tokens";
 import { PartMesh, type PartColors } from "./part-mesh";
 import type { AssemblyViewerProps, ScreenBox, ViewPreset } from "./viewer-types";
 import { recordCaught } from "@/lib/support/recent-errors";
+import { useSettings } from "@/lib/settings/use-settings";
 
 type OrbitControlsImpl = React.ComponentRef<typeof OrbitControls>;
 
@@ -44,8 +45,10 @@ const SETTLED = 1e-3;
 
 type Registry = Map<string, THREE.Group>;
 
+/** The system asks for still motion, or Settings › Appearance › Reduce motion does. */
 function useReducedMotion() {
   const [reduced, setReduced] = React.useState(false);
+  const chosen = useSettings().appearance.motion === "reduce";
   React.useEffect(() => {
     const q = window.matchMedia("(prefers-reduced-motion: reduce)");
     const read = () => setReduced(q.matches);
@@ -53,7 +56,7 @@ function useReducedMotion() {
     q.addEventListener("change", read);
     return () => q.removeEventListener("change", read);
   }, []);
-  return reduced;
+  return reduced || chosen;
 }
 
 function PartNode({

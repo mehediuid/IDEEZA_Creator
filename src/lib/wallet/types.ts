@@ -117,8 +117,12 @@ export type RequestPurpose =
   | "listEdition"
   /** AI credits paid from the demo wallet (Buy credits). */
   | "buyCredits"
-  /** A plan paid from the demo wallet (Plan & pricing). */
+  /** A plan paid from the demo wallet (Plan & billing). */
   | "subscribe"
+  /** Earnings withdrawn in Settings › Get paid: a signature, nothing charged. */
+  | "withdraw"
+  /** A withdrawal method added or made the default in Settings › Get paid: a signature. */
+  | "payoutMethod"
   /** IDZ bought in the demo presale (Balance › Buy IDZ Token). */
   | "buyIdz"
   /** A presale purchase's IDZ claimed once it unlocks. */

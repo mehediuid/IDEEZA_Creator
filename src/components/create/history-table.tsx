@@ -26,6 +26,7 @@ import {
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { useDates } from "@/lib/settings/use-dates";
 
 export type HistoryRow = {
   id: string;
@@ -140,6 +141,7 @@ function Row({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const dates = useDates();
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -201,7 +203,8 @@ function Row({
         role="cell"
         className="text-md tabular-nums text-text-secondary"
       >
-        {formatTimestamp(row.ts)}
+        {/* Settings › Language › Date & Time Formatting, in the table's "date | time" form. */}
+        {`${dates.date(row.ts, { style: "numeric" })} | ${dates.time(row.ts, { seconds: true })}`}
       </div>
 
       {/* Status */}
@@ -299,21 +302,4 @@ function Action({ row }: { row: HistoryRow }) {
   }
   // In progress — no action by user direction.
   return <span aria-hidden className="text-text-tertiary">—</span>;
-}
-
-// ───────────────────────── formatting ─────────────────────────────
-
-function formatTimestamp(ts: number): string {
-  const d = new Date(ts);
-  const date = `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
-  let hr = d.getHours();
-  const min = d.getMinutes();
-  const sec = d.getSeconds();
-  const ampm = hr >= 12 ? "PM" : "AM";
-  hr = hr % 12 || 12;
-  return `${date} | ${pad(hr)}:${pad(min)}:${pad(sec)} ${ampm}`;
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
 }

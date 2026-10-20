@@ -18,7 +18,9 @@ import { C } from "@/lib/pcb/colors";
 import { useEditorScope } from "@/components/manual/use-step-nav";
 import { readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/editor-docs";
 import type { EditorScope } from "@/lib/manual/p2-types";
+import { reportSave } from "@/lib/manual/save-status";
 import { ModelViewer } from "./model-viewer";
+import { readSettings } from "@/lib/settings/prefs";
 
 type Provider = "meshy" | "demo";
 type Phase = "idle" | "generating" | "ready" | "failed";
@@ -42,7 +44,8 @@ function loadPersisted(scope: EditorScope, headRowId: string): { saved: Persiste
 }
 
 function savePersisted(handle: DocHandle, v: Persisted) {
-  writeEditorDoc(handle, JSON.stringify(v), window.localStorage);
+  const write = () => writeEditorDoc(handle, JSON.stringify(v), window.localStorage);
+  reportSave("3d.ai", write(), write);
 }
 
 export function AiGenerateModal({
@@ -124,7 +127,8 @@ export function AiGenerateModal({
       const res = await fetch("/api/three/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text }),
+        // Settings › AI & your data: the concept image stays off the volunteer pool when it's off.
+        body: JSON.stringify(readSettings().ai.volunteerPool ? { prompt: text } : { prompt: text, pool: "off" }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "request failed");
       created = await res.json();

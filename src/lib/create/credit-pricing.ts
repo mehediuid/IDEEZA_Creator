@@ -15,9 +15,36 @@
 
 import { IDZ_USD_PRICE } from "../wallet/idz-price";
 
-/** Settings › Plan & pricing: its Plans tab, and its Credits tab. */
-export const PLAN_PRICING_HREF = "/settings/plan";
+/** Settings › Plan & billing: one page of sections, each a card whose DOM id
+ *  is its address (/settings/plan#credits). */
+export const PLAN_HREF = "/settings/plan";
+export const PLAN_SECTIONS = {
+  plan: "your-plan",
+  credits: "credits",
+  buy: "buy-credits",
+  alerts: "credit-alerts",
+  payWith: "pay-with",
+  billingDetails: "billing-details",
+  invoices: "invoices",
+} as const;
+
+/** Pricing: the plan cards, the comparison and the FAQs, beside Plan & billing. */
+export const PRICING_HREF = "/settings/plan/pricing";
+
+/** The Credits section. Kept in the older tabbed form, which the page still
+ *  reads (`sectionOfTab`), so links already in the bell keep landing. */
 export const CREDITS_HREF = "/settings/plan?tab=credits";
+export const BUY_CREDITS_HREF = `${PLAN_HREF}#${PLAN_SECTIONS.buy}`;
+export const INVOICES_HREF = `${PLAN_HREF}#${PLAN_SECTIONS.invoices}`;
+
+/** Where an older ?tab= link (Plan & pricing had tabs) lands now. */
+export function sectionOfTab(tab: string | null): string | null {
+  if (tab === "plans") return PLAN_SECTIONS.plan;
+  if (tab === "credits") return PLAN_SECTIONS.credits;
+  if (tab === "billing") return PLAN_SECTIONS.invoices;
+  if (tab === "payment") return PLAN_SECTIONS.payWith;
+  return null;
+}
 
 export type PackId = "starter" | "pro" | "power";
 

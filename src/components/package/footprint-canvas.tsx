@@ -446,7 +446,8 @@ export function FootprintCanvas({
         const x2 = sx(o.x2);
         const y2 = sy(o.y2);
         const mm = Math.hypot(o.x2 - o.x1, o.y2 - o.y1);
-        const label = draft.units === "mm" ? `${mm.toFixed(2)} mm` : `${(mm / 0.0254).toFixed(0)} mil`;
+        const label =
+          draft.units === "mm" ? `${mm.toFixed(2)} mm` : draft.units === "inch" ? `${(mm / 25.4).toFixed(3)} inch` : `${(mm / 0.0254).toFixed(0)} mil`;
         return (
           <g key={o.id}>
             <g pointerEvents="none" stroke={stroke} strokeWidth={sw} fill="none">

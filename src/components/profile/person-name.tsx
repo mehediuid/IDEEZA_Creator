@@ -4,11 +4,13 @@
 // every name in the app opens the same page. A name that belongs to nobody
 // yet (typed into a project team) stays plain text. The link keeps the text
 // colour of the place it sits in and underlines on hover, so a feed card, a
-// comment and a Messages header read as they did.
+// comment and a Messages header read as they did. Your own name links to your
+// handle's address once you have one (Settings › Profile).
 
 import * as React from "react";
 import Link from "next/link";
 import { profileHrefOf } from "@/lib/people/ids";
+import { useMyProfile } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
 
 const TONE = {
@@ -33,7 +35,8 @@ export function PersonName({
   /** An id for the link itself (a comment labels its article by it). */
   linkId?: string;
 }) {
-  const href = profileHrefOf(id, from);
+  const { fields } = useMyProfile();
+  const href = profileHrefOf(id, from, fields.handle);
   if (!href) {
     return (
       <span id={linkId} className={cn(TONE[tone], className)}>

@@ -59,13 +59,15 @@ test("a fixed or stuck bar over <main> is <main>'s scroll-padding, so focus neve
   assert.equal(editor.match(/ref=\{stuckBarRef\} className="sticky top-0/g)?.length, 2, "the touch bar and the desktop bar");
 });
 
-// Pages that render nothing of their own: they send the reader on at once.
+// Pages that render nothing of their own: they send the reader on at once
+// (and the settings pages Settings v2 folded into others, Get paid's old sub-pages too).
 const REDIRECTS = ["app/(create)/build/[jobId]/brief/page.tsx", "app/(create)/projects/[id]/business-plan/page.tsx"];
+const isRedirect = (page) => REDIRECTS.includes(page) || /^\s*redirect(Legacy)?\(/m.test(read(page));
 
 test("every shell page names its tab ‹Page› · IDEEZA", () => {
   const untitled = [];
   for (const page of [...pagesUnder("app/(dashboard)"), ...pagesUnder("app/(create)")]) {
-    if (REDIRECTS.includes(page)) continue;
+    if (isRedirect(page)) continue;
     // Its own metadata, or a layout's between it and its group.
     let titled = /export (const metadata|async function generateMetadata)/.test(read(page));
     for (let dir = page.slice(0, page.lastIndexOf("/")); !titled && /^app\/\([a-z]+\)/.test(dir); dir = dir.slice(0, dir.lastIndexOf("/"))) {
@@ -84,7 +86,8 @@ test("every shell page names its tab ‹Page› · IDEEZA", () => {
   for (const [page, title] of [
     ["app/(dashboard)/page.tsx", "Home · IDEEZA"],
     ["app/(create)/history/page.tsx", "History · IDEEZA"],
-    ["app/(create)/settings/plan/page.tsx", "Plan & pricing · IDEEZA"],
+    ["app/(create)/settings/plan/page.tsx", "Plan & billing · IDEEZA"],
+    ["app/(create)/settings/plan/pricing/page.tsx", "Pricing · IDEEZA"],
   ]) {
     assert.match(read(page), new RegExp(`title: "${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   }

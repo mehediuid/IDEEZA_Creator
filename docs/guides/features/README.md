@@ -9,6 +9,7 @@ Moved verbatim from `CLAUDE.md` §5 on 2026-09-29 and split by area; each sectio
 | Area | Guide | Sections |
 |---|---|---|
 | Global shell, `/parts` home, Add Network & Connection Map, My projects / Project details, History, Innovations, minting | [platform-and-projects.md](platform-and-projects.md) | Platform & shell · Add Network & Connection Map · Projects, history & community |
+| Settings: `/settings` and its pages, the side-nav, Find a setting, the preferences store | [settings.md](settings.md) | Shell · pages |
 | Messages: `/messages`, the conversations between the demo people, Requests, entry points, the sidebar badge | [messages.md](messages.md) | Messages |
 | Blog: `/blog`, the editor, Send for review, the demo review, the article page, review results in the bell | [blog.md](blog.md) | Blog |
 | The Earn area: `/projects/<id>/earn` and its tabs (Overview, Sell, Business plan, Money) | [earn-layer.md](earn-layer.md) | Earn area · Tabs |

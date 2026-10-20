@@ -32,8 +32,12 @@ import {
   type BuildJob,
   type ChatSession,
 } from "@/lib/create/history";
+import { chatDeletePlan, projectBuildIds } from "@/lib/create/history-delete";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { formatRelativeTime } from "@/lib/utils";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import { ConfirmDialog, IconButton } from "@/components/ideeza";
+import { useDates } from "@/lib/settings/use-dates";
 import { HistoryTable, type HistoryRow } from "./history-table";
 import { HistoryRowDetail, generateSubSteps } from "./history-row-detail";
 import { Pagination, HISTORY_PAGE_SIZE } from "./pagination";
@@ -61,7 +65,9 @@ export function HistoryTabbedPage() {
     buildsForChat,
     retryBuildItem,
     attentionBuilds,
+    deleteChat,
   } = useCreateHistory();
+  const [deleting, setDeleting] = React.useState<ChatSession | null>(null);
   // A build that was saved with "Save Project" carries the project's id;
   // the row names that project instead of leaving the column blank.
   const { projects } = useManualProjects();
@@ -184,6 +190,7 @@ export function HistoryTabbedPage() {
             <ChatsList
               chats={chats}
               countBuilds={(id) => buildsForChat(id).length}
+              onDelete={setDeleting}
             />
           )
         ) : // Project/Product Generations — table view from the design.
@@ -216,6 +223,15 @@ export function HistoryTabbedPage() {
           them as a render-prop so the closure has fresh access to
           retryBuildItem without re-render churn. */}
       <RetryWiring builds={builds} retryBuildItem={retryBuildItem} />
+      <DeleteChatDialog
+        chat={deleting}
+        plan={deleting ? chatDeletePlan(deleting.id, builds, projectBuildIds(projects)) : null}
+        onCancel={() => setDeleting(null)}
+        onDelete={(chat, drop) => {
+          deleteChat(chat.id, drop);
+          setDeleting(null);
+        }}
+      />
     </Page>
   );
 }
@@ -228,9 +244,11 @@ export function HistoryTabbedPage() {
 function ChatsList({
   chats,
   countBuilds,
+  onDelete,
 }: {
   chats: ChatSession[];
   countBuilds: (chatId: string) => number;
+  onDelete: (chat: ChatSession) => void;
 }) {
   return (
     <ul role="list" className="flex flex-col gap-[8px]">
@@ -243,6 +261,7 @@ function ChatsList({
           key={chat.id}
           chat={chat}
           buildCount={countBuilds(chat.id)}
+          onDelete={() => onDelete(chat)}
         />
       ))}
     </ul>
@@ -252,10 +271,13 @@ function ChatsList({
 function ChatRow({
   chat,
   buildCount,
+  onDelete,
 }: {
   chat: ChatSession;
   buildCount: number;
+  onDelete: () => void;
 }) {
+  const dates = useDates();
   const assistantImage = [...chat.turns]
     .reverse()
     .find((t) => t.role === "assistant" && t.status === "ready") as
@@ -263,10 +285,10 @@ function ChatRow({
     | undefined;
   const turnCount = chat.turns.length;
   return (
-    <li>
+    <li className="relative">
       <Link
         href={`/chat/${chat.id}`}
-        className="flex items-center gap-[16px] rounded-xl border border-border bg-bg-surface p-[16px] outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="flex items-center gap-[16px] rounded-xl border border-border bg-bg-surface p-[16px] pr-[64px] outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         <div
           aria-hidden
@@ -293,9 +315,16 @@ function ChatRow({
           </p>
         </div>
         <span className="text-sm text-text-tertiary">
-          {formatRelativeTime(chat.updatedAt)}
+          {dates.stamp(chat.updatedAt)}
         </span>
       </Link>
+      <IconButton
+        size="md"
+        aria-label={`Delete “${chat.title}”`}
+        icon={<Icon icon={Delete02Icon} size={18} />}
+        onClick={onDelete}
+        className="absolute right-[12px] top-1/2 -translate-y-1/2 [@media(pointer:coarse)]:size-[var(--touch-min)]"
+      />
     </li>
   );
 }
@@ -351,6 +380,47 @@ function RetryWiring(_props: {
   retryBuildItem: (buildId: string, kind: BuildItemKind) => void;
 }) {
   return null;
+}
+
+// ───────────────────────── delete a chat ───────────────────────────
+
+/** Deleting a chat: what goes with it, what a project keeps, and what IDEEZA's server still holds. */
+function DeleteChatDialog({
+  chat,
+  plan,
+  onCancel,
+  onDelete,
+}: {
+  chat: ChatSession | null;
+  plan: ReturnType<typeof chatDeletePlan> | null;
+  onCancel: () => void;
+  onDelete: (chat: ChatSession, drop: string[]) => void;
+}) {
+  const n = plan?.drop.length ?? 0;
+  const kept = plan?.kept ?? 0;
+  return (
+    <ConfirmDialog
+      open={!!chat && !!plan}
+      title={chat ? `Delete “${chat.title}”?` : ""}
+      confirmLabel="Delete chat"
+      confirmUnavailable={!!plan?.busy}
+      onCancel={onCancel}
+      onConfirm={() => {
+        if (chat && plan && !plan.busy) onDelete(chat, plan.drop);
+      }}
+    >
+      {plan?.busy ? (
+        <p className="m-0">A build from this chat is still waiting or building. You can delete the chat once it finishes.</p>
+      ) : (
+        <p className="m-0">
+          Its prompts and concept images are removed from this browser
+          {n ? `, and so ${n === 1 ? "is the build" : `are the ${n} builds`} started from it` : ""}.
+          {kept ? ` ${kept === 1 ? "The build a project holds stays" : `The ${kept} builds projects hold stay`} with ${kept === 1 ? "that project" : "those projects"}.` : ""}{" "}
+          IDEEZA&apos;s server keeps a copy of each concept image with its prompt, and there&apos;s no way to delete those yet.
+        </p>
+      )}
+    </ConfirmDialog>
+  );
 }
 
 // ───────────────────────── empty state ────────────────────────────

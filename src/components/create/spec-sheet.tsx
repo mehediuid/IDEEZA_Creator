@@ -67,6 +67,7 @@ import {
   type Edit,
 } from "./spec-sections";
 import { useDialogFocus } from "./use-dialog-focus";
+import { motionReduced } from "@/lib/settings/appearance";
 
 /** The exit's length — the panel stays on the page this long after it is
  *  closed, so it can leave the way it came. Matches `duration-normal`. */
@@ -248,7 +249,7 @@ export function SpecSheet({
   }
   React.useEffect(() => {
     if (!leaving) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = motionReduced();
     const timer = window.setTimeout(() => setLeaving(null), still ? 0 : EXIT_MS);
     return () => window.clearTimeout(timer);
   }, [leaving]);

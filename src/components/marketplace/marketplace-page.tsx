@@ -53,6 +53,8 @@ import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
 import { ListingCard, ListingCardSkeleton } from "./listing-card";
+import { recordSearch } from "@/lib/data/activity-log";
+import { motionReduced } from "@/lib/settings/appearance";
 
 type Tab = MarketQuery["tab"];
 
@@ -127,6 +129,7 @@ export function MarketplacePage() {
   );
   const changeView = (patch: Partial<Omit<MarketQuery, "page">>) => write({ ...view, ...patch, page: 1 });
   const changeQuery = (next: string) => {
+    recordSearch("explore", next);
     setText(next);
     write({ ...view, q: next.trim(), page: 1 });
   };
@@ -181,7 +184,7 @@ export function MarketplacePage() {
   const searchRef = React.useRef<HTMLInputElement>(null);
   const changePage = (page: number) => {
     write({ ...view, page });
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = motionReduced();
     resultsRef.current?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
     headingRef.current?.focus({ preventScroll: true });
   };

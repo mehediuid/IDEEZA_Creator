@@ -25,6 +25,7 @@ import {
   STEPS,
   blockedReason,
   clearDraft,
+  defaultDraftUnit,
   entrySub,
   initialDraft,
   loadDraft,
@@ -297,7 +298,7 @@ export function PackageProvider({ children }: { children: React.ReactNode }) {
 
       reset: () => {
         dirty.current = true;
-        setState({ ...initialState(), draft: initialDraft() });
+        setState({ ...initialState(), draft: initialDraft(defaultDraftUnit()) });
       },
 
       flash: (toast) => {

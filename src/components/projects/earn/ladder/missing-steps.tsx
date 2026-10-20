@@ -3,25 +3,30 @@
 // The ladder's missing steps, each with its one-tap fix (Build and Earn P1-4).
 // One row component for the Earn overview's track and every commit point, so
 // a step reads and fixes the same wherever it's asked:
-// - Open products, Go to mint, Set payout wallet: links to the one place that
-//   step is done. Minting starts from Earn › Project NFT (the Brief entry, the
-//   mint flow's home), and the payout wallet lives in its Outcome block.
+// - Open products, Go to mint: links to the one place that step is done.
+//   Minting starts from Earn › Sell (the Brief entry, the mint flow's home).
+// - Verify identity: links to Settings › Get paid › Verify your identity
+//   (Settings v2, V7), carrying the page you were on so the settings page
+//   offers the way back.
 // - Make videos: opens the products' videos in a dialog right here, where
 //   each one is generated (make-videos.tsx; owner, 2026-10-12).
 // - Connect wallet: opens the Demo wallet dialog.
 // - Confirm ownership: writes `ownerConfirmedAt` at once, the readiness gate's
 //   own write.
-// - Choose a license, Verify identity: open their dialogs.
+// - Choose a license: opens its dialog.
 // Every fix is secondary: the page's one violet control stays its own.
 // Inside a dialog, `onCover` tells it while a fix's own dialog sits on top,
 // so the keyboard belongs to the top one (ModalFrame's `covered`).
 
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CheckmarkCircle02Icon, CircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
+import { getPaidHref } from "@/lib/account/get-paid-href";
+import { withReturn } from "@/lib/account/return-to";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import type { LadderStep } from "@/lib/commerce/ladder";
 import { earnHref } from "@/lib/manual/earn-route";
@@ -29,7 +34,6 @@ import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 import { MakeVideosButton } from "../../make-videos";
 import { LicenseDialog } from "./license-dialog";
-import { VerifyIdentityDialog } from "./verify-identity-dialog";
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const FIX = cn(buttonVariants({ hierarchy: "secondary", size: "md" }), "shrink-0 whitespace-nowrap max-sm:w-full", TAP);
@@ -47,7 +51,8 @@ type FixContext = {
 export function StepFix({ step, project, brief, announce, onCover, describedBy }: FixContext & { step: LadderStep; describedBy?: string }) {
   const { openManage } = useWalletRequest();
   const { setOwnerConfirmed } = useManualProjects();
-  const [dialog, setDialog] = React.useState<"license" | "identity" | null>(null);
+  const pathname = usePathname();
+  const [dialog, setDialog] = React.useState<"license" | null>(null);
   const label = step.fix.label;
   // Also uncovers when the fixed step's row goes away with its dialog.
   React.useEffect(() => {
@@ -75,9 +80,14 @@ export function StepFix({ step, project, brief, announce, onCover, describedBy }
         />
       );
     case "mint":
-    case "payout":
       return (
         <Link href={earnHref(project.id, "sell")} className={FIX} aria-describedby={describedBy}>
+          {label}
+        </Link>
+      );
+    case "identity":
+      return (
+        <Link href={withReturn(getPaidHref("identity"), pathname)} className={FIX} aria-describedby={describedBy}>
           {label}
         </Link>
       );
@@ -116,15 +126,6 @@ export function StepFix({ step, project, brief, announce, onCover, describedBy }
             onClose={() => setDialog(null)}
             onSaved={announce}
           />
-        </>
-      );
-    case "identity":
-      return (
-        <>
-          <Button type="button" hierarchy="secondary" size="md" className={FIX} aria-describedby={describedBy} onClick={() => setDialog("identity")}>
-            {label}
-          </Button>
-          <VerifyIdentityDialog open={dialog === "identity"} onClose={() => setDialog(null)} onVerified={announce} />
         </>
       );
   }

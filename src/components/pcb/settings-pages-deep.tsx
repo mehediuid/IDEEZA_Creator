@@ -3,7 +3,7 @@
 // IDEEZA PCB Software — Settings overlay deep pages (Phase D).
 // Three multi-tab settings pages: Schematic / Symbol, PCB / Footprint, and
 // Panel / Panel Lib. Each shares the same TabBar pattern and renders one of
-// several sub-pages (General / Theme / Layer / Grid / Track Width / Snap …)
+// several sub-pages (General / Canvas theme / Layer / Grid / Track Width / Snap …)
 // backed by store state.
 
 import * as React from "react";
@@ -231,7 +231,7 @@ function ThemeGrid({
 
 const SCHEM_SYM_TABS: { id: "general" | "theme"; label: string }[] = [
   { id: "general", label: "General" },
-  { id: "theme",   label: "Theme" },
+  { id: "theme",   label: "Canvas theme" },
 ];
 
 export function SchematicSymbolSettingsPage() {
@@ -296,7 +296,7 @@ export function SchematicSymbolSettingsPage() {
 
 const PCB_FP_TABS: { id: "general" | "theme" | "layer" | "gridCart" | "gridPolar" | "trackWidth" | "snap"; label: string }[] = [
   { id: "general",    label: "General" },
-  { id: "theme",      label: "Theme" },
+  { id: "theme",      label: "Canvas theme" },
   { id: "layer",      label: "Layer" },
   { id: "gridCart",   label: "Grid · Cartesian" },
   { id: "gridPolar",  label: "Grid · Polar" },
@@ -603,7 +603,7 @@ export function PcbFootprintSettingsPage() {
 
 const PANEL_LIB_TABS: { id: "general" | "theme" | "themeLine" | "themeStroke"; label: string }[] = [
   { id: "general",     label: "General" },
-  { id: "theme",       label: "Theme" },
+  { id: "theme",       label: "Canvas theme" },
   { id: "themeLine",   label: "Line Style" },
   { id: "themeStroke", label: "Stroke Width" },
 ];

@@ -3,6 +3,7 @@
 
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
 import type { PcbDrcConfig } from "./drc";
+import { DEFAULT_MEASUREMENT_UNIT, type MeasurementUnit } from "./measurement-unit";
 
 export type Mode = "schematic" | "pcb" | "2d" | "3d";
 export type LeftMain = "project" | "library";
@@ -106,8 +107,6 @@ export type ModalId =
   | "set3dFont"
   | "set3dDrawing"
   | "set3dProperty"
-  | "set3dHotkey"
-  | "set3dTopToolbar"
   | null;
 
 // Tools-menu manager overlays.
@@ -890,6 +889,13 @@ export interface PcbState {
   panelLibSettings: PanelLibSettings;
   // Phase E — Top toolbar customization
   toolbarCustomization: ToolbarCustomization;
+  // The editor's settings record (`ideeza:pcb:appSettings`, lib/pcb/app-settings.ts):
+  // the slices above, the one Measurement Unit default, and the 3D Setting
+  // dialogs' own values. Global, not per product. `appSettingsLoaded` turns
+  // true once the record is read, so nothing is written over it before then.
+  measurementUnit: MeasurementUnit;
+  dialogSettings: Record<string, PcbDialogValue>;
+  appSettingsLoaded: boolean;
   // Phase 3 — PCB Tools manager modals
   pcbNetClasses: NetClass[];
   pcbDiffPairs: DiffPair[];
@@ -921,6 +927,9 @@ export interface Hotkey {
   key: string;
   comment?: string;
 }
+
+/** A 3D Setting dialog field's stored value (select/text, toggle, pills). */
+export type PcbDialogValue = string | boolean | string[];
 
 // Drawing template (referenced from "Drawing Setting" page).
 export interface Drawing {
@@ -1019,14 +1028,20 @@ export interface SystemSettingsState {
   // General — Pasting Update Module
   promptOnPaste: boolean;
   syncOnPaste: boolean;
+  // General — Canvas & Interaction
+  canvasZoomType: string;
+  autoPanning: string;
+  sidePanelAutoHide: string;
   // Category — checkbox list of category groups (drives left panel filter)
   categories: Array<{ id: string; label: string; on: boolean }>;
   // Common Library — Device
   libDeviceShow: boolean;
   libDeviceAutoLoad: boolean;
+  libDeviceSource: string;
   // Common Library — Panel Lib
   libPanelShow: boolean;
   libPanelAutoLoad: boolean;
+  libPanelFormat: string;
 }
 
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettingsState = {
@@ -1051,6 +1066,9 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettingsState = {
   alignWhileMoving: true,
   promptOnPaste: true,
   syncOnPaste: false,
+  canvasZoomType: "Scroll",
+  autoPanning: "Uniform",
+  sidePanelAutoHide: "Right",
   categories: [
     { id: "resistor",  label: "Resistors",  on: true },
     { id: "capacitor", label: "Capacitors", on: true },
@@ -1065,8 +1083,10 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettingsState = {
   ],
   libDeviceShow: true,
   libDeviceAutoLoad: true,
+  libDeviceSource: "Cloud + Local",
   libPanelShow: true,
   libPanelAutoLoad: false,
+  libPanelFormat: "IDEEZA Panel",
 };
 
 // ── Property Settings (Phase C) ──────────────────────────────────────────────
@@ -1943,6 +1963,9 @@ export const initialState: PcbState = {
   pcbFootprintSettings: DEFAULT_PCB_FOOTPRINT_SETTINGS,
   panelLibSettings: DEFAULT_PANEL_LIB_SETTINGS,
   toolbarCustomization: DEFAULT_TOOLBAR_CUSTOMIZATION,
+  measurementUnit: DEFAULT_MEASUREMENT_UNIT,
+  dialogSettings: {},
+  appSettingsLoaded: false,
   pcbNetClasses: DEFAULT_NET_CLASSES,
   pcbDiffPairs: DEFAULT_DIFF_PAIRS,
   pcbEqualLength: DEFAULT_EQUAL_LENGTH_GROUPS,

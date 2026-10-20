@@ -3,15 +3,29 @@
 // IDEEZA PCB — 3D-view standalone Setting dialogs (Ideeza_PCB3D_Dialogs spec).
 // Each 3D-menu "Setting > X" item opens its own lightweight card modal (as the
 // designer drew them), not the unified SettingsOverlay. Data-driven: every
-// dialog is a spec of rows/fields rendered by one component; values persist to
-// localStorage so Save/Reset are real.
+// dialog is a spec of rows/fields rendered by one component. Values live in
+// the editor's one settings record (`ideeza:pcb:appSettings`, written by the
+// store), shared with the overlay: Measurement Unit and the font are the same
+// fields the overlay's System and Common Fonts pages edit. Hotkey and Top
+// toolbar open the overlay's own pages. Each dialog opens with a line saying
+// which of its values the editor acts on today (DIALOG_TRUTH).
 
 import * as React from "react";
 import { Button, Select } from "@/components/ideeza";
 import { DsIcon } from "@/lib/pcb/icons";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { DEFAULT_FONTS, type PcbDialogValue } from "@/lib/pcb/types";
+import { DIALOG_TRUTH } from "@/lib/pcb/app-settings";
+import {
+  DEFAULT_MEASUREMENT_UNIT,
+  MEASUREMENT_UNITS,
+  MEASUREMENT_UNIT_LABELS,
+  unitFrom,
+} from "@/lib/pcb/measurement-unit";
 
-const STORE_KEY = "ideeza:pcb:appSettings";
+/** Fields that are the overlay's too, kept in their own store fields rather
+ *  than in the dialogs' own values. */
+const SHARED_KEYS = ["measurementUnit", "font"];
 
 // ── Field / dialog spec ───────────────────────────────────────────────────────
 type Field =
@@ -21,7 +35,8 @@ type Field =
   | { k: "pills"; key: string; label: string; options: string[]; def: string[] }
   | { k: "note"; text: string }
   | { k: "preview"; text: string }
-  | { k: "cache"; key: string; label: string; value: string; button: string };
+  /** A fact, not a choice: what the editor does, with no control. */
+  | { k: "info"; label: string; value: string; desc: string };
 type Row = Field[]; // input fields (sel/txt) render side-by-side; others full-width
 type DialogSpec = { title: string; icon: string; rows: Row[] };
 
@@ -31,11 +46,8 @@ export const SETTING_DIALOGS: Record<string, DialogSpec> = {
     title: "System — General",
     icon: "sys",
     rows: [
-      [
-        { k: "sel", key: "measurementUnit", label: "Measurement Unit", options: ["Millimeters (mm)", "Mils", "Inches"], def: "Millimeters (mm)" },
-        { k: "sel", key: "language", label: "Language", options: ["English", "中文", "日本語", "Deutsch"], def: "English" },
-      ],
-      [{ k: "tog", key: "autoSave", label: "Auto-save", desc: "Every 5 minutes", def: true }],
+      [{ k: "sel", key: "measurementUnit", label: "Measurement Unit", options: MEASUREMENT_UNITS.map((u) => MEASUREMENT_UNIT_LABELS[u]), def: MEASUREMENT_UNIT_LABELS[DEFAULT_MEASUREMENT_UNIT] }],
+      [{ k: "info", label: "Language", value: "English", desc: "Other languages aren't available yet." }],
       [{ k: "tog", key: "reopenLast", label: "Reopen last project on launch", def: true }],
       [{ k: "tog", key: "startupTips", label: "Show startup tips", def: false }],
     ],
@@ -60,7 +72,7 @@ export const SETTING_DIALOGS: Record<string, DialogSpec> = {
       [{ k: "sel", key: "libSource", label: "Default Library Source", options: ["Ideeza Cloud Library", "Local Only", "LCSC"], def: "Ideeza Cloud Library" }],
       [{ k: "txt", key: "libPath", label: "Local Library Path", def: "C:\\Users\\Ideeza\\Libraries" }],
       [{ k: "tog", key: "libSync", label: "Sync library in background", desc: "Keep local cache up to date automatically", def: true }],
-      [{ k: "cache", key: "libCache", label: "Local cache size", value: "1.8 GB used", button: "Clear Cache" }],
+      [{ k: "info", label: "Local cache", value: "None", desc: "The parts library ships with the app, so nothing is cached in this browser." }],
     ],
   },
   set3dPanelGeneral: {
@@ -77,7 +89,7 @@ export const SETTING_DIALOGS: Record<string, DialogSpec> = {
     ],
   },
   set3dPanelTheme: {
-    title: "Panel/Panel Lib — Theme",
+    title: "Panel/Panel Lib — Canvas theme",
     icon: "panel",
     rows: [
       [
@@ -94,7 +106,7 @@ export const SETTING_DIALOGS: Record<string, DialogSpec> = {
     icon: "font",
     rows: [
       [
-        { k: "sel", key: "silkFont", label: "Silkscreen Font", options: ["Ideeza Sans", "Ideeza Mono", "Arial"], def: "Ideeza Sans" },
+        { k: "sel", key: "font", label: "Font", options: DEFAULT_FONTS, def: "Inter" },
         { k: "txt", key: "fontDefaultSize", label: "Default Size", def: "1.0 mm" },
       ],
       [{ k: "sel", key: "designatorFont", label: "Designator Font", options: ["Ideeza Mono", "Ideeza Sans"], def: "Ideeza Mono" }],
@@ -137,9 +149,9 @@ function defaultsOf(spec: DialogSpec): Record<string, unknown> {
   return out;
 }
 
-function loadSaved(): Record<string, unknown> {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(window.localStorage.getItem(STORE_KEY) || "{}"); } catch { return {}; }
+/** The keys a dialog stores itself (its fields minus the shared ones). */
+function ownKeysOf(spec: DialogSpec): string[] {
+  return Object.keys(defaultsOf(spec)).filter((k) => !SHARED_KEYS.includes(k));
 }
 
 // ── Small atoms ───────────────────────────────────────────────────────────────
@@ -158,20 +170,27 @@ function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 // ── Dialog ────────────────────────────────────────────────────────────────────
 export function SettingDialog({ id }: { id: string }) {
   const spec = SETTING_DIALOGS[id];
+  const state = usePcbState();
   const actions = usePcbActions();
-  const [draft, setDraft] = React.useState<Record<string, unknown>>(() => ({ ...defaultsOf(spec), ...loadSaved() }));
+  const [draft, setDraft] = React.useState<Record<string, unknown>>(() => ({
+    ...defaultsOf(spec),
+    ...state.dialogSettings,
+    measurementUnit: MEASUREMENT_UNIT_LABELS[state.measurementUnit],
+    font: state.fonts.selected,
+  }));
   if (!spec) return null;
 
   const set = (k: string, v: unknown) => setDraft((d) => ({ ...d, [k]: v }));
   const save = () => {
-    const merged = { ...loadSaved(), ...draft };
-    try { window.localStorage.setItem(STORE_KEY, JSON.stringify(merged)); } catch {}
-    // Wire the settings that drive real app behaviour.
-    if (id === "set3dSysGeneral") {
-      const u = String(draft.measurementUnit || "");
-      actions.setUnit(u.startsWith("Mil") && !u.startsWith("Milli") ? "Mil" : u.startsWith("Inch") ? "Inch" : "mm");
-    }
-    actions.flashToast(`${spec.title} — saved`);
+    const own: Record<string, PcbDialogValue> = {};
+    for (const k of ownKeysOf(spec)) own[k] = draft[k] as PcbDialogValue;
+    actions.saveDialogSettings(own);
+    // The shared fields: the same store fields the overlay edits.
+    const keys = Object.keys(defaultsOf(spec));
+    const unit = unitFrom(draft.measurementUnit);
+    if (keys.includes("measurementUnit") && unit) actions.setMeasurementUnit(unit);
+    if (keys.includes("font") && typeof draft.font === "string") actions.setSelectedFont(draft.font);
+    actions.flashToast(`${spec.title} saved`);
     actions.closeModal();
   };
   const reset = () => setDraft(defaultsOf(spec));
@@ -231,23 +250,23 @@ export function SettingDialog({ id }: { id: string }) {
     }
     if (f.k === "preview") {
       return (
-        <div key={i} style={{ width: "100%", padding: "var(--spacing-6)", borderLeft: "3px solid var(--color-violet-600)", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-md)", textAlign: "center", fontSize: "var(--font-size-xl)", color: "var(--color-text-primary)" }}>{f.text}</div>
+        <div key={i} style={{ width: "100%", padding: "var(--spacing-6)", borderLeft: "3px solid var(--color-violet-600)", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-md)", textAlign: "center", fontSize: "var(--font-size-xl)", color: "var(--color-text-primary)", fontFamily: typeof draft.font === "string" ? `${draft.font}, sans-serif` : undefined }}>{f.text}</div>
       );
     }
-    // cache
+    // info: a fact with no control
     return (
-      <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "var(--spacing-4) 0" }}>
+      <div key={i} className="flex w-full items-center justify-between gap-[var(--spacing-6)] py-[var(--spacing-4)]">
         <div>
-          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{f.label}</div>
-          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>{f.value}</div>
+          <div className="text-sm leading-sm text-text-primary">{f.label}</div>
+          <div className="mt-[2px] text-xs leading-xs text-text-tertiary">{f.desc}</div>
         </div>
-        <Button hierarchy="secondary" size="sm" onClick={() => actions.flashToast("Cache cleared")}>{f.button}</Button>
+        <span className="shrink-0 text-sm leading-sm text-text-secondary">{f.value}</span>
       </div>
     );
   };
 
   return (
-    <DialogShell title={spec.title} icon={spec.icon} onClose={actions.closeModal}
+    <DialogShell title={spec.title} icon={spec.icon} onClose={actions.closeModal} truth={DIALOG_TRUTH[id]}
       footer={<>
         <Button hierarchy="secondary" size="md" onClick={reset}>Reset to Default</Button>
         <Button hierarchy="primary" size="md" onClick={save}>Save</Button>
@@ -262,7 +281,7 @@ export function SettingDialog({ id }: { id: string }) {
 }
 
 // ── Reusable card shell (violet header + scrollable body + footer) ────────────
-function DialogShell({ title, icon, onClose, footer, width = 460, children }: { title: string; icon: string; onClose: () => void; footer: React.ReactNode; width?: number; children: React.ReactNode }) {
+function DialogShell({ title, icon, onClose, footer, truth, width = 460, children }: { title: string; icon: string; onClose: () => void; footer: React.ReactNode; truth?: string; width?: number; children: React.ReactNode }) {
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 88, background: "rgba(20,8,30,.34)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} style={{ width, maxWidth: "90vw", background: "var(--color-bg-surface)", borderRadius: "var(--radius-2xl)", boxShadow: "var(--elevation-6)", overflow: "hidden", animation: "ideeza-rise .2s cubic-bezier(.2,.9,.3,1.1)" }}>
@@ -276,6 +295,7 @@ function DialogShell({ title, icon, onClose, footer, width = 460, children }: { 
           </button>
         </div>
         <div style={{ padding: "var(--spacing-7) var(--spacing-8)", display: "flex", flexDirection: "column", gap: "var(--spacing-5)", maxHeight: "70vh", overflowY: "auto" }}>
+          {truth && <p className="text-sm leading-sm text-text-tertiary">{truth}</p>}
           {children}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-4)", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-7)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
@@ -283,92 +303,6 @@ function DialogShell({ title, icon, onClose, footer, width = 460, children }: { 
         </div>
       </div>
     </div>
-  );
-}
-
-// ── Hotkey dialog (spec §11) — search + keybindings grouped by menu ───────────
-const HOTKEY_GROUPS: { group: string; rows: { action: string; key: string }[] }[] = [
-  { group: "VIEW", rows: [
-    { action: "Full Screen", key: "F11" },
-    { action: "Window Arrangement › Tile Horizontally", key: "H" },
-    { action: "Window Arrangement › Merge All", key: "M" },
-  ] },
-  { group: "HELP", rows: [{ action: "Tutorials", key: "F1" }] },
-];
-
-export function HotkeyDialog() {
-  const actions = usePcbActions();
-  const [q, setQ] = React.useState("");
-  const groups = HOTKEY_GROUPS
-    .map((g) => ({ ...g, rows: g.rows.filter((r) => r.action.toLowerCase().includes(q.toLowerCase())) }))
-    .filter((g) => g.rows.length);
-  return (
-    <DialogShell title="Hotkey" icon="key" onClose={actions.closeModal} width={540}
-      footer={<>
-        <Button hierarchy="secondary" size="md" onClick={() => { setQ(""); actions.flashToast("Hotkeys reset to default"); }}>Reset All to Default</Button>
-        <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast("Hotkeys saved"); actions.closeModal(); }}>Save</Button>
-      </>}>
-      <input placeholder="Search actions…" value={q} onChange={(e) => setQ(e.target.value)} style={INPUT} />
-      {groups.map((g) => (
-        <div key={g.group}>
-          <div style={{ ...LABEL, color: "var(--color-text-brand)", marginBottom: "var(--spacing-2)" }}>{g.group}</div>
-          {g.rows.map((r) => (
-            <div key={r.action} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-4) 0", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{r.action}</span>
-              <kbd style={{ padding: "3px 9px", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-sm)", background: "var(--color-bg-subtle)", fontSize: "var(--font-size-xs)", fontFamily: "monospace", color: "var(--color-text-secondary)" }}>{r.key}</kbd>
-            </div>
-          ))}
-        </div>
-      ))}
-      {groups.length === 0 && <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", textAlign: "center", padding: "var(--spacing-6)" }}>No actions match &ldquo;{q}&rdquo;</div>}
-    </DialogShell>
-  );
-}
-
-// ── Top Toolbar dialog (spec §12) — two-column customizer ─────────────────────
-const TOOLBAR_TOOLS = ["Pan (Hand Tool)", "Zoom In / Out", "Top / Bottom / Left / Right View", "Outline / Normal View", "Dimension Measurement", "Align Object", "Back View"];
-const TOOLBAR_DEFAULT = ["Pan (Hand Tool)", "Zoom In / Out", "Top / Bottom / Left / Right View", "Outline / Normal View"];
-
-export function TopToolbarDialog() {
-  const actions = usePcbActions();
-  const [active, setActive] = React.useState<string[]>(() => {
-    const s = loadSaved();
-    return Array.isArray(s.threeDToolbar) ? (s.threeDToolbar as string[]) : TOOLBAR_DEFAULT;
-  });
-  const toggle = (t: string) => setActive((a) => (a.includes(t) ? a.filter((x) => x !== t) : [...a, t]));
-  const col = (title: string, items: string[]) => (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={LABEL}>{title}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-2)" }}>
-        {items.map((t) => {
-          const on = active.includes(t);
-          return (
-            <div key={t} onClick={() => toggle(t)} className="ix-row" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-4)", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-md)", cursor: "pointer" }}>
-              <span style={{ width: 15, height: 15, borderRadius: 4, border: `2px solid ${on ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: on ? "var(--color-violet-600)" : "transparent", flex: "0 0 auto" }} />
-              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t}</span>
-            </div>
-          );
-        })}
-        {items.length === 0 && <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", padding: "var(--spacing-4)" }}>—</div>}
-      </div>
-    </div>
-  );
-  const save = () => {
-    try { window.localStorage.setItem(STORE_KEY, JSON.stringify({ ...loadSaved(), threeDToolbar: active })); } catch {}
-    actions.flashToast("Top toolbar saved");
-    actions.closeModal();
-  };
-  return (
-    <DialogShell title="Top Toolbar" icon="grid" onClose={actions.closeModal} width={580}
-      footer={<>
-        <Button hierarchy="secondary" size="md" onClick={() => setActive(TOOLBAR_DEFAULT)}>Reset to Default</Button>
-        <Button hierarchy="primary" size="md" onClick={save}>Save</Button>
-      </>}>
-      <div style={{ display: "flex", gap: "var(--spacing-6)" }}>
-        {col("Available Tools", TOOLBAR_TOOLS.filter((t) => !active.includes(t)))}
-        {col("Active on Toolbar", TOOLBAR_TOOLS.filter((t) => active.includes(t)))}
-      </div>
-    </DialogShell>
   );
 }
 

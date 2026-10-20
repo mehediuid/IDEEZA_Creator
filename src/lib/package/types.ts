@@ -9,10 +9,13 @@
 // Coordinate spaces are deliberately different, because the two editors model
 // different things: the symbol is abstract sheet units (a schematic symbol has
 // no millimetres), the footprint is real millimetres with the part's own centre
-// at the origin. The mm/mil toggle is a display unit only — the model always
-// stores mm, so switching units can never round the geometry away.
+// at the origin. The mm/mil/inch toggle is a display unit only — the model
+// always stores mm, so switching units can never round the geometry away. A new
+// draft starts on the editor's Measurement Unit default (lib/pcb/measurement-unit.ts);
+// a draft that has its own unit keeps it.
 
 import { componentBodyColor } from "@/lib/pcb/pcb-3d";
+import { packageUnitFor, readMeasurementUnit } from "@/lib/pcb/measurement-unit";
 
 export type Pt = { x: number; y: number };
 
@@ -77,7 +80,7 @@ export type SymTool = (typeof SYM_TOOLS)[number];
 export const MOUNTINGS = ["SMD", "THT"] as const;
 export type Mounting = (typeof MOUNTINGS)[number];
 
-export const UNITS = ["mm", "mil"] as const;
+export const UNITS = ["mm", "mil", "inch"] as const;
 export type Unit = (typeof UNITS)[number];
 
 export const PAD_KINDS = ["Pad", "Shaped Pad", "Mounting"] as const;
@@ -190,7 +193,7 @@ export type PackageDraft = {
   } | null;
 };
 
-export const initialDraft = (): PackageDraft => ({
+export const initialDraft = (units: Unit = "mm"): PackageDraft => ({
   path: null,
   prefix: "U",
   value: "",
@@ -198,7 +201,7 @@ export const initialDraft = (): PackageDraft => ({
   symGrid: 10,
   symSnap: true,
   mounting: "SMD",
-  units: "mm",
+  units,
   drawLayer: "Top Silkscreen",
   footprint: [],
   fpSnap: true,
@@ -321,16 +324,21 @@ export const MM_PER_MIL = 0.0254;
 export const mmToMil = (mm: number) => mm / MM_PER_MIL;
 export const milToMm = (mil: number) => mil * MM_PER_MIL;
 
+export const MM_PER_INCH = 25.4;
+
 /** Format a stored mm value for display in the draft's current unit. */
-export const toDisplay = (mm: number, unit: Unit) => (unit === "mm" ? mm : mmToMil(mm));
+export const toDisplay = (mm: number, unit: Unit) =>
+  unit === "mm" ? mm : unit === "inch" ? mm / MM_PER_INCH : mmToMil(mm);
 /** Read a displayed value in the draft's current unit back to stored mm. */
-export const fromDisplay = (v: number, unit: Unit) => (unit === "mm" ? v : milToMm(v));
+export const fromDisplay = (v: number, unit: Unit) =>
+  unit === "mm" ? v : unit === "inch" ? v * MM_PER_INCH : milToMm(v);
 
 /** Trailing zeros read as false precision on a dimension, so they are trimmed.
- *  mm keeps 3 decimals (a 0.001 mm step is meaningful), mil keeps 1. */
+ *  mm keeps 3 decimals (a 0.001 mm step is meaningful), inch 4 (a tenth of a
+ *  mil), mil keeps 1. */
 export function fmt(mm: number, unit: Unit): string {
   const v = toDisplay(mm, unit);
-  const s = v.toFixed(unit === "mm" ? 3 : 1);
+  const s = v.toFixed(unit === "mm" ? 3 : unit === "inch" ? 4 : 1);
   return s.replace(/\.?0+$/, "");
 }
 
@@ -398,8 +406,8 @@ const oneOf = <T extends readonly string[]>(v: unknown, list: T, fb: T[number]):
 
 /** Shape-check every key on load — a hand-edited or stale localStorage entry
  *  must not be able to crash a canvas that trusts the model. */
-export function sanitizeDraft(raw: unknown): PackageDraft {
-  const base = initialDraft();
+export function sanitizeDraft(raw: unknown, units: Unit = "mm"): PackageDraft {
+  const base = initialDraft(units);
   if (!raw || typeof raw !== "object") return base;
   const r = raw as Record<string, unknown>;
   const b = (r.body ?? {}) as Record<string, unknown>;
@@ -412,7 +420,7 @@ export function sanitizeDraft(raw: unknown): PackageDraft {
     symGrid: (SYM_GRIDS as readonly number[]).includes(num(r.symGrid, 10)) ? (num(r.symGrid, 10) as SymGrid) : 10,
     symSnap: typeof r.symSnap === "boolean" ? r.symSnap : true,
     mounting: oneOf(r.mounting, MOUNTINGS, base.mounting),
-    units: oneOf(r.units, UNITS, base.units),
+    units: packageUnitFor(r.units, base.units),
     drawLayer: oneOf(r.drawLayer, FP_LAYERS, base.drawLayer),
     footprint: Array.isArray(r.footprint) ? (r.footprint.filter((o) => o && typeof (o as FpObj).kind === "string") as FpObj[]) : [],
     fpSnap: typeof r.fpSnap === "boolean" ? r.fpSnap : true,
@@ -451,13 +459,24 @@ export function sanitizeDraft(raw: unknown): PackageDraft {
   };
 }
 
+/** The unit a new draft starts on: the editor's Measurement Unit default. */
+export function defaultDraftUnit(): Unit {
+  if (typeof window === "undefined") return "mm";
+  try {
+    return readMeasurementUnit(window.localStorage);
+  } catch {
+    return "mm";
+  }
+}
+
 export function loadDraft(): PackageDraft {
-  if (typeof window === "undefined") return initialDraft();
+  const units = defaultDraftUnit();
+  if (typeof window === "undefined") return initialDraft(units);
   try {
     const raw = window.localStorage.getItem(DRAFT_KEY);
-    return sanitizeDraft(raw ? JSON.parse(raw) : null);
+    return sanitizeDraft(raw ? JSON.parse(raw) : null, units);
   } catch {
-    return initialDraft();
+    return initialDraft(units);
   }
 }
 

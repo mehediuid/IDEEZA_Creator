@@ -20,6 +20,7 @@
 // card carries a build button of its own.
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Alert02Icon,
   CheckmarkBadge01Icon,
@@ -35,6 +36,7 @@ import { BuyCreditsButton } from "@/components/credits/buy-credits";
 import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { CAP_REASON, CREDIT_ALERTS_HREF } from "@/lib/create/credit-limits";
 import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
 import { productIdOf } from "@/lib/create/project-state";
 import { ARRIVAL_RING, productCardId, productRetryId } from "./anchors";
@@ -575,8 +577,11 @@ const FAIL_COPY: Record<NonNullable<ConceptFailReason>, string> = {
     "The concept this was refining is no longer stored, so there was nothing to evolve. Nothing was charged — start a fresh concept instead.",
   credits:
     "Your credit balance ran out before this render started. Nothing was charged.",
+  cap: `${CAP_REASON}. This render would go over the monthly spending limit you set. Nothing was charged.`,
   filtered:
     "The image service's safety filter blocked this render by mistake, so there is no picture. Nothing was charged — trying again usually works.",
+  "pool-off":
+    "Images are off: you switched off the volunteer GPU pool in Settings › AI & your data, and this app has no other image service. Switch it back on to draw concepts. Nothing was charged.",
 };
 
 const FAIL_FALLBACK =
@@ -613,6 +618,14 @@ function FailedImageTurn({
         <p className="text-sm leading-relaxed text-text-tertiary">
           {reason ? FAIL_COPY[reason] : FAIL_FALLBACK}
         </p>
+        {reason === "cap" && (
+          <Link
+            href={CREDIT_ALERTS_HREF}
+            className="w-fit text-sm font-semibold text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            Change your limit →
+          </Link>
+        )}
         <button
           id={productRetryId(productId)}
           type="button"

@@ -3,7 +3,8 @@
 // BuildManuallyInfo — what the home hero shows in place of the AI mode
 // textarea when the user picks "Build manually". Per spec: the user
 // can build a complete electronics project across PCB · Code · 3D ·
-// Preview stages, then Save it as a draft and publish it from its page. The panel replaces the typing field with a
+// Preview stages. Everything saves as it goes, as a draft only the maker
+// sees, and is published from the project page (owner D8, 2026-10-19). The panel replaces the typing field with a
 // scannable explainer + a single primary "Create Project" CTA.
 //
 // Styling matches the AI mode prompt card exactly so swapping modes
@@ -16,7 +17,6 @@ import {
   CpuIcon,
   CubeIcon,
   EyeIcon,
-  FloppyDiskIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "./icon";
 
@@ -29,7 +29,6 @@ const STAGES: Array<{
   { icon: CodeIcon, label: "Code", detail: "Firmware code" },
   { icon: CubeIcon, label: "3D Module", detail: "Printable enclosure" },
   { icon: EyeIcon, label: "Product Preview", detail: "Assembled view" },
-  { icon: FloppyDiskIcon, label: "Save", detail: "Draft, then publish" },
 ];
 
 export function BuildManuallyInfo({
@@ -46,16 +45,16 @@ export function BuildManuallyInfo({
         id="manual-info-label"
         className="text-2xs font-bold uppercase tracking-wider text-text-tertiary"
       >
-        Five stages, one project
+        Four stages, one project
       </p>
       <p className="mt-[6px] text-md leading-relaxed text-text-secondary">
-        Design every piece yourself — no AI prompts. Save as a draft any
-        time and pick up where you left off.
+        Design every piece yourself — no AI prompts. Everything saves as you
+        go, as a draft only you can see.
       </p>
 
       <ul
         role="list"
-        className="mt-[16px] grid gap-[8px] sm:grid-cols-2 lg:grid-cols-3"
+        className="mt-[16px] grid gap-[8px] sm:grid-cols-2"
       >
         {STAGES.map((stage) => (
           <li

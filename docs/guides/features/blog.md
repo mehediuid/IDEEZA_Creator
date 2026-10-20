@@ -51,6 +51,7 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
     - Unsent edits also add Discard changes.
   - **Confirmations:** Delete, Take offline and Discard changes confirm in alertdialogs that say where the blog goes and what is lost. Their toast offers **Undo**.
   - **Quick view:** a DS Drawer with the thumbnail, the status, the reasons grouped by review, and the body.
+  - The list's Date & time and Quick view's "Last edited" follow Settings › Language & region (Date and time format, Time zone); the byline and reasons keep the Figma form (`lib/blog/dates.ts`).
   - **First visit:** it teaches the three steps and "What the IDEEZA team looks for", and says blogs live in this browser (demo).
 - **The editor** (`/blog/new`, `/blog/[slug]/edit`, `components/blog/editor/`, Figma frames 10–13). TipTap v3 loads only here.
   - **Layout:** the card fills the page frame; the details and the writing sit in the narrow column (at most 720) on the left edge, never centred.
@@ -114,7 +115,8 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
   - **Blog · Approved / Rejected / Featured / Removed**.
   - On phones the bell sits in the top bar at 44 px, with its count.
   - A decided review is announced politely.
-  - Opening a result marks it seen and lands on the blog's details.
+  - Opening a result marks it seen and lands on the blog's details; read results stay listed (the notice model, [settings.md](settings.md) › Notifications).
+  - The announcement follows Settings › Notifications: none once a day or paused, in quiet hours, or with Blog reviews switched off (the bell still lists the result); with "Keep notices until I close them" it stays and has a close button.
 - **Blog details** (`/blog/[slug]`, `components/blog/article/`, Figma frames 21–22).
   - **The Reject reason panel** sits under the title and byline (a notice never sits above the page's title), grouped by review.
     - "Latest review" opens, with a count caption, the Demo note and three lines per reason: title, what was found, how to fix.

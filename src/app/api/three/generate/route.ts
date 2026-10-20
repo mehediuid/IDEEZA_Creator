@@ -1,7 +1,9 @@
 // /api/three/generate — AI image→3D for the 3D module.
 //
-//   POST  { prompt?, imageUrl?, seed? }
+//   POST  { prompt?, imageUrl?, seed?, pool?: "off" }
 //         → { provider, taskId, imageUrl }   (kicks off generation)
+//         pool "off": a prompt's concept image never goes to the volunteer
+//         GPU pool (Settings › AI & your data); 409 when nothing else can draw it.
 //   GET   ?provider=&taskId=
 //         → { status, progress, glbUrl? }    (poll until ready/failed)
 //
@@ -15,6 +17,7 @@
 // timeouts) stays available as this grows.
 
 import { NextResponse, type NextRequest } from "next/server";
+import { RenderError } from "@/lib/create/image-gen";
 import {
   createTask,
   pollTask,
@@ -25,7 +28,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  let body: { prompt?: string; imageUrl?: string; seed?: number };
+  let body: { prompt?: string; imageUrl?: string; seed?: number; pool?: string };
   try {
     body = await request.json();
   } catch {
@@ -49,9 +52,20 @@ export async function POST(request: NextRequest) {
       // Concept images are served by this app, and the image-to-3D provider
       // fetches them from its own servers, so it needs to know where we are.
       origin: request.nextUrl.origin,
+      volunteerPool: body.pool !== "off",
     });
     return NextResponse.json(result);
   } catch (err) {
+    if (err instanceof RenderError && err.reason === "pool-off") {
+      return NextResponse.json(
+        {
+          error:
+            "Images are off: the volunteer GPU pool is switched off in Settings › AI & your data, and this app has no other image service.",
+          reason: "pool-off",
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "generation failed" },
       { status: 502 },

@@ -229,7 +229,7 @@ function Row({ label, value, note, strong }: { label: string; value: React.React
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-[12px] gap-y-[2px]">
       <dt className={cn("min-w-0", strong ? "font-bold text-text-primary" : "text-sm text-text-secondary")}>{label}</dt>
-      <dd className={cn("ml-auto min-w-0 text-right tabular-nums", strong ? "font-bold text-text-primary" : "font-medium text-text-primary")}>
+      <dd className={cn("ml-auto min-w-0 text-right tabular-nums [overflow-wrap:anywhere]", strong ? "font-bold text-text-primary" : "font-medium text-text-primary")}>
         {value}
         {note && <span className="ml-[6px] font-regular text-text-tertiary">{note}</span>}
       </dd>

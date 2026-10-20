@@ -5,12 +5,12 @@
 // real IDEEZA DS atoms (Toggle / Select) + Cancel / Save Changes footer (Button).
 
 import * as React from "react";
-import { Button, IconButton, Toggle, Select } from "@/components/ideeza";
+import { Button, IconButton } from "@/components/ideeza";
 import { DsIcon, Icon } from "@/lib/pcb/icons";
 import { buildSettingsNav, settingsTitle } from "@/lib/pcb/data";
-import type { SettingsPage } from "@/lib/pcb/types";
+import type { PcbState, SettingsPage } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
-import { useTheme } from "@/components/theme-provider";
+import { overlayTruth } from "@/lib/pcb/app-settings";
 import {
   SaveSettingsPage,
   FontsSettingsPage,
@@ -26,57 +26,8 @@ import {
   TopToolsBarSettingsPage,
 } from "@/components/pcb/settings-pages-deep";
 
-const THEME_OPTIONS = [
-  { label: "Light", value: "light" },
-  { label: "Dark", value: "dark" },
-  { label: "System", value: "system" },
-];
-
 const CLOSE_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-
-type Field = { label: string } & ({ kind: "toggle"; on: boolean } | { kind: "select"; value: string });
-
-const SETTINGS: Record<string, Field[]> = {
-  system: [
-    { label: "Language", kind: "select", value: "English" },
-    { label: "Auto Save", kind: "toggle", on: true },
-    { label: "Crash Recovery", kind: "toggle", on: true },
-    { label: "Theme", kind: "select", value: "Light" },
-    { label: "Default Unit", kind: "select", value: "mil" },
-    { label: "Show Welcome Screen", kind: "toggle", on: false },
-  ],
-  drawing: [
-    { label: "Grid Style", kind: "select", value: "Dotted" },
-    { label: "Grid Size", kind: "select", value: "5 mil" },
-    { label: "Snap to Grid", kind: "toggle", on: true },
-    { label: "Show Rulers", kind: "toggle", on: true },
-    { label: "Wire Width", kind: "select", value: "0.254mm" },
-    { label: "Auto Junction", kind: "toggle", on: true },
-  ],
-  hotkey: [
-    { label: "Undo", kind: "select", value: "Ctrl + Z" },
-    { label: "Redo", kind: "select", value: "Ctrl + Y" },
-    { label: "Place Wire", kind: "select", value: "W" },
-    { label: "Place Net Label", kind: "select", value: "N" },
-    { label: "Zoom Fit", kind: "select", value: "Ctrl + 0" },
-    { label: "Delete", kind: "select", value: "Del" },
-  ],
-  property: [
-    { label: "Show Designators", kind: "toggle", on: true },
-    { label: "Designator Size", kind: "select", value: "1.5mm" },
-    { label: "Show Pin Numbers", kind: "toggle", on: true },
-    { label: "Show Net Names", kind: "toggle", on: false },
-    { label: "Color Theme", kind: "select", value: "Default" },
-  ],
-  save: [
-    { label: "Auto Save Interval", kind: "select", value: "5 min" },
-    { label: "Backup Copies", kind: "select", value: "3" },
-    { label: "Save Location", kind: "select", value: "Cloud + Local" },
-    { label: "Compress Files", kind: "toggle", on: true },
-    { label: "Save on Exit", kind: "toggle", on: true },
-  ],
-};
 
 function SettingsBody({ page }: { page: SettingsPage }) {
   // Phase B — simple pages.
@@ -92,55 +43,19 @@ function SettingsBody({ page }: { page: SettingsPage }) {
   if (page === "footprint") return <PcbFootprintSettingsPage />;
   if (page === "panel") return <PanelLibSettingsPage />;
   // Phase E — Top Toolbar customization.
-  if (page === "toptools") return <TopToolsBarSettingsPage />;
-  return <LegacyFlatFields page={page} />;
+  return <TopToolsBarSettingsPage />;
 }
 
-// Legacy flat-field rendering for pages still on the SETTINGS map
-// (system / property — get replaced in Phase C).
-function LegacyFlatFields({ page }: { page: SettingsPage }) {
-  const fields = SETTINGS[page] ?? SETTINGS.system;
-  const [toggles, setToggles] = React.useState<Record<string, boolean>>({});
-  const isOn = (f: Extract<Field, { kind: "toggle" }>) => toggles[f.label] ?? f.on;
-  const { theme, setTheme } = useTheme();
-
-  return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-4) var(--spacing-12) var(--spacing-12)" }}>
-      {fields.map((f) => {
-        const isTheme = page === "system" && f.label === "Theme";
-        return (
-          <div
-            key={f.label}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "var(--spacing-6) var(--spacing-0)",
-              borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-            }}
-          >
-            <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-primary)" }}>{f.label}</span>
-            {isTheme ? (
-              <Select
-                value={theme}
-                options={THEME_OPTIONS}
-                minWidth={160}
-                onChange={(v) => setTheme(v as "light" | "dark" | "system")}
-              />
-            ) : f.kind === "toggle" ? (
-              <Toggle
-                aria-label={f.label}
-                checked={isOn(f)}
-                onChange={() => setToggles((t) => ({ ...t, [f.label]: !isOn(f) }))}
-              />
-            ) : (
-              <Select value={f.value} options={[{ label: f.value, value: f.value }]} minWidth={160} />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+/** The open tab of a page that has tabs — the line over it can differ by tab. */
+function openTab(state: PcbState): string {
+  switch (state.settingsPage) {
+    case "system": return state.systemSettings.subPage;
+    case "footprint": return state.pcbFootprintSettings.subPage;
+    case "symbol": return state.schemSymbolSettings.subPage;
+    case "panel": return state.panelLibSettings.subPage;
+    case "toptools": return state.toolbarCustomization.scope;
+    default: return "";
+  }
 }
 
 // Phase F — footer footer with wired Export / Import / Restore Default / Apply / Confirm.
@@ -238,6 +153,8 @@ export function SettingsOverlay() {
   const actions = usePcbActions();
   if (!state.settingsOpen) return null;
   const nav = buildSettingsNav(state, actions);
+  // What this page's values do today (lib/pcb/app-settings.ts): no silent controls.
+  const truth = overlayTruth(state.settingsPage, openTab(state));
 
   return (
     <div
@@ -313,6 +230,9 @@ export function SettingsOverlay() {
             <IconButton hierarchy="ghost" size="md" aria-label="Close" onClick={actions.closeSettings} icon={<Icon html={CLOSE_SVG} />} />
           </div>
 
+          {truth && (
+            <p className="px-[var(--spacing-12)] pt-[var(--spacing-6)] text-sm leading-sm text-text-tertiary">{truth}</p>
+          )}
           <SettingsBody page={state.settingsPage} />
 
           <SettingsFooter />

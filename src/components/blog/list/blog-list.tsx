@@ -64,6 +64,7 @@ import { DateRangeFilter } from "./date-range-filter";
 import { FilterSelect, type FilterOption } from "./filter-select";
 import { EmptyStatusState, FirstVisitState, KEPT_HERE, NoMatchState, UnreadableState } from "./list-states";
 import { QuickView } from "./quick-view";
+import { motionReduced } from "@/lib/settings/appearance";
 
 /** The rows; the head band draws the line above the first one. */
 const LIST = "m-0 flex list-none flex-col gap-5 p-0 [@container(min-width:600px)]:gap-0 [@container(min-width:600px)]:[&>li:first-child]:border-t-0";
@@ -198,7 +199,7 @@ export function BlogList() {
   const changePage = (page: number) => {
     toFirstRow.current = true;
     write({ ...view, page });
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const still = motionReduced();
     sectionRef.current?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
   };
 

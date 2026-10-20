@@ -6,8 +6,11 @@
 // credits.
 //
 // The banner:
-//   • Reads `topAttention` from the create-history store (the first
-//     not-yet-dismissed attention item, prioritised by build order).
+//   • Shows the first not-yet-dismissed attention item (by build order)
+//     that the Notification settings let toast: none once a day or with
+//     pop-ups paused, during quiet hours, for a muted project, or with
+//     Builds and videos switched off (lib/notifications/filter.ts). The
+//     bell still lists it.
 //   • Auto-hides when the user is already on the target build page —
 //     no point telling them about something they're already looking at.
 //   • Renders a primary CTA ("Open build" / "Buy credits") + a ×
@@ -33,7 +36,10 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { buildCost } from "@/lib/create/credits";
+import { CREDIT_ALERTS_HREF } from "@/lib/create/credit-limits";
 import { productsOf, useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
+import { buildNotices } from "@/lib/notifications/sources";
+import { useToastGate } from "@/components/notifications/use-notices";
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
 // "PCB" · "PCB and Firmware code" — the build page's own join rule, so
 // the two surfaces can't word one list two ways.
@@ -72,7 +78,13 @@ function useLayerOverMain() {
 
 export function BuildAttentionBanner() {
   const pathname = usePathname();
-  const { topAttention, dismissAttention } = useCreateHistory();
+  const { attentionBuilds, dismissAttention, getChat } = useCreateHistory();
+  const allowed = useToastGate();
+  const topAttention = React.useMemo(
+    () =>
+      attentionBuilds.find((a) => !a.job.attentionDismissedAt && allowed(buildNotices([a], (id) => !!getChat(id))[0])) ?? null,
+    [attentionBuilds, allowed, getChat],
+  );
   useLayerOverMain();
 
   // Re-plays the enter transition each time a new attention item takes
@@ -119,6 +131,9 @@ export function BuildAttentionBanner() {
   // grammar
   // ("…the 3D model, PCB, Firmware code, Wiring and Parts step failed").
   const systemFailure = job.failure === "system";
+  // Paused by the monthly spending limit rather than the balance: its way
+  // out is the limit, not Buy credits.
+  const capped = job.blocked === "cap";
   const tone: "brand" | "warning" | "error" = systemFailure
     ? "error"
     : reason === "review"
@@ -146,7 +161,9 @@ export function BuildAttentionBanner() {
           return `${name} · the ${joinLabels(labels)} ${step} failed`;
         })()
       : reason === "credits"
-        ? `${name} is paused — buy credits to start it`
+        ? capped
+          ? `${name} is paused: you reached your monthly limit`
+          : `${name} is paused — buy credits to start it`
         : `${name} is ready`;
 
   // The build's home is the chat it was started from — that is where its
@@ -192,7 +209,12 @@ export function BuildAttentionBanner() {
           {message}
         </p>
       </div>
-      {reason === "credits" ? (
+      {reason === "credits" && capped ? (
+        <Link href={CREDIT_ALERTS_HREF} className={ctaClass}>
+          Change limit
+          <Icon icon={ArrowRight01Icon} />
+        </Link>
+      ) : reason === "credits" ? (
         <BuyCreditsButton need={buildCost(productsOf(job).length)} className={ctaClass}>
           Buy credits
           <Icon icon={ArrowRight01Icon} />

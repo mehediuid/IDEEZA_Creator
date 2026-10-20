@@ -20,6 +20,7 @@ import {
 } from "@/lib/wiring/types";
 import { useEditorScope } from "@/components/manual/use-step-nav";
 import { DocSaveQueue, globalTimers, readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/editor-docs";
+import { registerSaveFlusher, reportSave } from "@/lib/manual/save-status";
 
 type DraftStage = "idle" | "pin1" | "height1" | "pin2" | "height2" | "sketch";
 
@@ -106,10 +107,17 @@ export function WiringProvider({ children }: { children: React.ReactNode }) {
     () =>
       new DocSaveQueue<DocHandle, { parts: WirePart[]; wires: WireObj[] }>(
         250,
-        (handle, doc) => writeEditorDoc(handle, JSON.stringify(doc), window.localStorage),
+        (handle, doc) => {
+          const write = () => writeEditorDoc(handle, JSON.stringify(doc), window.localStorage);
+          const ok = write();
+          reportSave("wiring", ok, write);
+          return ok;
+        },
         globalTimers,
       ),
   );
+  // Saving on purpose (Ctrl+S, File › Save, Finish) writes the pending change now.
+  React.useEffect(() => registerSaveFlusher("wiring", () => saveQueue.flush()), [saveQueue]);
 
   // One hydrate per product from the external store (localStorage). This is
   // exactly what an effect is for; the strict cascading-render lint doesn't apply.

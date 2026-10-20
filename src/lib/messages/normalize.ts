@@ -13,6 +13,7 @@ import {
   type MessagesData,
   type Participant,
   type Report,
+  type ReportEvidence,
   type ReportReason,
   type Subject,
 } from "./types";
@@ -122,9 +123,21 @@ function blockIn(v: unknown): Block | null {
 
 const REASONS: ReadonlySet<string> = new Set<ReportReason>(["spam", "scam", "harassment", "other"]);
 
+function evidenceIn(v: unknown): ReportEvidence | null {
+  if (!isRec(v) || !isId(v.from) || !isNum(v.at) || !isStr(v.text)) return null;
+  return {
+    from: v.from,
+    at: v.at,
+    text: v.text,
+    files: arr(v.files).map(fileIn).filter((f): f is FileRef => f !== null),
+    cards: arr(v.cards).map(cardIn).filter((c): c is CardRef => c !== null),
+  };
+}
+
 function reportIn(v: unknown): Report | null {
   if (!isRec(v) || !isId(v.id) || !isId(v.by) || !isId(v.conversationId) || !isNum(v.at)) return null;
   if (!isStr(v.reason) || !REASONS.has(v.reason)) return null;
+  const evidence = evidenceIn(v.evidence);
   return {
     id: v.id,
     by: v.by,
@@ -133,6 +146,7 @@ function reportIn(v: unknown): Report | null {
     reason: v.reason as ReportReason,
     note: isStr(v.note) ? v.note : "",
     at: v.at,
+    ...(evidence ? { evidence } : {}),
   };
 }
 
@@ -150,7 +164,9 @@ export function normalizeMessages(raw: unknown): MessagesData {
   const settings: MessagesData["settings"] = {};
   if (isRec(raw.settings)) {
     for (const [id, s] of Object.entries(raw.settings)) {
-      if (isRec(s) && (s.allowNew === "everyone" || s.allowNew === "known")) settings[id] = { allowNew: s.allowNew };
+      if (isRec(s) && (s.allowNew === "everyone" || s.allowNew === "known" || s.allowNew === "nobody")) {
+        settings[id] = { allowNew: s.allowNew };
+      }
     }
   }
   return {

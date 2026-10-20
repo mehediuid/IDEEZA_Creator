@@ -276,6 +276,8 @@ const ACTIVITY_VERB: Record<RequestPurpose, string> = {
   listEdition: "Signed an edition listing",
   buyCredits: "Bought AI credits",
   subscribe: "Paid for a plan",
+  withdraw: "Withdrew earnings",
+  payoutMethod: "Signed a withdrawal method",
   buyIdz: "Bought IDZ in the presale",
   claimIdz: "Claimed presale IDZ",
 };

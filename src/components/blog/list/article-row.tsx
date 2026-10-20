@@ -27,7 +27,7 @@ import { IconButton, Menu, Skeleton, type MenuItem } from "@/components/ideeza";
 import { StatusBadges } from "@/components/blog/status-badges";
 import { displayTitle } from "@/lib/blog/article";
 import { categoryLabel } from "@/lib/blog/categories";
-import { clockTime, dayDate } from "@/lib/blog/dates";
+import { useDates } from "@/lib/settings/use-dates";
 import { sameDoc } from "@/lib/blog/doc";
 import { draftMetaChanged, rowEvent, rowNote } from "@/lib/blog/list";
 import { articleHref, editHref, slugOf } from "@/lib/blog/slug";
@@ -175,6 +175,8 @@ export function ArticleRow({
   const differs = useDraftDiffers(article, status === "live");
   const note = rowNote(article, differs);
   const event = rowEvent(article);
+  // Settings › Language › Date & Time Formatting.
+  const dates = useDates();
   const category = categoryLabel(shown.categoryId);
   const menuLabel = `Actions for "${title}"`;
 
@@ -237,8 +239,8 @@ export function ArticleRow({
           <span ref={momentRef} className="[@container(min-width:600px)]:sr-only">
             {event.moment}
           </span>{" "}
-          <span className="text-text-primary">{dayDate(event.at)}</span>{" "}
-          <span className="text-text-secondary">{clockTime(event.at)}</span>
+          <span className="text-text-primary">{dates.date(event.at)}</span>{" "}
+          <span className="text-text-secondary">{dates.time(event.at)}</span>
         </time>
         {dateTip}
       </div>

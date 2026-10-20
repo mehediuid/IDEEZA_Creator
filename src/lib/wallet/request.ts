@@ -39,6 +39,8 @@ const NOUN_OF: Record<RequestPurpose, string> = {
   listEdition: "listing",
   buyCredits: "payment",
   subscribe: "payment",
+  withdraw: "withdrawal",
+  payoutMethod: "withdrawal method",
   buyIdz: "purchase",
   claimIdz: "claim",
 };

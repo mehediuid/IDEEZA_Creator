@@ -2,14 +2,16 @@
 
 // ProjectGrid — responsive thumbnail grid + pagination. Refetches whenever the
 // feed params change (mode / category / sort / search) or, in Following, whom
-// this browser follows (a Follow on a post counts here); appends on "Load more".
+// this browser follows (a Follow on a post counts here), or, in Saved and
+// Appreciated, what this browser saved or appreciated (un-saving a card there
+// takes it off); appends on "Load more".
 // Skeletons cover the initial load; empty + error states are explicit.
 
 import * as React from "react";
 import { ProjectCard } from "./project-card";
 import { EmptyState } from "./empty-state";
 import { PAGE_GRID } from "@/components/ideeza/page";
-import { fetchFeed, followParamOf, type FeedParams, type Project } from "@/lib/feed";
+import { fetchFeed, followParamOf, isOwnList, type FeedParams, type Project } from "@/lib/feed";
 import { useReactions } from "@/lib/innovations/reactions";
 
 export function ProjectGrid({
@@ -19,48 +21,47 @@ export function ProjectGrid({
   params: FeedParams;
   onClearFilters: () => void;
 }) {
-  const [items, setItems] = React.useState<Project[]>([]);
-  const [cursor, setCursor] = React.useState<string | null>(null);
-  const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [reloadToken, setReloadToken] = React.useState(0);
 
   const { hydrated, reactions } = useReactions();
   const follow = reactions.follow;
   const following = params.mode === "following" ? followParamOf(follow) : "";
-  const key = `${params.mode}|${params.category}|${params.sort}|${params.q}|${following}`;
+  const own = isOwnList(params.mode) ? reactions[params.mode] : null;
+  const ids = React.useMemo(() => (own ?? []).filter((id) => id.startsWith("sample:")).map((id) => id.slice("sample:".length)), [own]);
+  const key = `${params.mode}|${params.category}|${params.sort}|${params.q}|${following}|${ids.join(",")}|${reloadToken}`;
+
+  // The page for one key; another key (or none yet) reads as loading, so nothing is reset by hand.
+  const [loaded, setLoaded] = React.useState<{ key: string; status: "ready" | "error"; items: Project[]; cursor: string | null } | null>(null);
+  const current = loaded?.key === key ? loaded : null;
+  const status = current?.status ?? "loading";
+  const items = current?.items ?? [];
+  const cursor = current?.cursor ?? null;
 
   React.useEffect(() => {
-    // Following waits for this browser's follows, so it never flashes the dataset's list first.
-    if (params.mode === "following" && !hydrated) return;
+    // Following, Saved and Appreciated wait for this browser's own lists, so they never flash the wrong cards first.
+    if ((params.mode === "following" || isOwnList(params.mode)) && !hydrated) return;
     let cancelled = false;
-    setStatus("loading");
-    setItems([]);
-    setCursor(null);
-    fetchFeed(params, null, follow)
+    fetchFeed(params, null, follow, ids)
       .then((res) => {
-        if (cancelled) return;
-        setItems(res.projects);
-        setCursor(res.nextCursor);
-        setStatus("ready");
+        if (!cancelled) setLoaded({ key, status: "ready", items: res.projects, cursor: res.nextCursor });
       })
       .catch(() => {
-        if (!cancelled) setStatus("error");
+        if (!cancelled) setLoaded({ key, status: "error", items: [], cursor: null });
       });
     return () => {
       cancelled = true;
     };
-    // params and follow are fully encoded by `key`; reloadToken forces a manual retry.
+    // params, follow and the retry are fully encoded by `key`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, reloadToken, hydrated]);
+  }, [key, hydrated]);
 
   const loadMore = async () => {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await fetchFeed(params, cursor, follow);
-      setItems((prev) => [...prev, ...res.projects]);
-      setCursor(res.nextCursor);
+      const res = await fetchFeed(params, cursor, follow, ids);
+      setLoaded((prev) => (prev && prev.key === key ? { ...prev, items: [...prev.items, ...res.projects], cursor: res.nextCursor } : prev));
     } catch {
       // Leave the button in place so the user can try again.
     } finally {
@@ -91,12 +92,12 @@ export function ProjectGrid({
   }
 
   if (items.length === 0) {
-    const isFollowingEmpty =
-      params.mode === "following" && !params.q.trim() && params.category === "all";
+    const unfiltered = !params.q.trim() && params.category === "all";
+    const variant = unfiltered && params.mode !== "discover" ? params.mode : "noResults";
     return (
       <EmptyState
-        variant={isFollowingEmpty ? "following" : "noResults"}
-        onClear={isFollowingEmpty ? undefined : onClearFilters}
+        variant={variant}
+        onClear={variant === "noResults" ? onClearFilters : undefined}
       />
     );
   }

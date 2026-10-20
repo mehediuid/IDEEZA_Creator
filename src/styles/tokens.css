@@ -754,3 +754,92 @@
     --elevation-4: 0px 8px 16px 0px rgba(0, 0, 0, 0.75);
   }
 }
+
+/* ============================================================
+ * Settings › Appearance & accessibility (lib/settings/appearance.ts)
+ * ============================================================ */
+
+/* Text size: Large. Each size takes the next DS size's value and keeps its
+   line height paired with it (the next pair). 5xl and up have no larger line
+   height to pair with, so the display sizes stay as they are. */
+:root[data-text-size="large"] {
+  --font-size-2xs: 11px;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 28px;
+  --font-size-4xl: 32px;
+  --line-height-2xs: 16px;
+  --line-height-xs: 18px;
+  --line-height-sm: 20px;
+  --line-height-md: 24px;
+  --line-height-lg: 26px;
+  --line-height-xl: 28px;
+  --line-height-2xl: 32px;
+  --line-height-3xl: 36px;
+  --line-height-4xl: 40px;
+}
+@media (max-width: 767px) {
+  /* The phone scale's own next steps (its xl is 16, so lg stays 16). */
+  :root[data-text-size="large"] {
+    --font-size-lg: 16px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 20px;
+    --font-size-3xl: 24px;
+    --font-size-4xl: 28px;
+  }
+}
+
+/* High contrast: every text ink reads at least 7:1 and every edge 3:1 on the
+   page, the surface and the subtle fill. Secondary and tertiary text take the
+   primary ink; disabled and coloured text a DS step further from the ground;
+   every border, and a switch's off track (it is the strong border), one step
+   that clears 3:1. Light: disabled gray-700 (9.4:1 on gray-100), borders
+   gray-500 (4.3:1), brand violet-800, link blue-800, error red-800, success
+   green-900, warning yellow-900 (7.6:1 or more). Dark: disabled gray-300
+   (9.8:1 on gray-800), borders gray-400 (5.7:1), brand violet-200, link
+   blue-300, error red-200 (8.1:1 or more). After the theme blocks and more
+   specific than them, so it wins in both; repeated on a nested [data-theme]
+   (the editors' shell carries its own). */
+:root[data-contrast="high"],
+:root[data-contrast="high"] [data-theme="light"] {
+  --color-text-secondary: var(--color-text-primary);
+  --color-text-tertiary: var(--color-text-primary);
+  --color-text-disabled: var(--color-gray-700);
+  --color-text-brand: var(--color-violet-800);
+  --color-text-link: var(--color-blue-800);
+  --color-text-error: var(--color-red-800);
+  --color-text-success: var(--color-green-900);
+  --color-text-warning: var(--color-yellow-900);
+  --color-border-strong: var(--color-gray-500);
+  --color-border-default: var(--color-border-strong);
+  --color-border-subtle: var(--color-border-strong);
+}
+:root[data-contrast="high"][data-theme="dark"],
+:root[data-contrast="high"] [data-theme="dark"] {
+  --color-text-secondary: var(--color-text-primary);
+  --color-text-tertiary: var(--color-text-primary);
+  --color-text-disabled: var(--color-gray-300);
+  --color-text-brand: var(--color-violet-200);
+  --color-text-link: var(--color-blue-300);
+  --color-text-error: var(--color-red-200);
+  --color-text-success: var(--color-green-400);
+  --color-text-warning: var(--color-yellow-400);
+  --color-border-strong: var(--color-gray-400);
+  --color-border-default: var(--color-border-strong);
+  --color-border-subtle: var(--color-border-strong);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-contrast="high"]:not([data-theme]) {
+    --color-text-disabled: var(--color-gray-300);
+    --color-text-brand: var(--color-violet-200);
+    --color-text-link: var(--color-blue-300);
+    --color-text-error: var(--color-red-200);
+    --color-text-success: var(--color-green-400);
+    --color-text-warning: var(--color-yellow-400);
+    --color-border-strong: var(--color-gray-400);
+  }
+}

@@ -22,8 +22,6 @@ export type CodeAction =
   | "settings:clearWorkspace"
   | "settings:exportXml"
   | "settings:importXml"
-  | "settings:theme:light"
-  | "settings:theme:dark"
   | "help:docs"
   | "help:shortcuts"
   | "help:about"
@@ -63,9 +61,6 @@ const MENUS: Record<string, MenuItem[]> = {
   Settings: [
     { label: "Toggle Grid", action: "settings:toggleGrid" },
     { label: "Toggle Trashcan", action: "settings:toggleTrashcan" },
-    { label: "", divider: true },
-    { label: "Theme: Light", action: "settings:theme:light" },
-    { label: "Theme: Dark", action: "settings:theme:dark" },
     { label: "", divider: true },
     { label: "Export Workspace…", action: "settings:exportXml" },
     { label: "Import Workspace…", action: "settings:importXml" },

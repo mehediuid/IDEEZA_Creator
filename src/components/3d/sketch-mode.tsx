@@ -11,6 +11,7 @@ import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import { useEditorScope } from "@/components/manual/use-step-nav";
 import { editorDocKey } from "@/lib/manual/editor-scope";
+import { writeReported } from "@/lib/manual/save-status";
 
 type SketchTool =
   | "select" | "point" | "line" | "polyline" | "circle" | "arc" | "ellipse"
@@ -437,7 +438,7 @@ export function SketchMode({ topOffset = 132, onExit, onSave, leftWidth = 230, r
   }, [key]);
   React.useEffect(() => {
     if (!hydrated || !key) return;
-    try { window.localStorage.setItem(key, JSON.stringify(sketches)); } catch {}
+    writeReported("3d.sketches", key, JSON.stringify(sketches));
   }, [sketches, hydrated, key]);
 
   React.useEffect(() => {

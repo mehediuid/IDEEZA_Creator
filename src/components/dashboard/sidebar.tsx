@@ -10,8 +10,9 @@
 // (labels hidden, tooltips + aria-labels keep every item reachable) and
 // expands it back. The choice persists in localStorage (sidebar-state.ts).
 //
-// Messages carries the unread badge (Messages spec §6; D7: only here, never
-// the bell): a count pill beside the label, a dot on the collapsed rail.
+// Messages carries the unread badge (Messages spec §6): a count pill beside the
+// label, a dot on the collapsed rail. The bell lists new messages and requests
+// too (Settings spec §5.6, D7), as notices you can switch off.
 //
 // Sizing note: the project's Tailwind preset overrides `spacing` with
 // the IDEEZA DS spacing tokens (so `h-5` resolves to 10px, not 20px).
@@ -42,8 +43,7 @@ import {
   SidebarRight01Icon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
-import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { PRICING_HREF } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
 import { idzCompactOf } from "@/lib/wallet/idz";
@@ -55,7 +55,6 @@ import {
   AccountPopover,
   FloatingPanel,
   WalletPopover,
-  moveFocus,
   useMe,
   usePlanLabel,
 } from "./sidebar-account";
@@ -68,14 +67,17 @@ import { countsFor } from "@/lib/messages/rules";
 import { useMessages } from "@/lib/messages/store";
 import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
-import { Badge, linkVariants } from "@/components/ideeza";
+import { linkVariants } from "@/components/ideeza";
 import { openReportProblem } from "@/lib/support/open-report";
 import { useBlog, useReviewClock, updateBlog } from "@/lib/blog/store";
 import { findArticle, markSeen } from "@/lib/blog/article";
-import { DEMO_REVIEW_LABEL } from "@/lib/blog/demo-review";
 import { blogNews, newsAnnouncement, newsKicker, newsMessage, type BlogNews } from "@/lib/blog/news";
 import { markNoticesSeen, useSeenNotices } from "@/lib/blog/notice-seen";
 import { articleHref, slugOf } from "@/lib/blog/slug";
+import { useSettings } from "@/lib/settings/use-settings";
+import { BellCount, NoticeBell, bellLabelOf } from "@/components/notifications/notice-bell";
+import { NoticePanelBody, onPanelKeyDown } from "@/components/notifications/notice-panel";
+import { useAttentionElsewhere, useNotices, useToastGate } from "@/components/notifications/use-notices";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -92,20 +94,6 @@ const NAV: NavItem[] = [
   { label: "Blog", href: "/blog", icon: BookOpen01Icon },
   { label: "Messages", href: MESSAGES_HREF, icon: Mail01Icon },
 ];
-
-/** The builds that need the maker — minus the one whose chat is open, which
- *  is already in front of them. The bell used to say "1 needs attention"
- *  about the very build on screen. */
-function useAttentionElsewhere(): BuildAttention[] {
-  const pathname = usePathname();
-  const { attentionBuilds } = useCreateHistory();
-  return React.useMemo(() => {
-    const open = pathname.startsWith("/chat/") ? pathname.split("/")[2] : null;
-    return open
-      ? attentionBuilds.filter((a) => a.job.chatId !== open)
-      : attentionBuilds;
-  }, [attentionBuilds, pathname]);
-}
 
 /** Unread Inbox conversations of the tab's acting person; 0 until both stores are read. The
  *  demo conversations are planted here, so the badge counts them from the first visit. */
@@ -561,7 +549,7 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
   if (collapsed) {
     return (
       <Link
-        href={PLAN_PRICING_HREF}
+        href={PRICING_HREF}
         aria-label={label}
         title={label}
         className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg bg-bg-brand-subtle text-text-brand outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
@@ -572,7 +560,7 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
   }
   return (
     <Link
-      href={PLAN_PRICING_HREF}
+      href={PRICING_HREF}
       onClick={onLeave}
       className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-brand-subtle px-[12px] py-[12px] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
     >
@@ -766,7 +754,8 @@ function ProfileRow({
     if (!openPanel) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Element;
-      if (rowRef.current?.contains(t) || t.closest?.("[data-footer-popover]")) return;
+      // A notice's ⋯ menu portals out of the bell's panel; a press in it is still inside.
+      if (rowRef.current?.contains(t) || t.closest?.("[data-footer-popover]") || t.closest?.('[role="menu"]')) return;
       setOpenPanel(null);
     };
     document.addEventListener("pointerdown", onDown, true);
@@ -879,20 +868,11 @@ const FOOTER_BUTTON =
 const WALLET_PILL =
   "relative inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border-[length:var(--border-width-1-5)] border-solid border-[var(--color-button-secondary-border)] bg-[var(--color-button-secondary-bg)] px-[8px] text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)]";
 
-// Exhaustive over BuildAttention.reason — a build blocked on credits reads
-// and links differently than one merely waiting on a retry or a review, and
-// TS enforces every reason has a kicker so a new reason can't fall through.
-const ATTENTION_KICKER: Record<BuildAttention["reason"], string> = {
-  review: "Ready to review",
-  retry: "Needs attention",
-  credits: "Paused — needs credits",
-};
-
-// The bell answers with what the app actually knows: the builds waiting
-// for the user (the same list the attention banner surfaces), or, when
-// there are none, a panel that says so — never a click that does nothing.
-// Open state is controlled by ProfileRow so the bell and the other popovers
-// can never be open at once.
+// The bell lists what the app knows needs the maker (lib/notifications: builds,
+// sales and bids, messages, credits, video takes, comments, Blog results), with
+// the Notification settings applied — or, when there is nothing, a panel that
+// says so, never a click that does nothing. Open state is controlled by
+// ProfileRow so the bell and the other popovers can never be open at once.
 function NotificationBell({
   buttonRef,
   trigger,
@@ -920,41 +900,28 @@ function NotificationBell({
   /** A notification was followed: close, and close the drawer too. */
   onPick: () => void;
 }) {
-  const attentionBuilds = useAttentionElsewhere();
-  const { getChat } = useCreateHistory();
-  const news = useBlogNews();
-  const count = attentionBuilds.length + news.length;
+  const feed = useNotices();
   const { frameRef, side, panelRef, focusFirst, onClose } = popover;
-
-  const label = bellLabel(attentionBuilds.length, news.length);
+  const label = feed.hydrated ? bellLabelOf(feed) : "Notifications";
 
   return (
     <>
       <button
         ref={buttonRef}
         {...trigger}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-label={label}
         title={label}
         className={[FOOTER_BUTTON, open ? "bg-bg-subtle text-text-primary" : ""].join(" ")}
       >
         <Icon icon={Notification03Icon} />
-        {count > 0 && (
-          <span
-            aria-hidden
-            // Filled with the error ink, not the error fill: white on
-            // red-500 is 3.76:1 at 10 px, on red-600 it is 4.83:1.
-            className="absolute right-[-6px] top-[-6px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--color-text-error)] px-[4px] text-2xs font-bold leading-none text-text-inverse"
-          >
-            {count > 99 ? "99+" : count}
-          </span>
-        )}
+        {feed.hydrated && <BellCount count={feed.unread} className="right-[-6px] top-[-6px]" />}
       </button>
 
       {open && (
         <FloatingPanel
           id={id}
-          role="menu"
+          role="dialog"
           aria-label="Notifications"
           anchorRef={buttonRef}
           frameRef={frameRef}
@@ -962,76 +929,16 @@ function NotificationBell({
           tone="surface"
           panelRef={panelRef}
           initialFocus={focusFirst ? "first" : "panel"}
-          onKeyDown={(e) => {
-            if (moveFocus(e, panelRef.current)) return;
-            if (e.key === "Escape") {
-              e.preventDefault();
-              e.stopPropagation();
-              onClose(true);
-            } else if (e.key === "Tab") {
-              onClose(true);
-            }
-          }}
+          onKeyDown={(e) => onPanelKeyDown(e, panelRef.current, () => onClose(true))}
         >
-          <p className="border-b border-border px-[16px] py-[10px] text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-            Notifications
-          </p>
-          {count === 0 ? (
-            <p className="px-[16px] py-[16px] text-sm font-regular text-text-tertiary">
-              No notifications yet — builds that need you and your Blog&apos;s review results show up here.
-            </p>
-          ) : (
-            <ul role="none" className="max-h-[min(420px,60vh)] overflow-y-auto py-[4px]">
-              {news.map((n) => (
-                <BlogNewsItem key={n.key} news={n} onPick={onPick} />
-              ))}
-              {attentionBuilds.map((att) => (
-                <li key={att.job.id} role="none">
-                  <Link
-                    href={
-                      att.reason === "credits"
-                        ? "/history#credits"
-                        : getChat(att.job.chatId)
-                          ? `/chat/${att.job.chatId}`
-                          : `/build/${att.job.id}`
-                    }
-                    role="menuitem"
-                    data-nav-item
-                    onClick={onPick}
-                    className={BELL_ROW}
-                  >
-                    <span className="block text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-                      {ATTENTION_KICKER[att.reason]}
-                    </span>
-                    <span className="mt-[2px] block truncate text-sm font-regular text-text-primary">
-                      {att.message}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          <NoticePanelBody feed={feed} variant="rail" onPick={onPick} />
         </FloatingPanel>
       )}
     </>
   );
 }
 
-/** The bell's name: how many builds need the maker, and how many Blog updates wait. */
-function bellLabel(builds: number, blog: number): string {
-  const parts = [
-    builds ? `${builds} need${builds === 1 ? "s" : ""} attention` : "",
-    blog ? `${blog} Blog update${blog === 1 ? "" : "s"}` : "",
-  ].filter(Boolean);
-  return parts.length ? `Notifications, ${parts.join(", ")}` : "No notifications yet";
-}
-
-// A focused row shows a ring inside its own edge (the DS Menu row's), not just a fill that
-// measures 1.04:1 against the panel (F10); 44 px tall on touch.
-const BELL_ROW =
-  "block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
-
-/** The Blog's news the bell lists: unopened review results, and Featured or Removed. */
+/** The Blog's news the announcement watches: unopened review results, and Featured or Removed. */
 function useBlogNews(): BlogNews[] {
   const blog = useBlog();
   const notices = useSeenNotices();
@@ -1047,225 +954,9 @@ function markNewsSeen(n: BlogNews): void {
   else updateBlog((d) => markSeen(d, n.id));
 }
 
-/** A Blog item in the bell (D10, D-16), in the Figma's status words: opening it marks it seen
- *  and lands on the blog's details, where a rejection's or removal's reasons sit on top. */
-function BlogNewsItem({ news: n, onPick }: { news: BlogNews; onPick: () => void }) {
-  const { data } = useBlog();
-  const article = findArticle(data, n.id);
-  if (!article) return null;
-  return (
-    <li role="none">
-      <Link
-        href={articleHref(slugOf(article))}
-        role="menuitem"
-        data-nav-item
-        onClick={() => {
-          markNewsSeen(n);
-          onPick();
-        }}
-        className={BELL_ROW}
-      >
-        <span className="flex flex-wrap items-center gap-[6px] text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-          {newsKicker(n)}
-          {n.demo && (
-            <Badge tone="neutral" className="px-[6px] py-0 text-xs normal-case leading-xs tracking-normal">
-              {DEMO_REVIEW_LABEL}
-            </Badge>
-          )}
-        </span>
-        <span className="mt-[2px] block text-sm font-regular text-text-primary">{newsMessage(n)}</span>
-      </Link>
-    </li>
-  );
-}
-
-/** The rows a keyboard moves through, in order. */
-const bellRows = (panel: HTMLElement | null) => Array.from(panel?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
-
-// A focused row shows a ring inside its own edge (the DS Menu row's), not just a fill
-// that measures 1.04:1 against the panel (F10).
-const PHONE_BELL_ROW =
-  "block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
-const PHONE_BELL_KICKER = "flex flex-wrap items-center gap-[6px] text-sm font-medium leading-sm text-text-secondary";
-
-// The phone top bar's bell: the same news and builds in a panel that opens below the bar.
-function PhoneNotificationBell({
-  open,
-  onToggle,
-  onClose,
-  placement = "above",
-}: {
-  open: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-  /** Above the sidebar's profile row; below the phone top bar. */
-  placement?: "above" | "below";
-}) {
-  const attentionBuilds = useAttentionElsewhere();
-  const { getChat } = useCreateHistory();
-  const news = useBlogNews();
-  const count = attentionBuilds.length + news.length;
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
-  const panelRef = React.useRef<HTMLDivElement>(null);
-  const panelId = React.useId();
-  // Where focus goes when the panel opens: a row (keyboard), or the panel itself (pointer).
-  const focusOnOpen = React.useRef<"first" | "last" | "panel">("panel");
-
-  const builds = attentionBuilds.length;
-  const parts = [
-    builds ? `${builds} need${builds === 1 ? "s" : ""} attention` : "",
-    news.length ? `${news.length} Blog update${news.length === 1 ? "" : "s"}` : "",
-  ].filter(Boolean);
-  const label = count > 0 ? `Notifications, ${parts.join(", ")}` : "No notifications yet";
-
-  React.useEffect(() => {
-    if (!open) return;
-    const rows = bellRows(panelRef.current);
-    const want = focusOnOpen.current;
-    focusOnOpen.current = "panel";
-    if (want === "first" && rows[0]) rows[0].focus();
-    else if (want === "last" && rows.length) rows[rows.length - 1].focus();
-    else panelRef.current?.focus();
-  }, [open]);
-
-  const closeToBell = () => {
-    buttonRef.current?.focus();
-    onClose();
-  };
-
-  const onButtonKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (open) return;
-    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") focusOnOpen.current = "first";
-    else if (e.key === "ArrowUp") focusOnOpen.current = "last";
-    else return;
-    e.preventDefault();
-    onToggle();
-  };
-
-  const onPanelKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const rows = bellRows(panelRef.current);
-    const at = rows.indexOf(document.activeElement as HTMLElement);
-    const go = (i: number) => rows.length && rows[(i + rows.length) % rows.length].focus();
-    if (e.key === "ArrowDown") go(at + 1);
-    else if (e.key === "ArrowUp") go(at < 0 ? rows.length - 1 : at - 1);
-    else if (e.key === "Home") go(0);
-    else if (e.key === "End") go(rows.length - 1);
-    else if (e.key === "Escape") closeToBell();
-    else if (e.key === "Tab") {
-      // Focus the bell first, so the browser's own Tab moves on from it.
-      buttonRef.current?.focus();
-      onClose();
-      return;
-    } else return;
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  return (
-    <div className="relative shrink-0">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={onToggle}
-        onKeyDown={onButtonKey}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-label={label}
-        title={label}
-        className={
-          placement === "below"
-            ? "relative inline-flex h-[var(--touch-min)] w-[var(--touch-min)] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-            : "relative inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-border text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:size-[var(--touch-min)]"
-        }
-      >
-        <Icon icon={Notification03Icon} />
-        {count > 0 && (
-          <span
-            aria-hidden
-            // Filled with the error ink, not the error fill: white on
-            // red-500 is 3.76:1 at 10 px, on red-600 it is 4.83:1.
-            className="absolute right-[2px] top-[2px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--color-text-error)] px-[4px] text-2xs font-bold leading-none text-text-inverse"
-          >
-            {count > 99 ? "99+" : count}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div
-          ref={panelRef}
-          id={panelId}
-          role="menu"
-          aria-label="Notifications"
-          tabIndex={-1}
-          onKeyDown={onPanelKey}
-          className={[
-            "absolute right-0 z-dropdown overflow-hidden rounded-xl border border-border bg-bg-surface shadow-3 outline-none",
-            // Above, it spans the sidebar from the bell's edge; below the phone bar it may be wider.
-            placement === "below" ? "top-[calc(100%+8px)] w-[300px] max-w-[calc(100vw-24px)]" : "bottom-[calc(100%+8px)] w-[260px]",
-          ].join(" ")}
-        >
-          <p className="border-b border-border px-[16px] py-[10px] text-sm font-semibold leading-sm text-text-primary">Notifications</p>
-          {count === 0 ? (
-            <p className="px-[16px] py-[16px] text-sm font-regular text-text-secondary">
-              No notifications yet. Builds that need you and your Blog&apos;s review results show up here.
-            </p>
-          ) : (
-            <ul role="none" className="max-h-[min(420px,60vh)] overflow-y-auto py-[4px]">
-              {news.map((n) => (
-                <BlogNewsItem key={n.key} news={n} onPick={onClose} />
-              ))}
-              {attentionBuilds.map((att) => (
-                <li key={att.job.id} role="none">
-                  <Link
-                    href={
-                      att.reason === "credits"
-                        ? "/history#credits"
-                        : getChat(att.job.chatId)
-                          ? `/chat/${att.job.chatId}`
-                          : `/build/${att.job.id}`
-                    }
-                    role="menuitem"
-                    onClick={onClose}
-                    className={PHONE_BELL_ROW}
-                  >
-                    <span className={PHONE_BELL_KICKER}>{ATTENTION_KICKER[att.reason]}</span>
-                    <span className="mt-[2px] block truncate text-sm font-regular text-text-primary">
-                      {att.message}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** The phone's bell, in the top bar (F25): the same bell and panel at 44 px, opening below. */
+/** The phone's bell, in the top bar (F25): the same notices and panel at 44 px, opening below. */
 function PhoneBell() {
-  const [open, setOpen] = React.useState(false);
-  const ref = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("touchstart", onDown);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("touchstart", onDown);
-    };
-  }, [open]);
-  return (
-    <div ref={ref}>
-      <PhoneNotificationBell open={open} onToggle={() => setOpen((v) => !v)} onClose={() => setOpen(false)} placement="below" />
-    </div>
-  );
+  return <NoticeBell look="phone" />;
 }
 
 /** Says once, politely, when a Blog result arrives (F25): a toast anyone can see, read out by
@@ -1274,6 +965,8 @@ function PhoneBell() {
 function BlogNewsAnnouncer() {
   const news = useBlogNews();
   const blog = useBlog();
+  const allowed = useToastGate();
+  const keep = useSettings().appearance.keepNotices;
   const known = React.useRef<Set<string> | null>(null);
   const [say, setSay] = React.useState<BlogNews | null>(null);
   const [queued, setQueued] = React.useState<BlogNews | null>(null);
@@ -1287,8 +980,11 @@ function BlogNewsAnnouncer() {
     }
     const fresh = news.find((n) => !known.current!.has(n.key));
     for (const k of keys) known.current.add(k);
-    if (fresh) setQueued(fresh);
-  }, [news, blog.hydrated]);
+    // A summary, quiet hours or the Blog's notices switched off: the bell keeps it, no toast.
+    if (fresh && allowed({ id: `blog:${fresh.key}`, kind: "blog", tag: newsKicker(fresh), title: newsMessage(fresh), href: "", at: fresh.at })) {
+      setQueued(fresh);
+    }
+  }, [news, blog.hydrated, allowed]);
 
   React.useEffect(() => {
     if (!queued) return;
@@ -1302,11 +998,12 @@ function BlogNewsAnnouncer() {
     return () => document.removeEventListener("visibilitychange", show);
   }, [queued]);
 
+  // "Keep notices until I close them" (Appearance): no timer, and a close button.
   React.useEffect(() => {
-    if (!say) return;
+    if (!say || keep) return;
     const t = window.setTimeout(() => setSay(null), 8000);
     return () => window.clearTimeout(t);
-  }, [say]);
+  }, [say, keep]);
 
   const article = say ? findArticle(blog.data, say.id) : null;
   return (
@@ -1325,6 +1022,16 @@ function BlogNewsAnnouncer() {
             >
               View
             </Link>
+          )}
+          {keep && (
+            <button
+              type="button"
+              aria-label="Dismiss this notification"
+              onClick={() => setSay(null)}
+              className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-md text-text-inverse outline-none focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:size-[var(--touch-min)]"
+            >
+              <Icon icon={Cancel01Icon} />
+            </button>
           )}
         </div>
       )}

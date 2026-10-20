@@ -58,11 +58,13 @@ ideeza-creator-panel/
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
    │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), command-palette (⌘K)
-   │  ├─ credits/            Settings › Plan & pricing (User Panel V2 layouts): pricing-frame (sheet,
-   │  │                      breadcrumb, pill tabs), plan-pricing-page, plans-panel, credits-panel,
-   │  │                      billing-history, payment-method-panel, plan-banner (+ plan details),
-   │  │                      checkout-page + order-summary + payment-picker (the checkout page),
-   │  │                      buy-credits (the in-place shortfall dialog), invoice-view
+   │  ├─ credits/            Settings › Plan & billing: plan-billing-page (the sections) with your-plan,
+   │  │                      credits-summary, buy-credits-card, credit-alerts, pay-with,
+   │  │                      billing-details, billing-history (Invoices); plans-panel (Pricing:
+   │  │                      cards, compare, FAQs, downgrade/cancel dialogs); pricing-frame (the
+   │  │                      sheet + crumbs of Pricing and the checkout); checkout-page +
+   │  │                      order-summary + payment-picker (the checkout page), buy-credits (the
+   │  │                      in-place shortfall dialog + auto top-up), invoice-view, purchase-confirm
    │  ├─ support/            report-problem (the one Report a problem dialog + host)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
@@ -85,7 +87,8 @@ ideeza-creator-panel/
    │  │                      listing/ (Add to marketplace, Relist, Close auction); editions/ (Physical
    │  │                      and Virtual NFT); earn/ (the Earn area; earn/sell/ the Sell copies
    │  │                      flow; earn/ladder/ the gating ladder's track, commit
-   │  │                      checks, Verify identity (demo), Choose a license, Request payout);
+   │  │                      checks, Choose a license); earn/project-earnings (Sales'
+   │  │                      Your earnings → Withdraw in Get paid);
    │  │                      business-plan/ (chip runner + page) — see
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
@@ -94,7 +97,13 @@ ideeza-creator-panel/
    │  │                      renderer, preview), send/ (Send for review, cover picker, Change cover)
    │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
-   │  │                      timeline, composer), start view, settings + report dialogs
+   │  │                      timeline, composer), start view, report dialog
+   │  ├─ settings/           Settings: frame, side-nav, cards and rows, choice dialog, home, the pages;
+   │  │                      data-page + data-* (AI & your data);
+   │  │                      get-paid/ (the one page, withdraw and method dialogs, identity
+   │  │                      form, history + statement, parts)
+   │  ├─ notifications/      the bell: notice feed hook (use-notices), panel, standalone bell (phone, editor),
+   │  │                      notice-popups (browser pop-ups + daily summary, root), browser-popups
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ balance/            Balance › Overview and Buy IDZ Token: the shared balance card, Transaction Activity, Import token dialog, tip buttons, the purchase table, the presale dialog and its buy form
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
@@ -122,13 +131,30 @@ ideeza-creator-panel/
    │  │                      avatar, tag, skeleton, menu…)
    │  ├─ ui/                 shadcn-style primitives (badge, button, card, input)
    │  ├─ brand/              ideeza-logo
-   │  └─ theme-provider.tsx · theme-toggle.tsx
+   │  └─ theme-provider.tsx
    │
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
+   │  ├─ settings/           Settings: registry (pages, crumbs, nav), rows/ (each page's
+   │  │                      searchable rows), search, prefs (the ideeza:settings record) + use-settings,
+   │  │                      audience (who can comment, Take a break, the locked profile, hidden words
+   │  │                      and their Bangla-safe matcher, people you've met),
+   │  │                      dates (+ use-dates; format and time zone), regions (date formats per region),
+   │  │                      voice, keys + shortcuts (single-key shortcuts and each editor's key table),
+   │  │                      appearance (pre-paint)
+   │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
+   │  │                      videos, comments), filter (heard or quiet, count, quiet hours, pop-up
+   │  │                      mode, hidden words), popups (daily summary, browser pop-ups), read state; withdrawal-method notices
+   │  ├─ account/            the account: payment token, invoices, credit-spend (credits by project), summary, your private identity
+   │  │                      (ideeza:account:identity: the legal name) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store
+   │  ├─ data/               Your data: search history, Download your information (export plan,
+   │  │                      HTML pages, zip writer), the backup inside it + zip reader +
+   │  │                      restore plan, last download + storage status (backup.ts), the
+   │  │                      browser's IDEEZA storage as a whole (dump, erase, restore),
+   │  │                      reports you made, blog reuse
    │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
    │  │                      units), store, wizard (24 families), kicad parsers,
    │  │                      library (save/publish, version lock)
@@ -137,7 +163,8 @@ ideeza-creator-panel/
    │  │                      AI-answer validation), geometry, products, store,
    │  │                      from-concept (the concept network as the saved Network)
    │  ├─ create/             history.tsx (chats + build jobs), credits.tsx, credit-pricing.ts, credit-lots.ts
-   │  │                      (credits ledger), plans.ts + plan.tsx (the account's plan:
+   │  │                      (credits ledger), credit-limits.ts (monthly spending, the limit, running low,
+   │  │                      next expiry, confirm-above, auto top-up's decision), plans.ts + plan.tsx (the account's plan:
    │  │                      subscription, renewals, monthly credit grants), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
    │  │                      plan.tsx (build-plan data)
@@ -182,7 +209,8 @@ ideeza-creator-panel/
    │  ├─ blog/               Blog: the model (doc, statuses, actions, demo review, list, slugs, cover),
    │  │                      the local store (ideeza:blog + rev'd bodies), IndexedDB files (ideeza-blog)
    │  ├─ people/             the creator profile's people layer: one person id and handles, profile
-   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt
+   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt,
+   │  │                      your handle's rules, time zones and spoken languages (Settings)
    │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration, demo seed),
    │  │                      the local store (ideeza:messages), IndexedDB files, acting-as, actions
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)
@@ -224,6 +252,10 @@ src/lib/pcb/
 │                       user-authored parts (`readPersonalParts`) + captured modules
 │                       (`readPersonalModules` / `allModules`)
 ├─ tool-labels.ts       Armed-tool names (from the palette's labels) + next-step hints
+├─ app-settings.ts      The editor's one settings record `ideeza:pcb:appSettings` (v2): overlay
+│                       pages + 3D dialog values, v1 migration, field-by-field repair, what each page does
+├─ measurement-unit.ts  The one Measurement Unit default (mm/mil/inch) + who wins over it; read by
+│                       the board, the schematic and Parts › New Package
 ├─ glb-export.ts        Board → three.js scene → glTF/GLB (GLTFExporter)
 ├─ gltf-import.ts       glTF/GLB import: GLTFLoader parse + session-only model registry
 ├─ dxf-import.ts        ASCII-DXF parser (LINE/POLYLINE/CIRCLE/ARC/TEXT) → CanvasObjects
@@ -251,7 +283,7 @@ src/components/pcb/
 ├─ bottom-bar.tsx + bottom-content.tsx         Logs/Parts Audit/DRC/Find/Property List
 ├─ modals.tsx · modal-kit.tsx · pcb-manager-modals.tsx
 ├─ device-manager.tsx · footprint-manager.tsx
-├─ settings-overlay.tsx · settings-pages.tsx · settings-pages-deep.tsx
+├─ settings-overlay.tsx · settings-pages.tsx · settings-pages-deep.tsx · settings-dialogs.tsx
 └─ color-picker.tsx
 ```
 
