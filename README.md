@@ -88,9 +88,8 @@ one of:
 | `pcb` | Schematic + PCB editor (the largest module) |
 | `code` | Firmware: Monaco IDE and Blockly visual editor |
 | `3d` | Enclosure modelling with AI generation |
-| `assembly` | Assembly |
-| `wiring` | Peripheral wiring |
-| `preview` | Product preview: three.js assembly with mates |
+| `assembly` | Assembly: the board, the case and off-board parts in one 3D scene, with its Wiring mode (`wiring` redirects here) |
+| `preview` | Product preview: a read-only view of the assembly |
 | `brief` | Add Brief: idea → video → mint → success |
 
 **Server routes** under `src/app/api/`: `kicad` (Gerber/DRC via kicad-cli),
@@ -103,7 +102,7 @@ one of:
 ```
 src/
   app/              Next App Router routes, layouts and API routes
-  components/       UI grouped by module: pcb · code · 3d · preview · wiring ·
+  components/       UI grouped by module: pcb · code · 3d · assembly · preview ·
                     brief · create · dashboard · projects · newsfeed · ideeza (DS primitives)
   lib/              Logic and data with no heavy UI
     pcb/            The PCB engine: store, types, nets/ERC, DRC, schematic→PCB,

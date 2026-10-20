@@ -69,7 +69,7 @@ export function AssemblyCanvasImpl(props: AssemblyCanvasProps) {
 function Contents(props: AssemblyCanvasProps) {
   const { scene, mode, section, explode, fitTick, view } = props;
   const controls = React.useRef<React.ComponentRef<typeof OrbitControls>>(null);
-  const { camera, gl } = useThree();
+  const { camera } = useThree();
   const offsets = React.useMemo(() => (explode > 0 ? explodeOffsets(scene, explode) : null), [scene, explode]);
 
   const clip = React.useMemo(() => {
@@ -77,9 +77,6 @@ function Contents(props: AssemblyCanvasProps) {
     const n = section.axis === "x" ? new THREE.Vector3(-1, 0, 0) : section.axis === "y" ? new THREE.Vector3(0, -1, 0) : new THREE.Vector3(0, 0, -1);
     return [new THREE.Plane(n, section.at)];
   }, [section]);
-  React.useEffect(() => {
-    gl.localClippingEnabled = true;
-  }, [gl]);
 
   // Frame the whole assembly (on open, Bring in, Fit view) or look from one side.
   const frame = React.useCallback(

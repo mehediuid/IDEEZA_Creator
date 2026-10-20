@@ -63,29 +63,33 @@ test("PCB doc holding only the sch- sample: PCB reads sample, Assembly reads non
   assert.deepEqual(work.assembly, { state: "none" });
 });
 
-test("PCB doc with real objects and board parts, some checked off", () => {
+test("PCB doc with real objects and board parts; the old parts checklist is not an assembly (D4)", () => {
   setStorage({
     [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json"),
     [`ideeza:assembly:${PID}`]: fixture("assembly-progress.json"),
   });
   const work = firstRowWork(PID);
   assert.deepEqual(work.pcb, { state: "work", text: "4 objects · 2 on the board" });
-  assert.deepEqual(work.assembly, { state: "work", text: "1 of 2 parts checked" });
+  assert.deepEqual(work.assembly, { state: "none" });
+  assert.deepEqual(work.preview, { state: "none" });
 });
 
-test("PCB doc with board parts but no assembly progress key yet: 0 checked, not none", () => {
-  setStorage({ [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json") });
-  const work = firstRowWork(PID);
-  assert.deepEqual(work.assembly, { state: "work", text: "0 of 2 parts checked" });
-});
-
-test("a checked-off id no longer on the board doesn't count (stale progress entry)", () => {
-  setStorage({
-    [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json"),
-    [`ideeza:assembly:${PID}`]: { "ghost-part": true },
+test("an assembly reads its saved summary: placed, fit, wires; Preview counts what it shows", () => {
+  const doc = (summary, wires = []) => ({
+    v: 1, mode: "assembly", brought: true, clearanceMm: 0.5, mates: [], patterns: [], wires,
+    instances: [{ id: "pcb", source: "pcb", ref: "board" }, { id: "three:c", source: "three", ref: "c", grounded: true }],
+    ...(summary ? { summary } : {}),
   });
-  const work = firstRowWork(PID);
-  assert.deepEqual(work.assembly, { state: "work", text: "0 of 2 parts checked" });
+  const wire = { id: "w1", name: "Wiring1", from: { inst: "a", pin: "+" }, to: { inst: "pcb", pin: "p" }, gauge: 22, color: "#dc2626", sleeveMm: 0.5, slackPct: 10, points: [] };
+  setStorage({ [`ideeza:assembly:${PID}:p1`]: doc({ parts: 4, placed: 4, problems: 0, warnings: 0, wires: 1, at: 1 }, [wire]) });
+  let work = firstRowWork(PID);
+  assert.deepEqual(work.assembly, { state: "work", text: "4 of 4 placed · Fit OK · 1 wire" });
+  assert.deepEqual(work.preview, { state: "work", text: "4 parts to view" });
+  setStorage({ [`ideeza:assembly:${PID}:p1`]: doc({ parts: 3, placed: 2, problems: 2, warnings: 0, wires: 0, at: 1 }) });
+  assert.deepEqual(firstRowWork(PID).assembly, { state: "work", text: "2 of 3 placed · 2 fit problems" });
+  setStorage({ [`ideeza:assembly:${PID}:p1`]: doc(null) });
+  work = firstRowWork(PID);
+  assert.deepEqual(work.assembly, { state: "work", text: "2 parts" });
 });
 
 test("an empty PCB objects array is work, not sample", () => {
@@ -178,13 +182,6 @@ test("3D gains shape and AI-model facts, joined when both exist", () => {
     state: "work",
     text: "1 shapes · AI model generated",
   });
-});
-
-test("Preview reads the mate count once the product has its own scoped mates", () => {
-  setStorage({ [`ideeza:preview:mates:${PID}:prd_a`]: { i1: {}, i2: {} } });
-  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").preview, { state: "work", text: "2 mates set" });
-  setStorage({});
-  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").preview, { state: "none" });
 });
 
 // ───────────────────── every row the delete sweep removes (R2-C1) ─────────────────────

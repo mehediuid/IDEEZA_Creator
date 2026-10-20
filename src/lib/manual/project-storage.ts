@@ -55,6 +55,7 @@ export function projectStorageKeys(id: string, rowIds: readonly string[]): strin
     `ideeza:project:bizplan:${id}`, // manual/business-plan.ts BusinessPlan (T08/T11)
     `ideeza:project:editions:${id}`, // market/editions.ts EditionTrack[] (T04)
     `ideeza:project:edition-terms:${id}`, // market/sell-flow.ts SellTerms (Build and Earn P1-3)
+    `ideeza:project:snapshots:${id}`, // manual/snapshots.ts Product Preview's snapshots (Media tab)
   ];
 }
 

@@ -24,7 +24,6 @@ import {
 import { MenuBar } from "@/components/pcb/menu-bar";
 import { CodeMenu } from "@/components/code/code-menu";
 import { ThreeMenu } from "@/components/3d/three-menu";
-import { WiringMenu } from "@/components/wiring/wiring-menu";
 import { ProfileDropdown } from "@/components/app-chrome/profile-dropdown";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useMe } from "@/lib/people/profile-store";
@@ -72,8 +71,6 @@ function pickMenu(step: FlowStep | null): React.ReactNode | null {
       return <CodeMenu />;
     case "three":
       return <ThreeMenu />;
-    case "wiring":
-      return <WiringMenu />;
     default:
       return null;
   }

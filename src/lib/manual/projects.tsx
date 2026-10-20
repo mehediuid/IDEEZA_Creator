@@ -405,12 +405,17 @@ function isRowId(v: unknown): v is string {
   return typeof v === "string" && v !== "" && !v.includes(":");
 }
 
-// COR-91 — kept when its step is one of FLOW_STEPS and its time is finite; a
+// A step a project may have recorded: the flow's, plus Wiring — no longer a
+// step of its own, but its address still opens Assembly's Wiring mode.
+// (A function: FLOW_STEPS is declared further down the module.)
+const recordedSteps = (): Array<keyof ManualFlowState> => [...FLOW_STEPS, "wiring"];
+
+// COR-91 — kept when its step is a recorded step and its time is finite; a
 // `productId` (P2-EDITOR-7) is kept when it is a row id, else dropped on its
 // own. No productId = the first row's record (EDITOR §3.1).
 function lastOpenedIn(raw: unknown): ManualProject["lastOpened"] {
   if (!isRecord(raw)) return undefined;
-  const step = FLOW_STEPS.find((s) => s === raw.step);
+  const step = recordedSteps().find((s) => s === raw.step);
   const at = raw.at;
   if (!step || !isTime(at)) return undefined;
   const productId = isRowId(raw.productId) ? raw.productId : undefined;
@@ -428,7 +433,7 @@ function editorOpenedIn(raw: unknown): ManualProject["editorOpened"] {
   const kept: [string, { step: EditorStep; at: number }][] = [];
   for (const [rowId, v] of entries) {
     const step = isRecord(v)
-      ? FLOW_STEPS.find((s): s is EditorStep => s !== "brief" && s === v.step)
+      ? recordedSteps().find((s): s is EditorStep => s !== "brief" && s === v.step)
       : undefined;
     if (!isRowId(rowId) || !isRecord(v) || !step || !isTime(v.at)) {
       same = false;
@@ -1741,13 +1746,13 @@ export function useManualProjects(): Ctx {
 // Derived helper — returns the first step not yet completed on a
 // project, so "Resume" navigates the user where they actually left off.
 // UIUX-80 — module order per client direction: PCB Design → Code → 3D Module →
-// Assembly → Peripheral Wiring → Product Preview → Add Brief.
+// Assembly → Product Preview → Brief. Wiring is a mode inside Assembly (the
+// Assembly + Wiring plan D1); its flow-state key stays for stored projects.
 export const FLOW_STEPS: Array<keyof ManualFlowState> = [
   "pcb",
   "code",
   "three",
   "assembly",
-  "wiring",
   "preview",
   "brief",
 ];
@@ -1790,7 +1795,7 @@ export const STEP_LABELS: Record<keyof ManualFlowState, string> = {
   code: "Code",
   three: "3D Module",
   assembly: "Assembly",
-  wiring: "Peripheral Wiring",
+  wiring: "Wiring",
   preview: "Product Preview",
   brief: "Brief",
 };

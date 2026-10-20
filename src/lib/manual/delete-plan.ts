@@ -56,20 +56,20 @@ const AIM: Record<Intent, string> = { sell: "to sell", give: "to give away", sav
 
 /** The fact's text when the store holds something. editorWorkOf writes a
  *  leading 0 for a store that exists but holds nothing yet ("0 objects · 0 on
- *  the board", "0 of 2 parts checked"): nothing is lost, so it isn't listed
+ *  the board", "0 of 2 placed"): nothing is lost, so it isn't listed
  *  and doesn't ask for the name. */
 function lost(f: StepFact): string | null {
   return f.state === "work" && !/^0\b/.test(f.text) ? f.text : null;
 }
 
-/** Each editor step's line, in the order the dialog lists them. */
+/** Each editor step's line, in the order the dialog lists them. Preview only
+ *  shows the assembly, so it has nothing of its own to lose. */
 const STEP_LINES: readonly [keyof EditorWork, string][] = [
   ["pcb", "The PCB board"],
-  ["wiring", "Wiring"],
-  ["assembly", "Assembly checks"],
+  ["wiring", "The old 2D wiring"],
+  ["assembly", "The assembly"],
   ["code", "Code"],
   ["three", "The 3D model"],
-  ["preview", "Preview"],
 ];
 
 /** A row's lines, and whether any of them is work the maker would lose. */

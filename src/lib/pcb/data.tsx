@@ -1439,14 +1439,13 @@ export function buildCtxItems(state: PcbState, actions: PcbActions) {
 // `iconEl(x)` reduced to the raw SVG string `x` (rendered via <Icon html=.../>).
 
 export function buildRail(_state: PcbState | null = null, activeKey: string = 'pcb') {
-  // UIUX-80 — module order per client direction: Assembly is new (after 3D),
-  // Wiring reads "Peripheral Wiring", and Product Preview follows it.
+  // UIUX-80's order, with Peripheral Wiring now a mode inside Assembly (the
+  // Assembly + Wiring plan D1/D2, owner-approved 2026-10-19).
   const railDefs = [
     { key: 'pcb', label: 'PCB Design', icon: 'pcb' },
     { key: 'code', label: 'Code', icon: 'code' },
     { key: '3d', label: '3D Module', icon: 'cube' },
     { key: 'assembly', label: 'Assembly', icon: 'assembly' },
-    { key: 'wiring', label: 'Peripheral Wiring', icon: 'wire' },
     { key: 'preview', label: 'Product Preview', icon: 'preview' },
     // No Save item (owner D1, 2026-10-19): every editor saves as it goes and the project is a
     // Draft from the start. The top bar says whether the work is saved; Finish ends the flow.
@@ -1461,7 +1460,7 @@ export function buildRail(_state: PcbState | null = null, activeKey: string = 'p
       fg: active ? C.primary : (r.faded ? 'var(--color-border-strong)' : C.body),
       opacity: r.faded ? 'var(--opacity-muted)' : '1',
       cursor: r.faded ? 'default' : 'pointer',
-      href: r.key === 'pcb' ? '/pcb' : r.key === 'code' ? '/code' : r.key === '3d' ? '/3d' : r.key === 'preview' ? '/preview' : r.key === 'wiring' ? '/wiring' : r.key === 'brief' ? '/brief' : null,
+      href: r.key === 'pcb' ? '/pcb' : r.key === 'code' ? '/code' : r.key === '3d' ? '/3d' : r.key === 'preview' ? '/preview' : r.key === 'brief' ? '/brief' : null,
     };
   });
 }

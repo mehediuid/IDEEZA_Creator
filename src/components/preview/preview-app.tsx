@@ -1,372 +1,318 @@
 "use client";
 
-// Preview — the 4th step in the product creation flow. CAD-style composite
-// preview modelled on Onshape's part-studio layout: PreviewToolbar (top),
-// InstancesPanel (left tree), live ThreeViewport (center), PreviewRightPanel
-// (right). Flow chrome lives on top: the global TopBar carries the IDEEZA
-// menu bar + profile + premium parts chip.
-//
-// Wires every piece to a shared PreviewContext so the toolbar, tree,
-// view-cube and side icons all act on the same scene state. Shapes are read
-// from (and persisted to) the SAME localStorage slot the /3d module owns,
-// so the preview is a true viewer of what the user built upstream.
+// Product Preview (the Assembly + Wiring plan D3, P3): the finished product
+// to look at — the assembly exactly as Assembly placed it, never changed
+// here. Explode it along its stacking axis with each part named (F32), cut a
+// section, hide the lid, turn it, look from a side (F33); read the fit report
+// and the wire list (F34); keep a snapshot in the project's Media (F35).
+// Editing lives in Assembly: one control, one home. The flow ends here with
+// Finish (EditorSave's saved dialog).
 
 import * as React from "react";
-import { useStepNav } from "@/components/manual/use-step-nav";
+import { Camera01Icon, Layers01Icon, Rotate360Icon, ScissorIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import { useEditorScope, useStepNav } from "@/components/manual/use-step-nav";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { LeftRail } from "@/components/pcb/left-rail";
 import { LeftPanel } from "@/components/pcb/left-panel";
-import {
-  PreviewProvider,
-  usePreview,
-  type FitVerdict,
-} from "./preview-context";
-import { PreviewToolbar } from "./preview-toolbar";
-import { InstancesSection } from "./preview-instances";
-import { PreviewViewport } from "./preview-viewport";
-import { PreviewRightPanel } from "./preview-right-panel";
-import { PreviewContextMenu } from "./preview-context-menu";
+import { Button, Segmented, Slider } from "@/components/ideeza";
+import { AssemblyProvider, useAssembly } from "@/components/assembly/assembly-store";
+import { AssemblyCanvas } from "@/components/assembly/assembly-canvas";
+import type { CanvasView } from "@/components/assembly/assembly-canvas-impl";
+import { describeIssue } from "@/lib/assembly/scene";
+import { addSnapshot } from "@/lib/manual/snapshots";
+import { cn } from "@/lib/utils";
 
-const TOP_BAR_H = 62;
-const PREVIEW_TOOLBAR_H = 40;
-const LEFT_RAIL_W = 74;
-// Shared project panel (Project Design | Library) — same width everywhere.
-const LEFT_PANEL_W = 292;
-// Right side: full panel matching the PCB / 3D module pattern (292px) with
-// content + a vertical tab strip on its inner-right edge.
-const RIGHT_PANEL_W = 292;
+const TOOLBAR_H = 44;
+const TOP = 62 + TOOLBAR_H;
+const RAIL = 74;
+const LEFT = 292;
+const RIGHT = 292;
+const r1 = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
-// Total vertical chrome above the viewport.
-const VIEWPORT_TOP = TOP_BAR_H + PREVIEW_TOOLBAR_H;
-
-// The Wiring step reuses the whole Preview workspace for now (same scene,
-// panels and toolbar) — only the rail highlight and the flow pills differ.
-// When wiring gets its own tools this becomes its own module.
-export type PreviewVariant = "preview" | "wiring";
-
-export function PreviewApp({ variant = "preview" }: { variant?: PreviewVariant }) {
+export function PreviewApp() {
   return (
-    <PreviewProvider>
-      <PreviewBody variant={variant} />
-    </PreviewProvider>
+    <AssemblyProvider readOnly>
+      <PreviewBody />
+    </AssemblyProvider>
   );
 }
 
-function PreviewBody({ variant }: { variant: PreviewVariant }) {
-  const { go: goStep } = useStepNav();
-  const { showInstancesPanel, toast } = usePreview();
-  const isWiring = variant === "wiring";
+function PreviewBody() {
+  const a = useAssembly();
+  const { go: goStep, activeProject } = useStepNav();
+  const editor = useEditorScope();
+  const { scene, doc } = a;
+  const [explode, setExplode] = React.useState(0);
+  const [hideLid, setHideLid] = React.useState(false);
+  const [turntable, setTurntable] = React.useState(false);
+  const [view, setView] = React.useState<{ name: CanvasView; tick: number }>({ name: "iso", tick: 0 });
+  const [selected, setSelected] = React.useState<string | null>(null);
+  const canvasBox = React.useRef<HTMLDivElement>(null);
+  const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-  // Reflow viewport + flow pills when the instances panel is collapsed via
-  // the side-icon toggle.
-  const leftPanelOffset = showInstancesPanel ? LEFT_PANEL_W : 0;
-  const viewportLeft = LEFT_RAIL_W + leftPanelOffset;
+  // Explode / Collapse ease over 240 ms (none with reduced motion); the slider is direct.
+  const animateTo = (to: number) => {
+    if (reduced) {
+      setExplode(to);
+      return;
+    }
+    const from = explode;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / 240);
+      setExplode(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+
+  const snapshot = () => {
+    const canvas = canvasBox.current?.querySelector("canvas");
+    if (!canvas || !activeProject || !editor) return;
+    const png = canvas.toDataURL("image/png");
+    const name = (editor.productName || activeProject.name || "product").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "product";
+    const link = document.createElement("a");
+    link.href = png;
+    link.download = `${name}-preview.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // A smaller JPEG copy goes to the project's Media.
+    const w = Math.min(960, canvas.width);
+    const h = Math.round((canvas.height * w) / canvas.width);
+    const small = document.createElement("canvas");
+    small.width = w;
+    small.height = h;
+    small.getContext("2d")?.drawImage(canvas, 0, 0, w, h);
+    const r = addSnapshot(
+      activeProject.id,
+      { id: `snap-${Date.now().toString(36)}`, productId: editor.scope.productId, productName: editor.productName || "Main product", dataUrl: small.toDataURL("image/jpeg", 0.82), at: Date.now() },
+      window.localStorage,
+    );
+    a.flash(r.kept ? `Saved ${name}-preview.png, and a copy in the project's Media${r.dropped ? ` (the oldest ${r.dropped === 1 ? "one" : r.dropped} made room)` : ""}.` : `Saved ${name}-preview.png. The Media copy didn't fit in this browser's storage.`);
+  };
+
+  const fit = scene.fit;
+  const lid = scene.items.some((i) => i.part.enclosure?.role === "lid");
+  const unplaced = scene.items.filter((i) => !i.placed).length;
+  const pct = Math.round(explode * 100);
 
   return (
     <EditorShell>
       <TopBar />
-      <PreviewToolbar />
-
-      {/* Shared module-switcher rail (PCB Design / Code / 3D Module /
-          Product Preview). */}
-      <LeftRail
-        topOffset={VIEWPORT_TOP}
-        bottomOffset={0}
-        activeKey={isWiring ? "wiring" : "preview"}
-      />
-
-      {/* Shared project panel — preview's instances tree merges into the
-          same Project Design | Library navigator every tab has. */}
-      {showInstancesPanel && (
-        <LeftPanel
-          topOffset={VIEWPORT_TOP}
-          bottomOffset={0}
-          hideProjectTree
-          aiContext="preview"
-          moduleSlot={<InstancesSection />}
-        />
-      )}
-
-      <PreviewViewport
-        topOffset={VIEWPORT_TOP}
-        leftOffset={viewportLeft}
-        rightOffset={RIGHT_PANEL_W}
-      />
-      <PreviewRightPanel topOffset={VIEWPORT_TOP} />
-      <FitStatusBadge
-        topOffset={VIEWPORT_TOP + 16}
-        leftOffset={viewportLeft + 16}
-      />
-
-      {/* Back — bottom-LEFT inside the viewport area. UIUX-80 — Product
-          Preview now follows Peripheral Wiring in the module order. */}
-      <FlowPill
-        kind="back"
-        label={isWiring ? "Back to Assembly" : "Back to Peripheral Wiring"}
-        onClick={() => goStep(isWiring ? "assembly" : "wiring")}
-        style={{ left: viewportLeft + 20, bottom: 20 }}
-      />
-
-      {/* Continue — bottom-RIGHT inside the viewport area. */}
-      <FlowPill
-        kind="forward"
-        label={isWiring ? "Continue to Preview" : "Finish"}
-        onClick={() => goStep(isWiring ? "preview" : "brief")}
-        style={{ right: RIGHT_PANEL_W + 20, bottom: 20 }}
-      />
-
-      {toast && <PreviewToast text={toast} />}
-      <PreviewContextMenu />
-    </EditorShell>
-  );
-}
-
-// FitStatusBadge — top-left pill showing whether the PCB fits inside the
-// enclosure. The underlying canvas computes the verdict from real Box3
-// math, so this badge is a true reflection of the merged scene.
-function FitStatusBadge({
-  topOffset,
-  leftOffset,
-}: {
-  topOffset: number;
-  leftOffset: number;
-}) {
-  const { fitVerdict, showPcb, showEnclosure } = usePreview();
-  if (!showPcb || !showEnclosure) return null;
-
-  const { tone, icon, title, sub } = describeVerdict(fitVerdict);
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        position: "absolute",
-        top: topOffset,
-        left: leftOffset,
-        zIndex: 20,
-        padding: "10px 14px 10px 12px",
-        background: "var(--color-bg-surface)",
-        border: `var(--border-width-1-5) solid ${toneBorder(tone)}`,
-        borderRadius: 999,
-        boxShadow: "0 8px 26px -8px rgba(0,0,0,.18)",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        maxWidth: 360,
-      }}
-    >
-      <span
-        aria-hidden="true"
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 14,
-          background: toneBg(tone),
-          color: toneFg(tone),
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flex: "0 0 28px",
-        }}
-      >
-        {icon}
-      </span>
-      <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: "var(--color-text-primary)",
-            whiteSpace: "nowrap",
-          }}
+      <div role="toolbar" aria-label="Preview tools" className="absolute inset-x-0 z-[16] flex items-center gap-2 overflow-x-auto border-b border-solid border-border-subtle bg-bg-surface px-4" style={{ top: 62, height: TOOLBAR_H }}>
+        <Button hierarchy={explode > 0.5 ? "tonal" : "ghost"} size="sm" aria-pressed={explode > 0.5} iconLeading={<Icon icon={Layers01Icon} size={16} />} onClick={() => animateTo(explode > 0.5 ? 0 : 1)} className="shrink-0 px-3">
+          {explode > 0.5 ? "Collapse" : "Explode"}
+        </Button>
+        <div className="w-[180px] shrink-0">
+          <Slider value={pct} min={0} max={100} step={1} onValueChange={(v) => setExplode(v / 100)} valueLabel={(v) => `${v}% apart`} />
+        </div>
+        <span className="w-10 shrink-0 font-mono text-xs leading-xs text-text-secondary">{pct}%</span>
+        <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border-default" />
+        <Button hierarchy={a.section.on ? "tonal" : "ghost"} size="sm" aria-pressed={a.section.on} iconLeading={<Icon icon={ScissorIcon} size={16} />} onClick={() => a.setSection({ on: !a.section.on })} className="shrink-0 px-3">
+          Section
+        </Button>
+        <Button
+          hierarchy={hideLid ? "tonal" : "ghost"}
+          size="sm"
+          aria-pressed={hideLid}
+          aria-disabled={!lid || undefined}
+          title={lid ? "Hide the lid" : "There is no lid in the assembly"}
+          iconLeading={<Icon icon={ViewOffIcon} size={16} />}
+          onClick={() => (lid ? setHideLid((v) => !v) : a.flash("There is no lid in the assembly."))}
+          className={cn("shrink-0 px-3", !lid && "opacity-50")}
         >
-          {title}
-        </span>
-        {sub && (
-          <span
-            style={{
-              fontSize: 11,
-              color: "var(--color-text-secondary)",
-              marginTop: 1,
-            }}
-          >
-            {sub}
-          </span>
-        )}
-      </span>
-    </div>
-  );
-}
+          Hide lid
+        </Button>
+        <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border-default" />
+        <Segmented
+          label="View from"
+          size="sm"
+          value={view.name}
+          onChange={(name) => setView((v) => ({ name, tick: v.tick + 1 }))}
+          options={[
+            { value: "iso", label: "Iso" },
+            { value: "front", label: "Front" },
+            { value: "top", label: "Top" },
+            { value: "right", label: "Right" },
+          ]}
+          className="shrink-0"
+        />
+        <Button hierarchy={turntable ? "tonal" : "ghost"} size="sm" aria-pressed={turntable} iconLeading={<Icon icon={Rotate360Icon} size={16} />} onClick={() => setTurntable((v) => !v)} className="shrink-0 px-3">
+          Turn
+        </Button>
+        <span className="flex-1" />
+        <Button hierarchy="secondary" size="sm" iconLeading={<Icon icon={Camera01Icon} size={16} />} onClick={snapshot} className="shrink-0">
+          Snapshot
+        </Button>
+        <Button hierarchy="ghost" size="sm" onClick={() => goStep("assembly")} className="shrink-0">
+          Edit in Assembly
+        </Button>
+      </div>
 
-type Tone = "ok" | "warn" | "neutral";
-
-function describeVerdict(v: FitVerdict): {
-  tone: Tone;
-  icon: React.ReactNode;
-  title: string;
-  sub?: string;
-} {
-  if (v.kind === "fits") {
-    const smallest = Math.min(...v.headroom);
-    return {
-      tone: "ok",
-      icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 13l4 4 10-10" />
-        </svg>
-      ),
-      title: "PCB fits inside enclosure",
-      sub: `Tightest clearance ${smallest.toFixed(2)} u`,
-    };
-  }
-  if (v.kind === "overflow") {
-    const axes = ["X", "Y", "Z"];
-    const worstIdx = v.overflow.indexOf(Math.max(...v.overflow));
-    return {
-      tone: "warn",
-      icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3l10 18H2z" />
-          <path d="M12 10v5" />
-          <path d="M12 18h.01" />
-        </svg>
-      ),
-      title: "PCB exceeds enclosure",
-      sub: `Worst overflow ${v.overflow[worstIdx].toFixed(2)} u on ${axes[worstIdx]} axis`,
-    };
-  }
-  if (v.kind === "enclosure-missing") {
-    return {
-      tone: "neutral",
-      icon: (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 7l8-4 8 4-8 4z" />
-          <path d="M4 7v10l8 4 8-4V7" />
-        </svg>
-      ),
-      title: "No enclosure to check against",
-      sub: "Design one in the 3D module or add a part here.",
-    };
-  }
-  return {
-    tone: "neutral",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="6" width="18" height="12" rx="1" />
-        <path d="M7 6v12M17 6v12" />
-      </svg>
-    ),
-    title: "No PCB to check",
-    sub: "Place components in the PCB module.",
-  };
-}
-
-function toneBg(t: Tone) {
-  if (t === "ok") return "var(--color-green-100)";
-  if (t === "warn")
-    return "var(--color-orange-100, var(--color-bg-brand-subtle))";
-  return "var(--color-bg-surface-raised)";
-}
-function toneFg(t: Tone) {
-  if (t === "ok") return "var(--color-green-700)";
-  if (t === "warn")
-    return "var(--color-orange-600, var(--color-text-error))";
-  return "var(--color-text-secondary)";
-}
-function toneBorder(t: Tone) {
-  if (t === "ok") return "var(--color-green-500)";
-  if (t === "warn")
-    return "var(--color-orange-500, var(--color-border-strong))";
-  return "var(--color-border-subtle)";
-}
-
-function PreviewToast({ text }: { text: string }) {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        position: "absolute",
-        bottom: 80,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 90,
-        padding: "10px 18px",
-        background: "var(--color-bg-inverse, #1E1E1E)",
-        color: "var(--color-text-on-brand, #FFFFFF)",
-        borderRadius: 999,
-        boxShadow: "0 12px 32px -8px rgba(0,0,0,.3)",
-        fontSize: 13,
-        fontWeight: 500,
-        animation: "ix-preview-toast .18s ease-out",
-      }}
-    >
-      {text}
-      <style>{`
-        @keyframes ix-preview-toast {
-          from { opacity: 0; transform: translate(-50%, 8px); }
-          to   { opacity: 1; transform: translate(-50%, 0); }
+      <LeftRail topOffset={TOP} bottomOffset={0} activeKey="preview" />
+      <LeftPanel
+        topOffset={TOP}
+        bottomOffset={0}
+        hideProjectTree
+        aiContext="preview"
+        moduleSlot={
+          <div className="flex flex-col gap-1 pb-6">
+            <h3 className="px-3 pb-2 pt-5 text-xs font-semibold uppercase leading-xs tracking-caps text-text-tertiary">Parts</h3>
+            {scene.items.length === 0 && <p className="px-3 text-xs leading-xs text-text-tertiary">Nothing assembled yet. Bring parts in and place them in Assembly.</p>}
+            {scene.items.map((i) => (
+              <button
+                key={i.rec.id}
+                type="button"
+                aria-pressed={selected === i.rec.id}
+                onClick={() => setSelected((s) => (s === i.rec.id ? null : i.rec.id))}
+                className={cn("flex items-center gap-3 rounded-md border-0 px-3 py-2 text-left", selected === i.rec.id ? "bg-bg-brand-subtle" : "bg-transparent hover:bg-bg-subtle")}
+              >
+                <span aria-hidden className="size-[9px] shrink-0 rounded-full border border-solid border-border-strong" style={{ background: i.part.solids[0]?.color }} />
+                <span className={cn("min-w-0 flex-1 truncate text-sm leading-xs", selected === i.rec.id ? "font-semibold text-text-brand" : "text-text-primary")}>{i.part.name}</span>
+                {!i.placed && <span className="text-xs leading-xs text-text-warning">not placed</span>}
+              </button>
+            ))}
+            <h3 className="px-3 pb-2 pt-5 text-xs font-semibold uppercase leading-xs tracking-caps text-text-tertiary">Fit report</h3>
+            <div className="mx-3 flex flex-col gap-2 rounded-lg border border-solid border-border-subtle p-4">
+              {!doc.brought ? (
+                <p className="text-sm leading-xs text-text-secondary">Not assembled yet.</p>
+              ) : fit.problems.length ? (
+                <>
+                  <p className="text-sm font-semibold leading-xs text-text-error">
+                    {fit.problems.length} {fit.problems.length === 1 ? "problem" : "problems"}
+                  </p>
+                  {fit.problems.slice(0, 3).map((p, k) => (
+                    <p key={k} className="text-xs leading-xs text-text-secondary">
+                      {describeIssue(p, doc.clearanceMm)}
+                    </p>
+                  ))}
+                </>
+              ) : (
+                <p className="text-sm font-semibold leading-xs text-text-success">{unplaced ? `${unplaced} not placed yet` : "Everything fits"}</p>
+              )}
+              {scene.lid && <p className="text-xs leading-xs text-text-secondary">{scene.lid.gap >= 0 ? `The lid closes, ${r1(scene.lid.gap)} mm over ${scene.lid.part}.` : `The lid can't close: ${scene.lid.part} is ${r1(-scene.lid.gap)} mm too tall.`}</p>}
+              <div>
+                <Button hierarchy="secondary" size="sm" onClick={() => goStep("assembly")}>
+                  {fit.problems.length || unplaced ? "Fix in Assembly" : "Open Assembly"}
+                </Button>
+              </div>
+            </div>
+          </div>
         }
-      `}</style>
-    </div>
-  );
-}
+      />
 
-function FlowPill({
-  kind,
-  label,
-  onClick,
-  style,
-}: {
-  kind: "back" | "forward";
-  label: string;
-  onClick: () => void;
-  style: React.CSSProperties;
-}) {
-  const isForward = kind === "forward";
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        position: "absolute",
-        zIndex: 20,
-        padding: "10px 18px",
-        background: isForward
-          ? "var(--color-violet-600)"
-          : "var(--color-bg-surface)",
-        color: isForward
-          ? "var(--color-text-on-brand)"
-          : "var(--color-text-primary)",
-        border: isForward
-          ? "none"
-          : "var(--border-width-1) solid var(--color-border-default)",
-        borderRadius: "var(--radius-3xl)",
-        fontSize: 13,
-        fontWeight: isForward ? 700 : 600,
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        boxShadow: isForward
-          ? "0 8px 26px -8px rgba(124, 45, 185, .42)"
-          : "0 4px 12px -4px rgba(0,0,0,.18)",
-        fontFamily: "inherit",
-        ...style,
-      }}
-    >
-      {!isForward && (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 6l-6 6 6 6" />
-        </svg>
+      <div ref={canvasBox} className="absolute overflow-hidden bg-bg-page" style={{ top: TOP, left: RAIL + LEFT, right: RIGHT, bottom: 0 }} onContextMenu={(e) => e.preventDefault()}>
+        {a.hydrated && (
+          <AssemblyCanvas
+            scene={scene}
+            wires={doc.wires.map((rec) => ({ rec, geom: a.wires.get(rec.id)! })).filter((w) => w.geom)}
+            mode="preview"
+            selectedInst={selected}
+            selectedWire={null}
+            problemSolids={[]}
+            tool={null}
+            snapFrom={null}
+            wireFrom={null}
+            measure={[]}
+            section={a.section}
+            explode={explode}
+            hideLid={hideLid}
+            labels
+            fitTick={a.fitTick}
+            view={view}
+            turntable={turntable}
+            onSelectInst={setSelected}
+            onSelectWire={() => {}}
+            onPickFeature={() => {}}
+            onPickPin={() => {}}
+            onMeasurePoint={() => {}}
+            onWirePoint={() => {}}
+            onMovePreview={() => {}}
+            onMoveCommit={() => {}}
+          />
+        )}
+        {a.hydrated && scene.items.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center p-8">
+            <div className="flex max-w-[380px] flex-col items-center gap-3 rounded-xl border border-solid border-border-default bg-bg-surface p-6 text-center shadow-3">
+              <p className="text-md font-semibold leading-md text-text-primary">Nothing to preview yet</p>
+              <p className="text-sm leading-sm text-text-secondary">Bring the board and the case into Assembly and place them; they show here, ready to explode, cut and photograph.</p>
+              <Button hierarchy="primary" size="md" onClick={() => goStep("assembly")}>
+                Open Assembly
+              </Button>
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => goStep("assembly")}
+          className="absolute bottom-5 left-5 z-[6] inline-flex items-center gap-3 rounded-3xl border border-solid border-border-default bg-bg-surface px-8 py-3 text-md font-semibold leading-md text-text-primary shadow-2 hover:bg-bg-subtle"
+        >
+          <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+          Back to Assembly
+        </button>
+        <button
+          type="button"
+          onClick={() => goStep("brief")}
+          className="absolute bottom-5 right-5 z-[6] inline-flex items-center gap-3 rounded-3xl border-0 bg-bg-brand px-8 py-3 text-md font-bold leading-md text-text-on-brand shadow-3 hover:bg-bg-brand-hover"
+        >
+          Finish
+          <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+      </div>
+
+      <aside aria-label="Details" className="absolute bottom-0 right-0 overflow-y-auto border-l border-solid border-border-subtle bg-bg-surface" style={{ top: TOP, width: RIGHT }}>
+        <section className="flex flex-col gap-3 border-b border-solid border-border-subtle px-6 py-5">
+          <h3 className="text-sm font-semibold leading-xs text-text-primary">Wire list</h3>
+          {doc.wires.length === 0 ? (
+            <p className="text-xs leading-xs text-text-tertiary">No wires yet. They are drawn in Assembly › Wiring.</p>
+          ) : (
+            <table className="w-full border-collapse text-xs leading-xs">
+              <thead>
+                <tr className="text-left text-text-tertiary">
+                  <th className="py-1 pr-2 font-medium">From → To</th>
+                  <th className="py-1 pr-2 font-medium">AWG</th>
+                  <th className="py-1 text-right font-medium">Cut mm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doc.wires.map((w) => {
+                  const g = a.wires.get(w.id);
+                  return (
+                    <tr key={w.id} className="border-t border-solid border-border-subtle text-text-primary">
+                      <td className="py-1 pr-2">
+                        <span aria-hidden className="mr-2 inline-block size-[8px] rounded-full" style={{ background: w.color }} />
+                        {g?.from?.pin.label ?? "?"} → {g?.to?.pin.label ?? "?"}
+                      </td>
+                      <td className="py-1 pr-2 font-mono">{w.gauge}</td>
+                      <td className="py-1 text-right font-mono">{g ? r1(g.cut) : "–"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {explode > 0 && doc.wires.length > 0 && <p className="text-xs leading-xs text-text-tertiary">Wires hide while the product is exploded.</p>}
+        </section>
+        <section className="flex flex-col gap-2 px-6 py-5">
+          <h3 className="text-sm font-semibold leading-xs text-text-primary">{selected ? (scene.items.find((i) => i.rec.id === selected)?.part.name ?? "Part") : "View only"}</h3>
+          <p className="text-xs leading-xs text-text-tertiary">
+            {selected ? scene.items.find((i) => i.rec.id === selected)?.part.origin : "This is the product as Assembly placed it. Nothing moves here: edit it in Assembly."}
+          </p>
+        </section>
+      </aside>
+
+      {a.toast && (
+        <div role="status" aria-live="polite" className="absolute bottom-20 left-1/2 z-toast max-w-[560px] -translate-x-1/2 rounded-lg bg-bg-toast px-6 py-3 text-center text-sm font-medium leading-sm text-text-on-toast shadow-4">
+          {a.toast}
+        </div>
       )}
-      {label}
-      {isForward && (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 6l6 6-6 6" />
-        </svg>
-      )}
-    </button>
+    </EditorShell>
   );
 }

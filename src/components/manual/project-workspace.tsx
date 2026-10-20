@@ -130,16 +130,22 @@ const AssemblyApp = dynamic(
   () => import("@/components/assembly/assembly-app").then((m) => m.AssemblyApp),
   { ssr: false, loading },
 );
-const WiringApp = dynamic(
-  () => import("@/components/wiring/wiring-app").then((m) => m.WiringApp),
-  { ssr: false, loading },
-);
+/** Wiring is a mode of Assembly (the Assembly + Wiring plan D1): its address
+ *  opens Assembly in Wiring mode. */
+function WiringRedirect() {
+  const router = useRouter();
+  const { activeProject, activeProductId } = useManualProjects();
+  React.useEffect(() => {
+    if (activeProject && activeProductId) router.replace(`${editorHref(activeProject, activeProductId, "assembly")}?mode=wiring`);
+  }, [activeProject, activeProductId, router]);
+  return <BlankShell label="Opening Wiring in Assembly…" />;
+}
 const APP_BY_STEP: Record<EditorStep, React.ComponentType> = {
   pcb: PcbApp,
   code: CodeApp,
   three: ThreeApp,
   assembly: AssemblyApp,
-  wiring: WiringApp,
+  wiring: WiringRedirect,
   preview: PreviewApp,
 };
 
@@ -150,7 +156,6 @@ const SEED_EDITOR_OF: Partial<Record<keyof ManualFlowState, SeedEditor>> = {
   pcb: "pcb",
   three: "three",
   code: "code",
-  wiring: "wiring",
 };
 
 /** What this open's seed did for one product (`key` = project:row), and the

@@ -150,7 +150,8 @@ test("the editors end with Finish, never the mint flow's Choose; no Save step (o
   const nav = readSrc("components/manual/use-step-nav.tsx");
   assert.match(nav, /if \(step === "brief"\) return `\/projects\/\$\{encodeURIComponent\(project\.id\)\}`;/);
   assert.match(nav, /if \(step === "brief" && save\) \{\s*save\(\);\s*return;\s*\}/);
-  assert.match(readSrc("components/preview/preview-app.tsx"), /isWiring \? "Continue to Preview" : "Finish"/);
+  // The flow ends on Product Preview (Wiring is a mode of Assembly now): its forward pill is Finish.
+  assert.match(readSrc("components/preview/preview-app.tsx"), /onClick=\{\(\) => goStep\("brief"\)\}[\s\S]{0,400}Finish/);
   // D1: the rail lists the modules only.
   const data = readSrc("lib/pcb/data.tsx");
   assert.doesNotMatch(data, /key: 'brief'/);
@@ -168,9 +169,7 @@ test("one save status for every editor; Ctrl+S saves now; no fake toggle, no too
     ["components/3d/three-app.tsx", "3d.shapes"],
     ["components/3d/sketch-mode.tsx", "3d.sketches"],
     ["components/3d/ai-generate-modal.tsx", "3d.ai"],
-    ["components/preview/preview-context.tsx", "preview.shapes"],
-    ["components/wiring/wiring-context.tsx", "wiring"],
-    ["components/assembly/assembly-app.tsx", "assembly"],
+    ["components/assembly/assembly-store.tsx", "assembly"],
     ["lib/pcb/store.tsx", "pcb"],
   ]) {
     assert.match(readSrc(file), new RegExp(`(reportSave|writeReported)\\("${source.replace(".", "\\.")}"`), `${file} reports its writes`);

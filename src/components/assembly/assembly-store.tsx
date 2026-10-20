@@ -21,7 +21,9 @@ import { DEFAULT_SHAPES, type SceneShape } from "@/lib/three/scene";
 import { parseAsmDoc, serializeAsmDoc, nextId, wireName, mateName } from "@/lib/assembly/doc";
 import { pcbPart, type PcbDocLike } from "@/lib/assembly/model-pcb";
 import { threeParts, threeInstanceId, isPristineScene } from "@/lib/assembly/model-three";
-import { LIBRARY_BY_KIND, nextLabel, type LibraryKind } from "@/lib/assembly/library";
+import { LIBRARY_BY_KIND, libraryKindOf, nextLabel, type LibraryKind } from "@/lib/assembly/library";
+import { fingerprintOf } from "@/lib/manual/build-load";
+import { readSeed } from "@/lib/manual/build-load-io";
 import { composeScene, summarize, type AsmScene, type Sources } from "@/lib/assembly/scene";
 import { applyPlan, lidPlan, placeInsidePlan, snapPlan, type Plan } from "@/lib/assembly/place";
 import { suggestWires, wireGeometry, pointOn, type WireGeom } from "@/lib/assembly/wiring";
@@ -117,15 +119,43 @@ function readShapes(scope: EditorScope): SceneShape[] {
   }
 }
 
+/** The maker's own 2D wiring from before Wiring moved into Assembly (D14) —
+ *  not the copy a build seeded, which is the build's record, not their work. */
 function readOldWiring(scope: EditorScope): { parts: number; wires: number } | null {
   try {
     const raw = window.localStorage.getItem(editorDocKey("wiring", scope));
+    const seeded = readSeed(scope, window.localStorage)?.seeded.wiring;
+    if (raw !== null && seeded !== undefined && seeded === fingerprintOf("wiring", raw)) return null;
     const v = raw ? JSON.parse(raw) : null;
     const parts = Array.isArray(v?.parts) ? v.parts.length : 0;
     const wires = Array.isArray(v?.wires) ? v.wires.length : 0;
     return parts || wires ? { parts, wires } : null;
   } catch {
     return null;
+  }
+}
+
+// A built product's off-board parts (F3): the ones its seed placed in the old
+// wiring document, and the ones it had no wiring part for, as library parts.
+const WIRING_KIND: Record<string, LibraryKind> = { led: "led-5", button: "tactile-6", motor: "vibration-motor", connector: "jst-ph-2" };
+function readBuildParts(scope: EditorScope): Array<{ kind: LibraryKind; label: string }> {
+  try {
+    const seed = readSeed(scope, window.localStorage);
+    if (!seed) return [];
+    const out: Array<{ kind: LibraryKind; label: string }> = [];
+    const doc = JSON.parse(window.localStorage.getItem(editorDocKey("wiring", scope)) ?? "null");
+    for (const part of Array.isArray(doc?.parts) ? doc.parts : []) {
+      const kind = WIRING_KIND[String(part?.kind)];
+      if (kind && typeof part.name === "string") out.push({ kind, label: part.name });
+    }
+    for (const entry of seed.reports.wiring?.noPart ?? []) {
+      const [ref, ...rest] = entry.split(" ");
+      const kind = libraryKindOf(ref, rest.join(" "));
+      if (kind) out.push({ kind, label: ref });
+    }
+    return out.filter((p, i) => out.findIndex((q) => q.label === p.label) === i);
+  } catch {
+    return [];
   }
 }
 
@@ -153,6 +183,7 @@ export function AssemblyProvider({ children, readOnly = false }: { children: Rea
   const [hydrated, setHydrated] = React.useState(false);
   const [shapes, setShapes] = React.useState<SceneShape[]>(DEFAULT_SHAPES);
   const [oldWiring, setOldWiring] = React.useState<{ parts: number; wires: number } | null>(null);
+  const [buildParts, setBuildParts] = React.useState<Array<{ kind: LibraryKind; label: string }>>([]);
   const past = React.useRef<AsmDoc[]>([]);
   const future = React.useRef<AsmDoc[]>([]);
   const [, bump] = React.useState(0);
@@ -184,6 +215,7 @@ export function AssemblyProvider({ children, readOnly = false }: { children: Rea
     setDoc(parseAsmDoc(read.raw));
     setShapes(readShapes(scope));
     setOldWiring(readOldWiring(scope));
+    setBuildParts(readBuildParts(scope));
     past.current = [];
     future.current = [];
     setHydrated(true);
@@ -294,9 +326,11 @@ export function AssemblyProvider({ children, readOnly = false }: { children: Rea
       three: isPristineScene(shapes)
         ? []
         : three.filter((p) => !inDoc.has(p.id)).map((p) => ({ id: p.ref, name: p.name, enclosure: p.enclosure?.role ?? null })),
-      library: [],
+      library: buildParts
+        .filter((b) => !doc.instances.some((i) => i.source === "library" && i.label === b.label))
+        .map((b) => ({ ...b, from: "From the build's parts list" })),
     };
-  }, [doc.instances, pcb.part, pcb.ready, shapes, three]);
+  }, [buildParts, doc.instances, pcb.part, pcb.ready, shapes, three]);
 
   // ── the actions ──
   const select = React.useCallback((s: Selection) => setSelection(s), []);

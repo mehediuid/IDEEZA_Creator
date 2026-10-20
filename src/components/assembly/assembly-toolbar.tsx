@@ -72,7 +72,7 @@ export function AssemblyToolbar({ onBringIn, onExport }: { onBringIn: () => void
   const { doc, scene, selection, tool, available } = a;
   const wiring = doc.mode === "wiring";
   const selected = selection.kind === "inst" ? scene.items.find((i) => i.rec.id === selection.id) : undefined;
-  const newCount = available.three.length + (available.pcb.ready && !available.pcb.inAssembly ? 1 : 0);
+  const newCount = available.three.length + available.library.length + (available.pcb.ready && !available.pcb.inAssembly ? 1 : 0);
   const notBrought = !doc.brought ? "Bring in your parts first." : null;
   const isLid = selected?.part.enclosure?.role === "lid";
   const placeWhy =

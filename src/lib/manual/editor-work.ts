@@ -11,14 +11,15 @@
 // (src/lib/pcb/store.tsx) that also validates and clamps rule sets, panel
 // sizes and render settings nothing here needs, and never through
 // `PcbProvider`, which hydrates the *scoped* product's doc on every route in
-// the app regardless of whether that route reads it. The parsed object list
-// is reused for both the PCB and the Assembly facts, so one visit costs one
-// parse of that key, not two. Call `editorWorkOf` from an idle callback
+// the app regardless of whether that route reads it. Assembly and Preview read
+// the summary the Assembly editor saves with its document, never re-solving the
+// assembly here. Call `editorWorkOf` from an idle callback
 // after first paint (COR-61) — never from a provider mounted at the app root.
 //
 // Relative imports only: the node:test harness (tests/projects) compiles this
 // file with tsc, which leaves `@/…` specifiers unresolved in its output.
 
+import { parseAsmDoc } from "../assembly/doc";
 import { boardPartsOf } from "../pcb/board-parts";
 import { docReadKeys } from "./editor-scope";
 import type { EditorDoc, EditorScope, EditorStep } from "./p2-types";
@@ -27,7 +28,7 @@ import { sweepRowIdsOf, type ManualProject } from "./projects";
 export type StepFact =
   | { state: "not-opened" } // no doc for this product
   | { state: "sample" } // PCB: only `sch-` sample objects
-  | { state: "work"; text: string } // "42 objects · 12 on the board", "6 parts · 9 wires", "8 of 12 parts checked", "3 shapes · AI model generated"
+  | { state: "work"; text: string } // "42 objects · 12 on the board", "4 of 4 placed · Fit OK · 2 wires", "3 shapes · AI model generated"
   | { state: "none" }; // nothing attributable (a doc that was never opened, and isn't PCB or Wiring)
 
 export type EditorWork = Record<EditorStep, StepFact>;
@@ -69,28 +70,32 @@ function idOf(o: unknown): string {
     : "";
 }
 
-function pcbAndAssemblyFacts(scope: EditorScope, headRowId: string): { pcb: StepFact; assembly: StepFact } {
+function pcbFact(scope: EditorScope, headRowId: string): StepFact {
   const parsed = readDoc("pcb", scope, headRowId) as { objects?: unknown } | null;
-  if (parsed === null) {
-    // No PCB doc at all: PCB reads "Not opened". Assembly never reads "Not
-    // opened" itself (COR-60) — with no doc there are no board parts, so
-    // it's nothing attributable.
-    return { pcb: { state: "not-opened" }, assembly: { state: "none" } };
-  }
+  if (parsed === null) return { state: "not-opened" };
   const objects = Array.isArray(parsed.objects) ? parsed.objects : [];
   const isSample = objects.length > 0 && objects.every((o) => idOf(o).startsWith("sch-"));
   const placed = objects.filter((o) => !idOf(o).startsWith("sch-")).length;
   const board = boardPartsOf({ objects });
-  const pcb: StepFact = isSample
-    ? { state: "sample" }
-    : { state: "work", text: `${placed} objects · ${board.length} on the board` };
+  return isSample ? { state: "sample" } : { state: "work", text: `${placed} objects · ${board.length} on the board` };
+}
 
-  if (board.length === 0) {
-    return { pcb, assembly: { state: "none" } };
-  }
-  const progress = (readDoc("assembly", scope, headRowId) as Record<string, unknown> | null) ?? {};
-  const checked = board.filter((p) => progress[p.id] === true).length;
-  return { pcb, assembly: { state: "work", text: `${checked} of ${board.length} parts checked` } };
+/** The assembly as its editor last saved it (the doc's summary, written with
+ *  every save): "4 of 4 placed · Fit OK · 2 wires". Nothing brought in yet
+ *  (or the old parts checklist, D4) is nothing attributable. */
+function assemblyFacts(scope: EditorScope, headRowId: string): { assembly: StepFact; preview: StepFact } {
+  const raw = readRaw(docReadKeys("assembly", scope, headRowId).key) ?? readRaw(docReadKeys("assembly", scope, headRowId).adoptFrom ?? "");
+  const doc = parseAsmDoc(raw);
+  if (!doc.brought && doc.instances.length === 0) return { assembly: { state: "none" }, preview: { state: "none" } };
+  const s = doc.summary;
+  const parts = s ? s.parts : doc.instances.length;
+  const fit = s ? (s.problems ? `${s.problems} fit ${s.problems === 1 ? "problem" : "problems"}` : "Fit OK") : null;
+  const wires = doc.wires.length ? ` · ${doc.wires.length} ${doc.wires.length === 1 ? "wire" : "wires"}` : "";
+  const text = s ? `${s.placed} of ${parts} placed · ${fit}${wires}` : `${parts} parts${wires}`;
+  return {
+    assembly: { state: "work", text },
+    preview: parts ? { state: "work", text: `${parts} ${parts === 1 ? "part" : "parts"} to view` } : { state: "none" },
+  };
 }
 
 function wiringFact(scope: EditorScope, headRowId: string): StepFact {
@@ -131,27 +136,20 @@ function threeFact(scope: EditorScope, headRowId: string): StepFact {
   return parts.length > 0 ? { state: "work", text: parts.join(" · ") } : { state: "none" };
 }
 
-/** "{n} mates set" once the product has its own scoped Preview mates. */
-function previewFact(scope: EditorScope, headRowId: string): StepFact {
-  const mates = readDoc("preview.mates", scope, headRowId);
-  const n = mates && typeof mates === "object" ? Object.keys(mates as object).length : 0;
-  return n > 0 ? { state: "work", text: `${n} mates set` } : { state: "none" };
-}
-
 /** Per-product editor facts (P2-EDITOR-8) — every step but Brief, which has
  *  its own read (`project-brief.ts`, COM-1). `headRowId` is the project's
  *  first row, the one that adopts the legacy per-project keys. Pure: reads
  *  up to eight localStorage keys once and returns; never writes, never
  *  caches, never subscribes. */
 export function editorWorkOf(scope: EditorScope, headRowId: string): EditorWork {
-  const { pcb, assembly } = pcbAndAssemblyFacts(scope, headRowId);
+  const { assembly, preview } = assemblyFacts(scope, headRowId);
   return {
-    pcb,
+    pcb: pcbFact(scope, headRowId),
     assembly,
     wiring: wiringFact(scope, headRowId),
     three: threeFact(scope, headRowId),
     code: codeFact(scope, headRowId),
-    preview: previewFact(scope, headRowId),
+    preview,
   };
 }
 

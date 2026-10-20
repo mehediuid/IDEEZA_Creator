@@ -17,6 +17,6 @@ Moved verbatim from `CLAUDE.md` §5 on 2026-09-29 and split by area; each sectio
 | Schematic canvas, palette, sheets, connectivity, ERC, netlist, annotation, sheet export | [pcb-schematic.md](pcb-schematic.md) | PCB module — schematic editor · Schematic connectivity, ERC, netlist & annotation |
 | Board canvas, 3D view, board areas, teardrops, pour, authoring + Move, Schematic → PCB, routing, DRC | [pcb-board.md](pcb-board.md) | PCB 2D canvas — visualisation · PCB editor · Board areas · Teardrops · Copper pour · Board-document authoring · Native Schematic → PCB · Interactive routing · Native PCB DRC engine |
 | Toolbars, exports, library window, menus, 3D menus, right/left/bottom panels, boolean geometry, context menus | [pcb-tools-menus-panels.md](pcb-tools-menus-panels.md) | Top toolbar · Right panel · Boolean / Combine geometry · Menu leaves · Right-click context menus · Left panel · Bottom panel · PCB module — misc |
-| Code, 3D Module, Product Preview, Wiring, the mint flow (the Brief) | [editor-modules.md](editor-modules.md) | Other editor modules |
+| Code, 3D Module, Assembly (with its Wiring mode), Product Preview, the mint flow (the Brief) | [editor-modules.md](editor-modules.md) | Other editor modules |
 
 *Not yet inventoried:* the **Assembly** module (`src/components/assembly/`, step `assembly` in `FLOW_STEPS`) has no entry; add one once it is browser-verified.

@@ -7,6 +7,7 @@
 import * as React from "react";
 import { useStepNav } from "@/components/manual/use-step-nav";
 import { Button, Checkbox } from "@/components/ideeza";
+import { LIBRARY_BY_KIND } from "@/lib/assembly/library";
 import { useAssembly } from "./assembly-store";
 
 const mm = (n: number) => (Math.round(n * 10) / 10).toString();
@@ -18,9 +19,11 @@ export function BringInCard({ onClose }: { onClose?: () => void }) {
   const pcbOffer = available.pcb.ready && !available.pcb.inAssembly;
   const [pcb, setPcb] = React.useState(pcbOffer);
   const [three, setThree] = React.useState<string[]>(() => available.three.map((t) => t.id));
-  const count = (pcb && pcbOffer ? 1 : 0) + three.filter((id) => available.three.some((t) => t.id === id)).length;
+  const [lib, setLib] = React.useState<string[]>(() => available.library.map((l) => l.label));
+  const libChosen = available.library.filter((l) => lib.includes(l.label));
+  const count = (pcb && pcbOffer ? 1 : 0) + three.filter((id) => available.three.some((t) => t.id === id)).length + libChosen.length;
   const first = !doc.brought;
-  const nothing = !pcbOffer && available.three.length === 0;
+  const nothing = !pcbOffer && available.three.length === 0 && available.library.length === 0;
 
   return (
     <div role="dialog" aria-labelledby="bring-in-title" className="flex w-[min(440px,100%)] flex-col gap-4 rounded-xl border border-solid border-border-default bg-bg-surface p-6 shadow-3">
@@ -60,6 +63,20 @@ export function BringInCard({ onClose }: { onClose?: () => void }) {
           </span>
         </label>
       ))}
+      {available.library.map((l) => (
+        <label key={l.label} className="flex cursor-pointer items-start gap-3 rounded-lg border border-solid border-border-subtle p-4">
+          <Checkbox checked={lib.includes(l.label)} onChange={() => setLib((s) => (s.includes(l.label) ? s.filter((x) => x !== l.label) : [...s, l.label]))} />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium leading-xs text-text-primary">
+              Off-board · {l.label} {LIBRARY_BY_KIND[l.kind]?.name}
+            </span>
+            <span className="block text-xs leading-xs text-text-tertiary">
+              {l.from} · {LIBRARY_BY_KIND[l.kind]?.dims} mm, with its leads
+            </span>
+          </span>
+        </label>
+      ))}
+
       {available.three.length === 0 && !doc.instances.some((i) => i.source === "three") && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-dashed border-border-strong p-4">
           <span className="text-xs leading-xs text-text-tertiary">Nothing in the 3D Module yet. Add an Enclosure there (Shape Creation ▸ Enclosure) for the case.</span>
@@ -80,7 +97,7 @@ export function BringInCard({ onClose }: { onClose?: () => void }) {
           size="md"
           disabled={count === 0}
           onClick={() => {
-            a.bringIn({ pcb: pcb && pcbOffer, three: three.filter((id) => available.three.some((t) => t.id === id)), library: [] });
+            a.bringIn({ pcb: pcb && pcbOffer, three: three.filter((id) => available.three.some((t) => t.id === id)), library: libChosen.map((l) => ({ kind: l.kind, label: l.label })) });
             onClose?.();
           }}
         >
