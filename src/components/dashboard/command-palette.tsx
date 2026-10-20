@@ -97,7 +97,7 @@ export function CommandPalette({
         icon: Home01Icon, onActivate: go("/") },
       { id: "history", label: "History", category: "Pages",
         icon: HistoryIcon, onActivate: go("/history") },
-      { id: "history-builds", label: "Open project create history", category: "Pages",
+      { id: "history-builds", label: "Open build history", category: "Pages",
         icon: HistoryIcon, onActivate: go("/history?tab=builds") },
       { id: "projects", label: "My projects", category: "Pages",
         icon: Folder01Icon, onActivate: go("/projects") },

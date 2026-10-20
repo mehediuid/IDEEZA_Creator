@@ -110,8 +110,7 @@ const STORAGE_KEY = "ideeza:create:credits";
 const SEED_BALANCE = 8;
 
 // Safe placeholder for the pre-hydration render only — never shown,
-// since both QuotaCard's and CreditsCard's convention is to render a
-// hidden shell until `hydrated` is true.
+// since readers render a hidden shell until `hydrated` is true.
 const DEFAULT_STATE: CreditsState = { balance: 0, ledger: [] };
 
 function makeId(): string {
@@ -304,7 +303,7 @@ export function expireState(state: CreditsState, now: number): CreditsState {
   return next;
 }
 
-// One-line description of a ledger entry for display (CreditsCard). `subject`
+// One-line description of a ledger entry for display. `subject`
 // names what was charged — the build's title — because the id alone
 // ("build_t4p17pf3_…") tells the reader nothing.
 export function describeEntry(entry: CreditEntry, subject?: string): string {

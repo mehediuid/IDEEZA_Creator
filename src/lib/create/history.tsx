@@ -14,6 +14,7 @@
 
 import * as React from "react";
 import { reportWrite } from "../storage-status";
+import { stampItemTimes } from "./item-times";
 import type { Companion } from "./companions";
 import type { LinkEdit, NetworkEdits, NetworkReply } from "./network-reply";
 import {
@@ -225,6 +226,11 @@ export type BuildItem = {
   kind: BuildItemKind;
   status: BuildItemStatus;
   progress: number; // 0–100
+  /** When it last started building and when it finished, stamped by the
+   *  store's setter (item-times.ts) — History's step durations. Absent on
+   *  builds stored before the stamps. */
+  startedAt?: number;
+  endedAt?: number;
 };
 
 /** Part 4 §4.4 — a companion product built alongside the primary one.
@@ -567,6 +573,10 @@ function normalizeItems(raw: unknown): BuildItem[] {
   for (const item of Array.isArray(raw) ? (raw as BuildItem[]) : []) {
     if (!item || !ITEM_KINDS.includes(item.kind)) continue;
     const progress = Number(item.progress);
+    const time = (v: unknown) =>
+      typeof v === "number" && Number.isFinite(v) ? { value: v } : null;
+    const startedAt = time(item.startedAt);
+    const endedAt = time(item.endedAt);
     byKind.set(item.kind, {
       kind: item.kind,
       status: ITEM_STATUS_VALUES.includes(item.status)
@@ -575,6 +585,8 @@ function normalizeItems(raw: unknown): BuildItem[] {
       progress: Number.isFinite(progress)
         ? Math.max(0, Math.min(100, progress))
         : 0,
+      ...(startedAt ? { startedAt: startedAt.value } : null),
+      ...(endedAt ? { endedAt: endedAt.value } : null),
     });
   }
   return ITEM_KINDS.map(
@@ -843,13 +855,24 @@ type Ctx = {
 
 const CreateHistoryContext = React.createContext<Ctx | null>(null);
 
+// What was stored is taken as it is; any other write is stamped.
+type BuildsAction = React.SetStateAction<BuildJob[]> | { hydrate: BuildJob[] };
+
+function buildsReducer(prev: BuildJob[], action: BuildsAction): BuildJob[] {
+  if (typeof action === "function") return stampItemTimes(prev, action(prev), Date.now());
+  if (Array.isArray(action)) return stampItemTimes(prev, action, Date.now());
+  return action.hydrate;
+}
+
 export function CreateHistoryProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const [chats, setChats] = React.useState<ChatSession[]>([]);
-  const [builds, setBuilds] = React.useState<BuildJob[]>([]);
+  // Every write after hydration is stamped: each artifact's start and
+  // finish, wherever its status changes (item-times.ts).
+  const [builds, setBuilds] = React.useReducer(buildsReducer, []);
   const [hydrated, setHydrated] = React.useState(false);
 
   // Latest builds, readable inside event callbacks (the queue has to
@@ -864,11 +887,11 @@ export function CreateHistoryProvider({
   // older shape.
   React.useEffect(() => {
     setChats(loadJSON<ChatSession[]>(CHATS_KEY, []));
-    setBuilds(
-      enforceSingleRunning(
+    setBuilds({
+      hydrate: enforceSingleRunning(
         loadJSON<BuildJob[]>(BUILDS_KEY, []).map(normalizeJob),
       ),
-    );
+    });
     setHydrated(true);
   }, []);
 
