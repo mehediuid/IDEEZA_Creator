@@ -39,7 +39,7 @@ const buttonVariants = cva(
         ghost:
           "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
         danger:
-          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:bg-[var(--color-button-danger-bg-hover)] active:bg-[var(--color-button-danger-bg-pressed)]",
+          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:bg-[var(--color-button-danger-bg-hover)] active:bg-[var(--color-button-danger-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
         // DS Hierarchy=Tonal (3288:640) and Outline brand (3289:700).
         tonal:
           "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-[var(--color-button-tonal-bg)] text-[color:var(--color-button-tonal-text)] hover:bg-[var(--color-button-tonal-bg-hover)] active:bg-[var(--color-button-tonal-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",

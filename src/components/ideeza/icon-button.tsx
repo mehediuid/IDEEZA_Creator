@@ -4,13 +4,15 @@
 // Converted from Figma (node 167:1479). Square icon-only button for compact
 // actions (close, edit, delete, more). Token-driven. radius-lg, icon = size/2.
 // Hierarchy: primary/secondary/ghost/danger · Size: 32/36/40/44/48.
+// Danger keeps its red and fades the whole button, as A02 draws it: 88 % on
+// hover, 76 % pressed; disabled is the disabled fill and ink at 50 %.
 
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const iconButtonVariants = cva(
-  "inline-flex items-center justify-center shrink-0 rounded-[var(--radius-lg)] transition-[background-color,filter] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
+  "inline-flex items-center justify-center shrink-0 rounded-[var(--radius-lg)] transition-[background-color,opacity] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
   {
     variants: {
       hierarchy: {
@@ -21,7 +23,7 @@ const iconButtonVariants = cva(
         ghost:
           "bg-transparent text-[color:var(--color-icon-default)] hover:bg-[var(--color-button-ghost-bg-hover)]",
         danger:
-          "bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:brightness-105 active:brightness-95",
+          "bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:opacity-[0.88] active:opacity-[0.76] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)] disabled:opacity-50",
       },
       size: {
         sm: "size-[32px]",
