@@ -16,7 +16,7 @@
 Demo values the owner can change in one place:
 - Network: Base Sepolia (Testnet), the stand-in for the Figma's "Ethereum"; ETH, USDT and USDC are paid there (C6). A wallet on Amoy is asked to switch by the wallet's own dialog (X7).
 - Round 1 at the one IDZ price `IDZ_USD_PRICE` $0.025065 (D5), ending 31 Dec 2026, 11:59:59 PM Bangladesh time (17:59:59 UTC), written with the time zone. The countdown runs to that moment and never resets; after it the card says the round ended and Buy is off. The next price, $0.03, is written beside the countdown (D8).
-- Test ETH at a demo reference rate of 1 ETH = $2,500, written wherever an ETH amount is quoted; USDT and USDC one for one.
+- Dollars per coin come from the app's one demo rate table, `DEMO_USD_RATES` (`lib/account/payout.ts`, also used by Settings › Get paid): test ETH 1 ETH = $3,750, written wherever an ETH amount is quoted; USDT and USDC one for one.
 - Whitelist (C7): Demo account 2 pays 10% less, $0.022558 (rounded down to the micro-dollar). The old price is struck through.
 - Release (C8): bought IDZ unlocks 2 minutes after its purchase confirms, then the buyer claims it.
 - Gas reserve: the demo network fee twice over — this purchase and its claim (C5b) — paid in test ETH whatever the coin.

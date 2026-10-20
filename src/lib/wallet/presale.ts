@@ -1,14 +1,17 @@
 // The demo IDZ presale (spec 2026-10-19-balance-buy-idz-design.md; Figma
 // User Panel V2 › Balance → Buy IDEEZA Coin 41571:113536). Its config — one
 // round at the one IDZ price, a real end that never resets, the next price,
-// the release time, the whitelist, the demo rate for test ETH — and the
+// the release time, the whitelist — and the
 // rules the buy form and the claim keep: the two-way quote, Max, the gas
 // reserve, the field errors, and the wallet requests that pay and claim.
 //
-// Every sum runs in bigint micros (`money.ts`); nothing touches a chain.
+// A coin's dollars come from the app's one demo rate table (`DEMO_USD_RATES`,
+// `account/payout.ts`), the same one Get paid uses. Every sum runs in bigint
+// micros (`money.ts`); nothing touches a chain.
 //
 // Pure, relative imports only.
 
+import { DEMO_USD_RATES } from "../account/payout";
 import type { Network, Token } from "../brief/types";
 import { estimateGas } from "../commerce/gas";
 import { demoAddress, makerId } from "./demo-wallet";
@@ -42,8 +45,6 @@ export const PRESALE = {
   endsAt: Date.UTC(2026, 11, 31, 17, 59, 59),
   /** Bought IDZ unlocks this long after its purchase confirms, then it is claimed. */
   lockMs: 2 * MINUTE,
-  /** A demo reference rate for test ETH, in US dollars — test ETH has no market. */
-  ethUsd: "2500",
   /** C7: the demo accounts on the whitelist, and the share off their price. */
   whitelist: { accounts: [2] as readonly AccountIndex[], percentOff: 10 },
 } as const;
@@ -67,9 +68,9 @@ function ceilDiv(a: bigint, b: bigint): bigint {
 
 // ── price ───────────────────────────────────────────────────────────────
 
-/** US dollars per coin: test ETH at the demo rate, USDT and USDC one for one. */
+/** US dollars per coin, from the app's one demo rate table: USDT and USDC one for one, test ETH at its demo rate. */
 export function coinRateOf(coin: PayCoin): Amount {
-  return coin === "ETH" ? PRESALE.ethUsd : "1";
+  return DEMO_USD_RATES[coin];
 }
 
 /** The price this address pays: the round's, or the whitelist's (rounded down to the micro-dollar). */
@@ -108,7 +109,7 @@ export function formatUsd(a: Amount): string {
   return USD.format(Number(cents) / 100);
 }
 
-/** "$0.025065", "$2,500" — a price keeps all its digits, its whole part grouped. */
+/** "$0.025065", "$3,750" — a price keeps all its digits, its whole part grouped. */
 export function formatPrice(a: Amount): string {
   return `$${formatAmount(a, "IDZ").replace(/ IDZ$/, "")}`;
 }

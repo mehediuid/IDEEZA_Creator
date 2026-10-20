@@ -10,6 +10,7 @@ const { balancesOf } = await import("../../.tmp-test/lib/wallet/balances.js");
 const { defaultWallet, pushActivity, demoAddress, normalizeWallet, walletConnect } = await import("../../.tmp-test/lib/wallet/demo-wallet.js");
 const { activityOf, chargeRowsOf, proofOf } = await import("../../.tmp-test/lib/wallet/request-view.js");
 const { requestCopy } = await import("../../.tmp-test/lib/wallet/request.js");
+const { DEMO_USD_RATES } = await import("../../.tmp-test/lib/account/payout.js");
 
 const NOW = Date.UTC(2026, 9, 19, 9, 30, 0);
 const EMPTY_MARKET = { listings: [], sales: [], bids: [], support: [], unreadable: false };
@@ -33,6 +34,8 @@ function claim(w, purchase, at, nonce = "c") {
 // ── the config ─────────────────────────────────────────────────────────
 
 test("one price: the presale sells at the one IDZ price, on Base Sepolia, for ETH, USDT and USDC", () => {
+  assert.equal(presale.coinRateOf("ETH"), DEMO_USD_RATES.ETH); // the app's one demo dollar table
+  assert.equal(presale.coinRateOf("USDT"), "1");
   assert.equal(presale.PRESALE.price, idz.IDZ_USD_PRICE);
   assert.equal(presale.PRESALE.network, "baseSepolia");
   assert.deepEqual(presale.PAY_COINS, ["ETH", "USDT", "USDC"]);
@@ -56,24 +59,24 @@ test("the round: open until its end, closed from that second on; the countdown n
 
 // ── the quote ──────────────────────────────────────────────────────────
 
-test("two-way quote: 34 IDZ costs 0.85221 USDT, or 0.000341 test ETH at the demo rate (rounded up)", () => {
+test("two-way quote: 34 IDZ costs 0.85221 USDT, or 0.000228 test ETH at the app's demo rate (rounded up)", () => {
   assert.equal(presale.quotePayOf("34", "USDT", "0.025065"), "0.85221");
   assert.equal(presale.quotePayOf("34", "USDC", "0.025065"), "0.85221");
-  assert.equal(presale.quotePayOf("34", "ETH", "0.025065"), "0.000341");
+  assert.equal(presale.quotePayOf("34", "ETH", "0.025065"), "0.000228");
   // The other way rounds down, so the presale never gives more than was paid for.
   assert.equal(presale.quoteIdzOf("1", "USDT", "0.025065"), "39.896269");
-  assert.equal(presale.quoteIdzOf("0.000341", "ETH", "0.025065"), "34.011569");
+  assert.equal(presale.quoteIdzOf("0.000341", "ETH", "0.025065"), "51.017354");
   assert.equal(presale.quotePayOf("abc", "ETH", "0.025065"), null);
   assert.equal(presale.quoteIdzOf("", "ETH", "0.025065"), null);
 });
 
 test("worth in dollars: what was paid at its coin's rate", () => {
   assert.equal(presale.worthUsdOf("0.85221", "USDT"), "0.85221");
-  assert.equal(presale.worthUsdOf("0.000341", "ETH"), "0.8525");
+  assert.equal(presale.worthUsdOf("0.000228", "ETH"), "0.855");
   assert.equal(presale.formatUsd("0.8525"), "$0.85");
   assert.equal(presale.formatUsd("12553103.33"), "$12,553,103.33");
   assert.equal(presale.formatPrice("0.025065"), "$0.025065");
-  assert.equal(presale.formatPrice("2500"), "$2,500");
+  assert.equal(presale.formatPrice("3750"), "$3,750");
 });
 
 test("gas: the reserve is the network fee twice (the purchase and its claim), in test ETH", () => {
@@ -112,7 +115,7 @@ test("checks: a valid amount quotes the other field and has no error; after the 
   const ok = check({ driver: "get", text: "34", coin: "ETH" });
   assert.equal(ok.error, null);
   assert.equal(ok.idz, "34");
-  assert.equal(ok.pay, "0.000341");
+  assert.equal(ok.pay, "0.000228");
   const byPay = check({ driver: "pay", text: "0.04792", coin: "ETH" });
   assert.equal(byPay.error, null);
   assert.equal(byPay.pay, "0.04792");
@@ -124,14 +127,14 @@ test("checks: a valid amount quotes the other field and has no error; after the 
 // ── the requests ───────────────────────────────────────────────────────
 
 test("the buy request: a transaction on the presale network whose review shows N5 — IDZ, price, worth, claim time", () => {
-  const req = presale.buyRequestOf({ idz: "34", pay: "0.000341", coin: "ETH", price: "0.025065", whitelisted: false });
+  const req = presale.buyRequestOf({ idz: "34", pay: "0.000228", coin: "ETH", price: "0.025065", whitelisted: false });
   assert.equal(req.kind, "transaction");
   assert.equal(req.purpose, "buyIdz");
   assert.equal(req.network, "baseSepolia");
   assert.deepEqual(req.summary.map((r) => r.label), ["You get", "Price", "Worth", "Claim"]);
   assert.equal(req.summary[0].value, "34 IDZ");
   assert.match(req.summary[3].value, /2 minutes after it confirms/);
-  assert.deepEqual(req.charge, { network: "baseSepolia", lines: [{ coin: "ETH", amount: "0.00104" }, { coin: "ETH", amount: "0.000341" }] });
+  assert.deepEqual(req.charge, { network: "baseSepolia", lines: [{ coin: "ETH", amount: "0.00104" }, { coin: "ETH", amount: "0.000228" }] });
   const rows = chargeRowsOf(req).rows.map((r) => r.label);
   assert.deepEqual(rows, ["Network fee (Base Sepolia)", "You pay"]);
   assert.equal(requestCopy("confirmed", req, defaultWallet()).title, "Purchase successful");
@@ -139,7 +142,7 @@ test("the buy request: a transaction on the presale network whose review shows N
 });
 
 test("a whitelisted buy names its discount in the review", () => {
-  const req = presale.buyRequestOf({ idz: "34", pay: "0.000307", coin: "ETH", price: "0.022558", whitelisted: true });
+  const req = presale.buyRequestOf({ idz: "34", pay: "0.000205", coin: "ETH", price: "0.022558", whitelisted: true });
   assert.equal(req.summary[1].value, "1 IDZ = $0.022558 · whitelist −10%");
 });
 
@@ -149,8 +152,8 @@ test("a purchase is locked, then ready to claim at its unlock time, then claimed
   let { w } = buy(walletConnect(defaultWallet(), "maker-1"));
   const [p] = records.purchasesOf(w, "maker-1");
   assert.equal(p.buy.idz, "34");
-  assert.deepEqual(p.buy.paid, { coin: "ETH", amount: "0.000341" });
-  assert.equal(p.buy.usd, "0.8525");
+  assert.deepEqual(p.buy.paid, { coin: "ETH", amount: "0.000228" });
+  assert.equal(p.buy.usd, "0.855");
   assert.equal(p.buy.unlocksAt, NOW + presale.PRESALE.lockMs);
   assert.equal(records.purchaseStatusOf(p, NOW), "locked");
   assert.equal(records.purchaseStatusOf(p, p.buy.unlocksAt), "claimable");
@@ -164,13 +167,13 @@ test("balances: the coin and gas leave at purchase, the IDZ arrives at claim —
   let { w } = buy(defaultWallet());
   let bal = balancesOf("maker-1", ctx(w));
   assert.equal(bal.idz, "2000");
-  assert.equal(bal.native.baseSepolia.ETH, "0.048619"); // 0.05 − 0.000341 − 0.00104
+  assert.equal(bal.native.baseSepolia.ETH, "0.048732"); // 0.05 − 0.000228 − 0.00104
   const [p] = records.purchasesOf(w, "maker-1");
   w = claim(w, p, p.buy.unlocksAt);
   w = claim(w, p, p.buy.unlocksAt + 5, "d"); // a second tab's claim of the same purchase
   bal = balancesOf("maker-1", ctx(w));
   assert.equal(bal.idz, "2034");
-  assert.equal(bal.native.baseSepolia.ETH, "0.046539"); // both claims' gas was spent
+  assert.equal(bal.native.baseSepolia.ETH, "0.046652"); // both claims' gas was spent
   assert.equal(records.claimedIdzOf(w, "maker-1"), "34");
 });
 
@@ -204,7 +207,7 @@ test("ledger: a held Buy row, then a Claim row; it still reconciles with the der
     ["buy", "in", "34", true],
     ["reward", "in", "2000", false],
   ]);
-  assert.match(rows[1].title, /Presale Round 1 · paid 0\.000341 ETH/);
+  assert.match(rows[1].title, /Presale Round 1 · paid 0\.000228 ETH/);
   const net = rows.reduce((sum, r) => sum + (r.held ? 0 : (r.direction === "in" ? 1 : -1) * Number(r.amount)), 0);
   assert.equal(String(net), balancesOf("maker-1", ctx(w)).idz);
   assert.deepEqual(idz.TRANSFER_TYPES.map((t) => t.label), ["Reward", "Project Create", "Credits", "Buy", "Claim"]);
@@ -215,8 +218,8 @@ test("total USD raised: the sum of every demo purchase in this wallet, any accou
   assert.equal(records.totalRaisedOf(defaultWallet()), "0");
   let { w } = buy(defaultWallet(), { id: "maker-1", coin: "USDT", nonce: "a" });
   ({ w } = buy(w, { id: "maker-2", coin: "ETH", nonce: "b" }));
-  // 0.85221 USDT + the whitelisted account's 0.000307 ETH (34 × 0.022558 ÷ 2500, rounded up) × 2500.
-  assert.equal(records.totalRaisedOf(w), "1.61971");
+  // 0.85221 USDT + the whitelisted account's 0.000205 ETH (34 × 0.022558 ÷ 3750, rounded up) × 3750.
+  assert.equal(records.totalRaisedOf(w), "1.62096");
 });
 
 test("a stored purchase and claim survive a reload; a malformed one loses only its presale fields", () => {
