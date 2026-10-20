@@ -14,7 +14,7 @@ export type ThreeAction =
   // AI
   | "ai:generate"
   // Shape Creation
-  | "shape:box" | "shape:sphere" | "shape:cylinder" | "shape:cone" | "shape:torus" | "shape:plane" | "shape:spline" | "shape:sketch" | "shape:import"
+  | "shape:box" | "shape:sphere" | "shape:cylinder" | "shape:cone" | "shape:torus" | "shape:plane" | "shape:enclosure" | "shape:spline" | "shape:sketch" | "shape:import"
   // Modeling Operation
   | "model:extrude" | "model:revolve" | "model:sweep" | "model:loft" | "model:fillet" | "model:chamfer" | "model:shell" | "model:union" | "model:subtract" | "model:intersect" | "model:mirror" | "model:pattern"
   // Transformation & Utilities
@@ -40,6 +40,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "Cone", action: "shape:cone" },
     { label: "Torus", action: "shape:torus" },
     { label: "Plane", action: "shape:plane", shortcut: "P" },
+    { label: "Enclosure", action: "shape:enclosure" },
     { label: "Spline", action: "shape:spline" },
     { label: "", divider: true },
     { label: "Sketch…", action: "shape:sketch", shortcut: "⌘K" },

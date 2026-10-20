@@ -28,6 +28,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "Cone", action: "shape:cone" },
     { label: "Torus", action: "shape:torus" },
     { label: "Plane", action: "shape:plane", shortcut: "P" },
+    { label: "Enclosure", action: "shape:enclosure" },
     { label: "Spline", action: "shape:spline" },
     { label: "", divider: true },
     { label: "Sketch…", action: "shape:sketch", shortcut: "⌘K" },
