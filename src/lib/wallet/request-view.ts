@@ -144,7 +144,8 @@ export function chargeRowsOf(req: WalletRequest): { rows: ChargeRow[]; total: st
       feeSeen = true;
       return { label: gas.label, value: formatAmount(line.amount, line.coin), note: gas.note };
     }
-    return { label: req.purpose === "purchase" ? "Price" : "Amount", value: formatAmount(line.amount, line.coin) };
+    const label = req.purpose === "purchase" ? "Price" : req.purpose === "buyIdz" ? "You pay" : "Amount";
+    return { label, value: formatAmount(line.amount, line.coin) };
   });
   const total = sumCharge(req.charge)
     .lines.map((l) => formatAmount(l.amount, l.coin))
@@ -277,10 +278,15 @@ const ACTIVITY_VERB: Record<RequestPurpose, string> = {
   subscribe: "Paid for a plan",
   withdraw: "Withdrew earnings",
   payoutMethod: "Signed a withdrawal method",
+  buyIdz: "Bought IDZ in the presale",
+  claimIdz: "Claimed presale IDZ",
 };
 
-/** "Minted on chain · Car": the verb for the purpose, then the request's "Project" row (else its title). */
+/** "Minted on chain · Car": the verb for the purpose, then the request's "Project" row (else its
+ *  title). A presale purchase or claim has no project: "Bought IDZ in the presale · 34 IDZ". */
 export function activityTitleOf(req: WalletRequest): string {
+  if (req.purpose === "buyIdz" && req.presale) return `${ACTIVITY_VERB.buyIdz} · ${formatAmount(req.presale.idz, "IDZ")}`;
+  if (req.purpose === "claimIdz") return ACTIVITY_VERB.claimIdz;
   const project = req.summary.find((r) => r.label === "Project")?.value;
   return project ? `${ACTIVITY_VERB[req.purpose]} · ${project}` : req.title;
 }
@@ -306,6 +312,11 @@ export function activityOf(req: WalletRequest, proof: Proof, id: string, project
   if (proof.txHash) entry.txHash = proof.txHash;
   if (proof.signature) entry.signature = proof.signature;
   if (req.kind === "transaction" && req.charge && req.purpose !== "purchase") entry.charge = sumCharge(req.charge);
+  if (req.purpose === "buyIdz" && req.presale) {
+    const { lockMs, ...bought } = req.presale;
+    entry.presale = { ...bought, unlocksAt: proof.at + lockMs };
+  }
+  if (req.purpose === "claimIdz" && req.claims) entry.claims = req.claims;
   return entry;
 }
 

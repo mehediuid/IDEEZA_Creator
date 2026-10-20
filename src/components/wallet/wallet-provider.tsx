@@ -80,6 +80,9 @@ export type WalletRequestApi = {
   request: (req: WalletRequest, opts?: RequestOptions) => Promise<RequestResult>;
   /** Opens the Demo wallet dialog (P2-MINT-2): connect, account, network, demo buyers. */
   openManage: () => void;
+  /** The dialog is on screen — a dialog under it stays covered until it closes (it still shows
+   *  Done after `request` resolves). */
+  dialogOpen: boolean;
 };
 
 const WalletContext = React.createContext<WalletRequestApi | null>(null);
@@ -403,7 +406,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (failure) fail(failure);
   }, [wallet, screen, fail]);
 
-  const api = React.useMemo<WalletRequestApi>(() => ({ request, openManage }), [request, openManage]);
+  const dialogOpen = screen.mode !== "closed";
+  const api = React.useMemo<WalletRequestApi>(() => ({ request, openManage, dialogOpen }), [request, openManage, dialogOpen]);
 
   const view: RequestView | null =
     screen.mode === "request"

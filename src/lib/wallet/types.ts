@@ -37,7 +37,32 @@ export type WalletActivity = {
   /** What the request was for. Records older than the Balance page have none
    *  (the IDZ ledger then reads the title). */
   purpose?: RequestPurpose;
+  /** A presale purchase (`buyIdz`): what it bought, held until it unlocks. */
+  presale?: PresaleBuy;
+  /** A claim (`claimIdz`): the id of the purchase whose IDZ it releases. */
+  claims?: string;
 };
+
+/**
+ * What one presale purchase bought (Balance › Buy IDZ Token). Its activity
+ * line's charge is the coin paid plus the purchase's gas; the IDZ here stays
+ * with the presale until `unlocksAt`, then a claim moves it into the balance.
+ */
+export type PresaleBuy = {
+  idz: Amount;
+  /** The coin and amount paid for it, without the gas. */
+  paid: ChargeLine;
+  /** Its worth in US dollars at the coin's rate: what "Total USD raised" sums. */
+  usd: Amount;
+  /** US dollars per IDZ, after any whitelist discount. */
+  price: Amount;
+  round: string;
+  whitelisted: boolean;
+  unlocksAt: number;
+};
+
+/** A purchase before it confirms: the lock is counted from the moment it does. */
+export type PresaleDraft = Omit<PresaleBuy, "unlocksAt"> & { lockMs: number };
 
 export type DemoWallet = {
   v: 2;
@@ -97,7 +122,11 @@ export type RequestPurpose =
   /** Earnings withdrawn in Settings › Get paid: a signature, nothing charged. */
   | "withdraw"
   /** A withdrawal method added or made the default in Settings › Get paid: a signature. */
-  | "payoutMethod";
+  | "payoutMethod"
+  /** IDZ bought in the demo presale (Balance › Buy IDZ Token). */
+  | "buyIdz"
+  /** A presale purchase's IDZ claimed once it unlocks. */
+  | "claimIdz";
 
 export type WalletRequest = {
   kind: "signature" | "transaction";
@@ -116,6 +145,10 @@ export type WalletRequest = {
   /** A purchase that ends this listing (an auction's Buy now): the buyer's own
    *  held top bid on it pays toward the charge (R1-3). */
   releases?: string;
+  /** `buyIdz`: what the confirmed line records as its purchase. */
+  presale?: PresaleDraft;
+  /** `claimIdz`: the purchase it claims. */
+  claims?: string;
 };
 
 export type RequestPhase =

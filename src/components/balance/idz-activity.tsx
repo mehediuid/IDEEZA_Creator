@@ -6,7 +6,9 @@
 // Transaction ID · Date & Time · Amount · Wallet Address · Chain · Transfer
 // Type with its arrow. The ID is the short transaction hash with a copy
 // button (the full hash is copied); In and Out are written, not only
-// coloured. Below a 720 px box the rows stack, one card each.
+// coloured. Below a 720 px box the rows stack, one card each. A presale Buy
+// row is IDZ the presale still holds: written without a sign, with where it
+// stands (Claim in …, Ready to claim, Claimed) — its Claim row is the "+".
 
 import * as React from "react";
 import { ArrowDown02Icon, ArrowUp02Icon } from "@hugeicons/core-free-icons";
@@ -25,6 +27,7 @@ import {
   type TransferType,
 } from "@/lib/wallet/idz";
 import { formatAmount } from "@/lib/wallet/money";
+import { claimInOf } from "@/lib/wallet/presale";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import { cn } from "@/lib/utils";
 import { IdzCoin } from "./idz-coin";
@@ -37,7 +40,15 @@ const ALL = "all";
 const CELL = "px-[16px] py-[8px]";
 
 function signed(r: IdzRow): string {
+  if (r.held) return formatAmount(r.amount, "IDZ");
   return `${r.direction === "in" ? "+" : "−"}${formatAmount(r.amount, "IDZ")}`;
+}
+
+/** Where a held Buy row stands: "Claim in 1 m 58 s", "Ready to claim", "Claimed". */
+function heldLine(r: IdzRow, now: number): string | null {
+  if (!r.held) return null;
+  if (r.held.claimed) return "Claimed";
+  return now >= r.held.unlocksAt ? "Ready to claim" : claimInOf(r.held.unlocksAt - now);
 }
 
 function chainOf(r: IdzRow): string {
@@ -54,7 +65,7 @@ function Direction({ r }: { r: IdzRow }) {
   );
 }
 
-function AddressChip({ address }: { address: string }) {
+export function AddressChip({ address }: { address: string }) {
   return (
     <span
       title={address}
@@ -66,7 +77,33 @@ function AddressChip({ address }: { address: string }) {
   );
 }
 
-export function IdzActivity({ rows }: { rows: IdzRow[] }) {
+/** A short transaction hash with the full one for screen readers and a copy button; "—" without one. */
+export function TxHashCell({
+  id,
+  hash,
+  copied,
+  copy,
+  none = "Your demo wallet starts with this",
+}: {
+  id: string;
+  hash: string | null;
+  copied: { what: string } | null;
+  copy: (what: string, value: string, done: string) => void;
+  none?: string;
+}) {
+  if (!hash) return <span title={none}>—</span>;
+  return (
+    <span className="inline-flex items-center gap-[4px]">
+      <span title={hash} className="tabular-nums">
+        <span aria-hidden>{shortAddress(hash)}</span>
+        <span className="sr-only">{hash}</span>
+      </span>
+      <CopyButton label="Copy transaction hash" done={copied?.what === id} onPress={() => copy(id, hash, "Transaction hash copied")} />
+    </span>
+  );
+}
+
+export function IdzActivity({ rows, now }: { rows: IdzRow[]; now: number }) {
   const [network, setNetwork] = React.useState<string>(UNSET);
   const [type, setType] = React.useState<string>(UNSET);
   const [page, setPage] = React.useState(1);
@@ -82,22 +119,7 @@ export function IdzActivity({ rows }: { rows: IdzRow[] }) {
   const pageRows = shown.slice((current - 1) * PER_PAGE, current * PER_PAGE);
   const filtered = filter.network !== "all" || filter.type !== "all";
 
-  const txCell = (r: IdzRow) =>
-    r.txHash ? (
-      <span className="inline-flex items-center gap-[4px]">
-        <span title={r.txHash} className="tabular-nums">
-          <span aria-hidden>{shortAddress(r.txHash)}</span>
-          <span className="sr-only">{r.txHash}</span>
-        </span>
-        <CopyButton
-          label="Copy transaction hash"
-          done={copied?.what === r.id}
-          onPress={() => copy(r.id, r.txHash!, "Transaction hash copied")}
-        />
-      </span>
-    ) : (
-      <span title="Your demo wallet starts with this">—</span>
-    );
+  const txCell = (r: IdzRow) => <TxHashCell id={r.id} hash={r.txHash} copied={copied} copy={copy} />;
 
   return (
     <section aria-labelledby="idz-activity-title" className="flex flex-col gap-[24px] [container-type:inline-size]">
@@ -175,9 +197,12 @@ export function IdzActivity({ rows }: { rows: IdzRow[] }) {
                     </th>
                     <td className={cn(CELL, "whitespace-nowrap tabular-nums")}>{r.at === null ? "—" : formatWhen(r.at)}</td>
                     <td className={cn(CELL, "whitespace-nowrap")}>
-                      <span className="inline-flex items-center gap-[4px] font-medium tabular-nums">
-                        <IdzCoin height={20} />
-                        {signed(r)}
+                      <span className="flex flex-col gap-[2px]">
+                        <span className="inline-flex items-center gap-[4px] font-medium tabular-nums">
+                          <IdzCoin height={20} />
+                          {signed(r)}
+                        </span>
+                        {r.held && <span className="text-sm leading-xs tabular-nums text-text-tertiary">{heldLine(r, now)}</span>}
                       </span>
                     </td>
                     <td className={CELL}>
@@ -210,9 +235,12 @@ export function IdzActivity({ rows }: { rows: IdzRow[] }) {
                     </span>
                     <span className="text-sm leading-xs text-text-tertiary">{r.title}</span>
                   </span>
-                  <span className="inline-flex shrink-0 items-center gap-[4px] text-md font-semibold leading-md tabular-nums text-text-primary">
-                    <IdzCoin height={20} />
-                    {signed(r)}
+                  <span className="flex shrink-0 flex-col items-end gap-[2px]">
+                    <span className="inline-flex items-center gap-[4px] text-md font-semibold leading-md tabular-nums text-text-primary">
+                      <IdzCoin height={20} />
+                      {signed(r)}
+                    </span>
+                    {r.held && <span className="text-sm leading-xs tabular-nums text-text-tertiary">{heldLine(r, now)}</span>}
                   </span>
                 </div>
                 <p className="text-sm leading-xs text-text-secondary">

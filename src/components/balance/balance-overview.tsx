@@ -5,39 +5,41 @@
 // demo account, and every IDZ movement. It sits in the V2 sheet with the
 // breadcrumb on its first line, as Plan & pricing does.
 //
-// The card (41571:126270): the network select is the demo wallet's own
-// network, so choosing one switches the wallet; the amount and "= $…" read
-// the one IDZ price; the token address is the demo IDZ contract on that
-// network. Buy and Stake are the next two steps of this feature and say so;
-// Import opens the token's details. Not connected: the card offers Connect
-// wallet and the page shows the Figma's empty state with the same button.
+// The card is the one every Balance page shares (balance-card.tsx). Buy
+// Ideeza Coin opens the presale on Balance › Buy IDZ Token; Stake is the next
+// step of this feature and says so; Import opens the token's details. When a
+// presale purchase has unlocked, one line under the card says so and leads to
+// its Claim (N2).
 
 import * as React from "react";
 import NextLink from "next/link";
-import { MoneyBag01Icon, PackageIcon, ShoppingBasket02Icon, Upload01Icon } from "@hugeicons/core-free-icons";
+import { useRouter } from "next/navigation";
+import { MoneyBag01Icon, ShoppingBasket02Icon, Upload01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { PricingFrame } from "@/components/credits/pricing-frame";
-import { Button, Select, Skeleton, linkVariants } from "@/components/ideeza";
-import { CopyButton, useCopy, useWalletClock } from "@/components/wallet/wallet-dialog";
+import { buttonVariants, linkVariants } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { NETWORKS, type Network } from "@/lib/brief/types";
+import type { Network } from "@/lib/brief/types";
 import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useMarket } from "@/lib/market/market-store";
-import { makerId, shortAddress, walletSwitchNetwork, readWallet } from "@/lib/wallet/demo-wallet";
-import { idzContractOf, idzHoldingsOf, idzLedgerOf, idzUsdOf } from "@/lib/wallet/idz";
-import { formatAmount } from "@/lib/wallet/money";
-import { useDemoWallet, writeDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { makerId } from "@/lib/wallet/demo-wallet";
+import { idzHoldingsOf, idzLedgerOf } from "@/lib/wallet/idz";
+import { compareAmounts, formatAmount } from "@/lib/wallet/money";
+import { BUY_IDZ_HREF, BUY_IDZ_NOW_HREF } from "@/lib/wallet/presale";
+import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { BalanceCard, BalanceCardSkeleton, ConnectEmptyState, NotConnectedCard } from "./balance-card";
 import { IdzActivity } from "./idz-activity";
-import { IdzCoin } from "./idz-coin";
 import { ImportTokenDialog } from "./import-token-dialog";
 import { TipButton } from "./tip-button";
+import { useSecondClock } from "./use-second-clock";
 
 const SOON = "Opens in the next step of Balance.";
 
 export function BalanceOverview() {
   const wallet = useDemoWallet();
   const { data: market } = useMarket();
-  const now = useWalletClock();
+  const now = useSecondClock();
+  const router = useRouter();
   const { openManage } = useWalletRequest();
   const [importing, setImporting] = React.useState(false);
 
@@ -45,10 +47,11 @@ export function BalanceOverview() {
   const state = wallet && id ? wallet.identities[id] : undefined;
   const connected = !!state?.connected;
   const network: Network = state?.network ?? "baseSepolia";
+  const holdings = wallet && id && connected ? idzHoldingsOf(wallet, id, { wallet, market, now }) : null;
 
   const actions = (
     <div className="flex items-center gap-[6px]">
-      <TipButton label="Buy Ideeza Coin" soon={SOON} icon={<Icon icon={ShoppingBasket02Icon} size={20} />} />
+      <TipButton label="Buy Ideeza Coin" icon={<Icon icon={ShoppingBasket02Icon} size={20} />} onPress={() => router.push(BUY_IDZ_NOW_HREF)} />
       <TipButton label="Stake" soon={SOON} icon={<Icon icon={MoneyBag01Icon} size={20} />} />
       <TipButton
         label="Import IDZ token into Wallet"
@@ -63,123 +66,30 @@ export function BalanceOverview() {
       <h1 className="sr-only">Balance</h1>
       <div className="flex flex-col gap-[24px]">
         {!wallet ? (
-          <div className="flex flex-col gap-[24px] rounded-xl bg-bg-page p-[24px]" aria-busy="true">
-            <Skeleton shape="block" className="h-[32px] w-[160px]" />
-            <Skeleton shape="block" className="h-[36px] w-[240px]" />
-          </div>
-        ) : connected && id ? (
-          <ConnectedCard
-            network={network}
-            onNetwork={(n) => writeDemoWallet(walletSwitchNetwork(readWallet(), makerId(readWallet().account), n))}
-            amount={idzHoldingsOf(wallet, id, { wallet, market, now })}
-            actions={actions}
-          />
+          <BalanceCardSkeleton />
+        ) : holdings ? (
+          <BalanceCard network={network} holdings={holdings} actions={actions} />
         ) : (
-          // Figma 41571:114057: "Current Balance" and Connect Wallet in place of the amount.
-          <div className="flex flex-wrap items-start justify-between gap-[16px] rounded-xl bg-bg-page p-[24px]">
-            <div className="flex flex-col items-start gap-[8px]">
-              <span className="text-md leading-md text-text-secondary">Current Balance</span>
-              <Button hierarchy="secondary" size="md" onClick={openManage}>
-                Connect wallet
-              </Button>
-            </div>
-            {actions}
+          <NotConnectedCard actions={actions} onConnect={openManage} />
+        )}
+
+        {holdings && compareAmounts(holdings.claimable, "0") > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-[12px] rounded-xl border border-solid border-border-brand bg-bg-brand-subtle px-[16px] py-[12px]">
+            <p className="text-md font-medium leading-md text-text-primary">
+              {formatAmount(holdings.claimable, "IDZ")} from the presale is ready to claim.
+            </p>
+            <NextLink href={BUY_IDZ_HREF} className={buttonVariants({ hierarchy: "primary", size: "md" })}>
+              Go to claim
+            </NextLink>
           </div>
         )}
 
         <AboutIdz />
 
-        {!wallet ? null : connected && id ? (
-          <IdzActivity rows={idzLedgerOf(wallet, id)} />
-        ) : (
-          // Figma 41571:128609: the empty state, with the way out it was missing.
-          <div className="flex flex-col items-center gap-[12px] py-[64px] text-center">
-            <span aria-hidden className="text-text-tertiary">
-              <Icon icon={PackageIcon} size={28} />
-            </span>
-            <p className="text-lg leading-lg text-text-secondary">
-              No data found.
-              <br />
-              Please Connect Your Wallet.
-            </p>
-            <Button hierarchy="primary" size="lg" onClick={openManage}>
-              Connect wallet
-            </Button>
-          </div>
-        )}
+        {!wallet ? null : connected && id ? <IdzActivity rows={idzLedgerOf(wallet, id)} now={now} /> : <ConnectEmptyState onConnect={openManage} />}
       </div>
       <ImportTokenDialog open={importing} network={network} onClose={() => setImporting(false)} />
     </PricingFrame>
-  );
-}
-
-function ConnectedCard({
-  network,
-  onNetwork,
-  amount,
-  actions,
-}: {
-  network: Network;
-  onNetwork: (n: Network) => void;
-  amount: ReturnType<typeof idzHoldingsOf>;
-  actions: React.ReactNode;
-}) {
-  const { copied, copy } = useCopy();
-  const contract = idzContractOf(network);
-  const parts: { label: string; value: string }[] = [
-    { label: "Available", value: amount.available },
-    { label: "Staked", value: amount.staked },
-    { label: "Ready to claim", value: amount.claimable },
-    { label: "Pending", value: amount.pending },
-  ];
-  return (
-    <div className="flex flex-col gap-[24px] rounded-xl bg-bg-page p-[24px]">
-      <div className="flex flex-wrap items-center justify-between gap-[12px]">
-        <Select
-          aria-label="Network"
-          size="md"
-          minWidth={140}
-          value={network}
-          onChange={(v) => onNetwork(v as Network)}
-          options={NETWORKS.map((n) => ({ label: n.label, value: n.value }))}
-        />
-        {actions}
-      </div>
-      <div className="flex flex-col gap-[8px]">
-        <p className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
-          <IdzCoin height={36} />
-          <span className="text-4xl font-semibold leading-4xl tabular-nums text-text-brand">
-            {formatAmount(amount.available, "IDZ")}
-          </span>
-          <span className="text-lg font-semibold leading-lg tabular-nums text-text-secondary">= {idzUsdOf(amount.available)}</span>
-        </p>
-        <dl className="flex flex-wrap gap-x-[16px] gap-y-[4px] text-sm leading-xs">
-          {parts.map((p) => (
-            <div key={p.label} className="flex items-center gap-[4px]">
-              <dt className="text-text-secondary">{p.label}</dt>
-              <dd className="font-semibold tabular-nums text-text-primary">{formatAmount(p.value, "IDZ")}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="flex items-center gap-[4px]">
-          <span
-            title={contract}
-            className="inline-flex h-[24px] items-center gap-[4px] rounded-lg bg-bg-surface px-[8px] text-sm font-medium leading-xs tabular-nums text-text-secondary"
-          >
-            Token Address : <span aria-hidden>{shortAddress(contract)}</span>
-            <span className="sr-only">{contract}</span>
-          </span>
-          <CopyButton
-            label="Copy token address"
-            done={copied?.what === "contract"}
-            onPress={() => copy("contract", contract, "Token address copied")}
-          />
-        </div>
-      </div>
-      <p role="status" aria-live="polite" className="sr-only">
-        {copied?.text ?? ""}
-      </p>
-    </div>
   );
 }
 
