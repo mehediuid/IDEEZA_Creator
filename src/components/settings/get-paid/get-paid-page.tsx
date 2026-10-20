@@ -390,7 +390,7 @@ function GetPaidInCard({ store, onSaved }: { store: PayoutStore; onSaved: (s: st
   const [refused, setRefused] = React.useState(false);
   const name = React.useId();
   return (
-    <SettingsCard id="get-paid-in" title="Get paid in" description="The token your withdrawals are paid in. What you pay IDEEZA with is set in Plan & billing.">
+    <SettingsCard id="get-paid-in" title="Get paid in" description="The token your withdrawals are paid in. What you pay IDEEZA with is set in Plan & pricing.">
       <div role="radiogroup" aria-label="Get paid in" className="flex flex-col gap-[2px]">
         {TOKENS.map((t) => (
           <ChoiceRow

@@ -26,7 +26,6 @@ import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useCreateHistory } from "@/lib/create/history";
 import { editorHref } from "@/lib/manual/editor-scope";
-import { BUY_CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { PROJECT_NAME_MAX, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 
@@ -218,7 +217,7 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
         </p>
       </div>
       {!canRender && (
-        <a href={BUY_CREDITS_HREF} className="self-start text-md font-medium text-text-brand underline underline-offset-2">
+        <a href="/settings/plan?tab=credits" className="self-start text-md font-medium text-text-brand underline underline-offset-2">
           Top up credits
         </a>
       )}

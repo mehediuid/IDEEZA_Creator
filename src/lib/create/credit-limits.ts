@@ -1,4 +1,4 @@
-// Credit alerts and limits (Settings › Plan & billing, spec §5.11):
+// Credit alerts and limits (Settings › Plan & pricing › Credits, spec §5.11):
 // the rules behind the five preferences in `ideeza:settings` › credits.
 //
 // - Spent this month: every build and concept charge made in the calendar
@@ -24,7 +24,7 @@ export type SpendLine = { id: string; delta: number; reason: string; buildId?: s
 const DAY = 24 * 60 * 60 * 1000;
 
 /** The card that holds these settings: a paused build and a refused render link here. */
-export const CREDIT_ALERTS_HREF = "/settings/plan#credit-alerts";
+export const CREDIT_ALERTS_HREF = "/settings/plan?tab=credits#credit-alerts";
 
 /** The one sentence for what the limit stops. */
 export const CAP_REASON = "You reached your monthly limit";
@@ -88,18 +88,6 @@ export function buildGate(i: {
 /** "Running low": the balance is at or under your number. */
 export function runningLow(balance: number, lowAt: number): boolean {
   return balance <= lowAt;
-}
-
-const WORDS = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
-
-/** Why the "Running low" mark sits where it does: how many one-product
- *  builds (`buildCost` each) it still covers when the warning comes. */
-export function lowMarkWhy(lowAt: number, buildCost: number): string {
-  if (lowAt <= 0) return "At 0 it warns only once you have none left.";
-  const builds = Math.floor(lowAt / buildCost);
-  if (builds === 0) return `That's less than one build (${buildCost} credits), so a build may have to wait before you're warned.`;
-  const count = builds < WORDS.length ? WORDS[builds] : String(builds);
-  return `At ${lowAt} you can still run ${count} ${builds === 1 ? "build" : "builds"} of one product (${buildCost} credits each), so you're warned before a build has to wait.`;
 }
 
 /** The live lot that expires first and still has credits in it. */

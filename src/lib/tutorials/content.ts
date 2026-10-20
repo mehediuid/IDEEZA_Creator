@@ -196,7 +196,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
         summary: "How AI credits are spent, where to buy more, and what each plan gives you.",
         blocks: [
           p(
-            "AI credits pay for the work AI does for you, such as drawing concepts and running builds. Plans add credits every month. You manage both in Settings, under Plan & billing.",
+            "AI credits pay for the work AI does for you, such as drawing concepts and running builds. Plans add credits every month. You manage both in Settings, under Plan & pricing.",
           ),
           video("set-up-ideeza/plans-and-credits/1", "Buying credits and choosing a plan"),
           h2("What costs credits"),
@@ -210,7 +210,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
           ),
           h2("Check your balance and buy credits"),
           p(
-            "Select your name in the sidebar: the Credits card shows what you have left. Press Buy credits to go to Plan & billing, where you can buy a pack:",
+            "Select your name in the sidebar: the Credits card shows what you have left. Press Buy credits to go to the Credits tab of Plan & pricing, where you can buy a pack:",
           ),
           list(
             "Starter: 100 credits for $5.",
@@ -226,7 +226,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
           ),
           h2("Paying in the demo"),
           p(
-            "Card and PayPal are not available yet. In this demo you pay with test USDT or IDZ from the demo wallet, and Pay with in Plan & billing sets which one. Invoices keeps every payment with its invoice. Because the wallet is a testnet demo, no real money changes hands.",
+            "Card and PayPal are not available yet. In this demo you pay with test USDT or IDZ from the demo wallet, and the Payment method tab of Plan & pricing sets which one. Billing history keeps every payment with its invoice. Because the wallet is a testnet demo, no real money changes hands.",
           ),
         ],
       },

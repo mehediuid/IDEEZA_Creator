@@ -71,7 +71,7 @@ import {
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { PRICING_HREF } from "@/lib/create/credit-pricing";
+import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { ArRecordPanel } from "./ar-record-panel";
 import { useVideoJobs } from "./video-jobs-provider";
@@ -589,7 +589,7 @@ function QualityField({ value, onChange }: { value: VideoQuality; onChange: (q: 
       {!qualityOpen("high", sub.tier) && (
         <p id={noteId} className="text-sm text-text-secondary">
           {HIGH_LOCKED_NOTE}{" "}
-          <Link href={PRICING_HREF} className="font-semibold text-text-link hover:text-text-link-hover">
+          <Link href={PLAN_PRICING_HREF} className="font-semibold text-text-link hover:text-text-link-hover">
             See plans
           </Link>
         </p>

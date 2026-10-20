@@ -148,7 +148,7 @@ function PlanCard() {
           Buy credits
         </Link>
         <Link href="/settings/plan" className={ACTION("ghost")}>
-          Plan and billing
+          Plan and pricing
         </Link>
       </Actions>
     </SettingsCard>

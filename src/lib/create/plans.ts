@@ -62,6 +62,7 @@ export function featuresOf(p: Plan): string[] {
   const discount = discountFor(p.tier, "monthly");
   return [
     `${count(p.credits)} AI credits a month`,
+    p.queue,
     `${count(p.projects)} ${p.projects === 1 ? "project" : "projects"} · ${count(p.exports)} exports a month`,
     p.contributors === 0 ? "Just you, no contributors" : `${count(p.contributors)} ${p.contributors === 1 ? "contributor" : "contributors"}`,
     ...(discount > 0 ? [`${pct(discount)} off credits (${pct(discountFor(p.tier, "yearly"))} yearly)`] : []),
@@ -69,62 +70,13 @@ export function featuresOf(p: Plan): string[] {
   ];
 }
 
-// ── Compare plans (Pricing) ─────────────────────────────────────────────
-
-export type CompareCell = string | number | boolean;
-/** `later`: the plan promises it, but the app doesn't do it yet. The row
- *  stays (it is the design's) and says so, rather than selling it. */
-export type CompareRow = { label: string; values: CompareCell[]; chip?: boolean; later?: boolean };
-
-/** Every row of the design's comparison, grouped as it groups them, one value per plan in PLANS order. */
-export const COMPARE: { group: string; rows: CompareRow[] }[] = [
-  {
-    group: "AI & resources",
-    rows: [
-      { label: "AI credits / month", values: PLANS.map((p) => p.credits), chip: true },
-      { label: "AI queue", values: ["Basic queue", "Standard queue", "Priority queue", "Fast-track queue"], later: true },
-      { label: "AI credit discount", values: [false, false, "15% · 25% yearly", "25% · 35% yearly"] },
-      { label: "Help & support", values: ["Community", "Standard", "Priority", "Priority"], later: true },
-    ],
-  },
-  {
-    group: "Projects & products",
-    rows: [
-      { label: "Projects", values: PLANS.map((p) => p.projects) },
-      { label: "Public and private components", values: [false, 5, 20, "Unlimited"], later: true },
-      { label: "Exports / month", values: PLANS.map((p) => p.exports) },
-      { label: "Contributors", values: PLANS.map((p) => p.contributors || false) },
-    ],
-  },
-  {
-    group: "AI video generation",
-    rows: [
-      { label: "AI video quality", values: PLANS.map((p) => (p.tier === HIGH_VIDEO_TIER ? "720p" : "480p")) },
-      { label: "AI video length", values: ["10 sec", "10 sec", "10 sec", "10 sec"] },
-      { label: "Video with IDEEZA AR", values: [false, false, false, true], later: true },
-    ],
-  },
-  {
-    group: "Marketplace & commerce",
-    rows: [
-      { label: "Mint, list and buy", values: [true, true, true, true] },
-      { label: "Hire a freelancer or a manufacturer", values: [false, false, true, true], later: true },
-    ],
-  },
-  {
-    group: "Enterprise & network",
-    rows: [
-      { label: "Network", values: [true, true, true, true] },
-      { label: "APK generator", values: [false, false, false, true], later: true },
-    ],
-  },
-];
-
 /** What gets smaller moving from one plan to another: "AI credits: 300 → 10 a month". Empty when nothing does. */
 export function lossesOf(from: Plan, to: Plan): string[] {
   const out: string[] = [];
+  const queueName = (q: string) => q.split(",")[0].replace(/ queue$/, "");
   const people = (n: number) => (n === 0 ? "none" : count(n));
   if (to.credits < from.credits) out.push(`AI credits: ${count(from.credits)} → ${count(to.credits)} a month`);
+  if (rank(to.tier) < rank(from.tier) && to.queue !== from.queue) out.push(`AI queue: ${queueName(from.queue)} → ${queueName(to.queue)}`);
   if (to.projects < from.projects) out.push(`Projects: ${count(from.projects)} → ${count(to.projects)}`);
   if (to.exports < from.exports) out.push(`Exports: ${count(from.exports)} → ${count(to.exports)} a month`);
   if (to.contributors < from.contributors) out.push(`Contributors: ${people(from.contributors)} → ${people(to.contributors)}`);

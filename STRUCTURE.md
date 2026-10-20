@@ -58,13 +58,13 @@ ideeza-creator-panel/
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
    │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), command-palette (⌘K)
-   │  ├─ credits/            Settings › Plan & billing: plan-billing-page (the sections) with your-plan,
-   │  │                      credits-summary, buy-credits-card, credit-alerts, pay-with,
-   │  │                      billing-details, billing-history (Invoices); plans-panel (Pricing:
-   │  │                      cards, compare, FAQs, downgrade/cancel dialogs); pricing-frame (the
-   │  │                      sheet + crumbs of Pricing and the checkout); checkout-page +
-   │  │                      order-summary + payment-picker (the checkout page), buy-credits (the
-   │  │                      in-place shortfall dialog + auto top-up), invoice-view, purchase-confirm
+   │  ├─ credits/            Settings › Plan & pricing (User Panel V2 layouts): pricing-frame (sheet,
+   │  │                      breadcrumb, pill tabs), plan-pricing-page, plans-panel, credits-panel,
+   │  │                      billing-history, payment-method-panel, plan-banner (+ plan details),
+   │  │                      checkout-page + order-summary + payment-picker (the checkout page),
+   │  │                      buy-credits (the in-place shortfall dialog + auto top-up), invoice-view,
+   │  │                      credit-alerts (Credit alerts and limits card), billing-details (card),
+   │  │                      purchase-confirm (the "ask before a purchase over" confirm)
    │  ├─ support/            report-problem (the one Report a problem dialog + host)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog,
@@ -148,7 +148,7 @@ ideeza-creator-panel/
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
    │  │                      videos, comments), filter (heard or quiet, count, quiet hours, pop-up
    │  │                      mode, hidden words), popups (daily summary, browser pop-ups), read state; withdrawal-method notices
-   │  ├─ account/            the account: payment token, invoices, credit-spend (credits by project), summary, your private identity
+   │  ├─ account/            the account: payment token, invoices, summary, your private identity
    │  │                      (ideeza:account:identity: the legal name) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
