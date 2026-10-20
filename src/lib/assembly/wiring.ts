@@ -9,7 +9,7 @@ import { add, apply, applyDir, dist, scale, type Aabb, type Vec3 } from "./math"
 import { routeWire } from "./route";
 import type { AsmScene, SceneItem } from "./scene";
 import type { AsmDoc, Pin, WireEnd, WirePoint, WireRec } from "./types";
-import { cutLength, filletPath, minBendRadius, odOf, pathHits } from "./wires";
+import { cutLength, filletPath, minBendRadius, odOf, pathHits, segmentHitsAabb } from "./wires";
 
 export type PinRef = { item: SceneItem; pin: Pin; point: Vec3; dir: Vec3 };
 
@@ -106,16 +106,21 @@ export function wireGeometry(scene: AsmScene, w: WireRec): WireGeom {
   const empty = { points: [], path: [], length: 0, cut: 0, od, minBend, allowed: Infinity, tight: false, through: [], nets: { from: null, to: null, same: null } };
   if (!from || !to) return { ok: false, reason: "One end's part or pin is gone.", from, to, ...empty };
   const obstacles = obstaclesOf(scene);
+  const inflate = od / 2 + 0.5;
+  const via = w.points.map((p) => viaWorld(scene, p));
   const r = routeWire({
     from: { point: from.point, dir: from.dir },
     to: { point: to.point, dir: to.dir },
-    via: w.points.map((p) => viaWorld(scene, p)),
+    via,
     obstacles: obstacles.map((o) => o.box),
     bounds: boundsOf(scene),
-    inflate: od / 2 + 0.5,
+    inflate,
+    // Out of each pin far enough that the first turn can be a gentle one.
+    leadOut: Math.max(3, minBend + od),
     straight: !!w.straight,
   });
-  const f = filletPath(r.points, minBend);
+  const points = w.straight || !r.ok ? r.points : relaxBends(r.points, minBend, obstacles.map((o) => o.box), inflate, via);
+  const f = filletPath(points, minBend);
   // Its own ends sit on their parts' surfaces: never "through" the parts it is soldered to.
   const own = new Set(obstacles.filter((o) => o.id.startsWith(`${from.item.rec.id}/`) || o.id.startsWith(`${to.item.rec.id}/`)).map((o) => o.id));
   const hitIds = pathHits(f.path, obstacles, 0, own);
@@ -131,7 +136,7 @@ export function wireGeometry(scene: AsmScene, w: WireRec): WireGeom {
     ...(r.reason ? { reason: r.reason } : {}),
     from,
     to,
-    points: r.points,
+    points,
     path: f.path,
     length: f.length,
     cut: cutLength(f.length, w.slackPct),
@@ -142,6 +147,23 @@ export function wireGeometry(scene: AsmScene, w: WireRec): WireGeom {
     through: names,
     nets: { from: fromNet, to: toNet, same },
   };
+}
+
+/** Drops the corners too tight for the wire's bend radius wherever the
+ *  straight cut across them is clear of every part (CAD-398: an auto-routed
+ *  wire must not come out "too tight"). The pins, their lead-outs and the
+ *  maker's own points always stay. */
+export function relaxBends(points: readonly Vec3[], minBend: number, boxes: readonly Aabb[], inflate: number, keep: readonly Vec3[] = []): Vec3[] {
+  let pts = points.slice();
+  const fixed = (p: Vec3) => keep.some((k) => dist(k, p) < 1e-6);
+  for (let guard = 0; guard < 64; guard++) {
+    const f = filletPath(pts, minBend);
+    const tight = f.corners.filter((c) => c.allowed + 1e-9 < minBend && c.index > 1 && c.index < pts.length - 2 && !fixed(pts[c.index])).sort((a, b) => a.allowed - b.allowed);
+    const drop = tight.find((c) => !boxes.some((b) => segmentHitsAabb(pts[c.index - 1], pts[c.index + 1], b, inflate)));
+    if (!drop) break;
+    pts = [...pts.slice(0, drop.index), ...pts.slice(drop.index + 1)];
+  }
+  return pts;
 }
 
 export type Suggestion = { from: WireEnd; to: WireEnd; net: string; color: string; label: string };

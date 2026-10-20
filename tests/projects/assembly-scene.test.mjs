@@ -10,7 +10,8 @@ import { pcbPart, pcbFacts } from "../../.tmp-test/lib/assembly/model-pcb.js";
 import { threeParts, isPristineScene } from "../../.tmp-test/lib/assembly/model-three.js";
 import { libraryKindOf, libraryPart, nextLabel } from "../../.tmp-test/lib/assembly/library.js";
 import { parseAsmDoc, serializeAsmDoc, isAsmDocStarted } from "../../.tmp-test/lib/assembly/doc.js";
-import { suggestWires, wireGeometry, netMatches } from "../../.tmp-test/lib/assembly/wiring.js";
+import { suggestWires, wireGeometry, netMatches, relaxBends } from "../../.tmp-test/lib/assembly/wiring.js";
+import { filletPath } from "../../.tmp-test/lib/assembly/wires.js";
 import { enclosureGeometry, newEnclosurePair, normalizeEnclosure } from "../../.tmp-test/lib/three/enclosure.js";
 import { apply } from "../../.tmp-test/lib/assembly/math.js";
 
@@ -190,6 +191,8 @@ test("wires: the board asks for the battery's two leads; the routed wire measure
   assert.ok(g.length > 10);
   near(g.cut, g.length * 1.1, 1e-6);
   assert.deepEqual(g.through, []);
+  // Round the board's edge through a 6 mm gap: a real U-turn, so the bend check must still speak.
+  assert.equal(g.tight, g.minBend > g.allowed);
   assert.equal(g.nets.same, true);
   assert.equal(netMatches("VBAT", "+5V"), true);
   assert.equal(netMatches("GND", "VBAT"), false);
@@ -224,4 +227,18 @@ test("the library: a built product's battery and speaker map to library parts; l
   assert.equal(libraryKindOf("R1", "10k resistor"), null);
   assert.equal(nextLabel("lipo-503450", ["BT1"]), "BT2");
   assert.equal(libraryPart("x", "nope"), null);
+});
+
+test("auto-routed kinks that have room to straighten are straightened (CAD-398), the pins' lead-outs kept", () => {
+  const zig = [[0, 0, 0], [3, 0, 0], [4, 1, 0], [5, 0, 0], [6, 1, 0], [20, 0, 0], [23, 0, 0]];
+  assert.ok(filletPath(zig, 6).allowed < 6);
+  const out = relaxBends(zig, 6, [], 1.25);
+  assert.deepEqual(out[0], [0, 0, 0]);
+  assert.deepEqual(out[1], [3, 0, 0]);
+  assert.deepEqual(out[out.length - 2], [20, 0, 0]);
+  assert.ok(filletPath(out, 6).allowed >= 6);
+  // A kink a part forces stays.
+  const wall = { min: [3.5, -5, -5], max: [5.5, 0.5, 5] };
+  const kept = relaxBends([[0, 0, 0], [3, 0, 0], [3, 3, 0], [6, 3, 0], [6, 0, 0], [9, 0, 0]], 6, [wall], 0.5);
+  assert.ok(kept.length > 4);
 });

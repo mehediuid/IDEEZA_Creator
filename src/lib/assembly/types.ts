@@ -196,6 +196,9 @@ export type PatternRec =
   | { id: string; kind: "circular"; seed: string; count: number; angle: number; axis: Vec3; center: Vec3 }
   | { id: string; kind: "mirror"; seed: string; normal: Vec3; point: Vec3 };
 
+/** A pattern as the maker asks for it, before it has an id. */
+export type NewPattern = { [K in PatternRec["kind"]]: Omit<Extract<PatternRec, { kind: K }>, "id"> }[PatternRec["kind"]];
+
 /** What the product page's Editor block shows without opening the editor. */
 export type AsmSummary = { parts: number; placed: number; problems: number; warnings: number; wires: number; at: number };
 

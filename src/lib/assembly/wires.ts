@@ -63,8 +63,9 @@ const SAME = 1e-9;
 const copy = (p: Vec3): Vec3 => [p[0], p[1], p[2]];
 
 /** Rounds every interior corner of `points` with an arc of `radius` (or the
- *  most that fits), tangent to both segments. A corner may use at most half of
- *  each adjacent segment, so neighbouring arcs never overlap. */
+ *  most that fits), tangent to both segments. A segment between two corners is
+ *  shared — each may use half of it, so neighbouring arcs never overlap — but a
+ *  segment that ends at the wire's own end belongs to its one corner whole. */
 export function filletPath(points: readonly Vec3[], radius: number): FilletResult {
   const pts: Vec3[] = [];
   const src: number[] = [];
@@ -94,7 +95,9 @@ export function filletPath(points: readonly Vec3[], radius: number): FilletResul
     // tan(θ/2) = sin θ / (1 + cos θ): exact at 90°, unlike Math.tan(π/4). A full
     // reversal has an infinite tangent distance, so nothing fits there.
     const tanHalf = sin / (1 + cos);
-    const allowed = theta > Math.PI - STRAIGHT ? 0 : Math.min(seg[i - 1], seg[i]) / 2 / tanHalf;
+    const before = i - 1 === 0 ? seg[i - 1] : seg[i - 1] / 2;
+    const after = i + 1 === n - 1 ? seg[i] : seg[i] / 2;
+    const allowed = theta > Math.PI - STRAIGHT ? 0 : Math.min(before, after) / tanHalf;
     const used = Math.min(r, allowed);
     corners.push({ index: src[i], allowed, used });
     allowedMin = Math.min(allowedMin, allowed);

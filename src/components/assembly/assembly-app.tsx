@@ -1,327 +1,231 @@
 "use client";
 
-// Assembly — the module between 3D Module and Peripheral Wiring (UIUX-80).
-// It reads the product's real PCB board — the live one the PCB store holds
-// for this product (P2-EDITOR-4), so an edit made a moment ago in PCB is
-// already here — and turns its placed parts into an assembly checklist:
-// designator + footprint per row, grouped by the side of the board each part
-// sits on, with check-off progress persisted per product. The wider assembly
-// workflow is still being scoped with the client; what ships here is real —
-// the list is the board, not a mock.
+// Assembly (the Assembly + Wiring plan, owner-approved 2026-10-19 with every
+// D1–D16 default): where the maker brings in the PCB's 3D and the 3D Module's
+// bodies and puts them together — places, snaps, checks the fit, measures,
+// cuts a section — and, in Wiring mode (D1/D2: the old Peripheral Wiring
+// step, now a mode here), wires the off-board parts to the board in 3D.
+// The old parts checklist is gone (D4).
 
 import * as React from "react";
-import { useEditorScope, useStepNav } from "@/components/manual/use-step-nav";
+import { useStepNav } from "@/components/manual/use-step-nav";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { LeftRail } from "@/components/pcb/left-rail";
-import { Button, Checkbox } from "@/components/ideeza";
-import { boardPartsOf, type BoardPart } from "@/lib/pcb/board-parts";
-import { usePcbState } from "@/lib/pcb/store";
-import { readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/editor-docs";
-import { reportSave } from "@/lib/manual/save-status";
+import { LeftPanel } from "@/components/pcb/left-panel";
+import { cn } from "@/lib/utils";
+import { describeIssue } from "@/lib/assembly/scene";
+import { AssemblyProvider, useAssembly } from "./assembly-store";
+import { AssemblyCanvas } from "./assembly-canvas";
+import { AssemblyToolbar, TOOLBAR_H } from "./assembly-toolbar";
+import { AssemblyTree } from "./assembly-tree";
+import { AssemblyProps } from "./assembly-props";
+import { BringInCard } from "./bring-in";
+import { exportGlb } from "./assembly-export";
 
-const TOP = 62; // TopBar height
-const LEFT_RAIL = 74;
-const BOTTOM = 36;
+const TOP = 62 + TOOLBAR_H;
+const RAIL = 74;
+const LEFT = 292;
+const RIGHT = 292;
+const STATUS = 32;
 
 export function AssemblyApp() {
-  const { go } = useStepNav();
-  const editor = useEditorScope();
-  const scope = editor?.scope ?? null;
-  const headRowId = editor?.headRowId ?? "";
+  return (
+    <AssemblyProvider>
+      <AssemblyBody />
+    </AssemblyProvider>
+  );
+}
 
-  // The board's parts. `boardPartsOf` is the one rule for what counts as a
-  // part "on the board" — shared with the product page's Editor block
-  // (src/lib/manual/editor-work.ts) so the checklist and the progress fact
-  // can't disagree.
-  const { objects } = usePcbState();
-  const parts = React.useMemo(() => boardPartsOf({ objects }), [objects]);
+const typing = (t: EventTarget | null) => {
+  const el = t as HTMLElement | null;
+  return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+};
 
-  // Progress: this product's own key, else — on the first row — a legacy
-  // per-project checklist with something ticked. The server has no storage,
-  // so reading it during render would hydrate different markup; the read
-  // happens here, once per product, on purpose.
-  const [done, setDone] = React.useState<Record<string, boolean>>({});
-  const handleRef = React.useRef<DocHandle | null>(null);
+function AssemblyBody() {
+  const a = useAssembly();
+  const { go, activeProject } = useStepNav();
+  const [bringOpen, setBringOpen] = React.useState(false);
+  const [view] = React.useState({ name: "iso" as const, tick: 0 });
+  const { doc, scene, selection, tool } = a;
+
+  // The old /wiring address opens here in Wiring mode (D1).
+  const wantsWiring = React.useRef(typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mode") === "wiring");
   React.useEffect(() => {
-    if (!scope) return;
-    const read = readEditorDoc("assembly", scope, headRowId, window.localStorage);
-    handleRef.current = { key: read.key, settle: read.settle };
-    let progress: Record<string, boolean> = {};
-    try {
-      const v = read.raw ? JSON.parse(read.raw) : null;
-      if (v && typeof v === "object" && !Array.isArray(v)) progress = v as Record<string, boolean>;
-    } catch {}
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDone(progress);
-  }, [scope, headRowId]);
+    if (!a.hydrated || !wantsWiring.current) return;
+    wantsWiring.current = false;
+    a.setMode("wiring");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("mode");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, [a, a.hydrated]);
 
-  const toggle = (id: string) => {
-    const next = { ...done, [id]: !done[id] };
-    setDone(next);
-    const handle = handleRef.current;
-    if (!handle) return;
-    const write = () => writeEditorDoc(handle, JSON.stringify(next), window.localStorage);
-    reportSave("assembly", write(), write);
-  };
-  const resetProgress = () => {
-    setDone({});
-    const handle = handleRef.current;
-    if (!handle) return;
+  // Keys: Esc leaves a tool, Delete removes the selected wire or snap, ⌘Z / ⇧⌘Z. Ctrl+S is EditorSave's.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (typing(e.target)) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (e.key === "Escape") {
+        if (a.tool) a.setTool(null);
+        else a.select({ kind: "none" });
+      } else if (mod && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) a.redo();
+        else a.undo();
+      } else if (mod && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        a.redo();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        if (selection.kind === "wire") a.deleteWire(selection.id);
+        else if (selection.kind === "mate") a.deleteMate(selection.id);
+        else return;
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [a, selection]);
+
+  const problemSolids = React.useMemo(
+    () => scene.fit.problems.flatMap((p) => (p.kind === "outside" ? [] : [{ inst: p.a.inst, solid: p.a.solid }, { inst: p.b.inst, solid: p.b.solid }])),
+    [scene.fit.problems],
+  );
+  const wires = React.useMemo(() => doc.wires.map((rec) => ({ rec, geom: a.wires.get(rec.id)! })).filter((w) => w.geom), [doc.wires, a.wires]);
+
+  const onExport = async () => {
+    const name = (activeProject?.name ?? "assembly").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "assembly";
     try {
-      window.localStorage.removeItem(handle.key);
-      if (handle.settle) window.localStorage.removeItem(handle.settle);
-      handle.settle = null;
-    } catch {}
+      const bytes = await exportGlb(scene, `${name}-assembly.glb`);
+      a.flash(`Exported ${name}-assembly.glb (${Math.max(1, Math.round(bytes / 1024))} KB): every visible part, in millimetres.`);
+    } catch {
+      a.flash("The 3D file couldn't be made. Nothing was downloaded.");
+    }
   };
 
-  const placed = parts.filter((p) => done[p.id]).length;
-  const top = parts.filter((p) => p.side === "top");
-  const bottom = parts.filter((p) => p.side === "bottom");
+  const fitChip = (() => {
+    if (!doc.brought) return { tone: "plain" as const, text: "Fit · nothing to check yet" };
+    const unplaced = scene.items.filter((i) => !i.placed).length;
+    if (scene.fit.problems.length) return { tone: "bad" as const, text: `Fit · ${scene.fit.problems.length} problem${scene.fit.problems.length > 1 ? "s" : ""}: ${describeIssue(scene.fit.problems[0], doc.clearanceMm)}` };
+    if (unplaced) return { tone: "plain" as const, text: `Fit · ${unplaced} not placed yet` };
+    return { tone: "ok" as const, text: "Fit · OK" };
+  })();
+  const hint =
+    tool === "snap"
+      ? a.snapFrom
+        ? "Snap: now click where it goes, on another part. Esc cancels."
+        : "Snap: click a face or a hole on the part you want to move."
+      : tool === "measure"
+        ? "Measure: click two points."
+        : tool === "wire"
+          ? a.wireFrom
+            ? "Add wire: pick the second pin."
+            : "Add wire: pick the first pin (a dot)."
+          : tool === "move" || tool === "rotate"
+            ? selection.kind === "inst"
+              ? "Drag the handles: 1 mm and 15° steps."
+              : "Select a part to move it."
+            : doc.mode === "wiring"
+              ? "Wiring: dots are pins. Double-click a wire to add a point."
+              : doc.brought && scene.items.some((i) => !i.placed)
+                ? "New parts wait above the case: select one, then Snap or Place inside."
+                : "";
 
   return (
     <EditorShell>
       <TopBar />
-      <LeftRail topOffset={TOP} bottomOffset={BOTTOM} activeKey="assembly" />
+      <AssemblyToolbar onBringIn={() => setBringOpen((v) => !v)} onExport={onExport} />
+      <LeftRail topOffset={TOP} bottomOffset={STATUS} activeKey="assembly" />
+      <LeftPanel topOffset={TOP} bottomOffset={STATUS} hideProjectTree aiContext="preview" moduleSlot={<AssemblyTree />} />
 
-      <div
-        style={{
-          position: "absolute",
-          top: TOP,
-          left: LEFT_RAIL,
-          right: 0,
-          bottom: BOTTOM,
-          overflowY: "auto",
-          background: "var(--color-bg-page)",
-        }}
-      >
-        <div style={{ maxWidth: 760, margin: "0 auto", padding: "var(--spacing-12) var(--spacing-10) var(--spacing-16)" }}>
-          <h1 style={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
-            Assembly
-          </h1>
-          <div style={{ marginTop: "var(--spacing-2)", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
-            Place the board&apos;s parts and check each one off — the list is read from this product&apos;s PCB.
+      <div className="absolute overflow-hidden bg-bg-page" style={{ top: TOP, left: RAIL + LEFT, right: RIGHT, bottom: STATUS }} onContextMenu={(e) => e.preventDefault()}>
+        {a.hydrated && (
+          <AssemblyCanvas
+            scene={scene}
+            wires={wires}
+            mode={doc.mode}
+            selectedInst={selection.kind === "inst" ? selection.id : null}
+            selectedWire={selection.kind === "wire" ? selection.id : null}
+            problemSolids={problemSolids}
+            tool={tool}
+            snapFrom={a.snapFrom}
+            wireFrom={a.wireFrom}
+            measure={a.measure}
+            section={a.section}
+            explode={0}
+            hideLid={false}
+            labels={false}
+            fitTick={a.fitTick}
+            view={view}
+            turntable={false}
+            onSelectInst={(id) => a.select(id ? { kind: "inst", id } : { kind: "none" })}
+            onSelectWire={(id) => a.select({ kind: "wire", id })}
+            onPickFeature={a.pickFeature}
+            onPickPin={a.pickPin}
+            onMeasurePoint={a.addMeasurePoint}
+            onWirePoint={a.addWirePoint}
+            onMovePreview={a.movePreview}
+            onMoveCommit={a.moveCommit}
+          />
+        )}
+        {a.hydrated && (!doc.brought || bringOpen) && (
+          <div className={cn("absolute inset-0 z-[5] flex items-center justify-center p-8", bringOpen && doc.brought && "items-start justify-start")}>
+            <BringInCard onClose={doc.brought ? () => setBringOpen(false) : undefined} />
           </div>
+        )}
+        {hint && (
+          <div className="pointer-events-none absolute left-4 top-4 z-[4] max-w-[440px] rounded-lg border border-solid border-border-default bg-bg-surface px-4 py-2 text-sm font-medium leading-xs text-text-primary shadow-2">{hint}</div>
+        )}
+        <FlowPills onBack={() => go("three")} onNext={() => go("preview")} />
+      </div>
 
-          {parts.length === 0 ? (
-            <div
-              style={{
-                marginTop: "var(--spacing-12)",
-                padding: "var(--spacing-12)",
-                border: "var(--border-width-1) dashed var(--color-border-strong)",
-                borderRadius: "var(--radius-xl)",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                No parts on the board yet
-              </div>
-              <div style={{ marginTop: "var(--spacing-3)", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", lineHeight: 1.6 }}>
-                Draw the circuit in PCB Design and convert it (Design ▸ Generate PCB) — the parts land here as an
-                assembly checklist.
-              </div>
-              <div style={{ marginTop: "var(--spacing-8)" }}>
-                <Button hierarchy="primary" size="md" onClick={() => go("pcb")}>
-                  Open PCB Design
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Progress — a count and a filled track: state feedback, not decoration. */}
-              <div style={{ marginTop: "var(--spacing-10)", display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-                <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>
-                  {placed} of {parts.length} placed
-                </div>
-                <div
-                  role="progressbar"
-                  aria-valuenow={placed}
-                  aria-valuemin={0}
-                  aria-valuemax={parts.length}
-                  aria-label="Assembly progress"
-                  style={{ flex: 1, height: 6, borderRadius: "var(--radius-full)", background: "var(--color-bg-subtle)", overflow: "hidden" }}
-                >
-                  <div
-                    style={{
-                      width: `${parts.length ? Math.round((placed / parts.length) * 100) : 0}%`,
-                      height: "100%",
-                      borderRadius: "var(--radius-full)",
-                      background: "var(--color-violet-600)",
-                    }}
-                  />
-                </div>
-                {placed > 0 && (
-                  <button
-                    className="ix-btn"
-                    onClick={resetProgress}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "var(--font-size-xs)",
-                      color: "var(--color-text-tertiary)",
-                      padding: "var(--spacing-2) var(--spacing-3)",
-                    }}
-                  >
-                    Reset progress
-                  </button>
-                )}
-              </div>
+      <aside aria-label="Properties" className="absolute right-0 overflow-y-auto border-l border-solid border-border-subtle bg-bg-surface" style={{ top: TOP, width: RIGHT, bottom: STATUS }}>
+        {a.hydrated && <AssemblyProps />}
+      </aside>
 
-              <SideSection title="Top side" parts={top} done={done} onToggle={toggle} />
-              <SideSection title="Bottom side" parts={bottom} done={done} onToggle={toggle} />
-            </>
+      <div className="absolute inset-x-0 bottom-0 z-[12] flex items-center gap-4 border-t border-solid border-border-subtle bg-bg-surface px-6" style={{ height: STATUS }}>
+        <button
+          type="button"
+          disabled={!scene.fit.problems.length}
+          onClick={() => a.select({ kind: "problem", index: 0 })}
+          className={cn(
+            "max-w-[60%] truncate rounded-full border-0 px-4 py-1 text-xs font-semibold leading-xs",
+            fitChip.tone === "bad" ? "cursor-pointer bg-bg-error-subtle text-text-error" : fitChip.tone === "ok" ? "bg-bg-success-subtle text-text-success" : "bg-bg-subtle text-text-secondary",
           )}
+        >
+          {fitChip.text}
+        </button>
+        <span className="min-w-0 flex-1 truncate text-xs leading-xs text-text-tertiary">
+          {doc.mode === "wiring" ? `${doc.wires.length} ${doc.wires.length === 1 ? "wire" : "wires"} · ${(Math.round(doc.wires.reduce((s, w) => s + (a.wires.get(w.id)?.cut ?? 0), 0) * 10) / 10).toFixed(1)} mm to cut` : `${scene.items.length} parts · ${doc.mates.length} snaps`}
+        </span>
+        <span className="font-mono text-xs leading-xs text-text-tertiary">mm</span>
+      </div>
+
+      {a.toast && (
+        <div role="status" aria-live="polite" className="absolute bottom-16 left-1/2 z-toast max-w-[560px] -translate-x-1/2 rounded-lg bg-bg-toast px-6 py-3 text-center text-sm font-medium leading-sm text-text-on-toast shadow-4">
+          {a.toast}
         </div>
-      </div>
-
-      {/* flow pills — Assembly sits between 3D Module and Peripheral Wiring. */}
-      <FlowPill kind="back" label="Back to 3D" onClick={() => go("three")} style={{ left: LEFT_RAIL + 20, bottom: BOTTOM + 16 }} />
-      <FlowPill kind="forward" label="Continue to Peripheral Wiring" onClick={() => go("wiring")} style={{ right: 20, bottom: BOTTOM + 16 }} />
-
-      {/* bottom bar */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: BOTTOM,
-          background: "var(--color-bg-surface)",
-          borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
-          zIndex: 12,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 var(--spacing-8)",
-          fontSize: "var(--font-size-xs)",
-          color: "var(--color-text-tertiary)",
-        }}
-      >
-        Assembly · check parts off as they go onto the board
-      </div>
+      )}
     </EditorShell>
   );
 }
 
-function SideSection({
-  title,
-  parts,
-  done,
-  onToggle,
-}: {
-  title: string;
-  parts: BoardPart[];
-  done: Record<string, boolean>;
-  onToggle: (id: string) => void;
-}) {
-  if (parts.length === 0) return null;
+function FlowPills({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+  const pill =
+    "absolute bottom-5 z-[6] inline-flex items-center gap-3 rounded-3xl border-1-5 border-solid border-border-brand bg-bg-surface px-8 py-3 text-md font-semibold leading-md text-text-brand shadow-2 hover:bg-bg-brand-subtle";
   return (
-    <div style={{ marginTop: "var(--spacing-10)" }}>
-      <div
-        style={{
-          fontSize: "var(--font-size-xs)",
-          fontWeight: 700,
-          color: "var(--color-text-secondary)",
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          paddingBottom: "var(--spacing-3)",
-          borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-        }}
-      >
-        {title} · {parts.length}
-      </div>
-      {parts.map((p) => {
-        const checked = !!done[p.id];
-        return (
-          <button
-            key={p.id}
-            role="checkbox"
-            aria-checked={checked}
-            onClick={() => onToggle(p.id)}
-            className="ix-row"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--spacing-5)",
-              width: "100%",
-              minHeight: 40,
-              padding: "var(--spacing-3) var(--spacing-4)",
-              background: "none",
-              border: "none",
-              borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-          >
-            <Checkbox checked={checked} decorative size="md" />
-            <span
-              style={{
-                fontWeight: 600,
-                fontSize: "var(--font-size-sm)",
-                color: checked ? "var(--color-text-tertiary)" : "var(--color-text-primary)",
-                textDecoration: checked ? "line-through" : "none",
-                minWidth: 64,
-              }}
-            >
-              {p.designator}
-            </span>
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums" }}>
-              {p.footprint}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// Same pill the neighbouring modules draw — each app carries its own copy of
-// this tiny presentational piece (see wiring-app.tsx).
-function FlowPill({
-  kind,
-  label,
-  onClick,
-  style,
-}: {
-  kind: "back" | "forward";
-  label: string;
-  onClick: () => void;
-  style: React.CSSProperties;
-}) {
-  const fwd = kind === "forward";
-  return (
-    <button
-      onClick={onClick}
-      className="ix-btn"
-      style={{
-        position: "absolute",
-        zIndex: 18,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "var(--spacing-3)",
-        padding: "var(--spacing-3) var(--spacing-8)",
-        background: "var(--color-bg-surface)",
-        border: "var(--border-width-1-5) solid var(--color-border-brand)",
-        borderRadius: "var(--radius-3xl)",
-        cursor: "pointer",
-        color: "var(--color-violet-600)",
-        fontWeight: 600,
-        fontSize: "var(--font-size-md)",
-        boxShadow: "var(--elevation-2)",
-        ...style,
-      }}
-    >
-      {!fwd && <Caret dir="left" />}
-      {label}
-      {fwd && <Caret dir="right" />}
-    </button>
-  );
-}
-
-function Caret({ dir }: { dir: "left" | "right" }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-      {dir === "left" ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 6l6 6-6 6" />}
-    </svg>
+    <>
+      <button type="button" className={cn(pill, "left-5")} onClick={onBack}>
+        <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+        Back to 3D Module
+      </button>
+      <button type="button" className={cn(pill, "right-5")} onClick={onNext}>
+        Continue to Product Preview
+        <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </button>
+    </>
   );
 }

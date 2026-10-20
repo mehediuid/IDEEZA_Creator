@@ -93,11 +93,11 @@ test("the 400 000 cell cap holds for a huge bounds", () => {
   assert.ok(performance.now() - t0 < 3000);
 });
 
-test("filletPath on an L of two 10 mm legs, r = 2", () => {
+test("filletPath on an L of two 10 mm legs, r = 2: legs that end at the wire's ends belong to the corner whole", () => {
   const f = filletPath([[0, 0, 0], [10, 0, 0], [10, 10, 0]], 2);
   assert.ok(Math.abs(f.length - (20 - 2 * 2 + (Math.PI * 2) / 2)) < 1e-6, `length ${f.length}`);
-  assert.equal(f.allowed, 5);
-  assert.deepEqual(f.corners, [{ index: 1, allowed: 5, used: 2 }]);
+  assert.equal(f.allowed, 10);
+  assert.deepEqual(f.corners, [{ index: 1, allowed: 10, used: 2 }]);
   assert.deepEqual(f.path[0], [0, 0, 0]);
   assert.deepEqual(f.path[f.path.length - 1], [10, 10, 0]);
   // Every arc point lies on the circle about (8, 2, 0), and no arc step is wider than 15°.
@@ -109,8 +109,8 @@ test("filletPath on an L of two 10 mm legs, r = 2", () => {
 
 test("filletPath clamps the radius to what fits", () => {
   const f = filletPath([[0, 0, 0], [10, 0, 0], [10, 10, 0]], 50);
-  assert.equal(f.corners[0].used, 5);
-  assert.ok(Math.abs(f.length - (10 + (Math.PI * 5) / 2)) < 1e-6);
+  assert.equal(f.corners[0].used, 10);
+  assert.ok(Math.abs(f.length - (Math.PI * 10) / 2) < 1e-6);
 });
 
 test("filletPath on a U-turn: the two arcs meet in a half circle", () => {
