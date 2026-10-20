@@ -12,6 +12,7 @@ Moved verbatim from `CLAUDE.md` §5 on 2026-09-29 and split by area; each sectio
 | Settings: `/settings` and its pages, the side-nav, Find a setting, the preferences store | [settings.md](settings.md) | Shell · pages |
 | Messages: `/messages`, the conversations between the demo people, Requests, entry points, the sidebar badge | [messages.md](messages.md) | Messages |
 | Blog: `/blog`, the editor, Send for review, the demo review, the article page, review results in the bell | [blog.md](blog.md) | Blog |
+| Tutorials: `/tutorials`, the topic pages, video rewards paid into the demo wallet | [tutorials.md](tutorials.md) | Tutorials |
 | The Earn area: `/projects/<id>/earn` and its tabs (Overview, Sell, Business plan, Money) | [earn-layer.md](earn-layer.md) | Earn area · Tabs |
 | Home prompt → concept chat → build → review, credits, companions, spec sheet, 3D tab, voice | [ai-create-flow.md](ai-create-flow.md) | AI create & build flow |
 | `/parts`, `/parts/[id]`, the New Package flow, land patterns | [parts-package.md](parts-package.md) | Part authoring — New Package flow |

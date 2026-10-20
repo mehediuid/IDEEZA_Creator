@@ -104,15 +104,17 @@ export function heldBy(id: IdentityId, ctx: { market: MarketData; now: number },
 
 /**
  * `id`'s balance right now: the seed, minus its own activity charges, plus
- * the IDZ its presale claims released, minus what it paid buying, plus what
- * it was paid selling, minus what a live auction's top bid holds. Never
+ * its activity credits (tutorial rewards), plus the IDZ its presale claims
+ * released, minus what it paid buying, plus what it was paid selling, minus
+ * what a live auction's top bid holds. Never
  * stored — every read walks the wallet and the market fresh (C4).
  */
 export function balancesOf(id: IdentityId, ctx: BalanceCtx, opts: HoldOpts = {}): Balances {
   const bal = seedBalancesOf(id);
   for (const entry of ctx.wallet?.activity ?? []) {
-    if (entry.identity !== id || !entry.charge) continue;
-    for (const line of entry.charge.lines) debit(bal, line.coin, entry.charge.network, line.amount);
+    if (entry.identity !== id) continue;
+    if (entry.charge) for (const line of entry.charge.lines) debit(bal, line.coin, entry.charge.network, line.amount);
+    if (entry.credit) for (const line of entry.credit.lines) credit(bal, line.coin, entry.credit.network, line.amount);
   }
   credit(bal, "IDZ", "baseSepolia", claimedIdzOf(ctx.wallet, id));
   const address = demoAddress(id);

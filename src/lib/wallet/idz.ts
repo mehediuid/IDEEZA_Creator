@@ -105,6 +105,14 @@ function idzOut(a: WalletActivity): Amount | null {
   return compareAmounts(sum, "0") > 0 ? sum : null;
 }
 
+/** The IDZ an activity line paid in: a tutorial reward's credit. */
+function idzIn(a: WalletActivity): Amount | null {
+  const lines = a.credit?.lines.filter((l) => l.coin === "IDZ") ?? [];
+  if (!lines.length) return null;
+  const sum = addAmounts(...lines.map((l) => l.amount));
+  return compareAmounts(sum, "0") > 0 ? sum : null;
+}
+
 /** Every IDZ movement of `id`, newest first; the starting balance last. A presale purchase is a
  *  held Buy row, and its claim (the first) a Claim row. */
 export function idzLedgerOf(w: DemoWallet | undefined, id: IdentityId): IdzRow[] {
@@ -140,20 +148,24 @@ export function idzLedgerOf(w: DemoWallet | undefined, id: IdentityId): IdzRow[]
   for (const a of w?.activity ?? []) {
     if (a.identity !== id || a.purpose === "buyIdz" || a.purpose === "claimIdz") continue;
     const amount = idzOut(a);
-    if (!amount) continue;
-    const row: IdzRow = {
-      id: a.id,
-      at: a.at,
-      network: a.network,
-      type: typeOf(a),
-      direction: "out",
-      amount,
-      title: a.title,
-      txHash: a.txHash ?? null,
-      address,
-    };
-    if (a.projectId) row.projectId = a.projectId;
-    rows.push(row);
+    if (amount) {
+      const row: IdzRow = {
+        id: a.id,
+        at: a.at,
+        network: a.network,
+        type: typeOf(a),
+        direction: "out",
+        amount,
+        title: a.title,
+        txHash: a.txHash ?? null,
+        address,
+      };
+      if (a.projectId) row.projectId = a.projectId;
+      rows.push(row);
+    }
+    // A tutorial reward (`credit`): IDZ in, typed Reward, as `balancesOf` counts it.
+    const paidIn = idzIn(a);
+    if (paidIn) rows.push({ id: `${a.id}:in`, at: a.at, network: a.network, type: "reward", direction: "in", amount: paidIn, title: a.title, txHash: a.txHash ?? null, address });
   }
   rows.sort((x, y) => (y.at ?? 0) - (x.at ?? 0));
   const seed = seedBalancesOf(id).idz;

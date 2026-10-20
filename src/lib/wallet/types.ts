@@ -41,6 +41,8 @@ export type WalletActivity = {
   presale?: PresaleBuy;
   /** A claim (`claimIdz`): the id of the purchase whose IDZ it releases. */
   claims?: string;
+  /** What the entry paid in: a tutorial reward ("Tutorial reward · …"). */
+  credit?: Charge;
 };
 
 /**

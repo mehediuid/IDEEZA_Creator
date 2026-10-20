@@ -68,6 +68,7 @@ import { useMessages } from "@/lib/messages/store";
 import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
 import { linkVariants } from "@/components/ideeza";
+import { cn } from "@/lib/utils";
 import { openReportProblem } from "@/lib/support/open-report";
 import { useBlog, useReviewClock, updateBlog } from "@/lib/blog/store";
 import { findArticle, markSeen } from "@/lib/blog/article";
@@ -582,9 +583,9 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
 
 // Support — the four help destinations, written as sentence links rather
 // than four nav-sized rows: they are read once, not navigated daily.
-const SUPPORT_LINKS: Array<{ label: string; icon: IconValue }> = [
+const SUPPORT_LINKS: Array<{ label: string; icon: IconValue; href?: string }> = [
   { label: "Help Center", icon: HelpCircleIcon },
-  { label: "Tutorial", icon: MortarboardIcon },
+  { label: "Tutorial", icon: MortarboardIcon, href: "/tutorials" },
   { label: "Tour Guide", icon: Compass01Icon },
 ];
 
@@ -602,7 +603,7 @@ function SupportBlock({ collapsed, onLeave }: { collapsed: boolean; onLeave?: ()
       <ul role="list" className="mb-[12px] flex flex-col gap-[2px]">
         {SUPPORT_LINKS.map((row) => (
           <li key={row.label}>
-            <SupportAction label={row.label} icon={row.icon} collapsed />
+            <SupportAction label={row.label} icon={row.icon} href={row.href} onLeave={onLeave} collapsed />
           </li>
         ))}
         <li>
@@ -624,7 +625,7 @@ function SupportBlock({ collapsed, onLeave }: { collapsed: boolean; onLeave?: ()
                 •
               </span>
             )}
-            <SupportAction label={row.label} icon={row.icon} />
+            <SupportAction label={row.label} icon={row.icon} href={row.href} onLeave={onLeave} />
           </React.Fragment>
         ))}
       </p>
@@ -635,20 +636,52 @@ function SupportBlock({ collapsed, onLeave }: { collapsed: boolean; onLeave?: ()
   );
 }
 
-// Help Center, Tutorial and Tour Guide have no page of their own yet, so
-// without an `onClick` the control says so instead of pretending to
-// navigate.
+// Tutorial has a page (`href`): a link, marked current on its pages. Help
+// Center and Tour Guide have none yet, so without an `href` or an `onClick`
+// the control says so instead of pretending to navigate.
 function SupportAction({
   label,
   icon,
   collapsed,
   onClick,
+  href,
+  onLeave,
 }: {
   label: string;
   icon: IconValue;
   collapsed?: boolean;
   onClick?: () => void;
+  href?: string;
+  onLeave?: () => void;
 }) {
+  const pathname = usePathname();
+  if (href) {
+    const current = pathname === href || pathname.startsWith(`${href}/`);
+    return collapsed ? (
+      <Link
+        href={href}
+        aria-label={label}
+        title={label}
+        aria-current={current ? "page" : undefined}
+        onClick={onLeave}
+        className={cn(
+          "flex h-[32px] w-full items-center justify-center rounded-md outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus",
+          current ? "bg-bg-brand-subtle text-text-brand" : "text-text-secondary",
+        )}
+      >
+        <Icon icon={icon} />
+      </Link>
+    ) : (
+      <Link
+        href={href}
+        aria-current={current ? "page" : undefined}
+        onClick={onLeave}
+        className={linkVariants({ color: current ? "brand" : "neutral", size: "md", className: cn("min-h-[24px]", current ? "font-semibold" : "font-regular") })}
+      >
+        {label}
+      </Link>
+    );
+  }
   if (onClick) {
     return collapsed ? (
       <button

@@ -761,7 +761,15 @@ export function WalletPopover({
           }}
         />
         <WalletRow title="Stake" hint="Deposit & Earn Reward" soon="Staking opens in a later step of Balance" />
-        <WalletRow title="Earn IDZ tokens" hint="Free tokens to start" soon="Earning tokens isn't open yet" />
+        {/* Tutorials pay IDZ for each video watched (Tutorials plan A3). */}
+        <WalletRow
+          title="Earn IDZ tokens"
+          hint="Watch tutorial videos"
+          onSelect={() => {
+            leave();
+            router.push("/tutorials");
+          }}
+        />
         <WalletRow title="Claim rewards" hint="See pending claims" soon="Rewards aren't open yet" />
       </div>
     </FloatingPanel>

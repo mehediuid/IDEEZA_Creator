@@ -95,6 +95,8 @@ ideeza-creator-panel/
    │  │                      bid dialogs, Ask the creator / Get creator support, demo-buyer banner
    │  ├─ blog/               Blog: list/, editor/ (TipTap, editor routes only), article/ (page, reader,
    │  │                      renderer, preview), send/ (Send for review, cover picker, Change cover)
+   │  ├─ tutorials/          Tutorials: the categories page and card, the topic page (menu, article,
+   │  │                      Page Content), the video card with its reward
    │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
@@ -208,6 +210,8 @@ ideeza-creator-panel/
    │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
    │  ├─ blog/               Blog: the model (doc, statuses, actions, demo review, list, slugs, cover),
    │  │                      the local store (ideeza:blog + rev'd bodies), IndexedDB files (ideeza-blog)
+   │  ├─ tutorials/          Tutorials: the content, the catalog (pages, counts, IDZ totals, headings),
+   │  │                      progress (ideeza:tutorials:progress) and paying a reward into the demo wallet
    │  ├─ people/             the creator profile's people layer: one person id and handles, profile
    │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt,
    │  │                      your handle's rules, time zones and spoken languages (Settings)

@@ -8,7 +8,7 @@
 // Sections covered:
 //   • Actions     — start a new project
 //   • Pages       — the 7 sidebar nav destinations
-//   • Resources   — Report a problem (the tutorial, tour and help pages
+//   • Resources   — the tutorial, Report a problem (the tour and help pages
 //                   aren't built yet, so they aren't listed)
 //   • Theme       — Light / Dark / System
 //   • Account     — Profile, Wallet, Settings, Plan & billing, Pricing
@@ -35,6 +35,7 @@ import {
   HistoryIcon,
   Mail01Icon,
   Moon01Icon,
+  MortarboardIcon,
   News01Icon,
   Search01Icon,
   Settings01Icon,
@@ -113,6 +114,8 @@ export function CommandPalette({
       { id: "messages", label: "Messages", category: "Pages",
         icon: Mail01Icon, onActivate: go("/messages") },
       // Resources
+      { id: "tutorial", label: "Open the tutorial", category: "Resources",
+        icon: MortarboardIcon, onActivate: go("/tutorials") },
       { id: "bug", label: "Report a problem", category: "Resources",
         icon: Bug01Icon, onActivate: exit(openReportProblem) },
       // Theme

@@ -190,6 +190,8 @@ function sanitizeActivityEntry(raw: unknown): WalletActivity | null {
   const presale = sanitizePresale(raw.presale);
   if (presale) entry.presale = presale;
   if (typeof raw.claims === "string") entry.claims = raw.claims;
+  const credit = sanitizeCharge(raw.credit);
+  if (credit) entry.credit = credit;
   return entry;
 }
 
