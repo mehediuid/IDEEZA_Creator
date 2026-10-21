@@ -14,6 +14,7 @@ import { BuildSimulator } from "@/components/create/build-simulator";
 import { WalletProvider } from "@/components/wallet/wallet-provider";
 import { BuyCreditsProvider } from "@/components/credits/buy-credits";
 import { VideosDialogHost } from "@/components/projects/make-videos";
+import { ProjectVideoDialogHost } from "@/components/video-jobs/project-video-dialog";
 import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
 import { ReportProblemHost } from "@/components/support/report-problem";
@@ -144,6 +145,10 @@ export default function RootLayout({
                                   opens (make-videos.tsx): here, so it outlives the
                                   step's row when the last video lands. */}
                               <VideosDialogHost />
+                              {/* The Project video dialog, opened by
+                                  openProjectVideoDialog() from a toast or a
+                                  render's Try again, on any page. */}
+                              <ProjectVideoDialogHost />
                               {/* Report a problem: one dialog for every page,
                                   editors included, since they sit outside
                                   the app shell. Opened by
