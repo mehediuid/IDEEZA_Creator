@@ -217,3 +217,53 @@ test("describeJoin: one line per segment, with its seconds", () => {
     "12–14 s — closing card: 'Built with IDEEZA'.",
   ]);
 });
+
+// ─────────────────────────── the join's timeline ───────────────────────────
+
+const { joinFrameAt, JOIN_FADE_MS } = await import("../../.tmp-test/lib/video/project-video.js");
+const at = (p, sec) => {
+  const f = joinFrameAt(p, sec);
+  return [f.segment, f.index, Math.round(f.localMs * 1000) / 1000, Math.round(f.fade * 1000) / 1000, f.prev && [f.prev.segment, f.prev.index, f.prev.localMs]];
+};
+const THREE_CUTS = plan([["rc", "t_rc"], ["bp", "t_bp"], ["cs", "t_cs"]]);
+
+test("joinFrameAt: the intro, each cut in order, then the outro", () => {
+  assert.equal(JOIN_FADE_MS, 250);
+  assert.deepEqual(at(THREE_CUTS, 0), ["intro", 0, 0, 1, null]);
+  assert.deepEqual(at(THREE_CUTS, 1), ["intro", 0, 1000, 1, null]);
+  assert.deepEqual(at(THREE_CUTS, 4.5), ["cut", 0, 2500, 1, null]);
+  assert.deepEqual(at(THREE_CUTS, 9.5), ["cut", 1, 2500, 1, null]);
+  assert.deepEqual(at(THREE_CUTS, 14.5), ["cut", 2, 2500, 1, null]);
+  assert.deepEqual(at(THREE_CUTS, 18), ["outro", 0, 1000, 1, null]);
+});
+
+test("joinFrameAt: 250 ms cross-fades, over the stretch before held at its end", () => {
+  assert.deepEqual(at(THREE_CUTS, 2), ["cut", 0, 0, 0, ["intro", 0, 2000]]);
+  assert.deepEqual(at(THREE_CUTS, 2.125), ["cut", 0, 125, 0.5, ["intro", 0, 2000]]);
+  assert.deepEqual(at(THREE_CUTS, 2.25), ["cut", 0, 250, 1, null]);
+  assert.deepEqual(at(THREE_CUTS, 7.1), ["cut", 1, 100, 0.4, ["cut", 0, 5000]]);
+  assert.deepEqual(at(THREE_CUTS, 17), ["outro", 0, 0, 0, ["cut", 2, 5000]]);
+});
+
+test("joinFrameAt: clamped to the video; a frame on a boundary starts the next stretch", () => {
+  assert.deepEqual(at(THREE_CUTS, -1), ["intro", 0, 0, 1, null]);
+  assert.deepEqual(at(THREE_CUTS, 19), ["outro", 0, 2000, 1, null]);
+  assert.deepEqual(at(THREE_CUTS, 60), ["outro", 0, 2000, 1, null]);
+  const odd = { ...THREE_CUTS, cuts: THREE_CUTS.cuts.map((c) => ({ ...c, ms: 3_300 })) };
+  // 2 s + 3.3 s = 5.3 s = frame 159 at 30 fps.
+  assert.deepEqual(at(odd, 159 / 30), ["cut", 1, 0, 0, ["cut", 0, 3300]]);
+});
+
+test("joinFrameAt: every frame of a 19 s join at 30 fps, in order", () => {
+  const counts = new Map();
+  let last = -1;
+  const order = ["intro:0", "cut:0", "cut:1", "cut:2", "outro:0"];
+  for (let i = 0; i < 570; i++) {
+    const f = joinFrameAt(THREE_CUTS, i / 30);
+    const key = `${f.segment}:${f.index}`;
+    assert.ok(order.indexOf(key) >= last, `frame ${i} went back to ${key}`);
+    last = order.indexOf(key);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  assert.deepEqual(order.map((k) => counts.get(k)), [60, 150, 150, 150, 60]);
+});
