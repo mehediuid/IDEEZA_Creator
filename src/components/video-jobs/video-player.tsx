@@ -18,7 +18,7 @@
 //   and failed panels of P2-VIDEO-4 in the same 16:9 box.
 
 import * as React from "react";
-import { AlertCircleIcon, Cancel01Icon, InformationCircleIcon, LockIcon, PlayIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, Cancel01Icon, InformationCircleIcon, LockIcon, PlayIcon, Tick02Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, ModalFrame, ProgressBar, Spinner } from "@/components/ideeza";
 import { formatDate } from "@/lib/manual/project-summary";
@@ -43,6 +43,7 @@ const GLYPH_TONE = {
   success: "text-text-success",
   warning: "text-text-warning",
   neutral: "text-text-secondary",
+  brand: "text-text-brand",
 } as const;
 
 const GLYPHS = {
@@ -51,10 +52,11 @@ const GLYPHS = {
   alert: AlertCircleIcon,
   lock: LockIcon,
   info: InformationCircleIcon,
+  eye: ViewIcon,
 } as const;
 
 /** P2-VIDEO-4's icon for a state — always beside its words, never alone. The project video's
- *  row adds the lock (waiting) and the info note. */
+ *  row adds the lock (waiting) and the info note; a take waiting for review, the eye. */
 export function StatusGlyph({
   icon,
   tone,

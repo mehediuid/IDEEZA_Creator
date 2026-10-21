@@ -280,3 +280,31 @@ test("the project video's fix lives where the product videos' does", () => {
   assert.equal(readinessOf(f, "relist").rules.find((x) => x.id === "projectVideo").fixedIn, "gate");
   assert.equal(readinessOf(f, "sell").rules.find((x) => x.id === "projectVideo").fixedIn, "brief");
 });
+
+// ─────────────────────────── review before it counts (owner, 2026-10-21) ───────────────────────
+
+const reviewVideo = (takeId) => ({ takes: [{ ...readyTake(takeId), toReview: true }], inUseId: null });
+
+test("a finished video nobody chose doesn't count: 'Review 1 video to continue.'", () => {
+  const f = facts({ products: [product("a", "A"), product("b", "B")], videos: { a: readyVideo("t_a"), b: reviewVideo("t_b") } });
+  const r = readinessOf(f, "sell");
+  assert.equal(r.counts.ready, 1);
+  assert.equal(r.counts.review, 1);
+  assert.equal(r.counts.missing, 0);
+  assert.equal(r.blocker, "Review 1 video to continue.");
+});
+
+test("missing beats rendering beats review", () => {
+  const two = facts({ products: [product("a", "A"), product("b", "B"), product("c", "C")], videos: { a: reviewVideo("t_a"), b: renderingVideo("t_b") }, jobs: [renderingJob("t_b", 45)] });
+  assert.match(readinessOf(two, "sell").blocker, /^1 product still needs an AI video/);
+  const one = facts({ products: [product("a", "A"), product("b", "B")], videos: { a: reviewVideo("t_a"), b: renderingVideo("t_b") }, jobs: [renderingJob("t_b", 45)] });
+  assert.equal(readinessOf(one, "sell").blocker, "Waiting for 1 video to finish — under a minute left.");
+});
+
+test("a project video waiting for review blocks with its own line", () => {
+  const join = { intro: ["P", ""], cuts: [{ productId: "a", takeId: "t_a", fromMs: 0, ms: 5_000, label: "a" }], outro: "Built with IDEEZA" };
+  const project = { takes: [{ ...readyTake("t_project"), productId: "project", join, toReview: true }], inUseId: null };
+  const r = readinessOf(facts({ products: [product("a", "A")], videos: { a: readyVideo("t_a"), project } }), "sell");
+  assert.equal(r.project.state, "review");
+  assert.equal(r.blocker, "Review the project video to continue.");
+});

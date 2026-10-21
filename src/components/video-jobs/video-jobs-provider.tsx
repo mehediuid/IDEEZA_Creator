@@ -30,8 +30,9 @@
 // own terminal state. A cancelled take is acknowledged the moment any tab
 // sees it, so a cancel leaves no "failed" toast in this tab or another. On
 // `ideeza:project-deleted`, the project's running jobs are cancelled and its
-// clip files deleted (P2-VIDEO-18). Once a project is sold in full, a render
-// that finishes keeps its take but never becomes the product's video.
+// clip files deleted (P2-VIDEO-18). A render that finishes is ready to review:
+// it becomes the product's video only when the maker chooses it (owner,
+// 2026-10-21), so a project sold in full keeps the video it was sold with.
 //
 // The demo speed multiplier (`DEMO_SPEED`, lib/video/jobs) turns the
 // 20-minute budget into ~30 seconds; flip it to 1 for a real backend.
@@ -46,7 +47,6 @@ import {
   type VideoJobStage,
 } from "@/lib/video/jobs";
 import { onProjectDeleted } from "@/lib/manual/events";
-import { lockOf } from "@/lib/manual/guards";
 import { readBriefDraft } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
@@ -131,8 +131,10 @@ type Ctx = {
   startProjectVideo: (spec: ProjectVideoSpec) => StartResult;
   /** Fails the take with `cancelled`; no clip is kept. */
   cancelRender: (takeId: string) => void;
-  /** Makes a ready take the product's video (P2-VIDEO-8). */
+  /** Use this video: makes a ready take the product's video (P2-VIDEO-8) and settles its review. */
   pickTake: (projectId: string, productId: string, takeId: string) => TakeWrite;
+  /** Passes over a take waiting for review (owner, 2026-10-21); it stays in Takes. */
+  declineTake: (projectId: string, productId: string, takeId: string) => TakeWrite;
   /** Removes a take that isn't in use, and its file. */
   deleteTake: (projectId: string, productId: string, takeId: string) => TakeWrite;
   saveDraft: (projectId: string, productId: string, draft: NonNullable<ProductVideo["draft"]>) => TakeWrite;
@@ -235,13 +237,6 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     jobsRef.current = jobs;
   }, [jobs]);
-  // The projects, for the lock an encode that ends seconds later reads.
-  const { projects } = useManualProjects();
-  const projectsRef = React.useRef(projects);
-  React.useEffect(() => {
-    projectsRef.current = projects;
-  }, [projects]);
-
   // Hydrate from localStorage after mount.
   React.useEffect(() => {
     // Reading localStorage in the state initialiser would render different
@@ -425,15 +420,7 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
           durationMs: clip.durationMs,
           bytes: clip.video.size,
         };
-        // Sold in full (the guards read the sales as they are now: another tab
-        // may have just sold the rest), the buyer's product keeps the video it was sold with.
-        const owner = projectsRef.current.find((p) => p.id === projectId);
-        const locked = !!owner && lockOf(owner) !== null;
-        const wrote = writeProduct(projectId, productId, (v) => {
-          if (!v) return null;
-          const next = pv.finishTake(v, id, meta, Date.now());
-          return locked ? { ...next, inUseId: v.inUseId } : next;
-        });
+        const wrote = writeProduct(projectId, productId, (v) => (v ? pv.finishTake(v, id, meta, Date.now()) : null));
         if (!wrote.ok) {
           void deleteClips([id]).catch(() => undefined);
           return fail("storage");
@@ -613,6 +600,11 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
     return { ok: res.ok && res.after?.inUseId === id };
   }, []);
 
+  const declineTake = React.useCallback((projectId: string, productId: string, id: string): TakeWrite => {
+    const res = writeProduct(projectId, productId, (v) => (v ? pv.declineTake(v, id) : null));
+    return { ok: res.ok };
+  }, []);
+
   const deleteTake = React.useCallback((projectId: string, productId: string, id: string): TakeWrite => {
     const res = writeProduct(projectId, productId, (v) => (v ? pv.deleteTake(v, id) : null));
     const removed = res.ok && !!res.after && !res.after.takes.some((t) => t.id === id);
@@ -643,6 +635,7 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
       startProjectVideo,
       cancelRender,
       pickTake,
+      declineTake,
       deleteTake,
       saveDraft,
     }),
@@ -657,6 +650,7 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
       startProjectVideo,
       cancelRender,
       pickTake,
+      declineTake,
       deleteTake,
       saveDraft,
     ],

@@ -102,6 +102,7 @@ function sanitizeTake(raw: unknown, productId: string): VideoTake | null {
   if (isObj(raw.failure) && isFailureKind(raw.failure.kind)) {
     take.failure = { kind: raw.failure.kind, at: num(raw.failure.at, Date.now()) };
   }
+  if (raw.toReview === true) take.toReview = true;
   return take;
 }
 
@@ -183,22 +184,29 @@ export function productVideoStatus(
   const inUse = v.inUseId ? v.takes.find((t) => t.id === v.inUseId) : undefined;
   const latest = v.takes[v.takes.length - 1];
 
+  // The newest finished take still waiting for the maker's word (owner, 2026-10-21).
+  const waiting = [...v.takes].reverse().find((t) => t.id !== inUse?.id && t.toReview && t.readyAt && !t.failure);
+
   if (inUse) {
     if (latest.id !== inUse.id) {
       const info = renderInfoOf(latest, jobs, now);
       if (info) return { state: "ready", take: inUse, next: { take: latest, progress: info.progress, eta: info.eta } };
     }
-    return { state: "ready", take: inUse };
+    return waiting ? { state: "ready", take: inUse, review: waiting } : { state: "ready", take: inUse };
   }
 
-  // No established take yet: the latest attempt decides the product's state.
+  // No chosen take yet: the latest attempt decides the product's state, and a
+  // finished one waits for review — it never counts by itself (owner, 2026-10-21).
   // A failure wins over `readyAt`: a lost take keeps its ready time, but its
   // file is gone, so the product has no video (P2-VIDEO-9, P2-VIDEO-19).
+  const info = renderInfoOf(latest, jobs, now);
+  if (!latest.failure && latest.readyAt) return { state: "review", take: latest };
+  if (!latest.failure && info) return { state: "rendering", take: latest, stage: info.stage, progress: info.progress, eta: info.eta };
+  // Another take that failed or was lost leaves an earlier finished one to review.
+  const earlier = [...v.takes].reverse().find((t) => t.readyAt && !t.failure);
+  if (earlier) return { state: "review", take: earlier };
   if (latest.failure?.kind === "lost") return { state: "none" };
   if (latest.failure) return { state: "failed", take: latest, failure: latest.failure.kind };
-  if (latest.readyAt) return { state: "ready", take: latest };
-  const info = renderInfoOf(latest, jobs, now);
-  if (info) return { state: "rendering", take: latest, stage: info.stage, progress: info.progress, eta: info.eta };
   // No ready time, no failure record, no job: interrupted (P2-VIDEO-3).
   return { state: "failed", take: latest, failure: "interrupted" };
 }
@@ -239,6 +247,7 @@ export function startTake(
     ...(input.auto ? { auto: input.auto } : null),
     ...(input.storyboard ? { storyboard: input.storyboard } : null),
     ...(input.join ? { join: input.join } : null),
+    toReview: true,
   };
   const next = [...takes, take];
   const evicted: string[] = [];
@@ -251,8 +260,8 @@ export function startTake(
   return { video: { ...(v ?? { inUseId: null }), takes: next }, evicted };
 }
 
-/** The render finished: the take becomes ready and takes over `inUseId`
- *  (P2-VIDEO-1 — "when a take finishes it becomes the product's video"). */
+/** The render finished: the take is ready to review. It becomes the product's video only when
+ *  the maker chooses it (`useTake`; owner, 2026-10-21) — the one in use, if any, stays. */
 export function finishTake(
   v: ProductVideo,
   takeId: string,
@@ -265,7 +274,7 @@ export function finishTake(
     delete next.failure;
     return next;
   });
-  return { ...v, takes, inUseId: takeId };
+  return { ...v, takes };
 }
 
 /** The render failed. The in-use take, if any, is untouched. */
@@ -274,13 +283,30 @@ export function failTake(v: ProductVideo, takeId: string, kind: VideoFailureKind
   return { ...v, takes };
 }
 
-/** Makes an existing ready take the product's video (P2-VIDEO-8). A take
- *  that isn't ready — rendering, failed or missing — is refused, and `v`
- *  comes back unchanged. */
+/** Use this video: makes an existing ready take the product's video (P2-VIDEO-8), and settles its
+ *  review. A take that isn't ready — rendering, failed or missing — is refused, and `v` comes
+ *  back unchanged. */
 export function useTake(v: ProductVideo, takeId: string): ProductVideo {
   const take = v.takes.find((t) => t.id === takeId);
   if (!take || !take.readyAt || take.failure) return v;
-  return { ...v, inUseId: takeId };
+  return { ...v, inUseId: takeId, takes: settled(v.takes, takeId) };
+}
+
+/** Passed over (Make another take, Edit storyboard, Change the prompt from its review): the take
+ *  stops waiting beside the one in use, and stays in Takes to pick later. */
+export function declineTake(v: ProductVideo, takeId: string): ProductVideo {
+  const take = v.takes.find((t) => t.id === takeId);
+  if (!take?.toReview) return v;
+  return { ...v, takes: settled(v.takes, takeId) };
+}
+
+function settled(takes: VideoTake[], takeId: string): VideoTake[] {
+  return takes.map((t) => {
+    if (t.id !== takeId || !t.toReview) return t;
+    const next = { ...t };
+    delete next.toReview;
+    return next;
+  });
 }
 
 /** Removes a take and its place in history. The in-use take can never be

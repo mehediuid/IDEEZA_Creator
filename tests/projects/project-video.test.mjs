@@ -267,3 +267,20 @@ test("joinFrameAt: every frame of a 19 s join at 30 fps, in order", () => {
   }
   assert.deepEqual(order.map((k) => counts.get(k)), [60, 150, 150, 150, 60]);
 });
+
+test("review: a finished project take nobody chose — Review, never counted; beside a fresh one it's a note", () => {
+  const j = plan([["rc", "t_rc"], ["bp", "t_bp"], ["cs", "t_cs"]]);
+  const alone = status(THREE, { ...allReady, [PROJECT_VIDEO_KEY]: { takes: [{ ...take("t_p", PROJECT_VIDEO_KEY, { join: j }), toReview: true }], inUseId: null } });
+  assert.equal(alone.state, "review");
+  assert.equal(alone.ok, false);
+  assert.equal(projectRowCopy(alone).text, "Ready to review");
+  assert.equal(projectActionLabel(projectRowCopy(alone).action), "Review");
+  const beside = status(THREE, {
+    ...allReady,
+    [PROJECT_VIDEO_KEY]: { takes: [take("t_p", PROJECT_VIDEO_KEY, { join: j }), { ...take("t_p2", PROJECT_VIDEO_KEY, { n: 2, join: j, createdAt: NOW - 1_000 }), toReview: true }], inUseId: "t_p" },
+  });
+  assert.equal(beside.state, "ready");
+  assert.equal(beside.ok, true);
+  assert.equal(beside.review.id, "t_p2");
+  assert.equal(projectRowCopy(beside).action, "review");
+});

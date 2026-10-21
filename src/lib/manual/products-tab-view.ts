@@ -177,7 +177,9 @@ export function videoLineOf(status: ProductVideoStatus): string {
     case "rendering":
       return `Rendering · ${Math.round(status.progress)} %`;
     case "ready":
-      return "Video ready";
+      return status.review ? `Video ready · Take ${status.review.n} to review` : "Video ready";
+    case "review":
+      return "Ready to review";
     case "failed":
       return "Render failed";
   }

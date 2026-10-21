@@ -69,7 +69,8 @@ export type Readiness = {
   ok: boolean;
   rules: ReadinessRule[];
   products: ProductReadiness[];
-  counts: { total: number; ready: number; rendering: number; missing: number };
+  /** `review`: finished, not yet chosen (owner, 2026-10-21) — counted apart from ready. */
+  counts: { total: number; ready: number; rendering: number; review: number; missing: number };
   /** The project video, where the purpose asks for it (every whole-project purpose; not an edition). */
   project: ProjectVideoStatus | null;
   blocker: string | null;

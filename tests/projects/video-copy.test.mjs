@@ -97,11 +97,21 @@ test("counts and state changes", () => {
   assert.equal(copy.readyCountLine(1, 2), "1 of 2 ready");
   assert.equal(copy.videosGroupMeta(1, 2), "1 of 2 products have a video");
   assert.equal(copy.videosGroupMeta(1, 1), "1 of 1 product has a video");
-  assert.equal(copy.stateChangeLine("Rider", { state: "ready", take: take() }), "Rider video is ready.");
+  assert.equal(copy.stateChangeLine("Rider", { state: "ready", take: take() }), "Rider video is in use.");
+  assert.equal(copy.stateChangeLine("Rider", { state: "review", take: take() }), "Rider video is ready to review.");
   assert.equal(copy.stateChangeLine("Rider", { state: "none" }), null);
   assert.equal(copy.toastHeading("rendering", "under a minute"), "Video rendering · under a minute left");
-  assert.equal(copy.toastHeading("ready", ""), "Video ready");
+  assert.equal(copy.toastHeading("ready", ""), "Video ready · review it");
   assert.equal(copy.toastHeading("failed", ""), "Video render failed");
   assert.equal(copy.moreToastsLine(1), "+1 more video");
   assert.equal(copy.moreToastsLine(3), "+3 more videos");
+});
+
+test("review: a finished take waits for the maker's word, with Review (owner, 2026-10-21)", () => {
+  const r = copy.statusCopy({ state: "review", take: take() });
+  assert.equal(r.text, "Ready to review");
+  assert.equal(copy.actionLabel(r.action), "Review");
+  const beside = copy.statusCopy({ state: "ready", take: take(), review: { ...take(), n: 2 } });
+  assert.equal(beside.text, "Video ready · Take 2 to review");
+  assert.equal(copy.actionLabel(beside.action), "Review");
 });
