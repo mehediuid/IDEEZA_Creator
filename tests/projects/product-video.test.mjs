@@ -224,10 +224,10 @@ test("startTake: when the oldest take IS in use, the next-oldest is evicted inst
   assert.deepEqual(after.takes.map((t) => t.id), ["take_1", "take_3", "take_4", "take_5", "take_6"]);
 });
 
-test("finishTake: the take becomes ready and takes over inUseId; an earlier failure is cleared", () => {
+test("finishTake: the take becomes ready to review — never the video by itself — and an earlier failure is cleared", () => {
   const v = { takes: [{ id: "take_1", productId: "prd_a", n: 1, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: NOW, failure: { kind: "encode", at: NOW } }], inUseId: null };
   const next = finishTake(v, "take_1", CLIP, NOW + 1_000);
-  assert.equal(next.inUseId, "take_1");
+  assert.equal(next.inUseId, null);
   assert.equal(next.takes[0].readyAt, NOW + 1_000);
   assert.equal(next.takes[0].failure, undefined);
   assert.deepEqual(next.takes[0].clip, CLIP);
@@ -411,4 +411,57 @@ test("sanitizeProjectVideos keeps a well-formed join plan and the draft's, and d
   assert.deepEqual(v.takes[0].join, JOIN);
   assert.equal(v.takes[1].join, undefined);
   assert.deepEqual(v.draft.join, JOIN);
+});
+
+// ─────────────────────────── review before it counts (owner, 2026-10-21) ───────────────────────
+
+const { declineTake } = await import("../../.tmp-test/lib/video/product-video.js");
+const fresh = (id, n, o = {}) => ({ id, productId: "prd_a", n, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: NOW - 10_000 + n, ...o });
+
+test("a new take is started waiting for review", () => {
+  const { video } = startTake(undefined, { productId: "prd_a", prompt: "", lines: ["", "", ""], quality: "low", source: null }, NOW, "take_1");
+  assert.equal(video.takes[0].toReview, true);
+});
+
+test("a finished take nobody chose is 'review', and Use this video makes it the video", () => {
+  const v = { takes: [fresh("take_1", 1, { readyAt: NOW, clip: CLIP, toReview: true })], inUseId: null };
+  assert.equal(productVideoStatus(v, [], NOW).state, "review");
+  const used = useTake(v, "take_1");
+  assert.equal(used.inUseId, "take_1");
+  assert.equal(used.takes[0].toReview, undefined);
+  assert.equal(productVideoStatus(used, [], NOW).state, "ready");
+});
+
+test("a newer take waits beside the one in use, which stays until the maker chooses", () => {
+  const v = {
+    takes: [fresh("take_1", 1, { readyAt: NOW - 5_000, clip: CLIP }), fresh("take_2", 2, { readyAt: NOW, clip: CLIP, toReview: true })],
+    inUseId: "take_1",
+  };
+  const s = productVideoStatus(v, [], NOW);
+  assert.equal(s.state, "ready");
+  assert.equal(s.take.id, "take_1");
+  assert.equal(s.review.id, "take_2");
+  const passed = productVideoStatus(declineTake(v, "take_2"), [], NOW);
+  assert.equal(passed.take.id, "take_1");
+  assert.equal(passed.review, undefined);
+  const picked = productVideoStatus(useTake(v, "take_2"), [], NOW);
+  assert.equal(picked.take.id, "take_2");
+  assert.equal(picked.review, undefined);
+});
+
+test("takes from before review are settled: an older in-use video never asks for review", () => {
+  const v = { takes: [fresh("take_1", 1, { readyAt: NOW - 5_000, clip: CLIP }), fresh("take_2", 2, { readyAt: NOW, clip: CLIP })], inUseId: "take_2" };
+  assert.equal(productVideoStatus(v, [], NOW).review, undefined);
+});
+
+test("another take that failed leaves the earlier finished one to review", () => {
+  const v = { takes: [fresh("take_1", 1, { readyAt: NOW - 5_000, clip: CLIP, toReview: true }), fresh("take_2", 2, { failure: { kind: "encode", at: NOW } })], inUseId: null };
+  const s = productVideoStatus(v, [], NOW);
+  assert.equal(s.state, "review");
+  assert.equal(s.take.id, "take_1");
+});
+
+test("sanitizeProjectVideos keeps toReview", () => {
+  const raw = { version: 1, projectId: "p-x", products: { prd_a: { takes: [{ ...fresh("take_1", 1, { readyAt: NOW, clip: CLIP }), toReview: true }], inUseId: null } } };
+  assert.equal(sanitizeProjectVideos(raw, "p-x").products.prd_a.takes[0].toReview, true);
 });

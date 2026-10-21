@@ -34,7 +34,7 @@ These follow the approved mockup.
 - Make: "Every product video is ready." → **Make project video**.
 - Rendering: the product rendering copy.
 - Ready: "Project video ready · 0:19". With older takes: "Made from an older Remote Controller video." → **Update**.
-- Outdated: "Propeller Guard Set isn't in it yet." → **Update project video**. It says "… Make its video first." while that product has no video.
+- Outdated: "Propeller Guard Set isn't in it yet." → **Update project video**. It says "… Finish its video first." while that product has no video.
 - Failed: the failure copy → **Try again**.
 - Reason lines:
   - "2 products still need an AI video. The project video comes next."

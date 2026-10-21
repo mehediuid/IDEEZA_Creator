@@ -75,10 +75,10 @@ export type StatusCopy = {
   text: string;
   /** The line under it: "about 1 min left", or the failure copy. */
   sub: string | null;
-  tone: "error" | "neutral" | "success";
-  icon: "cross" | "spinner" | "check" | "alert";
-  /** The owner's action in this state (none while rendering or ready). */
-  action: "generate" | "retry" | null;
+  tone: "error" | "neutral" | "success" | "brand";
+  icon: "cross" | "spinner" | "check" | "alert" | "eye";
+  /** The owner's action in this state (none while rendering or ready and settled). */
+  action: "generate" | "retry" | "review" | null;
   /** 0–100 while something renders, else null. */
   progress: number | null;
 };
@@ -107,7 +107,12 @@ export function statusCopy(status: ProductVideoStatus): StatusCopy {
             action: null,
             progress: null,
           }
-        : { text: "Video ready", sub: null, tone: "success", icon: "check", action: null, progress: null };
+        : status.review
+          ? { text: `Video ready · Take ${status.review.n} to review`, sub: null, tone: "success", icon: "check", action: "review", progress: null }
+          : { text: "Video ready", sub: null, tone: "success", icon: "check", action: null, progress: null };
+    case "review":
+      // Finished, not chosen yet (owner, 2026-10-21): it doesn't count until Use this video.
+      return { text: "Ready to review", sub: null, tone: "brand", icon: "eye", action: "review", progress: null };
     case "failed":
       return {
         text: "Render failed",
@@ -122,7 +127,7 @@ export function statusCopy(status: ProductVideoStatus): StatusCopy {
 
 /** The owner's action label for a state (P2-VIDEO-4 / P2-VIDEO-7). */
 export function actionLabel(action: StatusCopy["action"]): string | null {
-  return action === "generate" ? "Generate AI video" : action === "retry" ? "Try again" : null;
+  return action === "generate" ? "Generate AI video" : action === "retry" ? "Try again" : action === "review" ? "Review" : null;
 }
 
 export type ReadinessCopy = { title: string; info: string; cta: string };
@@ -180,7 +185,9 @@ export function videosGroupMeta(ready: number, total: number): string {
 export function stateChangeLine(productName: string, status: ProductVideoStatus): string | null {
   switch (status.state) {
     case "ready":
-      return `${productName} video is ready.`;
+      return `${productName} video is in use.`;
+    case "review":
+      return `${productName} video is ready to review.`;
     case "rendering":
       return `${productName} video is rendering.`;
     case "failed":
@@ -192,7 +199,7 @@ export function stateChangeLine(productName: string, status: ProductVideoStatus)
 
 /** The render toast's heading (P2-VIDEO-3). */
 export function toastHeading(state: "rendering" | "ready" | "failed", eta: string): string {
-  return state === "rendering" ? `Video rendering · ${eta} left` : state === "ready" ? "Video ready" : "Video render failed";
+  return state === "rendering" ? `Video rendering · ${eta} left` : state === "ready" ? "Video ready · review it" : "Video render failed";
 }
 
 /** The line under a capped toast stack: how many more wait behind the ones shown. */
@@ -217,9 +224,9 @@ export type ProjectRowCopy = {
   text: string;
   /** A second line: the note under a ready video, or the failure. */
   sub: string | null;
-  tone: "error" | "neutral" | "success" | "warning";
-  icon: "lock" | "check" | "spinner" | "alert" | "info";
-  action: "make" | "update" | "updateNote" | "retry" | null;
+  tone: "error" | "neutral" | "success" | "warning" | "brand";
+  icon: "lock" | "check" | "spinner" | "alert" | "info" | "eye";
+  action: "make" | "update" | "updateNote" | "retry" | "review" | null;
   /** 0–100 while it renders, else null. */
   progress: number | null;
 };
@@ -257,12 +264,18 @@ export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
       if (v.state === "ready" && v.next) {
         return { text: `${text} · Take ${v.next.take.n} rendering ${Math.round(v.next.progress)} %`, sub: null, tone: "success", icon: "check", action: null, progress: null };
       }
+      if (s.review) {
+        return { text: `${text} · Take ${s.review.n} to review`, sub: null, tone: "success", icon: "check", action: "review", progress: null };
+      }
       if (s.older.length > 0) {
         const sub = s.older.length === 1 ? `Made from an older ${s.older[0]} video.` : `Made from older videos of ${listNames(s.older)}.`;
         return { text, sub, tone: "success", icon: "check", action: "updateNote", progress: null };
       }
       return { text, sub: null, tone: "success", icon: "check", action: null, progress: null };
     }
+    case "review":
+      // Finished, not chosen yet (owner, 2026-10-21): it doesn't count until Use this video.
+      return { text: "Ready to review", sub: null, tone: "brand", icon: "eye", action: "review", progress: null };
     case "outdated": {
       const canUpdate = s.total > 0 && s.ready === s.total;
       const what =
@@ -270,7 +283,7 @@ export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
           ? `${listNames(s.missing)} ${s.missing.length === 1 ? "isn't" : "aren't"} in it yet.`
           : `It still shows ${listNames(s.extra)}.`;
       return {
-        text: canUpdate ? what : `${what} Make ${s.missing.length === 1 ? "its" : "their"} video first.`,
+        text: canUpdate ? what : `${what} Finish ${s.missing.length === 1 ? "its video" : "their videos"} first.`,
         sub: null,
         tone: "warning",
         icon: "alert",
@@ -306,6 +319,8 @@ export function projectActionLabel(action: ProjectRowCopy["action"]): string | n
       return "Update";
     case "retry":
       return "Try again";
+    case "review":
+      return "Review";
     default:
       return null;
   }
@@ -321,7 +336,9 @@ export function projectStateLine(s: ProjectVideoStatus, productCount: number): s
     case "rendering":
       return "Project video is rendering.";
     case "ready":
-      return "Project video is ready.";
+      return "Project video is in use.";
+    case "review":
+      return "The project video is ready to review.";
     case "outdated":
       return s.total > 0 && s.ready === s.total ? "Every product has its video. You can update the project video now." : null;
     case "failed":

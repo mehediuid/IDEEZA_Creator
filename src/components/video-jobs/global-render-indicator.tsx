@@ -4,14 +4,17 @@
 // every page, one per video job the maker hasn't dismissed (Phase 2 VIDEO
 // P2-VIDEO-3). Newest on top; the title is "{Product} · {Project}":
 //   rendering → "Video rendering · {eta} left" + Cancel + ×
-//   ready     → "Video ready" + Watch (plays it, and hides the toast) + ×
+//   ready     → "Video ready · review it" + Review (the Generate dialog's
+//               Review of that take; a project video's own dialog) + × —
+//               Watch (the bare player) only where it can't be reviewed: a
+//               project sold in full, or a take already used or passed over
 //   failed    → "Video render failed" + Try again (the Generate dialog, with
 //               that take's inputs) + ×
 // × hides the toast (acknowledge) — it no longer deletes the job, which used
 // to erase the clip link (D7). A v1 Brief job (no file) keeps Cancel while
 // it runs and offers nothing to watch. A project video job ("Project video ·
-// {Project}") has Cancel and Watch, and its Try again opens the Project video
-// dialog instead of Generate.
+// {Project}") has Cancel and Review, and its Review and Try again open the
+// Project video dialog instead of Generate.
 //
 // When a product video lands and every current product of its project now has
 // one, a nudge joins the stack (owner, 2026-10-21): "All 3 product videos are
@@ -25,8 +28,8 @@
 // The toasts are the maker's: a buyer view — Preview as buyer or as a
 // contributor (`?view=`), and Explore marketplace (`/marketplace/*`) — shows
 // none (errata 56). Try again is `can(owner, "video.generate", { locked })`,
-// so a project sold in full offers none. Watch and Try again hide their toast,
-// so when their dialog closes focus goes to the next toast, else <main>.
+// so a project sold in full offers none. Review, Watch and Try again hide their
+// toast, so when their dialog closes focus goes to the next toast, else <main>.
 //
 // The stack is capped: two toasts, one at phone width, and a quiet
 // "+N more videos" line under them — so however many renders finish, the
@@ -43,6 +46,7 @@ import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useGuards } from "@/lib/manual/use-write-guard";
 import { isProjectKey, projectVideoStatusOf } from "@/lib/video/project-video";
+import { subscribeStores } from "@/lib/key-store";
 import { readProjectVideos, useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
 import { moreToastsLine, projectActionLabel, toastHeading } from "@/lib/video/video-copy";
@@ -67,6 +71,16 @@ const OWNER: Viewer = { kind: "local-owner" };
 const SHOWN = 2;
 const MORE =
   "m-0 rounded-full border border-solid border-border bg-bg-surface px-[12px] py-[2px] text-sm text-text-secondary shadow-1";
+
+/** The finished jobs whose take still waits for the maker's word, as "id,id": a take used or
+ *  passed over anywhere (this tab or another) settles, and its toast turns back to Watch. */
+function waitingTakesOf(jobs: VideoJob[]): string {
+  return jobs
+    .filter((j) => isProductJob(j) && j.stage === "done")
+    .filter((j) => readProjectVideos(j.projectId!)?.products[j.productId!]?.takes.some((t) => t.id === j.id && t.toReview))
+    .map((j) => j.id)
+    .join(",");
+}
 
 /** After a dialog opened from a toast closes: that toast is gone, so focus
  *  goes to the next toast's first control, else the page's <main>. */
@@ -109,7 +123,11 @@ function RenderToasts() {
   const guards = useGuards();
   const buyerView = useBuyerView();
   const [watching, setWatching] = React.useState<Watching | null>(null);
-  const [retry, setRetry] = React.useState<{ target: VideoTarget; takeId: string } | null>(null);
+  // The Generate dialog from a toast: a failed take's Try again, or a finished take's Review.
+  const [generate, setGenerate] = React.useState<{ target: VideoTarget; takeId: string; review: boolean } | null>(null);
+  const [said, setSaid] = React.useState("");
+  const waitingKey = React.useSyncExternalStore(subscribeStores, () => waitingTakesOf(jobs), () => "");
+  const waiting = new Set(waitingKey.split(","));
 
   // The shared toast layer's "render" slot (src/app/layout.tsx) — queried
   // after mount so this never touches `document` during SSR; the portal is
@@ -128,9 +146,9 @@ function RenderToasts() {
     return project && can(OWNER, "video.generate", { locked: guards.lockOf(project) !== null }) ? project : null;
   };
 
-  /** The Generate dialog's target for a failed product job, when its project
-   *  and product still exist and the maker may still render for it. A project
-   *  video job has none: it is remade from its own dialog, not Generate. */
+  /** The Generate dialog's target for a failed or finished product job, when
+   *  its project and product still exist and the maker may still render for
+   *  it. A project video job has none: it has its own dialog, not Generate. */
   const targetOf = (j: VideoJob): VideoTarget | null => {
     if (!isProductJob(j) || isProjectKey(j.productId)) return null;
     const project = renderable(j.projectId);
@@ -217,16 +235,30 @@ function RenderToasts() {
               />
             ))}
             {shown.map((j, i) => {
-              const target = j.stage === "failed" ? targetOf(j) : null;
-              // A project video is remade from its own dialog.
-              const retryProject =
-                j.stage === "failed" && isProductJob(j) && isProjectKey(j.productId) && renderable(j.projectId) !== null;
+              const target = j.stage === "failed" || j.stage === "done" ? targetOf(j) : null;
+              // A project video is remade and reviewed in its own dialog.
+              const ownProject = isProductJob(j) && isProjectKey(j.productId) && renderable(j.projectId) !== null;
+              const retryProject = j.stage === "failed" && ownProject;
+              const reviewable = j.stage === "done" && waiting.has(j.id);
               return (
                 <ToastLine
                   key={j.id}
                   className={i >= phoneJobs ? "max-md:hidden" : undefined}
                   job={j}
                   now={now}
+                  onReview={
+                    reviewable && target
+                      ? () => {
+                          acknowledge(j.id);
+                          setGenerate({ target, takeId: j.id, review: true });
+                        }
+                      : reviewable && ownProject
+                        ? () => {
+                            acknowledge(j.id);
+                            openProjectVideoDialog(j.projectId!);
+                          }
+                        : null
+                  }
                   onWatch={
                     isProductJob(j) && j.stage === "done"
                       ? () => {
@@ -246,10 +278,10 @@ function RenderToasts() {
                       : () => (isProductJob(j) ? cancelRender(j.id) : dismiss(j.id))
                   }
                   onRetry={
-                    target
+                    target && j.stage === "failed"
                       ? () => {
                           acknowledge(j.id);
-                          setRetry({ target, takeId: j.id });
+                          setGenerate({ target, takeId: j.id, review: false });
                         }
                       : retryProject
                         ? () => {
@@ -295,14 +327,19 @@ function RenderToasts() {
       )}
 
       <GenerateVideoDialog
-        open={retry !== null}
-        target={retry?.target ?? null}
-        fromTakeId={retry?.takeId ?? null}
+        open={generate !== null}
+        target={generate?.target ?? null}
+        fromTakeId={generate && !generate.review ? generate.takeId : null}
+        reviewTakeId={generate?.review ? generate.takeId : null}
+        announce={setSaid}
         onClose={() => {
-          setRetry(null);
+          setGenerate(null);
           refocusAfterToast();
         }}
       />
+      <p role="status" aria-live="polite" className="sr-only">
+        {said}
+      </p>
     </>
   );
 }
@@ -328,6 +365,7 @@ function ToastLine({
   className,
   job,
   now,
+  onReview,
   onWatch,
   onCancel,
   onRetry,
@@ -336,6 +374,7 @@ function ToastLine({
   className?: string;
   job: VideoJob;
   now: number;
+  onReview: (() => void) | null;
   onWatch: (() => void) | null;
   onCancel: (() => void) | null;
   onRetry: (() => void) | null;
@@ -345,7 +384,9 @@ function ToastLine({
   const isFailed = job.stage === "failed";
   const { etaSec } = progressOf(job, now);
   const action = isDone
-    ? onWatch && { label: "Watch", run: onWatch }
+    ? onReview
+      ? { label: "Review", run: onReview }
+      : onWatch && { label: "Watch", run: onWatch }
     : isFailed
       ? onRetry && { label: "Try again", run: onRetry }
       : onCancel && { label: "Cancel", run: onCancel };
@@ -353,7 +394,8 @@ function ToastLine({
     <ToastCard
       className={className}
       tone={isDone ? "success" : isFailed ? "error" : "info"}
-      kicker={toastHeading(isDone ? "ready" : isFailed ? "failed" : "rendering", etaLabel(etaSec))}
+      // A take that can't be reviewed (sold in full, or already settled) is only to watch.
+      kicker={isDone && !onReview ? "Video ready" : toastHeading(isDone ? "ready" : isFailed ? "failed" : "rendering", etaLabel(etaSec))}
       title={job.title || "Untitled video"}
       action={action}
       onDismiss={onDismiss}

@@ -112,7 +112,7 @@ export function mergeJoinDraft(draft: JoinPlan | undefined, fresh: JoinPlan): Jo
   return { intro: draft.intro, cuts: [...kept, ...added], outro: draft.outro };
 }
 
-export type ProjectVideoState = "waiting" | "make" | "rendering" | "ready" | "outdated" | "failed";
+export type ProjectVideoState = "waiting" | "make" | "rendering" | "review" | "ready" | "outdated" | "failed";
 
 export type ProjectVideoStatus = {
   state: ProjectVideoState;
@@ -131,6 +131,9 @@ export type ProjectVideoStatus = {
   older: string[];
   /** The in-use take's length. */
   lengthMs: number | null;
+  /** A finished take waiting for the maker's word (owner, 2026-10-21): alone (state "review"),
+   *  or beside an up-to-date one in use (state "ready"). */
+  review: VideoTake | null;
 };
 
 /** One state for every surface (spec, "Rows and copy"). */
@@ -148,6 +151,7 @@ export function projectVideoStatusOf(input: {
 
   const video = productVideoStatus(videos?.products[PROJECT_VIDEO_KEY], jobs, now);
   const inUse = video.state === "ready" ? video.take : null;
+  const review = video.state === "review" ? video.take : video.state === "ready" ? (video.review ?? null) : null;
   const names = new Map(input.products.map((p) => [p.id, nameOf(p.name)]));
   const currentIds = new Set(current.map((p) => p.id));
 
@@ -173,12 +177,13 @@ export function projectVideoStatusOf(input: {
   let state: ProjectVideoState;
   if (fresh) state = "ready";
   else if (renderingNow) state = "rendering";
+  else if (review) state = "review";
   else if (inUse) state = "outdated";
   else if (video.state === "failed" && productsReady) state = "failed";
   else state = productsReady ? "make" : "waiting";
 
   const lengthMs = inUse ? inUse.clip?.durationMs || (inUse.join ? joinLengthMs(inUse.join) : null) : null;
-  return { state, ok: fresh, video, ready, total, missing, extra, older, lengthMs };
+  return { state, ok: fresh, video, ready, total, missing, extra, older, lengthMs, review };
 }
 
 function seconds(ms: number): string {

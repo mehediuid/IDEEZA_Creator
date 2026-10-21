@@ -167,7 +167,7 @@ test("outdated: a product added after — blocks; asks for its video first, then
   assert.equal(waiting.state, "outdated");
   assert.equal(waiting.ok, false);
   assert.deepEqual(waiting.missing, ["Propeller Guard Set"]);
-  assert.equal(projectRowCopy(waiting).text, "Propeller Guard Set isn't in it yet. Make its video first.");
+  assert.equal(projectRowCopy(waiting).text, "Propeller Guard Set isn't in it yet. Finish its video first.");
   assert.equal(projectRowCopy(waiting).action, null);
   const canUpdate = status(four, { ...allReady, pg: ready("t_pg", "pg"), ...proj });
   assert.equal(projectRowCopy(canUpdate).text, "Propeller Guard Set isn't in it yet.");
@@ -266,4 +266,21 @@ test("joinFrameAt: every frame of a 19 s join at 30 fps, in order", () => {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   assert.deepEqual(order.map((k) => counts.get(k)), [60, 150, 150, 150, 60]);
+});
+
+test("review: a finished project take nobody chose — Review, never counted; beside a fresh one it's a note", () => {
+  const j = plan([["rc", "t_rc"], ["bp", "t_bp"], ["cs", "t_cs"]]);
+  const alone = status(THREE, { ...allReady, [PROJECT_VIDEO_KEY]: { takes: [{ ...take("t_p", PROJECT_VIDEO_KEY, { join: j }), toReview: true }], inUseId: null } });
+  assert.equal(alone.state, "review");
+  assert.equal(alone.ok, false);
+  assert.equal(projectRowCopy(alone).text, "Ready to review");
+  assert.equal(projectActionLabel(projectRowCopy(alone).action), "Review");
+  const beside = status(THREE, {
+    ...allReady,
+    [PROJECT_VIDEO_KEY]: { takes: [take("t_p", PROJECT_VIDEO_KEY, { join: j }), { ...take("t_p2", PROJECT_VIDEO_KEY, { n: 2, join: j, createdAt: NOW - 1_000 }), toReview: true }], inUseId: "t_p" },
+  });
+  assert.equal(beside.state, "ready");
+  assert.equal(beside.ok, true);
+  assert.equal(beside.review.id, "t_p2");
+  assert.equal(projectRowCopy(beside).action, "review");
 });

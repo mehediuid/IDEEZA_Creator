@@ -15,6 +15,10 @@
 //   over each visit's fresh takes and lengths (`mergeJoinDraft`).
 // - Generate project video starts the render and closes; the row shows its progress. Opened while
 //   a render runs it shows that render; opened before every product has its video it says so.
+// - Review (owner, 2026-10-21): opened on a finished take nobody chose yet, it shows that take
+//   first — "Is this the video you want?" — with Use this video, Make another take (the same
+//   scenes and order), Change scenes (the editor, from that take's plan) and Decide later. A take
+//   in use stays until the maker chooses.
 
 import * as React from "react";
 import { ArrowDown01Icon, ArrowLeft01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
@@ -51,6 +55,7 @@ import { cn } from "@/lib/utils";
 import { QualityField } from "./generate-video-dialog";
 import { VideoThumb } from "./project-video-row";
 import { useVideoJobs } from "./video-jobs-provider";
+import { VideoPlayer } from "./video-player";
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 /** ↑ ↓: the secondary icon button's border drawn, greyed at either end, a touch target on touch. */
@@ -100,7 +105,7 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
     window.dispatchEvent(new CustomEvent(PROJECT_VIDEO_OPENED, { detail: project.id }));
   }, [project.id]);
   const { record, hydrated } = useProjectVideos(project.id);
-  const { jobs, now, hydrated: jobsHydrated, startProjectVideo, saveDraft, cancelRender } = useVideoJobs();
+  const { jobs, now, hydrated: jobsHydrated, startProjectVideo, saveDraft, cancelRender, pickTake, declineTake } = useVideoJobs();
   const { sub } = useCreatePlan();
   const current = React.useMemo(() => currentProductsOf(products), [products]);
   const ready = hydrated && jobsHydrated;
@@ -133,6 +138,8 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
     setSound(saved?.audioPrompt ?? "");
   }
   const plan = fresh ? mergeJoinDraft(edit, fresh) : null;
+  // Change scenes leaves the review for the editor, on that take's plan.
+  const [editing, setEditing] = React.useState(false);
 
   // Kept as the draft 400 ms after the last edit (Generate video's debounce).
   const edited = React.useRef(false);
@@ -200,6 +207,46 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
     onClose();
   };
 
+  // Review: a finished take waiting for the maker's word.
+  const reviewTake = editing ? null : status.review;
+  const inUseTake = status.video.state === "ready" ? status.video.take : null;
+  const leave = () => (back ? back.onBack() : onClose());
+  const useIt = () => {
+    if (!reviewTake) return;
+    if (!pickTake(project.id, PROJECT_VIDEO_KEY, reviewTake.id).ok) {
+      setError(WRITE_ERROR_MESSAGE);
+      return;
+    }
+    leave();
+  };
+  const anotherTake = () => {
+    if (!reviewTake || !fresh) return;
+    declineTake(project.id, PROJECT_VIDEO_KEY, reviewTake.id);
+    const res = startProjectVideo({
+      projectId: project.id,
+      projectName: project.name,
+      plan: mergeJoinDraft(reviewTake.join, fresh),
+      quality: qualityOpen(reviewTake.quality, sub.tier) ? reviewTake.quality : "low",
+      audioPrompt: reviewTake.audioPrompt ?? "",
+    });
+    if (!res.ok) {
+      setError(WRITE_ERROR_MESSAGE);
+      return;
+    }
+    onClose();
+  };
+  const changeScenes = () => {
+    if (!reviewTake) return;
+    declineTake(project.id, PROJECT_VIDEO_KEY, reviewTake.id);
+    if (reviewTake.join) {
+      edited.current = true;
+      setEdit(reviewTake.join);
+    }
+    setQuality(reviewTake.quality);
+    setSound(reviewTake.audioPrompt ?? "");
+    setEditing(true);
+  };
+
   // A render already running: its progress, the way Generate video opens on one.
   const v = status.video;
   const renderingTake = v.state === "rendering" ? v.take : v.state === "ready" && v.next ? v.next.take : null;
@@ -210,6 +257,36 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
   if (!ready) {
     body = <div aria-busy="true" className="h-[240px] rounded-lg bg-bg-subtle motion-safe:animate-pulse" />;
     footer = null;
+  } else if (reviewTake) {
+    body = (
+      <div className="flex flex-col gap-6 [container-type:inline-size]">
+        <VideoPlayer take={reviewTake} productName={project.name} projectId={project.id} />
+        {/* The player's own line already names the take, its quality and length. */}
+        <h3 className="text-lg font-bold text-text-primary">Is this the video you want?</h3>
+        {inUseTake && <p className="text-sm text-text-secondary">Take {inUseTake.n} stays in use until you choose.</p>}
+        <div className="grid grid-cols-1 gap-4 [@container(min-width:440px)]:grid-cols-2">
+          {fresh && <Choice title="Make another take" note="The same scenes and order" onClick={anotherTake} />}
+          <Choice title="Change scenes" note="Order, labels, intro and outro" onClick={changeScenes} />
+        </div>
+      </div>
+    );
+    footer = (
+      <div className="ml-auto flex flex-col items-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-6">
+          <Button type="button" hierarchy="secondary" size="lg" className={TAP} onClick={onClose}>
+            Decide later
+          </Button>
+          <Button ref={primaryRef} type="button" hierarchy="primary" size="lg" className={TAP} onClick={useIt}>
+            Use this video
+          </Button>
+        </div>
+        {error && (
+          <p role="alert" className="text-sm text-text-error">
+            {error}
+          </p>
+        )}
+      </div>
+    );
   } else if (status.state === "rendering" && renderingTake && renderingJob) {
     const { total, etaSec } = progressOf(renderingJob, now);
     body = (
@@ -446,6 +523,23 @@ function Scene({
       </div>
       {actions ? <div className="[@container(max-width:439px)]:col-start-2">{actions}</div> : <span aria-hidden />}
     </li>
+  );
+}
+
+/** One of the review's other ways forward: a plain card button, its title and what it does. */
+function Choice({ title, note, onClick }: { title: string; note: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-start gap-1 rounded-lg border border-solid border-border bg-bg-surface px-6 py-5 text-left outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
+        TAP,
+      )}
+    >
+      <span className="text-md font-semibold text-text-primary">{title}</span>
+      <span className="text-sm text-text-secondary">{note}</span>
+    </button>
   );
 }
 

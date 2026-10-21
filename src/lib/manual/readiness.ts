@@ -93,6 +93,9 @@ function videosReason(
     if (!project) return need;
     return `${need} ${project.state === "outdated" ? "Then update the project video." : "The project video comes next."}`;
   }
+  if (counts.rendering === 0) {
+    return counts.review === 1 ? "Review 1 video to continue." : `Review ${counts.review} videos to continue.`;
+  }
   const etaSec = products
     .filter((p) => p.video.state === "rendering")
     .reduce((max, p) => {
@@ -115,6 +118,8 @@ function projectVideoReason(project: ProjectVideoStatus): string | null {
       return "The project video is made once every product has its video.";
     case "make":
       return "Every product has its video. Make the project video to continue.";
+    case "review":
+      return "Review the project video to continue.";
     case "rendering": {
       const v = project.video;
       const eta = v.state === "rendering" ? v.eta : v.state === "ready" && v.next ? v.next.eta : etaLabel(0);
@@ -147,7 +152,7 @@ function buildRule(
     case "videos": {
       // An edition reads one product; with none, there's nothing to list — never a vacuous pass.
       if (purpose === "edition" && counts.total === 0) return { id, ok: false, fixedIn: "gate", reason: NO_EDITION_PRODUCT };
-      const ok = counts.missing === 0 && counts.rendering === 0;
+      const ok = counts.missing === 0 && counts.rendering === 0 && counts.review === 0;
       // Showcase reaches this gate through its own dialog; Sell/Give render
       // their videos inline on the Brief's preview step (P2-VIDEO-17), and
       // Relist/Edition reuse Sell's rule outside the Brief but still surface
@@ -187,8 +192,9 @@ export function readinessOf(facts: ReadinessFacts, purpose: ReadinessPurpose): R
   const total = products.length;
   const ready = products.filter((p) => p.video.state === "ready").length;
   const rendering = products.filter((p) => p.video.state === "rendering").length;
-  const missing = total - ready - rendering;
-  const counts = { total, ready, rendering, missing };
+  const review = products.filter((p) => p.video.state === "review").length;
+  const missing = total - ready - rendering - review;
+  const counts = { total, ready, rendering, review, missing };
   const project = RULES_OF[purpose].includes("projectVideo")
     ? projectVideoStatusOf({ products: facts.products, videos: facts.videos, jobs: facts.jobs, now: facts.now })
     : null;

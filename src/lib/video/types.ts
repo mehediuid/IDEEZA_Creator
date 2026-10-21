@@ -65,12 +65,15 @@ export type VideoTake = {
   readyAt?: number;
   clip?: { mime: string; width: number; height: number; durationMs: number; bytes: number };
   failure?: { kind: VideoFailureKind; at: number };
+  /** Waiting for the maker's word (owner, 2026-10-21): a new take is reviewed — used, or passed
+   *  over for another — before it counts. Absent once decided, and on every take from before. */
+  toReview?: true;
 };
 
 export type ProductVideo = {
   /** Oldest first, at most TAKES_MAX. */
   takes: VideoTake[];
-  /** Only ever a ready take. */
+  /** Only ever a ready take, and only one the maker chose (Use this video). */
   inUseId: string | null;
   draft?: VideoDraft;
 };
@@ -88,8 +91,16 @@ export type VideoDraft = {
 
 export type ProjectVideos = { version: 1; projectId: string; products: Record<string, ProductVideo> };
 
+/** `review`: a finished take nobody has chosen yet, and no video in use — it doesn't count.
+ *  `ready` is the chosen take; `review` on it is a newer finished take waiting beside it. */
 export type ProductVideoStatus =
   | { state: "none" }
   | { state: "rendering"; take: VideoTake; stage: VideoJobStage; progress: number; eta: string }
-  | { state: "ready"; take: VideoTake; next?: { take: VideoTake; progress: number; eta: string } }
+  | { state: "review"; take: VideoTake }
+  | {
+      state: "ready";
+      take: VideoTake;
+      next?: { take: VideoTake; progress: number; eta: string };
+      review?: VideoTake;
+    }
   | { state: "failed"; take: VideoTake; failure: VideoFailureKind };

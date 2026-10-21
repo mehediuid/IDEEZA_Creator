@@ -24,23 +24,29 @@
 // - render: "Take {n} · Stage {i} of 5 · {label}", the progress, the time
 //   left, "Notify me on this browser"; Cancel render · Close. Closing leaves
 //   the render running — its toast carries on in the corner.
-// - result: the player (never autoplaying) and "Take {n} is now {Product}'s
-//   video."; Regenerate · Done (or Continue, back to the gate).
+// - review (owner, 2026-10-21): a finished take counts only once the maker
+//   says so. The player (never autoplaying; its line names the take),
+//   "Is this the video you want?", Use this video (and which take stays in
+//   use meanwhile), then Make another take (the same storyboard, rendered again now) ·
+//   Edit storyboard · Change the prompt — each passes this take over first —
+//   · Decide later; and, with more than one, the other takes to go back to.
 // - failed: the failure copy; Close · Try again.
-// Opening on a product that is already rendering goes straight to the render
-// view. Owner only: callers mount it where can(viewer, "video.generate").
+// Opening goes to `reviewTakeId`'s Review when given; else to the render view
+// of a product already rendering; else, unless `fromTakeId` asks for the
+// form, to the Review of a take waiting for one. Owner only: callers mount it
+// where can(viewer, "video.generate", { locked }).
 
 import * as React from "react";
-import { ArrowDown01Icon, ArrowLeft01Icon, ArrowUp01Icon, Clock01Icon, SparklesIcon, VrIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ArrowLeft01Icon, ArrowUp01Icon, Clock01Icon, SparklesIcon, Tick02Icon, VrIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { PromptHelpModal } from "@/components/brief/prompt-help-modal";
-import { Banner, Button, Checkbox, ModalFrame, ProgressBar, Spinner, Textarea, Toggle } from "@/components/ideeza";
+import { Badge, Banner, Button, Checkbox, ModalFrame, ProgressBar, Spinner, Textarea, Toggle } from "@/components/ideeza";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import type { ManualProject, ProductSource } from "@/lib/manual/projects";
 import { WRITE_ERROR_MESSAGE } from "@/lib/storage-status";
 import { etaLabel, progressOf } from "@/lib/video/jobs";
-import { defaultLines } from "@/lib/video/product-video";
+import { defaultLines, productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import {
   SCENE_FIELD_MAX,
@@ -67,6 +73,7 @@ import {
   storyboardHonesty,
   honestyLine,
   renderTitle,
+  resolutionOf,
   stageLine,
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
@@ -608,17 +615,45 @@ export function QualityField({
   );
 }
 
+// ─────────────────────────── the review ───────────────────────────
+
+/** "Take 2 · 480p · 10 s". */
+function reviewTakeLine(take: VideoTake): string {
+  const seconds = take.clip?.durationMs ? Math.round(take.clip.durationMs / 1000) : VIDEO_QUALITY[take.quality].seconds;
+  return `Take ${take.n} · ${resolutionOf(take.quality)} · ${seconds} s`;
+}
+
+/** One way on from a review: the secondary Button, as a two-line card — what it does, and how. */
+function ReviewChoice({ title, text, onClick }: { title: string; text: string; onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      hierarchy="secondary"
+      size="lg"
+      onClick={onClick}
+      className="h-auto min-h-[var(--touch-min)] flex-col items-start justify-center gap-1 whitespace-normal py-4 text-left"
+    >
+      <span className="text-md font-semibold text-text-primary">{title}</span>
+      <span className="text-sm font-normal text-text-secondary">{text}</span>
+    </Button>
+  );
+}
+
 // ─────────────────────────── the dialog ───────────────────────────
 
 export type GenerateVideoDialogProps = {
   open: boolean;
   target: VideoTarget | null;
   onClose: () => void;
-  /** Opened from the readiness dialog: "← Back" returns there, and the
-   *  result's second button is Continue (back, with the row now ready). */
+  /** Opened from the readiness dialog: "← Back" returns there, and so does
+   *  Use this video (with the row now ready). */
   back?: { label: string; onBack: () => void };
-  /** Pre-fill the form from this take (a failed toast's Try again). */
+  /** Pre-fill the form from this take (a failed toast's Try again, Regenerate). */
   fromTakeId?: string | null;
+  /** Open on this finished take's Review (a toast's or a row's Review). */
+  reviewTakeId?: string | null;
+  /** Says "{Product} take n is in use." once Use this video has closed the dialog. */
+  announce?: (message: string) => void;
   /** Where focus goes on close when the control that opened the dialog is
    *  gone — a tile's Generate button turns into "Rendering" once it's used. */
   fallbackFocus?: () => HTMLElement | null;
@@ -641,19 +676,28 @@ function GenerateVideoDialogOpen({
   onClose,
   back,
   fromTakeId,
+  reviewTakeId,
+  announce,
   fallbackFocus,
 }: GenerateVideoDialogProps & { target: VideoTarget }) {
   const { record, hydrated } = useProjectVideos(target.projectId);
-  const { jobs, now, startProductVideo, cancelRender, setBrowserNotify, acknowledge } = useVideoJobs();
+  const { jobs, now, startProductVideo, cancelRender, setBrowserNotify, acknowledge, pickTake, declineTake } = useVideoJobs();
   const { sub: planSub } = useCreatePlan();
   const planTier = planSub.tier;
   const video = record?.products[target.productId];
 
-  // A render already running for this product: straight to its view.
+  // The take asked for; else a render already running for this product; else
+  // the form a caller asked for; else a take waiting for its review.
   const [mode, setMode] = React.useState<Mode>(() => {
+    const asked = reviewTakeId ? video?.takes.find((t) => t.id === reviewTakeId && t.readyAt && !t.failure) : undefined;
+    if (asked) return { kind: "take", id: asked.id };
     const latest = video?.takes[video.takes.length - 1];
     const running = latest && !latest.readyAt && !latest.failure && jobs.some((j) => j.id === latest.id && j.stage !== "done" && j.stage !== "failed");
-    return running ? { kind: "take", id: latest.id } : { kind: "form", from: fromTakeId ?? null };
+    if (running) return { kind: "take", id: latest.id };
+    if (fromTakeId) return { kind: "form", from: fromTakeId };
+    const status = productVideoStatus(video, jobs, now);
+    const waiting = status.state === "review" ? status.take : status.state === "ready" ? status.review : undefined;
+    return waiting ? { kind: "take", id: waiting.id } : { kind: "form", from: null };
   });
   const [value, setValue] = React.useState<VideoFormValue>(() =>
     formValueOf(target, video, fromTakeId ? video?.takes.find((t) => t.id === fromTakeId) : null),
@@ -692,13 +736,13 @@ function GenerateVideoDialogOpen({
 
   const take = mode.kind === "take" ? video?.takes.find((t) => t.id === mode.id) ?? null : null;
   const job = take ? jobs.find((j) => j.id === take.id) : undefined;
-  const view: "form" | "drafting" | "storyboard" | "render" | "result" | "failed" =
+  const view: "form" | "drafting" | "storyboard" | "render" | "review" | "failed" =
     mode.kind === "drafting" || mode.kind === "storyboard" ? mode.kind : !take
     ? "form"
     : take.failure
       ? "failed"
       : take.readyAt
-        ? "result"
+        ? "review"
         : job && job.stage !== "done" && job.stage !== "failed"
           ? "render"
           : "failed";
@@ -736,7 +780,7 @@ function GenerateVideoDialogOpen({
 
   // Shown here, so the corner doesn't also announce it.
   React.useEffect(() => {
-    if (view === "result" && job && !job.acknowledged) acknowledge(job.id);
+    if (view === "review" && job && !job.acknowledged) acknowledge(job.id);
   }, [view, job, acknowledge]);
 
   const blocker = videoFormBlocker(value);
@@ -804,6 +848,60 @@ function GenerateVideoDialogOpen({
     setValue(formValueOf(target, video, from));
     setTried(false);
     setMode({ kind: "form", from: from?.id ?? null });
+  };
+
+  // ── Review: the maker's word on a finished take ──
+  const leave = back ? back.onBack : onClose;
+  /** Use this video (or an earlier take instead); the reviewed take, when it isn't the one
+   *  chosen, is passed over. */
+  const chooseTake = (chosen: VideoTake, reviewed: VideoTake) => {
+    setError(null);
+    if (!pickTake(target.projectId, target.productId, chosen.id).ok) {
+      setError("That take couldn't be put in use. Try again.");
+      return;
+    }
+    if (chosen.id !== reviewed.id) declineTake(target.projectId, target.productId, reviewed.id);
+    announce?.(`${target.productName} take ${chosen.n} is in use.`);
+    leave();
+  };
+  /** The same storyboard and inputs, rendered again now. */
+  const makeAnother = (t: VideoTake) => {
+    setError(null);
+    declineTake(target.projectId, target.productId, t.id);
+    const res = startProductVideo({
+      projectId: target.projectId,
+      projectName: target.projectName,
+      productId: target.productId,
+      productName: target.productName,
+      prompt: t.prompt,
+      lines: t.lines,
+      quality: qualityOpen(t.quality, planTier) ? t.quality : "low",
+      source: target.source,
+      imageUrl: target.imageUrl,
+      audioPrompt: t.audioPrompt,
+      auto: t.auto,
+      storyboard: t.storyboard,
+    });
+    if (!res.ok) {
+      setError(WRITE_ERROR_MESSAGE);
+      return;
+    }
+    setMode({ kind: "take", id: res.takeId });
+  };
+  /** The storyboard the take was made from (a take from before storyboards gets one drafted from
+   *  its own inputs); Generate video there makes a new take. */
+  const editStoryboard = (t: VideoTake) => {
+    setError(null);
+    declineTake(target.projectId, target.productId, t.id);
+    const from = formValueOf(target, video, t);
+    setValue(from);
+    setTried(false);
+    setMode({ kind: "storyboard", storyboard: t.storyboard ?? draftStoryboard(storyboardInputOf(target, from)) });
+  };
+  const changePrompt = (t: VideoTake) => {
+    setError(null);
+    declineTake(target.projectId, target.productId, t.id);
+    toForm(t);
   };
 
   const setFocus = (el: HTMLElement | null) => {
@@ -947,25 +1045,61 @@ function GenerateVideoDialogOpen({
         </Button>
       </div>
     );
-  } else if (view === "result" && take) {
+  } else if (view === "review" && take) {
+    const inUse = video?.inUseId && video.inUseId !== take.id ? video.takes.find((t) => t.id === video.inUseId) : undefined;
+    const finished = (video?.takes ?? []).filter((t) => t.readyAt && !t.failure);
     body = (
-      <div className="flex flex-col gap-6">
-        <VideoPlayer take={take} productName={target.productName} projectId={target.projectId} owner onGenerate={() => toForm(take)} />
-        <p ref={setFocus} tabIndex={-1} className="text-md font-semibold text-text-primary outline-none">
-          Take {take.n} is now {target.productName}&apos;s video.
-        </p>
+      <div className="flex flex-col gap-8 [container-type:inline-size]">
+        <VideoPlayer take={take} productName={target.productName} projectId={target.projectId} owner onGenerate={() => changePrompt(take)} />
+        <div className="flex flex-col gap-4">
+          {/* The player's own line already names the take, its quality and length. */}
+          <h3 ref={setFocus} tabIndex={-1} className="text-lg font-bold text-text-primary outline-none">
+            Is this the video you want?
+          </h3>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Button type="button" hierarchy="primary" size="lg" className={TAP} onClick={() => chooseTake(take, take)}>
+              Use this video
+            </Button>
+            {inUse && <p className="text-sm text-text-secondary">Take {inUse.n} stays in use until you choose.</p>}
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-text-error">
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-4 [@container(min-width:480px)]:grid-cols-2">
+          <ReviewChoice title="Make another take" text="The same storyboard, a new render" onClick={() => makeAnother(take)} />
+          <ReviewChoice title="Edit storyboard" text="Change the scenes, or ask AI again" onClick={() => editStoryboard(take)} />
+          <ReviewChoice title="Change the prompt" text="Start from what it should show" onClick={() => changePrompt(take)} />
+          <ReviewChoice title="Decide later" text="Keep it to review from the row" onClick={onClose} />
+        </div>
+        {finished.length > 1 && (
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold text-text-secondary">Your takes</h4>
+            <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-solid border-border p-0">
+              {[...finished].reverse().map((t) => (
+                <li key={t.id} className="flex min-h-[48px] flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-3">
+                  <span className="text-md text-text-primary">{reviewTakeLine(t)}</span>
+                  {t.id === take.id ? (
+                    <span className="text-sm text-text-tertiary">This one</span>
+                  ) : t.id === video?.inUseId ? (
+                    <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} strokeWidth={2.5} />}>
+                      In use
+                    </Badge>
+                  ) : (
+                    <Button type="button" hierarchy="secondary" size="sm" className={TAP} onClick={() => chooseTake(t, take)}>
+                      Use this take
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     );
-    footer = (
-      <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
-        <Button type="button" hierarchy="secondary" size="lg" className={TAP} onClick={() => toForm(take)}>
-          Regenerate
-        </Button>
-        <Button type="button" hierarchy="primary" size="lg" className={TAP} onClick={back ? back.onBack : onClose}>
-          {back ? "Continue" : "Done"}
-        </Button>
-      </div>
-    );
+    footer = null;
   } else {
     const kind = take?.failure?.kind ?? "interrupted";
     body = (
@@ -991,12 +1125,12 @@ function GenerateVideoDialogOpen({
       onClose={onClose}
       covered={help}
       size="md"
-      title="Generate video"
+      title={view === "review" ? "Review the video" : "Generate video"}
       description={renderTitle(`For ${target.productName}`, target.projectName)}
       initialFocus={view === "form" ? promptRef : focusRef}
       footer={hydrated ? footer : null}
     >
-      {back && (view === "form" || view === "result" || view === "failed" || view === "render") && (
+      {back && (view === "form" || view === "review" || view === "failed" || view === "render") && (
         <button
           type="button"
           onClick={back.onBack}

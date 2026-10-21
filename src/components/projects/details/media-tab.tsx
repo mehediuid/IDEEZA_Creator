@@ -13,7 +13,8 @@
 // - **Product videos** (Phase 2): one tile per current product, the product's
 //   in-use take. A ready tile opens VideoLightbox; the owner also sees every
 //   other state in P2-VIDEO-4's words, with its action (Generate AI video /
-//   Try again → the Generate dialog). A buyer sees ready tiles only — no
+//   Try again → the Generate dialog; Review → its Review of the waiting take,
+//   which a ready tile notes too). A buyer sees ready tiles only — no
 //   status, no actions, no counts — and no group at all when none is ready.
 // - **From your builds**: concept-image tiles gathered from every saved build
 //   (CNT-9), a single Cover chip with its "Use as cover" action (CNT-14 /
@@ -199,7 +200,7 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
       </h2>
 
       <ProjectVideoSection project={project} products={allProducts} viewer={viewer} ctx={ctx} announce={announce} />
-      <VideosGroup project={project} products={products} viewer={viewer} ctx={ctx} />
+      <VideosGroup project={project} products={products} viewer={viewer} ctx={ctx} announce={announce} />
       {ownerFacts && <SnapshotsGroup projectId={project.id} canRemove={showCoverControl} />}
 
       {tiles.length === 0 ? (
@@ -437,17 +438,19 @@ function VideosGroup({
   products,
   viewer,
   ctx,
+  announce,
 }: {
   project: ManualProject;
   products: ProjectProduct[];
   viewer: Viewer;
   ctx: CanContext;
+  announce: (message: string) => void;
 }) {
   const owner = can(viewer, "video.generate", ctx);
   const { record, hydrated } = useProjectVideos(project.id);
   const { jobs, now, hydrated: jobsHydrated } = useVideoJobs();
   const [checked, setChecked] = React.useState<string | null>(null);
-  const [generate, setGenerate] = React.useState<{ target: VideoTarget; from: string | null } | null>(null);
+  const [generate, setGenerate] = React.useState<{ target: VideoTarget; from: string | null; review: string | null } | null>(null);
   // The items are kept as they were on open: a file that vanishes mid-view
   // shows its "lost" copy in the player rather than closing the lightbox.
   const [lightbox, setLightbox] = React.useState<{ index: number; trigger: HTMLElement; items: LightboxVideo[] } | null>(null);
@@ -531,6 +534,8 @@ function VideosGroup({
                 setGenerate({
                   target: videoTargetOf(project, r.product),
                   from: r.status.state === "failed" ? r.status.take.id : null,
+                  review:
+                    r.status.state === "review" ? r.status.take.id : r.status.state === "ready" ? (r.status.review?.id ?? null) : null,
                 })
               }
             />
@@ -552,6 +557,8 @@ function VideosGroup({
           open={generate !== null}
           target={generate?.target ?? null}
           fromTakeId={generate?.from ?? null}
+          reviewTakeId={generate?.review ?? null}
+          announce={announce}
           onClose={() => setGenerate(null)}
           // The tile's own button turns into "Rendering"; its tile takes focus.
           fallbackFocus={() => (generate ? (tileRefs.current.get(generate.target.productId) ?? null) : null)}
@@ -596,7 +603,8 @@ function VideoTileCard({
       )}
       <div className="flex flex-col gap-1">
         <span className="truncate text-md font-semibold text-text-primary">{caption}</span>
-        {owner && !take && (
+        {/* A ready tile says its state only when a newer take waits for review. */}
+        {owner && (!take || copy.action === "review") && (
           <>
             <span className="flex items-center gap-2 text-md text-text-secondary">
               <StatusGlyph icon={copy.icon} tone={copy.tone} size={14} />
