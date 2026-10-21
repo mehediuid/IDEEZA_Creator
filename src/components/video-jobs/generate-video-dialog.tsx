@@ -25,9 +25,9 @@
 //   left, "Notify me on this browser"; Cancel render · Close. Closing leaves
 //   the render running — its toast carries on in the corner.
 // - review (owner, 2026-10-21): a finished take counts only once the maker
-//   says so. The player (never autoplaying), "Is this the video you want?",
-//   "Take {n} · 480p · 10 s" (and which take stays in use meanwhile), Use this
-//   video, then Make another take (the same storyboard, rendered again now) ·
+//   says so. The player (never autoplaying; its line names the take),
+//   "Is this the video you want?", Use this video (and which take stays in
+//   use meanwhile), then Make another take (the same storyboard, rendered again now) ·
 //   Edit storyboard · Change the prompt — each passes this take over first —
 //   · Decide later; and, with more than one, the other takes to go back to.
 // - failed: the failure copy; Close · Try again.
@@ -1052,12 +1052,10 @@ function GenerateVideoDialogOpen({
       <div className="flex flex-col gap-8 [container-type:inline-size]">
         <VideoPlayer take={take} productName={target.productName} projectId={target.projectId} owner onGenerate={() => changePrompt(take)} />
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <h3 ref={setFocus} tabIndex={-1} className="text-lg font-bold text-text-primary outline-none">
-              Is this the video you want?
-            </h3>
-            <p className="text-sm text-text-secondary">{reviewTakeLine(take)}</p>
-          </div>
+          {/* The player's own line already names the take, its quality and length. */}
+          <h3 ref={setFocus} tabIndex={-1} className="text-lg font-bold text-text-primary outline-none">
+            Is this the video you want?
+          </h3>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <Button type="button" hierarchy="primary" size="lg" className={TAP} onClick={() => chooseTake(take, take)}>
               Use this video

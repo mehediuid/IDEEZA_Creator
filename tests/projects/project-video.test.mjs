@@ -167,7 +167,7 @@ test("outdated: a product added after — blocks; asks for its video first, then
   assert.equal(waiting.state, "outdated");
   assert.equal(waiting.ok, false);
   assert.deepEqual(waiting.missing, ["Propeller Guard Set"]);
-  assert.equal(projectRowCopy(waiting).text, "Propeller Guard Set isn't in it yet. Make its video first.");
+  assert.equal(projectRowCopy(waiting).text, "Propeller Guard Set isn't in it yet. Finish its video first.");
   assert.equal(projectRowCopy(waiting).action, null);
   const canUpdate = status(four, { ...allReady, pg: ready("t_pg", "pg"), ...proj });
   assert.equal(projectRowCopy(canUpdate).text, "Propeller Guard Set isn't in it yet.");

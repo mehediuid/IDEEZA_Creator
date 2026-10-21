@@ -49,7 +49,6 @@ import {
   PROJECT_VIDEO_TITLE,
   RENDER_KEEPS_RUNNING,
   projectRowCopy,
-  resolutionOf,
   stageLine,
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
@@ -259,15 +258,12 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
     body = <div aria-busy="true" className="h-[240px] rounded-lg bg-bg-subtle motion-safe:animate-pulse" />;
     footer = null;
   } else if (reviewTake) {
-    const length = reviewTake.clip?.durationMs || (reviewTake.join ? joinLengthMs(reviewTake.join) : 0);
     body = (
       <div className="flex flex-col gap-6 [container-type:inline-size]">
         <VideoPlayer take={reviewTake} productName={project.name} projectId={project.id} />
-        <p className="text-sm text-text-secondary">
-          {`Take ${reviewTake.n} · ${resolutionOf(reviewTake.quality)}${length ? ` · ${secs(length)}` : ""}`}
-          {inUseTake ? ` · Take ${inUseTake.n} stays in use until you choose.` : ""}
-        </p>
-        <h3 className="text-lg font-semibold text-text-primary">Is this the video you want?</h3>
+        {/* The player's own line already names the take, its quality and length. */}
+        <h3 className="text-lg font-bold text-text-primary">Is this the video you want?</h3>
+        {inUseTake && <p className="text-sm text-text-secondary">Take {inUseTake.n} stays in use until you choose.</p>}
         <div className="grid grid-cols-1 gap-4 [@container(min-width:440px)]:grid-cols-2">
           {fresh && <Choice title="Make another take" note="The same scenes and order" onClick={anotherTake} />}
           <Choice title="Change scenes" note="Order, labels, intro and outro" onClick={changeScenes} />

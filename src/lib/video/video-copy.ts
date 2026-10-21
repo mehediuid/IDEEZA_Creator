@@ -283,7 +283,7 @@ export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
           ? `${listNames(s.missing)} ${s.missing.length === 1 ? "isn't" : "aren't"} in it yet.`
           : `It still shows ${listNames(s.extra)}.`;
       return {
-        text: canUpdate ? what : `${what} Make ${s.missing.length === 1 ? "its" : "their"} video first.`,
+        text: canUpdate ? what : `${what} Finish ${s.missing.length === 1 ? "its video" : "their videos"} first.`,
         sub: null,
         tone: "warning",
         icon: "alert",
