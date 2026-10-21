@@ -14,7 +14,10 @@ import type { StoredDraft } from "../brief/project-brief";
 import { etaLabel, progressOf, type VideoJob } from "./jobs";
 import { sanitizeStoryboard, type Storyboard } from "./storyboard";
 import {
+  PROJECT_VIDEO_KEY,
   TAKES_MAX,
+  type JoinCut,
+  type JoinPlan,
   type OnScreenLines,
   type ProductVideo,
   type ProductVideoStatus,
@@ -56,6 +59,17 @@ function sanitizeAuto(raw: unknown): { video: boolean; audio: boolean } | null {
   return { video: raw.video === true, audio: raw.audio === true };
 }
 
+/** A project video's join plan; a malformed one is dropped whole, never half-kept. */
+export function sanitizeJoin(raw: unknown): JoinPlan | null {
+  if (!isObj(raw) || !Array.isArray(raw.intro) || !Array.isArray(raw.cuts) || typeof raw.outro !== "string") return null;
+  const cuts: JoinCut[] = [];
+  for (const c of raw.cuts) {
+    if (!isObj(c) || typeof c.productId !== "string" || typeof c.takeId !== "string") return null;
+    cuts.push({ productId: c.productId, takeId: c.takeId, fromMs: num(c.fromMs), ms: num(c.ms), label: str(c.label) });
+  }
+  return { intro: [str(raw.intro[0]), str(raw.intro[1])], cuts, outro: raw.outro };
+}
+
 function sanitizeTake(raw: unknown, productId: string): VideoTake | null {
   if (!isObj(raw) || typeof raw.id !== "string" || typeof raw.n !== "number") return null;
   const take: VideoTake = {
@@ -73,6 +87,8 @@ function sanitizeTake(raw: unknown, productId: string): VideoTake | null {
   if (auto) take.auto = auto;
   const storyboard = sanitizeStoryboard(raw.storyboard);
   if (storyboard) take.storyboard = storyboard;
+  const join = sanitizeJoin(raw.join);
+  if (join) take.join = join;
   if (typeof raw.readyAt === "number") take.readyAt = raw.readyAt;
   if (isObj(raw.clip) && typeof raw.clip.mime === "string") {
     take.clip = {
@@ -108,6 +124,8 @@ function sanitizeProductVideo(raw: unknown, productId: string): ProductVideo | n
     if (typeof raw.draft.audioPrompt === "string") video.draft.audioPrompt = raw.draft.audioPrompt;
     const auto = sanitizeAuto(raw.draft.auto);
     if (auto) video.draft.auto = auto;
+    const join = sanitizeJoin(raw.draft.join);
+    if (join) video.draft.join = join;
   }
   return video;
 }
@@ -201,6 +219,7 @@ export function startTake(
     audioPrompt?: string;
     auto?: { video: boolean; audio: boolean };
     storyboard?: Storyboard;
+    join?: JoinPlan;
   },
   now: number,
   id: string,
@@ -219,6 +238,7 @@ export function startTake(
     ...(input.audioPrompt !== undefined ? { audioPrompt: input.audioPrompt } : null),
     ...(input.auto ? { auto: input.auto } : null),
     ...(input.storyboard ? { storyboard: input.storyboard } : null),
+    ...(input.join ? { join: input.join } : null),
   };
   const next = [...takes, take];
   const evicted: string[] = [];
@@ -328,10 +348,13 @@ export function migrateLegacyClip(
   };
 }
 
-/** D6: no project-level "Default Media" — MARKET's listing card falls back
- *  to the first current product's in-use take, purely. */
+/** The video that stands for the whole project: its project video (owner, 2026-10-21), else the
+ *  first current product's in-use take. */
 export function featuredVideoOf(video: ProjectVideos | null, products: ProjectProduct[]): VideoTake | null {
   if (!video) return null;
+  const project = video.products[PROJECT_VIDEO_KEY];
+  const own = project?.inUseId ? project.takes.find((t) => t.id === project.inUseId) : undefined;
+  if (own) return own;
   for (const p of products) {
     if (p.dropped !== null) continue;
     const pv = video.products[p.id];

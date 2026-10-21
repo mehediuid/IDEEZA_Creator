@@ -6,7 +6,7 @@
 // `components/video-jobs/video-jobs-provider.tsx`, which re-exports all of
 // this, so its importers are unchanged.
 
-import type { OnScreenLines } from "./types";
+import type { JoinPlan, OnScreenLines } from "./types";
 
 export type VideoJobStage =
   | "queued"
@@ -41,7 +41,9 @@ export type VideoJob = {
   // `in` check.
   projectId?: string | null;
   productId?: string | null;
-  render?: { lines: OnScreenLines; imageUrl: string | null; productName: string } | null;
+  // A project video (`productId` is `PROJECT_VIDEO_KEY`) joins the products' clips instead of
+  // drawing one image; `productName` is then the project's name.
+  render?: { lines: OnScreenLines; imageUrl: string | null; productName: string; join?: JoinPlan | null } | null;
 };
 
 export const STAGE_BUDGETS_SEC: Record<

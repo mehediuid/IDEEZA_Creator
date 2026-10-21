@@ -30,6 +30,16 @@ export const TAKES_MAX = 5;
 /** localStorage key of a project's `ProjectVideos`. */
 export const VIDEOS_KEY = (projectId: string) => `ideeza:video:${projectId}`;
 
+/** The project video's key in `ProjectVideos.products` (owner, 2026-10-21; the market's
+ *  `PROJECT_SCOPE` spelling). It is stored, rendered and picked like a product's video. Product
+ *  ids are `prd_…` (or the legacy `p1`), so it never collides with one. */
+export const PROJECT_VIDEO_KEY = "project";
+
+/** One product's part of a project video: which of its takes, and which stretch of it. */
+export type JoinCut = { productId: string; takeId: string; fromMs: number; ms: number; label: string };
+/** What a project video take is made of: an intro card, the products' cuts in order, an outro card. */
+export type JoinPlan = { intro: [string, string]; cuts: JoinCut[]; outro: string };
+
 export type VideoTake = {
   /** "take_" + 8 base-36 = VideoJob.id = the clip-store key. */
   id: string;
@@ -45,6 +55,8 @@ export type VideoTake = {
   auto?: { video: boolean; audio: boolean };
   /** The three scenes the maker reviewed before Generate; each scene's speech is its on-screen line. */
   storyboard?: Storyboard;
+  /** A project video take only: the product cuts it joins (`PROJECT_VIDEO_KEY`). */
+  join?: JoinPlan;
   lines: OnScreenLines;
   quality: VideoQuality;
   /** The build product whose image the frames used; null = no image. */
@@ -70,6 +82,8 @@ export type VideoDraft = {
   quality: VideoQuality;
   audioPrompt?: string;
   auto?: { video: boolean; audio: boolean };
+  /** The project video's draft: the order and labels picked in its dialog. */
+  join?: JoinPlan;
 };
 
 export type ProjectVideos = { version: 1; projectId: string; products: Record<string, ProductVideo> };
