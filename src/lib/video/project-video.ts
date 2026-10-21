@@ -31,6 +31,39 @@ export function joinLengthMs(plan: JoinPlan): number {
   return INTRO_MS + plan.cuts.reduce((sum, c) => sum + c.ms, 0) + OUTRO_MS;
 }
 
+export const JOIN_FADE_MS = 250;
+
+/** One stretch of a project video: the intro card, product cut `index`, or the outro card. */
+export type JoinSegment = { segment: "intro" | "cut" | "outro"; index: number; localMs: number };
+/** A frame: its stretch and, for 250 ms after each boundary, the stretch before it held at its
+ *  last instant under this one fading in (`fade` 0 → 1). */
+export type JoinFrame = JoinSegment & { fade: number; prev: JoinSegment | null };
+
+/** What the renderer draws at `tSec`, clamped to the video's length. */
+export function joinFrameAt(plan: JoinPlan, tSec: number): JoinFrame {
+  const segments: { segment: JoinSegment["segment"]; index: number; ms: number }[] = [
+    { segment: "intro", index: 0, ms: INTRO_MS },
+    ...plan.cuts.map((c, index) => ({ segment: "cut" as const, index, ms: c.ms })),
+    { segment: "outro", index: 0, ms: OUTRO_MS },
+  ];
+  // Whole microseconds, so a frame on a boundary (159 / 30 s) never lands a hair before it.
+  const t = Math.max(0, Math.min(joinLengthMs(plan), Math.round(tSec * 1_000_000) / 1000));
+  let i = 0;
+  let start = 0;
+  while (i < segments.length - 1 && t >= start + segments[i].ms) start += segments[i++].ms;
+  const s = segments[i];
+  const localMs = Math.min(s.ms, t - start);
+  const before = i > 0 ? segments[i - 1] : null;
+  const fading = before !== null && localMs < JOIN_FADE_MS;
+  return {
+    segment: s.segment,
+    index: s.index,
+    localMs,
+    fade: fading ? localMs / JOIN_FADE_MS : 1,
+    prev: fading ? { segment: before.segment, index: before.index, localMs: before.ms } : null,
+  };
+}
+
 function line(s: string): string {
   const t = s.trim();
   return t.length <= LINE_MAX ? t : `${t.slice(0, LINE_MAX - 1).trimEnd()}…`;

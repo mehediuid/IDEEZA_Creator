@@ -9,7 +9,9 @@
 //               that take's inputs) + ×
 // × hides the toast (acknowledge) — it no longer deletes the job, which used
 // to erase the clip link (D7). A v1 Brief job (no file) keeps Cancel while
-// it runs and offers nothing to watch.
+// it runs and offers nothing to watch. A project video job ("Project video ·
+// {Project}") has Cancel and Watch, but no Try again: it isn't remade from
+// Generate.
 //
 // It also mounts VideoUpkeep (verify clip files, migrate the Brief's old
 // clip), which needs the history provider this component sits inside.
@@ -35,6 +37,7 @@ import { can, type Viewer } from "@/lib/manual/permissions";
 import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useGuards } from "@/lib/manual/use-write-guard";
+import { isProjectKey } from "@/lib/video/project-video";
 import { useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
 import { moreToastsLine, toastHeading } from "@/lib/video/video-copy";
@@ -113,9 +116,10 @@ function RenderToasts() {
   }, []);
 
   /** The Generate dialog's target for a failed product job, when its project
-   *  and product still exist and the maker may still render for it. */
+   *  and product still exist and the maker may still render for it. A project
+   *  video job has none: it is remade from its own dialog, not Generate. */
   const targetOf = (j: VideoJob): VideoTarget | null => {
-    if (!isProductJob(j)) return null;
+    if (!isProductJob(j) || isProjectKey(j.productId)) return null;
     const project = projects.find((p) => p.id === j.projectId);
     if (!project || !can(OWNER, "video.generate", { locked: guards.lockOf(project) !== null })) return null;
     const product = productsOfProject(project, buildsOf(project, builds)).find((x) => x.id === j.productId);

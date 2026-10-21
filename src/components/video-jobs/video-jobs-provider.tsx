@@ -16,7 +16,9 @@
 //   stores it (clip-store.ts), marks the take ready (`finishTake`), and only
 //   then sets `done`. Until the file is stored, progress holds at 99 %.
 //   One tab encodes a take, under the Web Lock `ideeza-video:<takeId>`;
-//   other tabs pick the result up through the storage event.
+//   other tabs pick the result up through the storage event. The project
+//   video's job (`productId` = PROJECT_VIDEO_KEY) runs the same way; its last
+//   stage joins the products' stored clips (`renderJoin`) instead.
 // - A **legacy** job (the v1 Brief's timer-only clip, `render` absent): one
 //   stored before the Brief moved to per-product takes (T26) still ticks to
 //   `done` and never makes a file; nothing starts one any more.
@@ -370,13 +372,19 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
         if (take.readyAt) return settle(id, "done");
 
         // Loaded on first use: the muxer stays out of every page's bundle.
-        const { ClipRenderError, renderClip } = await import("./clip-renderer");
+        const { ClipRenderError, renderClip, renderJoin } = await import("./clip-renderer");
         let clip;
         try {
-          clip = await renderClip(
-            { lines: render.lines, imageUrl: render.imageUrl, productName: render.productName, quality: job.quality },
-            { signal: ac.signal },
-          );
+          // The project video joins its products' stored clips; a product's draws its image.
+          clip = render.join
+            ? await renderJoin(
+                { plan: render.join, projectName: render.productName, quality: job.quality },
+                { signal: ac.signal },
+              )
+            : await renderClip(
+                { lines: render.lines, imageUrl: render.imageUrl, productName: render.productName, quality: job.quality },
+                { signal: ac.signal },
+              );
         } catch (e) {
           if (ac.signal.aborted) return;
           const kind = e instanceof ClipRenderError ? e.kind : "encode";

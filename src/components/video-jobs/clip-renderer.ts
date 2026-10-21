@@ -16,16 +16,30 @@
 //   (`patchWebmDuration`) — without it `video.duration` reads Infinity.
 // - Neither: `unsupported`.
 //
+// The project video (`renderJoin`, owner 2026-10-21) goes through the same two
+// encoders: an intro card, each product's stored clip cut in order (seeked
+// frame by frame, with a chapter label top left), an outro card, 250 ms
+// cross-fades between them (`joinFrameAt`, lib/video/project-video.ts).
+//
 // Browser-only.
 
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
+import { getClip } from "@/lib/video/clip-store";
 import { framePlan, type FramePlan } from "@/lib/video/frames";
-import { VIDEO_QUALITY, type OnScreenLines, type VideoQuality } from "@/lib/video/types";
+import { INTRO_MS, joinFrameAt, joinLengthMs, type JoinSegment } from "@/lib/video/project-video";
+import { VIDEO_QUALITY, type JoinPlan, type OnScreenLines, type VideoQuality } from "@/lib/video/types";
 
 export type ClipInput = {
   lines: OnScreenLines;
   imageUrl: string | null;
   productName: string;
+  quality: VideoQuality;
+};
+
+export type JoinInput = {
+  plan: JoinPlan;
+  /** Titles the intro when its first line is blank. */
+  projectName: string;
   quality: VideoQuality;
 };
 
@@ -53,10 +67,15 @@ export class ClipRenderError extends Error {
 
 const FPS = 30;
 const SECONDS = 10;
-const FRAMES = FPS * SECONDS;
 const FRAME_US = 1_000_000 / FPS;
-const POSTER_FRAME = Math.round(1.5 * FPS);
+const POSTER_SEC = 1.5;
 const SCENE_STARTS = [0, 3, 6] as const;
+/** A product clip that hasn't loaded by then fails the project video. */
+const SOURCE_LOAD_MS = 15_000;
+/** A seek that never reports back: the frame it has is drawn after this. */
+const SEEK_TIMEOUT_MS = 1_000;
+/** More stuck seeks in a row than this: the clip won't seek, and the take fails. */
+const SEEK_STALLS_MAX = 3;
 
 // ─────────────────────────── what this browser can do ───────────────────────────
 
@@ -187,16 +206,24 @@ function taints(img: HTMLImageElement): boolean {
 
 // ─────────────────────────── drawing ───────────────────────────
 
-type Painter = (t: number) => void;
+/** Draws the frame at `t` seconds; a project video's awaits its seeks. */
+type Painter = (t: number) => void | Promise<void>;
 
-function makePainter(
-  ctx: CanvasRenderingContext2D,
-  W: number,
-  H: number,
-  input: ClipInput,
-  img: HTMLImageElement | null,
-  theme: Theme,
-): Painter {
+/** What both painters draw with: the canvas, the token theme, and sizes
+ *  authored at 360p (`k`). */
+type Kit = {
+  ctx: CanvasRenderingContext2D;
+  W: number;
+  H: number;
+  k: number;
+  theme: Theme;
+  font: (weight: number, px: number) => string;
+  fillGradient: (g: Gradient | null) => void;
+  wrap: (text: string, maxWidth: number, maxLines: number) => string[];
+  scrim: (x: number, y: number, w: number, h: number, alpha: number) => void;
+};
+
+function makeKit(ctx: CanvasRenderingContext2D, W: number, H: number, theme: Theme): Kit {
   const k = H / 360; // every size below is authored at 360p
   const font = (weight: number, px: number) => `${weight} ${Math.round(px * k)}px ${theme.font}`;
 
@@ -255,6 +282,12 @@ function makePainter(
     ctx.fill();
     ctx.restore();
   };
+
+  return { ctx, W, H, k, theme, font, fillGradient, wrap, scrim };
+}
+
+function makePainter(kit: Kit, input: ClipInput, img: HTMLImageElement | null): Painter {
+  const { ctx, W, H, k, theme, font, fillGradient, wrap, scrim } = kit;
 
   const picture = (plan: FramePlan) => {
     if (img) {
@@ -353,6 +386,145 @@ function makePainter(
   };
 }
 
+// ─────────────────────────── the project video ───────────────────────────
+
+/** A product's stored clip as a frame source: muted, inline, loading at once. */
+function sourceVideo(url: string): HTMLVideoElement {
+  const v = document.createElement("video");
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = "auto";
+  v.src = url;
+  return v;
+}
+
+function sourceReady(v: HTMLVideoElement, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (v.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return resolve();
+    let timer = 0;
+    const settle = (err: ClipRenderError | null) => {
+      window.clearTimeout(timer);
+      v.removeEventListener("loadeddata", onData);
+      v.removeEventListener("error", onError);
+      signal?.removeEventListener("abort", onAbort);
+      if (err) reject(err);
+      else resolve();
+    };
+    const onData = () => settle(null);
+    const onError = () => settle(new ClipRenderError("encode", "a product clip won't load"));
+    const onAbort = () => settle(new ClipRenderError("cancelled"));
+    v.addEventListener("loadeddata", onData);
+    v.addEventListener("error", onError);
+    signal?.addEventListener("abort", onAbort);
+    timer = window.setTimeout(() => settle(new ClipRenderError("encode", "a product clip took too long to load")), SOURCE_LOAD_MS);
+  });
+}
+
+function makeJoinPainter(
+  kit: Kit,
+  plan: JoinPlan,
+  projectName: string,
+  videos: HTMLVideoElement[],
+  signal?: AbortSignal,
+): Painter {
+  const { ctx, W, H, k, theme, font, fillGradient, wrap, scrim } = kit;
+  let stalls = 0;
+
+  /** Resolves once `v` shows `sec` (clamped to the clip), or after the timeout with the frame it has. */
+  const seek = (v: HTMLVideoElement, sec: number) =>
+    new Promise<void>((resolve, reject) => {
+      const end = Number.isFinite(v.duration) ? Math.max(0, v.duration - 0.001) : sec;
+      const to = Math.max(0, Math.min(end, sec));
+      if (!v.seeking && Math.abs(v.currentTime - to) < 0.0005) return resolve();
+      let timer = 0;
+      const settle = (stalled: boolean) => {
+        window.clearTimeout(timer);
+        v.removeEventListener("seeked", onSeeked);
+        stalls = stalled ? stalls + 1 : 0;
+        if (stalls > SEEK_STALLS_MAX) reject(new ClipRenderError("encode", "a product clip won't seek"));
+        else resolve();
+      };
+      const onSeeked = () => settle(false);
+      v.addEventListener("seeked", onSeeked);
+      timer = window.setTimeout(() => settle(true), SEEK_TIMEOUT_MS);
+      v.currentTime = to;
+    });
+
+  /** The intro and outro: the brand gradient, a big line, a smaller one beneath. */
+  const card = (big: string, small: string) => {
+    fillGradient(theme.brand);
+    ctx.save();
+    ctx.fillStyle = theme.white;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = font(500, 20);
+    const smallLines = small.trim() ? wrap(small, W - 128 * k, 2) : [];
+    ctx.font = font(700, 40);
+    const bigLines = wrap(big, W - 96 * k, 2);
+    const bigLh = 48 * k;
+    const smallLh = 26 * k;
+    const gap = smallLines.length ? 12 * k : 0;
+    let y = (H - bigLines.length * bigLh - gap - smallLines.length * smallLh) / 2;
+    bigLines.forEach((l, i) => ctx.fillText(l, W / 2, y + bigLh * (i + 0.5)));
+    y += bigLines.length * bigLh + gap;
+    ctx.font = font(500, 20);
+    smallLines.forEach((l, i) => ctx.fillText(l, W / 2, y + smallLh * (i + 0.5)));
+    ctx.restore();
+  };
+
+  /** The product's name, top left: its clip already carries a caption and title band at the bottom. */
+  const chapter = (label: string) => {
+    if (!label.trim()) return;
+    ctx.save();
+    ctx.font = font(600, 16);
+    const [text] = wrap(label, W / 2, 1);
+    const padX = 12 * k;
+    const h = 30 * k;
+    const x = 20 * k;
+    const y = 20 * k;
+    // Under a cross-fade the scrim fades with the rest of the frame.
+    scrim(x, y, ctx.measureText(text).width + padX * 2, h, 0.62 * ctx.globalAlpha);
+    ctx.fillStyle = theme.white;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x + padX, y + h / 2);
+    ctx.restore();
+  };
+
+  const cut = async (seg: JoinSegment) => {
+    const c = plan.cuts[seg.index];
+    const v = videos[seg.index];
+    // The middle of the frame's slot, so float rounding never lands on the frame before.
+    await seek(v, (c.fromMs + seg.localMs) / 1000 + 0.5 / FPS);
+    ctx.fillStyle = theme.overlay || "black";
+    ctx.fillRect(0, 0, W, H);
+    if (v.videoWidth && v.videoHeight) {
+      const s = Math.max(W / v.videoWidth, H / v.videoHeight);
+      const dw = v.videoWidth * s;
+      const dh = v.videoHeight * s;
+      ctx.drawImage(v, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    }
+    chapter(c.label);
+  };
+
+  const segment = async (seg: JoinSegment) => {
+    if (seg.segment === "cut") return cut(seg);
+    if (seg.segment === "intro") return card(plan.intro[0].trim() || projectName, plan.intro[1]);
+    card(plan.outro, "");
+  };
+
+  return async (t: number) => {
+    checkAbort(signal);
+    const frame = joinFrameAt(plan, t);
+    if (!frame.prev) return segment(frame);
+    await segment(frame.prev);
+    ctx.save();
+    ctx.globalAlpha = frame.fade;
+    await segment(frame);
+    ctx.restore();
+  };
+}
+
 // ─────────────────────────── helpers ───────────────────────────
 
 /** Yields to the event loop without timer throttling (a hidden tab clamps
@@ -378,15 +550,22 @@ function checkAbort(signal?: AbortSignal) {
   if (signal?.aborted) throw new ClipRenderError("cancelled");
 }
 
+/** How long a clip runs, and the moment its poster is taken. */
+type Timing = { seconds: number; posterSec: number };
+type Encoded = { video: Blob; poster: Blob; mime: string; durationMs: number };
+
 // ─────────────────────────── the WebCodecs path ───────────────────────────
 
 async function encodeWithWebCodecs(
   canvas: HTMLCanvasElement,
   paint: Painter,
   plan: CodecPlan,
+  timing: Timing,
   signal?: AbortSignal,
-): Promise<{ video: Blob; poster: Blob; mime: string }> {
+): Promise<Encoded> {
   const { width, height } = canvas;
+  const frames = Math.round(timing.seconds * FPS);
+  const posterFrame = Math.round(timing.posterSec * FPS);
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
     video: { codec: plan.muxer, width, height, frameRate: FPS },
@@ -402,11 +581,11 @@ async function encodeWithWebCodecs(
   encoder.configure(plan.config);
   let poster: Blob | null = null;
   try {
-    for (let i = 0; i < FRAMES; i++) {
+    for (let i = 0; i < frames; i++) {
       checkAbort(signal);
       if (failure) throw failure;
-      paint(i / FPS);
-      if (i === POSTER_FRAME) poster = await toJpeg(canvas);
+      await paint(i / FPS);
+      if (i === posterFrame) poster = await toJpeg(canvas);
       const frame = new VideoFrame(canvas, { timestamp: Math.round(i * FRAME_US), duration: Math.round(FRAME_US) });
       encoder.encode(frame, { keyFrame: i % FPS === 0 });
       frame.close();
@@ -421,7 +600,12 @@ async function encodeWithWebCodecs(
   muxer.finalize();
   const buffer = muxer.target.buffer;
   if (!poster) throw new ClipRenderError("encode", "no poster");
-  return { video: new Blob([buffer], { type: "video/mp4" }), poster, mime: "video/mp4" };
+  return {
+    video: new Blob([buffer], { type: "video/mp4" }),
+    poster,
+    mime: "video/mp4",
+    durationMs: Math.round(timing.seconds * 1000),
+  };
 }
 
 // ─────────────────────────── the MediaRecorder fallback ───────────────────────────
@@ -434,9 +618,10 @@ function recorderMime(): string {
 async function encodeWithRecorder(
   canvas: HTMLCanvasElement,
   paint: Painter,
+  timing: Timing,
   signal?: AbortSignal,
-): Promise<{ video: Blob; poster: Blob; mime: string; durationMs: number }> {
-  paint(0);
+): Promise<Encoded> {
+  await paint(0);
   const stream = canvas.captureStream(FPS);
   const mimeType = recorderMime();
   const recorder = new MediaRecorder(stream, {
@@ -457,10 +642,10 @@ async function encodeWithRecorder(
   let elapsed = 0;
   try {
     // Real time: the recorder captures what the canvas shows as it shows it.
-    while (elapsed < SECONDS * 1000) {
+    while (elapsed < timing.seconds * 1000) {
       checkAbort(signal);
-      paint(elapsed / 1000);
-      if (!poster && !posterPending && elapsed >= 1500) {
+      await paint(elapsed / 1000);
+      if (!poster && !posterPending && elapsed >= timing.posterSec * 1000) {
         posterPending = toJpeg(canvas).then((b) => {
           poster = b;
         });
@@ -468,7 +653,7 @@ async function encodeWithRecorder(
       await new Promise((r) => setTimeout(r, 1000 / FPS));
       elapsed = performance.now() - t0;
     }
-    paint(SECONDS);
+    await paint(timing.seconds);
     elapsed = performance.now() - t0;
   } finally {
     if (recorder.state !== "inactive") recorder.stop();
@@ -614,7 +799,39 @@ export function patchWebmDuration(buffer: ArrayBuffer, durationMs: number): Arra
   return buffer;
 }
 
-// ─────────────────────────── the one entry point ───────────────────────────
+// ─────────────────────────── the entry points ───────────────────────────
+
+/** The token theme, once the faces the frames use have loaded. */
+async function themeWithFonts(weights: number[]): Promise<Theme> {
+  const theme = readTheme();
+  try {
+    await Promise.all(weights.map((w) => document.fonts?.load(`${w} 30px ${theme.font}`)));
+  } catch {
+    // The fallback face draws instead.
+  }
+  return theme;
+}
+
+function canvasFor(width: number, height: number, theme: Theme): { canvas: HTMLCanvasElement; kit: Kit } {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) throw new ClipRenderError("unsupported", "no 2d canvas");
+  return { canvas, kit: makeKit(ctx, width, height, theme) };
+}
+
+/** WebCodecs when this browser can encode a codec, else the recorder, else `unsupported`. */
+async function encode(canvas: HTMLCanvasElement, paint: Painter, timing: Timing, signal?: AbortSignal): Promise<Encoded> {
+  const plan = hasWebCodecs() ? await planCodec(canvas.width, canvas.height) : null;
+  if (plan) return encodeWithWebCodecs(canvas, paint, plan, timing, signal);
+  if (hasRecorder()) return encodeWithRecorder(canvas, paint, timing, signal);
+  throw new ClipRenderError("unsupported", "no encodable codec");
+}
+
+function asRenderError(e: unknown): ClipRenderError {
+  return e instanceof ClipRenderError ? e : new ClipRenderError("encode", e instanceof Error ? e.message : String(e));
+}
 
 /**
  * Draws and encodes one take. Throws ClipRenderError: `unsupported` when this
@@ -629,33 +846,56 @@ export async function renderClip(input: ClipInput, opts: { signal?: AbortSignal 
   const img = loaded && !taints(loaded) ? loaded : null;
   checkAbort(opts.signal);
 
-  const theme = readTheme();
-  try {
-    await document.fonts?.load(`700 30px ${theme.font}`);
-  } catch {
-    // The fallback face draws instead.
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  if (!ctx) throw new ClipRenderError("unsupported", "no 2d canvas");
-  const paint = makePainter(ctx, width, height, input, img, theme);
+  const theme = await themeWithFonts([700]);
+  const { canvas, kit } = canvasFor(width, height, theme);
+  const paint = makePainter(kit, input, img);
 
   try {
-    const plan = hasWebCodecs() ? await planCodec(width, height) : null;
-    if (plan) {
-      const out = await encodeWithWebCodecs(canvas, paint, plan, opts.signal);
-      return { ...out, width, height, durationMs: SECONDS * 1000, usedImage: img !== null };
-    }
-    if (hasRecorder()) {
-      const out = await encodeWithRecorder(canvas, paint, opts.signal);
-      return { ...out, width, height, usedImage: img !== null };
-    }
-    throw new ClipRenderError("unsupported", "no encodable codec");
+    const out = await encode(canvas, paint, { seconds: SECONDS, posterSec: POSTER_SEC }, opts.signal);
+    return { ...out, width, height, usedImage: img !== null };
   } catch (e) {
-    if (e instanceof ClipRenderError) throw e;
-    throw new ClipRenderError("encode", e instanceof Error ? e.message : String(e));
+    throw asRenderError(e);
+  }
+}
+
+/**
+ * Joins the products' stored clips into the project video: `joinLengthMs(plan)`
+ * long, its poster 1.5 s into the first cut. Throws ClipRenderError like
+ * renderClip; a product clip this browser doesn't hold, or one that won't load
+ * or seek, is `encode`.
+ */
+export async function renderJoin(input: JoinInput, opts: { signal?: AbortSignal } = {}): Promise<RenderedClip> {
+  if (!canMakeClips()) throw new ClipRenderError("unsupported");
+  const { plan } = input;
+  const { width, height } = VIDEO_QUALITY[input.quality];
+  const urls: string[] = [];
+  const videos: HTMLVideoElement[] = [];
+  try {
+    for (const cut of plan.cuts) {
+      const rec = await getClip(cut.takeId);
+      checkAbort(opts.signal);
+      if (!rec) throw new ClipRenderError("encode", `no clip for ${cut.label}`);
+      const url = URL.createObjectURL(rec.video);
+      urls.push(url);
+      const video = sourceVideo(url);
+      videos.push(video);
+      await sourceReady(video, opts.signal);
+    }
+
+    const theme = await themeWithFonts([700, 600, 500]);
+    checkAbort(opts.signal);
+    const { canvas, kit } = canvasFor(width, height, theme);
+    const paint = makeJoinPainter(kit, plan, input.projectName, videos, opts.signal);
+    const timing = { seconds: joinLengthMs(plan) / 1000, posterSec: INTRO_MS / 1000 + POSTER_SEC };
+    const out = await encode(canvas, paint, timing, opts.signal);
+    return { ...out, width, height, usedImage: true };
+  } catch (e) {
+    throw asRenderError(e);
+  } finally {
+    for (const v of videos) {
+      v.removeAttribute("src");
+      v.load();
+    }
+    for (const url of urls) URL.revokeObjectURL(url);
   }
 }
