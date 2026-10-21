@@ -10,7 +10,11 @@
 //   state, live. Videos are made in the project's Media tab, so a missing one
 //   offers "Make videos", which opens the products' videos in a dialog over
 //   the review (make-videos.tsx); a render still running never counts (C5).
-//   A plain private mint runs no gate — its videos are optional.
+//   Under them, the "Project video" group: one read-only row, made from the
+//   product videos (owner, 2026-10-21). The count is every video, the
+//   products' and the project's ("0 of 4 ready"), and the line under them is
+//   the first thing they still wait for. A plain private mint runs no gate —
+//   its videos are optional.
 // - The cost box (Sell and Give), the wallet fact line, and for a Sell what
 //   each sale pays out.
 // - The CTA is `commitCtaLabel`'s ("Sign and list" / "Pay and give" / "Sign
@@ -28,6 +32,7 @@ import { Image01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ProgressBar, TestnetDemoBadge } from "@/components/ideeza";
 import { MintCostRows, WalletFactLine } from "@/components/wallet/mint-cost";
+import { ProjectVideoList, ProjectVideoRow } from "@/components/video-jobs/project-video-row";
 import { StatusGlyph, useClipUrl } from "@/components/video-jobs/video-player";
 import { briefStateOf, type MintState } from "@/lib/brief/mint-flow";
 import { LICENSES, NETWORKS, type Intent } from "@/lib/brief/types";
@@ -38,7 +43,8 @@ import { listingInputFromBrief, listingSummaryRows, type ListingCtx, type Listin
 import { commitCtaLabel } from "@/lib/wallet/mint";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import type { MintType } from "@/lib/wallet/types";
-import { readyCountLine, statusCopy } from "@/lib/video/video-copy";
+import { videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { PROJECT_GROUP_META, PROJECT_VIDEO_TITLE, readyCountLine, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import { LevelCheck, useCommitCheck } from "@/components/projects/earn/ladder/level-check";
@@ -60,7 +66,7 @@ const SHARED_AS: Record<Intent, string> = {
 
 export const MAKE_VIDEOS = "Make videos";
 const VIDEOS_OPTIONAL = "Videos are optional when you keep it private.";
-const VIDEOS_READY = "Every product has its video.";
+const VIDEOS_READY = "Every video is ready.";
 /** The flow's own ownership confirm and its readiness gate already ask these. */
 const MINT_HANDLED = ["ownership", "videos"] as const;
 /** A Sell's too, and Details asks its license; the commit is the mint. */
@@ -158,9 +164,9 @@ export function StepReview({
   const cta = commitCtaLabel(intent, type, { last: true, fromPreview: false, innovations: state.shareToNewsfeed });
   const { readiness, gated } = gate;
   const counts = readiness.counts;
-  const videosLine = !gated
-    ? VIDEOS_OPTIONAL
-    : (readiness.rules.find((r) => r.id === "videos" && !r.ok)?.reason ?? VIDEOS_READY);
+  const videoCount = videoCountOf(readiness);
+  const videosBlocker = videosBlockerOf(readiness);
+  const videosLine = !gated ? VIDEOS_OPTIONAL : (videosBlocker ?? VIDEOS_READY);
 
   return (
     <BriefCard
@@ -197,17 +203,28 @@ export function StepReview({
             <h2 id={headingId} className="m-0 text-md font-semibold text-text-primary">
               Videos
             </h2>
-            <span className="text-sm text-text-secondary">{readyCountLine(counts.ready, counts.total)}</span>
+            <span className="text-sm text-text-secondary">{readyCountLine(videoCount.ready, videoCount.total)}</span>
           </div>
           {readiness.products.length > 0 ? (
-            <ul role="list" className="m-0 flex list-none flex-col divide-y divide-solid divide-border rounded-lg border border-solid border-border p-0">
-              {readiness.products.map((row) => (
-                <VideoRow key={row.productId} row={row} />
-              ))}
-            </ul>
+            <>
+              <GroupLabel label="Product videos" meta={readyCountLine(counts.ready, counts.total)} />
+              <ul role="list" className="m-0 flex list-none flex-col divide-y divide-solid divide-border rounded-lg border border-solid border-border p-0">
+                {readiness.products.map((row) => (
+                  <VideoRow key={row.productId} row={row} />
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {readiness.project && readiness.products.length > 0 ? (
+            <>
+              <GroupLabel label={PROJECT_VIDEO_TITLE} meta={PROJECT_GROUP_META} />
+              <ProjectVideoList status={readiness.project}>
+                <ProjectVideoRow status={readiness.project} projectName={project.name} products={readiness.products} variant="review" />
+              </ProjectVideoList>
+            </>
           ) : null}
           <p className="m-0 text-md text-text-secondary">{videosLine}</p>
-          {counts.missing > 0 ? (
+          {videosBlocker ? (
             // The videos open over the review: the maker never leaves the mint (owner, 2026-10-12).
             <MakeVideosButton projectId={project.id} label={MAKE_VIDEOS} className={cn(TAP, "self-start")} />
           ) : null}
@@ -295,6 +312,16 @@ export function StepReview({
         </div>
       </div>
     </BriefCard>
+  );
+}
+
+/** A group's name and its count or note, over its rows. */
+function GroupLabel({ label, meta }: { label: string; meta: string }) {
+  return (
+    <div className="mt-[4px] flex flex-wrap items-baseline justify-between gap-[8px]">
+      <h3 className="m-0 text-sm font-semibold text-text-secondary">{label}</h3>
+      <span className="text-sm tabular-nums text-text-tertiary">{meta}</span>
+    </div>
   );
 }
 

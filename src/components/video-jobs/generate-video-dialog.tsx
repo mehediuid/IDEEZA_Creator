@@ -505,8 +505,18 @@ function SceneField({
 
 /** "Video quality": two cards, a radiogroup. High is shown with its Upgrade
  *  tag but locked (§5 Q1): arrow keys skip it, and Enter or a click on it
- *  does nothing — the reason sits under the group. */
-function QualityField({ value, onChange }: { value: VideoQuality; onChange: (q: VideoQuality) => void }) {
+ *  does nothing — the reason sits under the group. The project video's dialog
+ *  shares it with its own length. */
+export function QualityField({
+  value,
+  onChange,
+  seconds,
+}: {
+  value: VideoQuality;
+  onChange: (q: VideoQuality) => void;
+  /** The clip's length; a product video's 10 s when omitted. */
+  seconds?: number;
+}) {
   const noteId = React.useId();
   const refs = React.useRef<Record<string, HTMLDivElement | null>>({});
   const { sub } = useCreatePlan();
@@ -520,7 +530,7 @@ function QualityField({ value, onChange }: { value: VideoQuality; onChange: (q: 
   return (
     <div className="flex flex-col gap-3">
       <p id={`${noteId}-label`} className="text-md font-semibold text-text-primary">
-        Select video quality <span className="font-medium text-text-tertiary">· 10 seconds</span>
+        Select video quality <span className="font-medium text-text-tertiary">· {seconds ?? VIDEO_QUALITY.low.seconds} seconds</span>
       </p>
       <div role="radiogroup" aria-labelledby={`${noteId}-label`} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {QUALITIES.map((q) => {
@@ -575,7 +585,7 @@ function QualityField({ value, onChange }: { value: VideoQuality; onChange: (q: 
                   </span>
                   <span className="inline-flex items-center gap-1 text-sm text-text-secondary">
                     <Icon icon={Clock01Icon} size={14} />
-                    {tier.seconds} sec
+                    {seconds ?? tier.seconds} sec
                   </span>
                 </span>
               </span>
