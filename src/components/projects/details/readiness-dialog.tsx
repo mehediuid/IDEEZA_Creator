@@ -9,7 +9,8 @@
 // - One row per current product (or the one edition product): the in-use
 //   poster, else the concept image, else a neutral icon; the name; the
 //   P2-VIDEO-4 status; and the owner's action — Generate AI video / Try
-//   again opens the Generate dialog on top, with ← Back to this one.
+//   again / Review opens the Generate dialog on top (Review on the waiting
+//   take's Review), with ← Back to this one.
 // - Every whole-project purpose (not an edition) adds the "Project video"
 //   group under the products (owner, 2026-10-21): one row, made from the
 //   product videos. It waits, with its reason, until every product has its
@@ -24,6 +25,8 @@
 // - While something here blocks, the CTA is aria-disabled but focusable,
 //   with the reason under it; pressing it then moves focus to the first
 //   row's action, or to the checkbox.
+// - Closing is safe (owner, 2026-10-21): the footer says Close, and while a
+//   video renders a note under the rows says the render keeps going.
 
 import * as React from "react";
 import { Image01Icon } from "@hugeicons/core-free-icons";
@@ -112,7 +115,7 @@ export function ReadinessDialog({
   const [askedOwnership] = React.useState(() => purpose === "showcase" && ownershipRule?.ok === false);
   const owned = ownershipRule?.ok === true;
 
-  const [generating, setGenerating] = React.useState<VideoTarget | null>(null);
+  const [generating, setGenerating] = React.useState<{ target: VideoTarget; reviewTakeId: string | null } | null>(null);
   const [projecting, setProjecting] = React.useState(false);
   const actionRefs = React.useRef(new Map<string, HTMLButtonElement>());
   const projectActionRef = React.useRef<HTMLButtonElement | null>(null);
@@ -149,10 +152,16 @@ export function ReadinessDialog({
   }
 
   const productById = React.useMemo(() => new Map(view.products.map((p) => [p.id, p])), [view.products]);
-  const openGenerate = (productId: string) => {
-    const p = productById.get(productId) ?? (product?.id === productId ? product : undefined);
-    if (p) setGenerating(videoTargetOf(project, p));
+  const openGenerate = (row: ProductReadiness) => {
+    const p = productById.get(row.productId) ?? (product?.id === row.productId ? product : undefined);
+    const v = row.video;
+    const waiting = v.state === "review" ? v.take : v.state === "ready" ? v.review : undefined;
+    if (p) setGenerating({ target: videoTargetOf(project, p), reviewTakeId: waiting?.id ?? null });
   };
+  // Something renders: closing this is safe, and the note says so.
+  const rendering =
+    readiness.products.some((p) => p.video.state === "rendering" || (p.video.state === "ready" && !!p.video.next)) ||
+    projectVideo?.state === "rendering";
 
   const pressCta = () => {
     if (!blocker && extraBlocker) {
@@ -181,7 +190,7 @@ export function ReadinessDialog({
           <div className="ml-auto flex flex-col items-end gap-2">
             <div className="flex flex-wrap items-center justify-end gap-6">
               <Button type="button" hierarchy="secondary" size="lg" className={TAP} onClick={onClose}>
-                Cancel
+                Close
               </Button>
               <Button
                 type="button"
@@ -224,7 +233,7 @@ export function ReadinessDialog({
                     if (el) actionRefs.current.set(p.productId, el);
                     else actionRefs.current.delete(p.productId);
                   }}
-                  onAction={() => openGenerate(p.productId)}
+                  onAction={() => openGenerate(p)}
                 />
               ))}
             </ul>
@@ -250,6 +259,15 @@ export function ReadinessDialog({
                 />
               </ProjectVideoList>
             </section>
+          )}
+
+          {rendering && (
+            <p className="flex items-start gap-3 rounded-lg bg-bg-surface-raised px-6 py-4 text-sm text-text-secondary">
+              <span className="mt-[2px]">
+                <StatusGlyph icon="info" tone="brand" size={16} />
+              </span>
+              Renders keep going if you close this. Their progress shows on the Review step and in the corner.
+            </p>
           )}
 
           {askedOwnership && (
@@ -281,7 +299,8 @@ export function ReadinessDialog({
 
       <GenerateVideoDialog
         open={generating !== null}
-        target={generating}
+        target={generating?.target ?? null}
+        reviewTakeId={generating?.reviewTakeId ?? null}
         back={{ label: `Back to ${copy.title}`, onBack: () => setGenerating(null) }}
         onClose={() => setGenerating(null)}
       />

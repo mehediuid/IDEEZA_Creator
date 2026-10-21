@@ -9,7 +9,11 @@
 //   video;
 // - rendering, ready, failed: the player (or P2-VIDEO-4's panel in its box),
 //   Regenerate beside the heading, and the Takes list — play any ready take
-//   in the player, make it the one in use, or delete one that isn't;
+//   in the player, make it the one in use (which settles its review), or
+//   delete one that isn't;
+// - a take waiting for review (owner, 2026-10-21): "Ready to review" in the
+//   player's box, or a note above a ready player ("Video ready · Take 2 to
+//   review"), each with Review → the Generate dialog's Review of that take;
 // - "Made from version {n}" when the take was drawn from another version.
 // A buyer sees the in-use video only, and no section when there is none.
 // Every video button here is secondary: the page's violet is Open in editor.
@@ -19,7 +23,7 @@ import { Button, ConfirmDialog } from "@/components/ideeza";
 import { GenerateVideoDialog, videoTargetOf } from "@/components/video-jobs/generate-video-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { TakeRow } from "@/components/video-jobs/take-row";
-import { VideoPlayer } from "@/components/video-jobs/video-player";
+import { StatusGlyph, VideoPlayer } from "@/components/video-jobs/video-player";
 import { productsOf } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
@@ -28,6 +32,7 @@ import { progressOf } from "@/lib/video/jobs";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
+import { statusCopy } from "@/lib/video/video-copy";
 
 /** Under "No video yet": why it matters, in one line. */
 const NO_VIDEO_LINE = "Every product needs one before you can share or sell the project.";
@@ -51,7 +56,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
   const owner = can(viewer, "video.generate", view.canCtx);
   const { record, hydrated } = useProjectVideos(project.id);
   const { jobs, now, hydrated: jobsHydrated, pickTake, deleteTake } = useVideoJobs();
-  const [generate, setGenerate] = React.useState<{ from: string | null } | null>(null);
+  const [generate, setGenerate] = React.useState<{ from: string | null; review: string | null } | null>(null);
   const [playingId, setPlayingId] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState<VideoTake | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -97,11 +102,14 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
 
   const target = videoTargetOf(project, product);
   const latest = takes[takes.length - 1] ?? null;
-  const openGenerate = (from: VideoTake | null) => {
+  const openGenerate = (from: VideoTake | null, review: VideoTake | null = null) => {
     // Safari doesn't focus a clicked button; the dialog returns focus to it.
     if (document.activeElement === document.body) sectionRef.current?.focus();
-    setGenerate({ from: from?.id ?? null });
+    setGenerate({ from: from?.id ?? null, review: review?.id ?? null });
   };
+  // A finished take waiting for the maker's word: alone ("Ready to review"), or beside the one in use.
+  const waiting = status.state === "review" ? status.take : status.state === "ready" ? (status.review ?? null) : null;
+  const copy = statusCopy(status);
   const focusSelf = (e: React.MouseEvent<HTMLElement>) => e.currentTarget.focus();
 
   // "Made from version {n}": the take was drawn from another version's build.
@@ -156,8 +164,36 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
         </div>
       ) : (
         <>
-          {/* No Generate again inside the player: Regenerate above is the one way to a new take. */}
-          <VideoPlayer take={playing} productName={name} projectId={project.id} owner status={status} />
+          {inUse && waiting && (
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-lg bg-bg-surface-raised px-6 py-4">
+              <span className="flex items-center gap-2 text-md text-text-secondary">
+                <StatusGlyph icon={copy.icon} tone={copy.tone} size={14} />
+                {copy.text}
+              </span>
+              <Button
+                type="button"
+                hierarchy="secondary"
+                size="md"
+                className={TAP}
+                onClick={(e) => {
+                  focusSelf(e);
+                  openGenerate(null, waiting);
+                }}
+              >
+                Review
+              </Button>
+            </div>
+          )}
+          {/* No Generate again inside the player: Regenerate above is the one way to a new take;
+              its box's Review (nothing in use yet) opens the waiting take's Review. */}
+          <VideoPlayer
+            take={playing}
+            productName={name}
+            projectId={project.id}
+            owner
+            status={status}
+            onGenerate={!playing && waiting ? () => openGenerate(null, waiting) : undefined}
+          />
           {madeFrom !== null && <p className="text-sm text-text-secondary">Made from version {madeFrom}</p>}
 
           <div className="flex flex-col gap-4">
@@ -178,7 +214,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
                     setError(null);
                     if (pickTake(project.id, product.id, t.id).ok) {
                       setPlayingId(t.id);
-                      announce(`Take ${t.n} is now ${name}'s video.`);
+                      announce(`${name} take ${t.n} is in use.`);
                     } else setError("That take couldn't be put in use. Try again.");
                   }}
                   onDelete={() => setDeleting(t)}
@@ -198,6 +234,8 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
         open={generate !== null}
         target={target}
         fromTakeId={generate?.from ?? null}
+        reviewTakeId={generate?.review ?? null}
+        announce={announce}
         onClose={() => setGenerate(null)}
         // "Generate AI video" gives way to Regenerate once a take exists.
         fallbackFocus={() =>
