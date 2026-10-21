@@ -90,7 +90,14 @@ const take = (productId) => ({ id: `t_${productId}`, productId, n: 1, prompt: ""
 const videosFor = (ids) => ({
   version: 1,
   projectId: "proj_a",
-  products: Object.fromEntries(ids.map((id) => [id, { takes: [take(id)], inUseId: `t_${id}` }])),
+  products: Object.fromEntries(
+    ids.map((id) => {
+      // "project": the project video, cut from the other ids' takes (owner, 2026-10-21).
+      if (id !== "project") return [id, { takes: [take(id)], inUseId: `t_${id}` }];
+      const cuts = ids.filter((x) => x !== "project").map((x) => ({ productId: x, takeId: `t_${x}`, fromMs: 0, ms: 5_000, label: x }));
+      return [id, { takes: [{ ...take(id), join: { intro: ["P", ""], cuts, outro: "Built with IDEEZA" } }], inUseId: `t_${id}` }];
+    }),
+  ),
 });
 const readiness = (s, videoIds, purpose = gatePurposeOf(s.intent, s.shareToNewsfeed)) =>
   purpose
@@ -300,9 +307,13 @@ test("reviewMissing: details first, then the wallet (never for a Save), then the
   assert.equal(reviewMissing({ intent: "save", details: null, shortfall: "Not enough MATIC", readiness: null }), null);
   assert.equal(
     reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1"]) }),
-    "1 product still needs an AI video.",
+    "1 product still needs an AI video. The project video comes next.",
   );
-  assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1", "p2"]) }), null);
+  assert.equal(
+    reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1", "p2"]) }),
+    "Every product has its video. Make the project video to continue.",
+  );
+  assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1", "p2", "project"]) }), null);
   // A Save runs no gate, posted to Innovations or not: the mint never waits for videos (owner, 2026-10-12).
   const save = { ...DEFAULT_MINT_STATE, intent: "save", collection: "Garden", confirmOwnership: true };
   assert.equal(reviewMissing({ intent: "save", details: null, shortfall: null, readiness: readiness(save, []) }), null);

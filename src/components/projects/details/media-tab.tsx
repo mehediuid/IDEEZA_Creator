@@ -3,7 +3,14 @@
 // MediaTab — the project page's Media tab (spec §5.8: CNT-8, CNT-9, CNT-11,
 // CNT-12, CNT-13, CNT-14, CNT-18, CNT-27; Phase 2 VIDEO P2-VIDEO-10). The
 // project's one media library:
-// - **Videos** (Phase 2, first): one tile per current product, the product's
+// - **Project video** (owner, 2026-10-21, first): the one video for the whole
+//   project, made from the product videos. A ready one plays in the player
+//   (its transcript is the join, scene by scene), with Regenerate and its
+//   Takes for the owner; until then, and while it is out of date, the owner
+//   sees its row (waiting, Make project video, rendering, Update, Try again),
+//   whose action opens the Project video dialog. A buyer sees a ready one
+//   only, or nothing.
+// - **Product videos** (Phase 2): one tile per current product, the product's
 //   in-use take. A ready tile opens VideoLightbox; the owner also sees every
 //   other state in P2-VIDEO-4's words, with its action (Generate AI video /
 //   Try again → the Generate dialog). A buyer sees ready tiles only — no
@@ -32,10 +39,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
-import { Badge, Banner, Button, IconButton, ProgressBar } from "@/components/ideeza";
+import { Badge, Banner, Button, ConfirmDialog, IconButton, ProgressBar } from "@/components/ideeza";
 import { GenerateVideoDialog, videoTargetOf, type VideoTarget } from "@/components/video-jobs/generate-video-dialog";
+import { ProjectVideoDialog } from "@/components/video-jobs/project-video-dialog";
+import { ProjectVideoList, ProjectVideoRow } from "@/components/video-jobs/project-video-row";
+import { TakeRow } from "@/components/video-jobs/take-row";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
-import { StatusGlyph, useClipUrl } from "@/components/video-jobs/video-player";
+import { StatusGlyph, VideoPlayer, useClipUrl } from "@/components/video-jobs/video-player";
 import { VideoLightbox, type LightboxVideo } from "@/components/video-jobs/video-lightbox";
 import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { productsOf } from "@/lib/create/history";
@@ -47,10 +57,20 @@ import { displayProductName } from "@/lib/manual/products-tab-view";
 import { currentProductsOf } from "@/lib/manual/readiness";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { verifyClips } from "@/lib/video/clip-store";
+import { progressOf } from "@/lib/video/jobs";
 import { productVideoStatus } from "@/lib/video/product-video";
+import { projectVideoStatusOf } from "@/lib/video/project-video";
 import { useProjectVideos } from "@/lib/video/store";
-import type { ProductVideoStatus, VideoTake } from "@/lib/video/types";
-import { actionLabel, resolutionOf, statusCopy, videosGroupMeta } from "@/lib/video/video-copy";
+import { PROJECT_VIDEO_KEY, type ProductVideoStatus, type VideoTake } from "@/lib/video/types";
+import {
+  PROJECT_GROUP_META,
+  PROJECT_VIDEO_TITLE,
+  actionLabel,
+  projectRowCopy,
+  resolutionOf,
+  statusCopy,
+  videosGroupMeta,
+} from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { useStoreWrite } from "./use-store-write";
 import { SnapshotsGroup } from "./snapshots-group";
@@ -142,7 +162,8 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
   });
   const tiles = React.useMemo(() => mediaTilesOf(refs), [refs]);
   // `productsOfProject` over the page's own refs is the view's `products`.
-  const products = React.useMemo(() => currentProductsOf(productsOfProject(project, refs)), [project, refs]);
+  const allProducts = React.useMemo(() => productsOfProject(project, refs), [project, refs]);
+  const products = React.useMemo(() => currentProductsOf(allProducts), [allProducts]);
   const coverUrl = coverOf(project, refs); // the one source of truth (CNT-14); its own override wins (LST-34).
   // What the cover would be without the maker's pick. "Stop using as cover"
   // is offered only where the pick is what makes the cover — on the default
@@ -177,6 +198,7 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
         Media
       </h2>
 
+      <ProjectVideoSection project={project} products={allProducts} viewer={viewer} ctx={ctx} announce={announce} />
       <VideosGroup project={project} products={products} viewer={viewer} ctx={ctx} />
       {ownerFacts && <SnapshotsGroup projectId={project.id} canRemove={showCoverControl} />}
 
@@ -235,6 +257,174 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
       )}
       {gate.dialog}
     </section>
+  );
+}
+
+// ─────────────────────────── Project video (owner, 2026-10-21) ───────────────────────────
+
+function ProjectVideoSection({
+  project,
+  products,
+  viewer,
+  ctx,
+  announce,
+}: {
+  project: ManualProject;
+  /** Every product, dropped included: the status reads which are current. */
+  products: ProjectProduct[];
+  viewer: Viewer;
+  ctx: CanContext;
+  announce: (message: string) => void;
+}) {
+  const owner = can(viewer, "video.generate", ctx);
+  const { record, hydrated } = useProjectVideos(project.id);
+  const { jobs, now, hydrated: jobsHydrated, pickTake, deleteTake } = useVideoJobs();
+  const [open, setOpen] = React.useState(false);
+  const [playingId, setPlayingId] = React.useState<string | null>(null);
+  const [showTakes, setShowTakes] = React.useState(false);
+  const [deleting, setDeleting] = React.useState<VideoTake | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const headingId = React.useId();
+  const takesId = React.useId();
+  const sectionRef = React.useRef<HTMLDivElement>(null);
+
+  const current = currentProductsOf(products);
+  if (!hydrated || !jobsHydrated || current.length === 0) return null;
+
+  const status = projectVideoStatusOf({ products, videos: record, jobs, now });
+  const copy = projectRowCopy(status);
+  const v = status.video;
+  const inUse = v.state === "ready" ? v.take : null;
+  const takes = record?.products[PROJECT_VIDEO_KEY]?.takes ?? [];
+  const picked = playingId ? takes.find((t) => t.id === playingId && !!t.readyAt && !t.failure) ?? null : null;
+  const playing = picked ?? inUse;
+
+  // A buyer: the ready video, or nothing at all.
+  if (!owner) {
+    if (!inUse) return null;
+    return (
+      <div className="mt-7 flex max-w-[var(--layout-content-narrow)] flex-col gap-4">
+        <h3 className="text-md font-semibold text-text-secondary">{PROJECT_VIDEO_TITLE}</h3>
+        <VideoPlayer take={inUse} productName={project.name} projectId={project.id} />
+      </div>
+    );
+  }
+
+  const rowProducts = current.map((p) => ({
+    productId: p.id,
+    thumb: p.built?.product.conceptImageUrl || null,
+    video: productVideoStatus(record?.products[p.id], jobs, now),
+  }));
+  // The row speaks while there's no video yet, while it's out of date or being remade, and
+  // whenever it has an action; a plain ready video is the player alone.
+  const showRow = !inUse || status.state !== "ready" || copy.action !== null || (v.state === "ready" && !!v.next);
+  const openDialog = (e: React.MouseEvent<HTMLElement> | null) => {
+    // Safari doesn't focus a clicked button; the dialog hands focus back to it.
+    e?.currentTarget.focus();
+    setOpen(true);
+  };
+  const closeDialog = () => {
+    setOpen(false);
+    // The row's button is gone once a render starts: the section takes focus instead of <body>.
+    requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (!at || at === document.body) sectionRef.current?.focus();
+    });
+  };
+
+  return (
+    <div ref={sectionRef} tabIndex={-1} aria-labelledby={headingId} role="group" className="mt-7 flex flex-col gap-4 outline-none">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+        <h3 id={headingId} className="text-md font-semibold text-text-secondary">
+          {PROJECT_VIDEO_TITLE}
+        </h3>
+        <span className="text-sm text-text-secondary">{PROJECT_GROUP_META}</span>
+      </div>
+
+      {showRow && (
+        <div className="max-w-[var(--layout-content-narrow)]">
+          <ProjectVideoList status={status}>
+            <ProjectVideoRow status={status} projectName={project.name} products={rowProducts} onAction={() => openDialog(null)} />
+          </ProjectVideoList>
+        </div>
+      )}
+
+      {playing && (
+        <div className="flex max-w-[var(--layout-content-narrow)] flex-col gap-4">
+          {/* No Generate again inside the player: Regenerate below is the one way to a new take. */}
+          <VideoPlayer take={playing} productName={project.name} projectId={project.id} owner status={v} />
+          <div className="flex flex-wrap items-center gap-4">
+            {/* While the row offers Update or Try again, that is the one way to the dialog; while it
+                waits on a product video or renders, there is nothing to make yet. */}
+            {copy.action === null && status.state === "ready" && !(v.state === "ready" && v.next) && (
+              <Button type="button" hierarchy="secondary" size="md" className={TAP} aria-haspopup="dialog" onClick={openDialog}>
+                Regenerate
+              </Button>
+            )}
+            <Button
+              type="button"
+              hierarchy="secondary"
+              size="md"
+              className={TAP}
+              aria-expanded={showTakes}
+              aria-controls={takesId}
+              onClick={() => setShowTakes((x) => !x)}
+            >
+              Takes ({takes.length})
+            </Button>
+          </div>
+          {showTakes && (
+            <ul id={takesId} role="list" aria-label="Takes" className="flex flex-col divide-y divide-border rounded-lg border border-solid border-border">
+              {[...takes].reverse().map((t) => (
+                <TakeRow
+                  key={t.id}
+                  take={t}
+                  inUse={inUse?.id === t.id}
+                  playing={playing.id === t.id}
+                  progress={(() => {
+                    const job = jobs.find((j) => j.id === t.id);
+                    return job && job.stage !== "done" && job.stage !== "failed" ? progressOf(job, now) : null;
+                  })()}
+                  onPlay={() => setPlayingId(t.id)}
+                  onUse={() => {
+                    setError(null);
+                    if (pickTake(project.id, PROJECT_VIDEO_KEY, t.id).ok) {
+                      setPlayingId(t.id);
+                      announce(`Take ${t.n} is now the project video.`);
+                    } else setError("That take couldn't be put in use. Try again.");
+                  }}
+                  onDelete={() => setDeleting(t)}
+                />
+              ))}
+            </ul>
+          )}
+          {error && (
+            <p role="alert" className="text-md text-text-error">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
+
+      <ProjectVideoDialog open={open} project={project} products={products} onClose={closeDialog} />
+      <ConfirmDialog
+        open={deleting !== null}
+        title={`Delete take ${deleting?.n ?? ""}?`}
+        confirmLabel="Delete take"
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => {
+          const t = deleting;
+          setDeleting(null);
+          if (!t) return;
+          if (deleteTake(project.id, PROJECT_VIDEO_KEY, t.id).ok) {
+            if (playingId === t.id) setPlayingId(null);
+            announce(`Take ${t.n} deleted.`);
+          } else setError("That take couldn't be deleted. Try again.");
+        }}
+      >
+        {"This video is removed from this browser. It can't be undone."}
+      </ConfirmDialog>
+    </div>
   );
 }
 
@@ -311,7 +501,7 @@ function VideosGroup({
     <div className="mt-7 [container-type:inline-size]">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <h3 id={headingId} className="text-md font-semibold text-text-secondary">
-          Videos
+          Product videos
         </h3>
         {owner && !loading && <span className="text-sm text-text-secondary">{videosGroupMeta(ready.length, rows.length)}</span>}
       </div>

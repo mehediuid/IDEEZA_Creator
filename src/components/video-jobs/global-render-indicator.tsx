@@ -9,7 +9,14 @@
 //               that take's inputs) + ×
 // × hides the toast (acknowledge) — it no longer deletes the job, which used
 // to erase the clip link (D7). A v1 Brief job (no file) keeps Cancel while
-// it runs and offers nothing to watch.
+// it runs and offers nothing to watch. A project video job ("Project video ·
+// {Project}") has Cancel and Watch, and its Try again opens the Project video
+// dialog instead of Generate.
+//
+// When a product video lands and every current product of its project now has
+// one, a nudge joins the stack (owner, 2026-10-21): "All 3 product videos are
+// ready" + Make project video (Update project video when one is out of date).
+// It goes once the project video starts, or on ×.
 //
 // It also mounts VideoUpkeep (verify clip files, migrate the Brief's old
 // clip), which needs the history provider this component sits inside.
@@ -35,10 +42,13 @@ import { can, type Viewer } from "@/lib/manual/permissions";
 import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useGuards } from "@/lib/manual/use-write-guard";
-import { useProjectVideos } from "@/lib/video/store";
+import { isProjectKey, projectVideoStatusOf } from "@/lib/video/project-video";
+import { readProjectVideos, useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
-import { moreToastsLine, toastHeading } from "@/lib/video/video-copy";
+import { moreToastsLine, projectActionLabel, toastHeading } from "@/lib/video/video-copy";
 import { GenerateVideoDialog, videoTargetOf, type VideoTarget } from "./generate-video-dialog";
+import { PROJECT_VIDEO_OPENED, openProjectVideoDialog } from "./project-video-dialog";
+import { cn } from "@/lib/utils";
 import { VideoPlayerDialog } from "./video-player";
 import {
   VideoUpkeep,
@@ -112,33 +122,109 @@ function RenderToasts() {
     setRenderSlot(document.getElementById("ideeza-toast-layer-render"));
   }, []);
 
+  /** The maker's own project, while they may still render for it. */
+  const renderable = (projectId: string | null | undefined) => {
+    const project = projects.find((p) => p.id === projectId);
+    return project && can(OWNER, "video.generate", { locked: guards.lockOf(project) !== null }) ? project : null;
+  };
+
   /** The Generate dialog's target for a failed product job, when its project
-   *  and product still exist and the maker may still render for it. */
+   *  and product still exist and the maker may still render for it. A project
+   *  video job has none: it is remade from its own dialog, not Generate. */
   const targetOf = (j: VideoJob): VideoTarget | null => {
-    if (!isProductJob(j)) return null;
-    const project = projects.find((p) => p.id === j.projectId);
-    if (!project || !can(OWNER, "video.generate", { locked: guards.lockOf(project) !== null })) return null;
+    if (!isProductJob(j) || isProjectKey(j.productId)) return null;
+    const project = renderable(j.projectId);
+    if (!project) return null;
     const product = productsOfProject(project, buildsOf(project, builds)).find((x) => x.id === j.productId);
     return product ? videoTargetOf(project, product) : null;
   };
 
+  // The nudge: a project whose last product video just landed and whose project video can now be
+  // made (or updated). Found when a product job turns done in this tab; dropped on × or once the
+  // project video no longer waits on the maker.
+  const nudgeOf = (projectId: string) => {
+    const project = renderable(projectId);
+    if (!project) return null;
+    const products = productsOfProject(project, buildsOf(project, builds));
+    const s = projectVideoStatusOf({ products, videos: readProjectVideos(projectId), jobs, now });
+    const updatable = s.state === "outdated" && s.total > 0 && s.ready === s.total;
+    if (s.state !== "make" && !updatable) return null;
+    return {
+      projectId,
+      title: s.total === 1 ? "Your product video is ready" : `All ${s.total} product videos are ready`,
+      action: projectActionLabel(updatable ? "update" : "make")!,
+    };
+  };
+  const [nudgeIds, setNudgeIds] = React.useState<string[]>([]);
+  const seenStage = React.useRef(new Map<string, VideoJob["stage"]>());
+  React.useEffect(() => {
+    if (!hydrated) return;
+    const landed: string[] = [];
+    for (const j of jobs) {
+      const before = seenStage.current.get(j.id);
+      seenStage.current.set(j.id, j.stage);
+      if (before && before !== "done" && j.stage === "done" && isProductJob(j) && !isProjectKey(j.productId)) {
+        landed.push(j.projectId!);
+      }
+    }
+    if (landed.length === 0) return;
+    // A job turning done is the event this answers; the stage map above is how it is seen.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNudgeIds((prev) => [...new Set([...prev, ...landed])]);
+  }, [jobs, hydrated]);
+  const nudges = hydrated && !buyerView ? nudgeIds.map(nudgeOf).filter((n) => n !== null) : [];
+  const dropNudge = (projectId: string) => setNudgeIds((prev) => prev.filter((id) => id !== projectId));
+  // Opened by any route (the rows, the review, Media), the dialog answers its nudge.
+  React.useEffect(() => {
+    const onOpened = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      setNudgeIds((prev) => prev.filter((x) => x !== id));
+    };
+    window.addEventListener(PROJECT_VIDEO_OPENED, onOpened);
+    return () => window.removeEventListener(PROJECT_VIDEO_OPENED, onOpened);
+  }, []);
+
   const visible = hydrated && !buyerView ? jobs.filter((j) => j.acknowledged !== true) : [];
-  // Newest job on top; the rest wait behind the line.
+  // Newest job on top; the rest wait behind the line. A nudge takes one of the places (and the
+  // phone's only one), so the stack keeps its height.
   const stacked = [...visible].reverse();
-  const shown = stacked.slice(0, SHOWN);
+  const nudgeShown = nudges.slice(0, SHOWN);
+  const shown = stacked.slice(0, SHOWN - nudgeShown.length);
+  const phoneJobs = nudgeShown.length > 0 ? 0 : 1;
 
   return (
     <>
       {renderSlot &&
-        stacked.length > 0 &&
+        (stacked.length > 0 || nudges.length > 0) &&
         createPortal(
           <div className="flex flex-col items-end gap-[8px]" role="status" aria-live="polite" aria-label="Video render status">
+            {nudgeShown.map((n, i) => (
+              <ToastCard
+                key={`nudge:${n.projectId}`}
+                className={i > 0 ? "max-md:hidden" : undefined}
+                tone="success"
+                kicker="Ready for the project video"
+                title={n.title}
+                wrapTitle
+                action={{
+                  label: n.action,
+                  run: () => {
+                    dropNudge(n.projectId);
+                    openProjectVideoDialog(n.projectId);
+                  },
+                }}
+                onDismiss={() => dropNudge(n.projectId)}
+              />
+            ))}
             {shown.map((j, i) => {
               const target = j.stage === "failed" ? targetOf(j) : null;
+              // A project video is remade from its own dialog.
+              const retryProject =
+                j.stage === "failed" && isProductJob(j) && isProjectKey(j.productId) && renderable(j.projectId) !== null;
               return (
                 <ToastLine
                   key={j.id}
-                  className={i > 0 ? "max-md:hidden" : undefined}
+                  className={i >= phoneJobs ? "max-md:hidden" : undefined}
                   job={j}
                   now={now}
                   onWatch={
@@ -165,15 +251,24 @@ function RenderToasts() {
                           acknowledge(j.id);
                           setRetry({ target, takeId: j.id });
                         }
-                      : null
+                      : retryProject
+                        ? () => {
+                            acknowledge(j.id);
+                            openProjectVideoDialog(j.projectId!);
+                          }
+                        : null
                   }
                   onDismiss={() => acknowledge(j.id)}
                 />
               );
             })}
             {/* `ix-render-more` lifts the phone's attention toast over this line (layout.tsx). */}
-            {stacked.length > 1 && <p className={`ix-render-more md:hidden ${MORE}`}>{moreToastsLine(stacked.length - 1)}</p>}
-            {stacked.length > SHOWN && <p className={`max-md:hidden ${MORE}`}>{moreToastsLine(stacked.length - SHOWN)}</p>}
+            {stacked.length > phoneJobs && (
+              <p className={`ix-render-more md:hidden ${MORE}`}>{moreToastsLine(stacked.length - phoneJobs)}</p>
+            )}
+            {stacked.length > shown.length && (
+              <p className={`max-md:hidden ${MORE}`}>{moreToastsLine(stacked.length - shown.length)}</p>
+            )}
 
             <style>{`
               @keyframes ix-render-toast-in {
@@ -249,18 +344,46 @@ function ToastLine({
   const isDone = job.stage === "done";
   const isFailed = job.stage === "failed";
   const { etaSec } = progressOf(job, now);
-  const title = job.title || "Untitled video";
-
-  // The attention toast's shape, so the app has one: a surface card, a tinted
-  // tile carrying the state, the state in words, one action in the card's own
-  // button style.
-  const tone = isDone ? "success" : isFailed ? "error" : "info";
-  const kicker = toastHeading(isDone ? "ready" : isFailed ? "failed" : "rendering", etaLabel(etaSec));
   const action = isDone
     ? onWatch && { label: "Watch", run: onWatch }
     : isFailed
       ? onRetry && { label: "Try again", run: onRetry }
       : onCancel && { label: "Cancel", run: onCancel };
+  return (
+    <ToastCard
+      className={className}
+      tone={isDone ? "success" : isFailed ? "error" : "info"}
+      kicker={toastHeading(isDone ? "ready" : isFailed ? "failed" : "rendering", etaLabel(etaSec))}
+      title={job.title || "Untitled video"}
+      action={action}
+      onDismiss={onDismiss}
+    />
+  );
+}
+
+/** The attention toast's shape, so the app has one: a surface card, a tinted
+ *  tile carrying the state, the state in words, one action in the card's own
+ *  button style. */
+function ToastCard({
+  className,
+  tone,
+  kicker,
+  title,
+  action,
+  wrapTitle = false,
+  onDismiss,
+}: {
+  className?: string;
+  tone: "success" | "error" | "info";
+  kicker: string;
+  title: string;
+  action: { label: string; run: () => void } | null;
+  /** A sentence (the nudge) wraps to two lines instead of losing its end. */
+  wrapTitle?: boolean;
+  onDismiss: () => void;
+}) {
+  const isDone = tone === "success";
+  const isFailed = tone === "error";
   const tap = "max-md:h-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)]";
 
   return (
@@ -290,7 +413,7 @@ function ToastLine({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm text-text-tertiary">{kicker}</p>
-        <p className="truncate text-md font-semibold text-text-primary">{title}</p>
+        <p className={cn("text-md font-semibold text-text-primary", wrapTitle ? "line-clamp-2" : "truncate")}>{title}</p>
       </div>
       {action && (
         <button

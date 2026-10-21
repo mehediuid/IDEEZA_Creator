@@ -38,6 +38,8 @@ export type ShowcaseGate = { readiness: Readiness; projectId: string };
 
 const NOT_SHOWCASED_NOTE = "Sharing shows it at the top of the Innovations page.";
 const SHOWCASED_NOTE = "It shows at the top of the Innovations page.";
+const NEEDS_PROJECT_VIDEO = "Sharing needs the project video, made from your product videos.";
+const SHARED_NO_PROJECT_VIDEO = "Shared — the project video isn't ready yet.";
 
 /**
  * COM-12's row and COM-55's control, from `summary.showcase` — showcasedAt, never the Brief's tick.
@@ -46,12 +48,15 @@ const SHOWCASED_NOTE = "It shows at the top of the Innovations page.";
  * - shared, but a current product has no ready video: "Shared — {Product} has no video yet."
  *   ({Product} links to its page), or "Shared — {n} products have no video yet.". The flag stays
  *   on; nothing is removed for the maker.
+ * - the product videos in place but the project video not (owner, 2026-10-21): "Sharing needs the
+ *   project video, made from your product videos." / "Shared — the project video isn't ready yet."
  * Otherwise the v1 notes stand.
  */
 export function showcaseRow(showcase: { at: number } | null, gate?: ShowcaseGate): ShowcaseRowCopy {
   const r = gate?.readiness;
   if (!showcase) {
     const videosFail = r ? r.rules.some((x) => x.id === "videos" && !x.ok) : false;
+    const projectFail = r ? r.rules.some((x) => x.id === "projectVideo" && !x.ok) : false;
     return {
       on: false,
       label: "Innovations",
@@ -59,7 +64,9 @@ export function showcaseRow(showcase: { at: number } | null, gate?: ShowcaseGate
       note:
         r && videosFail
           ? `Sharing needs an AI video for every product — ${r.counts.ready} of ${r.counts.total} have one.`
-          : NOT_SHOWCASED_NOTE,
+          : projectFail
+            ? NEEDS_PROJECT_VIDEO
+            : NOT_SHOWCASED_NOTE,
       action: "Share to Innovations",
     };
   }
@@ -83,6 +90,7 @@ export function showcaseRow(showcase: { at: number } | null, gate?: ShowcaseGate
     };
   }
   if (missing.length > 1) return { ...on, note: `Shared — ${missing.length} products have no video yet.` };
+  if (r?.project && !r.project.ok) return { ...on, note: SHARED_NO_PROJECT_VIDEO };
   return { ...on, note: SHOWCASED_NOTE };
 }
 

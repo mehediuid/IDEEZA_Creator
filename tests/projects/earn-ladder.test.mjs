@@ -245,7 +245,7 @@ test("levelStepsOf: a level's own steps with their state, done ones included", a
   const { levelStepsOf } = await import("../../.tmp-test/lib/commerce/ladder.js");
   const rows = levelStepsOf(3, facts({ licenseSet: false, reasons: { videos: "x" } }));
   assert.deepEqual(rows.map((r) => [r.id, r.ok]), [["minted", true], ["ownership", true], ["videos", true], ["license", false]]);
-  assert.equal(rows[2].reason, "Every product needs a finished AI video.", "a done step keeps its default words");
+  assert.equal(rows[2].reason, "Every product needs a finished AI video, then the project video is made from them.", "a done step keeps its default words");
   assert.deepEqual(levelStepsOf(2, facts()), [], "the mint's level asks nothing of its own");
 });
 
@@ -265,6 +265,11 @@ const realProduct = (id, name, dropped = null) => ({ id, name, description: "", 
 const readyVideo = (id) => ({
   takes: [{ id, productId: "x", n: 1, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: NOW - 10_000, readyAt: NOW - 5_000, clip: CLIP }],
   inUseId: id,
+});
+/** A ready project video cut from exactly these product takes (owner, 2026-10-21). */
+const projectVideo = (...cuts) => ({
+  takes: [{ ...readyVideo("t_project").takes[0], productId: "project", join: { intro: ["P", ""], cuts: cuts.map(([productId, takeId]) => ({ productId, takeId, fromMs: 0, ms: 5_000, label: productId })), outro: "Built with IDEEZA" } }],
+  inUseId: "t_project",
 });
 const gateFacts = (o = {}) => ({
   products: [realProduct("p1", "Planter"), realProduct("p2", "Hub")],
@@ -294,11 +299,11 @@ test("ladder × Sell gate: two products without videos and no ownership fail bot
   const r = earnLevelOf(f);
   assert.equal(r.level, 2, "neither keeps the project from its mint");
   assert.deepEqual(ids(r.next.missing), ["ownership", "videos"]);
-  assert.equal(r.next.missing.find((s) => s.id === "videos").reason, "2 products still need an AI video.");
+  assert.equal(r.next.missing.find((s) => s.id === "videos").reason, "2 products still need an AI video. The project video comes next.");
 });
 
 test("ladder × Sell gate: every video ready and ownership confirmed passes L3", () => {
-  const f = fromGate(gateFacts({ videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1"), p2: readyVideo("t2") } } }));
+  const f = fromGate(gateFacts({ videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1"), p2: readyVideo("t2"), project: projectVideo(["p1", "t1"], ["p2", "t2"]) } } }));
   assert.equal(f.videosReady, true);
   assert.equal(f.ownershipConfirmed, true);
   assert.equal(earnLevelOf(f).level, 3);
@@ -306,8 +311,19 @@ test("ladder × Sell gate: every video ready and ownership confirmed passes L3",
 
 test("ladder × Sell gate: a dropped product needs no video (COR-108)", () => {
   const products = [realProduct("p1", "Planter"), realProduct("p2", "Hub", { lastIn: 1, current: 2 })];
-  const f = fromGate(gateFacts({ products, videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1") } } }));
+  const f = fromGate(gateFacts({ products, videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1"), project: projectVideo(["p1", "t1"]) } } }));
   assert.equal(f.videosReady, true);
+});
+
+test("ladder × Sell gate: product videos alone don't make the step — the project video is part of it", () => {
+  const f = fromGate(gateFacts({ videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1"), p2: readyVideo("t2") } } }));
+  assert.equal(f.videosReady, false);
+  assert.equal(f.reasons.videos, "Every product has its video. Make the project video to continue.");
+  assert.equal(earnLevelOf(f).level, 2);
+});
+
+test("earnFactsOf: the step's label is \"Videos ready\"", () => {
+  assert.equal(LADDER_STEPS.find((s) => s.id === "videos").label, "Videos ready");
 });
 
 test("ladder × commercial axis: a mint record or a minted draft reads minted; a plain draft doesn't", async () => {

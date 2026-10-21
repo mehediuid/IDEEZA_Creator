@@ -16,6 +16,7 @@
 // Pure, relative imports only, so node:test loads the compiled module.
 
 import { TOKENS_BY_NETWORK, type Network, type Token } from "../brief/types";
+import { videosBlockerOf, type Readiness } from "../manual/public";
 import { formatAmount } from "../wallet/money";
 import { checkCreateTrack, checkEditionListing, editionGate, soldOf, trackCardOf, tracksOf, wholeNumberOf } from "./editions";
 import type { EditionKind, EditionTrack, EditionUse, Sale } from "./types";
@@ -325,29 +326,52 @@ export type SellCheck = {
   ok: boolean;
   title: string;
   detail: string | null;
-  /** The one-tap fix: the AI video, or back to Copies and price.
-   *  Ownership has none: its box is on Review, under the rows. */
-  fix: "video" | "price" | null;
+  /** The one-tap fix: a product's AI video, the Make videos dialog (the project video), or back
+   *  to Copies and price. Ownership has none: its box is on Review, under the rows. */
+  fix: "video" | "videos" | "price" | null;
 };
 
+/** The whole project's video row: it needs the project video too (owner, 2026-10-21). */
+export const PROJECT_VIDEOS_CHECK = "Each product has its AI video, and the project video is made";
+
+/** The video row's facts for a scope. `project`: the whole project, which also waits for the
+ *  project video; `productsOk`: every product's own video is ready. */
+export type SellVideo = { ok: boolean; reason: string | null; project?: boolean; productsOk?: boolean };
+
+/** The scope's readiness read for its video row: one product's video ("edition"), or every
+ *  product's and then the project video ("sell"). The reason is the first thing still missing. */
+export function sellVideoOf(r: Pick<Readiness, "rules">): Required<SellVideo> {
+  const products = r.rules.find((x) => x.id === "videos");
+  const project = r.rules.find((x) => x.id === "projectVideo");
+  const productsOk = products?.ok ?? false;
+  const ok = productsOk && (project?.ok ?? true);
+  return { ok, reason: ok ? null : videosBlockerOf(r as Readiness), project: project !== undefined, productsOk };
+}
+
 /** Review's rows: the readiness rules for this scope — one product's video ("edition"), or every
- *  product's for the whole project ("sell") — and (physical) the make-and-ship plan. Never the
- *  Main listing. `blocker` is the first failing row's reason. */
+ *  product's and the project video for the whole project ("sell") — and (physical) the
+ *  make-and-ship plan. Never the Main listing. `blocker` is the first failing row's reason. */
 export function sellChecksOf(f: {
   kind: EditionKind;
   /** Whose video: the product's name, or "Each product" for the whole project. */
   videoSubject: string;
-  /** The readiness videos rule for this scope. */
-  video: { ok: boolean; reason: string | null };
+  /** `sellVideoOf` this scope's readiness. */
+  video: SellVideo;
   ownershipConfirmed: boolean;
   draft: SellDraft;
 }): { ok: boolean; checks: SellCheck[]; blocker: string | null } {
   const checks: SellCheck[] = [];
-  checks.push(
-    f.video.ok
-      ? { id: "video", ok: true, title: `${f.videoSubject} has its AI video`, detail: null, fix: null }
-      : { id: "video", ok: false, title: `${f.videoSubject} needs an AI video`, detail: f.video.reason, fix: "video" },
-  );
+  if (f.video.project) {
+    // Fixed where it is missing: a product's video in Generate, the project video in Make videos.
+    const fix = f.video.ok ? null : f.video.productsOk === false ? "video" : "videos";
+    checks.push({ id: "video", ok: f.video.ok, title: PROJECT_VIDEOS_CHECK, detail: f.video.ok ? null : f.video.reason, fix });
+  } else {
+    checks.push(
+      f.video.ok
+        ? { id: "video", ok: true, title: `${f.videoSubject} has its AI video`, detail: null, fix: null }
+        : { id: "video", ok: false, title: `${f.videoSubject} needs an AI video`, detail: f.video.reason, fix: "video" },
+    );
+  }
   if (f.ownershipConfirmed) {
     checks.push({ id: "ownership", ok: true, title: "Ownership confirmed", detail: null, fix: null });
   } else if (f.draft.owner) {

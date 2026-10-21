@@ -12,6 +12,7 @@ import {
   type VideoTake,
 } from "./types";
 import type { ReadinessPurpose } from "../manual/p2-types";
+import type { ProjectVideoStatus } from "./project-video";
 
 /** P2-VIDEO-2's failure kinds, word for word. */
 export const FAILURE_COPY: Record<VideoFailureKind, string> = {
@@ -157,8 +158,8 @@ export function readinessCopy(purpose: ReadinessPurpose, productName = "This pro
       };
     case "videos":
       return {
-        title: "Product videos",
-        info: "Every product needs an AI video before the project can be minted, shared or sold.",
+        title: "Videos",
+        info: "Every product needs an AI video. Then the project video is made from them.",
         cta: "Continue",
       };
   }
@@ -197,4 +198,135 @@ export function toastHeading(state: "rendering" | "ready" | "failed", eta: strin
 /** The line under a capped toast stack: how many more wait behind the ones shown. */
 export function moreToastsLine(n: number): string {
   return `+${n} more video${n === 1 ? "" : "s"}`;
+}
+
+// ─────────────────────────── the project video (owner, 2026-10-21) ───────────────────────────
+
+export const PROJECT_VIDEO_TITLE = "Project video";
+export const PROJECT_GROUP_META = "Made from your product videos";
+export const PROJECT_HONESTY =
+  "Made in this browser from your product videos, silent for now. The intro, order, lines and sound are kept with the video for the AI video model.";
+
+/** "0:19" — a project video's length on its row. */
+export function clockOf(ms: number): string {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+export type ProjectRowCopy = {
+  text: string;
+  /** A second line: the note under a ready video, or the failure. */
+  sub: string | null;
+  tone: "error" | "neutral" | "success" | "warning";
+  icon: "lock" | "check" | "spinner" | "alert" | "info";
+  action: "make" | "update" | "updateNote" | "retry" | null;
+  /** 0–100 while it renders, else null. */
+  progress: number | null;
+};
+
+/** The project row's one table (spec "Rows and copy"). Never a greyed button: while it waits, the
+ *  row says why. */
+export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
+  const v = s.video;
+  switch (s.state) {
+    case "waiting":
+      return {
+        text: s.total === 1 ? "Opens when your product video is ready" : `Opens when every product has a video · ${s.ready} of ${s.total} ready`,
+        sub: null,
+        tone: "neutral",
+        icon: "lock",
+        action: null,
+        progress: null,
+      };
+    case "make":
+      return { text: "Every product video is ready.", sub: null, tone: "neutral", icon: "check", action: "make", progress: null };
+    case "rendering": {
+      const progress = v.state === "rendering" ? v.progress : v.state === "ready" && v.next ? v.next.progress : 0;
+      const eta = v.state === "rendering" ? v.eta : v.state === "ready" && v.next ? v.next.eta : "";
+      return {
+        text: `Rendering · ${Math.round(progress)} %`,
+        sub: eta ? `${eta} left` : null,
+        tone: "neutral",
+        icon: "spinner",
+        action: null,
+        progress,
+      };
+    }
+    case "ready": {
+      const text = s.lengthMs ? `Project video ready · ${clockOf(s.lengthMs)}` : "Project video ready";
+      if (v.state === "ready" && v.next) {
+        return { text: `${text} · Take ${v.next.take.n} rendering ${Math.round(v.next.progress)} %`, sub: null, tone: "success", icon: "check", action: null, progress: null };
+      }
+      if (s.older.length > 0) {
+        const sub = s.older.length === 1 ? `Made from an older ${s.older[0]} video.` : `Made from older videos of ${listNames(s.older)}.`;
+        return { text, sub, tone: "success", icon: "check", action: "updateNote", progress: null };
+      }
+      return { text, sub: null, tone: "success", icon: "check", action: null, progress: null };
+    }
+    case "outdated": {
+      const canUpdate = s.total > 0 && s.ready === s.total;
+      const what =
+        s.missing.length > 0
+          ? `${listNames(s.missing)} ${s.missing.length === 1 ? "isn't" : "aren't"} in it yet.`
+          : `It still shows ${listNames(s.extra)}.`;
+      return {
+        text: canUpdate ? what : `${what} Make ${s.missing.length === 1 ? "its" : "their"} video first.`,
+        sub: null,
+        tone: "warning",
+        icon: "alert",
+        action: canUpdate ? "update" : null,
+        progress: null,
+      };
+    }
+    case "failed":
+      return {
+        text: "Render failed",
+        sub: v.state === "failed" ? FAILURE_COPY[v.failure] : null,
+        tone: "error",
+        icon: "alert",
+        action: "retry",
+        progress: null,
+      };
+  }
+}
+
+function listNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** The project row's button. */
+export function projectActionLabel(action: ProjectRowCopy["action"]): string | null {
+  switch (action) {
+    case "make":
+      return "Make project video";
+    case "update":
+      return "Update project video";
+    case "updateNote":
+      return "Update";
+    case "retry":
+      return "Try again";
+    default:
+      return null;
+  }
+}
+
+/** What a screen reader hears when the project row changes state — never progress ticks. */
+export function projectStateLine(s: ProjectVideoStatus, productCount: number): string | null {
+  switch (s.state) {
+    case "make":
+      return productCount === 1
+        ? "Your product video is ready. You can make the project video now."
+        : `All ${productCount} product videos are ready. You can make the project video now.`;
+    case "rendering":
+      return "Project video is rendering.";
+    case "ready":
+      return "Project video is ready.";
+    case "outdated":
+      return s.total > 0 && s.ready === s.total ? "Every product has its video. You can update the project video now." : null;
+    case "failed":
+      return "Project video render failed.";
+    case "waiting":
+      return null;
+  }
 }

@@ -63,7 +63,8 @@ export type PostMedia =
   | { kind: "image"; src: string; alt: string; label: string }
   /** A product's video as a file (sample posts: `public/innovations/videos/`). */
   | { kind: "video"; src: string; poster: string | null; alt: string; label: string; durationMs: number | null; productId: string }
-  /** A product's video in this browser's clip store ("mine" only). */
+  /** A product's video in this browser's clip store ("mine" only), or the project video's
+   *  (`productId` = `PROJECT_VIDEO_KEY`). */
   | { kind: "clip"; takeId: string; alt: string; label: string; durationMs: number | null; productId: string };
 
 export type PostVideo = Extract<PostMedia, { kind: "video" | "clip" }>;

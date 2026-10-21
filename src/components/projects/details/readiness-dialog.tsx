@@ -10,9 +10,15 @@
 //   poster, else the concept image, else a neutral icon; the name; the
 //   P2-VIDEO-4 status; and the owner's action — Generate AI video / Try
 //   again opens the Generate dialog on top, with ← Back to this one.
+// - Every whole-project purpose (not an edition) adds the "Project video"
+//   group under the products (owner, 2026-10-21): one row, made from the
+//   product videos. It waits, with its reason, until every product has its
+//   video; then Make project video (or Update / Try again) opens the Project
+//   video dialog on top, with ← Back, and the CTA waits for it too.
 // - Everything is live: a render that finishes turns its row ready and
 //   enables the CTA without a reload. A screen-reader-only status says state
-//   changes ("Rider video is ready."), never progress ticks.
+//   changes ("Rider video is ready.", "All 3 product videos are ready. You can
+//   make the project video now."), never progress ticks.
 // - Showcase only, while ownership isn't confirmed: "I confirm I am the
 //   rightful owner of this idea". Ticking it writes `ownerConfirmedAt`.
 // - While something here blocks, the CTA is aria-disabled but focusable,
@@ -24,6 +30,8 @@ import { Image01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, Checkbox, ModalFrame, ProgressBar } from "@/components/ideeza";
 import { GenerateVideoDialog, videoTargetOf, type VideoTarget } from "@/components/video-jobs/generate-video-dialog";
+import { ProjectVideoDialog } from "@/components/video-jobs/project-video-dialog";
+import { ProjectVideoList, ProjectVideoRow } from "@/components/video-jobs/project-video-row";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { StatusGlyph, useClipUrl } from "@/components/video-jobs/video-player";
 import type { StoredDraft } from "@/lib/brief/project-brief";
@@ -34,7 +42,10 @@ import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
 import { useProjectVideos } from "@/lib/video/store";
 import {
+  PROJECT_GROUP_META,
+  PROJECT_VIDEO_TITLE,
   actionLabel,
+  projectStateLine,
   readinessCopy,
   readyCountLine,
   stateChangeLine,
@@ -60,10 +71,14 @@ export type ReadinessDialogProps = {
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
-/** What this dialog can fix, so what its CTA waits on: the videos (every
- *  purpose — they're the rows here) and any rule marked fixed in the gate. */
+/** What this dialog can fix, so what its CTA waits on: the videos and the
+ *  project video (every purpose — they're the rows here) and any rule marked
+ *  fixed in the gate. */
 export function dialogBlockerOf(readiness: Readiness): string | null {
-  return readiness.rules.find((r) => !r.ok && (r.fixedIn === "gate" || r.id === "videos"))?.reason ?? null;
+  return (
+    readiness.rules.find((r) => !r.ok && (r.fixedIn === "gate" || r.id === "videos" || r.id === "projectVideo"))?.reason ??
+    null
+  );
 }
 
 export function ReadinessDialog({
@@ -98,16 +113,23 @@ export function ReadinessDialog({
   const owned = ownershipRule?.ok === true;
 
   const [generating, setGenerating] = React.useState<VideoTarget | null>(null);
+  const [projecting, setProjecting] = React.useState(false);
   const actionRefs = React.useRef(new Map<string, HTMLButtonElement>());
+  const projectActionRef = React.useRef<HTMLButtonElement | null>(null);
   const boxRef = React.useRef<HTMLButtonElement>(null);
   const hintId = React.useId();
   const headingId = React.useId();
+  const projectHeadingId = React.useId();
+  const projectVideo = readiness.project;
 
-  // State changes only, said once each (never the progress ticks).
-  const stateKey = readiness.products.map((p) => `${p.productId}:${p.video.state}`).join("|");
+  // State changes only, said once each (never the progress ticks). The project row's key is its
+  // state and whether it can be updated, so "you can update it now" is said once too.
+  const projectKey = projectVideo ? `${projectVideo.state}:${projectVideo.ready === projectVideo.total}` : "";
+  const stateKey = `${readiness.products.map((p) => `${p.productId}:${p.video.state}`).join("|")}#${projectKey}`;
   const [seen, setSeen] = React.useState(stateKey);
   const [said, setSaid] = React.useState("");
   const [lastStates, setLastStates] = React.useState(() => new Map(readiness.products.map((p) => [p.productId, p.video.state])));
+  const [lastProject, setLastProject] = React.useState(projectKey);
   if (seen !== stateKey) {
     const lines: string[] = [];
     for (const p of readiness.products) {
@@ -116,8 +138,13 @@ export function ReadinessDialog({
         if (line) lines.push(line);
       }
     }
+    if (projectVideo && lastProject !== projectKey) {
+      const line = projectStateLine(projectVideo, readiness.counts.total);
+      if (line) lines.push(line);
+    }
     setSeen(stateKey);
     setLastStates(new Map(readiness.products.map((p) => [p.productId, p.video.state])));
+    setLastProject(projectKey);
     if (lines.length) setSaid(lines.join(" "));
   }
 
@@ -136,9 +163,9 @@ export function ReadinessDialog({
       onPass();
       return;
     }
-    const firstAction = readiness.products
-      .map((p) => actionRefs.current.get(p.productId))
-      .find((el): el is HTMLButtonElement => !!el);
+    const firstAction =
+      readiness.products.map((p) => actionRefs.current.get(p.productId)).find((el): el is HTMLButtonElement => !!el) ??
+      projectActionRef.current;
     (firstAction ?? (askedOwnership && !owned ? boxRef.current : null))?.focus();
   };
 
@@ -147,7 +174,7 @@ export function ReadinessDialog({
       <ModalFrame
         open
         onClose={onClose}
-        covered={generating !== null}
+        covered={generating !== null || projecting}
         size="md"
         title={copy.title}
         footer={
@@ -203,6 +230,28 @@ export function ReadinessDialog({
             </ul>
           </section>
 
+          {projectVideo && (
+            <section aria-labelledby={projectHeadingId} className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-4">
+                <h3 id={projectHeadingId} className="text-md font-semibold text-text-primary">
+                  {PROJECT_VIDEO_TITLE}
+                </h3>
+                <span className="text-sm text-text-secondary">{PROJECT_GROUP_META}</span>
+              </div>
+              <ProjectVideoList status={projectVideo}>
+                <ProjectVideoRow
+                  status={projectVideo}
+                  projectName={project.name}
+                  products={readiness.products}
+                  actionRef={(el) => {
+                    projectActionRef.current = el;
+                  }}
+                  onAction={() => setProjecting(true)}
+                />
+              </ProjectVideoList>
+            </section>
+          )}
+
           {askedOwnership && (
             <button
               ref={boxRef}
@@ -235,6 +284,13 @@ export function ReadinessDialog({
         target={generating}
         back={{ label: `Back to ${copy.title}`, onBack: () => setGenerating(null) }}
         onClose={() => setGenerating(null)}
+      />
+      <ProjectVideoDialog
+        open={projecting}
+        project={project}
+        products={view.products}
+        back={{ label: `Back to ${copy.title}`, onBack: () => setProjecting(false) }}
+        onClose={() => setProjecting(false)}
       />
     </>
   );

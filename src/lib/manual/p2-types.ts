@@ -6,6 +6,7 @@
 //
 // Types only, with relative imports.
 
+import type { ProjectVideoStatus } from "../video/project-video";
 import type { ProductVideoStatus } from "../video/types";
 import type { DemoBuyerId } from "../wallet/types";
 import type { ProjectStep } from "./projects";
@@ -55,7 +56,7 @@ export type EditorDoc =
   | "preview.mates";
 
 export type ReadinessPurpose = "showcase" | "sell" | "give" | "relist" | "edition" | "videos";
-export type ReadinessRuleId = "minted" | "videos" | "ownership" | "license";
+export type ReadinessRuleId = "minted" | "videos" | "projectVideo" | "ownership" | "license";
 export type ProductReadiness = { productId: string; name: string; thumb: string | null; video: ProductVideoStatus };
 export type ReadinessRule = {
   id: ReadinessRuleId;
@@ -69,6 +70,8 @@ export type Readiness = {
   rules: ReadinessRule[];
   products: ProductReadiness[];
   counts: { total: number; ready: number; rendering: number; missing: number };
+  /** The project video, where the purpose asks for it (every whole-project purpose; not an edition). */
+  project: ProjectVideoStatus | null;
   blocker: string | null;
   gateBlocker: string | null;
 };

@@ -379,3 +379,22 @@ test("aboutRowsOf: the owner's About — Created, Parts, Network, Team, Stored; 
     ],
   );
 });
+
+test("the share row names the project video once the product videos are in place (owner, 2026-10-21)", () => {
+  const readiness = (projectOk) => ({
+    purpose: "showcase",
+    ok: projectOk,
+    rules: [
+      { id: "videos", ok: true, fixedIn: "gate", reason: null },
+      { id: "projectVideo", ok: projectOk, fixedIn: "gate", reason: projectOk ? null : "Every product has its video. Make the project video to continue." },
+    ],
+    products: [{ productId: "p1", name: "Rover", thumb: null, video: { state: "ready" } }],
+    counts: { total: 1, ready: 1, rendering: 0, missing: 0 },
+    project: { state: projectOk ? "ready" : "make", ok: projectOk },
+    blocker: null,
+    gateBlocker: null,
+  });
+  assert.equal(showcaseRow(null, { readiness: readiness(false), projectId: "p" }).note, "Sharing needs the project video, made from your product videos.");
+  assert.equal(showcaseRow({ at: SHOWN }, { readiness: readiness(false), projectId: "p" }).note, "Shared — the project video isn't ready yet.");
+  assert.equal(showcaseRow({ at: SHOWN }, { readiness: readiness(true), projectId: "p" }).note, "It shows at the top of the Innovations page.");
+});

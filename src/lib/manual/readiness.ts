@@ -2,6 +2,9 @@
 // one pure rule set, shared by Showcase, Sell, Give — and, reusing Sell's
 // rules, Relist and a single Edition. "A rendering video is not yet a
 // video" (P2-VIDEO-13 C5) binds every caller, the listing included.
+// Everything that shares, sells or gives the whole project also waits for
+// the project video, made from the product videos (owner, 2026-10-21); an
+// Edition of one product doesn't.
 //
 // Pure, relative imports only.
 
@@ -9,6 +12,7 @@ import type { License } from "../brief/types";
 import type { StoredDraft } from "../brief/project-brief";
 import { etaLabel, progressOf, type VideoJob } from "../video/jobs";
 import { productVideoStatus } from "../video/product-video";
+import { projectVideoStatusOf, type ProjectVideoStatus } from "../video/project-video";
 import type { ProjectVideos } from "../video/types";
 import type { ManualProject } from "./projects";
 import type { ProjectProduct, ProjectView } from "./project-read";
@@ -61,21 +65,33 @@ const NO_EDITION_PRODUCT = "Choose which product these NFTs are for.";
 /** Table order, per purpose (P2-VIDEO-13). Relist and Edition take Sell's
  *  rules exactly (C13). */
 const RULES_OF: Record<ReadinessPurpose, ReadinessRuleId[]> = {
-  showcase: ["minted", "videos", "ownership"],
-  sell: ["videos", "ownership"],
-  give: ["videos", "ownership", "license"],
-  relist: ["videos", "ownership"],
+  showcase: ["minted", "videos", "projectVideo", "ownership"],
+  sell: ["videos", "projectVideo", "ownership"],
+  give: ["videos", "projectVideo", "ownership", "license"],
+  relist: ["videos", "projectVideo", "ownership"],
   edition: ["videos", "ownership"],
   // The videos alone: the Earn ladder's "Make a video for each product" and the mint's review
-  // open the dialog for this one rule (owner, 2026-10-12).
-  videos: ["videos"],
+  // open the dialog for these rules (owner, 2026-10-12).
+  videos: ["videos", "projectVideo"],
 };
 
-function videosReason(facts: ReadinessFacts, products: ProductReadiness[], counts: Readiness["counts"]): string {
+/** "A", "A and B", "A, B and C". */
+function listOf(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+function videosReason(
+  facts: ReadinessFacts,
+  products: ProductReadiness[],
+  counts: Readiness["counts"],
+  project: ProjectVideoStatus | null,
+): string {
   if (counts.missing > 0) {
-    return counts.missing === 1
-      ? "1 product still needs an AI video."
-      : `${counts.missing} products still need an AI video.`;
+    const need =
+      counts.missing === 1 ? "1 product still needs an AI video." : `${counts.missing} products still need an AI video.`;
+    if (!project) return need;
+    return `${need} ${project.state === "outdated" ? "Then update the project video." : "The project video comes next."}`;
   }
   const etaSec = products
     .filter((p) => p.video.state === "rendering")
@@ -91,12 +107,35 @@ function videosReason(facts: ReadinessFacts, products: ProductReadiness[], count
     : `Waiting for ${counts.rendering} videos to finish — ${eta} left.`;
 }
 
+function projectVideoReason(project: ProjectVideoStatus): string | null {
+  switch (project.state) {
+    case "ready":
+      return null;
+    case "waiting":
+      return "The project video is made once every product has its video.";
+    case "make":
+      return "Every product has its video. Make the project video to continue.";
+    case "rendering": {
+      const v = project.video;
+      const eta = v.state === "rendering" ? v.eta : v.state === "ready" && v.next ? v.next.eta : etaLabel(0);
+      return `Waiting for the project video — ${eta} left.`;
+    }
+    case "outdated":
+      return project.missing.length > 0
+        ? `The project video is missing ${listOf(project.missing)}. Update it to continue.`
+        : `The project video still shows ${listOf(project.extra)}. Update it to continue.`;
+    case "failed":
+      return "The project video didn't finish. Try again.";
+  }
+}
+
 function buildRule(
   id: ReadinessRuleId,
   purpose: ReadinessPurpose,
   facts: ReadinessFacts,
   products: ProductReadiness[],
   counts: Readiness["counts"],
+  project: ProjectVideoStatus | null,
 ): ReadinessRule {
   switch (id) {
     case "minted": {
@@ -114,7 +153,13 @@ function buildRule(
       // Relist/Edition reuse Sell's rule outside the Brief but still surface
       // it through the shared gate dialog, same as Showcase.
       const fixedIn = purpose === "showcase" || purpose === "relist" || purpose === "edition" ? "gate" : "brief";
-      return { id, ok, fixedIn, reason: ok ? null : videosReason(facts, products, counts) };
+      return { id, ok, fixedIn, reason: ok ? null : videosReason(facts, products, counts, project) };
+    }
+    case "projectVideo": {
+      // Fixed where the product videos are: the same rows, one group down.
+      const ok = project?.ok === true;
+      const fixedIn = purpose === "showcase" || purpose === "relist" ? "gate" : "brief";
+      return { id, ok, fixedIn, reason: ok || !project ? null : projectVideoReason(project) };
     }
     case "ownership": {
       const ok = facts.ownershipConfirmed;
@@ -144,8 +189,11 @@ export function readinessOf(facts: ReadinessFacts, purpose: ReadinessPurpose): R
   const rendering = products.filter((p) => p.video.state === "rendering").length;
   const missing = total - ready - rendering;
   const counts = { total, ready, rendering, missing };
+  const project = RULES_OF[purpose].includes("projectVideo")
+    ? projectVideoStatusOf({ products: facts.products, videos: facts.videos, jobs: facts.jobs, now: facts.now })
+    : null;
 
-  const rules = RULES_OF[purpose].map((id) => buildRule(id, purpose, facts, products, counts));
+  const rules = RULES_OF[purpose].map((id) => buildRule(id, purpose, facts, products, counts, project));
   const failing = rules.filter((r) => !r.ok);
 
   return {
@@ -154,9 +202,21 @@ export function readinessOf(facts: ReadinessFacts, purpose: ReadinessPurpose): R
     rules,
     products,
     counts,
+    project,
     blocker: failing[0]?.reason ?? null,
     gateBlocker: failing.find((r) => r.fixedIn === "gate")?.reason ?? null,
   };
+}
+
+/** "x of N+1 ready": the products' videos and, where it's asked, the project video. */
+export function videoCountOf(r: Readiness): { ready: number; total: number } {
+  if (!r.project) return { ready: r.counts.ready, total: r.counts.total };
+  return { ready: r.counts.ready + (r.project.ok ? 1 : 0), total: r.counts.total + 1 };
+}
+
+/** The first thing the videos still wait for, product videos before the project video. */
+export function videosBlockerOf(r: Readiness): string | null {
+  return r.rules.find((x) => !x.ok && (x.id === "videos" || x.id === "projectVideo"))?.reason ?? null;
 }
 
 /** Assembles `ReadinessFacts` from the page's own derivation. `view` is the

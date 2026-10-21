@@ -407,6 +407,36 @@ test("relistChecklist: a missing video is not ok, and points at generating video
   assert.equal(typeof items[0].href, "string");
 });
 
+test("relistChecklist: the project video has its own row after the products' videos (owner, 2026-10-21)", () => {
+  const readiness = (projectOk) => ({
+    purpose: "relist",
+    ok: projectOk,
+    rules: [
+      { id: "videos", ok: true, fixedIn: "gate", reason: null },
+      { id: "projectVideo", ok: projectOk, fixedIn: "gate", reason: projectOk ? null : "Every product has its video. Make the project video to continue." },
+      { id: "ownership", ok: true, fixedIn: "form", reason: null },
+    ],
+    products: [],
+    counts: { total: 1, ready: 1, rendering: 0, missing: 0 },
+    project: null,
+    blocker: null,
+    gateBlocker: null,
+  });
+  const ready = relistChecklist(readiness(true), []);
+  assert.deepEqual(
+    ready.map((i) => i.id),
+    ["videos", "projectVideo", "metadata"],
+  );
+  assert.equal(ready[1].label, "The project video");
+  assert.equal(ready[1].ok, true);
+  assert.equal(ready[1].href, undefined);
+  // Missing: not ok, fixed the same way as a missing product video.
+  const missing = relistChecklist(readiness(false), []);
+  assert.equal(missing[0].ok, true);
+  assert.equal(missing[1].ok, false);
+  assert.equal(missing[1].href, "generate-videos");
+});
+
 // ─────────────────────────────── listingLogOf ───────────────────────────────
 
 test("listingLogOf: list, edit, pause, relist and remove, newest first", () => {

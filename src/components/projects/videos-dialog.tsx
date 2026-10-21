@@ -13,7 +13,7 @@ export function VideosDialog({ request, onEnd }: { request: VideosRequest; onEnd
   const data = useProjectPageData(request.projectId, "project");
   const close = (done: boolean) => {
     onEnd();
-    if (done) request.announce?.("Every product has its video.");
+    if (done) request.announce?.("Every video is ready.");
     requestAnimationFrame(() => {
       const at = document.activeElement;
       if ((!at || at === document.body) && request.opener?.isConnected) request.opener.focus();

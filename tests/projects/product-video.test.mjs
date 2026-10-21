@@ -369,3 +369,46 @@ test("featuredVideoOf: no record, or nothing in use, gives null", () => {
   assert.equal(featuredVideoOf(null, []), null);
   assert.equal(featuredVideoOf({ version: 1, projectId: "p-x", products: {} }, [{ id: "prd_a", dropped: null }]), null);
 });
+
+// ─────────────────────────── the project video (owner, 2026-10-21) ───────────────────────
+
+const JOIN = { intro: ["Kit", "One kit"], cuts: [{ productId: "prd_b", takeId: "t_b", fromMs: 5_000, ms: 5_000, label: "B" }], outro: "Built with IDEEZA" };
+
+test("featuredVideoOf: the project video comes first when there is one", () => {
+  const products = [{ id: "prd_b", dropped: null }];
+  const video = {
+    version: 1,
+    projectId: "p-x",
+    products: {
+      prd_b: { takes: [{ id: "t_b", productId: "prd_b", n: 1, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: 0, readyAt: 0, clip: CLIP }], inUseId: "t_b" },
+      project: { takes: [{ id: "t_p", productId: "project", n: 1, prompt: "", lines: ["Kit", "One kit", "Built with IDEEZA"], quality: "low", source: null, createdAt: 0, readyAt: 0, clip: CLIP, join: JOIN }], inUseId: "t_p" },
+    },
+  };
+  assert.equal(featuredVideoOf(video, products).id, "t_p");
+});
+
+test("startTake keeps a project take's join plan", () => {
+  const { video } = startTake(undefined, { productId: "project", prompt: "", lines: ["Kit", "One kit", "Built with IDEEZA"], quality: "low", source: null, join: JOIN }, NOW, "t_p");
+  assert.deepEqual(video.takes[0].join, JOIN);
+});
+
+test("sanitizeProjectVideos keeps a well-formed join plan and the draft's, and drops a malformed one", () => {
+  const raw = {
+    version: 1,
+    projectId: "p-x",
+    products: {
+      project: {
+        takes: [
+          { id: "t_p", n: 1, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: 1, join: JOIN },
+          { id: "t_q", n: 2, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: 2, join: { intro: ["x"], cuts: [{ productId: 3 }], outro: "y" } },
+        ],
+        inUseId: null,
+        draft: { prompt: "", lines: ["", "", ""], quality: "low", join: JOIN },
+      },
+    },
+  };
+  const v = sanitizeProjectVideos(raw, "p-x").products.project;
+  assert.deepEqual(v.takes[0].join, JOIN);
+  assert.equal(v.takes[1].join, undefined);
+  assert.deepEqual(v.draft.join, JOIN);
+});

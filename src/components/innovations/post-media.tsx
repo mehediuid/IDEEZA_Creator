@@ -2,8 +2,9 @@
 
 // The post's media stage (plan §5): one 16:9 stage and, when there is more
 // than one, a row of thumbnails that picks what it shows. It opens on the
-// first product's video (owner, 2026-10-13: every post and every product
-// starts with its video), the other products' videos next, then the images.
+// project video, which stands for the whole project (owner, 2026-10-21), then
+// each product's video in product order (owner, 2026-10-13: every post and
+// every product starts with its video), then the images.
 // A shared project's video plays in the app's own player (its clip read from
 // this browser's clip store); a sample post's video is a file, in the
 // browser's player, never autoplaying (with Data saver on it doesn't even
@@ -17,6 +18,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { MediaLightbox, type MediaTile } from "@/components/projects/details/media-tab";
 import { useClipUrl, VideoPlayer } from "@/components/video-jobs/video-player";
 import type { InnovationPost, PostMedia, PostVideo } from "@/lib/innovations/types";
+import { isProjectKey } from "@/lib/video/project-video";
 import type { VideoTake } from "@/lib/video/types";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
@@ -143,8 +145,11 @@ function ClipStage({ post, mine, media }: { post: InnovationPost; mine: MinePost
       </div>
     );
   }
-  const productName = post.products.find((p) => p.id === take.productId)?.name ?? media.label;
-  return <VideoPlayer take={take} productName={productName} projectId={mine.project.id} />;
+  // The project video is the whole project's: named after it, never looked up among the products.
+  const name = isProjectKey(take.productId)
+    ? post.title
+    : (post.products.find((p) => p.id === take.productId)?.name ?? media.label);
+  return <VideoPlayer take={take} productName={name} projectId={mine.project.id} />;
 }
 
 function Thumb({ media, on, onPick }: { media: PostMedia; on: boolean; onPick: () => void }) {

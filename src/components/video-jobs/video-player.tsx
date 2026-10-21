@@ -18,19 +18,22 @@
 //   and failed panels of P2-VIDEO-4 in the same 16:9 box.
 
 import * as React from "react";
-import { AlertCircleIcon, Cancel01Icon, PlayIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, Cancel01Icon, InformationCircleIcon, LockIcon, PlayIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, ModalFrame, ProgressBar, Spinner } from "@/components/ideeza";
 import { formatDate } from "@/lib/manual/project-summary";
 import { getClip, verifyClips } from "@/lib/video/clip-store";
 import { describeClip } from "@/lib/video/frames";
+import { describeJoin, joinLengthMs } from "@/lib/video/project-video";
 import type { ProductVideoStatus, VideoTake } from "@/lib/video/types";
 import {
   CANNOT_PLAY_COPY,
   FAILURE_COPY,
+  PROJECT_HONESTY,
   actionLabel,
   clipMetaLine,
   honestyLine,
+  resolutionOf,
   statusCopy,
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
@@ -38,21 +41,31 @@ import { cn } from "@/lib/utils";
 const GLYPH_TONE = {
   error: "text-text-error",
   success: "text-text-success",
+  warning: "text-text-warning",
   neutral: "text-text-secondary",
 } as const;
 
-/** P2-VIDEO-4's icon for a state — always beside its words, never alone. */
+const GLYPHS = {
+  check: Tick02Icon,
+  cross: Cancel01Icon,
+  alert: AlertCircleIcon,
+  lock: LockIcon,
+  info: InformationCircleIcon,
+} as const;
+
+/** P2-VIDEO-4's icon for a state — always beside its words, never alone. The project video's
+ *  row adds the lock (waiting) and the info note. */
 export function StatusGlyph({
   icon,
   tone,
   size = 16,
 }: {
-  icon: "cross" | "spinner" | "check" | "alert";
+  icon: keyof typeof GLYPHS | "spinner";
   tone: keyof typeof GLYPH_TONE;
   size?: number;
 }) {
   if (icon === "spinner") return <Spinner size={size} />;
-  const glyph = icon === "check" ? Tick02Icon : icon === "cross" ? Cancel01Icon : AlertCircleIcon;
+  const glyph = GLYPHS[icon];
   return (
     <span aria-hidden className={cn("inline-flex shrink-0 items-center justify-center", GLYPH_TONE[tone])}>
       <Icon icon={glyph} size={size} strokeWidth={2} />
@@ -178,7 +191,8 @@ function ReadyPlayer({
   const [started, setStarted] = React.useState(false);
   const [broken, setBroken] = React.useState(false);
   const metaId = React.useId();
-  const label = `${productName} video`;
+  // A project video take (`join`) is named, described and dated as the whole project's.
+  const label = take.join ? `${productName} project video` : `${productName} video`;
 
   // A file that's gone turns the take lost, so it stops counting as ready
   // everywhere the gate reads it (P2-VIDEO-9, P2-VIDEO-19).
@@ -228,8 +242,12 @@ function ReadyPlayer({
     e.stopPropagation();
   };
 
-  const meta = clipMetaLine(take, formatDate(take.readyAt ?? take.createdAt));
-  const transcript = describeClip(take, productName, clip.state === "ready" ? clip.usedImage : take.source !== null);
+  const meta = take.join
+    ? projectClipMeta(take)
+    : clipMetaLine(take, formatDate(take.readyAt ?? take.createdAt));
+  const transcript = take.join
+    ? describeJoin(take.join)
+    : describeClip(take, productName, clip.state === "ready" ? clip.usedImage : take.source !== null);
 
   let box: React.ReactNode;
   if (clip.state === "loading" || clip.state === "idle") {
@@ -303,10 +321,16 @@ function ReadyPlayer({
             ))}
           </ul>
         </details>
-        <p className="text-sm text-text-tertiary">{honestyLine(productName)}</p>
+        <p className="text-sm text-text-tertiary">{take.join ? PROJECT_HONESTY : honestyLine(productName)}</p>
       </div>
     </>
   );
+}
+
+/** "Take 1 · 480p · 19 s" — a project video's meta line. */
+export function projectClipMeta(take: Pick<VideoTake, "n" | "quality" | "clip" | "join">): string {
+  const ms = take.clip?.durationMs || (take.join ? joinLengthMs(take.join) : 0);
+  return `Take ${take.n} · ${resolutionOf(take.quality)} · ${Math.round(ms / 1000)} s`;
 }
 
 /** A take in a dialog of its own: the render toast's Watch. */

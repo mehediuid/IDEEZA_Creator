@@ -108,8 +108,8 @@ export const LADDER_STEPS: readonly LadderStep[] = [
   {
     id: "videos",
     level: 3,
-    label: "Product videos ready",
-    reason: "Every product needs a finished AI video.",
+    label: "Videos ready",
+    reason: "Every product needs a finished AI video, then the project video is made from them.",
     fix: { kind: "media", label: "Make videos" },
   },
   {
@@ -236,10 +236,13 @@ export function earnFactsOf(i: EarnFactsInput): EarnFacts {
   const minted = i.commercial !== "none";
   const rule = (id: string) => i.sell.rules.find((r) => r.id === id);
   const videos = rule("videos");
-  const videosReady = built && videos?.ok === true;
+  // The project video, made from the product videos, is part of the same step (owner, 2026-10-21).
+  const project = rule("projectVideo");
+  const videosReady = built && videos?.ok === true && project?.ok !== false;
   const w = i.wallet;
   const reasons: Partial<Record<LadderStepId, string>> = {};
-  if (built && videos && !videos.ok && videos.reason) reasons.videos = videos.reason;
+  const waiting = videos && !videos.ok ? videos : project && !project.ok ? project : null;
+  if (built && waiting?.reason) reasons.videos = waiting.reason;
   return {
     built,
     walletConnected: !!w && w.identities[`maker-${w.account}`]?.connected === true,

@@ -16,7 +16,9 @@
 //   stores it (clip-store.ts), marks the take ready (`finishTake`), and only
 //   then sets `done`. Until the file is stored, progress holds at 99 %.
 //   One tab encodes a take, under the Web Lock `ideeza-video:<takeId>`;
-//   other tabs pick the result up through the storage event.
+//   other tabs pick the result up through the storage event. The project
+//   video's job (`productId` = PROJECT_VIDEO_KEY) runs the same way; its last
+//   stage joins the products' stored clips (`renderJoin`) instead.
 // - A **legacy** job (the v1 Brief's timer-only clip, `render` absent): one
 //   stored before the Brief moved to per-product takes (T26) still ticks to
 //   `done` and never makes a file; nothing starts one any more.
@@ -55,9 +57,17 @@ import { ClipStoreError, deleteClips, deleteProjectClips, putClip, verifyClips }
 // A namespace, so `pv.useTake` — a reducer, not a hook — reads as one.
 import * as pv from "@/lib/video/product-video";
 import { readProjectVideos, writeProjectVideos } from "@/lib/video/store";
-import type { OnScreenLines, ProductVideo, ProjectVideos, VideoFailureKind, VideoQuality } from "@/lib/video/types";
+import {
+  PROJECT_VIDEO_KEY,
+  type JoinPlan,
+  type OnScreenLines,
+  type ProductVideo,
+  type ProjectVideos,
+  type VideoFailureKind,
+  type VideoQuality,
+} from "@/lib/video/types";
 import type { Storyboard } from "@/lib/video/storyboard";
-import { renderTitle } from "@/lib/video/video-copy";
+import { PROJECT_VIDEO_TITLE, renderTitle } from "@/lib/video/video-copy";
 
 export {
   STAGE_BUDGETS_SEC,
@@ -91,6 +101,16 @@ export type ProductVideoSpec = {
   storyboard?: Storyboard;
 };
 
+/** What Make project video needs (owner, 2026-10-21): the product cuts it joins, in order. */
+export type ProjectVideoSpec = {
+  projectId: string;
+  projectName: string;
+  plan: JoinPlan;
+  quality: VideoQuality;
+  /** Kept with the take for the model; the local file is silent. */
+  audioPrompt?: string;
+};
+
 export type StartResult = { ok: true; takeId: string; n: number } | { ok: false };
 export type TakeWrite = { ok: boolean };
 
@@ -106,6 +126,9 @@ type Ctx = {
   dismiss: (id: string) => void;
   // ── Phase 2: product videos ──
   startProductVideo: (spec: ProductVideoSpec) => StartResult;
+  /** A take of the project video, under `PROJECT_VIDEO_KEY`; every take call below takes that key
+   *  as its product id. */
+  startProjectVideo: (spec: ProjectVideoSpec) => StartResult;
   /** Fails the take with `cancelled`; no clip is kept. */
   cancelRender: (takeId: string) => void;
   /** Makes a ready take the product's video (P2-VIDEO-8). */
@@ -349,13 +372,19 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
         if (take.readyAt) return settle(id, "done");
 
         // Loaded on first use: the muxer stays out of every page's bundle.
-        const { ClipRenderError, renderClip } = await import("./clip-renderer");
+        const { ClipRenderError, renderClip, renderJoin } = await import("./clip-renderer");
         let clip;
         try {
-          clip = await renderClip(
-            { lines: render.lines, imageUrl: render.imageUrl, productName: render.productName, quality: job.quality },
-            { signal: ac.signal },
-          );
+          // The project video joins its products' stored clips; a product's draws its image.
+          clip = render.join
+            ? await renderJoin(
+                { plan: render.join, projectName: render.productName, quality: job.quality },
+                { signal: ac.signal },
+              )
+            : await renderClip(
+                { lines: render.lines, imageUrl: render.imageUrl, productName: render.productName, quality: job.quality },
+                { signal: ac.signal },
+              );
         } catch (e) {
           if (ac.signal.aborted) return;
           const kind = e instanceof ClipRenderError ? e.kind : "encode";
@@ -471,15 +500,64 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   }, []);
 
-  const startProductVideo = React.useCallback((spec: ProductVideoSpec): StartResult => {
-    const id = newTakeId();
-    const t = Date.now();
-    let evicted: string[] = [];
-    let n = 0;
-    const wrote = writeProduct(spec.projectId, spec.productId, (v) => {
-      const res = pv.startTake(
-        v,
+  // One take and its job, for a product's video or the project's.
+  const startTakeJob = React.useCallback(
+    (a: {
+      projectId: string;
+      title: string;
+      take: Parameters<typeof pv.startTake>[1];
+      render: NonNullable<VideoJob["render"]>;
+    }): StartResult => {
+      const id = newTakeId();
+      const t = Date.now();
+      let evicted: string[] = [];
+      let n = 0;
+      const wrote = writeProduct(a.projectId, a.take.productId, (v) => {
+        const res = pv.startTake(v, a.take, t, id);
+        evicted = res.evicted;
+        n = res.video.takes.find((x) => x.id === id)?.n ?? 1;
+        return res.video;
+      });
+      if (!wrote.ok) return { ok: false };
+      const gone = new Set(evicted);
+      if (gone.size) {
+        for (const e of gone) {
+          encoding.current.get(e)?.abort();
+          encoding.current.delete(e);
+        }
+        void deleteClips([...gone]).catch(() => undefined);
+      }
+      setJobs((prev) => [
+        ...prev.filter((j) => !gone.has(j.id)),
         {
+          id,
+          title: a.title,
+          prompt: a.take.prompt,
+          quality: a.take.quality,
+          stage: "queued",
+          startedAt: t,
+          stageStartedAt: t,
+          emailReminder: null,
+          browserNotify: false,
+          acknowledged: false,
+          minted: false,
+          projectId: a.projectId,
+          productId: a.take.productId,
+          render: a.render,
+        },
+      ]);
+      setNow(t);
+      return { ok: true, takeId: id, n };
+    },
+    [],
+  );
+
+  const startProductVideo = React.useCallback(
+    (spec: ProductVideoSpec): StartResult =>
+      startTakeJob({
+        projectId: spec.projectId,
+        title: renderTitle(spec.productName, spec.projectName),
+        take: {
           productId: spec.productId,
           prompt: spec.prompt,
           lines: spec.lines,
@@ -489,44 +567,31 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
           auto: spec.auto,
           storyboard: spec.storyboard,
         },
-        t,
-        id,
-      );
-      evicted = res.evicted;
-      n = res.video.takes.find((x) => x.id === id)?.n ?? 1;
-      return res.video;
-    });
-    if (!wrote.ok) return { ok: false };
-    const gone = new Set(evicted);
-    if (gone.size) {
-      for (const e of gone) {
-        encoding.current.get(e)?.abort();
-        encoding.current.delete(e);
-      }
-      void deleteClips([...gone]).catch(() => undefined);
-    }
-    setJobs((prev) => [
-      ...prev.filter((j) => !gone.has(j.id)),
-      {
-        id,
-        title: renderTitle(spec.productName, spec.projectName),
-        prompt: spec.prompt,
-        quality: spec.quality,
-        stage: "queued",
-        startedAt: t,
-        stageStartedAt: t,
-        emailReminder: null,
-        browserNotify: false,
-        acknowledged: false,
-        minted: false,
-        projectId: spec.projectId,
-        productId: spec.productId,
         render: { lines: spec.lines, imageUrl: spec.imageUrl, productName: spec.productName },
-      },
-    ]);
-    setNow(t);
-    return { ok: true, takeId: id, n };
-  }, []);
+      }),
+    [startTakeJob],
+  );
+
+  const startProjectVideo = React.useCallback(
+    (spec: ProjectVideoSpec): StartResult => {
+      const lines: OnScreenLines = [spec.plan.intro[0], spec.plan.intro[1], spec.plan.outro];
+      return startTakeJob({
+        projectId: spec.projectId,
+        title: renderTitle(PROJECT_VIDEO_TITLE, spec.projectName),
+        take: {
+          productId: PROJECT_VIDEO_KEY,
+          prompt: "",
+          lines,
+          quality: spec.quality,
+          source: null,
+          audioPrompt: spec.audioPrompt,
+          join: spec.plan,
+        },
+        render: { lines, imageUrl: null, productName: spec.projectName, join: spec.plan },
+      });
+    },
+    [startTakeJob],
+  );
 
   const cancelRender = React.useCallback((id: string) => {
     const job = jobsRef.current.find((j) => j.id === id);
@@ -575,6 +640,7 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
       acknowledge,
       dismiss,
       startProductVideo,
+      startProjectVideo,
       cancelRender,
       pickTake,
       deleteTake,
@@ -588,6 +654,7 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
       acknowledge,
       dismiss,
       startProductVideo,
+      startProjectVideo,
       cancelRender,
       pickTake,
       deleteTake,
