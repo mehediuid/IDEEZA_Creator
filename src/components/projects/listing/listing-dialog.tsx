@@ -38,7 +38,7 @@ import { parseStored, readStoredKey } from "@/lib/key-store";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { listingMetadataOf, type ProjectView } from "@/lib/manual/project-read";
 import { normalizeProjects, PROJECTS_KEY, useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
 import { FEE_LABEL } from "@/lib/market/fee";
 import { createListing, editListing, listingViewOf } from "@/lib/market/listing";
 import {
@@ -139,8 +139,9 @@ export function sellRecheckOf(
   },
 ): string | null {
   const facts = readinessFactsOf(p, ctx.view, ctx.brief, readProjectVideos(p.id), ctx.jobs, ctx.now);
-  const videos = readinessOf(facts, ctx.purpose).rules.find((r) => r.id === "videos");
-  if (videos && !videos.ok) return `A video changed while this was open: ${videos.reason}`;
+  // The products' videos, then the project video (owner, 2026-10-21).
+  const videos = videosBlockerOf(readinessOf(facts, ctx.purpose));
+  if (videos) return `A video changed while this was open: ${videos}`;
   const maker = makerShareNow(p, ctx.market);
   if (ctx.percentSelling <= maker) return null;
   return maker > 0

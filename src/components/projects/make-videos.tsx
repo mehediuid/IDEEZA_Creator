@@ -2,7 +2,8 @@
 
 // Make videos — the one way to the products' videos from a step that asks for
 // them (owner, 2026-10-12): the Earn ladder's "Make a video for each product"
-// (StepFix's media fix, at every commit point) and the mint's Review step. It
+// (StepFix's media fix, at every commit point), the mint's Review step, and
+// Earn › Sell's fix for a missing project video (`openMakeVideos`). It
 // opens the ReadinessDialog for the videos alone, over the page the maker is
 // on, instead of sending them off to the project's Media tab:
 // - every product with its video's state (ready, rendering with progress,
@@ -50,6 +51,13 @@ const subscribe = (l: () => void) => {
     listeners.delete(l);
   };
 };
+
+/** Opens Make videos from a control that isn't `MakeVideosButton` (Earn › Sell's video fix for the
+ *  project video). `opts.opener` gets focus back; `onOpenChange` lets a dialog under it hand over
+ *  the keyboard. */
+export function openMakeVideos(projectId: string, opts: Omit<VideosRequest, "projectId" | "opener"> & { opener?: HTMLElement | null } = {}) {
+  publish({ ...opts, projectId, opener: opts.opener ?? null });
+}
 
 export function MakeVideosButton({
   projectId,

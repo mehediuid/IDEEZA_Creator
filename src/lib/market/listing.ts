@@ -474,13 +474,19 @@ export function metadataDiff(was: ListingMetadata, now: ListingMetadata): string
 
 export type RelistChecklistItem = { id: string; label: string; ok: boolean; href?: string };
 
-/** The Paused card's checklist (P2-LISTING-14 as changed): videos, plus the
- *  metadata note. The image and project-video rows are dropped. */
+/** The Paused card's checklist (P2-LISTING-14 as changed): the products'
+ *  videos, the project video made from them (owner, 2026-10-21), plus the
+ *  metadata note. The image row is dropped. */
 export function relistChecklist(readiness: Readiness, diff: string[]): RelistChecklistItem[] {
   const videosRule = readiness.rules.find((r) => r.id === "videos");
   const videosOk = videosRule ? videosRule.ok : true;
   const videos: RelistChecklistItem = { id: "videos", label: "An AI video for every product", ok: videosOk };
   if (!videosOk) videos.href = "generate-videos";
+  const projectRule = readiness.rules.find((r) => r.id === "projectVideo");
+  const project: RelistChecklistItem | null = projectRule
+    ? { id: "projectVideo", label: "The project video", ok: projectRule.ok }
+    : null;
+  if (project && !project.ok) project.href = "generate-videos";
   const metadata: RelistChecklistItem = {
     id: "metadata",
     label: diff.length
@@ -488,7 +494,7 @@ export function relistChecklist(readiness: Readiness, diff: string[]): RelistChe
       : "Updated NFT metadata — updated when you relist",
     ok: true,
   };
-  return [videos, metadata];
+  return project ? [videos, project, metadata] : [videos, metadata];
 }
 
 /** Every event of every listing this project ever had, newest first — the

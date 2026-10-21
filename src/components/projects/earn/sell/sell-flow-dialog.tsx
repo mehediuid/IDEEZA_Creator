@@ -12,8 +12,10 @@
 //   (More options opens first when the field is inside it). Back keeps
 //   everything typed. Closing with anything entered asks first.
 // - Review lists the summary, then the readiness rules (`sellChecksOf`): the
-//   AI video of this product ("edition" readiness), or of every product for
-//   the whole project ("sell"), fixed here with the Generate dialog on top;
+//   AI video of this product ("edition" readiness), fixed here with the
+//   Generate dialog on top; or, for the whole project ("sell"), every
+//   product's video and then the project video (owner, 2026-10-21), a
+//   product's fixed in Generate, the project video's in Make videos;
 //   ownership; and for a physical copy the make-and-ship note and its
 //   promises (fixed back on step 1). It also asks the ladder (Build and Earn
 //   P1-4): L3 for virtual copies, L4 (the demo identity check) for physical.
@@ -50,6 +52,7 @@ import {
   reviewSummaryOf,
   SELL_STEPS,
   sellChecksOf,
+  sellVideoOf,
   STEP_LABEL,
   stepProblemOf,
   trackStateOf,
@@ -68,6 +71,7 @@ import { cn } from "@/lib/utils";
 import { createdLine, createRequestOf, failureCopy, TAP, writeTracks } from "../../editions/create-dialog";
 import type { CopyScope } from "../../editions/edition-block";
 import { listRequestOf, lockGateNow } from "../../editions/list-dialog";
+import { openMakeVideos } from "../../make-videos";
 import { PriceStep, ReviewStep, type Choice } from "./sell-steps";
 import { useSellTerms, writeShipPlan } from "./use-sell-terms";
 import { LevelCheck, useCommitCheck } from "../ladder/level-check";
@@ -161,13 +165,12 @@ export function SellFlowDialog({
   const facts = readinessFactsOf(project, view, brief, videos, jobs, now);
   const askOwner = !facts.ownershipConfirmed;
   const ctx: SellCtx = { productId, network: chain?.network ?? "baseSepolia", tracks, askOwner };
-  // One product's video, or every product's for the whole project.
+  // One product's video, or every product's and then the project video for the whole project.
   const scopeReadiness = product ? readinessOf({ ...facts, product }, "edition") : readinessOf(facts, "sell");
-  const videoRule = scopeReadiness.rules.find((r) => r.id === "videos");
   const readiness = sellChecksOf({
     kind,
     videoSubject: product ? productName : "Each product",
-    video: { ok: videoRule?.ok ?? false, reason: videoRule?.reason ?? null },
+    video: sellVideoOf(scopeReadiness),
     ownershipConfirmed: facts.ownershipConfirmed,
     draft,
   });
@@ -357,11 +360,15 @@ export function SellFlowDialog({
           rows={reviewSummaryOf({ draft, what, count, networkLabel: networkLabelOf(chain.network) })}
           checks={readiness.checks}
           fixRef={fixRef}
-          onFix={(fix) => {
+          onFix={(fix, opener) => {
             if (fix === "price") {
               const p = stepProblemOf("price", draft, ctx);
               if (p) show(p);
               else go("price");
+              return;
+            }
+            if (fix === "videos") {
+              openMakeVideos(project.id, { opener, onOpenChange: setFixOpen });
               return;
             }
             // The whole project: the first product still without a ready video.

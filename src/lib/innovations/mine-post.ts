@@ -12,6 +12,8 @@ import type { ProjectProduct, ProjectView } from "../manual/project-read";
 import { coverOf } from "../manual/project-read";
 import type { ManualProject } from "../manual/projects";
 import { formatAmount } from "../manual/rail-copy";
+import { PROJECT_VIDEO_KEY } from "../video/types";
+import { PROJECT_VIDEO_TITLE } from "../video/video-copy";
 import { ME } from "./people";
 import { mineSlugOf, postIdOfProject } from "./slug";
 import type { InnovationPost, PostMedia, PostPart, PostPiece, PostProduct, PostVideo } from "./types";
@@ -38,6 +40,23 @@ function clipOf(p: ProjectProduct, view: ProjectView): PostVideo | null {
   if (!take) return null;
   const name = p.name.trim() || "Untitled product";
   return { kind: "clip", takeId: take.id, alt: `${name}, its video`, label: `${name} video`, durationMs: take.clip?.durationMs ?? null, productId: p.id };
+}
+
+/** The project video in use: it stands for the whole project (owner, 2026-10-21), so it is named
+ *  after the project, never a product. */
+function projectClipOf(project: ManualProject, view: ProjectView): PostVideo | null {
+  const pv = view.videos.record?.products[PROJECT_VIDEO_KEY];
+  const take = pv?.inUseId ? pv.takes.find((t) => t.id === pv.inUseId) : null;
+  if (!take) return null;
+  const name = project.name.trim() || "Untitled project";
+  return {
+    kind: "clip",
+    takeId: take.id,
+    alt: `${name}, its project video`,
+    label: `${PROJECT_VIDEO_TITLE} · ${name}`,
+    durationMs: take.clip?.durationMs ?? null,
+    productId: PROJECT_VIDEO_KEY,
+  };
 }
 
 function postProductOf(p: ProjectProduct, view: ProjectView): PostProduct {
@@ -82,8 +101,10 @@ export function listingOf(project: ManualProject, view: ProjectView): Innovation
 export function minePostOf(project: ManualProject, view: ProjectView, network: string | null = null): InnovationPost {
   const current = view.products.filter((p) => p.dropped === null);
   const products = current.map((p) => postProductOf(p, view));
-  // The videos lead, one per product in product order (owner, 2026-10-13); the images follow.
-  const media: PostMedia[] = products.flatMap((p) => (p.video ? [p.video] : []));
+  // The videos lead: the project video (owner, 2026-10-21), then one per product in product order
+  // (owner, 2026-10-13); the images follow.
+  const own = projectClipOf(project, view);
+  const media: PostMedia[] = [...(own ? [own] : []), ...products.flatMap((p) => (p.video ? [p.video] : []))];
   const cover = coverOf(project, view.refs);
   const seen = new Set<string>();
   const addImage = (src: string | null, label: string, alt: string) => {
