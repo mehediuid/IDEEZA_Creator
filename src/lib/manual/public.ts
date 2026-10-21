@@ -45,6 +45,7 @@ export type {
 export type { ProjectLogEntry } from "./project-read";
 export { normalizeLegal } from "./legal";
 export { ownershipOf } from "./ownership";
+export { videosBlockerOf } from "./readiness";
 export { benefitDurationText } from "./customers";
 export { useJourneyMediaSweep } from "./journey-store";
 

@@ -11,8 +11,9 @@
 //
 // Under the subline: the ownership proof (P2-MINT-6's MintProofCard); for a
 // Sell, the listing's terms as the listing record holds them now, and "View
-// on marketplace"; the ready products' posters, each opening its video; then
-// Go to My Projects and Showcase (P2-VIDEO-16).
+// on marketplace"; the posters, each opening its video: the project video's
+// first, named after the project (owner, 2026-10-21), then the ready
+// products'; then Go to My Projects and Showcase (P2-VIDEO-16).
 
 import * as React from "react";
 import Link from "next/link";
@@ -41,13 +42,15 @@ import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
 import type { SharePost } from "@/lib/manual/share-post";
 import { SUCCESS_SHOWCASE, shareAnnouncement } from "@/lib/manual/showcase-copy";
+import { videosBlockerOf } from "@/lib/manual/readiness";
 import { listingViewOf } from "@/lib/market/listing";
 import { termsLineOf } from "@/lib/market/listing-flow";
 import { useMarket } from "@/lib/market/market-store";
 import type { ListingMetadata } from "@/lib/market/types";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
-import type { VideoTake } from "@/lib/video/types";
+import { PROJECT_VIDEO_KEY, type VideoTake } from "@/lib/video/types";
+import { PROJECT_VIDEO_TITLE } from "@/lib/video/video-copy";
 import { MintStep, TAP } from "./brief-card";
 
 const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
@@ -90,10 +93,13 @@ export function StepSuccess({
   const ready = rows.flatMap((r) =>
     r.status.state === "ready" ? [{ product: r.product, take: r.status.take }] : [],
   );
+  const own = productVideoStatus(videos?.products[PROJECT_VIDEO_KEY], jobs, now);
+  const projectTake = own.state === "ready" ? own.take : null;
+  const projectLabel = projectName.trim() || PROJECT_VIDEO_TITLE;
   // Live once nothing renders any more (only a Save can arrive with a render running).
   const isLive = rendering === 0;
   const heading = isLive ? HEADING_LIVE_BY_INTENT[intent] : "Mint complete";
-  const subline = isLive ? liveSubline(intent, ready.length > 0) : pendingSubline();
+  const subline = isLive ? liveSubline(intent, ready.length > 0 || projectTake !== null) : pendingSubline();
 
   // The listing as its record holds it now, so an edit from the rail shows here too.
   const listing =
@@ -164,10 +170,19 @@ export function StepSuccess({
 
         {!isLive && <PendingCard rows={rows} rendering={rendering} />}
 
-        {ready.length > 0 && (
+        {(projectTake || ready.length > 0) && (
           <section aria-label="Videos" className="flex w-full flex-col gap-[10px] text-left">
             <div className="text-md font-medium text-text-tertiary">{projectName || "Videos"}</div>
             <ul role="list" className="m-0 grid list-none grid-cols-2 gap-[8px] p-0 sm:grid-cols-3">
+              {projectTake && (
+                <li key={PROJECT_VIDEO_KEY}>
+                  <PosterTile
+                    take={projectTake}
+                    name={projectLabel}
+                    onOpen={() => setWatching({ take: projectTake, name: projectLabel })}
+                  />
+                </li>
+              )}
               {ready.map(({ product, take }) => (
                 <li key={product.id}>
                   <PosterTile
@@ -294,6 +309,11 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
   if (!can({ kind: "local-owner" }, "project.showcase", { status })) return null;
   const readiness = view.videos.readiness.showcase;
   const blocked = dialogBlockerOf(readiness) !== null;
+  // Every product's video ready but not the project video: say what is left, not "3 of 3".
+  const productsFail = readiness.rules.some((r) => r.id === "videos" && !r.ok);
+  const gateLine = productsFail
+    ? showcaseGateLine(readiness.counts.ready, readiness.counts.total)
+    : (videosBlockerOf(readiness) ?? showcaseGateLine(readiness.counts.ready, readiness.counts.total));
 
   const flip = (next: boolean, post?: SharePost) => {
     focusNext.current = next ? "undo" : "show";
@@ -335,7 +355,7 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
             {SUCCESS_SHOWCASE.action}
           </button>
           <p id={lineId} className="m-0 text-md text-text-secondary">
-            {blocked ? showcaseGateLine(readiness.counts.ready, readiness.counts.total) : SUCCESS_SHOWCASE.line}
+            {blocked ? gateLine : SUCCESS_SHOWCASE.line}
           </p>
         </>
       )}

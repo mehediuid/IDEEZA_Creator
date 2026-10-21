@@ -25,13 +25,17 @@ const {
   firstProblemOf,
   normalizeSellTerms,
   reviewSummaryOf,
+  PROJECT_VIDEOS_CHECK,
   sellChecksOf,
+  sellVideoOf,
   sellingLinesOf,
   signStepsOf,
   stepProblemOf,
   trackStateOf,
   withShipPlan,
 } = await import("../../.tmp-test/lib/market/sell-flow.js");
+const { readinessOf } = await import("../../.tmp-test/lib/manual/readiness.js");
+const { PROJECT_VIDEO_KEY } = await import("../../.tmp-test/lib/video/types.js");
 
 function track(overrides = {}) {
   return {
@@ -400,8 +404,10 @@ test("sellChecksOf: everything ready passes, and the Main listing is never a row
     ["video", "ownership"],
   );
   assert.equal(r.checks[0].title, "Rider has its AI video");
-  // The whole project asks every product's video.
-  assert.equal(sellChecksOf(checks({ videoSubject: "Each product" })).checks[0].title, "Each product has its AI video");
+  // The whole project asks every product's video, then the project video (owner, 2026-10-21).
+  const whole = sellChecksOf(checks({ videoSubject: "Each product", video: { ...VIDEO_OK, project: true, productsOk: true } }));
+  assert.equal(whole.checks[0].title, "Each product has its AI video, and the project video is made");
+  assert.equal(whole.ok, true);
 });
 
 test("sellChecksOf: the product's video rule with its fix; ownership points at the box below", () => {
@@ -416,6 +422,63 @@ test("sellChecksOf: the product's video rule with its fix; ownership points at t
   const ticked = sellChecksOf(checks({ ownershipConfirmed: false, draft: ready({ owner: true }) }));
   assert.equal(ticked.ok, true);
   assert.equal(ticked.checks[1].detail, "Saved when you sell.");
+});
+
+const PRODUCT_REASON = "1 product still needs an AI video. The project video comes next.";
+const PROJECT_REASON = "Every product has its video. Make the project video to continue.";
+const rule = (id, ok, reason = null) => ({ id, ok, fixedIn: "brief", reason: ok ? null : reason });
+
+test("sellVideoOf: one product's video for an edition, with no project video", () => {
+  assert.deepEqual(sellVideoOf({ rules: [rule("videos", true), rule("ownership", true)] }), {
+    ok: true,
+    reason: null,
+    project: false,
+    productsOk: true,
+  });
+  const missing = sellVideoOf({ rules: [rule("videos", false, "1 product still needs an AI video.")] });
+  assert.deepEqual([missing.ok, missing.reason, missing.project], [false, "1 product still needs an AI video.", false]);
+});
+
+test("sellVideoOf: the whole project waits for every product's video, then the project video", () => {
+  const ready = sellVideoOf({ rules: [rule("videos", true), rule("projectVideo", true), rule("ownership", false, "x")] });
+  assert.deepEqual(ready, { ok: true, reason: null, project: true, productsOk: true });
+  // Only the project video is missing: still not ok, with its own reason.
+  const project = sellVideoOf({ rules: [rule("videos", true), rule("projectVideo", false, PROJECT_REASON)] });
+  assert.deepEqual(project, { ok: false, reason: PROJECT_REASON, project: true, productsOk: true });
+  // A product's video is missing: its reason comes first.
+  const products = sellVideoOf({ rules: [rule("videos", false, PRODUCT_REASON), rule("projectVideo", false, "later")] });
+  assert.deepEqual(products, { ok: false, reason: PRODUCT_REASON, project: true, productsOk: false });
+});
+
+test("sellChecksOf: the whole project fails while only the project video is missing, fixed in Make videos", () => {
+  const r = sellChecksOf(checks({ videoSubject: "Each product", video: { ok: false, reason: PROJECT_REASON, project: true, productsOk: true } }));
+  assert.equal(r.ok, false);
+  assert.equal(r.checks[0].title, PROJECT_VIDEOS_CHECK);
+  assert.equal(r.checks[0].title, "Each product has its AI video, and the project video is made");
+  assert.equal(r.checks[0].detail, PROJECT_REASON);
+  assert.equal(r.checks[0].fix, "videos");
+  assert.equal(r.blocker, PROJECT_REASON);
+  // A product's video missing keeps its Generate fix.
+  const p = sellChecksOf(checks({ videoSubject: "Each product", video: { ok: false, reason: PRODUCT_REASON, project: true, productsOk: false } }));
+  assert.equal(p.checks[0].fix, "video");
+  assert.equal(p.checks[0].title, PROJECT_VIDEOS_CHECK);
+  assert.equal(p.blocker, PRODUCT_REASON);
+});
+
+test("sellVideoOf over the real readiness: sell asks the project video, an edition doesn't", () => {
+  const product = { id: "prd_a", name: "Rider", description: "", dropped: null, built: null };
+  const take = { id: "take_a", productId: "prd_a", n: 1, prompt: "", lines: ["a", "b", "c"], quality: "low", source: null, createdAt: 1, readyAt: 2 };
+  const videos = { version: 1, projectId: "proj_1", products: { prd_a: { takes: [take], inUseId: "take_a" } } };
+  const facts = { products: [product], videos, jobs: [], now: 10, status: "private", ownershipConfirmed: true, license: null };
+  const sell = sellVideoOf(readinessOf(facts, "sell"));
+  assert.deepEqual([sell.ok, sell.project, sell.reason], [false, true, PROJECT_REASON]);
+  const edition = sellVideoOf(readinessOf({ ...facts, product }, "edition"));
+  assert.deepEqual([edition.ok, edition.project], [true, false]);
+  // With the project video made from that take, the whole project passes.
+  const join = { intro: ["Car", ""], cuts: [{ productId: "prd_a", takeId: "take_a", fromMs: 0, ms: 10000, label: "Rider" }], outro: "Built with IDEEZA" };
+  const own = { ...take, id: "take_p", productId: PROJECT_VIDEO_KEY, join };
+  const both = { ...videos, products: { ...videos.products, [PROJECT_VIDEO_KEY]: { takes: [own], inUseId: "take_p" } } };
+  assert.equal(sellVideoOf(readinessOf({ ...facts, videos: both }, "sell")).ok, true);
 });
 
 test("sellChecksOf: a physical copy adds the make-and-ship row, fixed back on step 1", () => {

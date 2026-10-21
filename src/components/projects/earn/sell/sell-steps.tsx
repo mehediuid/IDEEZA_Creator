@@ -368,6 +368,7 @@ export function PriceStep({
 
 const FIX_LABEL: Record<NonNullable<SellCheck["fix"]>, string> = {
   video: "Generate AI video",
+  videos: "Make videos",
   price: "Back to step 1",
 };
 
@@ -377,7 +378,8 @@ function ReadinessRows({
   fixRef,
 }: {
   checks: SellCheck[];
-  onFix: (fix: NonNullable<SellCheck["fix"]>) => void;
+  /** `opener`: the pressed control, for a dialog that hands focus back to it. */
+  onFix: (fix: NonNullable<SellCheck["fix"]>, opener: HTMLElement) => void;
   /** The first fix's control, where a press on the blocked CTA sends focus. */
   fixRef: React.RefObject<HTMLElement | null>;
 }) {
@@ -405,7 +407,12 @@ function ReadinessRows({
                   hierarchy="secondary"
                   size="md"
                   className={cn("mt-2 self-start", TAP)}
-                  onClick={() => onFix(fix)}
+                  aria-haspopup={fix === "videos" ? "dialog" : undefined}
+                  onClick={(e) => {
+                    // Safari doesn't focus a clicked button; Make videos hands focus back to it.
+                    e.currentTarget.focus();
+                    onFix(fix, e.currentTarget);
+                  }}
                 >
                   {FIX_LABEL[fix]}
                 </Button>
@@ -432,7 +439,8 @@ export function ReviewStep({
 }: StepProps & {
   rows: { label: string; value: string }[];
   checks: SellCheck[];
-  onFix: (fix: NonNullable<SellCheck["fix"]>) => void;
+  /** `opener`: the pressed control, for a dialog that hands focus back to it. */
+  onFix: (fix: NonNullable<SellCheck["fix"]>, opener: HTMLElement) => void;
   fixRef: React.RefObject<HTMLElement | null>;
   askOwner: boolean;
   /** The ladder's level check, while a step is missing. */

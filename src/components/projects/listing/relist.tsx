@@ -4,10 +4,10 @@
 // 41505:153766, 153890). Inline in the rail's Marketplace block — the page
 // stays usable while a listing is paused.
 //
-// "To relist:" is `relistChecklist`: "An AI video for every product"
-// (Ready / Missing, with "Generate videos") and "Updated NFT metadata —
-// updated when you relist". Each row says its state in words beside the
-// glyph.
+// "To relist:" is `relistChecklist`: "An AI video for every product" and
+// "The project video" (owner, 2026-10-21; each Ready / Missing, with
+// "Generate videos") and "Updated NFT metadata — updated when you relist".
+// Each row says its state in words beside the glyph.
 // - Every video ready: ★ Relist makes the ONE wallet request (a free
 //   signature, or the network fee for an on-chain listing), and its commit
 //   writes `relistListing` — status live, and a new metadata snapshot of the
