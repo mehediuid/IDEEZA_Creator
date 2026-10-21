@@ -354,8 +354,9 @@ function ProjectVideoSection({
           {/* No Generate again inside the player: Regenerate below is the one way to a new take. */}
           <VideoPlayer take={playing} productName={project.name} projectId={project.id} owner status={v} />
           <div className="flex flex-wrap items-center gap-4">
-            {/* While the row offers Update or Try again, that is the one way to the dialog. */}
-            {copy.action === null && (
+            {/* While the row offers Update or Try again, that is the one way to the dialog; while it
+                waits on a product video or renders, there is nothing to make yet. */}
+            {copy.action === null && status.state === "ready" && !(v.state === "ready" && v.next) && (
               <Button type="button" hierarchy="secondary" size="md" className={TAP} aria-haspopup="dialog" onClick={openDialog}>
                 Regenerate
               </Button>

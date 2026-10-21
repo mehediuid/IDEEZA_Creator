@@ -47,7 +47,8 @@ import { readProjectVideos, useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
 import { moreToastsLine, projectActionLabel, toastHeading } from "@/lib/video/video-copy";
 import { GenerateVideoDialog, videoTargetOf, type VideoTarget } from "./generate-video-dialog";
-import { openProjectVideoDialog } from "./project-video-dialog";
+import { PROJECT_VIDEO_OPENED, openProjectVideoDialog } from "./project-video-dialog";
+import { cn } from "@/lib/utils";
 import { VideoPlayerDialog } from "./video-player";
 import {
   VideoUpkeep,
@@ -173,11 +174,23 @@ function RenderToasts() {
   }, [jobs, hydrated]);
   const nudges = hydrated && !buyerView ? nudgeIds.map(nudgeOf).filter((n) => n !== null) : [];
   const dropNudge = (projectId: string) => setNudgeIds((prev) => prev.filter((id) => id !== projectId));
+  // Opened by any route (the rows, the review, Media), the dialog answers its nudge.
+  React.useEffect(() => {
+    const onOpened = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      setNudgeIds((prev) => prev.filter((x) => x !== id));
+    };
+    window.addEventListener(PROJECT_VIDEO_OPENED, onOpened);
+    return () => window.removeEventListener(PROJECT_VIDEO_OPENED, onOpened);
+  }, []);
 
   const visible = hydrated && !buyerView ? jobs.filter((j) => j.acknowledged !== true) : [];
-  // Newest job on top; the rest wait behind the line.
+  // Newest job on top; the rest wait behind the line. A nudge takes one of the places (and the
+  // phone's only one), so the stack keeps its height.
   const stacked = [...visible].reverse();
-  const shown = stacked.slice(0, SHOWN);
+  const nudgeShown = nudges.slice(0, SHOWN);
+  const shown = stacked.slice(0, SHOWN - nudgeShown.length);
+  const phoneJobs = nudgeShown.length > 0 ? 0 : 1;
 
   return (
     <>
@@ -185,12 +198,14 @@ function RenderToasts() {
         (stacked.length > 0 || nudges.length > 0) &&
         createPortal(
           <div className="flex flex-col items-end gap-[8px]" role="status" aria-live="polite" aria-label="Video render status">
-            {nudges.map((n) => (
+            {nudgeShown.map((n, i) => (
               <ToastCard
                 key={`nudge:${n.projectId}`}
+                className={i > 0 ? "max-md:hidden" : undefined}
                 tone="success"
                 kicker="Ready for the project video"
                 title={n.title}
+                wrapTitle
                 action={{
                   label: n.action,
                   run: () => {
@@ -209,7 +224,7 @@ function RenderToasts() {
               return (
                 <ToastLine
                   key={j.id}
-                  className={i > 0 ? "max-md:hidden" : undefined}
+                  className={i >= phoneJobs ? "max-md:hidden" : undefined}
                   job={j}
                   now={now}
                   onWatch={
@@ -248,8 +263,12 @@ function RenderToasts() {
               );
             })}
             {/* `ix-render-more` lifts the phone's attention toast over this line (layout.tsx). */}
-            {stacked.length > 1 && <p className={`ix-render-more md:hidden ${MORE}`}>{moreToastsLine(stacked.length - 1)}</p>}
-            {stacked.length > SHOWN && <p className={`max-md:hidden ${MORE}`}>{moreToastsLine(stacked.length - SHOWN)}</p>}
+            {stacked.length > phoneJobs && (
+              <p className={`ix-render-more md:hidden ${MORE}`}>{moreToastsLine(stacked.length - phoneJobs)}</p>
+            )}
+            {stacked.length > shown.length && (
+              <p className={`max-md:hidden ${MORE}`}>{moreToastsLine(stacked.length - shown.length)}</p>
+            )}
 
             <style>{`
               @keyframes ix-render-toast-in {
@@ -351,6 +370,7 @@ function ToastCard({
   kicker,
   title,
   action,
+  wrapTitle = false,
   onDismiss,
 }: {
   className?: string;
@@ -358,6 +378,8 @@ function ToastCard({
   kicker: string;
   title: string;
   action: { label: string; run: () => void } | null;
+  /** A sentence (the nudge) wraps to two lines instead of losing its end. */
+  wrapTitle?: boolean;
   onDismiss: () => void;
 }) {
   const isDone = tone === "success";
@@ -391,7 +413,7 @@ function ToastCard({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm text-text-tertiary">{kicker}</p>
-        <p className="truncate text-md font-semibold text-text-primary">{title}</p>
+        <p className={cn("text-md font-semibold text-text-primary", wrapTitle ? "line-clamp-2" : "truncate")}>{title}</p>
       </div>
       {action && (
         <button

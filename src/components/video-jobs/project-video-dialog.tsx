@@ -85,6 +85,10 @@ export type ProjectVideoDialogProps = {
   back?: { label: string; onBack: () => void };
 };
 
+/** Sent on `window` when the dialog opens (detail: the project id), by whatever route: the corner
+ *  nudge that offered it goes. */
+export const PROJECT_VIDEO_OPENED = "ideeza:project-video-opened";
+
 export function ProjectVideoDialog(props: ProjectVideoDialogProps) {
   // Mounted only while open, so each visit starts from the project's current videos.
   if (!props.open) return null;
@@ -92,6 +96,9 @@ export function ProjectVideoDialog(props: ProjectVideoDialogProps) {
 }
 
 function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVideoDialogProps) {
+  React.useEffect(() => {
+    window.dispatchEvent(new CustomEvent(PROJECT_VIDEO_OPENED, { detail: project.id }));
+  }, [project.id]);
   const { record, hydrated } = useProjectVideos(project.id);
   const { jobs, now, hydrated: jobsHydrated, startProjectVideo, saveDraft, cancelRender } = useVideoJobs();
   const { sub } = useCreatePlan();

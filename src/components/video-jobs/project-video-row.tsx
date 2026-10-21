@@ -33,14 +33,19 @@ function isLive(status: ProjectVideoStatus): boolean {
   return action === "make" || action === "update";
 }
 
-/** The project video group's list: dashed while there's nothing to do, solid violet once it can be made. */
+/** The project video group's list: dashed while it waits on the product videos, solid violet once
+ *  it can be made, and like the product list once there is a video. */
 export function ProjectVideoList({ status, children }: { status: ProjectVideoStatus; children: React.ReactNode }) {
   return (
     <ul
       role="list"
       className={cn(
         "m-0 flex list-none flex-col overflow-hidden rounded-lg border p-0 transition-colors duration-normal ease-decelerate motion-reduce:transition-none",
-        isLive(status) ? "border-solid border-border-brand" : "border-dashed border-border-strong",
+        isLive(status)
+          ? "border-solid border-border-brand"
+          : status.state === "waiting"
+            ? "border-dashed border-border-strong"
+            : "border-solid border-border",
       )}
     >
       {children}
