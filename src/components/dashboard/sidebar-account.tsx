@@ -440,7 +440,8 @@ export function AccountPopover({
             </Link>
           </div>
 
-          <Divider className="my-[4px]" />
+          {/* On the raised panel border/subtle is the panel's own colour, so the line takes border/default. */}
+          <Divider tone="default" className="my-[4px]" />
 
           <SoonRow icon={Logout01Icon} label="Sign out" why="there is no sign-in yet; your work stays in this browser" />
         </div>
@@ -660,7 +661,7 @@ function MobileAppContent({ titleId }: { titleId: string }) {
       </div>
       {stores.map((s, i) => (
         <React.Fragment key={s.label}>
-          {i > 0 && <Divider />}
+          {i > 0 && <Divider tone="default" />}
           <div className="flex items-center gap-[10px]">
             <Icon icon={s.icon} size={18} className="text-text-primary" />
             <span className="flex-1 text-md font-medium leading-md text-text-primary">{s.label}</span>
