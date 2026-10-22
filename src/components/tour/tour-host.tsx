@@ -48,6 +48,11 @@ const WELCOME_DELAY_MS = 600;
 const OFFER_DELAY_MS = 1200;
 /** Neither a tip nor an offer opens while someone is typing. */
 const TYPING_MS = 2500;
+/** An ending tour fades out (the fast duration) before it is taken away. */
+const LEAVE_MS = 120;
+
+const still = () =>
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduce";
 
 const newest = <T extends { updatedAt?: number }>(list: readonly T[]): T | null =>
   list.reduce<T | null>((best, x) => (!best || (x.updatedAt ?? 0) > (best.updatedAt ?? 0) ? x : best), null);
@@ -63,7 +68,21 @@ export function TourHost() {
   const [welcome, setWelcome] = React.useState(false);
   const [tip, setTip] = React.useState<number | null>(null);
   const [offer, setOffer] = React.useState<ChapterId | null>(null);
+  const [leaving, setLeaving] = React.useState(false);
   const here = placeOf(pathname);
+
+  // What is on screen fades out before it goes; anything started meanwhile cancels the going.
+  const leaveToken = React.useRef(0);
+  const leave = (after: () => void) => {
+    const token = ++leaveToken.current;
+    if (still()) return after();
+    setLeaving(true);
+    window.setTimeout(() => {
+      if (leaveToken.current !== token) return;
+      after();
+      setLeaving(false);
+    }, LEAVE_MS);
+  };
 
   // When someone last pressed a key: tips and offers wait for a pause in typing.
   const lastKey = React.useRef(0);
@@ -114,6 +133,8 @@ export function TourHost() {
     const fits = placeFits(chapter, here);
     const goal = fits ? null : goalOf(chapter);
     if (!fits && !goal) return;
+    leaveToken.current++;
+    setLeaving(false);
     setPanel(null);
     setWelcome(false);
     setOffer(null);
@@ -129,7 +150,7 @@ export function TourHost() {
 
   const finish = (r: Run, state: ChapterState, step = r.index) => {
     updateTour((prev) => withChapter(prev, r.id, state, step));
-    setRun(null);
+    leave(() => setRun(null));
     const back = r.opener;
     if (back && isShown(back)) back.focus({ preventScroll: true });
   };
@@ -209,7 +230,7 @@ export function TourHost() {
     updateTour((prev) =>
       state === "skipped" ? withChapter(prev, "chat", "skipped", i) : withChapter(prev, "chat", last ? "done" : "paused", last ? i : i + 1),
     );
-    setTip(null);
+    leave(() => setTip(null));
   };
 
   // A first visit's offer: one chapter, after the page settles, while nothing else is up.
@@ -265,14 +286,16 @@ export function TourHost() {
           setWelcome(false);
         }}
       />
-      {run && current && (
+      {/* One layer for a whole chapter (or the chat's tips): steps glide into one another. */}
+      {run && current ? (
         <TourStep
-          key={`${run.id}:${run.index}`}
+          key="run"
           step={current}
           index={run.index}
           total={run.steps.length}
           first={run.shown === 0}
           nextPart={run.index === run.steps.length - 1 ? next : null}
+          leaving={leaving}
           onPrev={() => move(run.index - 1, -1)}
           onNext={() => move(run.index + 1, 1)}
           onDone={() => finish(run, "done")}
@@ -287,16 +310,16 @@ export function TourHost() {
           // Seen to the last step counts as done (on a phone, tapping the menu the step points at).
           onLost={() => finish(run, run.index === run.steps.length - 1 ? "done" : "paused")}
         />
-      )}
-      {tip !== null && tipStep && (
+      ) : tip !== null && tipStep ? (
         <TourStep
-          key={`chat:${tip}`}
+          key="tips"
           tips
           step={tipStep}
           index={tip}
           total={chapterById("chat").steps.length}
           first={false}
           nextPart={null}
+          leaving={leaving}
           onPrev={() => undefined}
           onNext={() => seenTip(tip)}
           onDone={() => seenTip(tip)}
@@ -307,7 +330,7 @@ export function TourHost() {
           // Used, or moved on (an answered question goes away): it was seen.
           onLost={() => seenTip(tip)}
         />
-      )}
+      ) : null}
       {offered && (
         <ChapterOffer
           key={offered.id}

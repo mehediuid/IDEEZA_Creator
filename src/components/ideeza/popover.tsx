@@ -39,6 +39,22 @@ export interface PopoverProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
   arrowOffset?: number | null;
 }
 
+/** M10's arrow alone, for a bubble composed around the same anchor (the Tour Guide's step card). */
+export const PopoverArrow = React.forwardRef<HTMLSpanElement, { placement: PopoverPlacement; offset?: number | null }>(
+  function PopoverArrow({ placement, offset }, ref) {
+    const a = ARROW[placement];
+    const along =
+      offset == null ? { [a.axis]: `calc(50% - ${(a.axis === "left" ? a.w : a.h) / 2}px)` } : { [a.axis]: `${offset}px` };
+    return (
+      <span ref={ref} aria-hidden className={cn("pointer-events-none absolute block", a.edge)} style={along}>
+        <svg width={a.w} height={a.h} viewBox={`0 0 ${a.w} ${a.h}`} className="block overflow-visible">
+          <path d={a.d} className="fill-[var(--color-bg-surface)] stroke-[var(--color-border-default)]" strokeWidth={1} />
+        </svg>
+      </span>
+    );
+  },
+);
+
 export const Popover = React.forwardRef<HTMLDivElement, PopoverProps>(function Popover(
   {
     placement = "bottom",
@@ -57,11 +73,6 @@ export const Popover = React.forwardRef<HTMLDivElement, PopoverProps>(function P
   },
   ref,
 ) {
-  const a = ARROW[placement];
-  const along =
-    arrowOffset == null
-      ? { [a.axis]: `calc(50% - ${(a.axis === "left" ? a.w : a.h) / 2}px)` }
-      : { [a.axis]: `${arrowOffset}px` };
   return (
     <div
       ref={ref}
@@ -92,13 +103,7 @@ export const Popover = React.forwardRef<HTMLDivElement, PopoverProps>(function P
           {actions}
         </div>
       )}
-      {arrow && (
-        <span ref={arrowRef} aria-hidden className={cn("pointer-events-none absolute block", a.edge)} style={along}>
-          <svg width={a.w} height={a.h} viewBox={`0 0 ${a.w} ${a.h}`} className="block overflow-visible">
-            <path d={a.d} className="fill-[var(--color-bg-surface)] stroke-[var(--color-border-default)]" strokeWidth={1} />
-          </svg>
-        </span>
-      )}
+      {arrow && <PopoverArrow ref={arrowRef} placement={placement} offset={arrowOffset} />}
     </div>
   );
 });

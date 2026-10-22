@@ -8,19 +8,17 @@
 // the phone's menu it is a dialog (a bottom sheet on a phone).
 
 import * as React from "react";
-import { Cancel01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, Cancel01Icon, CheckmarkCircle02Icon, CircleIcon, LockIcon, PlayCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { FloatingPanel } from "@/components/dashboard/sidebar-account";
-import { Button, ModalFrame, Stepper, Toggle, linkVariants } from "@/components/ideeza";
+import { ModalFrame, Stepper, Toggle, linkVariants } from "@/components/ideeza";
 import { TOUR_CHAPTERS, stepsFor } from "@/lib/tour/chapters";
 import { JOURNEY, journeyNow, type JourneyStage } from "@/lib/tour/journey";
 import { readinessOf } from "@/lib/tour/places";
 import { chapterStatus } from "@/lib/tour/state";
 import type { ChapterId, TourRecord } from "@/lib/tour/types";
+import { cn } from "@/lib/utils";
 import { isPhone, isShown } from "./targets";
-
-// A finger's reach on a phone or a touch screen, as ModalFrame's buttons have.
-const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 const OFFERS_LABEL = "Offer a tour the first time I open a page";
 
@@ -133,56 +131,61 @@ function ChapterList({ rec, ready, journey, atHome, onStart, onGoHome, onOffers,
         />
       </section>
       {groups.map((group) => (
-        <section key={group} aria-label={group} className="mt-4">
-          <h3 className="text-sm font-semibold leading-sm text-text-tertiary">{group}</h3>
-          <ul role="list" className="flex flex-col">
+        <section key={group} aria-label={group} className="mt-6">
+          <h3 className="mb-2 text-sm font-semibold leading-sm text-text-tertiary">{group}</h3>
+          <ul role="list" className="-mx-4 flex flex-col gap-1">
             {TOUR_CHAPTERS.filter((c) => c.group === group).map((c) => {
               const steps = stepsFor(c, phone);
               const status = chapterStatus(rec, c.id);
               const at = Math.min(status.step, steps.length - 1);
               const readiness = readinessOf(c.id, { phone, ...ready });
               const unit = c.tips ? (steps.length === 1 ? "tip" : "tips") : steps.length === 1 ? "step" : "steps";
-              const label =
-                status.kind === "done" ? "Replay" : status.kind === "resume" && at > 0 ? `Resume ${at + 1}/${steps.length}` : "Start";
-              return (
-                <li key={c.id} className="flex items-center gap-6 border-b border-solid border-border py-6 last:border-b-0">
-                  <div className="min-w-0 flex-1">
-                    <p className={readiness.ok ? "text-md font-medium leading-md text-text-primary" : "text-md font-medium leading-md text-text-secondary"}>
-                      {c.name}
-                    </p>
-                    <p className="text-sm leading-sm text-text-secondary">
-                      {readiness.ok ? `${steps.length} ${unit} · ${phone && c.phoneSteps ? "Menu" : c.where}` : readiness.why}
-                    </p>
-                  </div>
-                  {readiness.ok && status.kind === "done" && (
-                    <span className="inline-flex items-center gap-2 text-sm font-medium leading-sm text-text-success">
-                      <Icon icon={CheckmarkCircle02Icon} size={14} />
-                      Seen
+              const resume = status.kind === "resume" && at > 0;
+              const label = status.kind === "done" ? "Replay" : resume ? `Resume ${at + 1}/${steps.length}` : "Start";
+              if (!readiness.ok) {
+                return (
+                  <li key={c.id} className="flex items-center gap-6 px-4 py-4">
+                    <span aria-hidden className="inline-flex size-[20px] shrink-0 items-center justify-center text-text-tertiary">
+                      <Icon icon={LockIcon} size={16} />
                     </span>
-                  )}
-                  {readiness.ok ? (
-                    <Button
-                      type="button"
-                      hierarchy="secondary"
-                      size="sm"
-                      className={TAP}
-                      aria-label={`${label}: ${c.name}`}
-                      onClick={() => onStart(c.id, status.kind === "resume" ? at : 0)}
-                    >
-                      {label}
-                    </Button>
-                  ) : (
-                    readiness.home &&
-                    !atHome && (
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-md font-medium leading-md text-text-secondary">{c.name}</span>
+                      <span className="block text-sm leading-sm text-text-secondary">{readiness.why}</span>
+                    </span>
+                    {readiness.home && !atHome && (
                       <button
                         type="button"
                         onClick={onGoHome}
-                        className={linkVariants({ color: "brand", size: "md", className: "shrink-0 font-medium" })}
+                        className={linkVariants({ color: "brand", size: "md", className: "shrink-0 font-semibold" })}
                       >
                         Go to Home
                       </button>
-                    )
-                  )}
+                    )}
+                  </li>
+                );
+              }
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    aria-label={`${label}: ${c.name}${status.kind === "done" ? ", seen" : ""}`}
+                    onClick={() => onStart(c.id, resume ? at : 0)}
+                    className="group flex w-full items-center gap-6 rounded-lg px-4 py-4 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                  >
+                    <StatusMark kind={status.kind === "done" ? "done" : resume ? "resume" : "new"} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-md font-medium leading-md text-text-primary">{c.name}</span>
+                      <span className="block text-sm leading-sm text-text-secondary">
+                        {steps.length} {unit} · {phone && c.phoneSteps ? "Menu" : c.where}
+                      </span>
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold leading-sm text-text-brand">
+                      {label}
+                      <span aria-hidden className="inline-flex motion-safe:transition-transform motion-safe:duration-fast group-hover:translate-x-1">
+                        <Icon icon={ArrowRight01Icon} size={14} />
+                      </span>
+                    </span>
+                  </button>
                 </li>
               );
             })}
@@ -202,7 +205,7 @@ function ChapterList({ rec, ready, journey, atHome, onStart, onGoHome, onOffers,
             onReset();
             setReset(true);
           }}
-          className={linkVariants({ color: "brand", size: "md", className: "font-medium" })}
+          className={linkVariants({ color: "neutral", size: "md", className: "font-medium" })}
         >
           Reset tours
         </button>
@@ -211,5 +214,21 @@ function ChapterList({ rec, ready, journey, atHome, onStart, onGoHome, onOffers,
         </p>
       </div>
     </div>
+  );
+}
+
+/** Where a chapter stands, at a glance: seen, part-way, or not yet. */
+function StatusMark({ kind }: { kind: "done" | "resume" | "new" }) {
+  const icon = kind === "done" ? CheckmarkCircle02Icon : kind === "resume" ? PlayCircleIcon : CircleIcon;
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "inline-flex size-[20px] shrink-0 items-center justify-center",
+        kind === "done" ? "text-text-success" : kind === "resume" ? "text-text-brand" : "text-text-tertiary",
+      )}
+    >
+      <Icon icon={icon} size={18} />
+    </span>
   );
 }
