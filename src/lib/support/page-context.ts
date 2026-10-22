@@ -10,6 +10,8 @@
 // the stores at open time (`namesFor`). Messages never names anyone, and a
 // query value is read only when it picks a tab: never `q`, `to` or `as`.
 
+import { settingsPageAt } from "../settings/registry";
+
 const STEP_PAGE: Record<string, string> = {
   pcb: "PCB Design",
   code: "Code",
@@ -126,6 +128,30 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
       if (c === "preview") return { page: "Blog › Blog preview", route: "/blog/[slug]/preview" };
       if (c === "read") return { page: "Blog › Reader view", route: "/blog/[slug]/read" };
       return { page: "Blog › Blog details", route: "/blog/[slug]" };
+    case "settings": {
+      const at = settingsPageAt(`/${parts.join("/")}`);
+      const label = at ? (at.id === "home" ? "Settings" : `Settings › ${at.label}`) : "Settings";
+      const base = at?.href ?? "/settings";
+      // One level under a settings page is a step of it (Checkout, an
+      // invoice, Tax residence); an id below that is never read.
+      const sub = at && at.id !== "home" ? parts[base.split("/").length - 1] : undefined;
+      if (!sub) return { page: label, route: base };
+      return sub === "invoice"
+        ? { page: `${label} › Invoice`, route: `${base}/invoice/[orderId]` }
+        : { page: `${label} › ${humanize(sub)}`, route: `${base}/${sub}` };
+    }
+    case "balance":
+      return b === "buy" ? { page: "Balance › Buy IDZ", route: "/balance/buy" } : { page: "Balance", route: "/balance" };
+    case "tutorials":
+      if (!b) return { page: "Tutorials", route: "/tutorials" };
+      return c
+        ? { page: `Tutorials › ${humanize(b)} › ${humanize(c)}`, route: "/tutorials/[category]/[topic]" }
+        : { page: `Tutorials › ${humanize(b)}`, route: "/tutorials/[category]" };
+    case "creators":
+      // Never the person's name: a profile is "yours" or "a creator's".
+      return b === "me"
+        ? { page: "Your profile", route: "/creators/me" }
+        : { page: "Creator profile", route: "/creators/[handle]" };
     case "parts":
       if (!b) return { page: "Parts & agile module", route: "/parts" };
       return b === "new"
@@ -135,6 +161,12 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
       break;
   }
   return { page: "Page not found", route: "(unknown)" };
+}
+
+/** "tax-residence" → "Tax residence": a slug said in words. */
+function humanize(slug: string): string {
+  const words = slug.replace(/[-_]+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : slug;
 }
 
 function safeDecode(s: string): string {

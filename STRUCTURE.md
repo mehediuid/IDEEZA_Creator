@@ -65,7 +65,8 @@ ideeza-creator-panel/
    │  │                      buy-credits (the in-place shortfall dialog + auto top-up), invoice-view,
    │  │                      credit-alerts (Credit alerts and limits card), billing-details (card),
    │  │                      purchase-confirm (the "ask before a purchase over" confirm)
-   │  ├─ support/            report-problem (the one Report a problem dialog + host)
+   │  ├─ support/            report-problem (the one Report a problem dialog + host),
+   │  │                      editor-help-menu (Help for Assembly, Wiring, Preview)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog,
    │  │                      history-page + history-builds, image-editor/turn, prompt-bar,

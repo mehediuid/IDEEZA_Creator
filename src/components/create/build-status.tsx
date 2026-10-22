@@ -53,6 +53,7 @@ import {
   type BuildItemKind,
   type BuildJob,
 } from "@/lib/create/history";
+import { openReportProblem } from "@/lib/support/open-report";
 
 const KIND_ICON: Record<BuildItemKind, IconValue> = {
   "3d": CubeIcon,
@@ -493,6 +494,15 @@ export function BuildStatus({
               Back to chat
             </Link>
           )}
+          {/* A system error is ours to fix: the maker can tell us, starting
+              from which build it was. */}
+          <button
+            type="button"
+            onClick={() => openReportProblem({ kind: "bug", details: `The build "${job.title}" stopped with a system error.` })}
+            className="inline-flex h-[40px] items-center rounded-lg px-[16px] text-sm font-semibold text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            Report it
+          </button>
         </div>
       )}
 

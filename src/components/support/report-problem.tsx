@@ -18,6 +18,7 @@
 // reply: nothing in the app can answer one yet.
 
 import * as React from "react";
+import Link from "next/link";
 import { Camera01Icon, Cancel01Icon, ImageAdd01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, Checkbox, IconButton, ModalFrame, Segmented, SelectMenu, Spinner, Textarea } from "@/components/ideeza";
@@ -166,7 +167,8 @@ export function ReportProblemHost() {
     setDraft((d) => {
       const base = d ?? loadDraft();
       const details = prefill?.details?.trim();
-      return details && !base.details.trim() ? { ...base, details: details.slice(0, DETAILS_MAX) } : base;
+      const withDetails = details && !base.details.trim() ? { ...base, details: details.slice(0, DETAILS_MAX) } : base;
+      return prefill?.kind && !withDetails.kind ? { ...withDetails, kind: prefill.kind } : withDetails;
     });
     setSentRef(null);
     setOpen(true);
@@ -548,7 +550,11 @@ function ReportDialog({
             <p className="text-md font-semibold leading-md text-text-primary">Report sent</p>
             <p className="text-md leading-md text-text-secondary">
               Reference <span className="font-medium text-text-primary">{sentRef}</span>. It&apos;s with the IDEEZA team now.
-              We can&apos;t reply in the app yet.
+              We can&apos;t reply in the app yet. It stays in{" "}
+              <Link href="/settings/privacy#reports" onClick={close} className="font-medium text-text-brand underline underline-offset-2">
+                Your reports
+              </Link>
+              .
             </p>
           </div>
         ) : (
@@ -617,6 +623,15 @@ function ReportDialog({
               </label>
               <span id={detailsHintId} className={HINT}>
                 {copy.hint}
+                {draft.kind === "confusing" && (
+                  <>
+                    {" "}A tutorial may already show how:{" "}
+                    <Link href="/tutorials" onClick={close} className="font-medium text-text-brand underline underline-offset-2">
+                      Tutorials
+                    </Link>
+                    .
+                  </>
+                )}
               </span>
               <Textarea
                 id={detailsId}

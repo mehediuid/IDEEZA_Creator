@@ -23,6 +23,7 @@ import {
 import { MenuBar } from "@/components/pcb/menu-bar";
 import { CodeMenu } from "@/components/code/code-menu";
 import { ThreeMenu } from "@/components/3d/three-menu";
+import { EditorHelpMenu } from "@/components/support/editor-help-menu";
 import { ProfileDropdown } from "@/components/app-chrome/profile-dropdown";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useMe } from "@/lib/people/profile-store";
@@ -61,8 +62,8 @@ function ToolBtn({ children, size = 34 }: { children: React.ReactNode; size?: nu
 // Pick the menu bar to embed in the TopBar middle slot. Each module gets its
 // own module-specific menu (with the exact items/actions it had before — PCB
 // dispatches to actions.openModal, Code/3D dispatch a window event their app
-// listens for). Preview + Brief have no editor canvas so no menu — middle
-// slot stays empty.
+// listens for). Assembly, Wiring and Preview have no menu of their own, so
+// they get Help alone (Tutorials, Report a problem): every editor has one Help.
 function pickMenu(step: FlowStep | null): React.ReactNode | null {
   switch (step) {
     case "pcb":
@@ -71,6 +72,10 @@ function pickMenu(step: FlowStep | null): React.ReactNode | null {
       return <CodeMenu />;
     case "three":
       return <ThreeMenu />;
+    case "assembly":
+    case "wiring":
+    case "preview":
+      return <EditorHelpMenu />;
     default:
       return null;
   }

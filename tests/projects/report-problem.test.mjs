@@ -278,3 +278,60 @@ test("the Blog's pages are named, not 'Page not found'", () => {
   assert.equal(page("/blog/lamp-ab12cd34/read"), "Blog › Reader view");
 });
 
+
+test("Settings, Balance, Tutorials and profiles are named in the maker's words", () => {
+  const page = (path) => pageRefFor(path, "").page;
+  assert.equal(page("/settings"), "Settings");
+  assert.equal(page("/settings/plan"), "Settings › Plan & pricing");
+  assert.equal(page("/settings/plan/checkout"), "Settings › Plan & pricing › Checkout");
+  assert.equal(page("/settings/plan/invoice/ord_123"), "Settings › Plan & pricing › Invoice");
+  assert.equal(page("/settings/get-paid/tax-residence"), "Settings › Get paid › Tax residence");
+  assert.equal(page("/settings/privacy"), "Settings › Privacy & safety");
+  assert.equal(page("/settings/kyc"), "Settings", "a legacy page that redirects is still Settings");
+  assert.equal(page("/balance"), "Balance");
+  assert.equal(page("/balance/buy"), "Balance › Buy IDZ");
+  assert.equal(page("/tutorials"), "Tutorials");
+  assert.equal(page("/tutorials/getting-started/first-project"), "Tutorials › Getting started › First project");
+  assert.equal(page("/creators/me"), "Your profile");
+  assert.equal(page("/creators/ana-li"), "Creator profile");
+  assert.doesNotMatch(JSON.stringify(pageRefFor("/creators/ana-li")), /ana/, "never the person's name");
+  assert.equal(pageRefFor("/settings/plan/invoice/ord_123").route, "/settings/plan/invoice/[orderId]");
+});
+
+// A new page that nobody named shows up as "Page not found" in every report
+// sent from it, which is how Settings, Balance and Tutorials went unnamed for
+// a week. Every page.tsx under src/app gets a sample address and must be named.
+test("every page in src/app has a name", async () => {
+  const { readdirSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const root = new URL("../../src/app/", import.meta.url).pathname;
+  const SAMPLE = { step: "pcb", section: "sell", category: "getting-started", topic: "first-project" };
+  const pages = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) {
+        if (name !== "api") walk(full);
+      } else if (name === "page.tsx") pages.push(full.slice(root.length, -"page.tsx".length));
+    }
+  };
+  walk(root);
+  assert.ok(pages.length > 40, `found ${pages.length} pages`);
+  const unnamed = pages
+    .map((rel) =>
+      "/" +
+      rel
+        .split("/")
+        .filter((s) => s && !/^\(.*\)$/.test(s))
+        .map((s) => (/^\[(.+)\]$/.test(s) ? (SAMPLE[s.slice(1, -1)] ?? "x1") : s))
+        .join("/"),
+    )
+    .filter((path) => pageRefFor(path, "").page === "Page not found");
+  assert.deepEqual(unnamed, []);
+});
+
+test("a failed build and the menu-less editors open the dialog too", () => {
+  assert.match(src("src/components/create/build-status.tsx"), /openReportProblem\(\{ kind: "bug"/);
+  assert.match(src("src/components/pcb/top-bar.tsx"), /case "assembly":\s*case "wiring":\s*case "preview":\s*return <EditorHelpMenu \/>/);
+  assert.match(src("src/components/support/editor-help-menu.tsx"), /openReportProblem\(\)/);
+});
