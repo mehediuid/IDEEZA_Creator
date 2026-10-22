@@ -71,6 +71,8 @@ export function TourHost() {
   // Asked from the sidebar, ⌘K and the phone's menu.
   const onRequest = React.useEffectEvent((req: TourRequest) => {
     if (req.kind === "panel") {
+      // The sidebar's link toggles it, as the footer's popovers do.
+      if (panel && req.anchor && panel.anchor === req.anchor) return setPanel(null);
       if (run) finish(run, "paused");
       setWelcome(false);
       setPanel({ anchor: req.anchor });
@@ -153,7 +155,8 @@ export function TourHost() {
           }}
           onShown={() => setRun((r) => r && { ...r, shown: r.shown + 1 })}
           onMissing={onMissing}
-          onLost={() => finish(run, "paused")}
+          // Seen to the last step counts as done (on a phone, tapping the menu the step points at).
+          onLost={() => finish(run, run.index === run.steps.length - 1 ? "done" : "paused")}
         />
       )}
       {panel && (

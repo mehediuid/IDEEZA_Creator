@@ -190,7 +190,8 @@ export function TourStep({
     const observer = new MutationObserver(() => {
       if (document.querySelector('[aria-modal="true"]')) lost();
     });
-    observer.observe(document.body, { childList: true });
+    // Dialogs open in place too (the phone's menu drawer), not only as portals on <body>.
+    observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("keydown", onKey, true);
     return () => {
       observer.disconnect();
