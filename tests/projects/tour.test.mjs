@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 const { TOUR_CHAPTERS, chapterById, nextChapterOf } = await import("../../.tmp-test/lib/tour/chapters.js");
 const { TOUR_KEY, emptyTour, normalizeTour, shouldWelcome, withWelcome, withChapter, withOffered, withOffers, chapterStatus } =
   await import("../../.tmp-test/lib/tour/state.js");
-const { placeOf, placeFits, offerFor, tipsOn, tipFrom, readinessOf, pageMatches, fixedHrefOf, editorStepOf } = await import(
+const { placeOf, placeFits, offerFor, tipsOn, tipFrom, readinessOf, pageMatches, fixedHrefOf, editorStepOf, runnableSteps } = await import(
   "../../.tmp-test/lib/tour/places.js"
 );
 const { IDEEZA_FEE_BPS } = await import("../../.tmp-test/lib/market/fee.js");
@@ -185,6 +185,18 @@ test("a step's page: which addresses it is, and where a fixed one lives", () => 
   assert.equal(fixedHrefOf("post"), null);
   assert.equal(editorStepOf("editor-3d"), "three");
   assert.equal(editorStepOf("blog"), null);
+});
+
+test("without a project, a step about a project's page is left out instead of going nowhere", () => {
+  const share = chapterById("share");
+  assert.deepEqual(
+    runnableSteps(share, false).map((s) => s.page),
+    ["innovations", "post"],
+    "Share ends on its post: no project to open ⋯ on",
+  );
+  assert.equal(runnableSteps(share, true).length, 3);
+  for (const id of ["project", "editors", "pcb", "earn"]) assert.equal(runnableSteps(chapterById(id), false).length, 0, id);
+  for (const id of ["start", "way", "account", "chat"]) assert.deepEqual(runnableSteps(chapterById(id), false), chapterById(id).steps, id);
 });
 
 test("every fixed page a step names has its address, and the address is that page", () => {

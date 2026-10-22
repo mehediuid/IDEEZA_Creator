@@ -40,6 +40,9 @@ const WAIT_FIRST_MS = 6000;
 const WAIT_MS = 1500;
 /** How long a step with several controls waits for all of them before it shows the ones it has. */
 const ALL_MS = 800;
+/** How long a control that went away may take to be drawn again (a loading frame giving way to
+ *  the page) before the chapter pauses. */
+const REDRAW_MS = 600;
 /** The hole's clearance round the control (spacing-3). */
 const PAD = 6;
 /** Hole edge to card: the ring's outer pixel, the arrow's 8 and 1 of air. */
@@ -110,7 +113,8 @@ function setPath(el: SVGPathElement | null, d: string, glide: boolean) {
   }
 }
 
-type Shown = { index: number; step: Step; els: HTMLElement[] };
+/** A step on screen: its controls, and the page (path) they were found on. */
+type Shown = { index: number; step: Step; els: HTMLElement[]; path: string };
 
 /** Closes the menu a step opened (the button that opens it says whether it is open). */
 function closeMenu(revealed: React.RefObject<string | null>) {
@@ -128,6 +132,7 @@ export function TourStep({
   tips = false,
   nextPart,
   leaving = false,
+  waiting = false,
   onPrev,
   onNext,
   onDone,
@@ -148,6 +153,9 @@ export function TourStep({
   nextPart: TourChapter | null;
   /** The tour is ending: everything fades out, and nothing answers any more. */
   leaving?: boolean;
+  /** The step's page is opening: the card stays with the step's words, the old page's holes
+   *  close, and the step's controls are looked for once the page is there. */
+  waiting?: boolean;
   onPrev: () => void;
   onNext: () => void;
   /** Explore, on the last step. */
@@ -169,7 +177,9 @@ export function TourStep({
   const [phone] = React.useState(isPhone);
   const shownRef = React.useRef<Shown | null>(null);
   const placedRef = React.useRef(false);
-  const focusedFor = React.useRef<Shown | null>(null);
+  const focusedFor = React.useRef<{ index: number; step: Step } | null>(null);
+  /** The holes last drawn, for closing them while the next page opens. */
+  const lastHoles = React.useRef<Hole[]>([]);
   /** The menu a step opened (its `reveal`), closed again when the tour moves on. */
   const revealed = React.useRef<string | null>(null);
   const scrimRef = React.useRef<SVGPathElement>(null);
@@ -192,7 +202,7 @@ export function TourStep({
   // opened); one that is drawn but hidden only a moment (a phone keeps the menu in its drawer),
   // then the ones on screen do. A control that lives in a menu has the menu opened for it.
   React.useEffect(() => {
-    if (leaving) return;
+    if (leaving || waiting) return;
     const now = shownRef.current;
     if (now && now.index === index && now.step === step) return;
     const ids = Array.isArray(step.target) ? step.target : [step.target];
@@ -202,7 +212,7 @@ export function TourStep({
     const show = (els: HTMLElement[]) => {
       done = true;
       stop();
-      const next = { index, step, els };
+      const next = { index, step, els, path: location.pathname };
       shownRef.current = next;
       setShown(next);
     };
@@ -248,13 +258,25 @@ export function TourStep({
       window.clearTimeout(timer);
     }
     return stop;
-  }, [index, step, first, leaving]);
+  }, [index, step, first, leaving, waiting]);
 
   // Cut the shown step's controls out of the scrim and keep the card beside them; a new step
   // glides there from the last one.
   React.useEffect(() => {
     if (!shown) return;
-    if (revealed.current && revealed.current !== shown.step.reveal) closeMenu(revealed);
+    if (revealed.current && revealed.current !== step.reveal) closeMenu(revealed);
+    // The next step's page is opening: the old page's holes close where they were and the card
+    // waits in place (no arrow), so the tour never blinks out between pages.
+    if (waiting) {
+      const shut = lastHoles.current.map((h) => ({ x: h.x + h.w / 2, y: h.y + h.h / 2, w: 0, h: 0, r: 0 }));
+      const holes = shut.map(roundRect).join("");
+      const moving = !still();
+      setPath(scrimRef.current, `M0 0H${window.innerWidth}V${window.innerHeight}H0Z${holes}`, moving);
+      setPath(ringRef.current, holes, moving);
+      return;
+    }
+    // A newer step is being looked for on this page: what is shown holds still meanwhile.
+    if (shown.index !== index || shown.step !== step) return;
     const floating = floatingRef.current;
     const { els } = shown;
     const calm = still();
@@ -282,8 +304,8 @@ export function TourStep({
 
     let reclaim: (() => void) | null = null;
     const land = () => {
-      if (focusedFor.current === shown) return;
-      focusedFor.current = shown;
+      if (focusedFor.current?.index === shown.index && focusedFor.current.step === shown.step) return;
+      focusedFor.current = { index: shown.index, step: shown.step };
       titleRef.current?.focus({ preventScroll: true });
       // A menu opened for the step takes the focus once it is placed; it comes back to the card.
       // (Checked, not listened for: a window without focus fires no focus events.)
@@ -302,10 +324,32 @@ export function TourStep({
       announceShown();
     };
 
+    // A page can draw a control again (a loading frame giving way to the page, a list
+    // re-rendering): the same control on the same page is followed. Gone for good, or the page
+    // changed, the chapter pauses.
+    let redraw: number | null = null;
+    const follow = () => {
+      const again = findTargets(shown.step.target);
+      if (!again || again.length < els.length) return false;
+      const next = { ...shown, els: again };
+      shownRef.current = next;
+      setShown(next);
+      return true;
+    };
     const update = () => {
-      if (!els.every(isShown)) return lost();
+      if (location.pathname !== shown.path) return lost();
+      if (!els.every(isShown)) {
+        if (redraw === null && !follow()) redraw = window.setTimeout(() => !follow() && lost(), REDRAW_MS);
+        return;
+      }
+      if (redraw !== null) {
+        window.clearTimeout(redraw);
+        redraw = null;
+      }
       const moving = performance.now() < glideUntil;
-      const holes = holesOf(els).map(roundRect).join("");
+      const drawn = holesOf(els);
+      lastHoles.current = drawn;
+      const holes = drawn.map(roundRect).join("");
       setPath(scrimRef.current, `M0 0H${window.innerWidth}V${window.innerHeight}H0Z${holes}`, moving);
       setPath(ringRef.current, holes, moving);
       if (phone || !floating) {
@@ -342,9 +386,10 @@ export function TourStep({
       alive = false;
       stop();
       reclaim?.();
+      if (redraw !== null) window.clearTimeout(redraw);
       window.removeEventListener("resize", onResize);
     };
-  }, [shown, phone]);
+  }, [shown, phone, waiting, index, step]);
 
   // A menu the tour opened is closed when the tour ends.
   React.useEffect(() => () => closeMenu(revealed), []);
@@ -383,11 +428,16 @@ export function TourStep({
 
   // ← → move between steps. Keys typed here stop here: the editors listen on `window`, and Tab
   // goes on to whatever is next.
-  const content = shown ?? null;
+  // While the next step is on its way (its page opening, its control being found) the card
+  // already says it; a press meanwhile (a double click on Next) is ignored, so no step is passed
+  // over.
+  const busy = waiting || (!!shown && (shown.index !== index || shown.step !== step));
+  const content = shown && busy ? { ...shown, index, step } : shown;
   const at = content?.index ?? index;
   const last = at === total - 1;
+  const press = (act: () => void) => () => !busy && act();
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!tips && !leaving) {
+    if (!tips && !leaving && !busy) {
       if (e.key === "ArrowRight" && !last) {
         e.preventDefault();
         onNext();
@@ -436,6 +486,7 @@ export function TourStep({
           aria-labelledby={titleId}
           aria-describedby={bodyId}
           data-tour-step
+          aria-busy={waiting || undefined}
           onKeyDown={onKeyDown}
           className={cn(
             "relative rounded-lg border border-solid border-border bg-bg-surface p-8 shadow-3",
@@ -463,7 +514,7 @@ export function TourStep({
             {last && nextPart && !tips && (
               <button
                 type="button"
-                onClick={onNextPart}
+                onClick={press(onNextPart)}
                 className={linkVariants({ color: "brand", size: "md", className: "mt-4 font-semibold" })}
               >
                 Next part: {nextPart.name}
@@ -473,7 +524,7 @@ export function TourStep({
           </div>
           <div className="mt-8 flex items-center justify-end gap-4">
             {!tips && at > 0 && (
-              <Button type="button" hierarchy="ghost" size="md" className={TAP} onClick={onPrev}>
+              <Button type="button" hierarchy="ghost" size="md" className={TAP} onClick={press(onPrev)}>
                 Previous
               </Button>
             )}
@@ -482,13 +533,13 @@ export function TourStep({
               hierarchy="primary"
               size="md"
               className={TAP}
-              onClick={last ? onDone : onNext}
+              onClick={press(last ? onDone : onNext)}
               iconTrailing={!tips && !last ? <Icon icon={ArrowRight01Icon} size={16} /> : undefined}
             >
               {primary}
             </Button>
           </div>
-          {!phone && <PopoverArrow ref={arrowRef} placement={placement} offset={arrowAt} />}
+          {!phone && !waiting && <PopoverArrow ref={arrowRef} placement={placement} offset={arrowAt} />}
         </div>
       </div>
     </>,
