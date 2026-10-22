@@ -42,3 +42,25 @@ export function unionBox(els: HTMLElement[]): Box {
   }
   return { top, left, right, bottom, width: right - left, height: bottom - top };
 }
+
+/** An element's box grown by what spills out of it a level or two down (a profile photo pulled up
+ *  over the cover), unless the element clips it. */
+export function inkBox(el: HTMLElement): Box {
+  const b = el.getBoundingClientRect();
+  let { top, left, right, bottom } = b;
+  const grow = (node: Element, depth: number) => {
+    if (depth === 0 || getComputedStyle(node).overflow !== "visible") return;
+    for (const child of node.children) {
+      const r = child.getBoundingClientRect();
+      if (r.width && r.height) {
+        top = Math.min(top, r.top);
+        left = Math.min(left, r.left);
+        right = Math.max(right, r.right);
+        bottom = Math.max(bottom, r.bottom);
+      }
+      grow(child, depth - 1);
+    }
+  };
+  grow(el, 2);
+  return { top, left, right, bottom, width: right - left, height: bottom - top };
+}

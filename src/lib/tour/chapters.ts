@@ -5,7 +5,7 @@
 
 import { BUILD_COST, CONCEPT_COST } from "../create/credits";
 import { IDEEZA_FEE_BPS } from "../market/fee";
-import type { ChapterId, TourChapter, TourStep } from "./types";
+import type { ChapterId, TourChapter } from "./types";
 
 /** IDEEZA's cut of a sale, as the sale itself charges it (`lib/market/fee.ts`). */
 const IDEEZA_FEE_PERCENT = IDEEZA_FEE_BPS / 100;
@@ -21,35 +21,40 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       {
         // 4/19 Write your prompt here
         target: "home-composer",
+        page: "home",
         title: "Write your idea here",
         body: "Describe what you want to make in plain words, like “a desk lamp that turns on when I clap”. More detail gives a better design.",
       },
       {
         // 6/19 Start Your Project (Quick Start) + 7/19 Create New Project
         target: "home-mode",
+        page: "home",
         title: "With AI or by hand",
         body: "Generate with AI drafts the whole design for you. Build manually opens an empty project in the editor.",
       },
       {
         target: "home-examples",
+        page: "home",
         title: "Need a starting point?",
         body: "Tap an example to fill the box, or press Enhance and AI will sharpen what you wrote.",
       },
       {
         target: "home-get",
+        page: "home",
         title: "What every build gives you",
         body: "A 3D model, a PCB, firmware code, wiring and a parts list, all ready to change in the editors.",
       },
       {
         // 11/19 My Project Board
-        target: "nav-projects",
+        target: ["nav-projects", "page-head"],
+        page: "projects",
         title: "Your projects live here",
-        body: "Everything saves by itself. Open My projects to pick up where you left off.",
-        phoneBody: "Everything saves by itself. Open the menu, then My projects, to pick up where you left off.",
+        body: "Everything you make lands in My projects and saves by itself. Open one to pick up where you left off.",
       },
     ],
   },
   {
+    // Each step opens its page: the row in the menu and the page itself are lit together.
     id: "way",
     name: "Find your way",
     group: "Start",
@@ -57,41 +62,46 @@ export const TOUR_CHAPTERS: TourChapter[] = [
     place: "sidebar",
     steps: [
       {
-        // 1/19 Home Page Icon + 10/19 Dashboard
-        target: "nav-home",
-        title: "Home",
-        body: "Every new idea starts here. The IDEEZA logo brings you back too.",
-      },
-      {
         // 5/19 View your prompt history
-        target: "nav-history",
-        title: "Your prompt history",
-        body: "Every idea you sent and every build is listed here, so nothing gets lost.",
+        target: ["nav-history", "page-head"],
+        page: "history",
+        title: "History",
+        body: "Every idea you sent and every build, listed here so nothing gets lost.",
       },
       {
         // 8/19 Part + 9/19 New Agile Module + 12/19 Parts & Agile Module
-        target: "nav-parts",
-        title: "Parts and agile modules",
-        body: "Browse real parts and ready-made modules you can drop into any design.",
+        target: ["nav-parts", "page-head"],
+        page: "parts",
+        title: "Parts & agile module",
+        body: "Real parts and ready-made modules you can drop into any design, or add your own.",
       },
       {
-        // 13/19 Explore Marketplace + 14/19 News Feed
-        target: ["nav-marketplace", "nav-innovations"],
-        title: "See what others make",
-        body: "Explore marketplace sells projects and copies. Innovations is where makers share what they built.",
+        // 13/19 Explore Marketplace
+        target: ["nav-marketplace", "page-head"],
+        page: "marketplace",
+        title: "Explore marketplace",
+        body: "Projects and product copies other makers are selling. Buy one to own it or build it yourself.",
       },
       {
-        // 16/19 Messages + 17/19 Blog
-        target: ["nav-blog", "nav-messages"],
-        title: "Talk and read",
-        body: "Messages holds your conversations about projects. Blog has news and build stories.",
+        // 14/19 News Feed
+        target: ["nav-innovations", "page-head"],
+        page: "innovations",
+        title: "Innovations",
+        body: "Where makers share what they built. Follow them, appreciate and save projects you like.",
       },
-    ],
-    phoneSteps: [
       {
-        target: "menu",
-        title: "Find your way",
-        body: "The menu holds Home, History, Parts & agile module, Explore marketplace, Innovations, Blog and Messages.",
+        // 16/19 Messages
+        target: ["nav-messages", "page-head"],
+        page: "messages",
+        title: "Messages",
+        body: "Your conversations with other makers about their projects and yours.",
+      },
+      {
+        // 17/19 Blog
+        target: ["nav-blog", "page-head"],
+        page: "blog",
+        title: "Blog",
+        body: "Read news and build stories, or write your own and send it for review.",
       },
     ],
   },
@@ -104,39 +114,39 @@ export const TOUR_CHAPTERS: TourChapter[] = [
     steps: [
       {
         // 2/19 Visit Profile
-        target: "account",
+        target: ["account", "profile-head"],
+        page: "profile",
         title: "Your profile",
-        body: "Open this menu for your profile, where people see your work and how to reach you.",
+        body: "Your public page: what you have made, what you build with and how people reach you.",
       },
       {
-        target: "plan",
+        target: ["plan", "plan-credits"],
+        page: "credits",
+        // Plan & pricing opens on its plans; the Credits tab is chosen for the step.
+        reveal: "plan-credits-tab",
         title: "Credits pay for AI",
-        body: `A concept uses ${CONCEPT_COST} credit and a build uses ${BUILD_COST} for each product. Your plan adds credits every month.`,
+        body: `A concept uses ${CONCEPT_COST} credit and a build uses ${BUILD_COST} for each product. Buy more here, or get them every month with a plan.`,
       },
       {
         // 19/19 View Progress
-        target: "account",
+        target: "account-level",
+        reveal: "account",
         title: "Your level",
         body: "Concepts and builds earn XP. Your level grows from Explorer to Maker, Inventor and Pioneer.",
       },
       {
         // 3/19 Connect Your Wallet
-        target: "wallet",
+        target: ["wallet", "balance-card"],
+        page: "balance",
         title: "Your wallet",
-        body: "Connect a wallet to hold IDZ. You only need it to mint or sell, not to build.",
+        body: "Your IDZ balance and what moved in and out. You only need a wallet to mint or sell, not to build.",
       },
       {
         // 3/19 Earn IDEEZA Coin
-        target: "support-tutorial",
+        target: ["support-tutorial", "page-head"],
+        page: "tutorials",
         title: "Earn IDZ while you learn",
         body: "Tutorials explain each part of IDEEZA, and watching their videos earns IDZ.",
-      },
-    ],
-    phoneSteps: [
-      {
-        target: "menu",
-        title: "Your account",
-        body: "At the foot of the menu: your profile, credits, level and wallet, and the tutorials that earn IDZ.",
       },
     ],
   },
@@ -183,27 +193,32 @@ export const TOUR_CHAPTERS: TourChapter[] = [
     steps: [
       {
         target: "project-tabs",
+        page: "project",
         title: "Everything in one place",
         body: "Products, Media, Network and Team each have their own tab.",
       },
       {
-        target: "project-product",
-        title: "Open a product",
-        body: "Each product has its own page. Use Open in editor there to change its design.",
-      },
-      {
         target: "project-earn",
+        page: "project",
         title: "Earn from this project",
-        body: "When you are ready, mint it and sell it here. Nothing goes public until you choose.",
+        body: "When you are ready, mint it and sell it from here. Nothing goes public until you choose.",
       },
       {
         target: "project-actions",
+        page: "project",
         title: "More actions",
         body: "Edit the name and description, share to Innovations and more live in this menu.",
+      },
+      {
+        target: "product-editor",
+        page: "product",
+        title: "Open a product in the editor",
+        body: "Each product has its own page. Open in editor to change its PCB, code, 3D model and wiring.",
       },
     ],
   },
   {
+    // The Figma's Pro pages tour: each step opens that module.
     id: "editors",
     name: "The editors",
     group: "Build",
@@ -216,30 +231,35 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       {
         // Pro 1/8 PCB Design
         target: "rail-pcb",
+        page: "editor-pcb",
         title: "PCB Design",
         body: "Draw the schematic and lay out the circuit board.",
       },
       {
         // Pro 2/8 Design Your Code
         target: "rail-code",
+        page: "editor-code",
         title: "Code",
         body: "Write the firmware that runs on your board, in code or with blocks.",
       },
       {
         // Pro 3/8 Create 3D Module
         target: "rail-3d",
+        page: "editor-3d",
         title: "3D Module",
         body: "Shape the product's 3D model, like the case around the board.",
       },
       {
         // Pro 5/8 is missing from the Figma: Assembly is the module there today.
         target: "rail-assembly",
+        page: "editor-assembly",
         title: "Assembly",
         body: "Put the parts together, then connect them in Wiring mode.",
       },
       {
         // Pro 4/8 Product Overview
         target: "rail-preview",
+        page: "editor-preview",
         title: "Product Preview",
         body: "See the finished product the way others will see it.",
       },
@@ -258,28 +278,33 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       {
         // Pro 8/8 View Canvas Properties & Objects
         target: "pcb-properties",
+        page: "editor-pcb",
         title: "Properties and objects",
         body: "Select anything on the board to change it here. Filter and Layer sit in the next tabs.",
       },
       {
         // Pro 7/8 View Price For Premium Parts
         target: "pcb-price",
+        page: "editor-pcb",
         title: "Price for premium parts",
         body: "The total for premium parts on this board. Every library part is free today, so it reads $0.00.",
       },
       {
         target: "editor-saved",
+        page: "editor-pcb",
         title: "No save button needed",
         body: "Your work saves itself, and this shows when it last did. Ctrl+S (⌘S on a Mac) works too.",
       },
       {
         target: "editor-help",
+        page: "editor-pcb",
         title: "Stuck?",
         body: "Help has the tutorials and Report a problem.",
       },
     ],
   },
   {
+    // Each step opens its tab of Earn.
     id: "earn",
     name: "Mint and sell",
     group: "Earn & share",
@@ -290,24 +315,28 @@ export const TOUR_CHAPTERS: TourChapter[] = [
     steps: [
       {
         target: "earn-path",
+        page: "earn-overview",
         title: "Two steps to earning",
         body: "Mint your project first, then put it on sale. Each step lists what it still needs.",
       },
       {
         // Pro 6/8 Add Brief: the Brief is the mint flow now.
         target: "earn-step-mint",
+        page: "earn-overview",
         title: "Mint",
         body: "Minting records that you own this design. It is free, and you sign it with your wallet.",
       },
       {
-        target: "earn-sell",
+        target: ["earn-sell", "earn-sell-rules"],
+        page: "earn-sell",
         title: "Sell",
-        body: `Sell the whole project, or physical and virtual copies of each product. IDEEZA takes ${IDEEZA_FEE_PERCENT}% of each sale.`,
+        body: `Sell the whole project as its Main NFT, or physical and virtual copies of each product. IDEEZA takes ${IDEEZA_FEE_PERCENT}% of each sale.`,
       },
       {
-        target: "earn-money",
+        target: ["earn-money", "earn-sales"],
+        page: "earn-money",
         title: "Money",
-        body: "Sales and splits show up here. A sale pays your wallet directly.",
+        body: "Every sale and what it paid you. A sale pays your wallet directly; Splits, above, shows who shares in it.",
       },
     ],
   },
@@ -321,19 +350,22 @@ export const TOUR_CHAPTERS: TourChapter[] = [
     steps: [
       {
         target: ["feed-modes", "feed-categories"],
+        page: "innovations",
         title: "See what others build",
         body: "Switch between Discover, Following, Saved and Appreciated, or pick a category.",
       },
       {
-        target: "feed-card",
-        title: "Open a post",
-        body: "Each post shows the video, what is inside and how it was made.",
+        target: ["post-media", "post-head"],
+        page: "post",
+        title: "A post",
+        body: "Each post opens on its video, then the story, what is inside and how it was made.",
       },
       {
-        target: "nav-projects",
+        // Your own project's ⋯ menu; without one yet, My projects, where it will be.
+        target: "project-actions",
+        page: "project",
         title: "Share yours",
-        body: "Open your project from My projects, then ⋯ › Share to Innovations. Mint it and make its videos first.",
-        phoneBody: "Open your project from the menu's My projects, then ⋯ › Share to Innovations. Mint it and make its videos first.",
+        body: "Open ⋯ on your project and choose Share to Innovations. Mint it and make its videos first.",
       },
     ],
   },
@@ -347,13 +379,6 @@ export function chapterById(id: ChapterId): TourChapter {
 
 export function isChapterId(id: unknown): id is ChapterId {
   return TOUR_CHAPTERS.some((c) => c.id === id);
-}
-
-/** The steps for this screen. On a phone a step on My projects points at the menu button instead. */
-export function stepsFor(chapter: TourChapter, phone: boolean): TourStep[] {
-  if (!phone) return chapter.steps;
-  if (chapter.phoneSteps) return chapter.phoneSteps;
-  return chapter.steps.map((s) => (s.target === "nav-projects" ? { ...s, target: "menu", body: s.phoneBody ?? s.body } : s));
 }
 
 /** The chapter the last step offers as "Next part": the next one in its group, past any tips. */

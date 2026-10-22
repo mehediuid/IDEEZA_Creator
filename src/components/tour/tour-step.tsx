@@ -32,12 +32,14 @@ import { Button, PopoverArrow, linkVariants, type PopoverPlacement } from "@/com
 import { scrollWithin } from "@/components/create/anchors";
 import { cn } from "@/lib/utils";
 import type { TourChapter, TourStep as Step } from "@/lib/tour/types";
-import { findTargets, isPhone, isShown, unionBox } from "./targets";
+import { findTargets, inkBox, isPhone, isShown, unionBox } from "./targets";
 
 /** How long a step waits for its control to appear before it is skipped: the first step of a run
  *  may be waiting on a page that is still loading, the others only on the page they are on. */
 const WAIT_FIRST_MS = 6000;
 const WAIT_MS = 1500;
+/** How long a step with several controls waits for all of them before it shows the ones it has. */
+const ALL_MS = 800;
 /** The hole's clearance round the control (spacing-3). */
 const PAD = 6;
 /** Hole edge to card: the ring's outer pixel, the arrow's 8 and 1 of air. */
@@ -64,15 +66,25 @@ const cssPath = () => typeof CSS !== "undefined" && CSS.supports("d", 'path("M0 
 
 type Hole = { x: number; y: number; w: number; h: number; r: number };
 
-/** The hole round `els`: PAD clear of them, its corners following the control's own (one control)
- *  or the DS's lg radius (several, or a square control). */
-function holeOf(els: HTMLElement[]): Hole {
-  const b = unionBox(els);
+/** The hole round `el`: PAD clear of it, its corners following the control's own (at least the
+ *  DS's lg radius, so a square control still gets soft corners). */
+function holeOf(el: HTMLElement): Hole {
+  const b = inkBox(el);
   const w = b.width + 2 * PAD;
   const h = b.height + 2 * PAD;
-  const own = els.length === 1 ? parseFloat(getComputedStyle(els[0]).borderTopLeftRadius) || 0 : 0;
+  const own = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
   const lg = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--radius-lg")) || 0;
   return { x: b.left - PAD, y: b.top - PAD, w, h, r: Math.min(Math.max(own + PAD, lg), w / 2, h / 2) };
+}
+
+/** Every step draws the same number of holes, so one can always be tweened into the next: a step
+ *  with one control gets a second hole of no size at its centre. */
+const HOLES = 2;
+function holesOf(els: HTMLElement[]): Hole[] {
+  const holes = els.slice(0, HOLES).map(holeOf);
+  const c = holes[0];
+  while (holes.length < HOLES) holes.push({ x: c.x + c.w / 2, y: c.y + c.h / 2, w: 0, h: 0, r: 0 });
+  return holes;
 }
 
 const n = (v: number) => Math.round(v * 10) / 10;
@@ -99,6 +111,14 @@ function setPath(el: SVGPathElement | null, d: string, glide: boolean) {
 }
 
 type Shown = { index: number; step: Step; els: HTMLElement[] };
+
+/** Closes the menu a step opened (the button that opens it says whether it is open). */
+function closeMenu(revealed: React.RefObject<string | null>) {
+  const id = revealed.current;
+  revealed.current = null;
+  const opener = id ? findTargets(id)?.[0] : null;
+  if (opener?.getAttribute("aria-expanded") === "true") opener.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+}
 
 export function TourStep({
   step,
@@ -150,6 +170,8 @@ export function TourStep({
   const shownRef = React.useRef<Shown | null>(null);
   const placedRef = React.useRef(false);
   const focusedFor = React.useRef<Shown | null>(null);
+  /** The menu a step opened (its `reveal`), closed again when the tour moves on. */
+  const revealed = React.useRef<string | null>(null);
   const scrimRef = React.useRef<SVGPathElement>(null);
   const ringRef = React.useRef<SVGPathElement>(null);
   const svgRef = React.useRef<SVGSVGElement>(null);
@@ -164,29 +186,55 @@ export function TourStep({
   const skip = React.useEffectEvent(() => !leaving && onSkip());
   const announceShown = React.useEffectEvent(onShown);
 
-  // Find this step's control, waiting a moment for one still on its way. The first look is after
-  // this commit: a step that mounts with its page renders before that page's controls are in.
+  // Find this step's controls, waiting for ones still on their way. The first look is after this
+  // commit: a step that mounts with its page renders before that page's controls are in. A control
+  // the page hasn't drawn yet is waited for (the sidebar's row is there long before the page it
+  // opened); one that is drawn but hidden only a moment (a phone keeps the menu in its drawer),
+  // then the ones on screen do. A control that lives in a menu has the menu opened for it.
   React.useEffect(() => {
     if (leaving) return;
     const now = shownRef.current;
     if (now && now.index === index && now.step === step) return;
+    const ids = Array.isArray(step.target) ? step.target : [step.target];
+    const since = performance.now();
     let done = false;
-    const look = () => {
-      if (done) return;
-      const found = findTargets(step.target);
-      if (!found) return;
+    let opened = false;
+    const show = (els: HTMLElement[]) => {
       done = true;
       stop();
-      const next = { index, step, els: found };
+      const next = { index, step, els };
       shownRef.current = next;
       setShown(next);
     };
+    const look = () => {
+      if (done) return;
+      const found = findTargets(step.target);
+      if ((!found || found.length < ids.length) && step.reveal && !opened) {
+        const opener = findTargets(step.reveal)?.[0];
+        if (opener) {
+          opened = true;
+          revealed.current = step.reveal;
+          opener.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+        }
+        return;
+      }
+      if (!found) return;
+      if (found.length < ids.length) {
+        const drawing = ids.some((id) => !document.querySelector(`[data-tour~="${id}"]`));
+        if (drawing || performance.now() - since < ALL_MS) return;
+      }
+      show(found);
+    };
+    const settle = window.setTimeout(look, ALL_MS + 20);
     const observer = new MutationObserver(look);
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "hidden"] });
     const soon = window.setTimeout(look, 0);
     const timer = window.setTimeout(
       () => {
         if (done) return;
+        // Out of time: what is on screen is shown; nothing at all skips the step.
+        const found = findTargets(step.target);
+        if (found) return show(found);
         done = true;
         stop();
         missing();
@@ -196,6 +244,7 @@ export function TourStep({
     function stop() {
       observer.disconnect();
       window.clearTimeout(soon);
+      window.clearTimeout(settle);
       window.clearTimeout(timer);
     }
     return stop;
@@ -205,35 +254,60 @@ export function TourStep({
   // glides there from the last one.
   React.useEffect(() => {
     if (!shown) return;
+    if (revealed.current && revealed.current !== shown.step.reveal) closeMenu(revealed);
     const floating = floatingRef.current;
     const { els } = shown;
     const calm = still();
     scrollWithin(els[0], "nearest", calm ? "auto" : "smooth");
     const glideUntil = placedRef.current && !calm ? performance.now() + GLIDE_MS : 0;
+    // The card stands beside one control: the page's own (the last), or the step's `anchor`.
+    const anchorEl = shown.step.anchor === "first" ? els[0] : els[els.length - 1];
+    // Inside a sidebar panel (the account menu), the card stands clear of the whole panel.
+    const panel = anchorEl.closest<HTMLElement>("[data-footer-popover]");
     const box = () => {
-      const h = holeOf(els);
+      const h = holeOf(anchorEl);
+      if (panel) {
+        const p = panel.getBoundingClientRect();
+        h.x = Math.min(h.x, p.left);
+        h.w = Math.max(h.x + h.w, p.right) - h.x;
+      }
       return { x: h.x, y: h.y, width: h.w, height: h.h, top: h.y, left: h.x, right: h.x + h.w, bottom: h.y + h.h };
     };
-    const reference = { getBoundingClientRect: box, contextElement: els[0] };
+    const reference = { getBoundingClientRect: box, contextElement: anchorEl };
     // Beside a control at the screen's left edge (the sidebar), under anything else.
-    const start = unionBox(els);
+    const start = unionBox([anchorEl]);
     const side: Placement = start.left + start.width / 2 < window.innerWidth * 0.3 ? "right" : "bottom";
     const fallbackPlacements: Placement[] = side === "right" ? ["left", "bottom", "top"] : ["top", "left", "right"];
     let alive = true;
 
+    let reclaim: (() => void) | null = null;
     const land = () => {
       if (focusedFor.current === shown) return;
       focusedFor.current = shown;
       titleRef.current?.focus({ preventScroll: true });
+      // A menu opened for the step takes the focus once it is placed; it comes back to the card.
+      // (Checked, not listened for: a window without focus fires no focus events.)
+      if (shown.step.reveal) {
+        const since = performance.now();
+        const check = window.setInterval(() => {
+          const at = document.activeElement;
+          if (at && floating && !floating.contains(at)) titleRef.current?.focus({ preventScroll: true });
+          if (performance.now() - since > 600) reclaim?.();
+        }, 50);
+        reclaim = () => {
+          window.clearInterval(check);
+          reclaim = null;
+        };
+      }
       announceShown();
     };
 
     const update = () => {
       if (!els.every(isShown)) return lost();
       const moving = performance.now() < glideUntil;
-      const hole = holeOf(els);
-      setPath(scrimRef.current, `M0 0H${window.innerWidth}V${window.innerHeight}H0Z${roundRect(hole)}`, moving);
-      setPath(ringRef.current, roundRect(hole), moving);
+      const holes = holesOf(els).map(roundRect).join("");
+      setPath(scrimRef.current, `M0 0H${window.innerWidth}V${window.innerHeight}H0Z${holes}`, moving);
+      setPath(ringRef.current, holes, moving);
       if (phone || !floating) {
         if (!placedRef.current) {
           placedRef.current = true;
@@ -267,9 +341,13 @@ export function TourStep({
     return () => {
       alive = false;
       stop();
+      reclaim?.();
       window.removeEventListener("resize", onResize);
     };
   }, [shown, phone]);
+
+  // A menu the tour opened is closed when the tour ends.
+  React.useEffect(() => () => closeMenu(revealed), []);
 
   // Escape ends the tour from anywhere and never reaches the page behind. A dialog opening over
   // the page (⌘K, the phone's menu) pauses it.
@@ -326,13 +404,15 @@ export function TourStep({
   const counter = tips ? `Tip ${at + 1} of ${total}` : `${at + 1} of ${total}`;
   const primary = tips ? (last ? "Done" : "Got it") : last ? "Explore" : "Next Tip";
 
+  // One layer above the popovers: a menu a step opens (the account menu) sits under the scrim
+  // with only its lit part cut out.
   return createPortal(
     <>
       <svg
         ref={svgRef}
         aria-hidden
         data-tour-scrim
-        className={cn("pointer-events-none fixed inset-0 z-popover size-full", placed ? FADE_IN : "opacity-0")}
+        className={cn("pointer-events-none fixed inset-0 z-toast size-full", placed ? FADE_IN : "opacity-0")}
       >
         <path
           ref={scrimRef}
@@ -344,7 +424,7 @@ export function TourStep({
       <div
         ref={floatingRef}
         className={cn(
-          "fixed z-popover",
+          "fixed z-toast",
           phone
             ? "inset-x-[8px] bottom-[max(8px,env(safe-area-inset-bottom))]"
             : "left-0 top-0 w-[320px] max-w-[calc(100vw-16px)]",

@@ -23,8 +23,6 @@ export { Segmented, type SegmentedProps, type SegmentedOption, type SegmentedSiz
 export { Tooltip } from "./tooltip";
 // M10 Popover: the anchored bubble the Tour Guide's steps are drawn in.
 export { Popover, PopoverArrow, type PopoverProps, type PopoverPlacement } from "./popover";
-// M33 Stepper (Horizontal · Dotted): the Tour Guide panel's journey.
-export { Stepper, type StepperStep, type StepperState } from "./stepper";
 export { Badge, type BadgeTone } from "./badge";
 export {
   Avatar,

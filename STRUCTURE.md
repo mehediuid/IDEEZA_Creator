@@ -134,7 +134,7 @@ ideeza-creator-panel/
    │  │                      open — dot, live waveform, Cancel / Stop & review)
    │  ├─ ideeza/             In-house design-system primitives (button, select, toggle,
    │  │                      text-input, number-input, slider, banner, select-menu,
-   │  │                      avatar, tag, skeleton, menu, M10 popover, M33 stepper…)
+   │  │                      avatar, tag, skeleton, menu, M10 popover…)
    │  ├─ ui/                 shadcn-style primitives (badge, button, card, input)
    │  ├─ brand/              ideeza-logo
    │  └─ theme-provider.tsx
@@ -220,8 +220,8 @@ ideeza-creator-panel/
    │  ├─ tutorials/          Tutorials: the content, the catalog (pages, counts, IDZ totals, headings),
    │  │                      progress (ideeza:tutorials:progress) and paying a reward into the demo wallet
    │  ├─ tour/               Tour Guide: the chapters' steps and copy, the ideeza:tour record and its
-   │  │                      rules (who gets the Welcome, Resume), places (offers, tips, readiness),
-   │  │                      the journey (Idea → Earn from what was done), openTourGuide()
+   │  │                      rules (who gets the Welcome, Resume), places (offers, tips, readiness,
+   │  │                      each step's page and its address), openTourGuide()
    │  ├─ people/             the creator profile's people layer: one person id and handles, profile
    │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt,
    │  │                      your handle's rules, time zones and spoken languages (Settings)

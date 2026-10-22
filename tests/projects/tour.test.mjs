@@ -3,15 +3,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { TOUR_CHAPTERS, chapterById, stepsFor, nextChapterOf } = await import("../../.tmp-test/lib/tour/chapters.js");
+const { TOUR_CHAPTERS, chapterById, nextChapterOf } = await import("../../.tmp-test/lib/tour/chapters.js");
 const { TOUR_KEY, emptyTour, normalizeTour, shouldWelcome, withWelcome, withChapter, withOffered, withOffers, chapterStatus } =
   await import("../../.tmp-test/lib/tour/state.js");
-const { placeOf, placeFits, offerFor, tipsOn, tipFrom, readinessOf } = await import("../../.tmp-test/lib/tour/places.js");
-const { JOURNEY, journeyOf, journeyNow } = await import("../../.tmp-test/lib/tour/journey.js");
+const { placeOf, placeFits, offerFor, tipsOn, tipFrom, readinessOf, pageMatches, fixedHrefOf, editorStepOf } = await import(
+  "../../.tmp-test/lib/tour/places.js"
+);
 const { IDEEZA_FEE_BPS } = await import("../../.tmp-test/lib/market/fee.js");
 const { BUILD_COST, CONCEPT_COST } = await import("../../.tmp-test/lib/create/credits.js");
 
 const words = (s) => s.trim().split(/\s+/).length;
+const steps = (id) => chapterById(id).steps.map((s) => [s.target, s.page ?? null]);
 
 test("the store key", () => {
   assert.equal(TOUR_KEY, "ideeza:tour");
@@ -34,102 +36,166 @@ test("the chapters, in the panel's order and groups", () => {
   );
 });
 
-test("Mint and sell walks Earn: the two steps, Mint, Sell, Money — with the fee a sale really takes", () => {
+test("Start here runs on Home in the Figma's order, then opens My projects", () => {
+  assert.equal(chapterById("start").place, "home");
+  assert.deepEqual(steps("start"), [
+    ["home-composer", "home"],
+    ["home-mode", "home"],
+    ["home-examples", "home"],
+    ["home-get", "home"],
+    [["nav-projects", "page-head"], "projects"],
+  ]);
+});
+
+test("Find your way opens each page it names, lighting the row and the page together", () => {
+  assert.deepEqual(steps("way"), [
+    [["nav-history", "page-head"], "history"],
+    [["nav-parts", "page-head"], "parts"],
+    [["nav-marketplace", "page-head"], "marketplace"],
+    [["nav-innovations", "page-head"], "innovations"],
+    [["nav-messages", "page-head"], "messages"],
+    [["nav-blog", "page-head"], "blog"],
+  ]);
+});
+
+test("Your account opens the profile, credits, the level menu, the wallet and Tutorials", () => {
+  assert.deepEqual(steps("account"), [
+    [["account", "profile-head"], "profile"],
+    [["plan", "plan-credits"], "credits"],
+    ["account-level", null],
+    [["wallet", "balance-card"], "balance"],
+    [["support-tutorial", "page-head"], "tutorials"],
+  ]);
+  assert.equal(chapterById("account").steps[2].reveal, "account", "the level step opens the account menu");
+});
+
+test("the chat's tips follow the chat on its own page: question, concepts, build, save", () => {
+  const chat = chapterById("chat");
+  assert.equal(chat.tips, true);
+  assert.deepEqual(steps("chat"), [
+    ["chat-question", null],
+    ["chat-concept", null],
+    ["chat-build", null],
+    ["chat-save", null],
+  ]);
+});
+
+test("Your project walks the project page, then opens a product's page for its editor button", () => {
+  assert.deepEqual(steps("project"), [
+    ["project-tabs", "project"],
+    ["project-earn", "project"],
+    ["project-actions", "project"],
+    ["product-editor", "product"],
+  ]);
+});
+
+test("the editors chapter opens each module in the rail's order; the PCB chapter stays in the PCB editor", () => {
+  assert.deepEqual(
+    chapterById("editors").steps.map((s) => [s.target, s.page, s.title]),
+    [
+      ["rail-pcb", "editor-pcb", "PCB Design"],
+      ["rail-code", "editor-code", "Code"],
+      ["rail-3d", "editor-3d", "3D Module"],
+      ["rail-assembly", "editor-assembly", "Assembly"],
+      ["rail-preview", "editor-preview", "Product Preview"],
+    ],
+  );
+  assert.deepEqual(steps("pcb"), [
+    ["pcb-properties", "editor-pcb"],
+    ["pcb-price", "editor-pcb"],
+    ["editor-saved", "editor-pcb"],
+    ["editor-help", "editor-pcb"],
+  ]);
+});
+
+test("Mint and sell walks Earn page by page: Overview twice, then Sell, then Money", () => {
   const earn = chapterById("earn");
   assert.equal(earn.place, "earn");
-  assert.deepEqual(stepsFor(earn, false).map((s) => s.target), ["earn-path", "earn-step-mint", "earn-sell", "earn-money"]);
-  const sell = earn.steps.find((s) => s.target === "earn-sell");
+  assert.deepEqual(steps("earn"), [
+    ["earn-path", "earn-overview"],
+    ["earn-step-mint", "earn-overview"],
+    [["earn-sell", "earn-sell-rules"], "earn-sell"],
+    [["earn-money", "earn-sales"], "earn-money"],
+  ]);
+  const sell = earn.steps.find((s) => s.page === "earn-sell");
   assert.match(sell.body, new RegExp(`${IDEEZA_FEE_BPS / 100}% of each sale`));
 });
 
-test("Share with the community: the feed's modes and categories, a post, then where sharing starts", () => {
+test("Share with the community: the feed, an open post, then a project's ⋯ menu", () => {
   const share = chapterById("share");
   assert.equal(share.place, "feed");
-  assert.deepEqual(stepsFor(share, false).map((s) => s.target), [["feed-modes", "feed-categories"], "feed-card", "nav-projects"]);
-  const phone = stepsFor(share, true);
-  assert.equal(phone.at(-1).target, "menu");
-  assert.match(phone.at(-1).body, /menu's My projects/, "its own phone words, not Start here's");
-});
-
-test("the editors chapter follows the Figma's Pro pages: one step per module, in the rail's order", () => {
-  assert.deepEqual(
-    stepsFor(chapterById("editors"), false).map((s) => [s.target, s.title]),
-    [
-      ["rail-pcb", "PCB Design"],
-      ["rail-code", "Code"],
-      ["rail-3d", "3D Module"],
-      ["rail-assembly", "Assembly"],
-      ["rail-preview", "Product Preview"],
-    ],
-  );
-  assert.deepEqual(
-    stepsFor(chapterById("pcb"), false).map((s) => s.target),
-    ["pcb-properties", "pcb-price", "editor-saved", "editor-help"],
-  );
-});
-
-test("the chat's tips follow the chat: question, concepts, build, save", () => {
-  const chat = chapterById("chat");
-  assert.equal(chat.tips, true);
-  assert.deepEqual(chat.steps.map((s) => s.target), ["chat-question", "chat-concept", "chat-build", "chat-save"]);
+  assert.deepEqual(steps("share"), [
+    [["feed-modes", "feed-categories"], "innovations"],
+    [["post-media", "post-head"], "post"],
+    ["project-actions", "project"],
+  ]);
 });
 
 test("every chapter is short and every step says something", () => {
   for (const c of TOUR_CHAPTERS) {
-    for (const phone of [false, true]) {
-      const steps = stepsFor(c, phone);
-      assert.ok(steps.length >= 1 && steps.length <= 5, `${c.id} has 1–5 steps (${phone ? "phone" : "desktop"})`);
-      for (const s of steps) {
-        const targets = Array.isArray(s.target) ? s.target : [s.target];
-        assert.ok(targets.length >= 1 && targets.every((t) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(t)), `${c.id}: target ids`);
-        assert.ok(s.title.trim() && words(s.title) <= 6, `${c.id}: "${s.title}" is a short title`);
-        assert.ok(s.body.trim() && words(s.body) <= 25, `${c.id}: "${s.body}" is at most 25 words`);
-        assert.doesNotMatch(s.body, /lorem|ipsum/i);
-      }
+    assert.ok(c.steps.length >= 1 && c.steps.length <= 6, `${c.id} has 1–6 steps`);
+    for (const s of c.steps) {
+      const targets = Array.isArray(s.target) ? s.target : [s.target];
+      assert.ok(targets.length >= 1 && targets.length <= 2, `${c.id}: one or two things lit`);
+      assert.ok(targets.every((t) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(t)), `${c.id}: target ids`);
+      assert.ok(s.title.trim() && words(s.title) <= 6, `${c.id}: "${s.title}" is a short title`);
+      assert.ok(s.body.trim() && words(s.body) <= 25, `${c.id}: "${s.body}" is at most 25 words`);
+      assert.doesNotMatch(s.body, /lorem|ipsum/i);
     }
   }
 });
 
-test("Start here runs on Home and follows the Figma's order: prompt, mode, examples, what you get, My projects", () => {
-  const start = chapterById("start");
-  assert.equal(start.place, "home");
-  assert.deepEqual(
-    stepsFor(start, false).map((s) => s.target),
-    ["home-composer", "home-mode", "home-examples", "home-get", "nav-projects"],
-  );
-});
-
-test("on a phone the sidebar's steps point at the menu button", () => {
-  assert.equal(stepsFor(chapterById("start"), true).at(-1).target, "menu");
-  for (const id of ["way", "account"]) {
-    const steps = stepsFor(chapterById(id), true);
-    assert.equal(steps.length, 1);
-    assert.equal(steps[0].target, "menu");
-  }
-  // Home's own steps stay where they are.
-  assert.deepEqual(
-    stepsFor(chapterById("start"), true).slice(0, 4).map((s) => s.target),
-    ["home-composer", "home-mode", "home-examples", "home-get"],
-  );
-});
-
-test("Find your way spotlights two rows together where the Figma had two steps", () => {
-  const steps = stepsFor(chapterById("way"), false);
-  assert.deepEqual(steps.map((s) => s.target), [
-    "nav-home",
-    "nav-history",
-    "nav-parts",
-    ["nav-marketplace", "nav-innovations"],
-    ["nav-blog", "nav-messages"],
-  ]);
-});
-
 test("the credits steps quote the real prices", () => {
-  const credits = stepsFor(chapterById("account"), false).find((s) => s.target === "plan");
+  const credits = chapterById("account").steps.find((s) => s.page === "credits");
   assert.match(credits.body, new RegExp(`${CONCEPT_COST} credit`));
   assert.match(credits.body, new RegExp(`${BUILD_COST} for each product`));
   const build = chapterById("chat").steps.find((s) => s.target === "chat-build");
   assert.match(build.body, new RegExp(`${BUILD_COST} credits for each product`));
+});
+
+test("a step's page: which addresses it is, and where a fixed one lives", () => {
+  assert.ok(pageMatches("home", "/"));
+  assert.ok(!pageMatches("home", "/projects"));
+  assert.ok(pageMatches("projects", "/projects"));
+  assert.ok(!pageMatches("projects", "/projects/p-1"));
+  assert.ok(pageMatches("messages", "/messages"));
+  assert.ok(pageMatches("messages", "/messages/c-4"), "an open conversation keeps the list");
+  assert.ok(pageMatches("profile", "/creators/me"));
+  assert.ok(!pageMatches("profile", "/creators"));
+  assert.ok(pageMatches("credits", "/settings/plan"));
+  assert.ok(!pageMatches("credits", "/settings/plan/checkout"));
+  assert.ok(pageMatches("project", "/projects/p-1"));
+  assert.ok(!pageMatches("project", "/projects/p-1/earn"));
+  assert.ok(pageMatches("product", "/projects/p-1/products/x"));
+  assert.ok(pageMatches("earn-overview", "/projects/p-1/earn"));
+  assert.ok(!pageMatches("earn-overview", "/projects/p-1/earn/sell"));
+  assert.ok(pageMatches("earn-sell", "/projects/p-1/earn/sell"));
+  assert.ok(!pageMatches("earn-sell", "/projects/p-1/earn/money"));
+  assert.ok(pageMatches("earn-money", "/projects/p-1/earn/money"));
+  assert.ok(pageMatches("post", "/innovations/hexapod-robot"));
+  assert.ok(!pageMatches("post", "/innovations"));
+  assert.ok(pageMatches("innovations", "/innovations"));
+  assert.ok(pageMatches("editor-pcb", "/project/smart-lamp/products/p1/pcb"));
+  assert.ok(pageMatches("editor-code", "/project/smart-lamp/products/p1/code"));
+  assert.ok(!pageMatches("editor-code", "/project/smart-lamp/products/p1/pcb"));
+  assert.equal(fixedHrefOf("history"), "/history");
+  assert.equal(fixedHrefOf("profile"), "/creators/me");
+  assert.equal(fixedHrefOf("credits"), "/settings/plan?tab=credits");
+  assert.equal(fixedHrefOf("project"), null, "a project's pages need the project");
+  assert.equal(fixedHrefOf("post"), null);
+  assert.equal(editorStepOf("editor-3d"), "three");
+  assert.equal(editorStepOf("blog"), null);
+});
+
+test("every fixed page a step names has its address, and the address is that page", () => {
+  for (const c of TOUR_CHAPTERS) {
+    for (const s of c.steps) {
+      if (!s.page) continue;
+      const href = fixedHrefOf(s.page);
+      if (href) assert.ok(pageMatches(s.page, href.split("?")[0]), `${c.id}: ${s.page} → ${href}`);
+      else assert.ok(["project", "product", "earn-overview", "earn-sell", "earn-money", "post"].includes(s.page) || editorStepOf(s.page), s.page);
+    }
+  }
 });
 
 test("the next part stays in its group and passes the tips: start → way → account; project → editors → pcb", () => {
@@ -193,27 +259,6 @@ test("first-visit offers: once per chapter, The editors before the PCB editor, n
   assert.equal(offerFor(null, "earn", false), "earn");
   assert.equal(offerFor(null, "earn", true), "earn", "Earn works on a phone");
   assert.equal(offerFor(null, "feed", false), "share");
-});
-
-test("the journey ticks what was done, never what was watched", () => {
-  assert.deepEqual(JOURNEY.map((s) => s.label), ["Idea", "Concept", "Build", "Edit", "Earn"]);
-  const none = journeyOf([], []);
-  assert.deepEqual(none, { idea: false, concept: false, build: false, edit: false, earn: false });
-  assert.equal(journeyNow(none), "idea");
-  // An idea sent; the AI still drawing.
-  const asked = journeyOf([{ turns: [{ role: "user" }, { role: "assistant", status: "pending" }] }], []);
-  assert.deepEqual(asked, { idea: true, concept: false, build: false, edit: false, earn: false });
-  // A concept drawn.
-  assert.equal(journeyOf([{ turns: [{ role: "assistant", status: "ready" }] }], []).concept, true);
-  // A hand-made project: idea and build, no concept.
-  const byHand = journeyOf([], [{ status: "draft" }]);
-  assert.deepEqual(byHand, { idea: true, concept: false, build: true, edit: false, earn: false });
-  assert.equal(journeyNow(byHand), "concept");
-  // A saved AI build, opened in an editor, minted.
-  const all = journeyOf([], [{ status: "draft", buildId: "b1", editorOpened: { p1: { step: "pcb", at: 1 } }, mint: { tokenId: "1" } }]);
-  assert.deepEqual(all, { idea: true, concept: true, build: true, edit: true, earn: true });
-  assert.equal(journeyNow(all), null);
-  assert.equal(journeyOf([], [{ status: "completed" }]).earn, true, "a v1 project marked completed was minted");
 });
 
 test("the chat's tips: on for a first chat, on when turned on, off once seen or turned off", () => {

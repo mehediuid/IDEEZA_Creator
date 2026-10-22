@@ -13,14 +13,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCreateHistory } from "@/lib/create/history";
 import { editorHref, parseEditorPath } from "@/lib/manual/editor-scope";
 import { earnHref } from "@/lib/manual/earn-route";
+import type { EditorStep } from "@/lib/manual/p2-types";
 import { productRowsOf } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { chapterById, nextChapterOf, stepsFor } from "@/lib/tour/chapters";
-import { journeyOf } from "@/lib/tour/journey";
+import { chapterById, nextChapterOf } from "@/lib/tour/chapters";
 import { TOUR_EVENT, type TourRequest } from "@/lib/tour/open";
-import { offerFor, placeFits, placeOf, tipFrom, tipsOn } from "@/lib/tour/places";
+import { editorStepOf, fixedHrefOf, offerFor, pageMatches, placeFits, placeOf, tipFrom, tipsOn } from "@/lib/tour/places";
 import { emptyTour, shouldWelcome, withChapter, withOffered, withOffers, withWelcome } from "@/lib/tour/state";
-import type { ChapterId, ChapterState, TourChapter, TourStep as Step } from "@/lib/tour/types";
+import type { ChapterId, ChapterState, PageRef, TourChapter, TourStep as Step } from "@/lib/tour/types";
 import { ChapterOffer } from "./chapter-offer";
 import { findTargets, isPhone, isShown } from "./targets";
 import { TourGuidePanel } from "./tour-guide-panel";
@@ -36,8 +36,10 @@ type Run = {
   dir: 1 | -1;
   /** How many steps were on screen in this run: none means the chapter couldn't be shown here. */
   shown: number;
-  /** The run's page was reached (a chapter started elsewhere goes there first). */
+  /** The step's page is open (a step about another page goes there first). */
   arrived: boolean;
+  /** The step came up on a page just opened for it, still loading: it waits longer for its control. */
+  navigated: boolean;
   /** What had focus before the tour, given it back at the end. */
   opener: HTMLElement | null;
 };
@@ -95,57 +97,107 @@ export function TourHost() {
   }, []);
   const quiet = () => !document.querySelector('[aria-modal="true"]') && Date.now() - lastKey.current >= TYPING_MS;
 
-  // Where a chapter goes when it is started from somewhere it can't run: Home, the project on
-  // screen (or the one changed last), that project's PCB editor, the latest chat.
-  const goalOf = (chapter: TourChapter): string | null => {
+  // The project a step is about: the one on screen (its page, its Earn, its editor), else the one
+  // changed last.
+  const projectNow = (): ManualProject | null => {
     const parts = pathname.split("/").filter(Boolean);
-    const onScreen: ManualProject | null =
+    const onScreen =
       parts[0] === "projects" && parts[1]
-        ? (projects.find((p) => p.id === decodeURIComponent(parts[1])) ?? null)
+        ? projects.find((p) => p.id === decodeURIComponent(parts[1]))
         : parts[0] === "project" && parts[1]
-          ? (projects.find((p) => p.slug === parts[1]) ?? null)
-          : null;
-    const project = onScreen ?? newest(projects);
-    switch (chapter.place) {
-      case "home":
-      case "sidebar":
-        return "/";
-      case "chat": {
-        const chat = newest(chats);
-        return chat ? `/chat/${chat.id}` : null;
-      }
+          ? projects.find((p) => p.slug === parts[1])
+          : undefined;
+    return onScreen ?? newest(projects);
+  };
+
+  // The address of a step's page; `null` when there is nothing to show yet (no project).
+  const hrefOf = (page: PageRef): string | null => {
+    const fixed = fixedHrefOf(page);
+    if (fixed) return fixed;
+    const project = projectNow();
+    const parts = pathname.split("/").filter(Boolean);
+    switch (page) {
       case "project":
-        return project ? `/projects/${encodeURIComponent(project.id)}` : null;
-      case "earn":
+        // The Share chapter ends on your project's ⋯; without a project yet, on My projects.
+        return project ? `/projects/${encodeURIComponent(project.id)}` : "/projects";
+      case "product": {
+        if (!project) return null;
+        const row = parts[2] === "products" && parts[3] ? decodeURIComponent(parts[3]) : productRowsOf(project)[0].id;
+        return `/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(row)}`;
+      }
+      case "earn-overview":
         return project ? earnHref(project.id) : null;
-      case "feed":
-        return "/innovations";
+      case "earn-sell":
+        return project ? earnHref(project.id, "sell") : null;
+      case "earn-money":
+        return project ? earnHref(project.id, "money") : null;
+      case "post": {
+        // The first post on the feed the step before showed.
+        const link = document.querySelector<HTMLAnchorElement>('[data-tour~="feed-card"] a[href^="/innovations/"]');
+        return link?.getAttribute("href") ?? null;
+      }
       default: {
+        const step = editorStepOf(page) as EditorStep | null;
+        if (!step) return null;
         const editor = parseEditorPath(pathname);
-        if (editor?.productId) return editorHref(editor.slug, editor.productId, "pcb");
-        return project ? editorHref(project, productRowsOf(project)[0].id, "pcb") : null;
+        if (editor?.productId) return editorHref(editor.slug, editor.productId, step);
+        return project ? editorHref(project, productRowsOf(project)[0].id, step) : null;
       }
     }
   };
 
+  // Where a chapter goes when it is started somewhere it can't run and its step has no page of
+  // its own: Home, the latest chat (the tips).
+  const chapterHref = (chapter: TourChapter): string | null => {
+    if (chapter.place === "chat") {
+      const chat = newest(chats);
+      return chat ? `/chat/${chat.id}` : null;
+    }
+    return "/";
+  };
+
+  /** Whether the page a step needs is the one open. */
+  const stepFits = (chapter: TourChapter, step: Step) => (step.page ? pageMatches(step.page, pathname) : placeFits(chapter, here));
+
+  /** Puts `r` on step `to`, opening that step's page first when it is another one. A step with
+   *  nowhere to go is passed, in the same direction. */
+  const goTo = (r: Run, to: number, dir: 1 | -1) => {
+    const chapter = chapterById(r.id);
+    for (let i = to; i >= 0 && i < r.steps.length; i += dir) {
+      const step = r.steps[i];
+      if (stepFits(chapter, step)) return setRun({ ...r, index: i, dir, arrived: true, navigated: false });
+      const href = step.page ? hrefOf(step.page) : chapterHref(chapter);
+      if (!href) continue;
+      setRun({ ...r, index: i, dir, arrived: false, navigated: true });
+      router.push(href);
+      return;
+    }
+    if (dir < 0) return;
+    finish(r, r.shown > 0 ? "done" : "paused", r.shown > 0 ? r.steps.length - 1 : 0);
+  };
+
   const begin = (id: ChapterId, step = 0, opener: HTMLElement | null = null) => {
     const chapter = chapterById(id);
-    const fits = placeFits(chapter, here);
-    const goal = fits ? null : goalOf(chapter);
-    if (!fits && !goal) return;
     leaveToken.current++;
     setLeaving(false);
+    if (chapter.tips) {
+      // Tips aren't a run: they are turned on, and show as the chat's parts land.
+      const href = here === "chat" ? null : chapterHref(chapter);
+      if (here !== "chat" && !href) return;
+      setPanel(null);
+      setWelcome(false);
+      setOffer(null);
+      updateTour((prev) => withChapter(prev, id, "paused", step));
+      if (href) router.push(href);
+      return;
+    }
+    const start = Math.min(Math.max(step, 0), chapter.steps.length - 1);
+    const first = chapter.steps[start];
+    if (!stepFits(chapter, first) && !(first.page ? hrefOf(first.page) : chapterHref(chapter))) return;
     setPanel(null);
     setWelcome(false);
     setOffer(null);
-    if (chapter.tips) {
-      // Tips aren't a run: they are turned on, and show as the chat's parts land.
-      updateTour((prev) => withChapter(prev, id, "paused", step));
-    } else {
-      const steps = stepsFor(chapter, isPhone());
-      setRun({ id, steps, index: Math.min(Math.max(step, 0), steps.length - 1), dir: 1, shown: 0, arrived: fits, opener });
-    }
-    if (goal) router.push(goal);
+    goTo({ id, steps: chapter.steps, index: start, dir: 1, shown: 0, arrived: false, navigated: false, opener }, start, 1);
   };
 
   const finish = (r: Run, state: ChapterState, step = r.index) => {
@@ -175,9 +227,9 @@ export function TourHost() {
     return () => window.removeEventListener(TOUR_EVENT, listener);
   }, []);
 
-  // A chapter started from another page waits until a page it fits is open. After that a step
-  // whose control goes away (the page changed under it) pauses the chapter by itself.
-  if (run && !run.arrived && placeFits(chapterById(run.id), here)) setRun({ ...run, arrived: true });
+  // A step opened on another page waits until that page is open. After that a step whose control
+  // goes away (the page changed under it) pauses the chapter by itself.
+  if (run && !run.arrived && stepFits(chapterById(run.id), run.steps[run.index])) setRun({ ...run, arrived: true });
 
   // The Welcome: once, on Home, to someone who hasn't made anything yet (or whose tours were reset).
   const due =
@@ -251,14 +303,15 @@ export function TourHost() {
   const offered = offer && offer === offerDue ? chapterById(offer) : null;
 
   const current = run && run.arrived ? run.steps[run.index] : null;
-  const move = (to: number, dir: 1 | -1) => run && setRun({ ...run, index: to, dir });
+  const move = (to: number, dir: 1 | -1) => run && goTo(run, to, dir);
 
+  // A control that never showed up: the step is passed, in the direction of travel. Back past the
+  // start returns to where the user was; forward past the end finishes, unless nothing could be
+  // shown at all.
   const onMissing = () => {
     if (!run) return;
     const to = run.index + run.dir;
     if (to >= 0 && to < run.steps.length) return move(to, run.dir);
-    // Nothing more that way: back past the start returns to where the user was; forward past
-    // the end finishes, unless nothing could be shown at all.
     if (run.dir < 0) return move(run.index + 1, 1);
     finish(run, run.shown > 0 ? "done" : "paused", run.shown > 0 ? run.steps.length - 1 : 0);
   };
@@ -293,7 +346,7 @@ export function TourHost() {
           step={current}
           index={run.index}
           total={run.steps.length}
-          first={run.shown === 0}
+          first={run.shown === 0 || run.navigated}
           nextPart={run.index === run.steps.length - 1 ? next : null}
           leaving={leaving}
           onPrev={() => move(run.index - 1, -1)}
@@ -305,7 +358,7 @@ export function TourHost() {
             updateTour((prev) => withChapter(prev, run.id, "done", run.index));
             begin(next.id, 0, run.opener);
           }}
-          onShown={() => setRun((r) => r && { ...r, shown: r.shown + 1 })}
+          onShown={() => setRun((r) => r && { ...r, shown: r.shown + 1, navigated: false })}
           onMissing={onMissing}
           // Seen to the last step counts as done (on a phone, tapping the menu the step points at).
           onLost={() => finish(run, run.index === run.steps.length - 1 ? "done" : "paused")}
@@ -335,7 +388,7 @@ export function TourHost() {
         <ChapterOffer
           key={offered.id}
           chapter={offered}
-          steps={stepsFor(offered, isPhone()).length}
+          steps={offered.steps.length}
           inEditor={here === "editor" || here === "pcb"}
           onStart={() => begin(offered.id, 0, document.activeElement instanceof HTMLElement ? document.activeElement : null)}
           onDecline={() => {
@@ -349,7 +402,6 @@ export function TourHost() {
           anchor={panel.anchor}
           rec={rec ?? null}
           ready={{ hasProject: projects.length > 0, hasChat: chats.length > 0 }}
-          journey={journeyOf(chats, projects)}
           atHome={here === "home"}
           onStart={(id, step) => begin(id, step, panel.anchor)}
           onGoHome={() => {

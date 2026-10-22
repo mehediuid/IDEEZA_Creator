@@ -809,8 +809,15 @@ function ProfileRow({
     if (!openPanel) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Element;
-      // A notice's ⋯ menu portals out of the bell's panel; a press in it is still inside.
-      if (rowRef.current?.contains(t) || t.closest?.("[data-footer-popover]") || t.closest?.('[role="menu"]')) return;
+      // A notice's ⋯ menu portals out of the bell's panel; a press in it is still inside. The Tour
+      // Guide's card points at what is open here, so a press on it leaves the panel open too.
+      if (
+        rowRef.current?.contains(t) ||
+        t.closest?.("[data-footer-popover]") ||
+        t.closest?.('[role="menu"]') ||
+        t.closest?.("[data-tour-step], [data-tour-scrim]")
+      )
+        return;
       setOpenPanel(null);
     };
     document.addEventListener("pointerdown", onDown, true);

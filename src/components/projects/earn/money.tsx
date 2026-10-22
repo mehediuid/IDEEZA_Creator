@@ -77,6 +77,7 @@ function EarnCustomers({ project, view, viewer, now, announce }: SlotProps) {
   return (
     <EarnBlock
       id="customers"
+      tour="earn-sales"
       title="Sales"
       lead="Everyone who bought the project or a copy of it, and what the sales paid you."
       aside={<TestnetDemoBadge />}

@@ -6,13 +6,46 @@ export type ChapterId = "start" | "way" | "account" | "chat" | "project" | "edit
  *  any editor module, the PCB editor itself, a project's Earn area, or the Innovations feed. */
 export type Place = "home" | "sidebar" | "chat" | "project" | "editor" | "pcb" | "earn" | "feed";
 
-/** One popup. `target` is a `data-tour` id on a real control; several ids spotlight them together. */
+/** A page a step shows, resolved to an address when the step comes up (the project on screen, or
+ *  the one changed last, and its first product). */
+export type PageRef =
+  | "home"
+  | "projects"
+  | "history"
+  | "parts"
+  | "marketplace"
+  | "innovations"
+  | "messages"
+  | "blog"
+  | "profile"
+  | "credits"
+  | "balance"
+  | "tutorials"
+  | "project"
+  | "product"
+  | "earn-overview"
+  | "earn-sell"
+  | "earn-money"
+  | "post"
+  | "editor-pcb"
+  | "editor-code"
+  | "editor-3d"
+  | "editor-assembly"
+  | "editor-preview";
+
+/** One popup. `target` is a `data-tour` id on a real control; several ids are lit together, each in
+ *  its own hole (where it lives in the menu, and the page itself). */
 export type TourStep = {
   target: string | string[];
   title: string;
   body: string;
-  /** Said instead on a phone, where a sidebar step points at the menu button. */
-  phoneBody?: string;
+  /** The page this step is about: the tour goes there before it shows the step. */
+  page?: PageRef;
+  /** Which of several targets the card stands beside; the last when unset. */
+  anchor?: "first" | "last";
+  /** A control that opens what `target` lives in (a menu, a tab): pressed when a target isn't
+   *  there as the step comes up; a menu it opened is closed again when the tour moves on. */
+  reveal?: string;
 };
 
 export type TourChapter = {
@@ -32,9 +65,9 @@ export type TourChapter = {
   desktopOnly?: boolean;
   /** Offered the first time its place is opened (spec D2). */
   offered?: boolean;
+  /** Every step opens its own page, so a phone walks the same ones: the menu's rows are in the
+   *  drawer there, and the page alone is lit. */
   steps: TourStep[];
-  /** Below `md` the sidebar is a drawer behind the menu button, so its steps are told there instead. */
-  phoneSteps?: TourStep[];
 };
 
 export type ChapterState = "done" | "skipped" | "paused";

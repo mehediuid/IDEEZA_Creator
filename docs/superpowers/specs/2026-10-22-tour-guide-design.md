@@ -22,7 +22,7 @@ A step-by-step popup tour that shows a new user the whole journey, split into sh
 | D4 | Skip Tour Guide is the DS A03 Link (brand), not Figma's pink |
 | D5 | The panel floats beside the sidebar from Support › Tour Guide (a dialog elsewhere), no new page |
 | D6 | Chapters that need a project are locked with the reason until one exists (P2/P3) |
-| D7 | The panel's journey ticks come from real actions (P3) |
+| D7 | ~~The panel's journey ticks come from real actions (P3)~~ — removed at the owner's request (2026-10-22): the panel lists the chapters only |
 | D8 | Our own engine on the DS M10 Popover; `@floating-ui/dom` (already a dependency) places it; nothing new installed |
 | D9 | The editors chapter spotlights the five rail modules in one editor (P2) |
 
@@ -53,7 +53,8 @@ Added beyond the Figma: Start here · 3 (examples + Enhance), · 4 (what a build
 
 - **Store:** `ideeza:tour` = `{ v: 1, welcome: "unseen" | "started" | "declined", chapters: { [id]: { state: "done" | "skipped" | "paused", step } }, offers: boolean, offered: ChapterId[] }`. No record + no projects + no chats = a new user. **Reset tours** writes a fresh record, so the Welcome comes back on the next Home visit even with projects.
 - **Targets:** `data-tour="<id>"` on the real controls. A step may name several ids (one spotlight around them all). The first *visible* element counts (the sidebar exists twice: desktop aside and phone drawer).
-- **Phone (< 768 px):** the sidebar is a drawer, so its chapters become one step on the menu button, and Start here · 5 points at the menu button.
+- **Every step names its page** (owner, 2026-10-22: "every tour step must browse to exactly the page it's about"): Next opens that page, then lights the step there; a sidebar row is lit with the page it opened.
+- **Phone (< 768 px):** the sidebar is a drawer, so a step lights the page's part only.
 - **Missing target:** the step is skipped; if no step of the chapter can be shown the chapter pauses (the panel offers Resume). A chapter with a home page (Start here → `/`) goes there first.
 - **Losing the target** (navigation, a resize hiding it) pauses the chapter at that step.
 - **Keys:** Escape = Skip Tour Guide; ← → = Previous / Next Tip while focus is in the popup; keys typed in the popup stop there (the editors listen on `window`).
@@ -65,4 +66,4 @@ Added beyond the Figma: Start here · 3 (examples + Enhance), · 4 (what a build
 
 - **P1 (built):** M10 Popover, engine, Welcome, Start here, Find your way, Your account, the panel, Support › Tour Guide and ⌘K.
 - **P2 (built):** concept chat tips (shown as each part renders), Your project, The editors, Inside the PCB editor, first-visit offers, the panel's groups, locked reasons (D6, brought forward from P3 since P2's chapters need a project) and the offers switch.
-- **P3 (built):** Mint and sell, Share with the community, the journey on the DS M33 Stepper.
+- **P3 (built):** Mint and sell, Share with the community. (The journey on the DS M33 Stepper was built, then removed at the owner's request.)
