@@ -7,7 +7,7 @@ import type { ChapterId, ChapterState, TourRecord } from "./types";
 export const TOUR_KEY = "ideeza:tour";
 
 export function emptyTour(): TourRecord {
-  return { v: 1, welcome: "unseen", chapters: {} };
+  return { v: 1, welcome: "unseen", chapters: {}, offers: true, offered: [] };
 }
 
 const WELCOME = new Set(["unseen", "started", "declined"]);
@@ -29,6 +29,8 @@ export function normalizeTour(raw: unknown): TourRecord | null {
     const at = typeof step === "number" && Number.isFinite(step) ? Math.trunc(step) : 0;
     rec.chapters[id] = { state: state as ChapterState, step: Math.min(Math.max(at, 0), last) };
   }
+  if (typeof r.offers === "boolean") rec.offers = r.offers;
+  if (Array.isArray(r.offered)) rec.offered = [...new Set(r.offered.filter(isChapterId))];
   return rec;
 }
 
@@ -47,6 +49,17 @@ export function withWelcome(rec: TourRecord | null, choice: "started" | "decline
 export function withChapter(rec: TourRecord | null, id: ChapterId, state: ChapterState, step: number): TourRecord {
   const base = rec ?? emptyTour();
   return { ...base, chapters: { ...base.chapters, [id]: { state, step } } };
+}
+
+/** A first-visit offer answered with Not now: it isn't offered again. */
+export function withOffered(rec: TourRecord | null, id: ChapterId): TourRecord {
+  const base = rec ?? emptyTour();
+  return base.offered.includes(id) ? base : { ...base, offered: [...base.offered, id] };
+}
+
+/** The panel's "Offer a tour the first time I open a page". */
+export function withOffers(rec: TourRecord | null, on: boolean): TourRecord {
+  return { ...(rec ?? emptyTour()), offers: on };
 }
 
 /** What the panel offers: Start (new), Replay (done), or Resume at the step it stopped on. */

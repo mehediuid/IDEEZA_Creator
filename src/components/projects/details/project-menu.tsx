@@ -154,6 +154,7 @@ export function ProjectMenu({
         ref={triggerRef}
         hierarchy="secondary"
         size="lg"
+        data-tour="project-actions"
         aria-label="Project actions"
         aria-haspopup="menu"
         aria-expanded={open}

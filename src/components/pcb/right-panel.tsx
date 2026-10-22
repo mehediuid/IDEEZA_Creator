@@ -29,6 +29,7 @@ export function RightPanel() {
 
   return (
     <div
+      data-tour="pcb-properties"
       style={{
         position: "absolute",
         top: 62,

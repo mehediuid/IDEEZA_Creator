@@ -1,6 +1,7 @@
-// The Tour Guide's chapters: the Figma's Dashboard Homepage Tour (User Panel V2 › Tour Guide,
-// 16838:307342) cut into parts of at most five steps, on today's app. The Figma's step behind each
-// popup is noted beside it; its lorem ipsum is replaced by real copy (plan Rm6aBk8ieNSUpHgtS9JMu5).
+// The Tour Guide's chapters: the Figma's Dashboard Homepage Tour and Tour Guide for Pro Pages
+// (User Panel V2 › Tour Guide, 16838:307342) cut into parts of at most five steps, on today's app.
+// The Figma's step behind each popup is noted beside it; its lorem ipsum is replaced by real copy
+// (plan Rm6aBk8ieNSUpHgtS9JMu5).
 
 import { BUILD_COST, CONCEPT_COST } from "../create/credits";
 import type { ChapterId, TourChapter, TourStep } from "./types";
@@ -9,8 +10,9 @@ export const TOUR_CHAPTERS: TourChapter[] = [
   {
     id: "start",
     name: "Start here",
+    group: "Start",
     where: "Home",
-    route: "/",
+    place: "home",
     steps: [
       {
         // 4/19 Write your prompt here
@@ -45,7 +47,9 @@ export const TOUR_CHAPTERS: TourChapter[] = [
   {
     id: "way",
     name: "Find your way",
+    group: "Start",
     where: "Sidebar",
+    place: "sidebar",
     steps: [
       {
         // 1/19 Home Page Icon + 10/19 Dashboard
@@ -89,7 +93,9 @@ export const TOUR_CHAPTERS: TourChapter[] = [
   {
     id: "account",
     name: "Your account",
+    group: "Start",
     where: "Sidebar footer",
+    place: "sidebar",
     steps: [
       {
         // 2/19 Visit Profile
@@ -129,6 +135,145 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       },
     ],
   },
+  {
+    // Not in the Figma: the AI's answers take seconds to minutes to land, so each tip waits for
+    // its part of the chat instead of a run of Next Tip.
+    id: "chat",
+    name: "From idea to concepts",
+    group: "Build",
+    where: "Your AI chat",
+    place: "chat",
+    tips: true,
+    steps: [
+      {
+        target: "chat-question",
+        title: "A few quick questions",
+        body: "AI asks a question or two before it draws anything. Your answers shape the concepts.",
+      },
+      {
+        target: "chat-concept",
+        title: "Your concepts",
+        body: "Each card is one way to make your idea. Ask for changes in the chat, or pick the one you like.",
+      },
+      {
+        target: "chat-build",
+        title: "Build it",
+        body: `Build turns the concept into a real design: schematic, PCB, code and 3D. It uses ${BUILD_COST} credits for each product.`,
+      },
+      {
+        target: "chat-save",
+        title: "Check it, then save",
+        body: "Look over what was built and save it. Your project opens with every part in place.",
+      },
+    ],
+  },
+  {
+    id: "project",
+    name: "Your project",
+    group: "Build",
+    where: "Project page",
+    place: "project",
+    needsProject: true,
+    offered: true,
+    steps: [
+      {
+        target: "project-tabs",
+        title: "Everything in one place",
+        body: "Products, Media, Network and Team each have their own tab.",
+      },
+      {
+        target: "project-product",
+        title: "Open a product",
+        body: "Each product has its own page. Use Open in editor there to change its design.",
+      },
+      {
+        target: "project-earn",
+        title: "Earn from this project",
+        body: "When you are ready, mint it and sell it here. Nothing goes public until you choose.",
+      },
+      {
+        target: "project-actions",
+        title: "More actions",
+        body: "Edit the name and description, share to Innovations and more live in this menu.",
+      },
+    ],
+  },
+  {
+    id: "editors",
+    name: "The editors",
+    group: "Build",
+    where: "Editors",
+    place: "editor",
+    needsProject: true,
+    desktopOnly: true,
+    offered: true,
+    steps: [
+      {
+        // Pro 1/8 PCB Design
+        target: "rail-pcb",
+        title: "PCB Design",
+        body: "Draw the schematic and lay out the circuit board.",
+      },
+      {
+        // Pro 2/8 Design Your Code
+        target: "rail-code",
+        title: "Code",
+        body: "Write the firmware that runs on your board, in code or with blocks.",
+      },
+      {
+        // Pro 3/8 Create 3D Module
+        target: "rail-3d",
+        title: "3D Module",
+        body: "Shape the product's 3D model, like the case around the board.",
+      },
+      {
+        // Pro 5/8 is missing from the Figma: Assembly is the module there today.
+        target: "rail-assembly",
+        title: "Assembly",
+        body: "Put the parts together, then connect them in Wiring mode.",
+      },
+      {
+        // Pro 4/8 Product Overview
+        target: "rail-preview",
+        title: "Product Preview",
+        body: "See the finished product the way others will see it.",
+      },
+    ],
+  },
+  {
+    id: "pcb",
+    name: "Inside the PCB editor",
+    group: "Build",
+    where: "PCB Design",
+    place: "pcb",
+    needsProject: true,
+    desktopOnly: true,
+    offered: true,
+    steps: [
+      {
+        // Pro 8/8 View Canvas Properties & Objects
+        target: "pcb-properties",
+        title: "Properties and objects",
+        body: "Select anything on the board to change it here. Filter and Layer sit in the next tabs.",
+      },
+      {
+        // Pro 7/8 View Price For Premium Parts
+        target: "pcb-price",
+        title: "Price for premium parts",
+        body: "The total for premium parts on this board. Every library part is free today, so it reads $0.00.",
+      },
+      {
+        target: "editor-saved",
+        title: "No save button needed",
+        body: "Your work saves itself, and this shows when it last did. Ctrl+S (⌘S on a Mac) works too.",
+      },
+      {
+        target: "editor-help",
+        title: "Stuck?",
+        body: "Help has the tutorials and Report a problem.",
+      },
+    ],
+  },
 ];
 
 export function chapterById(id: ChapterId): TourChapter {
@@ -152,8 +297,9 @@ export function stepsFor(chapter: TourChapter, phone: boolean): TourStep[] {
   );
 }
 
-/** The chapter the last step offers as "Next part", if any. */
+/** The chapter the last step offers as "Next part": the next one in its group, past any tips. */
 export function nextChapterOf(id: ChapterId): TourChapter | null {
   const at = TOUR_CHAPTERS.findIndex((c) => c.id === id);
-  return TOUR_CHAPTERS[at + 1] ?? null;
+  const group = TOUR_CHAPTERS[at]?.group;
+  return TOUR_CHAPTERS.slice(at + 1).find((c) => c.group === group && !c.tips) ?? null;
 }

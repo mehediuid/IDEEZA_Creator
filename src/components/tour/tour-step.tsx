@@ -11,10 +11,13 @@
 // A step whose control isn't on screen waits a moment for it (a page still loading), then asks to
 // be skipped. A control that goes away mid-step (the page changed, a dialog opened over it)
 // pauses the chapter there.
+//
+// A tip (the chat's chapter) is the same popup with one way on, Got it, and Turn off tips in
+// place of Skip Tour Guide: tips come one at a time as the chat fills, so there is no Previous.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { arrow, autoUpdate, computePosition, flip, offset, shift } from "@floating-ui/dom";
+import { arrow, autoUpdate, computePosition, flip, offset, shift, type Placement } from "@floating-ui/dom";
 import { Button, Popover, linkVariants, type PopoverPlacement } from "@/components/ideeza";
 import { scrollWithin } from "@/components/create/anchors";
 import { cn } from "@/lib/utils";
@@ -51,6 +54,7 @@ export function TourStep({
   index,
   total,
   first,
+  tips = false,
   nextPart,
   onPrev,
   onNext,
@@ -66,6 +70,8 @@ export function TourStep({
   total: number;
   /** Nothing of this run is on screen yet. */
   first: boolean;
+  /** A tip of the chat's chapter: Got it and Turn off tips. */
+  tips?: boolean;
   /** The chapter the last step offers next, if any. */
   nextPart: TourChapter | null;
   onPrev: () => void;
@@ -149,12 +155,18 @@ export function TourStep({
     const update = () => {
       if (!els.every(isShown)) return lost();
       cutOut(scrimRef.current, unionBox(els));
-      const middleware = [offset(GAP), flip({ padding: 8 }), shift({ padding: 8 })];
+      // Beside, then the other sides in turn; a tall control (a concept card) leaves room only to
+      // one side. Where nothing fits, it slides along until it is on screen.
+      const fallbackPlacements: Placement[] = side === "right" ? ["left", "bottom", "top"] : ["top", "left", "right"];
+      const middleware = [offset(GAP), flip({ padding: 8, fallbackPlacements }), shift({ padding: 8, crossAxis: true })];
       if (arrowRef.current) middleware.push(arrow({ element: arrowRef.current, padding: 12 }));
       void computePosition(reference, floating, { strategy: "fixed", placement: side, middleware }).then(
         ({ x, y, placement: at, middlewareData }) => {
           if (!alive) return;
-          floating.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+          // left/top, not a transform: the fade-in's keyframes write `transform` and would hold
+          // the popup at the corner while they run.
+          floating.style.left = `${Math.round(x)}px`;
+          floating.style.top = `${Math.round(y)}px`;
           const s = at.split("-")[0] as PopoverPlacement;
           setPlacement(s);
           const a = middlewareData.arrow;
@@ -202,7 +214,9 @@ export function TourStep({
   // ← → move between steps. Keys typed here stop here: the editors listen on `window`, and Tab
   // goes on to whatever is next.
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowRight" && !last) {
+    if (tips) {
+      // Nothing to move between.
+    } else if (e.key === "ArrowRight" && !last) {
       e.preventDefault();
       onNext();
     } else if (e.key === "ArrowLeft" && index > 0) {
@@ -246,7 +260,7 @@ export function TourStep({
                   {index + 1}/{total}
                 </span>
                 <span className="sr-only">
-                  Step {index + 1} of {total}
+                  {tips ? "Tip" : "Step"} {index + 1} of {total}
                 </span>
               </span>
               <button
@@ -254,25 +268,31 @@ export function TourStep({
                 onClick={onSkip}
                 className={linkVariants({ color: "brand", size: "md", className: "font-medium" })}
               >
-                Skip Tour Guide
+                {tips ? "Turn off tips" : "Skip Tour Guide"}
               </button>
             </div>
           }
           actions={
-            <>
-              {index > 0 && (
-                <Button type="button" hierarchy="secondary" size="md" className={TAP} onClick={onPrev}>
-                  Previous
-                </Button>
-              )}
+            tips ? (
               <Button type="button" hierarchy="primary" size="md" className={TAP} onClick={last ? onDone : onNext}>
-                {last ? "Explore" : "Next Tip"}
+                {last ? "Done" : "Got it"}
               </Button>
-            </>
+            ) : (
+              <>
+                {index > 0 && (
+                  <Button type="button" hierarchy="secondary" size="md" className={TAP} onClick={onPrev}>
+                    Previous
+                  </Button>
+                )}
+                <Button type="button" hierarchy="primary" size="md" className={TAP} onClick={last ? onDone : onNext}>
+                  {last ? "Explore" : "Next Tip"}
+                </Button>
+              </>
+            )
           }
         >
           <p>{step.body}</p>
-          {last && nextPart && (
+          {last && nextPart && !tips && (
             <button
               type="button"
               onClick={onNextPart}

@@ -51,7 +51,7 @@ Added beyond the Figma: Start here · 3 (examples + Enhance), · 4 (what a build
 
 ## Behaviour
 
-- **Store:** `ideeza:tour` = `{ v: 1, welcome: "unseen" | "started" | "declined", chapters: { [id]: { state: "done" | "skipped" | "paused", step } } }`. No record + no projects + no chats = a new user. **Reset tours** writes a fresh record, so the Welcome comes back on the next Home visit even with projects.
+- **Store:** `ideeza:tour` = `{ v: 1, welcome: "unseen" | "started" | "declined", chapters: { [id]: { state: "done" | "skipped" | "paused", step } }, offers: boolean, offered: ChapterId[] }`. No record + no projects + no chats = a new user. **Reset tours** writes a fresh record, so the Welcome comes back on the next Home visit even with projects.
 - **Targets:** `data-tour="<id>"` on the real controls. A step may name several ids (one spotlight around them all). The first *visible* element counts (the sidebar exists twice: desktop aside and phone drawer).
 - **Phone (< 768 px):** the sidebar is a drawer, so its chapters become one step on the menu button, and Start here · 5 points at the menu button.
 - **Missing target:** the step is skipped; if no step of the chapter can be shown the chapter pauses (the panel offers Resume). A chapter with a home page (Start here → `/`) goes there first.
@@ -63,6 +63,6 @@ Added beyond the Figma: Start here · 3 (examples + Enhance), · 4 (what a build
 
 ## Phases
 
-- **P1 (this branch):** M10 Popover, engine, Welcome, Start here, Find your way, Your account, the panel, Support › Tour Guide and ⌘K.
-- **P2:** concept chat tips (shown as each part renders), Your project, The editors, Inside the PCB editor, first-visit offers.
-- **P3:** Mint and sell, Share with the community, journey ticks, locked chapters.
+- **P1 (built):** M10 Popover, engine, Welcome, Start here, Find your way, Your account, the panel, Support › Tour Guide and ⌘K.
+- **P2 (built):** concept chat tips (shown as each part renders), Your project, The editors, Inside the PCB editor, first-visit offers, the panel's groups, locked reasons (D6, brought forward from P3 since P2's chapters need a project) and the offers switch.
+- **P3:** Mint and sell, Share with the community, journey ticks.

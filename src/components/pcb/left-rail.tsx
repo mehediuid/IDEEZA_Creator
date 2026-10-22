@@ -48,6 +48,7 @@ export function LeftRail({
         <div
           key={r.key}
           className="ix-nav"
+          data-tour={`rail-${r.key}`}
           onClick={() => {
             // Skip the active item (already here) and unknown keys. Navigation
             // is project-scoped through the active project.

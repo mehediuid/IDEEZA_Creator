@@ -97,8 +97,9 @@ ideeza-creator-panel/
    │  │                      renderer, preview), send/ (Send for review, cover picker, Change cover)
    │  ├─ tutorials/          Tutorials: the categories page and card, the topic page (menu, article,
    │  │                      Page Content), the video card with its reward
-   │  ├─ tour/               Tour Guide: the host (root layout), the Welcome, a step (scrim cut-out +
-   │  │                      M10 Popover), the Tour Guide panel, finding data-tour controls
+   │  ├─ tour/               Tour Guide: the host (root layout), the Welcome, a step or tip (scrim
+   │  │                      cut-out + M10 Popover), the first-visit offer, the Tour Guide panel,
+   │  │                      finding data-tour controls
    │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
@@ -219,7 +220,8 @@ ideeza-creator-panel/
    │  ├─ tutorials/          Tutorials: the content, the catalog (pages, counts, IDZ totals, headings),
    │  │                      progress (ideeza:tutorials:progress) and paying a reward into the demo wallet
    │  ├─ tour/               Tour Guide: the chapters' steps and copy, the ideeza:tour record and its
-   │  │                      rules (who gets the Welcome, Resume), openTourGuide()
+   │  │                      rules (who gets the Welcome, Resume), places (offers, tips, readiness),
+   │  │                      openTourGuide()
    │  ├─ people/             the creator profile's people layer: one person id and handles, profile
    │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt,
    │  │                      your handle's rules, time zones and spoken languages (Settings)

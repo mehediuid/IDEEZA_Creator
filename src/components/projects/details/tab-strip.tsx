@@ -57,9 +57,12 @@ export function TabStrip<T extends string>({
   groups,
   active,
   onSelect,
+  tour,
 }: {
   /** The tablist's accessible name: "Project sections", "Product sections". */
   label: string;
+  /** The Tour Guide's id for the strip (components/tour). */
+  tour?: string;
   /** The tabs in strip order, in groups; a hairline sits between two non-empty groups. */
   groups: readonly (readonly TabDef<T>[])[];
   active: T;
@@ -130,6 +133,7 @@ export function TabStrip<T extends string>({
         ref={stripRef}
         role="tablist"
         aria-label={label}
+        data-tour={tour}
         onKeyDown={(e) => moveTab(e, ids, active, onSelect)}
         onScroll={measure}
         className={cn("flex flex-nowrap items-end gap-2 overflow-x-auto overflow-y-hidden", fade)}

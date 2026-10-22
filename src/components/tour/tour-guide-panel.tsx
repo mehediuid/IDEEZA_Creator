@@ -1,16 +1,18 @@
 "use client";
 
-// The Tour Guide panel (spec D5): every chapter with Start, Replay or Resume where it stopped, and
-// Reset tours. From the sidebar's Support › Tour Guide it floats beside the sidebar, the way the
-// footer's account popover does; from ⌘K or the phone's menu it is a dialog (a bottom sheet on a
-// phone).
+// The Tour Guide panel (spec D5): every chapter, under Start and Build, with Start, Replay or
+// Resume where it stopped — or, when it can't start yet, why and the way there (D6). Below them,
+// whether a page's tour is offered on a first visit, and Reset tours. From the sidebar's Support ›
+// Tour Guide it floats beside the sidebar, the way the footer's account popover does; from ⌘K or
+// the phone's menu it is a dialog (a bottom sheet on a phone).
 
 import * as React from "react";
 import { Cancel01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { FloatingPanel } from "@/components/dashboard/sidebar-account";
-import { Button, ModalFrame, linkVariants } from "@/components/ideeza";
+import { Button, ModalFrame, Toggle, linkVariants } from "@/components/ideeza";
 import { TOUR_CHAPTERS, stepsFor } from "@/lib/tour/chapters";
+import { readinessOf } from "@/lib/tour/places";
 import { chapterStatus } from "@/lib/tour/state";
 import type { ChapterId, TourRecord } from "@/lib/tour/types";
 import { isPhone, isShown } from "./targets";
@@ -18,11 +20,17 @@ import { isPhone, isShown } from "./targets";
 // A finger's reach on a phone or a touch screen, as ModalFrame's buttons have.
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
+const OFFERS_LABEL = "Offer a tour the first time I open a page";
+
 type PanelProps = {
   /** Support › Tour Guide in the sidebar, when that is what opened it. */
   anchor: HTMLElement | null;
   rec: TourRecord | null;
+  /** What the chapters that run on your own work need. */
+  ready: { hasProject: boolean; hasChat: boolean };
   onStart: (id: ChapterId, step: number) => void;
+  onGoHome: () => void;
+  onOffers: (on: boolean) => void;
   onReset: () => void;
   onClose: () => void;
 };
@@ -34,15 +42,16 @@ export function TourGuidePanel(props: PanelProps) {
   return beside && anchor ? <BesideSidebar {...props} anchor={anchor} /> : <AsDialog {...props} />;
 }
 
-function AsDialog({ rec, onStart, onReset, onClose }: PanelProps) {
+function AsDialog(props: PanelProps) {
   return (
-    <ModalFrame open onClose={onClose} size="sm" sheet title="Tour Guide" description="Your path from idea to product">
-      <ChapterList rec={rec} onStart={onStart} onReset={onReset} />
+    <ModalFrame open onClose={props.onClose} size="sm" sheet title="Tour Guide" description="Your path from idea to product">
+      <ChapterList {...props} />
     </ModalFrame>
   );
 }
 
-function BesideSidebar({ anchor, rec, onStart, onReset, onClose }: PanelProps & { anchor: HTMLElement }) {
+function BesideSidebar(props: PanelProps & { anchor: HTMLElement }) {
+  const { anchor, onClose } = props;
   const anchorRef = React.useRef<HTMLElement | null>(anchor);
   const frameRef = React.useRef<HTMLElement | null>(anchor.closest("aside"));
   const panelRef = React.useRef<HTMLDivElement>(null);
@@ -65,7 +74,7 @@ function BesideSidebar({ anchor, rec, onStart, onReset, onClose }: PanelProps & 
       anchorRef={anchorRef}
       frameRef={frameRef}
       side="right"
-      width={320}
+      width={340}
       tone="surface"
       panelRef={panelRef}
       initialFocus="panel"
@@ -77,7 +86,7 @@ function BesideSidebar({ anchor, rec, onStart, onReset, onClose }: PanelProps & 
         onClose();
       }}
     >
-      <div className="flex items-start gap-4 px-8 pb-4 pt-8">
+      <div className="flex items-start gap-4 px-8 pb-2 pt-8">
         <div className="min-w-0 flex-1">
           <h2 id={titleId} className="text-lg font-bold text-text-primary">
             Tour Guide
@@ -94,51 +103,81 @@ function BesideSidebar({ anchor, rec, onStart, onReset, onClose }: PanelProps & 
         </button>
       </div>
       <div className="px-8 pb-8">
-        <ChapterList rec={rec} onStart={onStart} onReset={onReset} />
+        <ChapterList {...props} />
       </div>
     </FloatingPanel>
   );
 }
 
-function ChapterList({ rec, onStart, onReset }: Pick<PanelProps, "rec" | "onStart" | "onReset">) {
+function ChapterList({ rec, ready, onStart, onGoHome, onOffers, onReset }: PanelProps) {
   const [phone] = React.useState(isPhone);
   const [reset, setReset] = React.useState(false);
+  const groups = [...new Set(TOUR_CHAPTERS.map((c) => c.group))];
+  const offers = rec?.offers ?? true;
   return (
     <div>
-      <ul role="list" className="flex flex-col">
-        {TOUR_CHAPTERS.map((c) => {
-          const steps = stepsFor(c, phone);
-          const status = chapterStatus(rec, c.id);
-          const at = Math.min(status.step, steps.length - 1);
-          const label = status.kind === "done" ? "Replay" : status.kind === "resume" && at > 0 ? `Resume ${at + 1}/${steps.length}` : "Start";
-          return (
-            <li key={c.id} className="flex items-center gap-6 border-b border-solid border-border py-6 last:border-b-0">
-              <div className="min-w-0 flex-1">
-                <p className="text-md font-medium leading-md text-text-primary">{c.name}</p>
-                <p className="text-sm leading-sm text-text-secondary">
-                  {steps.length} {steps.length === 1 ? "step" : "steps"} · {phone && c.phoneSteps ? "Menu" : c.where}
-                </p>
-              </div>
-              {status.kind === "done" && (
-                <span className="inline-flex items-center gap-2 text-sm font-medium leading-sm text-text-success">
-                  <Icon icon={CheckmarkCircle02Icon} size={14} />
-                  Seen
-                </span>
-              )}
-              <Button
-                type="button"
-                hierarchy="secondary"
-                size="sm"
-                className={TAP}
-                aria-label={`${label}: ${c.name}`}
-                onClick={() => onStart(c.id, status.kind === "resume" ? at : 0)}
-              >
-                {label}
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
+      {groups.map((group) => (
+        <section key={group} aria-label={group} className="mt-4">
+          <h3 className="text-sm font-semibold leading-sm text-text-tertiary">{group}</h3>
+          <ul role="list" className="flex flex-col">
+            {TOUR_CHAPTERS.filter((c) => c.group === group).map((c) => {
+              const steps = stepsFor(c, phone);
+              const status = chapterStatus(rec, c.id);
+              const at = Math.min(status.step, steps.length - 1);
+              const readiness = readinessOf(c.id, { phone, ...ready });
+              const unit = c.tips ? (steps.length === 1 ? "tip" : "tips") : steps.length === 1 ? "step" : "steps";
+              const label =
+                status.kind === "done" ? "Replay" : status.kind === "resume" && at > 0 ? `Resume ${at + 1}/${steps.length}` : "Start";
+              return (
+                <li key={c.id} className="flex items-center gap-6 border-b border-solid border-border py-6 last:border-b-0">
+                  <div className="min-w-0 flex-1">
+                    <p className={readiness.ok ? "text-md font-medium leading-md text-text-primary" : "text-md font-medium leading-md text-text-secondary"}>
+                      {c.name}
+                    </p>
+                    <p className="text-sm leading-sm text-text-secondary">
+                      {readiness.ok ? `${steps.length} ${unit} · ${phone && c.phoneSteps ? "Menu" : c.where}` : readiness.why}
+                    </p>
+                  </div>
+                  {readiness.ok && status.kind === "done" && (
+                    <span className="inline-flex items-center gap-2 text-sm font-medium leading-sm text-text-success">
+                      <Icon icon={CheckmarkCircle02Icon} size={14} />
+                      Seen
+                    </span>
+                  )}
+                  {readiness.ok ? (
+                    <Button
+                      type="button"
+                      hierarchy="secondary"
+                      size="sm"
+                      className={TAP}
+                      aria-label={`${label}: ${c.name}`}
+                      onClick={() => onStart(c.id, status.kind === "resume" ? at : 0)}
+                    >
+                      {label}
+                    </Button>
+                  ) : (
+                    readiness.home && (
+                      <button
+                        type="button"
+                        onClick={onGoHome}
+                        className={linkVariants({ color: "brand", size: "md", className: "shrink-0 font-medium" })}
+                      >
+                        Go to Home
+                      </button>
+                    )
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+      <div className="mt-6 flex items-center gap-6 border-t border-solid border-border pt-6">
+        <span aria-hidden className="min-w-0 flex-1 text-sm leading-sm text-text-secondary">
+          {OFFERS_LABEL}
+        </span>
+        <Toggle checked={offers} size="sm" aria-label={OFFERS_LABEL} onChange={() => onOffers(!offers)} />
+      </div>
       <div className="mt-6 flex items-center gap-4">
         <button
           type="button"

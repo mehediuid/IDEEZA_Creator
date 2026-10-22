@@ -265,6 +265,7 @@ function PremiumPartsChip() {
     <span
       role="status"
       aria-label="Price for premium parts: $0.00"
+      data-tour="pcb-price"
       style={{
         display: "inline-flex",
         alignItems: "center",
