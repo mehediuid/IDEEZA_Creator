@@ -65,4 +65,4 @@ Added beyond the Figma: Start here · 3 (examples + Enhance), · 4 (what a build
 
 - **P1 (built):** M10 Popover, engine, Welcome, Start here, Find your way, Your account, the panel, Support › Tour Guide and ⌘K.
 - **P2 (built):** concept chat tips (shown as each part renders), Your project, The editors, Inside the PCB editor, first-visit offers, the panel's groups, locked reasons (D6, brought forward from P3 since P2's chapters need a project) and the offers switch.
-- **P3:** Mint and sell, Share with the community, journey ticks.
+- **P3 (built):** Mint and sell, Share with the community, the journey on the DS M33 Stepper.

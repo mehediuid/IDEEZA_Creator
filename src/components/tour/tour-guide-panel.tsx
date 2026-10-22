@@ -1,7 +1,8 @@
 "use client";
 
-// The Tour Guide panel (spec D5): every chapter, under Start and Build, with Start, Replay or
-// Resume where it stopped — or, when it can't start yet, why and the way there (D6). Below them,
+// The Tour Guide panel (spec D5): your journey so far, ticked by what was done (D7), then every
+// chapter, under Start, Build and Earn & share, with Start, Replay or Resume where it stopped —
+// or, when it can't start yet, why and the way there (D6). Below them,
 // whether a page's tour is offered on a first visit, and Reset tours. From the sidebar's Support ›
 // Tour Guide it floats beside the sidebar, the way the footer's account popover does; from ⌘K or
 // the phone's menu it is a dialog (a bottom sheet on a phone).
@@ -10,8 +11,9 @@ import * as React from "react";
 import { Cancel01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { FloatingPanel } from "@/components/dashboard/sidebar-account";
-import { Button, ModalFrame, Toggle, linkVariants } from "@/components/ideeza";
+import { Button, ModalFrame, Stepper, Toggle, linkVariants } from "@/components/ideeza";
 import { TOUR_CHAPTERS, stepsFor } from "@/lib/tour/chapters";
+import { JOURNEY, journeyNow, type JourneyStage } from "@/lib/tour/journey";
 import { readinessOf } from "@/lib/tour/places";
 import { chapterStatus } from "@/lib/tour/state";
 import type { ChapterId, TourRecord } from "@/lib/tour/types";
@@ -28,6 +30,10 @@ type PanelProps = {
   rec: TourRecord | null;
   /** What the chapters that run on your own work need. */
   ready: { hasProject: boolean; hasChat: boolean };
+  /** Each stage of the journey, done or not. */
+  journey: Record<JourneyStage, boolean>;
+  /** Home is open: a locked chapter's "Go to Home" would go nowhere. */
+  atHome: boolean;
   onStart: (id: ChapterId, step: number) => void;
   onGoHome: () => void;
   onOffers: (on: boolean) => void;
@@ -109,13 +115,23 @@ function BesideSidebar(props: PanelProps & { anchor: HTMLElement }) {
   );
 }
 
-function ChapterList({ rec, ready, onStart, onGoHome, onOffers, onReset }: PanelProps) {
+function ChapterList({ rec, ready, journey, atHome, onStart, onGoHome, onOffers, onReset }: PanelProps) {
   const [phone] = React.useState(isPhone);
   const [reset, setReset] = React.useState(false);
   const groups = [...new Set(TOUR_CHAPTERS.map((c) => c.group))];
   const offers = rec?.offers ?? true;
+  const now = journeyNow(journey);
   return (
     <div>
+      <section aria-labelledby="tour-journey" className="mt-4 border-b border-solid border-border pb-6">
+        <h3 id="tour-journey" className="mb-4 text-sm font-semibold leading-sm text-text-tertiary">
+          Your journey
+        </h3>
+        <Stepper
+          label="Your journey"
+          steps={JOURNEY.map((s) => ({ label: s.label, state: journey[s.id] ? "completed" : s.id === now ? "active" : "inactive" }))}
+        />
+      </section>
       {groups.map((group) => (
         <section key={group} aria-label={group} className="mt-4">
           <h3 className="text-sm font-semibold leading-sm text-text-tertiary">{group}</h3>
@@ -156,7 +172,8 @@ function ChapterList({ rec, ready, onStart, onGoHome, onOffers, onReset }: Panel
                       {label}
                     </Button>
                   ) : (
-                    readiness.home && (
+                    readiness.home &&
+                    !atHome && (
                       <button
                         type="button"
                         onClick={onGoHome}

@@ -7,6 +7,8 @@ const { TOUR_CHAPTERS, chapterById, stepsFor, nextChapterOf } = await import("..
 const { TOUR_KEY, emptyTour, normalizeTour, shouldWelcome, withWelcome, withChapter, withOffered, withOffers, chapterStatus } =
   await import("../../.tmp-test/lib/tour/state.js");
 const { placeOf, placeFits, offerFor, tipsOn, tipFrom, readinessOf } = await import("../../.tmp-test/lib/tour/places.js");
+const { JOURNEY, journeyOf, journeyNow } = await import("../../.tmp-test/lib/tour/journey.js");
+const { IDEEZA_FEE_BPS } = await import("../../.tmp-test/lib/market/fee.js");
 const { BUILD_COST, CONCEPT_COST } = await import("../../.tmp-test/lib/create/credits.js");
 
 const words = (s) => s.trim().split(/\s+/).length;
@@ -26,8 +28,27 @@ test("the chapters, in the panel's order and groups", () => {
       ["Build", "project", "Your project"],
       ["Build", "editors", "The editors"],
       ["Build", "pcb", "Inside the PCB editor"],
+      ["Earn & share", "earn", "Mint and sell"],
+      ["Earn & share", "share", "Share with the community"],
     ],
   );
+});
+
+test("Mint and sell walks Earn: the two steps, Mint, Sell, Money — with the fee a sale really takes", () => {
+  const earn = chapterById("earn");
+  assert.equal(earn.place, "earn");
+  assert.deepEqual(stepsFor(earn, false).map((s) => s.target), ["earn-path", "earn-step-mint", "earn-sell", "earn-money"]);
+  const sell = earn.steps.find((s) => s.target === "earn-sell");
+  assert.match(sell.body, new RegExp(`${IDEEZA_FEE_BPS / 100}% of each sale`));
+});
+
+test("Share with the community: the feed's modes and categories, a post, then where sharing starts", () => {
+  const share = chapterById("share");
+  assert.equal(share.place, "feed");
+  assert.deepEqual(stepsFor(share, false).map((s) => s.target), [["feed-modes", "feed-categories"], "feed-card", "nav-projects"]);
+  const phone = stepsFor(share, true);
+  assert.equal(phone.at(-1).target, "menu");
+  assert.match(phone.at(-1).body, /menu's My projects/, "its own phone words, not Start here's");
 });
 
 test("the editors chapter follows the Figma's Pro pages: one step per module, in the rail's order", () => {
@@ -119,6 +140,8 @@ test("the next part stays in its group and passes the tips: start → way → ac
   assert.equal(nextChapterOf("project")?.id, "editors");
   assert.equal(nextChapterOf("editors")?.id, "pcb");
   assert.equal(nextChapterOf("pcb"), null);
+  assert.equal(nextChapterOf("earn")?.id, "share");
+  assert.equal(nextChapterOf("share"), null);
 });
 
 test("an address's place", () => {
@@ -127,7 +150,6 @@ test("an address's place", () => {
   assert.equal(placeOf("/history"), "sidebar");
   assert.equal(placeOf("/chat/abc123"), "chat");
   assert.equal(placeOf("/projects/p-1"), "project");
-  assert.equal(placeOf("/projects/p-1/earn"), "sidebar");
   assert.equal(placeOf("/projects/p-1/products/x"), "sidebar");
   assert.equal(placeOf("/project/smart-lamp/products/p1/pcb"), "pcb");
   assert.equal(placeOf("/project/smart-lamp/products/p1/code"), "editor");
@@ -136,11 +158,17 @@ test("an address's place", () => {
   assert.equal(placeOf("/pcb"), "pcb");
   assert.equal(placeOf("/3d"), "editor");
   assert.equal(placeOf("/brief"), null);
+  assert.equal(placeOf("/projects/p-1/earn"), "earn");
+  assert.equal(placeOf("/projects/p-1/earn/sell"), "earn");
+  assert.equal(placeOf("/projects/p-1/earn/money"), "earn");
+  assert.equal(placeOf("/projects/p-1/earn/mint"), null, "the mint flow is a page of its own");
+  assert.equal(placeOf("/innovations"), "feed");
+  assert.equal(placeOf("/innovations/hexapod-robot"), "sidebar");
 });
 
 test("where a chapter can run", () => {
   const way = chapterById("way");
-  for (const p of ["home", "sidebar", "chat", "project"]) assert.ok(placeFits(way, p), p);
+  for (const p of ["home", "sidebar", "chat", "project", "earn", "feed"]) assert.ok(placeFits(way, p), p);
   for (const p of ["editor", "pcb", null]) assert.ok(!placeFits(way, p), String(p));
   assert.ok(placeFits(chapterById("editors"), "pcb"));
   assert.ok(placeFits(chapterById("editors"), "editor"));
@@ -162,6 +190,30 @@ test("first-visit offers: once per chapter, The editors before the PCB editor, n
   assert.equal(offerFor(rec, "pcb", false), null);
   assert.equal(offerFor(withChapter(null, "project", "paused", 1), "project", false), null, "started is never offered");
   assert.equal(offerFor(withOffers(null, false), "project", false), null, "the panel's switch turns them off");
+  assert.equal(offerFor(null, "earn", false), "earn");
+  assert.equal(offerFor(null, "earn", true), "earn", "Earn works on a phone");
+  assert.equal(offerFor(null, "feed", false), "share");
+});
+
+test("the journey ticks what was done, never what was watched", () => {
+  assert.deepEqual(JOURNEY.map((s) => s.label), ["Idea", "Concept", "Build", "Edit", "Earn"]);
+  const none = journeyOf([], []);
+  assert.deepEqual(none, { idea: false, concept: false, build: false, edit: false, earn: false });
+  assert.equal(journeyNow(none), "idea");
+  // An idea sent; the AI still drawing.
+  const asked = journeyOf([{ turns: [{ role: "user" }, { role: "assistant", status: "pending" }] }], []);
+  assert.deepEqual(asked, { idea: true, concept: false, build: false, edit: false, earn: false });
+  // A concept drawn.
+  assert.equal(journeyOf([{ turns: [{ role: "assistant", status: "ready" }] }], []).concept, true);
+  // A hand-made project: idea and build, no concept.
+  const byHand = journeyOf([], [{ status: "draft" }]);
+  assert.deepEqual(byHand, { idea: true, concept: false, build: true, edit: false, earn: false });
+  assert.equal(journeyNow(byHand), "concept");
+  // A saved AI build, opened in an editor, minted.
+  const all = journeyOf([], [{ status: "draft", buildId: "b1", editorOpened: { p1: { step: "pcb", at: 1 } }, mint: { tokenId: "1" } }]);
+  assert.deepEqual(all, { idea: true, concept: true, build: true, edit: true, earn: true });
+  assert.equal(journeyNow(all), null);
+  assert.equal(journeyOf([], [{ status: "completed" }]).earn, true, "a v1 project marked completed was minted");
 });
 
 test("the chat's tips: on for a first chat, on when turned on, off once seen or turned off", () => {
@@ -188,6 +240,8 @@ test("why a chapter can't start yet", () => {
     home: false,
   });
   assert.deepEqual(readinessOf("pcb", { ...at, hasProject: true }), { ok: true });
+  assert.deepEqual(readinessOf("earn", at), { ok: false, why: "Make your first project to open this.", home: true });
+  assert.deepEqual(readinessOf("share", at), { ok: true });
 });
 
 test("the Welcome: a new browser on Home, with nothing made yet", () => {

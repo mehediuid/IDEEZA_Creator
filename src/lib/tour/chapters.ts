@@ -4,7 +4,11 @@
 // (plan Rm6aBk8ieNSUpHgtS9JMu5).
 
 import { BUILD_COST, CONCEPT_COST } from "../create/credits";
+import { IDEEZA_FEE_BPS } from "../market/fee";
 import type { ChapterId, TourChapter, TourStep } from "./types";
+
+/** IDEEZA's cut of a sale, as the sale itself charges it (`lib/market/fee.ts`). */
+const IDEEZA_FEE_PERCENT = IDEEZA_FEE_BPS / 100;
 
 export const TOUR_CHAPTERS: TourChapter[] = [
   {
@@ -41,6 +45,7 @@ export const TOUR_CHAPTERS: TourChapter[] = [
         target: "nav-projects",
         title: "Your projects live here",
         body: "Everything saves by itself. Open My projects to pick up where you left off.",
+        phoneBody: "Everything saves by itself. Open the menu, then My projects, to pick up where you left off.",
       },
     ],
   },
@@ -274,6 +279,64 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       },
     ],
   },
+  {
+    id: "earn",
+    name: "Mint and sell",
+    group: "Earn & share",
+    where: "Earn",
+    place: "earn",
+    needsProject: true,
+    offered: true,
+    steps: [
+      {
+        target: "earn-path",
+        title: "Two steps to earning",
+        body: "Mint your project first, then put it on sale. Each step lists what it still needs.",
+      },
+      {
+        // Pro 6/8 Add Brief: the Brief is the mint flow now.
+        target: "earn-step-mint",
+        title: "Mint",
+        body: "Minting records that you own this design. It is free, and you sign it with your wallet.",
+      },
+      {
+        target: "earn-sell",
+        title: "Sell",
+        body: `Sell the whole project, or physical and virtual copies of each product. IDEEZA takes ${IDEEZA_FEE_PERCENT}% of each sale.`,
+      },
+      {
+        target: "earn-money",
+        title: "Money",
+        body: "Sales and splits show up here. A sale pays your wallet directly.",
+      },
+    ],
+  },
+  {
+    id: "share",
+    name: "Share with the community",
+    group: "Earn & share",
+    where: "Innovations",
+    place: "feed",
+    offered: true,
+    steps: [
+      {
+        target: ["feed-modes", "feed-categories"],
+        title: "See what others build",
+        body: "Switch between Discover, Following, Saved and Appreciated, or pick a category.",
+      },
+      {
+        target: "feed-card",
+        title: "Open a post",
+        body: "Each post shows the video, what is inside and how it was made.",
+      },
+      {
+        target: "nav-projects",
+        title: "Share yours",
+        body: "Open your project from My projects, then ⋯ › Share to Innovations. Mint it and make its videos first.",
+        phoneBody: "Open your project from the menu's My projects, then ⋯ › Share to Innovations. Mint it and make its videos first.",
+      },
+    ],
+  },
 ];
 
 export function chapterById(id: ChapterId): TourChapter {
@@ -286,15 +349,11 @@ export function isChapterId(id: unknown): id is ChapterId {
   return TOUR_CHAPTERS.some((c) => c.id === id);
 }
 
-/** The steps for this screen. On a phone, Start here's last step points at the menu button. */
+/** The steps for this screen. On a phone a step on My projects points at the menu button instead. */
 export function stepsFor(chapter: TourChapter, phone: boolean): TourStep[] {
   if (!phone) return chapter.steps;
   if (chapter.phoneSteps) return chapter.phoneSteps;
-  return chapter.steps.map((s) =>
-    s.target === "nav-projects"
-      ? { ...s, target: "menu", body: "Everything saves by itself. Open the menu, then My projects, to pick up where you left off." }
-      : s,
-  );
+  return chapter.steps.map((s) => (s.target === "nav-projects" ? { ...s, target: "menu", body: s.phoneBody ?? s.body } : s));
 }
 
 /** The chapter the last step offers as "Next part": the next one in its group, past any tips. */

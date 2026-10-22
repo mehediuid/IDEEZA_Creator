@@ -1,23 +1,25 @@
 // The Tour Guide's shapes (spec docs/superpowers/specs/2026-10-22-tour-guide-design.md).
 
-export type ChapterId = "start" | "way" | "account" | "chat" | "project" | "editors" | "pcb";
+export type ChapterId = "start" | "way" | "account" | "chat" | "project" | "editors" | "pcb" | "earn" | "share";
 
 /** Where a chapter happens: Home, any page with the sidebar, a concept chat, a project's own page,
- *  any editor module, or the PCB editor itself. */
-export type Place = "home" | "sidebar" | "chat" | "project" | "editor" | "pcb";
+ *  any editor module, the PCB editor itself, a project's Earn area, or the Innovations feed. */
+export type Place = "home" | "sidebar" | "chat" | "project" | "editor" | "pcb" | "earn" | "feed";
 
 /** One popup. `target` is a `data-tour` id on a real control; several ids spotlight them together. */
 export type TourStep = {
   target: string | string[];
   title: string;
   body: string;
+  /** Said instead on a phone, where a sidebar step points at the menu button. */
+  phoneBody?: string;
 };
 
 export type TourChapter = {
   id: ChapterId;
   name: string;
   /** The Tour Guide panel's heading the chapter sits under. */
-  group: "Start" | "Build";
+  group: "Start" | "Build" | "Earn & share";
   /** Where it happens, as the Tour Guide panel lists it. */
   where: string;
   place: Place;

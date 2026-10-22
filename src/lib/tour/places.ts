@@ -14,6 +14,9 @@ export function placeOf(pathname: string): Place | null {
   const parts = pathname.split("/").filter(Boolean);
   if (parts[0] === "chat" && parts[1]) return "chat";
   if (parts[0] === "projects" && parts.length === 2) return "project";
+  // Earn and its tabs; its mint flow is a page of its own, without the tabs.
+  if (parts[0] === "projects" && parts[2] === "earn") return parts.length === 3 || (parts.length === 4 && parts[3] !== "mint") ? "earn" : null;
+  if (parts[0] === "innovations" && parts.length === 1) return "feed";
   if (parts[0] === "project") {
     const editor = parseEditorPath(pathname);
     if (!editor) return null;
@@ -30,7 +33,7 @@ export function placeFits(chapter: TourChapter, here: Place | null): boolean {
   if (!here) return false;
   switch (chapter.place) {
     case "sidebar":
-      return here === "home" || here === "sidebar" || here === "chat" || here === "project";
+      return here !== "editor" && here !== "pcb";
     case "editor":
       return here === "editor" || here === "pcb";
     default:

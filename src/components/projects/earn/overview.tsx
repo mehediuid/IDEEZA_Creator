@@ -94,7 +94,7 @@ export function EarnOverview({ project, view, brief, announce }: SlotProps) {
       )}
 
       <section aria-labelledby={headingId} className={EARN_CARD}>
-        <div className="flex flex-col gap-4">
+        <div data-tour="earn-path" className="flex flex-col gap-4">
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
             <div className="flex min-w-0 flex-col gap-1">
               <h2 id={headingId} className={EARN_H2}>{`Get ${project.name} earning`}</h2>
@@ -162,7 +162,11 @@ function StepGroup({
   const note = step.state === "done" ? "Done" : current ? "Now" : "Later";
 
   return (
-    <li aria-current={current ? "step" : undefined} className="flex flex-col gap-3 border-t border-solid border-border py-6 last:pb-0">
+    <li
+      aria-current={current ? "step" : undefined}
+      data-tour={`earn-step-${step.id}`}
+      className="flex flex-col gap-3 border-t border-solid border-border py-6 last:pb-0"
+    >
       <div className="flex items-center gap-4">
         <span
           aria-hidden

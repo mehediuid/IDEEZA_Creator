@@ -12,9 +12,11 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCreateHistory } from "@/lib/create/history";
 import { editorHref, parseEditorPath } from "@/lib/manual/editor-scope";
+import { earnHref } from "@/lib/manual/earn-route";
 import { productRowsOf } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { chapterById, nextChapterOf, stepsFor } from "@/lib/tour/chapters";
+import { journeyOf } from "@/lib/tour/journey";
 import { TOUR_EVENT, type TourRequest } from "@/lib/tour/open";
 import { offerFor, placeFits, placeOf, tipFrom, tipsOn } from "@/lib/tour/places";
 import { emptyTour, shouldWelcome, withChapter, withOffered, withOffers, withWelcome } from "@/lib/tour/state";
@@ -95,6 +97,10 @@ export function TourHost() {
       }
       case "project":
         return project ? `/projects/${encodeURIComponent(project.id)}` : null;
+      case "earn":
+        return project ? earnHref(project.id) : null;
+      case "feed":
+        return "/innovations";
       default: {
         const editor = parseEditorPath(pathname);
         if (editor?.productId) return editorHref(editor.slug, editor.productId, "pcb");
@@ -320,6 +326,8 @@ export function TourHost() {
           anchor={panel.anchor}
           rec={rec ?? null}
           ready={{ hasProject: projects.length > 0, hasChat: chats.length > 0 }}
+          journey={journeyOf(chats, projects)}
+          atHome={here === "home"}
           onStart={(id, step) => begin(id, step, panel.anchor)}
           onGoHome={() => {
             setPanel(null);
