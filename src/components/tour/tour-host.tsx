@@ -18,7 +18,7 @@ import { productRowsOf } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { chapterById, nextChapterOf } from "@/lib/tour/chapters";
 import { TOUR_EVENT, type TourRequest } from "@/lib/tour/open";
-import { editorStepOf, fixedHrefOf, offerFor, pageMatches, placeFits, placeOf, tipFrom, tipsOn } from "@/lib/tour/places";
+import { editorStepOf, fixedHrefOf, offerFor, pageMatches, placeFits, placeOf, runnableSteps, tipFrom, tipsOn } from "@/lib/tour/places";
 import { emptyTour, shouldWelcome, withChapter, withOffered, withOffers, withWelcome } from "@/lib/tour/state";
 import type { ChapterId, ChapterState, PageRef, TourChapter, TourStep as Step } from "@/lib/tour/types";
 import { ChapterOffer } from "./chapter-offer";
@@ -40,6 +40,9 @@ type Run = {
   arrived: boolean;
   /** The step came up on a page just opened for it, still loading: it waits longer for its control. */
   navigated: boolean;
+  /** The page a move to another page left from; landing anywhere but the step's page pauses the
+   *  chapter rather than leaving it waiting out of sight. */
+  from: string | null;
   /** What had focus before the tour, given it back at the end. */
   opener: HTMLElement | null;
 };
@@ -118,8 +121,7 @@ export function TourHost() {
     const parts = pathname.split("/").filter(Boolean);
     switch (page) {
       case "project":
-        // The Share chapter ends on your project's ⋯; without a project yet, on My projects.
-        return project ? `/projects/${encodeURIComponent(project.id)}` : "/projects";
+        return project ? `/projects/${encodeURIComponent(project.id)}` : null;
       case "product": {
         if (!project) return null;
         const row = parts[2] === "products" && parts[3] ? decodeURIComponent(parts[3]) : productRowsOf(project)[0].id;
@@ -165,10 +167,10 @@ export function TourHost() {
     const chapter = chapterById(r.id);
     for (let i = to; i >= 0 && i < r.steps.length; i += dir) {
       const step = r.steps[i];
-      if (stepFits(chapter, step)) return setRun({ ...r, index: i, dir, arrived: true, navigated: false });
+      if (stepFits(chapter, step)) return setRun({ ...r, index: i, dir, arrived: true, navigated: false, from: null });
       const href = step.page ? hrefOf(step.page) : chapterHref(chapter);
       if (!href) continue;
-      setRun({ ...r, index: i, dir, arrived: false, navigated: true });
+      setRun({ ...r, index: i, dir, arrived: false, navigated: true, from: pathname });
       router.push(href);
       return;
     }
@@ -191,13 +193,15 @@ export function TourHost() {
       if (href) router.push(href);
       return;
     }
-    const start = Math.min(Math.max(step, 0), chapter.steps.length - 1);
-    const first = chapter.steps[start];
+    const steps = runnableSteps(chapter, !!projectNow());
+    if (steps.length === 0) return;
+    const start = Math.min(Math.max(step, 0), steps.length - 1);
+    const first = steps[start];
     if (!stepFits(chapter, first) && !(first.page ? hrefOf(first.page) : chapterHref(chapter))) return;
     setPanel(null);
     setWelcome(false);
     setOffer(null);
-    goTo({ id, steps: chapter.steps, index: start, dir: 1, shown: 0, arrived: false, navigated: false, opener }, start, 1);
+    goTo({ id, steps, index: start, dir: 1, shown: 0, arrived: false, navigated: false, from: null, opener }, start, 1);
   };
 
   const finish = (r: Run, state: ChapterState, step = r.index) => {
@@ -230,6 +234,13 @@ export function TourHost() {
   // A step opened on another page waits until that page is open. After that a step whose control
   // goes away (the page changed under it) pauses the chapter by itself.
   if (run && !run.arrived && stepFits(chapterById(run.id), run.steps[run.index])) setRun({ ...run, arrived: true });
+
+  // The move landed somewhere else (a redirect, or a click while the page was opening): the
+  // chapter pauses instead of waiting out of sight for a page that isn't coming.
+  const strayed = React.useEffectEvent(() => {
+    if (run && !run.arrived && run.from !== null && pathname !== run.from) finish(run, "paused");
+  });
+  React.useEffect(() => strayed(), [pathname]);
 
   // The Welcome: once, on Home, to someone who hasn't made anything yet (or whose tours were reset).
   const due =
@@ -340,10 +351,11 @@ export function TourHost() {
         }}
       />
       {/* One layer for a whole chapter (or the chat's tips): steps glide into one another. */}
-      {run && current ? (
+      {run ? (
         <TourStep
           key="run"
-          step={current}
+          step={run.steps[run.index]}
+          waiting={!run.arrived}
           index={run.index}
           total={run.steps.length}
           first={run.shown === 0 || run.navigated}

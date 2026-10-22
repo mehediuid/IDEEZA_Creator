@@ -3,7 +3,7 @@
 
 import { parseEditorPath } from "../manual/editor-scope";
 import { TOUR_CHAPTERS, chapterById } from "./chapters";
-import type { ChapterId, PageRef, Place, TourChapter, TourRecord } from "./types";
+import type { ChapterId, PageRef, Place, TourChapter, TourRecord, TourStep } from "./types";
 
 // The editors that also live at the app's root, outside a project (`/pcb`, `/code`, …).
 const ROOT_EDITORS: Record<string, Place> = { pcb: "pcb", code: "editor", "3d": "editor", preview: "editor", wiring: "editor" };
@@ -88,6 +88,22 @@ export function fixedHrefOf(page: PageRef): string | null {
 
 export function editorStepOf(page: PageRef): string | null {
   return EDITOR_STEP[page] ?? null;
+}
+
+/** The pages that are a project's own: there is nothing to open for them without a project. */
+const PROJECT_PAGES: ReadonlySet<PageRef> = new Set<PageRef>([
+  "project",
+  "product",
+  "earn-overview",
+  "earn-sell",
+  "earn-money",
+  ...(Object.keys(EDITOR_STEP) as PageRef[]),
+]);
+
+/** The steps a chapter can show: one about a project's page is left out until there is a project
+ *  (Share with the community then ends on its post). */
+export function runnableSteps(chapter: TourChapter, hasProject: boolean): TourStep[] {
+  return hasProject ? chapter.steps : chapter.steps.filter((s) => !s.page || !PROJECT_PAGES.has(s.page));
 }
 
 /** Whether a chapter can run on this kind of page. The sidebar's chapters run on every page that
