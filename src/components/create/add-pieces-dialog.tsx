@@ -38,6 +38,11 @@ import {
 import { OUTLINE_BUTTON } from "./buttons";
 import { useDialogFocus } from "./use-dialog-focus";
 
+/** The added pieces' own ledger entry — one per press, never the build's. */
+function addChargeId(buildId: string): string {
+  return `${buildId}:add:${Date.now()}`;
+}
+
 export function AddPiecesDialog({
   buildId,
   product,
@@ -109,7 +114,7 @@ export function AddPiecesDialog({
     if (!chosen.length || short) return;
     // Its own charge, apart from the build's: the build's was booked and
     // may already be settled.
-    const ok = charge(`${buildId}:add:${Date.now()}`, cost, "build");
+    const ok = charge(addChargeId(buildId), cost, "build");
     if (!ok) return;
     addBuildPieces(
       buildId,
