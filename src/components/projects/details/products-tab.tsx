@@ -289,7 +289,7 @@ function ProductCard({
 
   return (
     <li>
-      <div className={CARD}>
+      <div data-tour="project-product" className={CARD}>
         <ProductImage url={built?.product.conceptImageUrl ?? null} name={name} />
         <div className="flex flex-1 flex-col gap-4 p-7">
           <div className="flex min-w-0 items-start gap-4">

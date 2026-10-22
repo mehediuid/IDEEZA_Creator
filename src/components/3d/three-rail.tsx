@@ -32,6 +32,7 @@ export function ThreeRail({ topOffset = 132 }: { topOffset?: number } = {}) {
         <div
           key={r.key}
           className="ix-nav"
+          data-tour={`rail-${r.key}`}
           onClick={() => {
             const step = RAIL_KEY_TO_STEP[r.key];
             if (step && r.key !== "3d" && activeProject) goStep(step);

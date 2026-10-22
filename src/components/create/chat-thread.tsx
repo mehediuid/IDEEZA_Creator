@@ -354,7 +354,13 @@ export function ChatThread({
           answered the rail carries the decision, and a read-back of it at the
           top of the canvas says the same thing twice in the same eyeful. */}
       {setup?.role === "setup" && setup.status !== "answered" && (
-        <div id={SETUP_QUESTION_ID} tabIndex={-1} className={`w-full max-w-[640px] ${LANDING_BARE}`}>
+        // The Tour Guide's first chat tip waits for the questions themselves, not the loading card.
+        <div
+          id={SETUP_QUESTION_ID}
+          data-tour={setup.status === "asking" ? "chat-question" : undefined}
+          tabIndex={-1}
+          className={`w-full max-w-[640px] ${LANDING_BARE}`}
+        >
           <SetupTurn
             prompt={setup.prompt}
             status={setup.status}
@@ -653,6 +659,7 @@ function BuildAction({
           — not a grey that reads as disabled while the work is under way. */}
       <button
         id={BUILD_ACTION_ID}
+        data-tour="chat-build"
         type="button"
         data-testid="build-action"
         onClick={preparing ? undefined : onBuild}

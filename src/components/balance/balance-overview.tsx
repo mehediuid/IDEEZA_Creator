@@ -65,13 +65,15 @@ export function BalanceOverview() {
     <PricingFrame crumbs={[{ label: "Balance" }, { label: "Overview" }]}>
       <h1 className="sr-only">Balance</h1>
       <div className="flex flex-col gap-[24px]">
-        {!wallet ? (
-          <BalanceCardSkeleton />
-        ) : holdings ? (
-          <BalanceCard network={network} holdings={holdings} actions={actions} />
-        ) : (
-          <NotConnectedCard actions={actions} onConnect={openManage} />
-        )}
+        <div data-tour="balance-card">
+          {!wallet ? (
+            <BalanceCardSkeleton />
+          ) : holdings ? (
+            <BalanceCard network={network} holdings={holdings} actions={actions} />
+          ) : (
+            <NotConnectedCard actions={actions} onConnect={openManage} />
+          )}
+        </div>
 
         {holdings && compareAmounts(holdings.claimable, "0") > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-[12px] rounded-xl border border-solid border-border-brand bg-bg-brand-subtle px-[16px] py-[12px]">

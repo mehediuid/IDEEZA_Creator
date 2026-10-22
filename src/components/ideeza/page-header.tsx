@@ -35,7 +35,7 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn("mb-12 flex flex-col gap-6", className)}>
+    <header data-tour="page-head" className={cn("mb-12 flex flex-col gap-6", className)}>
       {breadcrumb}
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-6">
         <div className="flex min-w-0 flex-1 basis-[20rem] flex-col gap-2">

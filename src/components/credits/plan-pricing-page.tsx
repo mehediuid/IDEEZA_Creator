@@ -23,7 +23,7 @@ import { PricingFrame, PricingTabs, type PricingTab } from "./pricing-frame";
 type Tab = "plans" | "credits" | "billing" | "payment";
 const TABS: readonly PricingTab<Tab>[] = [
   { id: "plans", label: "Available plan" },
-  { id: "credits", label: "Credits" },
+  { id: "credits", label: "Credits", tour: "plan-credits-tab" },
   { id: "billing", label: "Billing history" },
   { id: "payment", label: "Payment method" },
 ];

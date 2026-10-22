@@ -207,7 +207,7 @@ export function WorkspacePrompt() {
           <ModeToggle mode={mode} onChange={setMode} />
         </div>
 
-        <div className="mt-[24px]">
+        <div data-tour="home-composer" className="mt-[24px]">
           {mode === "ai" && addTo && (
             <div className="mb-[12px] flex justify-center">
               <p className="inline-flex max-w-full items-center gap-[4px] rounded-full border border-solid border-border bg-bg-surface py-[2px] pl-[14px] pr-[2px] text-sm text-text-secondary">
@@ -245,7 +245,7 @@ export function WorkspacePrompt() {
 
         {/* Chips suggest prompts — only meaningful in AI mode. */}
         {mode === "ai" && (
-          <div className="mt-[16px]">
+          <div data-tour="home-examples" className="mt-[16px]">
             <Chips
               items={chips}
               onPick={pickChip}
@@ -331,6 +331,7 @@ function ModeToggle({
     <div
       role="radiogroup"
       aria-label="How you want to start the project"
+      data-tour="home-mode"
       onKeyDown={onKey}
       className="inline-flex h-[48px] items-center gap-[4px] rounded-full border border-border bg-bg-surface p-[4px]"
     >
@@ -730,6 +731,7 @@ const DELIVERABLE_ICON: Record<BuildItemKind, IconValue> = {
 function WhatYouGet() {
   return (
     <div
+      data-tour="home-get"
       aria-label={`Each build delivers: ${ITEM_KINDS.map((k) => ITEM_LABELS[k]).join(", ")}`}
       className="flex flex-wrap items-center justify-center gap-[6px]"
     >

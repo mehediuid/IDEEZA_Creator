@@ -8,8 +8,8 @@
 // Sections covered:
 //   • Actions     — start a new project
 //   • Pages       — the 7 sidebar nav destinations
-//   • Resources   — the tutorial, Report a problem (the tour and help pages
-//                   aren't built yet, so they aren't listed)
+//   • Resources   — the tutorial, the Tour Guide, Report a problem (the help
+//                   pages aren't built yet, so they aren't listed)
 //   • Theme       — Light / Dark / System
 //   • Account     — Profile, Wallet, Settings, Plan & pricing
 //   • Settings    — while typing: the matching settings rows, each opening
@@ -27,6 +27,7 @@ import {
   Add01Icon,
   BookOpen01Icon,
   Bug01Icon,
+  Compass01Icon,
   ComputerIcon,
   CpuIcon,
   CreditCardIcon,
@@ -47,6 +48,7 @@ import {
 import { useTheme } from "@/components/theme-provider";
 import { Icon, type IconValue } from "./icon";
 import { openReportProblem } from "@/lib/support/open-report";
+import { openTourGuide } from "@/lib/tour/open";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { searchSettings } from "@/lib/settings/search";
 import { logActivations } from "@/lib/data/activity-log";
@@ -115,6 +117,8 @@ export function CommandPalette({
       // Resources
       { id: "tutorial", label: "Open the tutorial", category: "Resources",
         icon: MortarboardIcon, onActivate: go("/tutorials") },
+      { id: "tour", label: "Open Tour Guide", category: "Resources",
+        icon: Compass01Icon, onActivate: exit(() => openTourGuide()) },
       { id: "bug", label: "Report a problem", category: "Resources",
         icon: Bug01Icon, onActivate: exit(openReportProblem) },
       // Theme

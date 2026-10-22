@@ -18,6 +18,7 @@ import { ProjectVideoDialogHost } from "@/components/video-jobs/project-video-di
 import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
 import { ReportProblemHost } from "@/components/support/report-problem";
+import { TourHost } from "@/components/tour/tour-host";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NoticePopups } from "@/components/notifications/notice-popups";
 import { SIDEBAR_PREPAINT } from "@/components/dashboard/sidebar-state";
@@ -154,6 +155,10 @@ export default function RootLayout({
                                   the app shell. Opened by
                                   openReportProblem() from anywhere. */}
                               <ReportProblemHost />
+                              {/* The Tour Guide: the Welcome on Home, the
+                                  chapters' steps, and the panel Support ›
+                                  Tour Guide and ⌘K open (openTourGuide()). */}
+                              <TourHost />
                             </BuyCreditsProvider>
                           </WalletProvider>
                           {/* A build is a background job: it has to keep

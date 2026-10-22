@@ -56,7 +56,7 @@ export function EarnSell(props: SlotProps) {
 
 function SellRules() {
   return (
-    <EarnBlock title="What you can sell" lead={SELL_RULES_LEAD} aside={<TestnetDemoBadge />}>
+    <EarnBlock title="What you can sell" tour="earn-sell-rules" lead={SELL_RULES_LEAD} aside={<TestnetDemoBadge />}>
       <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 [@container(min-width:640px)]:grid-cols-3">
         {SELL_RULES.map((r) => (
           <li key={r.id} className="flex min-w-0 flex-col gap-2 rounded-xl border border-solid border-border bg-bg-surface p-6">

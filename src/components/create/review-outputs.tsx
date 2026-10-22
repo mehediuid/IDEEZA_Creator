@@ -552,6 +552,7 @@ function ReviewPanel({
             {saved ? (
               <LeaveButton
                 id={REVIEW_PRIMARY_ID}
+                data-tour="chat-save"
                 tone="primary"
                 busy={leaving}
                 blocked={leaving}
@@ -563,6 +564,7 @@ function ReviewPanel({
             ) : (
               <button
                 id={REVIEW_PRIMARY_ID}
+                data-tour="chat-save"
                 type="button"
                 aria-haspopup="dialog"
                 onClick={() => setStepOpen(true)}
