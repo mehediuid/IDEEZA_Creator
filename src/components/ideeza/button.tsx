@@ -3,13 +3,9 @@
 // IDEEZA Design System — A01 Button
 // Converted from Figma (node 172:1679). Token-driven via the IDEEZA design
 // tokens: semantic button colors, --spacing-*, --radius-*, --font-* scales.
-// Variants: hierarchy (primary/secondary/ghost/danger/tonal/outline-brand) × size (sm–2xl) +
-// icon leading/trailing, loading, disabled. Light/dark ready through tokens.
-//
-// The focus ring's 2 px offset gap is the surface colour, not the page's:
-// most filled Buttons sit in dialogs, panels and cards (bg-surface), where a
-// page-coloured gap showed as a darker band in dark. A caller on the bare
-// page can pass its own `ring-offset-bg-page`.
+// Variants: hierarchy (primary/secondary/ghost/danger/tonal/outline-brand/
+// inverse/ai) × size (sm–2xl) + icon leading/trailing, loading, disabled.
+// Light/dark ready through tokens.
 //
 // Every hierarchy draws A01's 1.5 px secondary stroke as a border —
 // transparent unless it is secondary — so a primary beside a secondary is the
@@ -21,37 +17,49 @@
 // before the size's `text-[length:…]`. For the same reason the side padding
 // is A01's (12 · 14 · 16 · 20 · 24) less the border, so the width matches
 // Figma too. Type is A01's Label style per size (MD · LG · LG · XL · XL);
-// the line height sits after the font size.
+// the line height sits after the font size. Icon slots are 14 · 16 · 18 · 20 ·
+// 24 beside a label and 16 · 18 · 20 · 22 · 24 alone; the spinner is 16.
+//
+// States follow A01 per hierarchy: the filled ones (primary, danger, AI) wear
+// the Depth/Top-line accent; focus is A01's own treatment — a 3 px halo
+// outside (on-fill, danger, inverse, brand), or the focus border on secondary;
+// disabled is one look for all: the disabled fill and ink, no stroke, no
+// depth. Outline brand's Figma focus repeats its default, so it takes the
+// brand halo to stay visible.
 
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-wide transition-[background-color,filter,box-shadow] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none ring-offset-bg-surface focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
+  "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-wide border-[length:var(--border-width-1-5)] border-solid border-transparent transition-[background-color,border-color,box-shadow] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none disabled:cursor-not-allowed disabled:border-transparent disabled:bg-[var(--color-button-disabled-bg)] disabled:bg-none disabled:text-[color:var(--color-button-disabled-text)] disabled:shadow-none disabled:[--btn-icon:var(--color-button-disabled-text)]",
   {
     variants: {
       hierarchy: {
         primary:
-          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] hover:bg-[var(--color-button-primary-bg-hover)] active:bg-[var(--color-button-primary-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] shadow-depth hover:bg-[var(--color-button-primary-bg-hover)] active:bg-[var(--color-button-primary-bg-pressed)] focus-visible:shadow-depth-focus-on-fill",
         secondary:
-          "bg-[var(--color-button-secondary-bg)] text-[color:var(--color-button-secondary-text)] border-[length:var(--border-width-1-5)] border-solid border-[var(--color-button-secondary-border)] hover:bg-[var(--color-bg-subtle)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "bg-[var(--color-button-secondary-bg)] text-[color:var(--color-button-secondary-text)] border-[var(--color-button-secondary-border)] hover:bg-[var(--color-button-secondary-bg-hover)] hover:border-[var(--color-button-secondary-border-hover)] active:bg-[var(--color-button-secondary-bg-pressed)] active:border-[var(--color-button-secondary-border-hover)] focus-visible:border-[var(--color-border-focus)]",
         ghost:
-          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] active:bg-[var(--color-bg-surface-raised)] focus-visible:shadow-focus-brand",
         danger:
-          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:bg-[var(--color-button-danger-bg-hover)] active:bg-[var(--color-button-danger-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] shadow-depth hover:bg-[var(--color-button-danger-bg-hover)] active:bg-[var(--color-button-danger-bg-pressed)] focus-visible:shadow-depth-focus-danger",
         // DS Hierarchy=Tonal (3288:640) and Outline brand (3289:700).
         tonal:
-          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-[var(--color-button-tonal-bg)] text-[color:var(--color-button-tonal-text)] hover:bg-[var(--color-button-tonal-bg-hover)] active:bg-[var(--color-button-tonal-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "bg-[var(--color-button-tonal-bg)] text-[color:var(--color-button-tonal-text)] [--btn-icon:var(--color-icon-brand)] hover:bg-[var(--color-button-tonal-bg-hover)] active:bg-[var(--color-button-tonal-bg-pressed)] focus-visible:shadow-focus-on-fill",
         "outline-brand":
-          "border-[length:var(--border-width-1-5)] border-solid border-[var(--color-border-brand)] bg-transparent text-[color:var(--color-text-brand)] hover:bg-[var(--color-bg-brand-subtle)] disabled:border-[var(--color-border-default)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "border-[var(--color-border-brand)] bg-transparent text-[color:var(--color-text-brand)] [--btn-icon:var(--color-icon-brand)] hover:bg-[var(--color-button-outline-bg-hover)] active:bg-[var(--color-button-outline-bg-pressed)] focus-visible:shadow-focus-brand",
+        inverse:
+          "bg-[var(--color-button-inverse-bg)] text-[color:var(--color-button-inverse-text)] [--btn-icon:var(--color-icon-default)] hover:bg-[var(--color-button-inverse-bg-hover)] active:bg-[var(--color-button-inverse-bg-pressed)] focus-visible:shadow-focus-inverse",
+        ai:
+          "bg-[image:var(--gradient-button-ai)] text-[color:var(--color-text-on-brand)] shadow-depth hover:bg-[image:var(--gradient-button-ai-hover)] active:bg-[image:var(--gradient-button-ai-pressed)] focus-visible:shadow-depth-focus-on-fill",
       },
       size: {
-        sm: "h-[32px] gap-[var(--spacing-3)] px-[calc(var(--spacing-6)_-_var(--border-width-1-5))] rounded-[var(--radius-lg)] text-[length:var(--font-size-sm)] leading-xs",
-        md: "h-[36px] gap-[var(--spacing-3)] px-[calc(var(--spacing-7)_-_var(--border-width-1-5))] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)] leading-md",
-        lg: "h-[40px] gap-[var(--spacing-3)] px-[calc(var(--spacing-8)_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-md)] leading-md",
-        xl: "h-[44px] gap-[var(--spacing-4)] px-[calc(var(--spacing-10)_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-lg)] leading-lg",
-        "2xl": "h-[48px] gap-[var(--spacing-4)] px-[calc(var(--spacing-12)_-_var(--border-width-1-5))] rounded-[var(--radius-2xl)] text-[length:var(--font-size-lg)] leading-lg",
+        sm: "h-[32px] gap-[var(--spacing-3)] px-[calc(var(--spacing-6)_-_var(--border-width-1-5))] rounded-[var(--radius-lg)] text-[length:var(--font-size-sm)] leading-xs [--btn-icon-size:14px]",
+        md: "h-[36px] gap-[var(--spacing-3)] px-[calc(var(--spacing-7)_-_var(--border-width-1-5))] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)] leading-md [--btn-icon-size:16px]",
+        lg: "h-[40px] gap-[var(--spacing-3)] px-[calc(var(--spacing-8)_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-md)] leading-md [--btn-icon-size:18px]",
+        xl: "h-[44px] gap-[var(--spacing-4)] px-[calc(var(--spacing-10)_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-lg)] leading-lg [--btn-icon-size:20px]",
+        "2xl": "h-[48px] gap-[var(--spacing-4)] px-[calc(var(--spacing-12)_-_var(--border-width-1-5))] rounded-[var(--radius-2xl)] text-[length:var(--font-size-lg)] leading-lg [--btn-icon-size:24px]",
       },
       iconOnly: {
         true: "px-0 py-0 aspect-square",
@@ -59,15 +67,19 @@ const buttonVariants = cva(
       },
     },
     compoundVariants: [
-      { iconOnly: true, size: "sm", class: "size-[32px]" },
-      { iconOnly: true, size: "md", class: "size-[36px]" },
-      { iconOnly: true, size: "lg", class: "size-[40px]" },
-      { iconOnly: true, size: "xl", class: "size-[44px]" },
-      { iconOnly: true, size: "2xl", class: "size-[48px]" },
+      { iconOnly: true, size: "sm", class: "size-[32px] [--btn-icon-size:16px]" },
+      { iconOnly: true, size: "md", class: "size-[36px] [--btn-icon-size:18px]" },
+      { iconOnly: true, size: "lg", class: "size-[40px] [--btn-icon-size:20px]" },
+      { iconOnly: true, size: "xl", class: "size-[44px] [--btn-icon-size:22px]" },
+      { iconOnly: true, size: "2xl", class: "size-[48px] [--btn-icon-size:24px]" },
     ],
     defaultVariants: { hierarchy: "primary", size: "md", iconOnly: false },
   },
 );
+
+/** An icon at the size's A01 slot, in the hierarchy's icon colour. */
+const ICON_SLOT =
+  "inline-flex shrink-0 size-[var(--btn-icon-size)] items-center justify-center text-[color:var(--btn-icon,currentColor)] [&_svg]:size-full";
 
 const Spinner = () => (
   <svg
@@ -126,18 +138,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           <Spinner />
         ) : (
           <>
-            {iconLeading && (
-              <span className="inline-flex shrink-0 size-[16px] items-center justify-center">
-                {iconLeading}
-              </span>
-            )}
+            {iconLeading && <span className={ICON_SLOT}>{iconLeading}</span>}
             {!iconOnly && content}
-            {iconTrailing && (
-              <span className="inline-flex shrink-0 size-[16px] items-center justify-center">
-                {iconTrailing}
-              </span>
-            )}
-            {iconOnly && content}
+            {iconTrailing && <span className={ICON_SLOT}>{iconTrailing}</span>}
+            {iconOnly && <span className={ICON_SLOT}>{content}</span>}
           </>
         )}
       </button>
