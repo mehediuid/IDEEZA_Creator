@@ -130,6 +130,7 @@ export function ProjectShell({
             ) : null}
             <TabStrip
               label="Project sections"
+              tour="project-tabs"
               groups={[shown.map((id) => ({ id, label: PROJECT_TAB_LABEL[id] }))]}
               active={active}
               onSelect={select}

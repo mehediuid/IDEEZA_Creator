@@ -70,6 +70,7 @@ import { useMessagePeople } from "@/lib/messages/use-people";
 import { linkVariants } from "@/components/ideeza";
 import { cn } from "@/lib/utils";
 import { openReportProblem } from "@/lib/support/open-report";
+import { openTourGuide } from "@/lib/tour/open";
 import { useBlog, useReviewClock, updateBlog } from "@/lib/blog/store";
 import { findArticle, markSeen } from "@/lib/blog/article";
 import { blogNews, newsAnnouncement, newsKicker, newsMessage, type BlogNews } from "@/lib/blog/news";
@@ -83,17 +84,18 @@ import { useAttentionElsewhere, useNotices, useToastGate } from "@/components/no
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
 // than linking to a 404. `unread` is the Messages badge, set where NAV is drawn.
-type NavItem = { label: string; href: string | null; icon: IconValue; unread?: number };
+// `tour` is the row's id for the Tour Guide's steps (lib/tour/chapters.ts).
+type NavItem = { label: string; href: string | null; icon: IconValue; tour: string; unread?: number };
 
 const NAV: NavItem[] = [
-  { label: "Home", href: "/", icon: Home01Icon },
-  { label: "History", href: "/history", icon: HistoryIcon },
-  { label: "My projects", href: "/projects", icon: Folder01Icon },
-  { label: "Parts & agile module", href: "/parts", icon: CpuIcon },
-  { label: "Explore marketplace", href: "/marketplace", icon: ShoppingBag01Icon },
-  { label: "Innovations", href: "/innovations", icon: News01Icon },
-  { label: "Blog", href: "/blog", icon: BookOpen01Icon },
-  { label: "Messages", href: MESSAGES_HREF, icon: Mail01Icon },
+  { label: "Home", href: "/", icon: Home01Icon, tour: "nav-home" },
+  { label: "History", href: "/history", icon: HistoryIcon, tour: "nav-history" },
+  { label: "My projects", href: "/projects", icon: Folder01Icon, tour: "nav-projects" },
+  { label: "Parts & agile module", href: "/parts", icon: CpuIcon, tour: "nav-parts" },
+  { label: "Explore marketplace", href: "/marketplace", icon: ShoppingBag01Icon, tour: "nav-marketplace" },
+  { label: "Innovations", href: "/innovations", icon: News01Icon, tour: "nav-innovations" },
+  { label: "Blog", href: "/blog", icon: BookOpen01Icon, tour: "nav-blog" },
+  { label: "Messages", href: MESSAGES_HREF, icon: Mail01Icon, tour: "nav-messages" },
 ];
 
 /** Unread Inbox conversations of the tab's acting person; 0 until both stores are read. The
@@ -256,6 +258,7 @@ function MobileBar({
       <button
         type="button"
         onClick={onOpenMenu}
+        data-tour="menu"
         aria-label="Open the menu"
         aria-haspopup="dialog"
         className="inline-flex h-[var(--touch-min)] w-[var(--touch-min)] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
@@ -485,6 +488,7 @@ function NavRow({
     <li>
       <Link
         href={href}
+        data-tour={item.tour}
         aria-current={isActive ? "page" : undefined}
         aria-label={collapsed || showAttention || unread > 0 ? fullLabel : undefined}
         title={collapsed ? item.label : undefined}
@@ -551,6 +555,7 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
     return (
       <Link
         href={PLAN_PRICING_HREF}
+        data-tour="plan"
         aria-label={label}
         title={label}
         className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg bg-bg-brand-subtle text-text-brand outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
@@ -562,6 +567,7 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
   return (
     <Link
       href={PLAN_PRICING_HREF}
+      data-tour="plan"
       onClick={onLeave}
       className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-brand-subtle px-[12px] py-[12px] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
     >
@@ -582,11 +588,13 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
 }
 
 // Support — the four help destinations, written as sentence links rather
-// than four nav-sized rows: they are read once, not navigated daily.
-const SUPPORT_LINKS: Array<{ label: string; icon: IconValue; href?: string }> = [
+// than four nav-sized rows: they are read once, not navigated daily. Tour Guide
+// opens its panel beside the sidebar (components/tour); `tour` is a row's id
+// for the Tour Guide's own steps.
+const SUPPORT_LINKS: Array<{ label: string; icon: IconValue; href?: string; tour?: string; opensTour?: boolean }> = [
   { label: "Help Center", icon: HelpCircleIcon },
-  { label: "Tutorial", icon: MortarboardIcon, href: "/tutorials" },
-  { label: "Tour Guide", icon: Compass01Icon },
+  { label: "Tutorial", icon: MortarboardIcon, href: "/tutorials", tour: "support-tutorial" },
+  { label: "Tour Guide", icon: Compass01Icon, tour: "support-tour", opensTour: true },
 ];
 
 // Report a problem is the one live row: it opens the app's one Report a
@@ -598,12 +606,19 @@ function SupportBlock({ collapsed, onLeave }: { collapsed: boolean; onLeave?: ()
     onLeave?.();
     openReportProblem();
   };
+  // From the phone drawer the drawer closes first and the panel opens as a sheet;
+  // from the sidebar it floats beside the link.
+  const tour = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const link = e.currentTarget;
+    onLeave?.();
+    openTourGuide(onLeave ? null : link);
+  };
   if (collapsed) {
     return (
       <ul role="list" className="mb-[12px] flex flex-col gap-[2px]">
         {SUPPORT_LINKS.map((row) => (
           <li key={row.label}>
-            <SupportAction label={row.label} icon={row.icon} href={row.href} onLeave={onLeave} collapsed />
+            <SupportAction label={row.label} icon={row.icon} href={row.href} tour={row.tour} onClick={row.opensTour ? tour : undefined} onLeave={onLeave} collapsed />
           </li>
         ))}
         <li>
@@ -625,7 +640,7 @@ function SupportBlock({ collapsed, onLeave }: { collapsed: boolean; onLeave?: ()
                 •
               </span>
             )}
-            <SupportAction label={row.label} icon={row.icon} href={row.href} onLeave={onLeave} />
+            <SupportAction label={row.label} icon={row.icon} href={row.href} tour={row.tour} onClick={row.opensTour ? tour : undefined} onLeave={onLeave} />
           </React.Fragment>
         ))}
       </p>
@@ -636,22 +651,25 @@ function SupportBlock({ collapsed, onLeave }: { collapsed: boolean; onLeave?: ()
   );
 }
 
-// Tutorial has a page (`href`): a link, marked current on its pages. Help
-// Center and Tour Guide have none yet, so without an `href` or an `onClick`
-// the control says so instead of pretending to navigate.
+// Tutorial has a page (`href`): a link, marked current on its pages. Tour Guide
+// and Report a problem open in place (`onClick`). Help Center has neither yet,
+// so the control says so instead of pretending to navigate.
 function SupportAction({
   label,
   icon,
   collapsed,
   onClick,
   href,
+  tour,
   onLeave,
 }: {
   label: string;
   icon: IconValue;
   collapsed?: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   href?: string;
+  /** The row's id for the Tour Guide's steps. */
+  tour?: string;
   onLeave?: () => void;
 }) {
   const pathname = usePathname();
@@ -660,6 +678,7 @@ function SupportAction({
     return collapsed ? (
       <Link
         href={href}
+        data-tour={tour}
         aria-label={label}
         title={label}
         aria-current={current ? "page" : undefined}
@@ -674,6 +693,7 @@ function SupportAction({
     ) : (
       <Link
         href={href}
+        data-tour={tour}
         aria-current={current ? "page" : undefined}
         onClick={onLeave}
         className={linkVariants({ color: current ? "brand" : "neutral", size: "md", className: cn("min-h-[24px]", current ? "font-semibold" : "font-regular") })}
@@ -690,6 +710,7 @@ function SupportAction({
         aria-label={label}
         title={label}
         onClick={onClick}
+        data-tour={tour}
         className="flex h-[32px] w-full items-center justify-center rounded-md text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         <Icon icon={icon} />
@@ -699,6 +720,7 @@ function SupportAction({
         type="button"
         aria-haspopup="dialog"
         onClick={onClick}
+        data-tour={tour}
         className={linkVariants({ color: "neutral", size: "md", className: "min-h-[24px] font-regular" })}
       >
         {label}
@@ -787,8 +809,15 @@ function ProfileRow({
     if (!openPanel) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Element;
-      // A notice's ⋯ menu portals out of the bell's panel; a press in it is still inside.
-      if (rowRef.current?.contains(t) || t.closest?.("[data-footer-popover]") || t.closest?.('[role="menu"]')) return;
+      // A notice's ⋯ menu portals out of the bell's panel; a press in it is still inside. The Tour
+      // Guide's card points at what is open here, so a press on it leaves the panel open too.
+      if (
+        rowRef.current?.contains(t) ||
+        t.closest?.("[data-footer-popover]") ||
+        t.closest?.('[role="menu"]') ||
+        t.closest?.("[data-tour-step], [data-tour-scrim]")
+      )
+        return;
       setOpenPanel(null);
     };
     document.addEventListener("pointerdown", onDown, true);
@@ -810,6 +839,7 @@ function ProfileRow({
     <button
       ref={accountButton}
       {...trigger("account")}
+      data-tour="account"
       aria-haspopup="dialog"
       aria-label={`${me.name}, ${planLabel} — open account menu`}
       title={collapsed ? `${me.name} — account` : undefined}
@@ -843,6 +873,7 @@ function ProfileRow({
     <button
       ref={walletButton}
       {...trigger("wallet")}
+      data-tour="wallet"
       aria-haspopup="menu"
       aria-label={showIdz ? `Wallet and tokens, ${formatAmount(idz.idz!, "IDZ")}` : "Wallet and tokens"}
       title={showIdz ? `Wallet and tokens · ${formatAmount(idz.idz!, "IDZ")}` : "Wallet and tokens"}

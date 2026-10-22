@@ -538,7 +538,7 @@ function BalanceCard({
         </p>
       )}
       <Divider />
-      <div className="flex flex-col gap-[7px]">
+      <div data-tour="account-level" className="flex flex-col gap-[7px]">
         <div className="flex items-center justify-between gap-[8px]">
           <span className="text-md font-semibold leading-md tracking-wide text-text-primary">{level.name}</span>
           <span className="text-sm font-medium leading-sm tabular-nums text-text-brand">{hydrated ? xpText : "—"}</span>

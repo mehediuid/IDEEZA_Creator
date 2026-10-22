@@ -67,7 +67,7 @@ export function PricingFrame({ crumbs, children }: { crumbs: Crumb[]; children: 
   );
 }
 
-export type PricingTab<T extends string> = { id: T; label: string };
+export type PricingTab<T extends string> = { id: T; label: string; /** The Tour Guide's anchor. */ tour?: string };
 
 /** The page's tabs: pills, centred, over a hairline. One Tab stop; ←/→/Home/End move. */
 export function PricingTabs<T extends string>({
@@ -99,6 +99,7 @@ export function PricingTabs<T extends string>({
               role="tab"
               id={`tab-${t.id}`}
               data-tab={t.id}
+              data-tour={t.tour}
               aria-selected={on}
               aria-controls={`panel-${t.id}`}
               tabIndex={on ? 0 : -1}

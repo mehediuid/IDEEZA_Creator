@@ -6,7 +6,8 @@ Moved verbatim from `CLAUDE.md` §3 on 2026-09-29. Keep it current: [AGENTS.md �
 left sidebar nav — **Home · History · My projects · Parts & agile module ·
 Explore marketplace · Innovations · Blog · Messages**; in the same sidebar —
 Search + **⌘K command palette**, the **Upgrade to Builder / Disruptor** card,
-the **Support** block (Help Center · Tutorial · Tour Guide · Report a problem)
+the **Support** block (Help Center · Tutorial · Tour Guide, which opens the
+Tour Guide panel · Report a problem)
 and the account row (profile popover with name and plan, wallet, bell). The
 editors have their own top bar, with the editor account menu.
 

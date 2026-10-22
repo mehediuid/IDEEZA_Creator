@@ -76,6 +76,7 @@ export function FeedControls({
       <div
         role="group"
         aria-label="Feed mode"
+        data-tour="feed-modes"
         className="inline-flex w-fit rounded-full border border-border bg-bg-surface p-[3px]"
       >
         {MODES.map((m) => {
@@ -101,7 +102,7 @@ export function FeedControls({
       {/* Category chips + sort */}
       <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[10px]">
         <span className="text-sm font-semibold text-text-primary">Popular</span>
-        <div className="flex flex-wrap items-center gap-[8px]">
+        <div data-tour="feed-categories" className="flex flex-wrap items-center gap-[8px]">
           {CATEGORIES.map((c) => {
             const active = params.category === c.id;
             return (

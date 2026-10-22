@@ -275,6 +275,7 @@ export function ProjectHeader({
                   blocked={leaving !== null}
                   onClick={() => leave("earn", earn.href)}
                   icon={Coins01Icon}
+                  data-tour="project-earn"
                   className={HEADER_BUTTON}
                   aria-describedby={earn.sub && !publishOptions ? earnFactId : undefined}
                 >
