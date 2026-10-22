@@ -433,7 +433,7 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
                     {...p}
                     type="button"
                     aria-label={`Sort comments, now ${sortLabel}`}
-                    className={cn(linkVariants({ color: "neutral", size: "sm" }), "text-sm font-medium leading-xs text-text-primary", TAP)}
+                    className={cn(linkVariants({ color: "neutral", size: "sm" }), TAP)}
                   >
                     {sortLabel}
                     <Icon icon={ArrowDown01Icon} size={12} />
@@ -475,7 +475,7 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
             <p id="comment-composer" className="m-0 text-md leading-md text-text-secondary">
               {refusal}{" "}
               {blockWith === "byMe" ? (
-                <Link href="/settings/privacy#blocked" className={cn(linkVariants({ color: "brand", size: "sm" }), "text-md font-medium leading-md", TAP)}>
+                <Link href="/settings/privacy#blocked" className={cn(linkVariants({ color: "brand", size: "md" }), TAP)}>
                   Blocked people
                 </Link>
               ) : null}
@@ -539,7 +539,7 @@ function CommentRuleLine({ settings, now }: { settings: SettingsV1; now: number 
       {quiet && settings.audience.quietUntil !== null
         ? `You're taking a break until ${quietEndLabel(settings.audience.quietUntil)}, so only people you work with can comment.`
         : `Who can comment: ${RULE_WORD[rule]}.`}{" "}
-      <Link href="/settings/privacy#comment" className={cn(linkVariants({ color: "brand", size: "sm" }), "text-md font-medium leading-md", TAP)}>
+      <Link href="/settings/privacy#comment" className={cn(linkVariants({ color: "brand", size: "md" }), TAP)}>
         Change
       </Link>
     </p>

@@ -1,5 +1,8 @@
-// IDEEZA Design System — M48 Empty State (Figma 47167:21980) and M49 Error
-// State (47167:21988): one shell, the icon badge's ground says which.
+// IDEEZA Design System — M48 Empty State (Figma 1763:3) and M49 Error State
+// (1763:54): one shell, the icon badge's ground and icon colour say which.
+// 480 wide, radius md, 12 padding inside the subtle edge (Figma strokes
+// inside, so the edge comes out of the padding), 10 between badge, text and
+// actions, no shadow.
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +34,7 @@ export function StateCard({
     <div
       role={tone === "error" ? "alert" : "status"}
       className={cn(
-        "flex w-[480px] max-w-full flex-col items-center gap-[20px] rounded-2xl border border-solid border-border-subtle bg-bg-surface px-[24px] pb-[24px] pt-[32px] text-center shadow-1",
+        "flex w-[480px] max-w-full flex-col items-center gap-5 rounded-md border border-solid border-border-subtle bg-bg-surface p-[calc(var(--spacing-6)_-_var(--border-width-1))] text-center",
         className,
       )}
     >
@@ -39,7 +42,9 @@ export function StateCard({
         aria-hidden
         className={cn(
           "inline-flex size-[80px] items-center justify-center rounded-full",
-          tone === "error" ? "bg-bg-error-subtle text-text-error" : "bg-bg-subtle text-text-tertiary",
+          tone === "error"
+            ? "bg-bg-error-subtle text-[color:var(--color-icon-error)]"
+            : "bg-bg-subtle text-[color:var(--color-icon-default)]",
         )}
       >
         {icon}
