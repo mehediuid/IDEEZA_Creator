@@ -319,7 +319,7 @@ export function Breadcrumb({ items }: { items: { label: string; onClick?: () => 
 export function StepHeading({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-[var(--spacing-4)]">
-      <h2 className="font-display text-2xl font-semibold leading-2xl tracking-tight text-text-primary">{title}</h2>
+      <h2 className="font-display text-2xl font-semibold leading-2xl text-text-primary">{title}</h2>
       {children ? (
         <p className="max-w-[62ch] font-display text-md font-regular leading-relaxed text-text-secondary">{children}</p>
       ) : null}

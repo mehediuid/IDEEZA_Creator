@@ -112,7 +112,7 @@ function FeaturedCard({
         <span className={cn("flex flex-col justify-center gap-[12px] p-[20px] [@container(min-width:620px)]:p-[32px]", onTogglePin && !item.cover && "pr-[56px]")}>
           {caption && <span className="text-sm font-semibold leading-sm text-text-tertiary">{caption}</span>}
           <StageBadges item={item} category />
-          <span className={cn("text-3xl font-semibold leading-3xl tracking-tight text-text-primary [text-wrap:balance]", TITLE_HOVER)}>{item.title}</span>
+          <span className={cn("text-3xl font-semibold leading-3xl tracking-slight text-text-primary [text-wrap:balance]", TITLE_HOVER)}>{item.title}</span>
           {item.summary && <span className="line-clamp-4 max-w-[62ch] text-md leading-md text-text-secondary [text-wrap:pretty]">{item.summary}</span>}
           <span className="text-sm leading-sm text-text-tertiary">{facts.join(" · ")}</span>
         </span>

@@ -85,7 +85,7 @@ export function IdentityHead({
           <h1
             ref={titleRef}
             tabIndex={-1}
-            className="min-w-0 break-words text-4xl font-semibold leading-4xl tracking-tight text-text-primary outline-none [text-wrap:balance]"
+            className="min-w-0 break-words text-4xl font-semibold leading-4xl tracking-near text-text-primary outline-none [text-wrap:balance]"
           >
             {name}
           </h1>

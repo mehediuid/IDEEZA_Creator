@@ -3,25 +3,19 @@
 // IDEEZA Design System — Text Input (+ Textarea)
 //
 // The field the DS was missing: every text field in the app was hand-rolled at
-// its call site, so no two agreed on height, radius or focus treatment. Its own
-// ramp is sm 32 · radius/lg · px 10 │ md 36 · radius/lg · px 10 │ lg 40 ·
-// radius/xl · px 12 │ xl 44 · radius/xl · px 12, value type 14/20 up to lg and
-// 16/24 at xl — shared, as of today, with A07 Search alone.
+// its call site, so no two agreed on height, radius or focus treatment. It
+// follows Figma Text Input (227:2517) on the shared field ramp, sm 32 ·
+// radius/lg · px 10 │ md 36 · radius/lg · px 10 │ lg 40 · radius/xl · px 12 │
+// xl 44 · radius/xl · px 12, value type 14/20 up to lg and 16/24 at xl — the
+// same heights A06 Select, A07 Search and A12 Number Input use for the same
+// names. The border is 1.5 px; focus is the focus border plus the 3 px halo,
+// and an error keeps its border and takes the danger halo.
 //
-// It is **not** yet the system-wide field ramp, and this comment used to claim
-// it was. A12 Number Input runs its own 30/38/44 on three sizes, and A06 Select
-// has no fixed height at all — it sizes by padding — so a `size="md"` TextInput
-// (36) beside a `size="md"` NumberInput (38) does not line up. Making the ramp
-// true means editing those two atoms, which changes the height of every numeric
-// field in the PCB modals and every Select in the editor; that is a design-system
-// decision with a visual diff across the app, not a comment fix, so the comment
-// is honest about the state of things until it is taken.
-//
-// `suffix` carries a unit adornment inside the field (mm · mil · °), which is
-// what a dimension field needs — the unit belongs to the value, not to a
-// separate label somewhere else in the form. It is drawn as quiet text inside
-// the field, with no divider or fill: it labels the value, and anything with an
-// edge and a background reads as a button you can press.
+// `suffix` carries a unit adornment inside the field (mm · mil · USD), which
+// is what a dimension or amount field needs — the unit belongs to the value.
+// Text is Figma's Suffix Text addon: a bg/subtle segment at least 60 wide,
+// the unit centred in it in text/secondary. Anything else (an icon) sits where
+// Figma's right icon does, inside the field's padding.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -35,20 +29,16 @@ const SIZES = {
 
 type Size = keyof typeof SIZES;
 
-// The focus ring is the app's own — the focus colour at 2px, as its buttons,
-// Segmented's radios, Search and Select's menu all draw it — not an
-// `--elevation-*`: the elevation scale is drop shadows in rgba black, and a
-// focus ring is a different thing from a lift. It used to be a 3px glow of
-// the subtle brand tint, a fill colour that came to about 1.1:1 against the
-// surface in both themes; the focus colour clears 3:1 in both.
+// The border width is a style (as the height and radius are): `border-1-5`
+// is dropped by tailwind-merge beside a border colour.
 const shell = (invalid?: boolean, disabled?: boolean) =>
   cn(
-    "flex items-stretch overflow-hidden border bg-[var(--color-input-bg)] transition-[border-color,box-shadow] duration-fast",
+    "flex items-stretch overflow-hidden border-solid bg-[var(--color-input-bg)] transition-[border-color,box-shadow] duration-fast",
     disabled
-      ? "cursor-not-allowed border-[var(--color-border-default)] bg-[var(--color-input-bg-disabled)]"
+      ? "cursor-not-allowed border-[var(--color-input-border-disabled)] bg-[var(--color-input-bg-disabled)]"
       : invalid
-        ? "border-[var(--color-input-border-error)] focus-within:ring-2 focus-within:ring-[var(--color-border-error)]"
-        : "border-[var(--color-input-border)] hover:border-[var(--color-input-border-hover)] focus-within:border-[var(--color-input-border-focus)] focus-within:ring-2 focus-within:ring-[var(--color-border-focus)]",
+        ? "border-[var(--color-input-border-error)] focus-within:shadow-focus-danger"
+        : "border-[var(--color-input-border)] hover:border-[var(--color-input-border-hover)] focus-within:border-[var(--color-input-border-focus)] focus-within:shadow-focus-brand",
   );
 
 const field = (s: (typeof SIZES)[Size]) =>
@@ -74,10 +64,11 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
   ref,
 ) {
   const s = SIZES[size];
+  const unit = typeof suffix === "string" || typeof suffix === "number";
   return (
     <div
       className={cn(shell(invalid, disabled), containerClassName)}
-      style={{ height: s.h, borderRadius: s.radius, borderWidth: "var(--border-width-1)" }}
+      style={{ height: s.h, borderRadius: s.radius, borderWidth: "var(--border-width-1-5)" }}
     >
       <input
         ref={ref}
@@ -85,16 +76,28 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
         disabled={disabled}
         onChange={(e) => onValueChange?.(e.target.value)}
         className={cn(field(s), className)}
-        style={{ paddingInline: s.px }}
+        // Figma keeps 8 between the value and whatever trails it.
+        style={{ paddingLeft: s.px, paddingRight: suffix ? "var(--spacing-4)" : s.px }}
         {...props}
       />
       {suffix ? (
-        <span
-          aria-hidden
-          className="inline-flex shrink-0 items-center pr-[var(--spacing-5)] font-[family-name:var(--font-family-mono)] text-[length:var(--font-size-sm)] text-[color:var(--color-text-tertiary)]"
-        >
-          {suffix}
-        </span>
+        unit ? (
+          <span
+            aria-hidden
+            className={cn(
+              "inline-flex min-w-[60px] shrink-0 items-center justify-center bg-[var(--color-bg-subtle)] pr-[var(--spacing-5)] font-[family-name:var(--font-family-body)]",
+              disabled ? "text-[color:var(--color-input-placeholder)]" : "text-[color:var(--color-text-secondary)]",
+              s.text,
+              s.lh,
+            )}
+          >
+            {suffix}
+          </span>
+        ) : (
+          <span aria-hidden className="inline-flex shrink-0 items-center text-[color:var(--color-text-tertiary)]" style={{ paddingRight: s.px }}>
+            {suffix}
+          </span>
+        )
       ) : null}
     </div>
   );
@@ -112,10 +115,12 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(fun
   ref,
 ) {
   const s = SIZES.md;
+  // Figma Textarea (223:492) Rows=MD: radius/xl, 1.5 px border, padding 12 top,
+  // 14 across, 8 below. Height stays the caller's `rows`.
   return (
     <div
       className={cn(shell(invalid, disabled), containerClassName)}
-      style={{ borderRadius: s.radius, borderWidth: "var(--border-width-1)" }}
+      style={{ borderRadius: "var(--radius-xl)", borderWidth: "var(--border-width-1-5)" }}
     >
       <textarea
         ref={ref}
@@ -123,8 +128,8 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(fun
         rows={rows}
         disabled={disabled}
         onChange={(e) => onValueChange?.(e.target.value)}
-        className={cn(field(s), "resize-y py-[var(--spacing-4)]", className)}
-        style={{ paddingInline: s.px }}
+        className={cn(field(s), "resize-y pb-[var(--spacing-4)] pt-[var(--spacing-6)]", className)}
+        style={{ paddingInline: "var(--spacing-7)" }}
         {...props}
       />
     </div>

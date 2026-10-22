@@ -50,27 +50,17 @@ type Pos = { top: number; left: number; width: number; maxH: number; above: bool
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
 
-const Chevron = ({ open }: { open: boolean }) => (
-  <svg
-    aria-hidden
-    className="shrink-0 transition-transform [transition-duration:var(--motion-duration-fast)]"
-    style={{ transform: open ? "rotate(180deg)" : undefined }}
-    width={16}
-    height={16}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M6 9l6 6 6-6" />
+// Figma _Chevron icon Down 16 (it stays Down while the panel is open) and the
+// selected row's icon/check, both 1.5 px at 16 px.
+const Chevron = () => (
+  <svg aria-hidden className="shrink-0" width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 9s-4.42 6-6 6-6-6-6-6" />
   </svg>
 );
 
 const Check = () => (
-  <svg aria-hidden className="shrink-0" width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 12l5 5L20 6" />
+  <svg aria-hidden className="shrink-0" width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--color-icon-brand)" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 14l3.5 3.5L19 6.5" />
   </svg>
 );
 
@@ -329,7 +319,7 @@ export function SelectMenu<V extends string = string>({
         <div
           key={`section-${i}`}
           role="presentation"
-          className="px-[var(--spacing-6)] pb-[var(--spacing-2)] pt-[var(--spacing-4)] text-[length:var(--font-size-2xs)] font-[var(--font-weight-semibold)] uppercase tracking-[0.08em] text-[color:var(--color-text-tertiary)]"
+          className="px-[var(--spacing-6)] pb-[var(--spacing-2)] pt-[var(--spacing-4)] text-[length:var(--font-size-2xs)] font-[var(--font-weight-semibold)] uppercase leading-2xs tracking-caps text-[color:var(--color-text-tertiary)]"
         >
           {o.section}
         </div>,
@@ -356,7 +346,8 @@ export function SelectMenu<V extends string = string>({
           setTip(-1);
         }}
         className={cn(
-          "flex items-center gap-[var(--spacing-4)] px-[var(--spacing-6)] py-[var(--spacing-4)] text-[length:var(--font-size-md)] transition-colors [transition-duration:var(--motion-duration-fast)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
+          // Figma _Select item SM: 32 high, radius/md, 14/20 Regular.
+          "flex shrink-0 items-center gap-[var(--spacing-4)] rounded-[var(--radius-md)] px-[var(--spacing-6)] py-[var(--spacing-3)] text-[length:var(--font-size-md)] leading-md transition-colors [transition-duration:var(--motion-duration-fast)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
           o.disabled
             ? "cursor-not-allowed text-[color:var(--color-text-disabled)]"
             : isSelected
@@ -394,7 +385,7 @@ export function SelectMenu<V extends string = string>({
   });
 
   return (
-    <div className={cn("flex w-full flex-col gap-[var(--spacing-3)]", className)}>
+    <div className={cn("flex w-full flex-col gap-[var(--spacing-2)]", className)}>
       {/* A button is not labelable, so the field is named through
        *  `aria-labelledby`; clicking the label still reaches the trigger. */}
       {label ? (
@@ -427,30 +418,30 @@ export function SelectMenu<V extends string = string>({
         className={cn(
           // `button { border: 0 }` in the reset drops the border style, so a
           // bordered button has to name it.
-          "flex w-full items-center justify-between gap-[var(--spacing-5)] rounded-[var(--radius-lg)] border border-solid px-[var(--spacing-6)] py-[var(--spacing-5)] text-left text-[length:var(--font-size-md)] outline-none transition-[border-color,box-shadow,background-color] [transition-duration:var(--motion-duration-fast)]",
+          // Figma A06 at 40: radius/xl, a 1.5 px input border, 14/20 value.
+          "flex h-[40px] w-full items-center justify-between gap-[var(--spacing-4)] rounded-[var(--radius-xl)] border-[length:var(--border-width-1-5)] border-solid px-[var(--spacing-6)] text-left text-[length:var(--font-size-md)] leading-md outline-none transition-[border-color,box-shadow,background-color] [transition-duration:var(--motion-duration-fast)]",
           disabled
-            ? "cursor-not-allowed border-[var(--color-border-default)] bg-[var(--color-input-bg-disabled)] text-[color:var(--color-text-disabled)]"
-            : "bg-[var(--color-input-bg)] text-[color:var(--color-text-primary)]",
-          !disabled && error && "border-[var(--color-border-error)]",
-          !disabled && !error && (open ? "border-[var(--color-border-brand)] shadow-[0_0_0_3px_var(--color-bg-brand-subtle)]" : "border-[var(--color-border-default)] hover:border-[var(--color-border-strong)]"),
-          // The app's ring, as Close, Done and a Segmented's radios have it: the
-          // focus colour at 2px, which clears 3:1 in both themes. The subtle
-          // brand tint is a fill — as a ring it was about 1.1:1.
-          !disabled && "focus-visible:border-[var(--color-border-focus)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]",
+            ? "cursor-not-allowed border-[var(--color-input-border-disabled)] bg-[var(--color-input-bg-disabled)] text-[color:var(--color-text-disabled)]"
+            : "bg-[var(--color-input-bg)] text-[color:var(--color-input-text)]",
+          !disabled && error && "border-[var(--color-input-border-error)]",
+          !disabled && !error && (open ? "border-[var(--color-input-border-focus)]" : "border-[var(--color-input-border)] hover:border-[var(--color-input-border-hover)]"),
+          // Focus is the DS halo, 3 px outside: the focus border with the brand
+          // halo, or, on an error, the error border kept with the danger halo.
+          !disabled && (error ? "focus-visible:shadow-focus-danger" : "focus-visible:border-[var(--color-input-border-focus)] focus-visible:shadow-focus-brand"),
         )}
       >
         <span className={cn("min-w-0 flex-1 truncate", !selected && "text-[color:var(--color-input-placeholder)]")}>{selected ? selected.label : placeholder}</span>
         <span className={cn("inline-flex", disabled ? "text-[color:var(--color-text-disabled)]" : "text-[color:var(--color-text-tertiary)]")}>
-          <Chevron open={open} />
+          <Chevron />
         </span>
       </button>
 
       {error ? (
-        <span id={errorId} className="text-[length:var(--font-size-sm)] text-[color:var(--color-input-error-text)]">
+        <span id={errorId} className="text-[length:var(--font-size-sm)] leading-xs text-[color:var(--color-input-error-text)]">
           {error}
         </span>
       ) : hint ? (
-        <span id={hintId} className="text-[length:var(--font-size-sm)] text-[color:var(--color-input-helper)]">
+        <span id={hintId} className="text-[length:var(--font-size-sm)] leading-xs text-[color:var(--color-input-helper)]">
           {hint}
         </span>
       ) : null}
@@ -476,11 +467,16 @@ export function SelectMenu<V extends string = string>({
                 maxHeight: pos?.maxH ?? MAX_PANEL_H,
                 visibility: pos?.ready ? "visible" : "hidden",
                 overflowY: "auto",
+                // Figma _Select dropdown panel (654:1561): radius/lg, 1 px
+                // border, Elevation/2 — Dropdown, a 4 px inset, 2 px between rows.
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--spacing-1)",
                 background: "var(--color-bg-surface)",
                 border: "var(--border-width-1) solid var(--color-border-default)",
                 borderRadius: "var(--radius-lg)",
-                boxShadow: "var(--elevation-5)",
-                padding: "var(--spacing-2) 0",
+                boxShadow: "var(--elevation-2)",
+                padding: "var(--spacing-2)",
                 outline: "none",
                 zIndex: "var(--z-popover)",
               }}

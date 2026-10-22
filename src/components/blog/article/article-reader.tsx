@@ -160,7 +160,7 @@ export function ArticleReader({
       <div className={cn(COLUMNS, "pt-12")}>
         <article aria-labelledby={titleId} className="flex w-full min-w-0 flex-col gap-12">
           <header className="flex flex-col gap-8">
-            <h1 id={titleId} className="text-4xl font-semibold leading-4xl tracking-tight text-text-primary [overflow-wrap:anywhere] max-md:leading-3xl">
+            <h1 id={titleId} className="text-4xl font-semibold leading-4xl tracking-near text-text-primary [overflow-wrap:anywhere] max-md:leading-3xl">
               {title}
             </h1>
             <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">

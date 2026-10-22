@@ -218,19 +218,9 @@ export function useArticleActions(
   const dialogs = (
     <ConfirmDialog
       open={!!confirm}
-      title={
-        copy && confirm?.kind === "delete" ? (
-          <span className="flex flex-col items-start gap-6">
-            {/* Figma frame 09: the delete dialog opens on a trash mark. */}
-            <span aria-hidden className="flex size-[40px] items-center justify-center rounded-lg border border-solid border-border bg-bg-surface text-[color:var(--color-icon-error)]">
-              <Icon icon={Delete02Icon} size={20} />
-            </span>
-            {copy.title}
-          </span>
-        ) : (
-          (copy?.title ?? "")
-        )
-      }
+      title={copy?.title ?? ""}
+      // Figma frame 09: the delete dialog opens on a trash mark, in M11's intent badge.
+      icon={confirm?.kind === "delete" ? Delete02Icon : undefined}
       confirmLabel={copy?.cta ?? ""}
       tone={copy?.tone ?? "danger"}
       onConfirm={accept}

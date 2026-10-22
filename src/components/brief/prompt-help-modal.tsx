@@ -151,7 +151,7 @@ function PromptHelpDialog({
             </p>
             <h2
               id="prompt-help-title"
-              className="mt-[6px] text-2xl font-bold tracking-tight text-text-primary"
+              className="mt-[6px] text-2xl font-bold text-text-primary"
             >
               Turn your idea into a video prompt
             </h2>

@@ -296,7 +296,7 @@ function ReviewPanel({
           </p>
           <h2
             id="review-heading"
-            className="mt-1 truncate text-xl font-bold tracking-tight text-text-primary"
+            className="mt-1 truncate text-xl font-bold text-text-primary"
           >
             {heading}
           </h2>
