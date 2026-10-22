@@ -1331,7 +1331,7 @@ function SaveSlot({
   const line = (
     <span className={cn("flex min-w-0 items-center gap-2 text-sm leading-sm", bad ? "font-semibold text-text-error" : "text-text-secondary")}>
       {busy ? (
-        <Spinner size={14} />
+        <Spinner size={16} />
       ) : (
         icon && (
           <span aria-hidden className="shrink-0">

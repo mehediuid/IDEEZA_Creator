@@ -2,8 +2,8 @@
 // demo money surface carries it: the demo wallet, prices, fees, balances,
 // sales and demo buyers. Nothing it labels touches a chain (owner decision 1).
 //
-// Tone: `warning`, from the existing tokens. Measured on its own background:
-// light #a16207 on #fefce8 = 4.76 : 1, dark #facc15 on #713f12 = 5.66 : 1,
+// Tone: `warning`, Figma color/badge/warning-*. Measured on its own background:
+// light #854d0e on #fefce8 = 6.62 : 1, dark #facc15 on #713f12 = 5.66 : 1,
 // both ≥ 4.5 : 1, so the spec's neutral fallback isn't needed. The words
 // carry the meaning, never the colour alone.
 import { Badge } from "./badge";
