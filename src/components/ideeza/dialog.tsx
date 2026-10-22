@@ -7,29 +7,38 @@
 // needs the same confirm (spec COR-68), and a second copy would drift, so both
 // live here and the network flow re-exports them unchanged.
 //
-// ModalFrame — a portal over one scrim. Focus moves in, Tab stays inside,
-// Escape and the scrim close it, and focus goes back to whatever opened it
-// (useDialogFocus). `covered` hands the keyboard to a dialog opened on top.
-// `closeUnavailable` greys the ✕ while the dialog can't close (a submitted
-// transaction), keeping it focusable and still calling onClose, so the caller
-// says why — as ConfirmDialog's confirm does.
+// ModalFrame (Figma M07 Modal) — a portal over one scrim. Focus moves in, Tab
+// stays inside, Escape and the scrim close it, and focus goes back to whatever
+// opened it (useDialogFocus). `covered` hands the keyboard to a dialog opened
+// on top. `closeUnavailable` greys the ✕ while the dialog can't close (a
+// submitted transaction), keeping it focusable and still calling onClose, so
+// the caller says why — as ConfirmDialog's confirm does.
 //
-// ConfirmDialog — a decision that removes something, said plainly: the way out
-// first and focused first, the danger second. `confirmUnavailable` marks the
-// confirm aria-disabled but keeps it focusable and still calls onConfirm, so
-// the caller can say why it can't go ahead yet (a typed name that doesn't
-// match, COR-69) instead of showing a dead button that explains nothing.
+// Its header is Figma's _Modal header (Alignment=Left): a 44 px row for the
+// intent icon, with ✕ held at that row's right (24 down, 8 px outside the
+// side padding), and the title and description under it. Without an icon the
+// row stays, as in M08 and M09, so ✕ never sits on a long title.
+//
+// ConfirmDialog (Figma M11 Confirm Dialog) — a decision that removes
+// something, said plainly: the way out first and focused first, the danger
+// second. `confirmUnavailable` marks the confirm aria-disabled but keeps it
+// focusable and still calls onConfirm, so the caller can say why it can't go
+// ahead yet (a typed name that doesn't match, COR-69) instead of showing a
+// dead button that explains nothing.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
+import { Cancel01Icon, InformationCircleIcon } from "@hugeicons/core-free-icons";
+import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 
+// xs and sm are M11's 440 and M07's 512. Figma binds no variable to either, and
+// a rem width would miss them: the root font size is 14.
 const WIDTH = {
-  sm: "max-w-lg",
+  xs: "max-w-[440px]",
+  sm: "max-w-[512px]",
   md: "max-w-2xl",
   lg: "max-w-5xl",
   xl: "max-w-7xl",
@@ -63,6 +72,11 @@ export interface ModalFrameProps {
   role?: "dialog" | "alertdialog";
   /** The id of body content that describes the dialog, when there is no `description`. */
   describedBy?: string;
+  /** _Modal header's Icon: the 44 px intent badge in the row above the title. */
+  icon?: React.ReactNode;
+  /** The body is the header's own text (ConfirmDialog's message): it starts 4 px under the title,
+   *  as the description does, instead of under the header's 24 px foot. */
+  bodyContinuesHeader?: boolean;
 }
 
 export function ModalFrame({
@@ -81,6 +95,8 @@ export function ModalFrame({
   labelledBy,
   role = "dialog",
   describedBy,
+  icon,
+  bodyContinuesHeader = false,
 }: ModalFrameProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
@@ -98,7 +114,7 @@ export function ModalFrame({
         aria-hidden
         onClick={covered ? undefined : onClose}
         className={cn(
-          "absolute inset-0 bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)] backdrop-blur-sm",
+          "absolute inset-0 bg-[var(--color-modal-scrim)]",
           ENTER,
         )}
       />
@@ -115,7 +131,7 @@ export function ModalFrame({
           }
         }}
         className={cn(
-          "relative flex max-h-full w-full flex-col overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface shadow-3",
+          "relative flex max-h-full w-full flex-col overflow-hidden rounded-xl border border-solid border-border bg-bg-surface shadow-modal",
           ENTER,
           "motion-safe:zoom-in-95",
           WIDTH[size],
@@ -123,38 +139,41 @@ export function ModalFrame({
             "max-md:max-h-[90dvh] max-md:max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:motion-safe:slide-in-from-bottom-4",
         )}
       >
-        <div className={cn("flex items-start gap-6 px-10 pt-8", labelledBy ? "pb-0" : "pb-4")}>
-          <div className="min-w-0 flex-1">
-            {/* Named from the body (labelledBy): the heading there is the only one, read once. */}
-            {!labelledBy && (
-              <h2 id={titleId} className="text-lg font-bold text-text-primary">
+        <div className={cn("relative flex flex-col gap-8 px-12 pt-12", labelledBy || bodyContinuesHeader ? "pb-0" : "pb-12")}>
+          <div className="flex h-[var(--touch-min)] items-start">{icon}</div>
+          {/* Named from the body (labelledBy): the heading there is the only one, read once. */}
+          {!labelledBy && (
+            <div className="flex min-w-0 flex-col gap-2 pr-4">
+              <h2 id={titleId} className="text-2xl font-semibold leading-2xl text-text-primary">
                 {title}
               </h2>
-            )}
-            {description && (
-              <p id={descId} className="mt-2 text-sm text-text-secondary">
-                {description}
-              </p>
-            )}
-          </div>
+              {description && (
+                <div id={descId} className="text-md leading-md text-text-secondary">
+                  {description}
+                </div>
+              )}
+            </div>
+          )}
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
             aria-disabled={closeUnavailable || undefined}
             className={cn(
-              "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] max-md:w-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)] [@media(pointer:coarse)]:w-[var(--touch-min)]",
+              "absolute right-8 top-12 inline-flex size-[var(--touch-min)] items-center justify-center rounded-full outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
               closeUnavailable
                 ? "cursor-not-allowed text-text-disabled"
-                : "text-text-tertiary hover:bg-bg-subtle hover:text-text-primary",
+                : "text-[color:var(--color-icon-default)] hover:bg-bg-subtle hover:text-text-primary",
             )}
           >
-            <Icon icon={Cancel01Icon} size={18} />
+            <Icon icon={Cancel01Icon} size={24} />
           </button>
         </div>
-        <div className={cn("min-h-0 flex-1 overflow-y-auto px-10 pb-8", bodyClassName)}>{children}</div>
+        <div className={cn("min-h-0 flex-1 overflow-y-auto px-12 pb-12", bodyContinuesHeader && "pt-2", bodyClassName)}>
+          {children}
+        </div>
         {footer && (
-          <div className="flex flex-wrap items-center gap-6 border-t border-solid border-border px-10 py-8">
+          <div className="flex flex-wrap items-center gap-6 border-t border-solid border-border-subtle px-12 pb-12 pt-8">
             {footer}
           </div>
         )}
@@ -172,13 +191,22 @@ export interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   tone?: "danger" | "primary";
+  /** The glyph in M11's intent badge (its Icon is a swap); M11's information-circle when omitted. */
+  icon?: IconValue;
   /** The confirm reads as unavailable (aria-disabled) yet stays focusable and
    *  still calls onConfirm, so the caller can say why it can't go ahead. */
   confirmUnavailable?: boolean;
 }
 
+// M11's Severity: Danger for `danger`, and Info (there is no primary severity) for `primary`.
+const INTENT = {
+  danger: "bg-[var(--color-bg-error-subtle)] text-[color:var(--color-icon-error)]",
+  primary: "bg-[var(--color-bg-info-subtle)] text-[color:var(--color-icon-blue)]",
+} as const;
+
 /** Figma 15 and 17 — a decision that removes something, said plainly, with
- *  the way out first and the danger second. Cancel takes the focus. */
+ *  the way out first and the danger second. Cancel takes the focus. Drawn as
+ *  M11: the intent badge, the title, the message 4 px under it, A01 MD actions. */
 export function ConfirmDialog({
   open,
   title,
@@ -187,6 +215,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   tone = "danger",
+  icon = InformationCircleIcon,
   confirmUnavailable = false,
 }: ConfirmDialogProps) {
   const cancelRef = React.useRef<HTMLButtonElement>(null);
@@ -199,17 +228,23 @@ export function ConfirmDialog({
       title={title}
       describedBy={bodyId}
       role={tone === "danger" ? "alertdialog" : "dialog"}
-      size="sm"
+      size="xs"
       initialFocus={cancelRef}
+      icon={
+        <span aria-hidden className={cn("inline-flex size-[var(--touch-min)] items-center justify-center rounded-full", INTENT[tone])}>
+          <Icon icon={icon} size={24} />
+        </span>
+      }
+      bodyContinuesHeader
       footer={
         <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
-          <Button ref={cancelRef} type="button" hierarchy="secondary" size="lg" className={tap} onClick={onCancel}>
+          <Button ref={cancelRef} type="button" hierarchy="secondary" size="md" className={tap} onClick={onCancel}>
             Cancel
           </Button>
           <Button
             type="button"
             hierarchy={tone === "danger" ? "danger" : "primary"}
-            size="lg"
+            size="md"
             aria-disabled={confirmUnavailable || undefined}
             className={cn(
               tap,
@@ -222,7 +257,8 @@ export function ConfirmDialog({
         </div>
       }
     >
-      <div id={bodyId} className="text-sm leading-relaxed text-text-secondary">
+      {/* M11 keeps the message in the header's text block (its 8 px right padding); here it scrolls. */}
+      <div id={bodyId} className="pr-4 text-md leading-md text-text-secondary">
         {children}
       </div>
     </ModalFrame>

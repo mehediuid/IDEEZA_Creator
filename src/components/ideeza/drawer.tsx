@@ -14,11 +14,18 @@
 // its own rather than through an ancestor relationship. Nothing is marked if
 // an outer layer already has (nested drawers never fight over the same node).
 //
-// `onBack` draws a "‹" before the title — a nested view inside the same
-// panel (the Add/Edit activity form), not a second dialog: the drawer stays
-// open and its focus trap is unchanged. `pinned` is a non-scrolling strip
+// `onBack` draws a "‹" in the header's top row, opposite ✕ — a nested view
+// inside the same panel (the Add/Edit activity form), not a second dialog: the
+// drawer stays open and its focus trap is unchanged. `pinned` is a non-scrolling strip
 // under the header (Activity History's "+ Add New Activity"); `footer` is a
 // non-scrolling strip under the body (the Add/Edit form's "Add Now" / "Update").
+//
+// Figma M08 Drawer draws it: _Modal header's 44 px row holds ✕ (and ‹ here),
+// with the H4 title and the description under it, and the footer's divider is
+// the subtle border. The width (the ACT spec's 550, where M08 is 400) and the
+// docked shape (square, edge on the left only, where M08 floats with a radius)
+// are this product's, and so are the insets: M08's header and footer sit 34 px
+// in and its body 10, which disagree.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -31,10 +38,15 @@ import { cn } from "@/lib/utils";
 const ENTER =
   "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right motion-safe:duration-normal motion-safe:ease-decelerate";
 
+// _Modal close icon (44, round, a 24 px glyph in icon/default), held at the header's top inset and
+// 8 px outside its side inset, as in _Modal header. ‹ mirrors ✕ on the left (the slot swaps to a chevron).
+const HEADER_BUTTON =
+  "absolute top-7 inline-flex size-[var(--touch-min)] items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
+
 export interface DrawerProps {
   open: boolean;
   onClose: () => void;
-  /** Draws a "‹" before the title; pressing it calls this instead of closing. */
+  /** Draws a "‹" at the header's top left; pressing it calls this instead of closing. */
   onBack?: () => void;
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -95,7 +107,7 @@ export function Drawer({
         aria-hidden
         onClick={covered ? undefined : onClose}
         className={cn(
-          "absolute inset-0 bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)] backdrop-blur-sm",
+          "absolute inset-0 bg-[var(--color-modal-scrim)]",
           "motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal motion-safe:ease-decelerate",
         )}
       />
@@ -113,44 +125,35 @@ export function Drawer({
         }}
         style={{ ["--drawer-w" as string]: `${width}px` }}
         className={cn(
-          "fixed inset-y-0 right-0 flex h-full w-full flex-col overflow-hidden border-l border-solid border-border bg-bg-surface shadow-3 outline-none",
+          "fixed inset-y-0 right-0 flex h-full w-full flex-col overflow-hidden border-l border-solid border-border bg-bg-surface shadow-modal outline-none",
           "sm:w-[var(--drawer-w)]",
           ENTER,
         )}
       >
-        <div className="flex items-start gap-4 border-b border-solid border-border px-8 pb-5 pt-7">
+        <div className="relative flex flex-col gap-8 px-8 pb-5 pt-7">
           {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              aria-label="Back"
-              className="mt-[2px] inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
-            >
-              <Icon icon={ArrowLeft01Icon} size={18} />
+            <button type="button" onClick={onBack} aria-label="Back" className={cn(HEADER_BUTTON, "left-4")}>
+              <Icon icon={ArrowLeft01Icon} size={24} />
             </button>
           )}
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-bold text-text-primary">
+          <div className="h-[var(--touch-min)]" />
+          <div className="flex min-w-0 flex-col gap-2 pr-4">
+            <h2 id={titleId} className="text-2xl font-semibold leading-2xl text-text-primary">
               {title}
             </h2>
             {description && (
-              <p id={descId} className="mt-2 text-sm text-text-secondary">
+              <p id={descId} className="text-md leading-md text-text-secondary">
                 {description}
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
-          >
-            <Icon icon={Cancel01Icon} size={18} />
+          <button type="button" onClick={onClose} aria-label="Close" className={cn(HEADER_BUTTON, "right-4")}>
+            <Icon icon={Cancel01Icon} size={24} />
           </button>
         </div>
         {pinned && <div className="border-b border-solid border-border px-8 py-5">{pinned}</div>}
         <div className={cn("min-h-0 flex-1 overflow-y-auto px-8 py-6", bodyClassName)}>{children}</div>
-        {footer && <div className="border-t border-solid border-border px-8 py-6">{footer}</div>}
+        {footer && <div className="border-t border-solid border-border-subtle px-8 py-6">{footer}</div>}
       </div>
     </div>,
     document.body,
