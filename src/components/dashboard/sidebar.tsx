@@ -43,7 +43,7 @@ import {
   SidebarRight01Icon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { checkoutHref } from "@/lib/create/checkout-route";
 import { useCreatePlan } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
 import { idzCompactOf } from "@/lib/wallet/idz";
@@ -544,17 +544,20 @@ function Footer({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => vo
 }
 
 // The way up from your plan (Creator Panel V3.0's "Upgrade to Builder · Unlock
-// more features"): a link to the plans, naming the next plan worth it — Builder
-// from Free or Tinkerer, Disruptor from Builder. Gone on the top plan.
+// more features"): names the next plan worth it — Builder from Free or Tinkerer,
+// Disruptor from Builder — and opens that plan's checkout, on the cycle you pay
+// by. It used to open Plan & pricing, so on that page a press did nothing at
+// all. Gone on the top plan.
 function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
   const { hydrated, sub } = useCreatePlan();
   if (!hydrated || sub.tier === "disruptor") return null;
   const next = planOf(sub.tier === "builder" ? "disruptor" : "builder");
   const label = `Upgrade to ${next.name}`;
+  const href = checkoutHref({ kind: "plan", tier: next.tier, cycle: sub.tier === "free" ? "monthly" : sub.cycle });
   if (collapsed) {
     return (
       <Link
-        href={PLAN_PRICING_HREF}
+        href={href}
         data-tour="plan"
         aria-label={label}
         title={label}
@@ -566,7 +569,7 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
   }
   return (
     <Link
-      href={PLAN_PRICING_HREF}
+      href={href}
       data-tour="plan"
       onClick={onLeave}
       className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-brand-subtle px-[12px] py-[12px] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
