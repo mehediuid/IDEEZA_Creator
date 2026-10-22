@@ -195,7 +195,7 @@ export function WorkspacePrompt() {
 
       {/* Hero — centered narrow column. */}
       <div className="relative mx-auto w-full max-w-[760px] px-[var(--layout-page-inset)] pt-[64px]">
-        <h1 className="text-center text-5xl font-bold tracking-tight text-text-primary">
+        <h1 className="text-center text-5xl font-bold tracking-close text-text-primary">
           What will you build today?
         </h1>
         <p className="mx-auto mt-[16px] max-w-[560px] text-center text-md leading-relaxed text-text-secondary">

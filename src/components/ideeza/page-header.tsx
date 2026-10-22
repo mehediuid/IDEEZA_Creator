@@ -45,7 +45,7 @@ export function PageHeader({
               className={cn(
                 "m-0 min-w-0 font-semibold text-text-primary [overflow-wrap:anywhere]",
                 level === "content"
-                  ? "text-4xl leading-4xl tracking-tight"
+                  ? "text-4xl leading-4xl tracking-near"
                   : "text-3xl leading-3xl tracking-slight",
               )}
             >

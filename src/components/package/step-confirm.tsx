@@ -29,7 +29,7 @@ export function StepConfirm({ saved }: { saved: SavedPackage }) {
         <span className="text-text-success">
           <Icon icon={CheckmarkCircle02Icon} size={30} strokeWidth={1.8} />
         </span>
-        <h2 className="font-display text-2xl font-semibold leading-2xl tracking-tight text-text-primary">
+        <h2 className="font-display text-2xl font-semibold leading-2xl text-text-primary">
           {published ? `${saved.name} is published` : `${saved.name} is saved`}
         </h2>
         <p className="max-w-[620px] font-display text-md font-regular leading-relaxed text-text-secondary">

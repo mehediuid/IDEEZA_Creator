@@ -138,13 +138,24 @@
   --line-height-3xl: 32px;
   --line-height-4xl: 36px;
   --line-height-5xl: 40px;
+  /* Display/MD · LG · XL: Figma line/height/7xl · 8xl · 9xl. */
+  --line-height-6xl: 56px;
+  --line-height-7xl: 68px;
+  --line-height-8xl: 80px;
   --line-height-relaxed: 1.55;
 
   /* ── Letter spacing ─────────────────────────────────────────── */
-  --letter-spacing-tight: -0.5px;
+  /* Figma letter/spacing/* — the heading styles step through them: Display/XL
+     tighter, LG tight, MD snug, H1 close, H2 near, H3 slight. */
+  --letter-spacing-tighter: -2.5px;
+  --letter-spacing-tight: -2px;
+  --letter-spacing-snug: -1.5px;
+  --letter-spacing-close: -0.75px;
+  --letter-spacing-near: -0.5px;
   --letter-spacing-normal: 0px;
   --letter-spacing-wide: 0.1px;
   --letter-spacing-wider: 0.15px;
+  --letter-spacing-widest: 1.2px;
   /* Uppercase micro-labels need air between letters to stay legible at 10–11px;
      they are all over the editor panels and the flow's section headings. The
      design system's own value (Figma letter/spacing/caps) is 1.5px — it was
@@ -187,6 +198,8 @@
   --layout-card-min: 280px;
   --layout-sidebar: 280px;
   --layout-sidebar-collapsed: 64px;
+  --layout-breakpoint-tablet: 768px;
+  --layout-breakpoint-desktop: 1280px;
 
   /* ── Radius (Desktop) ───────────────────────────────────────── */
   --radius-none: 0;
@@ -219,6 +232,7 @@
   --motion-duration-normal: 200ms;
   --motion-duration-slow: 300ms;
   --motion-duration-slower: 500ms;
+  --motion-duration-interaction: 120ms;
 
   --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --motion-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
@@ -286,6 +300,20 @@
     --font-size-6xl: 36px;
     --font-size-7xl: 44px;
     --font-size-8xl: 52px;
+    /* Figma line/height mobile values, under the paired names above. */
+    --line-height-xl: 24px;
+    --line-height-2xl: 26px;
+    --line-height-3xl: 28px;
+    --line-height-4xl: 32px;
+    --line-height-5xl: 36px;
+    --line-height-6xl: 42px;
+    --line-height-7xl: 50px;
+    --line-height-8xl: 58px;
+    --letter-spacing-tighter: -1.8px;
+    --letter-spacing-tight: -1.5px;
+    --letter-spacing-snug: -1.1px;
+    --letter-spacing-close: -0.7px;
+    --letter-spacing-near: -0.4px;
     --letter-spacing-slight: -0.2px;
   }
 }
@@ -339,16 +367,16 @@
 
   /* Text */
   --color-text-primary: var(--color-gray-900);
-  --color-text-secondary: var(--color-gray-600);
+  --color-text-secondary: var(--color-gray-700);
   /* Tertiary is the workhorse of every panel: table headers, field hints, unit
    * chips, counts, placeholders. It was gray-400, which measures 2.34-2.56:1 on
    * the surfaces it actually sits on — a WCAG 1.4.3 failure across the whole
    * app, and a drift from the design system, whose own colour/text/tertiary is
-   * #475569. Restored to the DS value (7.56:1). Disabled follows it down one
-   * step so it still reads as inactive while staying legible — 1.48:1 meant you
-   * could not read what a greyed control said. */
+   * #475569. Restored to the DS value (7.56:1). Disabled is the DS's own
+   * gray-300: WCAG exempts an inactive control, and the owner keeps every value
+   * to the design system. */
   --color-text-tertiary: var(--color-gray-600);
-  --color-text-disabled: var(--color-gray-400);
+  --color-text-disabled: var(--color-gray-300);
   --color-text-inverse: var(--color-white);
   --color-text-on-toast: var(--color-white);
   --color-text-on-brand: var(--color-white);
@@ -358,13 +386,15 @@
    * put and nothing shifts under the pointer. */
   --color-text-brand-hover: var(--color-violet-700);
   --color-text-blue: var(--color-blue-700);
-  --color-text-link: var(--color-blue-600);
+  --color-text-link: var(--color-blue-700);
   --color-text-link-hover: var(--color-blue-700);
-  --color-text-success: var(--color-green-700);
-  --color-text-warning: var(--color-yellow-700);
+  --color-text-success: var(--color-green-800);
+  --color-text-warning: var(--color-yellow-800);
+  --color-text-info: var(--color-blue-800);
   /* Figma color/text/error is red-700: red-600 read 4.41:1 on the error-subtle
    * ground, under AA. */
   --color-text-error: var(--color-red-700);
+  --color-text-error-hover: var(--color-red-800);
   --color-text-ai: var(--color-violet-600);
 
   /* Borders */
@@ -375,16 +405,52 @@
   --color-border-error: var(--color-red-500);
   --color-border-brand: var(--color-violet-600);
   --color-border-blue: var(--color-blue-500);
-  /* Figma color/card/border — a card's edge is the default border. */
+  --color-border-info: var(--color-blue-500);
+  /* Figma color/border/focus-* — the focus edge on a filled control. */
+  --color-border-focus-on-fill: var(--color-violet-900);
+  --color-border-focus-danger: var(--color-red-900);
+  --color-border-focus-inverse: var(--color-violet-200);
+  /* Figma color/card/* — a card's edge is the default border. */
+  --color-card-bg: var(--color-bg-surface);
+  --color-card-bg-hover: var(--color-bg-surface-raised);
   --color-card-border: var(--color-border-default);
+  /* Figma color/modal/*, color/tag/*, color/toast/*, color/ai/* — component
+   * names for roles above, so a component reads the DS variable it was drawn with. */
+  --color-modal-bg: var(--color-bg-surface);
+  --color-modal-border: var(--color-border-default);
+  --color-modal-overlay: var(--color-bg-overlay);
+  --color-tag-neutral-bg: var(--color-bg-subtle);
+  --color-tag-neutral-text: var(--color-text-secondary);
+  --color-tag-brand-bg: var(--color-bg-brand-subtle);
+  --color-tag-brand-text: var(--color-text-brand);
+  --color-toast-info-bg: var(--color-bg-info-subtle);
+  --color-toast-success-bg: var(--color-bg-success-subtle);
+  --color-toast-warning-bg: var(--color-bg-warning-subtle);
+  --color-toast-error-bg: var(--color-bg-error-subtle);
+  --color-ai-prompt-bg: var(--color-bg-surface);
+  --color-ai-prompt-border: var(--color-border-brand);
+  --color-ai-badge-bg: var(--color-bg-ai-subtle);
+  --color-ai-badge-text: var(--color-text-ai);
   /* Figma color/badge/* — a blue status badge reads on the blue-subtle ground. */
   --color-badge-blue-bg: var(--color-bg-blue-subtle);
   --color-badge-blue-text: var(--color-text-blue);
+  --color-badge-brand-bg: var(--color-bg-brand-subtle);
+  --color-badge-brand-text: var(--color-text-brand);
+  --color-badge-success-bg: var(--color-bg-success-subtle);
+  --color-badge-success-text: var(--color-text-success);
+  --color-badge-warning-bg: var(--color-bg-warning-subtle);
+  --color-badge-warning-text: var(--color-text-warning);
   /* An error badge keeps the error ink in light; dark gives it its own (below). */
   --color-badge-error-bg: var(--color-bg-error-subtle);
   --color-badge-error-text: var(--color-text-error);
   /* Figma color/focus/halo — the soft ring round a focused slider thumb. */
   --color-focus-halo: color-mix(in srgb, var(--color-violet-600) 45%, transparent);
+  /* Figma color/focus/halo-* — the 3 px focus halo outside a filled, danger,
+   * inverse or AI control. */
+  --color-focus-halo-on-fill: color-mix(in srgb, var(--color-violet-600) 55%, transparent);
+  --color-focus-halo-danger: color-mix(in srgb, var(--color-red-600) 50%, transparent);
+  --color-focus-halo-inverse: color-mix(in srgb, var(--color-white) 60%, transparent);
+  --color-focus-halo-ai: color-mix(in srgb, var(--color-violet-600) 55%, transparent);
   --color-border-ai: var(--color-violet-500);
   --color-border-success: var(--color-green-500);
   --color-border-warning: var(--color-yellow-500);
@@ -479,9 +545,9 @@
   --color-icon-on-brand: var(--color-white);
   --color-icon-brand: var(--color-violet-600);
   --color-icon-blue: var(--color-blue-500);
-  --color-icon-success: var(--color-green-600);
+  --color-icon-success: var(--color-green-700);
   --color-icon-warning: var(--color-yellow-600);
-  --color-icon-info: var(--color-blue-600);
+  --color-icon-info: var(--color-blue-700);
   --color-icon-error: var(--color-red-500);
   --color-icon-ai: var(--color-violet-500);
 
@@ -493,6 +559,9 @@
   --color-button-secondary-bg: var(--color-bg-surface);
   --color-button-secondary-border: var(--color-border-default);
   --color-button-secondary-text: var(--color-text-primary);
+  --color-button-secondary-bg-hover: var(--color-gray-100);
+  --color-button-secondary-bg-pressed: var(--color-gray-200);
+  --color-button-secondary-border-hover: var(--color-gray-400);
   --color-button-ghost-text: var(--color-text-primary);
   --color-button-ghost-bg-hover: var(--color-bg-subtle);
   /* Figma color/button/danger-* — one red in both themes, stepping darker on
@@ -510,6 +579,14 @@
   --color-button-tonal-bg-hover: var(--color-violet-100);
   --color-button-tonal-bg-pressed: var(--color-violet-200);
   --color-button-tonal-text: var(--color-violet-700);
+  /* Figma color/button/outline-* (Outline brand) and inverse-* (a white button
+   * for dark or brand grounds — the same in both themes). */
+  --color-button-outline-bg-hover: var(--color-violet-100);
+  --color-button-outline-bg-pressed: var(--color-violet-200);
+  --color-button-inverse-bg: var(--color-white);
+  --color-button-inverse-bg-hover: var(--color-gray-100);
+  --color-button-inverse-bg-pressed: var(--color-gray-200);
+  --color-button-inverse-text: var(--color-gray-900);
 
   --color-input-bg: var(--color-bg-surface);
   --color-input-bg-disabled: var(--color-bg-subtle);
@@ -517,6 +594,7 @@
   --color-input-border-hover: var(--color-border-strong);
   --color-input-border-focus: var(--color-border-focus);
   --color-input-border-error: var(--color-border-error);
+  --color-input-border-disabled: var(--color-border-subtle);
   --color-input-text: var(--color-text-primary);
   --color-input-placeholder: var(--color-text-tertiary);
   --color-input-label: var(--color-text-secondary);
@@ -549,6 +627,24 @@
   --elevation-5: 0px 12px 24px 0px rgba(0, 0, 0, 0.14);
   --elevation-6: 0px 16px 32px 0px rgba(0, 0, 0, 0.16);
   --elevation-inner: inset 0px 1px 2px 0px rgba(0, 0, 0, 0.06);
+
+  /* Figma effect styles the buttons are drawn with: Depth/Top-line accent (the
+   * lit top edge and soft inner base of a filled button), Focus/Halo — brand ·
+   * danger · inverse (a 3 px ring outside), and Depth + Focus/Halo — on-fill ·
+   * danger. The halo colours are the color/focus/halo-* variables, so they
+   * follow the theme. */
+  --elevation-depth: inset 0px 1px 0px 0px color-mix(in srgb, var(--color-white) 28%, transparent), inset 0px -2px 3px 0px color-mix(in srgb, var(--color-violet-950) 18%, transparent);
+  --elevation-focus-brand: 0px 0px 0px 3px var(--color-focus-halo);
+  --elevation-focus-on-fill: 0px 0px 0px 3px var(--color-focus-halo-on-fill);
+  --elevation-focus-danger: 0px 0px 0px 3px var(--color-focus-halo-danger);
+  --elevation-focus-inverse: 0px 0px 0px 3px var(--color-focus-halo-inverse);
+  --elevation-depth-focus-on-fill: var(--elevation-depth), var(--elevation-focus-on-fill);
+  --elevation-depth-focus-danger: var(--elevation-depth), var(--elevation-focus-danger);
+  /* A01 Hierarchy=AI: violet-600 → blue-600, a step darker on hover and press.
+   * 73° with the far stop at 153% is Figma's handle geometry on a button. */
+  --gradient-button-ai: linear-gradient(73deg, var(--color-violet-600) 2%, var(--color-blue-600) 153%);
+  --gradient-button-ai-hover: linear-gradient(73deg, var(--color-violet-700) 2%, var(--color-blue-700) 153%);
+  --gradient-button-ai-pressed: linear-gradient(73deg, var(--color-violet-800) 2%, var(--color-blue-800) 153%);
 }
 
 /* ============================================================
@@ -560,6 +656,11 @@
   --color-button-tonal-bg-hover: var(--color-violet-900);
   --color-button-tonal-bg-pressed: var(--color-violet-800);
   --color-button-tonal-text: var(--color-violet-200);
+  --color-button-secondary-bg-hover: var(--color-gray-800);
+  --color-button-secondary-bg-pressed: var(--color-gray-700);
+  --color-button-secondary-border-hover: var(--color-gray-500);
+  --color-button-outline-bg-hover: var(--color-violet-900);
+  --color-button-outline-bg-pressed: var(--color-violet-800);
   /* Review fix — dark theme: selection has to outrank hover (violet-400 reads
    * 5.1:1 here, so violet-600 at 2.6:1 inverted the hierarchy), and the net
    * highlight can go back to the brighter amber. */
@@ -590,8 +691,8 @@
   --color-bg-toast: var(--color-gray-800);
   --color-bg-overlay: var(--color-gray-950);
   --color-bg-brand: var(--color-violet-500);
-  --color-bg-brand-hover: var(--color-violet-400);
-  --color-bg-brand-pressed: var(--color-violet-300);
+  --color-bg-brand-hover: var(--color-violet-600);
+  --color-bg-brand-pressed: var(--color-violet-700);
   --color-bg-brand-subtle: var(--color-violet-950);
   --color-bg-blue: var(--color-blue-400);
   --color-bg-blue-subtle: var(--color-blue-950);
@@ -614,17 +715,19 @@
   --color-text-primary: var(--color-gray-50);
   --color-text-secondary: var(--color-gray-300);
   --color-text-tertiary: var(--color-gray-400);
-  --color-text-disabled: var(--color-gray-500);
+  --color-text-disabled: var(--color-gray-600);
   --color-text-inverse: var(--color-gray-900);
   --color-text-on-toast: var(--color-white);
   --color-text-brand: var(--color-violet-300);
-  --color-text-brand-hover: var(--color-violet-200);
+  --color-text-brand-hover: var(--color-violet-300);
   --color-text-blue: var(--color-blue-300);
   --color-text-link: var(--color-blue-400);
   --color-text-link-hover: var(--color-blue-300);
   --color-text-success: var(--color-green-400);
   --color-text-warning: var(--color-yellow-400);
   --color-text-error: var(--color-red-400);
+  --color-text-error-hover: var(--color-red-200);
+  --color-text-info: var(--color-blue-400);
   --color-text-ai: var(--color-violet-200);
 
   /* Borders */
@@ -635,7 +738,14 @@
   --color-border-error: var(--color-red-400);
   --color-border-brand: var(--color-violet-400);
   --color-border-blue: var(--color-blue-400);
+  --color-border-info: var(--color-blue-400);
+  --color-border-focus-on-fill: var(--color-violet-200);
+  --color-border-focus-danger: var(--color-red-200);
   --color-focus-halo: color-mix(in srgb, var(--color-violet-400) 55%, transparent);
+  --color-focus-halo-on-fill: color-mix(in srgb, var(--color-violet-500) 55%, transparent);
+  --color-focus-halo-danger: color-mix(in srgb, var(--color-red-400) 50%, transparent);
+  --color-focus-halo-ai: color-mix(in srgb, var(--color-violet-400) 55%, transparent);
+  --color-ai-prompt-border: var(--color-border-ai);
   --color-border-ai: var(--color-violet-400);
   --color-border-success: var(--color-green-400);
   --color-border-warning: var(--color-yellow-400);
@@ -650,7 +760,7 @@
 
   /* Icons */
   --color-icon-default: var(--color-gray-400);
-  --color-icon-secondary: var(--color-gray-500);
+  --color-icon-secondary: var(--color-gray-300);
   --color-icon-disabled: var(--color-gray-600);
   --color-icon-brand: var(--color-violet-300);
   --color-icon-blue: var(--color-blue-400);
@@ -692,6 +802,11 @@
   --color-button-tonal-bg-hover: var(--color-violet-900);
   --color-button-tonal-bg-pressed: var(--color-violet-800);
   --color-button-tonal-text: var(--color-violet-200);
+  --color-button-secondary-bg-hover: var(--color-gray-800);
+  --color-button-secondary-bg-pressed: var(--color-gray-700);
+  --color-button-secondary-border-hover: var(--color-gray-500);
+  --color-button-outline-bg-hover: var(--color-violet-900);
+  --color-button-outline-bg-pressed: var(--color-violet-800);
   /* Review fix — dark theme: selection has to outrank hover (violet-400 reads
    * 5.1:1 here, so violet-600 at 2.6:1 inverted the hierarchy), and the net
    * highlight can go back to the brighter amber. */
@@ -718,8 +833,8 @@
     /* Task 8 — keep the system-dark path in sync with [data-theme="dark"]. */
     --color-bg-toast: var(--color-gray-800);
     --color-bg-brand: var(--color-violet-500);
-    --color-bg-brand-hover: var(--color-violet-400);
-    --color-bg-brand-pressed: var(--color-violet-300);
+    --color-bg-brand-hover: var(--color-violet-600);
+    --color-bg-brand-pressed: var(--color-violet-700);
     --color-bg-brand-subtle: var(--color-violet-950);
     --gradient-brand: linear-gradient(135deg, var(--color-violet-300) 0%, var(--color-violet-600) 100%);
     --gradient-ai: linear-gradient(135deg, var(--color-violet-300) 0%, var(--color-violet-500) 100%);
@@ -729,14 +844,14 @@
     --color-text-primary: var(--color-gray-50);
     --color-text-secondary: var(--color-gray-300);
     --color-text-tertiary: var(--color-gray-400);
-    --color-text-disabled: var(--color-gray-500);
+    --color-text-disabled: var(--color-gray-600);
     --color-text-on-toast: var(--color-white);
     /* Same rule as the tokens above: the system-dark path mirrors
      * [data-theme="dark"], so nothing paints its light value for the frame
      * before ThemeProvider stamps the attribute. */
-    --color-text-brand-hover: var(--color-violet-200);
+    --color-text-brand-hover: var(--color-violet-300);
     --color-text-link-hover: var(--color-blue-300);
-    --color-icon-secondary: var(--color-gray-500);
+    --color-icon-secondary: var(--color-gray-300);
     --color-icon-info: var(--color-blue-400);
 
     --color-border-default: var(--color-gray-800);

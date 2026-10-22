@@ -60,7 +60,7 @@ test("the frame fills the width: the inset on every side, no cap, no centring", 
 test("the page title is O02's: Heading/H3 24/32 SemiBold, or H2 28/36 for published content", () => {
   const header = read("components/ideeza/page-header.tsx");
   assert.match(header, /"text-3xl leading-3xl tracking-slight"/);
-  assert.match(header, /"text-4xl leading-4xl tracking-tight"/);
+  assert.match(header, /"text-4xl leading-4xl tracking-near"/);
   assert.match(header, /font-semibold/);
   assert.doesNotMatch(header, /font-(bold|extrabold)/);
 });
