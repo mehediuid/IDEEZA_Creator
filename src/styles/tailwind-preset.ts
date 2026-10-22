@@ -121,6 +121,9 @@ export const ideezaPreset = {
         inner: "var(--elevation-inner)",
         // Figma effect styles: Depth/Top-line accent and the focus halos.
         depth: "var(--elevation-depth)",
+        modal: "var(--elevation-modal)",
+        overlay: "var(--elevation-overlay)",
+        tooltip: "var(--elevation-tooltip)",
         "focus-brand": "var(--elevation-focus-brand)",
         "focus-on-fill": "var(--elevation-focus-on-fill)",
         "focus-danger": "var(--elevation-focus-danger)",
@@ -232,6 +235,12 @@ export const ideezaPreset = {
         badge: {
           "blue-bg": "var(--color-badge-blue-bg)",
           "blue-text": "var(--color-badge-blue-text)",
+          "brand-bg": "var(--color-badge-brand-bg)",
+          "brand-text": "var(--color-badge-brand-text)",
+          "success-bg": "var(--color-badge-success-bg)",
+          "success-text": "var(--color-badge-success-text)",
+          "warning-bg": "var(--color-badge-warning-bg)",
+          "warning-text": "var(--color-badge-warning-text)",
           "error-bg": "var(--color-badge-error-bg)",
           "error-text": "var(--color-badge-error-text)",
         },
