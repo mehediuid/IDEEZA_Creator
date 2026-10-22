@@ -15,23 +15,21 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Cancel01Icon, LockIcon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { Segmented } from "@/components/ideeza/segmented";
 import { Toggle } from "@/components/ideeza/toggle";
 import {
   OPTIMIZE_COST,
+  PICKABLE_KINDS,
   PIECES,
   PIECE_KINDS,
   PRESET_LABEL,
   aboutTime,
   creditsLabel,
-  namesOf,
-  neededBy,
   pickCost,
   pickSeconds,
-  pickedKinds,
   pieceCost,
   pieceSeconds,
   pieceTimeLabel,
@@ -134,7 +132,7 @@ function PiecesPanel({
     setNote(said ? { productId, text: said } : null);
   };
   const preset = presetOf(pick);
-  const kinds = pickedKinds(pick);
+  const kinds = PICKABLE_KINDS.filter((k) => pick[k].on);
   const cost = pickCost(pick);
   const seconds = pickSeconds(pick);
 
@@ -227,7 +225,7 @@ function PiecesPanel({
           </p>
           <p className="text-sm text-text-tertiary">
             {kinds.length
-              ? `${kinds.length} of ${PIECE_KINDS.length} pieces · saves as you go`
+              ? `${kinds.length} of ${PICKABLE_KINDS.length} pieces · Parts list included · saves as you go`
               : "Pick at least one piece to build this product."}
           </p>
         </div>
@@ -276,8 +274,8 @@ function PiecesPanel({
 }
 
 /** One piece: the tick, what it is, what it costs and takes; ticked, its
- *  Quality and Optimize under it. The Parts list can't be unticked while a
- *  piece is made from it — the row says which. */
+ *  Quality and Optimize under it. The Parts list is no choice: it comes with
+ *  any picked piece, free — its row says so, with no tick to change. */
 function PieceRow({
   kind,
   pick,
@@ -295,10 +293,22 @@ function PieceRow({
 }) {
   const p = PIECES[kind];
   const c = pick[kind];
-  // Only the Parts list holds: every other piece is made from it. Unticking
-  // the PCB takes what needs it out instead, and says so.
-  const needers = kind === "parts" ? neededBy(pick, kind) : [];
-  const locked = c.on && needers.length > 0;
+  if (kind === "parts") {
+    return (
+      <li className={["flex items-start gap-[12px] px-[12px] py-[12px]", first ? "" : "border-t border-solid border-border", "bg-bg-page"].join(" ")}>
+        <span aria-hidden className={`mt-[2px] inline-flex shrink-0 ${c.on ? "text-text-success" : "text-text-tertiary"}`}>
+          <Icon icon={CheckmarkCircle02Icon} size={20} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
+          <span className="text-md font-medium text-text-primary">{p.name} list</span>
+          <span className="text-sm text-text-tertiary">
+            {p.sub}. {c.on ? "Comes with every build." : "Comes with any piece you pick."}
+          </span>
+        </span>
+        <span className="shrink-0 text-md font-semibold text-text-tertiary">Free</span>
+      </li>
+    );
+  }
   const cost = pieceCost(kind, c.on ? c : { quality: "medium", optimize: false });
   const secs = pieceSeconds(kind, c.on ? c : { quality: "medium", optimize: false });
   const qualityId = `${PIECES_SHEET_ID}-${kind}-quality`;
@@ -315,12 +325,12 @@ function PieceRow({
           type="button"
           role="checkbox"
           aria-checked={c.on}
-          aria-disabled={!onToggle || locked || undefined}
-          onClick={onToggle && !locked ? onToggle : undefined}
+          aria-disabled={!onToggle || undefined}
+          onClick={onToggle}
           className="flex min-w-0 flex-1 items-start gap-[12px] rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed"
         >
           <span className="mt-[2px] inline-flex shrink-0">
-            <Checkbox checked={c.on} decorative size="sm" disabled={locked} />
+            <Checkbox checked={c.on} decorative size="sm" />
           </span>
           <span className="flex min-w-0 flex-col gap-[2px]">
             <span className="text-md font-medium text-text-primary">{p.name}</span>
@@ -335,12 +345,6 @@ function PieceRow({
         </span>
       </div>
 
-      {locked && (
-        <p className="ml-[32px] flex items-center gap-[6px] text-sm text-text-tertiary">
-          <Icon icon={LockIcon} size={14} />
-          Needed by {namesOf(needers)}
-        </p>
-      )}
 
       {c.on && (p.quality || p.optimize) && (
         <div className="ml-[32px] flex flex-col gap-[10px]">

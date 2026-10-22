@@ -68,9 +68,10 @@ export function AddPiecesDialog({
     const it = product.items.find((i) => i.kind === k);
     return !!it && it.status !== "skipped";
   });
+  // The Parts list comes with any piece, so it is never one to add.
   const open = PIECE_KINDS.filter((k) => {
     const it = product.items.find((i) => i.kind === k);
-    return !!it && isLeftOut(it);
+    return k !== "parts" && !!it && isLeftOut(it);
   });
   // A pick over all five: what it has stays ticked (and can't be unticked
   // here); the left-out ones start as asked. Needs are added the same way

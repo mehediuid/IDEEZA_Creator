@@ -8,7 +8,6 @@ import {
   creditsLabel,
   defaultPick,
   isLeftOut,
-  neededBy,
   pickCost,
   pickSeconds,
   pickSummary,
@@ -49,9 +48,23 @@ test("ticking Firmware code adds the PCB it is made for", () => {
   assert.equal(r.note, "Added PCB — Firmware code is made from it.");
 });
 
-test("the Parts list is needed by every other piece", () => {
-  assert.deepEqual(neededBy(defaultPick(), "parts"), ["3d", "pcb", "code", "wiring"]);
-  assert.deepEqual(neededBy(withPreset(defaultPick(), "pcb"), "parts"), ["pcb"]);
+test("the Parts list comes with any picked piece, and never on its own", () => {
+  // Not a choice: ticking it does nothing, and it follows the other pieces.
+  assert.deepEqual(togglePiece(defaultPick(), "parts").pick, defaultPick());
+  assert.deepEqual(pickedKinds(withPreset(defaultPick(), "pcb")), ["pcb", "parts"]);
+  let p = withPreset(defaultPick(), "enclosure");
+  p = togglePiece(p, "3d").pick;
+  assert.deepEqual(pickedKinds(p), []);
+  assert.equal(pickSummary(p), "Nothing picked");
+  // A stored pick that had it off beside a piece, or on alone, is put right.
+  assert.equal(cleanPick({ parts: { on: false } }).parts.on, true);
+  const alone = cleanPick({ "3d": { on: false }, pcb: { on: false }, code: { on: false }, wiring: { on: false }, parts: { on: true } });
+  assert.deepEqual(pickedKinds(alone), []);
+});
+
+test("a custom pick counts the four pieces a maker picks", () => {
+  const p = togglePiece(withPreset(defaultPick(), "pcb"), "code").pick;
+  assert.equal(pickSummary(p), "2 of 4 pieces");
 });
 
 test("presets, quality and optimize change the cost and the time", () => {

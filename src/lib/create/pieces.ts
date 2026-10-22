@@ -11,7 +11,9 @@
 //
 // Everything a piece needs is added with it, and taking a piece out takes
 // out what needs it, said once in a line: Firmware code and Wiring are
-// made for the PCB, and every piece is made from the Parts list.
+// made for the PCB. The Parts list is not a choice (owner, 2026-10-22): on
+// its own it is a list the spec sheet already shows for free, so it comes
+// with every build, free, and never alone.
 
 import type { BuildItem, BuildItemKind } from "./history";
 
@@ -27,6 +29,16 @@ export type PiecePick = Record<BuildItemKind, PieceChoice>;
 /** The five pieces in the order every list shows them — the build's own
  *  order (history.ts ITEM_KINDS). */
 export const PIECE_KINDS: BuildItemKind[] = ["3d", "pcb", "code", "wiring", "parts"];
+
+/** The pieces a maker picks. The Parts list isn't one: it comes with any of
+ *  them — every piece is made from it — and never on its own. */
+export const PICKABLE_KINDS: BuildItemKind[] = ["3d", "pcb", "code", "wiring"];
+
+/** The Parts list goes with any picked piece, and with none, nothing is. */
+function withParts(pick: PiecePick): PiecePick {
+  const any = PICKABLE_KINDS.some((k) => pick[k].on);
+  return pick.parts.on === any ? pick : { ...pick, parts: { ...pick.parts, on: any } };
+}
 
 export type PieceInfo = {
   name: string;
@@ -105,6 +117,7 @@ export const PIECES: Record<BuildItemKind, PieceInfo> = {
   parts: {
     name: "Parts",
     sub: "Every part — category, name, reference and quantity",
+    note: "included",
     needs: [],
     quality: false,
     price: { medium: 0, high: 0 },
@@ -137,7 +150,7 @@ export function cleanPick(raw: unknown): PiecePick {
       optimize: r.optimize === true && !!PIECES[kind].optimize,
     };
   }
-  return out;
+  return withParts(out);
 }
 
 /** What a piece costs as chosen. */
@@ -176,9 +189,9 @@ export function pickSeconds(pick: PiecePick): number {
 
 export type PiecePreset = "whole" | "pcb" | "enclosure";
 const PRESET_KINDS: Record<PiecePreset, BuildItemKind[]> = {
-  whole: PIECE_KINDS,
-  pcb: ["pcb", "parts"],
-  enclosure: ["3d", "parts"],
+  whole: PICKABLE_KINDS,
+  pcb: ["pcb"],
+  enclosure: ["3d"],
 };
 export const PRESET_LABEL: Record<PiecePreset, string> = {
   whole: "Whole product",
@@ -187,7 +200,7 @@ export const PRESET_LABEL: Record<PiecePreset, string> = {
 };
 
 export function presetOf(pick: PiecePick): PiecePreset | "custom" | "none" {
-  const on = pickedKinds(pick).slice().sort().join(",");
+  const on = PICKABLE_KINDS.filter((k) => pick[k].on).sort().join(",");
   if (!on) return "none";
   for (const p of Object.keys(PRESET_KINDS) as PiecePreset[]) {
     if (PRESET_KINDS[p].slice().sort().join(",") === on) return p;
@@ -198,15 +211,15 @@ export function presetOf(pick: PiecePick): PiecePreset | "custom" | "none" {
 export function withPreset(pick: PiecePick, preset: PiecePreset): PiecePick {
   const want = new Set(PRESET_KINDS[preset]);
   const out = { ...pick };
-  for (const k of PIECE_KINDS) out[k] = { ...pick[k], on: want.has(k) };
-  return out;
+  for (const k of PICKABLE_KINDS) out[k] = { ...pick[k], on: want.has(k) };
+  return withParts(out);
 }
 
 /** "Whole product", "PCB only", "3 of 5 pieces", "Nothing picked". */
 export function pickSummary(pick: PiecePick): string {
   const p = presetOf(pick);
   if (p === "none") return "Nothing picked";
-  if (p === "custom") return `${pickedKinds(pick).length} of ${PIECE_KINDS.length} pieces`;
+  if (p === "custom") return `${PICKABLE_KINDS.filter((k) => pick[k].on).length} of ${PICKABLE_KINDS.length} pieces`;
   return PRESET_LABEL[p];
 }
 
@@ -219,22 +232,24 @@ export function namesOf(kinds: BuildItemKind[]): string {
 /** Ticks or unticks a piece, with what it needs or what needs it, and the
  *  line that says what else moved — null when nothing else did. */
 export function togglePiece(pick: PiecePick, kind: BuildItemKind): { pick: PiecePick; note: string | null } {
+  // The Parts list follows the other pieces; it isn't ticked on its own.
+  if (kind === "parts") return { pick: withParts(pick), note: null };
   const out: PiecePick = { ...pick };
   const on = !pick[kind].on;
   out[kind] = { ...pick[kind], on };
   const p = PIECES[kind];
   if (on) {
-    const added = p.needs.filter((n) => !out[n].on);
+    const added = p.needs.filter((n) => n !== "parts" && !out[n].on);
     for (const n of added) out[n] = { ...out[n], on: true };
     return {
-      pick: out,
+      pick: withParts(out),
       note: added.length ? `Added ${namesOf(added)} — ${p.name} is made from ${added.length > 1 ? "them" : "it"}.` : null,
     };
   }
-  const removed = PIECE_KINDS.filter((d) => out[d].on && PIECES[d].needs.includes(kind));
+  const removed = PICKABLE_KINDS.filter((d) => out[d].on && PIECES[d].needs.includes(kind));
   for (const d of removed) out[d] = { ...out[d], on: false };
   return {
-    pick: out,
+    pick: withParts(out),
     note: removed.length
       ? `Took out ${namesOf(removed)} too — ${removed.length > 1 ? "they need" : "it needs"} the ${p.name}.`
       : null,
