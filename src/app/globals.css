@@ -58,17 +58,20 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
   background: transparent;
   cursor: pointer;
 }
+/* A11 Disabled (Figma 632:752) is its own colours, not a fade: the filled
+   part and the thumb's edge turn border/default. */
 .ds-slider:disabled {
   cursor: not-allowed;
-  opacity: var(--opacity-disabled);
+  --ds-slider-fill-color: var(--color-border-default);
+  --ds-slider-thumb-edge: var(--color-border-default);
 }
 .ds-slider::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: var(--radius-full);
   background: linear-gradient(
     to right,
-    var(--color-bg-brand) 0%,
-    var(--color-bg-brand) var(--ds-slider-fill, 0%),
+    var(--ds-slider-fill-color, var(--color-bg-brand)) 0%,
+    var(--ds-slider-fill-color, var(--color-bg-brand)) var(--ds-slider-fill, 0%),
     var(--color-bg-subtle) var(--ds-slider-fill, 0%),
     var(--color-bg-subtle) 100%
   );
@@ -81,10 +84,11 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
 .ds-slider::-moz-range-progress {
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--color-bg-brand);
+  background: var(--ds-slider-fill-color, var(--color-bg-brand));
 }
-/* A11 (Figma 47167:21946): the thumb is the surface with a brand edge — a
-   ring, not a solid dot — and focus adds the design system's soft halo. */
+/* A11 (Figma 632:752, thumb 631:753): the thumb is the surface with a 2 px
+   bg/brand edge — a ring, not a solid dot — and its own small drop shadow;
+   hover grows it to 18 px, and focus trades the shadow for the DS halo. */
 .ds-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -92,28 +96,30 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
   height: 16px;
   width: 16px;
   border-radius: var(--radius-full);
-  border: var(--border-width-2) solid var(--color-border-brand);
+  border: var(--border-width-2) solid var(--ds-slider-thumb-edge, var(--color-bg-brand));
   background: var(--color-bg-surface);
+  box-shadow: var(--elevation-slider-thumb);
   transition: transform var(--motion-duration-fast) var(--motion-easing-standard);
 }
 .ds-slider::-moz-range-thumb {
   height: 16px;
   width: 16px;
   border-radius: var(--radius-full);
-  border: var(--border-width-2) solid var(--color-border-brand);
+  border: var(--border-width-2) solid var(--ds-slider-thumb-edge, var(--color-bg-brand));
   background: var(--color-bg-surface);
+  box-shadow: var(--elevation-slider-thumb);
 }
 .ds-slider:hover:not(:disabled)::-webkit-slider-thumb {
-  transform: scale(1.1);
+  transform: scale(1.125);
 }
 .ds-slider:focus-visible {
   outline: none;
 }
 .ds-slider:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px var(--color-focus-halo);
+  box-shadow: var(--elevation-focus-brand);
 }
 .ds-slider:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px var(--color-focus-halo);
+  box-shadow: var(--elevation-focus-brand);
 }
 @media (prefers-reduced-motion: reduce) {
   .ds-slider::-webkit-slider-thumb {

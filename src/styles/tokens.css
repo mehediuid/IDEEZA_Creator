@@ -649,6 +649,13 @@
   --elevation-modal: 0px 12px 40px 0px rgba(15, 23, 42, 0.14), 0px 4px 12px 0px rgba(15, 23, 42, 0.08);
   --elevation-overlay: 0px 24px 64px 0px rgba(15, 23, 42, 0.2), 0px 8px 20px 0px rgba(15, 23, 42, 0.1);
   --elevation-tooltip: 0px 4px 12px 0px rgba(0, 0, 0, 0.15);
+  /* Raw drop shadows the input atoms are drawn with (no effect style or
+   * variable carries them, and Figma gives no dark value, so both themes use
+   * them): A10 Toggle thumb (node 315:652), A11 Slider thumb (node 631:753)
+   * and A11 Slider value label (node 631:754). */
+  --elevation-toggle-thumb: 0px 1px 3px 0px rgba(0, 0, 0, 0.15);
+  --elevation-slider-thumb: 0px 1px 3px 0px rgba(0, 0, 0, 0.12);
+  --elevation-slider-value-label: 0px 2px 6px 0px rgba(0, 0, 0, 0.15);
   /* Figma color/modal/overlay at opacity/overlay — the scrim behind a modal. */
   --color-modal-scrim: color-mix(in srgb, var(--color-modal-overlay) calc(var(--opacity-overlay) * 100%), transparent);
   --gradient-button-ai: linear-gradient(73deg, var(--color-violet-600) 2%, var(--color-blue-600) 153%);

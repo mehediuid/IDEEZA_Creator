@@ -124,6 +124,10 @@ export const ideezaPreset = {
         modal: "var(--elevation-modal)",
         overlay: "var(--elevation-overlay)",
         tooltip: "var(--elevation-tooltip)",
+        // Raw Figma shadows of the A10 thumb and the A11 thumb and value label.
+        "toggle-thumb": "var(--elevation-toggle-thumb)",
+        "slider-thumb": "var(--elevation-slider-thumb)",
+        "slider-value-label": "var(--elevation-slider-value-label)",
         "focus-brand": "var(--elevation-focus-brand)",
         "focus-on-fill": "var(--elevation-focus-on-fill)",
         "focus-danger": "var(--elevation-focus-danger)",
