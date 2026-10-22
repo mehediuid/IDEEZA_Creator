@@ -13,8 +13,10 @@
 // `useCreateHistory()`.
 
 import * as React from "react";
+import { PIECE_KINDS, cleanPick, pickCost, pieceCost, type PieceChoice, type PiecePick, type PieceQuality } from "./pieces";
 import { reportWrite } from "../storage-status";
 import { stampItemTimes } from "./item-times";
+import { BUILD_COST } from "./credits";
 import type { Companion } from "./companions";
 import type { LinkEdit, NetworkEdits, NetworkReply } from "./network-reply";
 import {
@@ -84,6 +86,10 @@ export type SetupAnswer = {
    *  what travels (concept-network.ts). The protocol is each product's own
    *  radio, in `specs`. */
   network?: NetworkEdits;
+  /** What each product's build makes — which pieces, at what quality,
+   *  optimized or not (pieces.ts) — per product, "primary" or a companion
+   *  id. Absent: every piece, at Medium, as builds always were. */
+  pieces?: Record<string, PiecePick>;
 };
 
 export type ChatTurn =
@@ -231,6 +237,13 @@ export type BuildItem = {
    *  builds stored before the stamps. */
   startedAt?: number;
   endedAt?: number;
+  /** As chosen in What to build (pieces.ts). Absent: Medium, not optimized. */
+  quality?: PieceQuality;
+  optimize?: boolean;
+  /** Left out of the build by the maker (status `skipped`): it can be added
+   *  later, made for what the product already has. A plain `skipped` is a
+   *  piece an older build never had. */
+  omitted?: true;
 };
 
 /** Part 4 §4.4 — a companion product built alongside the primary one.
@@ -292,6 +305,10 @@ export type BuildJob = {
   estimateMin: number;
   creditsCharged: boolean;
   creditsRefunded: boolean;
+  /** What the build was booked for — the pieces each product got (pieces.ts).
+   *  Pieces added later are charged on their own. Absent on builds from
+   *  before What to build: BUILD_COST per product (see `jobCost`). */
+  cost?: number;
   // Set when the build died for a reason that isn't the user's — the
   // credits are refunded and the whole build can be retried.
   failure?: "system";
@@ -428,6 +445,31 @@ export function allItems(job: BuildJob): BuildItem[] {
  *  this rather than special-casing the primary. The primary carries the
  *  job's own description, as a companion carries its own (COR-90): without
  *  it every reader fell back to `summary`, which is the parts line. */
+/** What a build was booked for. A build from before What to build made every
+ *  piece of every product, at BUILD_COST each. */
+export function jobCost(job: BuildJob): number {
+  if (typeof job.cost === "number" && Number.isFinite(job.cost)) return job.cost;
+  return BUILD_COST * productsOf(job).length;
+}
+
+/** One product's items as booked from its pick: the pieces chosen start (or
+ *  wait their turn), the rest are left out — `skipped`, and `omitted` so they
+ *  can be added later. */
+function itemsFor(pick: PiecePick | undefined, busy: boolean): BuildItem[] {
+  const p = pick ?? cleanPick(undefined);
+  return PIECE_KINDS.map((kind) =>
+    p[kind].on
+      ? {
+          kind,
+          status: busy ? ("pending" as const) : ("building" as const),
+          progress: 0,
+          ...(p[kind].quality === "high" ? { quality: "high" as const } : null),
+          ...(p[kind].optimize ? { optimize: true } : null),
+        }
+      : { kind, status: "skipped" as const, progress: 0, omitted: true as const },
+  );
+}
+
 export function productsOf(job: BuildJob): BuildProduct[] {
   return [
     {
@@ -587,6 +629,9 @@ function normalizeItems(raw: unknown): BuildItem[] {
         : 0,
       ...(startedAt ? { startedAt: startedAt.value } : null),
       ...(endedAt ? { endedAt: endedAt.value } : null),
+      ...(item.quality === "high" ? { quality: "high" as const } : null),
+      ...(item.optimize === true ? { optimize: true } : null),
+      ...(item.omitted === true && item.status === "skipped" ? { omitted: true as const } : null),
     });
   }
   return ITEM_KINDS.map(
@@ -775,6 +820,8 @@ type Ctx = {
   setTurnConcept: (chatId: string, turnId: string, concept: ConceptSummary) => void;
   /** The maker's spec edits for one product, on the answered question. */
   setSpecEdits: (chatId: string, turnId: string, productId: string, edits: SpecEdits) => void;
+  /** What to build for one product (pieces.ts). */
+  setPieces: (chatId: string, turnId: string, productId: string, pick: PiecePick) => void;
   /** One concept-network link's edit, or null to put it back as suggested. */
   setNetworkEdit: (chatId: string, turnId: string, linkId: string, edit: LinkEdit | null) => void;
   /** Adds the concept network, or removes it — every link edit with it. */
@@ -797,6 +844,9 @@ type Ctx = {
     /** The primary's spec at booking — see BuildJob.spec. */
     spec?: ResolvedSpec;
     companions?: Omit<BuildProduct, "items">[];
+    /** What each product gets — "primary" or a companion id (pieces.ts).
+     *  A product without one gets every piece. */
+    picks?: Record<string, PiecePick>;
   }) => BuildJob;
   updateBuildItem: (
     buildId: string,
@@ -808,6 +858,14 @@ type Ctx = {
     buildId: string,
     kind: BuildItemKind,
     productId?: string,
+  ) => void;
+  /** Adds pieces left out of a build to it, as chosen — made for what the
+   *  product already has. The caller charges them (their own charge, not the
+   *  build's); this books them and adds their cost to the build's. */
+  addBuildPieces: (
+    buildId: string,
+    productId: string,
+    picks: { kind: BuildItemKind; quality: PieceQuality; optimize: boolean }[],
   ) => void;
   // Whole-build retry, after a system failure took the job down.
   retryBuild: (buildId: string) => void;
@@ -1226,6 +1284,15 @@ export function CreateHistoryProvider({
     [patchSetupAnswer],
   );
 
+  const setPieces = React.useCallback(
+    (chatId: string, turnId: string, productId: string, pick: PiecePick) =>
+      patchSetupAnswer(chatId, turnId, (a) => ({
+        ...a,
+        pieces: { ...(a.pieces ?? {}), [productId]: cleanPick(pick) },
+      })),
+    [patchSetupAnswer],
+  );
+
   const setNetworkEdit = React.useCallback(
     (chatId: string, turnId: string, linkId: string, edit: LinkEdit | null) =>
       patchSetupAnswer(chatId, turnId, (a) => {
@@ -1315,6 +1382,8 @@ export function CreateHistoryProvider({
       /** §4.4 — the companion products whose concepts are ready. Absent
        *  on every single-product build. */
       companions?: Omit<BuildProduct, "items">[];
+      /** What each product gets (pieces.ts); every piece without one. */
+      picks?: Record<string, PiecePick>;
     }) => {
       const now = Date.now();
       const id = makeId("build");
@@ -1341,22 +1410,19 @@ export function CreateHistoryProvider({
         estimateMin: BUILD_ESTIMATE_MIN,
         creditsCharged: false,
         creditsRefunded: false,
-        items: ITEM_KINDS.map((kind) => ({
-          kind,
-          status: busy ? ("pending" as const) : ("building" as const),
-          progress: 0,
-        })),
-        // Every product gets the same five artifacts — §4.7 opens each one
-        // into its own 3D / PCB / Code / BOM tabs, so each needs its own
-        // set rather than a share of the primary's.
+        // Each product's own pieces, as picked in What to build — §4.7 opens
+        // each one into its own 3D / PCB / Code / BOM tabs, so each needs its
+        // own set rather than a share of the primary's. A piece left out is
+        // kept in the five, marked, so it can be added later.
+        items: itemsFor(input.picks?.primary, busy),
         companions: (input.companions ?? []).map((c) => ({
           ...c,
-          items: ITEM_KINDS.map((kind) => ({
-            kind,
-            status: busy ? ("pending" as const) : ("building" as const),
-            progress: 0,
-          })),
+          items: itemsFor(input.picks?.[c.id], busy),
         })),
+        cost: [
+          "primary",
+          ...(input.companions ?? []).map((c) => c.id),
+        ].reduce((n, id) => n + pickCost(input.picks?.[id] ?? cleanPick(undefined)), 0),
         createdAt: now,
         updatedAt: now,
       };
@@ -1514,6 +1580,53 @@ export function CreateHistoryProvider({
     [updateBuildItem],
   );
 
+  const addBuildPieces = React.useCallback(
+    (
+      buildId: string,
+      productId: string,
+      picks: { kind: BuildItemKind; quality: PieceQuality; optimize: boolean }[],
+    ) => {
+      if (!picks.length) return;
+      const now = Date.now();
+      const busy = buildsRef.current.some((b) => isWorkingBuild(b) && b.id !== buildId);
+      const chosen = new Map(picks.map((p) => [p.kind, p]));
+      const added = picks.reduce((n, p) => n + pieceCost(p.kind, p as Pick<PieceChoice, "quality" | "optimize">), 0);
+      // Only a piece that was left out can be added — never one already made.
+      const book = (it: BuildItem): BuildItem => {
+        const c = chosen.get(it.kind);
+        if (!c || it.status !== "skipped" || !it.omitted) return it;
+        return {
+          kind: it.kind,
+          status: busy ? "pending" : "building",
+          progress: 0,
+          ...(c.quality === "high" ? { quality: "high" as const } : null),
+          ...(c.optimize ? { optimize: true } : null),
+        };
+      };
+      setBuilds((arr) =>
+        arr.map((b) => {
+          if (b.id !== buildId) return b;
+          const onPrimary = productId === "primary";
+          return {
+            ...b,
+            // The worker is someone else's: it waits its turn, already paid,
+            // as a single retry does.
+            ...(busy ? { status: "queued" as const, startedAt: undefined } : { status: "running" as const }),
+            endedAt: undefined,
+            cost: jobCost(b) + added,
+            items: onPrimary ? b.items.map(book) : b.items,
+            companions: onPrimary
+              ? (b.companions ?? [])
+              : (b.companions ?? []).map((c) => (c.id === productId ? { ...c, items: c.items.map(book) } : c)),
+            updatedAt: now,
+            attentionDismissedAt: undefined,
+          };
+        }),
+      );
+    },
+    [],
+  );
+
   // Part 4 §4.6 — "allowed only in Queued state". Once generation has
   // started it is unavailable, because cancel-then-refund would be the
   // farming loop the spec warns about. The guard is inside the updater so
@@ -1533,11 +1646,16 @@ export function CreateHistoryProvider({
     );
     // Every artifact starts over; whether it starts now or waits depends
     // on whether another build already holds the worker.
-    const restart = (it: BuildItem): BuildItem => ({
-      ...it,
-      status: busy ? ("pending" as const) : ("building" as const),
-      progress: 0,
-    });
+    // A piece left out of the build (or one an old build never had) stays
+    // out — the retry is of what was paid for.
+    const restart = (it: BuildItem): BuildItem =>
+      it.status === "skipped"
+        ? it
+        : {
+            ...it,
+            status: busy ? ("pending" as const) : ("building" as const),
+            progress: 0,
+          };
     setBuilds((arr) =>
       arr.map((b) => {
         if (b.id !== buildId) return b;
@@ -1803,12 +1921,14 @@ export function CreateHistoryProvider({
     setSetupLeftOut,
     setTurnConcept,
     setSpecEdits,
+    setPieces,
     setNetworkEdit,
     setNetworkAdded,
     getChat,
     startBuild,
     updateBuildItem,
     retryBuildItem,
+    addBuildPieces,
     retryBuild,
     cancelBuild,
     failBuildSystem,

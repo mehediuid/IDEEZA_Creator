@@ -30,6 +30,7 @@ import {
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { buildCost, useCredits } from "@/lib/create/credits";
+import { aboutTime } from "@/lib/create/pieces";
 import { useDialogFocus } from "./use-dialog-focus";
 import { BuyCreditsButton, useBuyCredits } from "@/components/credits/buy-credits";
 import { BUILD_ESTIMATE_MIN } from "@/lib/create/history";
@@ -126,6 +127,9 @@ export function ConfirmBuildDialog({
   products,
   productNames = [],
   specLines,
+  pieces = [],
+  cost: pickedCost,
+  seconds,
   onCancel,
   onConfirm,
   submitting,
@@ -151,6 +155,23 @@ export function ConfirmBuildDialog({
   /** One line per product — size · board · power — so what each build will
    *  be is on screen before the credits move. */
   specLines: string[];
+  /** What each product gets — its pieces as picked in What to build, what
+   *  they cost and take, and Edit, which opens that product's panel. */
+  pieces?: {
+    productId: string;
+    name: string;
+    summary: string;
+    detail: string;
+    credits: string;
+    time: string;
+    onEdit?: () => void;
+  }[];
+  /** What the picked pieces cost, all products together. Absent: every
+   *  piece of every product (buildCost). */
+  cost?: number;
+  /** About how long the build takes, in seconds — absent, the usual
+   *  estimate. */
+  seconds?: number;
   onCancel: () => void;
   onConfirm: (concept: ConceptSummary) => void;
   submitting: boolean;
@@ -205,7 +226,7 @@ export function ConfirmBuildDialog({
 
   if (!open) return null;
 
-  const cost = buildCost(products);
+  const cost = pickedCost ?? buildCost(products);
   // The rendered balance rather than canAfford(): the credits provider
   // refreshes that ref in its own effect, which runs after ours, so it
   // reads a render behind here (chat-thread.tsx reads it the same way).
@@ -268,6 +289,39 @@ export function ConfirmBuildDialog({
           </ul>
         )}
 
+        {/* What each product's build makes, from its What to build, with the
+            way back to that panel — the one surface every maker passes
+            through before paying (owner, 2026-10-22). */}
+        {pieces.length > 0 && (
+          <ul role="list" aria-label="What each product gets" className="flex flex-col gap-[8px]">
+            {pieces.map((p) => (
+              <li key={p.productId} className="flex flex-col gap-[4px] rounded-xl bg-bg-surface-raised px-[14px] py-[12px]">
+                <div className="flex items-baseline gap-[12px]">
+                  <span className="min-w-0 flex-1 text-md font-semibold text-text-primary">{p.name}</span>
+                  <span className="shrink-0 text-sm tabular-nums text-text-secondary">
+                    {p.credits} · {p.time}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-[8px]">
+                  <span className="min-w-0 flex-1 text-sm text-text-secondary">
+                    {p.summary} — {p.detail}
+                  </span>
+                  {p.onEdit && (
+                    <button
+                      type="button"
+                      onClick={p.onEdit}
+                      aria-label={`Edit what to build for ${p.name}`}
+                      className="inline-flex min-h-[24px] shrink-0 items-center rounded-sm px-[2px] text-sm font-semibold text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
         {/* §4.5 — both of these are on screen before any money moves. They
             are what stops a Draft result becoming a refund dispute. */}
         <div className="flex flex-col gap-[8px] rounded-xl bg-bg-subtle p-[14px]">
@@ -294,7 +348,9 @@ export function ConfirmBuildDialog({
                 : ` · ${balance} → ${balance - cost} after`
               : ""}
           </Chip>
-          <Chip icon={InformationCircleIcon}>{TIME_CHIP}</Chip>
+          <Chip icon={InformationCircleIcon}>
+            {seconds ? aboutTime(seconds).replace(/^about/, "About") : TIME_CHIP}
+          </Chip>
         </div>
 
         <div className="flex items-center gap-[12px] border-t border-solid border-border pt-[16px]">

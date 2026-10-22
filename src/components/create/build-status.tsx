@@ -36,7 +36,6 @@ import { Icon } from "@/components/dashboard/icon";
 import { Banner, type BannerTone } from "@/components/ideeza";
 import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { CAP_REASON, CREDIT_ALERTS_HREF } from "@/lib/create/credit-limits";
-import { buildCost } from "@/lib/create/credits";
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
 import {
   ITEM_LABELS,
@@ -44,6 +43,7 @@ import {
   allItems,
   elapsedMinutes,
   isOverrunning,
+  jobCost,
   productsOf,
   queuedAhead,
   rollupBuild,
@@ -140,7 +140,7 @@ export function stateRowFor(
   const status = statusOf(job);
   const elapsed = elapsedMinutes(job, now);
   // What this build was charged: one product's price per product.
-  const cost = buildCost(productsOf(job).length);
+  const cost = jobCost(job);
 
   // Its turn came up and the balance couldn't cover it. Still queued,
   // but for a reason the user can act on.
@@ -380,7 +380,7 @@ export function BuildStatus({
             </p>
             <p className="mt-[2px] text-sm text-text-secondary">
               It has run past twice its estimate. You can stop it and get your{" "}
-              {buildCost(products.length)} credits back.
+              {jobCost(job)} credits back.
             </p>
           </div>
           <button

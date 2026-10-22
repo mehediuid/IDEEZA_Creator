@@ -4,9 +4,10 @@
 //   • Pending  — a bare rendering tile: dotted texture + a centred
 //                "Drawing <product> · P%" pill, no card chrome
 //   • Ready    — the product's name with its concept number beside it, the
-//                image, the prompt on one line with a copy button, what will
-//                be built, then Edit spec · Refine · Regenerate and what
-//                each costs
+//                image, the prompt on one line with a copy button, its Spec
+//                (Edit spec on the title), What to build (Edit on the title,
+//                pieces-card.tsx), then Refine · Regenerate and what each
+//                costs
 //   • Failed   — error card with a retry control
 //
 // Spec §4b: regenerate is a FRESH from-scratch take; refinement is a change
@@ -35,17 +36,17 @@ import {
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
 import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
-import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { CAP_REASON, CREDIT_ALERTS_HREF } from "@/lib/create/credit-limits";
 import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
 import { productIdOf } from "@/lib/create/project-state";
 import { ARRIVAL_RING, productCardId, productRetryId } from "./anchors";
 import { useMinuteClock } from "./build-status";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
+import { PiecesBlock, type PiecesCard } from "./pieces-card";
 import {
   CARD_ACTION_ICON,
   CARD_ACTION_ROW,
-  EditSpecButton,
   SpecPanel,
   type SpecCard,
 } from "./spec-panel";
@@ -79,6 +80,7 @@ export function ImageTurn({
   buildChoice,
   onRemove,
   spec,
+  pieces,
   focused = false,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
@@ -103,6 +105,9 @@ export function ImageTurn({
    *  opens its spec sheet. Ready cards only: a drawing still under way has no
    *  parts to read yet. */
   spec?: SpecCard;
+  /** What the build makes of this product, with the way into the What to
+   *  build panel. Ready cards of a chat with the setup question only. */
+  pieces?: PiecesCard;
   /** The composer changes this product — said with the card's edge, and
    *  only when there is more than one card to tell it from. */
   focused?: boolean;
@@ -218,13 +223,15 @@ export function ImageTurn({
 
       {spec && <SpecPanel card={spec} />}
 
+      {pieces && <PiecesBlock card={pieces} />}
+
       <div aria-hidden className="h-px w-full bg-border" />
 
-      {/* The free way to change the product first, then the two that redraw
-          the image, and what each costs under them — a maker who types
-          "add a buzzer" into Refine pays for what Edit spec does free. */}
+      {/* The two that redraw the image, and what each costs under them —
+          beside the free way to change the product, Edit spec, which sits on
+          the Spec title: a maker who types "add a buzzer" into Refine pays
+          for what Edit spec does free. */}
       <div className={`flex flex-wrap items-center gap-[8px] ${CARD_ACTION_ROW}`}>
-        {spec && <EditSpecButton card={spec} />}
         <button
           type="button"
           onClick={onRefine}
@@ -374,8 +381,8 @@ export function InsufficientCreditsBanner({ cost }: { cost: number }) {
           Not enough credits to build this
         </p>
         <p className="text-sm text-text-secondary">
-          Building it costs {cost} credits — {BUILD_COST} per product — and
-          each concept render costs {CONCEPT_COST}.
+          Building it costs {cost} credits — what each product&apos;s picked
+          pieces cost — and each concept render costs {CONCEPT_COST}.
         </p>
         <BuyCreditsButton
           need={cost}

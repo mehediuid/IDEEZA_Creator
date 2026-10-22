@@ -12,6 +12,7 @@
 // imports are type-only, so it compiles and runs under `node --test` alone.
 
 import type { BuildItem, BuildItemKind, BuildJob } from "../create/history";
+import { isLeftOut } from "../create/pieces";
 import type { ProjectProduct, ProjectVersion } from "./project-read";
 
 // ───────────────────────────── versions ─────────────────────────────
@@ -160,9 +161,12 @@ export function productVersionView(
 
 /** "{ready} of {total} pieces ready" for ONE product — A2's `piecesOf(job)`
  *  counts the whole build. A piece the build never made isn't one. */
-export function productPiecesOf(items: BuildItem[]): { ready: number; total: number } {
+export function productPiecesOf(items: BuildItem[]): { ready: number; total: number; leftOut: number } {
   const live = items.filter((i) => i.status !== "skipped");
-  return { ready: live.filter((i) => i.status === "ready").length, total: live.length };
+  // A piece the maker left out counts toward the five (pieces.ts): "2 of 5
+  // pieces ready", with the rest addable.
+  const leftOut = items.filter(isLeftOut).length;
+  return { ready: live.filter((i) => i.status === "ready").length, total: live.length + leftOut, leftOut };
 }
 
 // ───────────────── the product page's tab strip (P2-EDITOR-16) ─────────────────
@@ -208,14 +212,22 @@ const PIECE_TABS: ReadonlyArray<{ kind: BuildItemKind; tab: ProductTabId }> = [
 export function productTabsOf(
   product: ProjectProduct,
   items: BuildItem[] | null,
-  gates: { firmware: boolean; contributors: boolean; customers: boolean; mediaFirst?: boolean },
+  gates: {
+    firmware: boolean;
+    contributors: boolean;
+    customers: boolean;
+    mediaFirst?: boolean;
+    /** The owner: a piece left out of the build shows as its own tab, Not
+     *  built, where it can be added. */
+    leftOut?: boolean;
+  },
 ): ProductTabId[] {
   const pieces: ProductTabId[] = [];
   if (product.state === "built" && items) {
     for (const { kind, tab } of PIECE_TABS) {
       if (tab === "code" && !gates.firmware) continue;
       const item = items.find((i) => i.kind === kind);
-      if (item && item.status !== "skipped") pieces.push(tab);
+      if (item && (item.status !== "skipped" || (gates.leftOut && isLeftOut(item)))) pieces.push(tab);
     }
   }
   // The owner's page is engineering: the build's pieces lead and Media follows them (owner,

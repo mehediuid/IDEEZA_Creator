@@ -61,6 +61,8 @@ import { REVIEW_PRIMARY_ID } from "./anchors";
 import { LeaveButton } from "./leave-button";
 import { SaveStep, useSaveMode } from "./save-step";
 import { moveTab } from "@/lib/ui/tab-keys";
+import { isLeftOut } from "@/lib/create/pieces";
+import { AddPiecesDialog, NotBuiltPanel } from "./add-pieces-dialog";
 
 export function ReviewOutputs({
   job,
@@ -140,10 +142,13 @@ function ReviewPanel({
   const building = statusOf(job) !== "ready";
   const product =
     products.find((x) => x.id === productId) ?? products[0];
+  // A piece the maker left out stays in the tabs, marked Not built, so it
+  // can be added (add-pieces-dialog.tsx); one an old build never had doesn't.
   const deliverables = React.useMemo(
-    () => product.items.filter((i) => i.status !== "skipped"),
+    () => product.items.filter((i) => i.status !== "skipped" || isLeftOut(i)),
     [product.items],
   );
+  const [adding, setAdding] = React.useState<BuildItemKind[] | null>(null);
   // §4.3 — one badge per product (§4.4.9), computed from the products
   // themselves so the badge on screen is what the checker returned.
   const confidence = React.useMemo(
@@ -181,6 +186,7 @@ function ReviewPanel({
   const shown =
     deliverables.find((i) => i.kind === wanted)?.kind ??
     deliverables.find(viewable)?.kind ??
+    deliverables.find((i) => !isLeftOut(i))?.kind ??
     deliverables[0]?.kind ??
     null;
 
@@ -418,20 +424,32 @@ function ReviewPanel({
                   data-tab={item.kind}
                   onClick={() => setPicked(item.kind)}
                   className={[
-                    "inline-flex h-[36px] items-center rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast",
+                    "inline-flex h-[36px] items-center gap-[6px] rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast",
                     "focus-visible:ring-2 focus-visible:ring-border-focus",
                     isActive
                       ? "bg-bg-brand-subtle text-text-brand"
-                      : "text-text-secondary hover:bg-bg-subtle hover:text-text-primary",
+                      : isLeftOut(item)
+                        ? "border border-dashed border-border-strong text-text-tertiary hover:text-text-primary"
+                        : "text-text-secondary hover:bg-bg-subtle hover:text-text-primary",
                   ].join(" ")}
                 >
                   {ITEM_LABELS[item.kind]}
+                  {isLeftOut(item) && <span className="text-sm font-medium text-text-tertiary">· Not built</span>}
                 </button>
               );
             })}
           </div>
 
-          {showModel ? (
+          {shownItem && isLeftOut(shownItem) ? (
+            <div className="px-10 pb-10">
+              <NotBuiltPanel
+                kind={shownItem.kind}
+                panelId="review-tabpanel"
+                tabId={`review-tab-${shownItem.kind}`}
+                onAdd={() => setAdding([shownItem.kind])}
+              />
+            </div>
+          ) : showModel ? (
             // The model carries its own rail — the model, its systems, what
             // ships — so it takes the whole width instead of sitting beside
             // the aside.
@@ -591,6 +609,9 @@ function ReviewPanel({
             window.requestAnimationFrame(() => document.getElementById(REVIEW_PRIMARY_ID)?.focus());
           }}
         />
+      )}
+      {adding && (
+        <AddPiecesDialog buildId={job.id} product={product} preselect={adding} onClose={() => setAdding(null)} />
       )}
     </section>
   );

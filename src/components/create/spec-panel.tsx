@@ -1,29 +1,26 @@
 "use client";
 
 // What a concept card says it will build (docs/superpowers/specs/2026-09-25-
-// product-spec-sheet-design.md): a line headed "What will be built", and
-// under it up to four facts chosen by what this product is (lib/spec/
-// facts.ts) — size first. Two lines on most cards, three when a companion's
-// name is long: a fact never breaks inside, and one wider than the card ends
-// in an ellipsis, so no fact takes more than a line. The way into the spec
-// sheet (spec-sheet.tsx) is the card's first action, Edit spec, before the
-// two that redraw the image: it is the free way to change a product, and it
-// used to be a quiet link at the end of this line while the paid ones were
-// buttons. The editor used to open inside the card, under a "Spec ⌄" that
-// read as a dropdown, and grew that one card in a row of three; the sheet
-// sits over the page instead, so no card changes height. A size the parts
-// can't fit says so here, on the size itself, before anything is paid. Once
-// the product is built the button reads View spec: its sheet shows what was
-// built.
+// product-spec-sheet-design.md): a section titled "Spec" with Edit spec
+// beside the title (owner, 2026-10-22), and under it up to four facts chosen
+// by what this product is (lib/spec/facts.ts) — size first. Two lines on
+// most cards, three when a companion's name is long: a fact never breaks
+// inside, and one wider than the card ends in an ellipsis, so no fact takes
+// more than a line. Edit spec opens the spec sheet (spec-sheet.tsx), the free
+// way to change a product; the sheet sits over the page or docks beside it,
+// so no card changes height. A size the parts can't fit says so here, on the
+// size itself, before anything is paid. Once the product is built the button
+// reads View spec: its sheet shows what was built. What the build makes of
+// the product is the next section on the card (pieces-card.tsx).
 
 import * as React from "react";
-import { SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
+import { PencilEdit02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import type { ConceptPart } from "@/lib/create/concept";
 import { cardFacts } from "@/lib/spec/format";
 import type { RadioPair } from "@/lib/spec/facts";
 import type { ResolvedSpec } from "@/lib/spec/types";
-import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
+import { OUTLINE_BUTTON_SM, OUTLINE_BUTTON_SM_OFF } from "./buttons";
 
 /** The sheet's Length field — where the Build line and the rail's size jump
  *  put the keyboard when a size can't be built. */
@@ -110,7 +107,12 @@ export function SpecPanel({ card }: { card: SpecCard }) {
         </p>
       )}
 
-      <h4 className="text-sm text-text-tertiary">What will be built</h4>
+      {/* The section's title, with the way into the spec sheet beside it
+          (owner, 2026-10-22: "Spec", Edit spec on its right). */}
+      <div className="flex items-center gap-[8px]">
+        <h4 className="min-w-0 flex-1 text-sm font-semibold text-text-secondary">Spec</h4>
+        <EditSpecButton card={card} />
+      </div>
 
       {spec ? (
         <SpecFacts spec={spec} parts={card.parts} pairs={card.pairs} />
@@ -155,9 +157,9 @@ export function EditSpecButton({ card }: { card: SpecCard }) {
       aria-controls={card.open ? SPEC_SHEET_ID : undefined}
       title={ready ? undefined : "Working out size and battery…"}
       onClick={card.onOpen}
-      className={ready ? OUTLINE_BUTTON : OUTLINE_BUTTON_OFF}
+      className={ready ? OUTLINE_BUTTON_SM : OUTLINE_BUTTON_SM_OFF}
     >
-      <Icon icon={SlidersHorizontalIcon} className={CARD_ACTION_ICON} />
+      <Icon icon={PencilEdit02Icon} size={14} />
       {card.editable ? "Edit spec" : "View spec"}
     </button>
   );

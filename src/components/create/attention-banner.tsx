@@ -35,9 +35,8 @@ import {
   Notification03Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { buildCost } from "@/lib/create/credits";
 import { CREDIT_ALERTS_HREF } from "@/lib/create/credit-limits";
-import { productsOf, useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
+import { jobCost, useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
 import { buildNotices } from "@/lib/notifications/sources";
 import { useToastGate } from "@/components/notifications/use-notices";
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
@@ -215,7 +214,7 @@ export function BuildAttentionBanner() {
           <Icon icon={ArrowRight01Icon} />
         </Link>
       ) : reason === "credits" ? (
-        <BuyCreditsButton need={buildCost(productsOf(job).length)} className={ctaClass}>
+        <BuyCreditsButton need={jobCost(job)} className={ctaClass}>
           Buy credits
           <Icon icon={ArrowRight01Icon} />
         </BuyCreditsButton>

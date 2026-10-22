@@ -6,6 +6,12 @@ export const OUTLINE_BUTTON =
   "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
 export const OUTLINE_BUTTON_OFF =
   "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none";
+/** The outline family at 32 px — an action on a card's section heading
+ *  (Edit spec, What to build's Edit), smaller than the card's own row. */
+export const OUTLINE_BUTTON_SM =
+  "inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border border-solid border-border bg-bg-surface px-[10px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
+export const OUTLINE_BUTTON_SM_OFF =
+  "inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border border-solid border-border bg-bg-subtle px-[10px] text-sm font-medium text-text-disabled outline-none";
 /** Quieter still: no edge, the same size and words as the outline family —
  *  for a second action beside one of them, like the sheet's Change by
  *  message beside Done. */

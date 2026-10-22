@@ -17,11 +17,13 @@
 
 import * as React from "react";
 import {
+  Add01Icon,
   Alert02Icon,
   CheckmarkCircle02Icon,
   Loading03Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { isLeftOut } from "@/lib/create/pieces";
 import {
   ITEM_LABELS,
   productsOf,
@@ -114,6 +116,18 @@ export function BuildRail({
 }
 
 export function PipelineRow({ item }: { item: BuildItem }) {
+  // Left out of the build by the maker: in its place, quiet, addable later.
+  if (isLeftOut(item)) {
+    return (
+      <li data-testid="pipeline-row" className="flex items-center gap-[8px] rounded-lg px-[6px] py-[5px] text-sm text-text-tertiary">
+        <span aria-hidden className="inline-flex shrink-0">
+          <Icon icon={Add01Icon} size={14} />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{ITEM_LABELS[item.kind]}</span>
+        <span className="shrink-0 text-sm text-text-tertiary">Not in this build</span>
+      </li>
+    );
+  }
   const tone =
     item.status === "ready"
       ? "done"
