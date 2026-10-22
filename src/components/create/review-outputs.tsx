@@ -33,7 +33,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
-import { deriveAssembly } from "@/lib/three/assembly";
+import { deriveAssembly, enclosureOnly } from "@/lib/three/assembly";
 import { ModelPanelLazy } from "./model-panel/model-panel-lazy";
 import {
   ITEM_LABELS,
@@ -207,7 +207,11 @@ function ReviewPanel({
     [product.title, product.parts, product.spec, isPrimary, job.modelGlbUrl],
   );
   const shellNote = !isPrimary ? null : job.modelFailed ? "failed" : !job.modelGlbUrl ? "pending" : null;
-  const showModel = shown === "3d" && shownItem?.status === "ready";
+  const showModel = (shown === "3d" || shown === "assembly") && shownItem?.status === "ready";
+  // The 3D Module is the enclosure alone where an Assembly piece shows the
+  // whole product; a build from before Assembly keeps it whole here.
+  const shellOnly =
+    shown === "3d" && product.items.some((i) => i.kind === "assembly" && (i.status !== "skipped" || isLeftOut(i)));
 
   // The project this build already belongs to (holderOf: its projectId, or
   // a project whose builds name it — a save whose builds-store write failed
@@ -461,7 +465,7 @@ function ReviewPanel({
             >
               <ModelPanelLazy
                 key={product.id}
-                assembly={assembly}
+                assembly={shellOnly ? enclosureOnly(assembly) : assembly}
                 shellNote={shellNote}
                 onRetryMesh={() => setBuildModelFailed(job.id, false)}
               />

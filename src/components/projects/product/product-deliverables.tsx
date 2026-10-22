@@ -36,7 +36,7 @@ import { ModelPanelLazy } from "@/components/create/model-panel/model-panel-lazy
 import { Button, buttonVariants } from "@/components/ideeza";
 import { bomFor, firmwareFor, isSampleModel, netsFor, type ArtifactSource } from "@/lib/create/build-artifacts";
 import { ITEM_LABELS, type BuildItem, type BuildItemKind, type BuildJob, type BuildProduct } from "@/lib/create/history";
-import { deriveAssembly } from "@/lib/three/assembly";
+import { deriveAssembly, enclosureOnly } from "@/lib/three/assembly";
 import { cn } from "@/lib/utils";
 import { ConceptImage } from "./product-identity";
 
@@ -45,7 +45,7 @@ import { ConceptImage } from "./product-identity";
 export const DeliverablesAccess = React.createContext(false);
 
 /** Each preview in a named scroll region the keyboard can reach (COR-34). */
-const REGION: Record<Exclude<BuildItemKind, "3d">, string> = {
+const REGION: Record<Exclude<BuildItemKind, "3d" | "assembly">, string> = {
   pcb: "PCB layout, scrollable",
   code: "Firmware code, scrollable",
   wiring: "Wiring map, scrollable",
@@ -82,8 +82,8 @@ export function ProductPiecePanel({
           artifact={<PieceNotReady item={item} chatHref={chatHref} />}
           aside={<Covers kind={kind} job={job} product={product} ready={false} />}
         />
-      ) : kind === "3d" ? (
-        <ModelTab job={job} product={product} />
+      ) : kind === "3d" || kind === "assembly" ? (
+        <ModelTab job={job} product={product} kind={kind} />
       ) : (
         <Split
           artifact={<Preview kind={kind} product={product} />}
@@ -107,7 +107,7 @@ function Split({ artifact, aside }: { artifact: React.ReactNode; aside: React.Re
   );
 }
 
-function Preview({ kind, product }: { kind: Exclude<BuildItemKind, "3d">; product: BuildProduct }) {
+function Preview({ kind, product }: { kind: Exclude<BuildItemKind, "3d" | "assembly">; product: BuildProduct }) {
   return (
     <div
       role="region"
@@ -279,21 +279,29 @@ function PieceNotReady({ item, chatHref }: { item: BuildItem; chatHref: string |
  *  mounts only then. Only the primary gets the generated mesh: the job makes
  *  one, from the primary's concept image, so a companion wearing it would
  *  claim a shape it never had. No retry here (`onRetryMesh` is omitted). */
-function ModelTab({ job, product }: { job: BuildJob; product: BuildProduct }) {
+/** The 3D view: the whole product for Assembly; for the 3D Module, the
+ *  enclosure alone when the build has an Assembly piece to show the rest —
+ *  a build from before Assembly keeps its whole product here. */
+function ModelTab({ job, product, kind }: { job: BuildJob; product: BuildProduct; kind: "3d" | "assembly" }) {
+  const shellOnly =
+    kind === "3d" && product.items.some((i) => i.kind === "assembly" && (i.status !== "skipped" || i.omitted));
   const [open, setOpen] = React.useState(false);
   const viewerRef = React.useRef<HTMLDivElement>(null);
   const primary = product.id === "primary";
   const assembly = React.useMemo(
     () =>
       open
-        ? deriveAssembly({
-            title: product.title,
-            parts: product.parts,
-            spec: product.spec,
-            meshUrl: primary ? job.modelGlbUrl : undefined,
-          })
+        ? (() => {
+            const a = deriveAssembly({
+              title: product.title,
+              parts: product.parts,
+              spec: product.spec,
+              meshUrl: primary ? job.modelGlbUrl : undefined,
+            });
+            return shellOnly ? enclosureOnly(a) : a;
+          })()
         : null,
-    [open, product.title, product.parts, product.spec, primary, job.modelGlbUrl],
+    [open, product.title, product.parts, product.spec, primary, job.modelGlbUrl, shellOnly],
   );
   const shellNote = !primary ? null : job.modelFailed ? "failed" : !job.modelGlbUrl ? "pending" : null;
 

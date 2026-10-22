@@ -28,6 +28,7 @@ import {
   CpuIcon,
   CubeIcon,
   ElectricWireIcon,
+  Layers01Icon,
   PackageIcon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
@@ -61,6 +62,7 @@ const KIND_ICON: Record<BuildItemKind, IconValue> = {
   code: CodeIcon,
   wiring: ElectricWireIcon,
   parts: PackageIcon,
+  assembly: Layers01Icon,
 };
 
 // ─────────────────────── the one state table ───────────────────────

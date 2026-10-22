@@ -207,7 +207,7 @@ export type ChatSession = {
   updatedAt: number;
 };
 
-export type BuildItemKind = "3d" | "pcb" | "code" | "wiring" | "parts";
+export type BuildItemKind = "3d" | "pcb" | "code" | "assembly" | "wiring" | "parts";
 
 export type BuildItemStatus =
   | "pending"
@@ -357,26 +357,33 @@ export type BuildAttention = {
 };
 
 // The five artifacts every build produces, in the order they're shown.
+// In the editor's own order and words (owner, 2026-10-22: "PCB, Code, 3D
+// Module, Assembly and Wiring — these are what gets built"), with the Parts
+// list the others are made from last. A build from before Assembly has none:
+// its item reads as `skipped` and shows nowhere.
 export const ITEM_KINDS: BuildItemKind[] = [
-  "3d",
   "pcb",
   "code",
+  "3d",
+  "assembly",
   "wiring",
   "parts",
 ];
 
 export const ITEM_LABELS: Record<BuildItemKind, string> = {
-  "3d": "3D model",
   pcb: "PCB",
-  code: "Firmware code",
+  code: "Code",
+  "3d": "3D Module",
+  assembly: "Assembly",
   wiring: "Wiring",
   parts: "Parts",
 };
 
 export const ITEM_SUBTITLES: Record<BuildItemKind, string> = {
-  "3d": "Printable enclosure with mount points",
   pcb: "Schematic, layout and BOM",
   code: "Starter firmware for the parts used",
+  "3d": "Printable enclosure with mount points",
+  assembly: "The board and its parts in place, inside the enclosure",
   wiring: "Harness and pin-to-pin connections",
   parts: "Bill of materials, grouped by function",
 };

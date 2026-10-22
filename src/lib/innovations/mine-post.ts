@@ -18,7 +18,9 @@ import { ME } from "./people";
 import { mineSlugOf, postIdOfProject } from "./slug";
 import type { InnovationPost, PostMedia, PostPart, PostPiece, PostProduct, PostVideo } from "./types";
 
-const PIECE_ORDER: readonly BuildItemKind[] = ["3d", "pcb", "code", "wiring", "parts"];
+// The post's own five (types.ts PostPiece); a build's Assembly is not one of
+// them yet.
+const PIECE_ORDER: readonly PostPiece[] = ["3d", "pcb", "code", "wiring", "parts"];
 
 /** The parts as a list: the same part named twice is one row with its count. */
 export function partsOf(product: BuildProduct): PostPart[] {

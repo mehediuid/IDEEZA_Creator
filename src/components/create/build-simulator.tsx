@@ -54,6 +54,7 @@ const PER_ITEM_JITTER: Record<BuildItemKind, number> = {
   code: 2,
   wiring: 3,
   parts: 4,
+  assembly: 2,
 };
 
 // Dev-only hooks so the failure states are reachable on demand. There is

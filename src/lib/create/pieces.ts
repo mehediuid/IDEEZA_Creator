@@ -10,8 +10,8 @@
 // maker who changes nothing pays what they always did.
 //
 // Everything a piece needs is added with it, and taking a piece out takes
-// out what needs it, said once in a line: Firmware code and Wiring are
-// made for the PCB. The Parts list is not a choice (owner, 2026-10-22): on
+// out what needs it, said once in a line: Code and Wiring are made for
+// the PCB, and Assembly for the PCB and the 3D Module. The Parts list is not a choice (owner, 2026-10-22): on
 // its own it is a list the spec sheet already shows for free, so it comes
 // with every build, free, and never alone.
 
@@ -28,11 +28,11 @@ export type PiecePick = Record<BuildItemKind, PieceChoice>;
 
 /** The five pieces in the order every list shows them — the build's own
  *  order (history.ts ITEM_KINDS). */
-export const PIECE_KINDS: BuildItemKind[] = ["3d", "pcb", "code", "wiring", "parts"];
+export const PIECE_KINDS: BuildItemKind[] = ["pcb", "code", "3d", "assembly", "wiring", "parts"];
 
 /** The pieces a maker picks. The Parts list isn't one: it comes with any of
  *  them — every piece is made from it — and never on its own. */
-export const PICKABLE_KINDS: BuildItemKind[] = ["3d", "pcb", "code", "wiring"];
+export const PICKABLE_KINDS: BuildItemKind[] = ["pcb", "code", "3d", "assembly", "wiring"];
 
 /** The Parts list goes with any picked piece, and with none, nothing is. */
 function withParts(pick: PiecePick): PiecePick {
@@ -66,7 +66,7 @@ export const OPTIMIZE_COST = 1;
 
 export const PIECES: Record<BuildItemKind, PieceInfo> = {
   "3d": {
-    name: "3D model",
+    name: "3D Module",
     sub: "Enclosure / cover, ready to 3D-print",
     note: "enclosure",
     needs: ["parts"],
@@ -89,7 +89,7 @@ export const PIECES: Record<BuildItemKind, PieceInfo> = {
     addsLater: "The schematic and the routed board, made from this product's parts.",
   },
   code: {
-    name: "Firmware code",
+    name: "Code",
     sub: "Code for the board, ready to flash",
     needs: ["pcb", "parts"],
     quality: true,
@@ -98,6 +98,17 @@ export const PIECES: Record<BuildItemKind, PieceInfo> = {
     optimize: "Low power — longer battery life",
     optimizeSeconds: 15,
     addsLater: "Written for the PCB this product already has, ready to flash.",
+  },
+  assembly: {
+    name: "Assembly",
+    sub: "The board and its parts in place, inside the enclosure",
+    needs: ["pcb", "3d", "parts"],
+    quality: false,
+    price: { medium: 1, high: 1 },
+    seconds: { medium: 25, high: 25 },
+    optimize: null,
+    optimizeSeconds: 0,
+    addsLater: "The whole product put together — the board and its parts inside the enclosure — to check that it all fits.",
   },
   wiring: {
     name: "Wiring",
@@ -132,7 +143,14 @@ const choice = (on: boolean): PieceChoice => ({ on, quality: "medium", optimize:
 
 /** Every piece, at Medium, nothing optimized — what a build always made. */
 export function defaultPick(): PiecePick {
-  return { "3d": choice(true), pcb: choice(true), code: choice(true), wiring: choice(true), parts: choice(true) };
+  return {
+    pcb: choice(true),
+    code: choice(true),
+    "3d": choice(true),
+    assembly: choice(true),
+    wiring: choice(true),
+    parts: choice(true),
+  };
 }
 
 /** A stored pick as it can be used: anything missing or malformed reads as
@@ -174,11 +192,15 @@ export function pickCost(pick: PiecePick): number {
 }
 
 /** The pieces run side by side where they can: the Parts list first, the
- *  PCB from it, Firmware and Wiring from the PCB, the enclosure beside them. */
+ *  PCB from it, Code and Wiring from the PCB, the enclosure beside them, and
+ *  Assembly once both the board and the enclosure are there. */
 export function chainSeconds(sec: Partial<Record<BuildItemKind, number>>): number {
   const t = (k: BuildItemKind) => sec[k] ?? 0;
   const any = PIECE_KINDS.some((k) => t(k) > 0);
-  return any ? t("parts") + Math.max(t("pcb") + Math.max(t("code"), t("wiring")), t("3d")) : 0;
+  // Assembly waits for both the board and the enclosure.
+  const board = t("pcb") + Math.max(t("code"), t("wiring"));
+  const together = t("assembly") ? Math.max(t("pcb"), t("3d")) + t("assembly") : 0;
+  return any ? t("parts") + Math.max(board, t("3d"), together) : 0;
 }
 
 export function pickSeconds(pick: PiecePick): number {
@@ -196,7 +218,7 @@ const PRESET_KINDS: Record<PiecePreset, BuildItemKind[]> = {
 export const PRESET_LABEL: Record<PiecePreset, string> = {
   whole: "Whole product",
   pcb: "PCB only",
-  enclosure: "Enclosure only",
+  enclosure: "3D Module only",
 };
 
 export function presetOf(pick: PiecePick): PiecePreset | "custom" | "none" {
