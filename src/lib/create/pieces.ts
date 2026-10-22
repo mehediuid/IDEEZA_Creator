@@ -98,16 +98,20 @@ export const PIECES: Record<BuildItemKind, PieceInfo> = {
     optimizeSeconds: 0,
     addsLater: "How every part on the PCB connects, pin by pin.",
   },
+  // The bill of materials, worked out from the spec's own parts (build-
+  // artifacts.ts `bomFor`) — no model is asked, and every other piece is
+  // made from it, so it costs nothing. It names and counts the parts; it
+  // carries no prices or suppliers, so it promises none.
   parts: {
     name: "Parts",
-    sub: "Parts list with prices and sources",
+    sub: "Every part — category, name, reference and quantity",
     needs: [],
     quality: false,
     price: { medium: 0, high: 0 },
     seconds: { medium: 5, high: 5 },
-    optimize: "Cheapest in-stock sources",
-    optimizeSeconds: 10,
-    addsLater: "The parts list with prices and where to buy them.",
+    optimize: null,
+    optimizeSeconds: 0,
+    addsLater: "Every part of this product — category, name, reference and quantity.",
   },
 };
 
