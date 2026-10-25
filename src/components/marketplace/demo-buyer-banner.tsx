@@ -17,7 +17,6 @@ import { Banner, SelectMenu, type SelectOption } from "@/components/ideeza";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
-import { cn } from "@/lib/utils";
 
 const OPTIONS: SelectOption<DemoBuyerId>[] = DEMO_BUYERS.map((b) => ({ value: b.id, label: `${b.name} · demo creator` }));
 
@@ -27,8 +26,7 @@ export function DemoBuyerBanner({ className }: { className?: string }) {
     <Banner
       tone="info"
       title={`Testnet demo · shopping as ${buyer.name}`}
-      // Below ~480 px the switch wraps under the words rather than squeezing them.
-      className={cn("flex-wrap [&>span:first-of-type]:min-w-[min(100%,240px)]", className)}
+      className={className}
       action={
         <SelectMenu<DemoBuyerId>
           label="Shopping as"

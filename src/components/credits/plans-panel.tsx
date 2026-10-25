@@ -104,7 +104,7 @@ export function PlansPanel() {
               value: "yearly",
               label: (
                 <>
-                  Annual plan <span className="text-text-success">(Save {pct(YEARLY_OFF)})</span>
+                  Annual plan <span className="text-text-success [[aria-checked=true]_&]:text-[color:inherit]">(Save {pct(YEARLY_OFF)})</span>
                 </>
               ),
             },

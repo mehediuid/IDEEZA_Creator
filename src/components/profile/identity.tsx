@@ -67,7 +67,7 @@ export function IdentityHead({
   phoneMenu?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-[16px]">
+    <div data-tour="profile-head" className="flex flex-col gap-[16px]">
       {/* The photo rises over the cover's lower edge, ringed in the page colour; at phone width ⋯
           sits beside it, just under the cover. */}
       <div className="flex items-start gap-[16px]">
@@ -85,7 +85,7 @@ export function IdentityHead({
           <h1
             ref={titleRef}
             tabIndex={-1}
-            className="min-w-0 break-words text-4xl font-semibold leading-4xl tracking-tight text-text-primary outline-none [text-wrap:balance]"
+            className="min-w-0 break-words text-4xl font-semibold leading-4xl tracking-near text-text-primary outline-none [text-wrap:balance]"
           >
             {name}
           </h1>

@@ -50,7 +50,7 @@ export function ProjectCard({ project }: { project: Project }) {
   const openComments = () => router.push(`${detailHref}?focus=comments`);
 
   return (
-    <article className="flex flex-col gap-[10px]">
+    <article data-tour="feed-card" className="flex flex-col gap-[10px]">
       <div className="group/thumb relative aspect-[4/3] overflow-hidden rounded-[12px] bg-bg-surface-raised">
         {/* thumbnail image or fallback gradient */}
         {project.image && imgOk ? (

@@ -1,9 +1,11 @@
-// IDEEZA Design System — A24 Divider, single line (Figma 46480:112588).
+// IDEEZA Design System — A24 Divider, single line (Figma 512:557). Figma draws
+// every line in color/border/subtle, so that is the default; "default"
+// (border/default) is a code-only tone.
 import { cn } from "@/lib/utils";
 
 export function Divider({
   orientation = "horizontal",
-  tone = "default",
+  tone = "subtle",
   className,
 }: {
   orientation?: "horizontal" | "vertical";

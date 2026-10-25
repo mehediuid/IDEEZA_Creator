@@ -70,9 +70,8 @@ a {
   transition: color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
-/* Hover is a colour step, never an underline: an underline appearing under
- * the pointer nudges the text's own box and reads as a second style rather
- * than a state. */
+/* A plain anchor (a nav row, a whole card) steps its colour on hover. A text
+ * link drawn with the Link atom underlines as well, as Figma A03 does. */
 a:hover {
   color: var(--color-text-link-hover);
 }

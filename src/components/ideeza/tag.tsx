@@ -58,13 +58,16 @@ export function Tag(props: TagProps) {
   const s = SIZE[size];
   const interactive = !!props.onClick && !disabled;
 
+  // The edge is Figma's 1 px inside stroke (a ring, not a border), so SM / MD / LG stay
+  // 24 / 28 / 32 tall. Disabled is the A18 component's own layer opacity, 0.5 (unbound in
+  // Figma; the opacity/disabled variable is 0.4).
   const box = cn(
-    "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-solid transition-colors duration-fast motion-reduce:transition-none",
+    "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full ring-[length:var(--border-width-1)] ring-inset transition-[color,background-color,box-shadow] duration-fast motion-reduce:transition-none",
     s.box,
     selected
-      ? "border-border-brand bg-bg-brand-subtle text-text-brand"
-      : cn("border-border bg-bg-surface-raised text-text-primary", interactive && "hover:border-border-strong hover:bg-bg-subtle"),
-    disabled && "opacity-[var(--opacity-disabled)]",
+      ? "bg-bg-brand-subtle text-text-brand ring-border-brand"
+      : cn("bg-bg-surface-raised text-text-primary ring-border", interactive && "hover:bg-bg-subtle hover:ring-border-strong"),
+    disabled && "opacity-50",
     interactive ? "cursor-pointer" : disabled && props.onClick ? "cursor-not-allowed" : undefined,
     className,
   );
@@ -99,8 +102,9 @@ export function Tag(props: TagProps) {
           aria-label={props.dismissLabel}
           disabled={disabled}
           onClick={props.onDismiss}
-          // On touch the ✕ keeps its glyph and gains a 44 px hit area around it (the chip doesn't grow).
-          className="relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full disabled:cursor-not-allowed [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:left-1/2 [@media(pointer:coarse)]:after:top-1/2 [@media(pointer:coarse)]:after:size-[var(--touch-min)] [@media(pointer:coarse)]:after:-translate-x-1/2 [@media(pointer:coarse)]:after:-translate-y-1/2 [@media(pointer:coarse)]:after:content-['']"
+          // The ✕ is Figma color/icon/current in its Default mode (icon/default), not the tag's ink.
+          // On touch it keeps its glyph and gains a 44 px hit area around it (the chip doesn't grow).
+          className="relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full text-[color:var(--color-icon-default)] disabled:cursor-not-allowed [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:left-1/2 [@media(pointer:coarse)]:after:top-1/2 [@media(pointer:coarse)]:after:size-[var(--touch-min)] [@media(pointer:coarse)]:after:-translate-x-1/2 [@media(pointer:coarse)]:after:-translate-y-1/2 [@media(pointer:coarse)]:after:content-['']"
         >
           <Icon icon={Cancel01Icon} size={s.close} />
         </button>

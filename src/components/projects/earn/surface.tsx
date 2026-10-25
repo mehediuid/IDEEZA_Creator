@@ -45,6 +45,7 @@ export function EarnBlock({
   lead,
   card = false,
   aside,
+  tour,
   children,
   className,
 }: {
@@ -54,6 +55,8 @@ export function EarnBlock({
   card?: boolean;
   /** Beside the heading, e.g. the Testnet demo badge. */
   aside?: React.ReactNode;
+  /** The Tour Guide's anchor for this section. */
+  tour?: string;
   children?: React.ReactNode;
   className?: string;
 }) {
@@ -61,6 +64,7 @@ export function EarnBlock({
   return (
     <section
       id={id}
+      data-tour={tour}
       aria-labelledby={headingId}
       className={cn(card ? EARN_CARD : "flex min-w-0 flex-col gap-8", "scroll-mt-10", className)}
     >

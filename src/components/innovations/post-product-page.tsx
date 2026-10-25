@@ -107,7 +107,7 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
             )}
           </span>
           <div className="flex min-w-0 flex-col gap-3">
-            <h1 ref={titleRef} tabIndex={-1} className="text-4xl font-semibold leading-4xl tracking-tight text-text-primary outline-none max-md:text-2xl max-md:leading-2xl">
+            <h1 ref={titleRef} tabIndex={-1} className="text-4xl font-semibold leading-4xl tracking-near text-text-primary outline-none max-md:text-2xl max-md:leading-2xl max-md:tracking-normal">
               {product.name}
             </h1>
             <p className="text-md leading-md text-text-secondary">{meta}</p>

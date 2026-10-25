@@ -21,6 +21,7 @@ import * as React from "react";
 import { AlertCircleIcon, Cancel01Icon, InformationCircleIcon, LockIcon, PlayIcon, Tick02Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, ModalFrame, ProgressBar, Spinner } from "@/components/ideeza";
+import { SPINNER_SIZES } from "@/components/ideeza/spinner";
 import { formatDate } from "@/lib/manual/project-summary";
 import { getClip, verifyClips } from "@/lib/video/clip-store";
 import { describeClip } from "@/lib/video/frames";
@@ -66,7 +67,8 @@ export function StatusGlyph({
   tone: keyof typeof GLYPH_TONE;
   size?: number;
 }) {
-  if (icon === "spinner") return <Spinner size={size} />;
+  // A20 draws the ring only at 16 / 20 / 24 / 32: the glyph's size takes the nearest one.
+  if (icon === "spinner") return <Spinner size={SPINNER_SIZES.reduce((a, b) => (Math.abs(b - size) < Math.abs(a - size) ? b : a))} />;
   const glyph = GLYPHS[icon];
   return (
     <span aria-hidden className={cn("inline-flex shrink-0 items-center justify-center", GLYPH_TONE[tone])}>

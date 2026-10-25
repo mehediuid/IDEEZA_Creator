@@ -1,6 +1,6 @@
 "use client";
 
-// IDEEZA Design System — Banner
+// IDEEZA Design System — Banner (Figma M01 Alert, Size=SM)
 //
 // One line saying where a step or a job stands. Four tones, each earning its
 // place: `good` (it passed), `attention` (something needs fixing before Next),
@@ -18,37 +18,42 @@
 // so an assertive alert would interrupt the user mid-drag on every change.
 
 import * as React from "react";
+import {
+  AlertCircleIcon,
+  CancelCircleHalfDotIcon,
+  CheckmarkCircle04Icon,
+  InformationCircleIcon,
+} from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import { cn } from "@/lib/utils";
 
-// Weight matches urgency. Everything that asks something of the user, or
-// reports a failure, takes a filled, bordered box; `good` is the absence of a
-// problem, and a full-width saturated slab announcing that nothing is wrong
-// competed with the step heading for the eye. It keeps the tick and the success
-// colour, and gives up the fill and the edge.
+// M01's Severity: every tone is the same box (its subtle fill and its edge),
+// and the tone lives in the 18 px badge and the action. The words take the
+// page's ink, as M01 sets them.
 const TONES = {
   good: {
-    box: "text-[color:var(--color-text-success)]",
-    boxed: false,
-    glyph: "M20 6L9 17l-5-5",
+    box: "border-[var(--color-border-success)] bg-[var(--color-bg-success-subtle)]",
+    badge: "bg-[var(--color-icon-success)]",
+    action: "text-[color:var(--color-icon-success)]",
+    glyph: CheckmarkCircle04Icon,
   },
   attention: {
-    box: "border-[var(--color-border-warning)] bg-[var(--color-bg-warning-subtle)] text-[color:var(--color-text-warning)]",
-    boxed: true,
-    glyph: "M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z",
+    box: "border-[var(--color-border-warning)] bg-[var(--color-bg-warning-subtle)]",
+    badge: "bg-[var(--color-icon-warning)]",
+    action: "text-[color:var(--color-icon-warning)]",
+    glyph: AlertCircleIcon,
   },
   info: {
-    box: "border-[var(--color-border-blue)] bg-[var(--color-bg-info-subtle)] text-[color:var(--color-text-blue)]",
-    boxed: true,
-    glyph: "M12 16v-4M12 8h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    box: "border-[var(--color-border-blue)] bg-[var(--color-bg-info-subtle)]",
+    badge: "bg-[var(--color-icon-blue)]",
+    action: "text-[color:var(--color-icon-blue)]",
+    glyph: InformationCircleIcon,
   },
   error: {
-    box: "border-[var(--color-border-error)] bg-[var(--color-bg-error-subtle)] text-[color:var(--color-text-error)]",
-    boxed: true,
-    glyph: "M15 9l-6 6M9 9l6 6M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-    // The error red on its own fill reads 4.4:1 in light and 3.6:1 in dark,
-    // short of 4.5:1 for words. The glyph, the edge and the fill carry the
-    // tone (≥ 3:1 is enough for them); the sentence takes the page's ink.
-    words: "text-[color:var(--color-text-primary)]",
+    box: "border-[var(--color-border-error)] bg-[var(--color-bg-error-subtle)]",
+    badge: "bg-[var(--color-icon-error)]",
+    action: "text-[color:var(--color-icon-error)]",
+    glyph: CancelCircleHalfDotIcon,
   },
 } as const;
 
@@ -56,19 +61,14 @@ export type BannerTone = keyof typeof TONES;
 
 export interface BannerProps {
   tone: BannerTone;
-  /**
-   * Optional heading above the message. With one, the tone colours the glyph
-   * alone and the words take the page's own text colours — a two-line banner
-   * printed entirely in the tone reads as a warning about itself. Without one,
-   * the whole line stays in the tone, which is what a single sentence wants.
-   */
+  /** Optional heading above the message (M01's title, with the message as its description). */
   title?: React.ReactNode;
   children: React.ReactNode;
   /**
-   * A control the banner offers alongside its message — e.g. Preview as
-   * buyer's Exit preview (PPL-5), or a pending-version notice's Review
-   * version / Open chat (COR-18). Right-aligned, vertically centered with
-   * the text. Absent by default, so every existing Banner is unchanged.
+   * A control the banner offers with its message — e.g. Preview as buyer's
+   * Exit preview (PPL-5), or a pending-version notice's Review version /
+   * Open chat (COR-18). It sits under the text, as M01's action row does, in
+   * the tone's icon colour.
    */
   action?: React.ReactNode;
   className?: string;
@@ -81,37 +81,34 @@ export function Banner({ tone, title, children, action, className }: BannerProps
       role="status"
       aria-live="polite"
       className={cn(
-        "flex items-start gap-[var(--spacing-4)] rounded-[var(--radius-lg)]",
-        "text-[length:var(--font-size-md)] leading-md font-[family-name:var(--font-family-body)]",
-        t.boxed ? "border px-[var(--spacing-6)] py-[var(--spacing-5)]" : "py-[var(--spacing-1)]",
+        // M01 SM pads 12 / 14 inside its stroke; the CSS border sits outside, so it comes off the padding.
+        "flex items-center gap-[var(--spacing-5)] rounded-[var(--radius-lg)] border-[length:var(--border-width-1)] border-solid",
+        "px-[calc(var(--spacing-7)_-_var(--border-width-1))] py-[calc(var(--spacing-6)_-_var(--border-width-1))]",
+        "font-[family-name:var(--font-family-body)] text-[length:var(--font-size-md)] leading-md text-[color:var(--color-text-primary)]",
         t.box,
         className,
       )}
-      style={t.boxed ? { borderWidth: "var(--border-width-1)" } : undefined}
     >
-      <svg
+      <span
         aria-hidden
-        width={16}
-        height={16}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="mt-[var(--spacing-1)] shrink-0"
+        className={cn(
+          "inline-flex size-[var(--spacing-9)] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-on-brand)]",
+          t.badge,
+        )}
       >
-        <path d={t.glyph} />
-      </svg>
-      {title ? (
-        <span className="min-w-0 flex-1">
-          <span className="block font-[var(--font-weight-semibold)] text-[color:var(--color-text-primary)]">{title}</span>
-          <span className="mt-[var(--spacing-1)] block text-[length:var(--font-size-sm)] text-[color:var(--color-text-secondary)]">{children}</span>
-        </span>
-      ) : (
-        <span className={cn("min-w-0 flex-1", "words" in t && t.words)}>{children}</span>
-      )}
-      {action && <span className="shrink-0 self-center">{action}</span>}
+        <Icon icon={t.glyph} size={12} />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-1)]">
+        {title ? (
+          <>
+            <div className="font-medium">{title}</div>
+            <div className="text-[length:var(--font-size-sm)] leading-xs text-[color:var(--color-text-secondary)]">{children}</div>
+          </>
+        ) : (
+          <div className="font-medium">{children}</div>
+        )}
+        {action && <div className={cn("flex flex-wrap items-center font-medium", t.action)}>{action}</div>}
+      </div>
     </div>
   );
 }

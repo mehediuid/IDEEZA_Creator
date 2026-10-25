@@ -1,5 +1,6 @@
-// IDEEZA Design System — A22 Progress Bar (Figma 45248:24676). The fill is
-// scaled, not resized (AGENTS.md UI/UX rules: animate transform, not width).
+// IDEEZA Design System — A22 Progress Bar (Figma 731:704). The fill slides in
+// from the left, not resized (AGENTS.md UI/UX rules: animate transform, not
+// width) and not scaled, so its end keeps radius/sm at every value as in Figma.
 import { cn } from "@/lib/utils";
 
 export function ProgressBar({ value, label, className }: { value: number; label: string; className?: string }) {
@@ -14,8 +15,8 @@ export function ProgressBar({ value, label, className }: { value: number; label:
       className={cn("h-[8px] w-full overflow-hidden rounded-sm bg-bg-subtle", className)}
     >
       <div
-        className="h-full w-full origin-left rounded-sm bg-bg-brand transition-transform duration-normal ease-out motion-reduce:transition-none"
-        style={{ transform: `scaleX(${v / 100})` }}
+        className="h-full w-full rounded-sm bg-bg-brand transition-transform duration-normal ease-out motion-reduce:transition-none"
+        style={{ transform: `translateX(${v - 100}%)` }}
       />
     </div>
   );

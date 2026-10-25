@@ -61,7 +61,7 @@ export function PostMediaStage({ post, mine, className }: { post: InnovationPost
   const cur = media[Math.min(at, media.length - 1)];
 
   return (
-    <div className={cn("flex flex-col gap-6", className)}>
+    <div data-tour="post-media" className={cn("flex flex-col gap-6", className)}>
       {cur.kind !== "image" ? (
         <PostVideoStage key={mediaKey(cur)} post={post} mine={mine} video={cur} />
       ) : (

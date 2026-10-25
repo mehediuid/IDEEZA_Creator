@@ -21,6 +21,7 @@ export function LeaveButton({
   className,
   "aria-label": ariaLabel,
   "aria-describedby": describedBy,
+  "data-tour": tour,
   children,
 }: {
   id?: string;
@@ -33,6 +34,8 @@ export function LeaveButton({
   className?: string;
   "aria-label"?: string;
   "aria-describedby"?: string;
+  /** The Tour Guide's id for the button (components/tour). */
+  "data-tour"?: string;
   children: React.ReactNode;
 }) {
   const base =
@@ -52,6 +55,7 @@ export function LeaveButton({
       aria-busy={busy}
       aria-label={ariaLabel}
       aria-describedby={describedBy}
+      data-tour={tour}
       className={cn(base, paint, blocked ? (busy ? "cursor-wait opacity-80" : "opacity-60") : "", className)}
     >
       <span aria-hidden className={busy ? "inline-flex motion-safe:animate-spin" : "inline-flex"}>

@@ -1,6 +1,6 @@
-// IDEEZA Design System — A19 Tooltip, top-arrow variant (Figma 46042:61319).
-// The bubble alone; the caller positions it. Its raw drop shadow has no
-// design-system effect style, so it is left out (reported).
+// IDEEZA Design System — A19 Tooltip, top-arrow variant (Figma 560:808).
+// The bubble alone; the caller positions it. The bubble carries Figma's drop
+// shadow (0 4 12, black 15%) as --elevation-tooltip.
 import { cn } from "@/lib/utils";
 
 export function Tooltip({
@@ -17,7 +17,7 @@ export function Tooltip({
 }) {
   return (
     <span id={id} role="tooltip" className={cn("pointer-events-none inline-flex flex-col items-center", className)}>
-      <span className={cn("rounded-lg bg-bg-inverse px-[12px] py-[8px] text-sm font-medium leading-sm text-text-inverse", wrap ? "w-max max-w-[280px] whitespace-normal" : "whitespace-nowrap")}>
+      <span className={cn("rounded-lg bg-bg-inverse px-6 py-4 text-sm font-medium leading-sm tracking-normal text-text-inverse shadow-tooltip", wrap ? "w-max max-w-[280px] whitespace-normal" : "whitespace-nowrap")}>
         {label}
       </span>
       <svg aria-hidden width="10" height="6" viewBox="0 0 10 6" className="fill-[var(--color-bg-inverse)]">

@@ -27,7 +27,7 @@ import { SAVE_FAILED, SettingsCard } from "./settings-card";
 
 const WHERE: Record<MetWhere, string> = { messages: "Messages", comments: "Comments", marketplace: "Marketplace" };
 const TAP = "max-md:min-h-[var(--touch-min)]";
-const TEXT_ACTION = cn(linkVariants({ color: "brand", size: "sm" }), "shrink-0 text-md font-medium leading-md", TAP);
+const TEXT_ACTION = cn(linkVariants({ color: "brand", size: "md" }), "shrink-0", TAP);
 const LIST = "m-0 flex flex-col p-0";
 const ROW = "flex items-center gap-[12px] border-b border-solid border-border py-[12px] last:border-b-0";
 const NOTE = "m-0 max-w-[62ch] text-md leading-md text-text-secondary";

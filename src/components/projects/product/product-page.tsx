@@ -304,6 +304,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                   <div data-header-actions className="flex shrink-0 items-center gap-3">
                     {editor && (
                       <LeaveButton
+                        data-tour="product-editor"
                         tone="primary"
                         busy={leaving}
                         blocked={leaving}

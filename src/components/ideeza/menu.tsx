@@ -8,9 +8,9 @@
 // the two soft dropdown shadows (Elevation/2). A `danger` row is in the error
 // colour. Rows that carry `selected` are a single choice (the sort menu):
 // they announce `menuitemradio` + `aria-checked`, and the chosen one is
-// brand-subtle fill with brand ink. A `disabled` row stays in the list,
-// `aria-disabled`, with its `hint` (the reason) under it, and the arrows skip
-// it. `hint` is a second line under any row.
+// brand-subtle fill with brand ink and a brand icon. A `disabled` row stays in
+// the list, `aria-disabled`, with its `hint` (the reason) under it, and the
+// arrows skip it. `hint` is a second line under any row, Caption 12/16.
 //
 // The panel portals to <body> with `position: fixed`, measured off the
 // trigger: below it (above when the rows don't fit and there is more room
@@ -270,7 +270,9 @@ function MenuRow({
               ? "text-[color:var(--color-icon-disabled)]"
               : danger
                 ? "text-[color:var(--color-icon-error)]"
-                : "text-[color:var(--color-icon-default)]",
+                : selected
+                  ? "text-[color:var(--color-icon-brand)]"
+                  : "text-[color:var(--color-icon-default)]",
           )}
         >
           {item.icon}
@@ -286,7 +288,7 @@ function MenuRow({
           {item.label}
         </span>
         {item.hint ? (
-          <span id={hintId} className="text-sm leading-sm text-text-secondary">
+          <span id={hintId} className="text-sm leading-xs text-text-secondary">
             {item.hint}
           </span>
         ) : null}

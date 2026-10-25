@@ -85,11 +85,11 @@ export function Slider({
     <div className={cn("relative", className)}>
       {input}
       {active && (
-        // Figma 47167:21949 — the value label. Its raw drop shadow has no
-        // design-system effect style, so it is left out (reported).
+        // Figma A11 value label (631:754): 8 px above the thumb, with its own
+        // drop shadow.
         <span
           aria-hidden
-          className="pointer-events-none absolute -top-[24px] -translate-x-1/2 whitespace-nowrap rounded-full bg-bg-inverse px-[8px] py-[3px] text-xs font-semibold leading-xs tracking-wider text-text-inverse"
+          className="pointer-events-none absolute -top-[26px] -translate-x-1/2 whitespace-nowrap rounded-full bg-bg-inverse px-[8px] py-[3px] text-xs font-semibold leading-xs tracking-wider text-text-inverse shadow-slider-value-label"
           style={{ left: `calc(${pct}% + ${THUMB_PX / 2 - (pct / 100) * THUMB_PX}px)` }}
         >
           {valueLabel(value)}

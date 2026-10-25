@@ -258,7 +258,7 @@ function uniquePairs(wires: NetWire[]): NetWire[] {
 
 function MetaLine({ text }: { text: string }) {
   return (
-    <p className="mt-6 font-mono text-sm tracking-tight text-text-secondary">
+    <p className="mt-6 font-mono text-sm text-text-secondary">
       {text}
     </p>
   );

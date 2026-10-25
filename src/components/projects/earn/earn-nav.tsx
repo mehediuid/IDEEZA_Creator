@@ -70,6 +70,7 @@ export function EarnNav({ projectId, section }: { projectId: string; section: Ea
                 href={earnHref(projectId, s)}
                 aria-current={on ? "page" : undefined}
                 data-section={s}
+                data-tour={`earn-${s}`}
                 className={cn(TAB, on ? TAB_ON : TAB_OFF)}
               >
                 {EARN_SECTION_LABEL[s]}

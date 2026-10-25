@@ -467,6 +467,7 @@ export function MenuBar() {
             aria-haspopup="menu"
             aria-expanded={!!help.open}
             aria-label="Help"
+            data-tour="editor-help"
             title="Help"
             onClick={help.toggle}
             style={iconTriggerStyle(!!help.open)}

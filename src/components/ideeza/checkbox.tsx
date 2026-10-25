@@ -1,10 +1,13 @@
 "use client";
 
 // IDEEZA Design System — A08 Selection Control (Checkbox + Radio)
-// Token-driven selection primitives. Checkbox is a square (radius-sm) with a
-// check glyph; Radio is a circle with a filled dot. Both share size/state logic
-// and theme via the IDEEZA tokens. Mirrors the Figma _Checkbox base / _Radio
-// base helpers consumed by A08.
+// Token-driven selection primitives. Checkbox is a rounded square with a
+// check (or, indeterminate, a minus); Radio is a circle with a filled dot.
+// Both share size/state logic and theme via the IDEEZA tokens. Mirrors the
+// Figma _Checkbox base (367:698) / _Radio base (368:690) helpers consumed by
+// A08: sm 20 and md 24, a 2 px input edge over the input fill, the hover edge
+// and fill steps, the 3 px focus halo outside, and Disabled as its own edge,
+// fill and glyph colours rather than a faded control.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -22,16 +25,30 @@ function keyProps(onChange?: () => void, disabled?: boolean, decorative?: boolea
   };
 }
 
-const SIZES: Record<string, { box: number; radius: number; glyph: number; dot: number }> = {
-  sm: { box: 16, radius: 4, glyph: 10, dot: 8 },
-  md: { box: 18, radius: 5, glyph: 11, dot: 9 },
-  lg: { box: 22, radius: 6, glyph: 13, dot: 11 },
+// Figma's own glyph vectors, in the box's coordinates: sm's check is 10×8 at a
+// 2 px stroke, md's 12×9.5 at 2.5 px; the minus is 10 / 12 wide. The svg is
+// the box's full size, centred over its edge, so the numbers land as drawn.
+// `lg` is code-only (Figma has sm and md) and draws md's glyphs scaled.
+const GLYPHS = {
+  20: { check: "M5 10.5l3.5 3.5L15 6", minus: "M5 10h10", stroke: 2 },
+  24: { check: "M6 12.5l4 4L18 7", minus: "M6 12h12", stroke: 2.5 },
+} as const;
+
+const SIZES: Record<string, { box: number; radius: string | number; grid: keyof typeof GLYPHS; dot: number }> = {
+  sm: { box: 20, radius: "var(--radius-md)", grid: 20, dot: 8 },
+  md: { box: 24, radius: "var(--radius-lg)", grid: 24, dot: 10 },
+  lg: { box: 22, radius: 6, grid: 24, dot: 11 },
 };
 
 type Size = keyof typeof SIZES;
 
+const BOX = "inline-flex items-center justify-center shrink-0 border-[length:var(--border-width-2)] border-solid outline-none transition-colors focus-visible:shadow-focus-brand";
+
 export interface CheckboxProps {
   checked: boolean;
+  /** Some but not all of what it stands for is on: a minus, announced as
+   *  "mixed". Takes precedence over `checked` for the picture. */
+  indeterminate?: boolean;
   onChange?: () => void;
   size?: Size;
   disabled?: boolean;
@@ -42,34 +59,51 @@ export interface CheckboxProps {
   decorative?: boolean;
 }
 
-export function Checkbox({ checked, onChange, size = "md", disabled, className, decorative }: CheckboxProps) {
+export function Checkbox({ checked, indeterminate, onChange, size = "md", disabled, className, decorative }: CheckboxProps) {
   const s = SIZES[size];
+  const g = GLYPHS[s.grid];
+  const on = checked || indeterminate;
   return (
     <span
       role={decorative ? undefined : "checkbox"}
-      aria-checked={decorative ? undefined : checked}
+      aria-checked={decorative ? undefined : indeterminate ? "mixed" : checked}
       aria-hidden={decorative || undefined}
       aria-disabled={decorative ? undefined : disabled}
       onClick={disabled ? undefined : onChange}
       {...keyProps(onChange, disabled, decorative)}
-      className={cn("inline-flex items-center justify-center shrink-0 transition-colors", className)}
-      // Edges and fills meet 3:1 against the surface in light and dark (WCAG 1.4.11): the empty
-      // box's edge is the secondary icon ink, the ticked fill the brand fill. A disabled box that
-      // is ticked (a choice that can no longer change) stays grey but solid, so the tick still
-      // reads; only an empty disabled box fades.
-      style={{
-        width: s.box,
-        height: s.box,
-        borderRadius: s.radius,
-        border: `var(--border-width-1-5) solid ${checked ? (disabled ? "var(--color-icon-secondary)" : "var(--color-bg-brand)") : "var(--color-icon-secondary)"}`,
-        background: checked ? (disabled ? "var(--color-icon-secondary)" : "var(--color-bg-brand)") : "var(--color-bg-surface)",
-        opacity: disabled && !checked ? "var(--opacity-disabled, .4)" : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
+      className={cn(
+        BOX,
+        disabled
+          ? cn(
+              "cursor-not-allowed",
+              on
+                ? "border-[var(--color-input-bg-disabled)] bg-[var(--color-input-bg-disabled)]"
+                : "border-[var(--color-input-border-disabled)] bg-[var(--color-input-bg)]",
+            )
+          : cn(
+              "cursor-pointer",
+              on
+                ? "border-[var(--color-bg-brand)] bg-[var(--color-bg-brand)] hover:border-[var(--color-bg-brand-hover)] hover:bg-[var(--color-bg-brand-hover)]"
+                : "border-[var(--color-input-border)] bg-[var(--color-input-bg)] hover:border-[var(--color-input-border-hover)]",
+            ),
+        className,
+      )}
+      style={{ width: s.box, height: s.box, borderRadius: s.radius }}
     >
-      {checked && (
-        <svg width={s.glyph} height={s.glyph} viewBox="0 0 24 24" fill="none" stroke="var(--color-text-on-brand)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 12l5 5L20 6" />
+      {on && (
+        <svg
+          aria-hidden
+          className="max-w-none shrink-0"
+          width={s.box}
+          height={s.box}
+          viewBox={`0 0 ${s.grid} ${s.grid}`}
+          fill="none"
+          stroke={disabled ? "var(--color-icon-disabled)" : "var(--color-icon-on-brand)"}
+          strokeWidth={g.stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d={indeterminate ? g.minus : g.check} />
         </svg>
       )}
     </span>
@@ -96,18 +130,29 @@ export function Radio({ checked, onChange, size = "md", disabled, className, dec
       aria-disabled={decorative ? undefined : disabled}
       onClick={disabled ? undefined : onChange}
       {...keyProps(onChange, disabled, decorative)}
-      className={cn("inline-flex items-center justify-center shrink-0 transition-colors", className)}
-      style={{
-        width: s.box,
-        height: s.box,
-        borderRadius: "var(--radius-full)",
-        border: `var(--border-width-1-5) solid ${checked ? "var(--color-violet-600)" : "var(--color-border-strong)"}`,
-        opacity: disabled ? "var(--opacity-disabled, .4)" : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
+      className={cn(
+        BOX,
+        "group rounded-[var(--radius-full)] bg-[var(--color-input-bg)]",
+        disabled
+          ? "cursor-not-allowed border-[var(--color-input-border-disabled)]"
+          : cn(
+              "cursor-pointer",
+              checked
+                ? "border-[var(--color-bg-brand)] hover:border-[var(--color-bg-brand-hover)]"
+                : "border-[var(--color-input-border)] hover:border-[var(--color-input-border-hover)]",
+            ),
+        className,
+      )}
+      style={{ width: s.box, height: s.box }}
     >
       {checked && (
-        <span style={{ width: s.dot, height: s.dot, borderRadius: "var(--radius-full)", background: "var(--color-violet-600)", display: "block" }} />
+        <span
+          className={cn(
+            "block shrink-0 rounded-[var(--radius-full)] transition-colors",
+            disabled ? "bg-[var(--color-input-bg-disabled)]" : "bg-[var(--color-bg-brand)] group-hover:bg-[var(--color-bg-brand-hover)]",
+          )}
+          style={{ width: s.dot, height: s.dot }}
+        />
       )}
     </span>
   );

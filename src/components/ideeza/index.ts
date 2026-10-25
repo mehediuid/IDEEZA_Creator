@@ -21,6 +21,8 @@ export { Slider, type SliderProps } from "./slider";
 export { Banner, type BannerProps, type BannerTone } from "./banner";
 export { Segmented, type SegmentedProps, type SegmentedOption, type SegmentedSize } from "./segmented";
 export { Tooltip } from "./tooltip";
+// M10 Popover: the anchored bubble the Tour Guide's steps are drawn in.
+export { Popover, PopoverArrow, type PopoverProps, type PopoverPlacement } from "./popover";
 export { Badge, type BadgeTone } from "./badge";
 export {
   Avatar,

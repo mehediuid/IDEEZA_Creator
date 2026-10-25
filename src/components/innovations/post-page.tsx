@@ -152,12 +152,12 @@ function PostBody({
           <div className="flex min-w-0 flex-col gap-12">
             <PostMediaStage post={post} mine={mine} />
 
-            <header className="flex flex-col gap-4">
+            <header data-tour="post-head" className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <h1
                   ref={focusComposer ? undefined : titleRef}
                   tabIndex={-1}
-                  className="text-4xl font-semibold leading-4xl tracking-tight text-text-primary outline-none max-md:text-2xl max-md:leading-2xl"
+                  className="text-4xl font-semibold leading-4xl tracking-near text-text-primary outline-none max-md:text-2xl max-md:leading-2xl max-md:tracking-normal"
                 >
                   {post.title}
                 </h1>

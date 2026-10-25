@@ -957,7 +957,7 @@ function GenerateVideoDialogOpen({
   } else if (view === "drafting") {
     body = (
       <div className="flex flex-col items-center gap-4 py-12 text-center">
-        <Spinner size={28} />
+        <Spinner size={32} />
         <p ref={setFocus} tabIndex={-1} className="text-md font-semibold text-text-primary outline-none">
           Drafting your storyboard…
         </p>

@@ -104,7 +104,7 @@ export function EditorSaveStatus({ project }: { project: ManualProject }) {
 
   const href = `/projects/${encodeURIComponent(project.id)}`;
   return (
-    <div ref={rootRef} className="relative flex shrink-0 items-center gap-3">
+    <div ref={rootRef} data-tour="editor-saved" className="relative flex shrink-0 items-center gap-3">
       <span className="max-2xl:hidden">
         <StatusChip status={status} word={STATUS_WORD[status]} />
       </span>

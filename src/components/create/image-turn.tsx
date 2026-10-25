@@ -180,6 +180,7 @@ export function ImageTurn({
   return (
     <article
       id={productCardId(productId)}
+      data-tour="chat-concept"
       tabIndex={-1}
       aria-label={name}
       className={`flex w-full max-w-[640px] flex-col gap-[12px] rounded-2xl border bg-bg-surface p-[16px] ${cardRoot(focused)}`}

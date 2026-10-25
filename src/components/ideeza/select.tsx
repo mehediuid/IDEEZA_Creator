@@ -30,10 +30,12 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
+// A06's field ramp (Figma 638:776): sm 32 · md 36 · lg 40, the heights Text
+// Input uses for the same names. The heights are raw in Figma, so they are here.
 const SIZES: Record<string, string> = {
-  sm: "px-[var(--spacing-4)] py-[var(--spacing-3)] text-[length:var(--font-size-sm)] rounded-[var(--radius-md)]",
-  md: "px-[var(--spacing-6)] py-[var(--spacing-4)] text-[length:var(--font-size-sm)] rounded-[var(--radius-lg)]",
-  lg: "px-[var(--spacing-6)] py-[var(--spacing-5)] text-[length:var(--font-size-md)] rounded-[var(--radius-lg)]",
+  sm: "h-[32px] px-[var(--spacing-5)] rounded-[var(--radius-lg)]",
+  md: "h-[36px] px-[var(--spacing-5)] rounded-[var(--radius-lg)]",
+  lg: "h-[40px] px-[var(--spacing-6)] rounded-[var(--radius-xl)]",
 };
 
 type Size = keyof typeof SIZES;
@@ -67,9 +69,17 @@ export interface SelectProps {
   "aria-labelledby"?: string;
 }
 
+// Figma _Chevron icon Down 16 and A06's selected-row check (icon/check), both
+// 1.5 px at 16 px.
 const Chevron = () => (
-  <svg className="shrink-0" width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth={2.2}>
-    <path d="M6 9l6 6 6-6" />
+  <svg aria-hidden className="shrink-0" width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--color-icon-default)" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 9s-4.42 6-6 6-6-6-6-6" />
+  </svg>
+);
+
+const Check = () => (
+  <svg aria-hidden className="shrink-0" width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--color-icon-brand)" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 14l3.5 3.5L19 6.5" />
   </svg>
 );
 
@@ -236,12 +246,15 @@ export function Select({
           // `button { border: 0 }` in the reset drops the border style, so a
           // bordered button has to name it — without `border-solid` the width
           // and colour below drew nothing.
-          "flex w-full items-center justify-between gap-[var(--spacing-5)] border-1 border-solid border-[var(--color-border-default)] bg-[var(--color-bg-surface)] text-[color:var(--color-text-primary)] outline-none transition-colors hover:border-[var(--color-border-strong)] focus-visible:border-[var(--color-border-focus)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed disabled:opacity-50",
+          // Figma A06: 1.5 px input border, the focus border plus the 3 px
+          // halo, the focus border while open, and Disabled as its own fill,
+          // edge and ink rather than a faded control.
+          "flex w-full items-center justify-between gap-[var(--spacing-4)] border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border)] bg-[var(--color-input-bg)] text-[length:var(--font-size-md)] leading-md text-[color:var(--color-input-text)] outline-none transition-[border-color,box-shadow] [transition-duration:var(--motion-duration-fast)] hover:border-[var(--color-input-border-hover)] aria-expanded:border-[var(--color-input-border-focus)] focus-visible:border-[var(--color-input-border-focus)] focus-visible:shadow-focus-brand disabled:cursor-not-allowed disabled:border-[var(--color-input-border-disabled)] disabled:bg-[var(--color-input-bg-disabled)] disabled:text-[color:var(--color-text-disabled)]",
           SIZES[size],
           className,
         )}
       >
-        <span className={cn("truncate", !selected && "text-[color:var(--color-text-tertiary)]")}>{selected ? selected.label : placeholder}</span>
+        <span className={cn("truncate", !selected && (disabled ? "text-[color:var(--color-text-disabled)]" : "text-[color:var(--color-input-placeholder)]"))}>{selected ? selected.label : placeholder}</span>
         <Chevron />
       </button>
       {open && options.length > 0 && typeof document !== "undefined" && createPortal(
@@ -250,7 +263,11 @@ export function Select({
           id={`${id}-list`}
           role="listbox"
           aria-label={ariaLabel}
-          className="z-dropdown overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] py-[var(--spacing-2)] shadow-[var(--elevation-5)]"
+          // Figma _Select dropdown panel (654:1561): radius/lg, 1 px border,
+          // Elevation/2 — Dropdown, a 4 px inset and 2 px between rows. The
+          // popover layer, as SelectMenu's: z-dropdown sat under the package
+          // editor's full-screen sheet (z-sheet), so the panel opened unseen.
+          className="z-popover flex flex-col gap-[var(--spacing-1)] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] p-[var(--spacing-2)] shadow-2"
           style={{
             position: "fixed",
             top: pos?.top ?? -9999,
@@ -274,16 +291,19 @@ export function Select({
                 onMouseEnter={() => setActive(i)}
                 onClick={() => commit(i)}
                 className={cn(
-                  "cursor-pointer px-[var(--spacing-6)] py-[var(--spacing-3)] text-[length:var(--font-size-sm)] transition-colors",
+                  // Figma _Select item SM: 32 high, radius/md, 14/20 Regular,
+                  // a 16 px check trailing the selected row.
+                  "flex shrink-0 cursor-pointer items-center justify-between gap-[var(--spacing-4)] rounded-[var(--radius-md)] px-[var(--spacing-6)] py-[var(--spacing-3)] text-[length:var(--font-size-md)] leading-md transition-colors",
                   // Hover and keyboard share one highlight, so arrowing looks
                   // like pointing; the committed value keeps the brand tint.
                   i === active && !isSelected && "bg-[var(--color-bg-subtle)]",
                   isSelected
-                    ? "bg-[var(--color-bg-brand-subtle)] text-[color:var(--color-text-brand)] font-[var(--font-weight-semibold)]"
+                    ? "bg-[var(--color-bg-brand-subtle)] text-[color:var(--color-text-brand)]"
                     : "text-[color:var(--color-text-primary)]",
                 )}
               >
-                {o.label}
+                <span className="min-w-0">{o.label}</span>
+                {isSelected ? <Check /> : null}
               </div>
             );
           })}

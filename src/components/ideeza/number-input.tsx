@@ -1,18 +1,25 @@
 "use client";
 
 // IDEEZA Design System — A12 Number Input
-// Numeric field with −/+ stepper buttons. Token-driven; theme-aware. Mirrors the
-// Figma _Stepper icon helper. Value is controlled (string, to preserve the
-// prototype's free-text numeric fields); steppers clamp to optional min/max.
+// Numeric field with −/+ stepper buttons. Token-driven; theme-aware. Mirrors
+// Figma A12 (688:1756), Stepper=Plus-minus: the value on the left, then a
+// [−][+] group of square radius/md buttons at the right, on the shared field
+// ramp (sm 32 · md 36 · lg 40) with a 1.5 px input border, the focus border
+// plus the 3 px halo, and Disabled as its own fill, edge and ink. Value is
+// controlled (string, to preserve the prototype's free-text numeric fields);
+// steppers clamp to optional min/max.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-const SIZES: Record<string, { h: number; text: string; btn: number }> = {
-  sm: { h: 30, text: "text-[length:var(--font-size-sm)]", btn: 26 },
-  md: { h: 38, text: "text-[length:var(--font-size-md)]", btn: 30 },
-  lg: { h: 44, text: "text-[length:var(--font-size-md)]", btn: 34 },
-};
+// `pr` is the inset after the [+] button. Figma draws 10 at 32 and 36 (the
+// field's padding-x) but 4 at 40; until that is settled lg keeps its
+// padding-x, as the A12 description's ramp states.
+const SIZES = {
+  sm: { h: 32, radius: "var(--radius-lg)", px: "var(--spacing-5)", text: "text-[length:var(--font-size-md)] leading-md", btn: 24 },
+  md: { h: 36, radius: "var(--radius-lg)", px: "var(--spacing-5)", text: "text-[length:var(--font-size-md)] leading-md", btn: 28 },
+  lg: { h: 40, radius: "var(--radius-xl)", px: "var(--spacing-6)", text: "text-[length:var(--font-size-md)] leading-md", btn: 32 },
+} as const;
 
 type Size = keyof typeof SIZES;
 
@@ -67,6 +74,7 @@ export function NumberInput({
     onChange?.(String(next));
   };
 
+  // icon-stepper minus / plus: 16 px at 1.5 px, in icon/default in every state.
   const stepBtn = (dir: 1 | -1, glyph: string) => (
     <button
       type="button"
@@ -74,10 +82,10 @@ export function NumberInput({
       disabled={disabled}
       onClick={() => bump(dir)}
       aria-label={`${dir === 1 ? "Increase" : "Decrease"}${stepsWhat ? ` ${stepsWhat}` : ""}`}
-      className="inline-flex items-center justify-center text-[color:var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
-      style={{ width: s.btn, height: "100%", flex: "0 0 auto" }}
+      className="inline-flex shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[color:var(--color-icon-default)] transition-colors enabled:hover:bg-[var(--color-bg-subtle)] disabled:cursor-not-allowed"
+      style={{ width: s.btn, height: s.btn }}
     >
-      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
+      <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round">
         <path d={glyph} />
       </svg>
     </button>
@@ -86,12 +94,14 @@ export function NumberInput({
   return (
     <div
       className={cn(
-        "flex items-stretch overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] transition-colors focus-within:border-[var(--color-border-focus)]",
+        "flex items-center gap-[var(--spacing-4)] border-[length:var(--border-width-1-5)] border-solid transition-[border-color,box-shadow] [transition-duration:var(--motion-duration-fast)]",
+        disabled
+          ? "border-[var(--color-input-border-disabled)] bg-[var(--color-input-bg-disabled)]"
+          : "border-[var(--color-input-border)] bg-[var(--color-input-bg)] focus-within:border-[var(--color-input-border-focus)] focus-within:shadow-focus-brand",
         className,
       )}
-      style={{ height: s.h }}
+      style={{ height: s.h, borderRadius: s.radius, paddingRight: s.px }}
     >
-      {stepBtn(-1, "M6 12h12")}
       {/* A spinbutton, as a native number field is: a screen reader says the
           value with its range, not "edit text". */}
       <input
@@ -116,11 +126,15 @@ export function NumberInput({
           bump(e.key === "ArrowUp" ? 1 : -1);
         }}
         className={cn(
-          "w-full min-w-0 flex-1 border-x border-[var(--color-border-subtle)] bg-transparent px-[var(--spacing-4)] text-center text-[color:var(--color-text-primary)] outline-none font-[family-name:var(--font-family-body)]",
+          "h-full w-full min-w-0 flex-1 bg-transparent text-left text-[color:var(--color-input-text)] outline-none font-[family-name:var(--font-family-body)] placeholder:text-[color:var(--color-input-placeholder)] disabled:cursor-not-allowed disabled:text-[color:var(--color-text-disabled)]",
           s.text,
         )}
+        style={{ paddingLeft: s.px }}
       />
-      {stepBtn(1, "M12 6v12M6 12h12")}
+      <div className="flex shrink-0 items-center gap-[var(--spacing-1)]">
+        {stepBtn(-1, "M5 12h14")}
+        {stepBtn(1, "M12 5v14M5 12h14")}
+      </div>
     </div>
   );
 }

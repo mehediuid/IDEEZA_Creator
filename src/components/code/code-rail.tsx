@@ -33,6 +33,7 @@ export function CodeRail({ topOffset = 152 }: { topOffset?: number } = {}) {
         <div
           key={r.key}
           className="ix-nav"
+          data-tour={`rail-${r.key}`}
           onClick={() => {
             const step = RAIL_KEY_TO_STEP[r.key];
             if (step && r.key !== "code" && activeProject) goStep(step);
