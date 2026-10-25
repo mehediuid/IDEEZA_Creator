@@ -26,18 +26,19 @@
 import * as React from "react";
 import {
   isWorkingBuild,
+  jobCost,
   productsOf,
   useCreateHistory,
   type BuildItemKind,
   type BuildJob,
 } from "@/lib/create/history";
 import {
-  buildCost,
   openCharges,
   useCredits,
   type CreditEntry,
 } from "@/lib/create/credits";
 import { buildGate, type BuildGate } from "@/lib/create/credit-limits";
+import { choiceOfItem, pieceSeconds } from "@/lib/create/pieces";
 import { useSettings } from "@/lib/settings/use-settings";
 
 // Per-tick increment per item (synthetic; a real backend will push real
@@ -53,6 +54,7 @@ const PER_ITEM_JITTER: Record<BuildItemKind, number> = {
   code: 2,
   wiring: 3,
   parts: 4,
+  assembly: 2,
 };
 
 // Dev-only hooks so the failure states are reachable on demand. There is
@@ -73,9 +75,9 @@ function oldestQueued(builds: BuildJob[]): BuildJob | null {
   return next;
 }
 
-// What this build costs: one product's price for every product it covers.
+// What this build was booked for — each product's picked pieces.
 function costOf(job: BuildJob): number {
-  return buildCost(productsOf(job).length);
+  return jobCost(job);
 }
 
 // Whether the ledger has ever put this build's credits back. Read with
@@ -203,9 +205,14 @@ export function BuildSimulator() {
         for (const product of productsOf(b)) {
           for (const item of product.items) {
             if (item.status !== "building") continue;
+            // A piece picked at High, or optimized, takes longer — as long as
+            // What to build said it would, against the same piece at Medium.
+            const slower =
+              pieceSeconds(item.kind, { quality: "medium", optimize: false }) /
+              pieceSeconds(item.kind, choiceOfItem(item));
             const next = Math.min(
               100,
-              item.progress + TICK_PROGRESS - PER_ITEM_JITTER[item.kind],
+              item.progress + (TICK_PROGRESS - PER_ITEM_JITTER[item.kind]) * slower,
             );
             const patch =
               next >= 100

@@ -17,6 +17,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { LockIcon } from "@hugeicons/core-free-icons";
+import { aboutTime, cleanPick, creditsLabel, pickCost, pickSeconds, pickSummary, pickedKinds } from "@/lib/create/pieces";
+import { pieceLine } from "./pieces-card";
+import { PiecesSheet, type PiecesSheetProduct } from "./pieces-sheet";
 import { Icon } from "@/components/dashboard/icon";
 import {
   conceptBriefOf,
@@ -329,6 +332,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     startBuild,
     setTurnConcept,
     setSpecEdits,
+    setPieces,
     setNetworkEdit,
     setNetworkAdded,
   } = useCreateHistory();
@@ -414,6 +418,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // Done or Close shut it and clear the selection. Held here, beside the
   // selection, because the rail, the canvas and the build path all open it.
   const [specSheet, setSpecSheet] = React.useState<SheetRequest | null>(null);
+  // The What to build panel's product (pieces-sheet.tsx) — its own panel,
+  // where the spec sheet sits; one of the two is open at a time.
+  const [piecesFor, setPiecesFor] = React.useState<string | null>(null);
   // What the page's announcer says for the sheet: a docked one opening beside
   // the canvas moves no focus, so it is said instead.
   const [sheetNote, setSheetNote] = React.useState<{ text: string; n: number } | null>(null);
@@ -539,7 +546,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // project), so that half is kept where the sheet's product is worked out.
   const select = React.useCallback((productId: string, open?: SheetFocus) => {
     setFocusedProduct(productId);
-    if (open) setSpecSheet((prev) => ({ focus: open, req: (prev?.req ?? 0) + 1 }));
+    if (open) {
+      setPiecesFor(null);
+      setSpecSheet((prev) => ({ focus: open, req: (prev?.req ?? 0) + 1 }));
+    }
   }, []);
   const openSpec = React.useCallback(
     (productId: string, focus: SheetFocus) => select(productId, focus),
@@ -548,6 +558,20 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // Done and Close: the sheet goes, and the selection with it.
   const closeSpec = React.useCallback(() => {
     setSpecSheet(null);
+    setFocusedProduct(null);
+  }, []);
+  // What to build › Edit — on a card, on the Build line, in the Build
+  // dialog: that product's What to build panel, in the spec sheet's place.
+  // From the dialog, the dialog closes first; Build opens it again.
+  const openPieces = React.useCallback((productId: string) => {
+    setConfirmFor(null);
+    setSpecSheet(null);
+    setFocusedProduct(productId);
+    setPiecesFor(productId);
+    setPane("work");
+  }, []);
+  const closePieces = React.useCallback(() => {
+    setPiecesFor(null);
     setFocusedProduct(null);
   }, []);
   // Change by message, over the page: the sheet goes and the product stays
@@ -1447,6 +1471,13 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           parts,
           spec,
           companions,
+          // What each product gets, as picked in What to build.
+          picks: Object.fromEntries(
+            ["primary", ...companions.map((c) => c.id)].map((id) => [
+              id,
+              railState.picks.get(id) ?? cleanPick(undefined),
+            ]),
+          ),
         });
         // The build does NOT leave the chat. It used to push /build/<id>,
         // a separate full-screen page with a Back link, which threw away
@@ -1459,7 +1490,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         setConfirmFor(null);
       }
     },
-    [chat, labels, startBuild, focusSpec],
+    [chat, labels, startBuild, focusSpec, railState.picks],
   );
 
   // The last step before money moves is always the gate. It used to offer
@@ -1739,6 +1770,46 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // whichever path moved the selection or the drawing, and stays closed.
   if (specSheet && !sheetProduct) setSpecSheet(null);
 
+  // The What to build panel's product — the pick from the rail's project
+  // model, the one the cards and the Build line read too.
+  const piecesProduct = React.useMemo((): PiecesSheetProduct | null => {
+    // Once the build holds its concepts there is nothing left to pick: a
+    // piece left out is added from the build (Add pieces), so the panel goes.
+    if (!piecesFor || buildHolds(activeBuild)) return null;
+    const turn = sheetTurnOf(railState, piecesFor);
+    if (!turn) return null;
+    const setupId = railState.setup?.answer ? railState.setup.id : null;
+    return {
+      productId: piecesFor,
+      name: sheetNameOf(railState.setup, turn, labels),
+      conceptLabel: labels.get(turn.id) ?? "1",
+      pick: railState.picks.get(piecesFor) ?? cleanPick(undefined),
+      onChange: chat && setupId ? (pick) => setPieces(chat.id, setupId, piecesFor, pick) : undefined,
+    };
+  }, [piecesFor, railState, labels, chat, activeBuild, setPieces]);
+  if (piecesFor && !piecesProduct) setPiecesFor(null);
+
+  // Each product's line in the Build dialog: what it gets, what that costs
+  // and takes, and Edit back to its panel.
+  const gatePieces = React.useMemo(() => {
+    if (!confirmFor) return [];
+    const ids = ["primary", ...companionPlan.filter((c) => pickedCompanions.has(c.id)).map((c) => c.id)];
+    return ids.map((id, i) => {
+      const pick = railState.picks.get(id) ?? cleanPick(undefined);
+      const turn = sheetTurnOf(railState, id);
+      const kinds = pickedKinds(pick).filter((k) => k !== "parts");
+      return {
+        productId: id,
+        name: gateNames[i] ?? (turn ? sheetNameOf(railState.setup, turn, labels) : id),
+        summary: pickSummary(pick),
+        detail: kinds.length ? kinds.map((k) => { const l = pieceLine(k, pick[k]); return l.name + l.note; }).join(" · ") : "nothing picked",
+        credits: creditsLabel(pickCost(pick)),
+        time: aboutTime(pickSeconds(pick)),
+        onEdit: railState.setup?.answer ? () => openPieces(id) : undefined,
+      };
+    });
+  }, [confirmFor, companionPlan, pickedCompanions, railState, gateNames, labels, openPieces]);
+
   if (!hydrated) {
     return <LoadingShell rootRef={setChatRoot} split={split} />;
   }
@@ -1973,6 +2044,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             specSheetFor={sheetProduct?.productId ?? null}
             specDocked={docked}
             onOpenSpec={(productId) => openSpec(productId, "sheet")}
+            piecesFor={piecesFor}
+            onOpenPieces={openPieces}
             onFocusSpec={focusSpec}
             onSpecChange={handleSpecChange}
             rereading={rereading}
@@ -1993,6 +2066,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         onShowEditor={showEditor}
       />
 
+      {/* What to build — its own panel, in the spec sheet's place. */}
+      <PiecesSheet
+        product={piecesProduct}
+        docked={docked}
+        onClose={closePieces}
+        onOpenSpec={(productId) => openSpec(productId, "sheet")}
+      />
+
       {/* Part 4 §4.4.2 — the products this build covers are chosen here,
           in the same dialog that confirms the build. One decision, one
           surface: a separate screen in front of this one asked the user
@@ -2006,6 +2087,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         products={pickedCompanions.size + 1}
         productNames={gateNames}
         specLines={confirmFor?.lines ?? []}
+        pieces={gatePieces}
+        cost={gatePieces.length ? gatePieces.reduce((n, p) => n + pickCost(railState.picks.get(p.productId) ?? cleanPick(undefined)), 0) : undefined}
+        seconds={gatePieces.length ? gatePieces.reduce((n, p) => Math.max(n, pickSeconds(railState.picks.get(p.productId) ?? cleanPick(undefined))), 0) : undefined}
         submitting={submittingBuild}
         onCancel={() => setConfirmFor(null)}
         onConfirm={handleConfirmBuild}

@@ -23,9 +23,11 @@
 //   with a lock: their panel says what a copy includes, never the files.
 
 import * as React from "react";
-import { SquareLock02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, SquareLock02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import type { BuildJob, BuildProduct } from "@/lib/create/history";
+import type { BuildItemKind, BuildJob, BuildProduct } from "@/lib/create/history";
+import { isLeftOut } from "@/lib/create/pieces";
+import { AddPiecesDialog, NotBuiltPanel } from "@/components/create/add-pieces-dialog";
 import { can } from "@/lib/manual/permissions";
 import { pickProductTab, productTabsOf, type ProductTabId } from "@/lib/manual/product-page";
 import { buyerSide } from "@/lib/manual/project-route";
@@ -35,9 +37,10 @@ import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
 
 export const PRODUCT_TAB_LABEL: Record<ProductTabId, string> = {
   media: "Media",
-  "3d": "3D model",
   pcb: "PCB",
-  code: "Firmware code",
+  code: "Code",
+  "3d": "3D Module",
+  assembly: "Assembly",
   wiring: "Wiring",
   parts: "Parts",
   contributors: "Contributors",
@@ -52,6 +55,7 @@ const PIECE: Partial<Record<ProductTabId, BuildProduct["items"][number]["kind"]>
   "3d": "3d",
   pcb: "pcb",
   code: "code",
+  assembly: "assembly",
   wiring: "wiring",
   parts: "parts",
 };
@@ -80,6 +84,9 @@ export function ProductTabs({
   post?: { locked: (tab: PostLockedTab) => React.ReactNode };
 }) {
   const { project, product, viewer } = slot;
+  // The owner adds a piece the build left out from its own tab.
+  const owner = !post && can(viewer, "product.openEditor", slot.view.canCtx);
+  const [adding, setAdding] = React.useState<BuildItemKind[] | null>(null);
   const panels = PRODUCT_SLOTS.panels;
   const contributors = project.contributors?.length ?? 0;
   // The page's product-scoped download grant (an edition holder of this product has it too).
@@ -97,6 +104,7 @@ export function ProductTabs({
             (can(viewer, "people.seeRoster") || (can(viewer, "people.seeTeam") && contributors > 0)),
           customers: false,
           mediaFirst: buyerSide(viewer),
+          leftOut: owner,
         },
   );
   // The pick shows at once; the URL follows it by replace.
@@ -109,10 +117,17 @@ export function ProductTabs({
     onTab(id === tabs[0] ? null : id);
   };
 
+  const leftOutKind = (id: ProductTabId) => {
+    const kind = PIECE[id];
+    const item = kind && bp ? bp.items.find((i) => i.kind === kind) : undefined;
+    return item && isLeftOut(item) ? kind : undefined;
+  };
   const def = (id: ProductTabId): TabDef<ProductTabId> =>
     post && POST_LOCKED.has(id)
       ? { id, label: PRODUCT_TAB_LABEL[id], icon: <Icon icon={SquareLock02Icon} size={14} /> }
-      : { id, label: PRODUCT_TAB_LABEL[id] };
+      : leftOutKind(id)
+        ? { id, label: `${PRODUCT_TAB_LABEL[id]} · Not built`, icon: <Icon icon={Add01Icon} size={14} /> }
+        : { id, label: PRODUCT_TAB_LABEL[id] };
   const second = post ? POST_LOCKED : PEOPLE;
   const groups = [tabs.filter((t) => !second.has(t)).map(def), tabs.filter((t) => second.has(t)).map(def)];
 
@@ -124,7 +139,9 @@ export function ProductTabs({
   if (tabs.length === 1) {
     return (
       <div>
-        {lockedPanel ?? (piece && job && bp ? (
+        {lockedPanel ?? (piece && job && bp && leftOutKind(active) ? (
+          <NotBuiltPanel kind={piece} onAdd={owner ? () => setAdding([piece]) : undefined} />
+        ) : piece && job && bp ? (
           <ProductPiecePanel key={`${job.id}:${bp.id}:${piece}`} job={job} product={bp} kind={piece} chatHref={chatHref} />
         ) : Panel ? (
           <Panel {...slot} />
@@ -143,12 +160,17 @@ export function ProductTabs({
         tabIndex={0}
         className="rounded-lg pt-10 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        {lockedPanel ?? (piece && job && bp ? (
+        {lockedPanel ?? (piece && job && bp && leftOutKind(active) ? (
+          <NotBuiltPanel kind={piece} onAdd={owner ? () => setAdding([piece]) : undefined} />
+        ) : piece && job && bp ? (
           <ProductPiecePanel key={`${job.id}:${bp.id}:${piece}`} job={job} product={bp} kind={piece} chatHref={chatHref} />
         ) : Panel ? (
           <Panel {...slot} />
         ) : null)}
       </div>
+      {adding && job && bp && (
+        <AddPiecesDialog buildId={job.id} product={bp} preselect={adding} onClose={() => setAdding(null)} />
+      )}
     </div>
   );
 }

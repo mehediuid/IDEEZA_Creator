@@ -145,6 +145,17 @@ type Draft = Omit<AssemblyPart, "explodeDir" | "inventoryAt" | "id" | "instance"
   key: string;
 };
 
+/** The enclosure on its own — the 3D Module piece, when the build has an
+ *  Assembly piece showing the whole product put together. */
+export function enclosureOnly(assembly: Assembly): Assembly {
+  const parts = assembly.parts.filter((p) => p.system === "enclosure");
+  return {
+    ...assembly,
+    parts,
+    systems: assembly.systems.filter((s) => s.id === "enclosure"),
+  };
+}
+
 export function deriveAssembly(input: {
   title: string;
   /** The product's build parts — BuildProduct.parts. */

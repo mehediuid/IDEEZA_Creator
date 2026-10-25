@@ -41,8 +41,8 @@ import {
   type CreditPack,
   type PackId,
 } from "@/lib/create/credit-pricing";
-import { BUILD_COST, CONCEPT_COST, buildCost, useCredits } from "@/lib/create/credits";
-import { productsOf, useCreateHistory, type BuildJob } from "@/lib/create/history";
+import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { jobCost, useCreateHistory, type BuildJob } from "@/lib/create/history";
 import { useSettings } from "@/lib/settings/use-settings";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
@@ -209,7 +209,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
         let line: string | null = null;
         if (paused) {
           const name = paused.projectChoiceName?.trim() || paused.title;
-          const cost = buildCost(productsOf(paused).length);
+          const cost = jobCost(paused);
           line = after >= cost ? `${name} starts now.` : `${name} needs ${cost} credits, ${cost - after} more.`;
         }
         setDone({ added: credits, after, paused: line });
@@ -243,7 +243,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
       title={title}
       description={
         step === "choose"
-          ? `Credits pay for AI work. A concept render uses ${CONCEPT_COST}, a product build uses ${BUILD_COST} per product.`
+          ? `Credits pay for AI work. A concept render uses ${CONCEPT_COST}, a whole-product build uses ${BUILD_COST} per product — less when you pick fewer pieces.`
           : undefined
       }
       size={step === "pay" ? "lg" : "md"}
@@ -442,7 +442,7 @@ function AutoTopUp({ held }: { held: boolean }) {
     if (!hydrated || !historyReady || held || busy.current) return;
     const job = pausedForCredits(builds);
     const pack = CREDIT_PACKS.find((p) => p.id === autoTopUp.pack) ?? CREDIT_PACKS[0];
-    const cost = job ? buildCost(productsOf(job).length) : 0;
+    const cost = job ? jobCost(job) : 0;
     const tried = readTried();
     const decision = autoTopUpDecision({
       on: autoTopUp.on,

@@ -43,6 +43,8 @@ import { LeaveButton } from "@/components/create/leave-button";
 import { partChangesOf, partChangesText } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { productsOf, useCreateHistory } from "@/lib/create/history";
+import { isLeftOut } from "@/lib/create/pieces";
+import { AddPiecesDialog } from "@/components/create/add-pieces-dialog";
 import { openInEditorOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
 import { productPiecesOf, productVersionView, withQuery, type ProductVersionView } from "@/lib/manual/product-page";
@@ -119,6 +121,8 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   const { chats } = useCreateHistory();
   const { selectEditorScope } = useManualProjects();
   const [leaving, setLeaving] = React.useState(false);
+  // "Add the rest" — every piece the build left out, in one dialog.
+  const [addingAll, setAddingAll] = React.useState(false);
 
   const ready = data.state === "ready" ? data : null;
   const project = ready?.project ?? null;
@@ -220,6 +224,20 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
       <>
         AI build · <When at={job.endedAt ?? job.createdAt} /> ·{" "}
         {pieces.ready === pieces.total ? `All ${pieces.total} pieces ready` : `${pieces.ready} of ${pieces.total} pieces ready`}
+        {/* The pieces its build left out, added from here in one go — or
+            one at a time from each Not built tab (owner, 2026-10-22). */}
+        {editor && bp && pieces.leftOut > 0 && (
+          <>
+            {" · "}
+            <button
+              type="button"
+              onClick={() => setAddingAll(true)}
+              className="inline-flex min-h-[24px] items-center rounded-sm px-[2px] align-baseline font-semibold text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              Add the rest
+            </button>
+          </>
+        )}
       </>
     ) : product.state !== "built" ? (
       UNBUILT[product.state]
@@ -341,6 +359,14 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
         }
       />
       <LiveRegion text={live} />
+      {addingAll && job && bp && (
+        <AddPiecesDialog
+          buildId={job.id}
+          product={bp}
+          preselect={bp.items.filter(isLeftOut).map((i) => i.kind)}
+          onClose={() => setAddingAll(false)}
+        />
+      )}
     </>
   );
 }

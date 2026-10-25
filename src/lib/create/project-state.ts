@@ -11,7 +11,7 @@
 // anywhere in its dependency chain would not resolve.
 
 import type { Companion } from "./companions";
-import { buildCost } from "./credits";
+import { cleanPick, isLeftOut, pickCost, pickSeconds, pickedKinds, type PiecePick } from "./pieces";
 import { asConceptSummary } from "../spec/hints";
 import type { ConceptPart, ConceptSummary } from "./concept";
 import {
@@ -25,6 +25,7 @@ import {
   type ChatSession,
   type ChatTurn,
   type SetupAnswer,
+  jobCost,
 } from "./history";
 import { batteryOf } from "../spec/batteries";
 import { RADIOS, radioChoices, radioKeyOf } from "../spec/catalog";
@@ -146,6 +147,16 @@ export type ProjectState = {
   allReady: boolean;
   /** A chosen product whose latest concept failed. */
   failedChoice: AssistantTurn | undefined;
+  /** What each product's build makes (pieces.ts), by product id — the
+   *  maker's pick from What to build, or every piece. */
+  picks: Map<string, PiecePick>;
+  /** What the next build costs: each chosen product's picked pieces. */
+  cost: number;
+  /** About how long the next build takes, in seconds — the products build
+   *  side by side, so the longest one. */
+  seconds: number;
+  /** A chosen product with nothing picked to build — it holds the build. */
+  emptyPick: AssistantTurn | undefined;
 };
 
 /** The build states that hold what they booked — every one but a failed
@@ -351,6 +362,14 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
   const allReady = selected.length > 0 && selected.every((t) => t.status === "ready");
   const failedChoice = selected.find((t) => t.status === "failed");
 
+  // What to build, per product — absent, every piece (pieces.ts).
+  const picks = new Map<string, PiecePick>();
+  for (const t of products) picks.set(productIdOf(t), cleanPick(answer?.pieces?.[productIdOf(t)]));
+  const pickOf = (t: AssistantTurn) => picks.get(productIdOf(t)) ?? cleanPick(undefined);
+  const cost = selected.reduce((n, t) => n + pickCost(pickOf(t)), 0);
+  const seconds = selected.reduce((n, t) => Math.max(n, pickSeconds(pickOf(t))), 0);
+  const emptyPick = selected.find((t) => pickedKinds(pickOf(t)).length === 0);
+
   return {
     setup,
     answer,
@@ -373,6 +392,10 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     removed,
     allReady,
     failedChoice,
+    picks,
+    cost,
+    seconds,
+    emptyPick,
   };
 }
 
@@ -433,6 +456,9 @@ export type RailRow = {
     progress: number;
     failedKinds: BuildItemKind[];
     items: BuildItem[];
+    /** Pieces the maker left out of the build (pieces.ts) — not counted, but
+     *  listed as Not in this build, so they can be added later. */
+    leftOut: BuildItem[];
   };
 };
 
@@ -445,6 +471,7 @@ function buildInfoFor(items: BuildItem[]) {
     progress: live.length ? ready / live.length : 0,
     failedKinds: live.filter((i) => i.status === "failed").map((i) => i.kind),
     items: live,
+    leftOut: items.filter(isLeftOut),
   };
 }
 
@@ -881,7 +908,7 @@ export function nextStep(args: {
   }
 
   const n = state.selected.length;
-  const cost = buildCost(n);
+  const cost = state.cost;
   const short = hydrated && balance < cost;
 
   if (job && statusOf(job) === "ready") {
@@ -1114,7 +1141,7 @@ export function buildLogOf(
   if (job) {
     const bookedAt = job.startedAt ?? job.createdAt;
     const n = productsOf(job).length;
-    const cost = buildCost(n);
+    const cost = jobCost(job);
     entries.push({
       id: `${job.id}-started`,
       tone: "done",

@@ -88,6 +88,15 @@ export function coversFor(
         // on — a case-only product (a strap, a shell) gets no PCB to fit.
         ...(spec.board ? ["Mount points sized for the PCB"] : []),
       ];
+    // The whole product put together — the 3D view with every system in it,
+    // and the explode that shows how it goes together.
+    case "assembly":
+      return [
+        withNote(`${mm3(spec.size)} assembled`),
+        spec.board ? "The board and every part on it, inside the enclosure" : "Every part, inside the enclosure",
+        "Explode it to see how it goes together",
+        "Show or hide each system — board, power, sensing",
+      ];
     case "pcb":
       return [
         spec.board ? withNote(boardLabel(spec)) : boardLabel(spec),

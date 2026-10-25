@@ -32,6 +32,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import {
+  ITEM_KINDS,
   ITEM_LABELS,
   rollupBuild,
   statusOf,
@@ -474,9 +475,15 @@ function ProductList({
       <ul role="list" className="mx-[10px] flex flex-col gap-[2px]">
         {rows.map((row) => {
           const selected = row.productId === focusedProduct;
-          // The model's items are the live ones already — skipped pieces out.
+          // The model's items are the live ones already — skipped pieces out;
+          // the ones the maker left out come back here, in their place, as
+          // Not in this build.
           const pieces =
-            row.build && (inBuild <= 2 || selected) ? row.build.items : [];
+            row.build && (inBuild <= 2 || selected)
+              ? [...row.build.items, ...row.build.leftOut].sort(
+                  (a, b) => ITEM_KINDS.indexOf(a.kind) - ITEM_KINDS.indexOf(b.kind),
+                )
+              : [];
           return (
             // The pieces are the row's sibling, not its child: a list inside
             // a button is not a list any more.
@@ -684,7 +691,7 @@ function statusLine(row: RailRow): {
       };
     }
     case "built":
-      return { text: `Built · ${total} of ${total} pieces`, tone: "secondary" };
+      return { text: `Built · ${total} of ${total + (b?.leftOut.length ?? 0)} pieces`, tone: "secondary" };
     case "reading":
       return { text: `${concept} · reading the spec…`, tone: "tertiary" };
     // A stand-in is said where the row's facts would be, which it drops:

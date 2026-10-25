@@ -30,7 +30,8 @@ import {
   type ChatTurn,
   type SetupAnswer,
 } from "@/lib/create/history";
-import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { PIECES, aboutTime, cleanPick, creditsLabel, pickCost, pickSummary, pickedKinds } from "@/lib/create/pieces";
 import type { ConceptPart } from "@/lib/create/concept";
 import type { RadioPair } from "@/lib/spec/facts";
 import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
@@ -115,6 +116,8 @@ export function ChatThread({
   specSheetFor,
   specDocked = false,
   onOpenSpec,
+  piecesFor,
+  onOpenPieces,
   onFocusSpec,
   onSpecChange,
   rereading,
@@ -161,6 +164,11 @@ export function ChatThread({
   specDocked?: boolean;
   /** Selects this product and opens its spec sheet — the card's Edit spec. */
   onOpenSpec?: (productId: string) => void;
+  /** The product the What to build panel is open on (pieces-sheet.tsx). */
+  piecesFor?: string | null;
+  /** Opens a product's What to build panel — the card's, and the Build
+   *  line's, Edit. */
+  onOpenPieces?: (productId: string) => void;
   /** Opens a product's spec sheet with the keyboard in its size — the Build
    *  line's way to a size that can't be built. */
   onFocusSpec?: (productId: string) => void;
@@ -221,6 +229,9 @@ export function ChatThread({
     removed,
     allReady,
     failedChoice,
+    picks,
+    seconds,
+    emptyPick,
   } = state;
 
   // Every card is titled with the product it is a drawing of — the name the
@@ -271,7 +282,7 @@ export function ChatThread({
   // canAfford(): the provider refreshes that ref in its own effect, which
   // runs after ours, so it reads a render behind here.
   const { hydrated: creditsHydrated, balance } = useCredits();
-  const cost = buildCost(selected.length);
+  const cost = state.cost;
   const shortForBuild = creditsHydrated && balance < cost;
   const shortForRender = creditsHydrated && balance < CONCEPT_COST;
 
@@ -332,6 +343,18 @@ export function ChatThread({
                   onOpen: () => onOpenSpec?.(productIdOf(turn)),
                   // A built product's spec is what was built: View spec.
                   editable: !!answer && !!onSpecChange && !locked.has(turn.id),
+                }
+              : undefined
+          }
+          pieces={
+            turn.status === "ready" && answer && onOpenPieces
+              ? {
+                  productId: productIdOf(turn),
+                  productName: productNameOf(turn) ?? `Concept ${labels.get(turn.id) ?? "1"}`,
+                  pick: picks.get(productIdOf(turn)) ?? cleanPick(undefined),
+                  open: piecesFor === productIdOf(turn),
+                  docked: specDocked,
+                  onEdit: () => onOpenPieces(productIdOf(turn)),
                 }
               : undefined
           }
@@ -473,6 +496,24 @@ export function ChatThread({
               failedName={failedChoice ? productNameOf(failedChoice) ?? "One product" : undefined}
               preparing={preparingTurnId === buildable.id}
               specBlock={specBlock ? productNameOf(specBlock) ?? "One product" : undefined}
+              emptyName={emptyPick ? productNameOf(emptyPick) ?? "One product" : undefined}
+              seconds={seconds}
+              lines={
+                answer
+                  ? selected.map((t) => {
+                      const pick = picks.get(productIdOf(t)) ?? cleanPick(undefined);
+                      const kinds = pickedKinds(pick).filter((k) => k !== "parts");
+                      return {
+                        productId: productIdOf(t),
+                        name: productNameOf(t) ?? `Concept ${labels.get(t.id) ?? "1"}`,
+                        summary: pickSummary(pick),
+                        detail: kinds.length ? kinds.map((k) => PIECES[k].name).join(" · ") : "nothing picked",
+                        credits: creditsLabel(pickCost(pick)),
+                        onEdit: onOpenPieces ? () => onOpenPieces(productIdOf(t)) : undefined,
+                      };
+                    })
+                  : []
+              }
               onBuild={() =>
                 specBlock ? onFocusSpec?.(productIdOf(specBlock)) : onBuild(buildable.id)
               }
@@ -603,6 +644,9 @@ function BuildAction({
   failedName,
   preparing,
   specBlock,
+  emptyName,
+  seconds,
+  lines,
   onBuild,
 }: {
   /** The products this build takes. */
@@ -620,13 +664,28 @@ function BuildAction({
   /** A chosen product whose size its parts can't fit. The button stays live
    *  and opens that product's spec sheet at Length instead of the gate. */
   specBlock?: string;
+  /** A chosen product with nothing picked in What to build — it holds the
+   *  build until a piece is picked or it is left out. */
+  emptyName?: string;
+  /** About how long the build takes, in seconds. */
+  seconds: number;
+  /** Each chosen product: what it gets and costs, with Edit to its What to
+   *  build panel (owner, 2026-10-22). */
+  lines: {
+    productId: string;
+    name: string;
+    summary: string;
+    detail: string;
+    credits: string;
+    onEdit?: () => void;
+  }[];
   onBuild: () => void;
 }) {
   const { hydrated, balance } = useCredits();
   const short = hydrated && balance < cost;
   // Preparing is busy, not disabled: a disabled button drops focus to <body>,
   // so the gate that opens next had nowhere to hand focus back to.
-  const blocked = short || !allReady;
+  const blocked = short || !allReady || !!emptyName;
   const reason = short
     ? `Not enough credits — this build costs ${cost}, you have ${balance}`
     : failedName
@@ -635,7 +694,9 @@ function BuildAction({
         ? "One of the concepts is still drawing"
         : specBlock
           ? `${specBlock} doesn't fit the size you set — fix it, or build it as Draft`
-          : undefined;
+          : emptyName
+            ? `${emptyName} has nothing picked to build — pick a piece in What to build, or leave it out`
+            : undefined;
   const label = again
     ? "Build again"
     : products === 1
@@ -643,11 +704,35 @@ function BuildAction({
       : `Build ${products} products`;
   return (
     <div className="flex w-full flex-wrap items-center gap-[12px] border-t border-solid border-border pt-[20px]">
+      {/* What each product gets, before the one button that builds them all. */}
+      {lines.length > 0 && (
+        <ul role="list" aria-label="What each product gets" className="flex w-full flex-col gap-[8px]">
+          {lines.map((l) => (
+            <li key={l.productId} className="flex flex-wrap items-baseline gap-x-[12px] gap-y-[2px] text-sm">
+              <span className="min-w-[160px] font-semibold text-text-primary">{l.name}</span>
+              <span className="min-w-0 flex-1 text-text-secondary">
+                {l.summary} — {l.detail}
+              </span>
+              <span className="tabular-nums text-text-secondary">{l.credits}</span>
+              {l.onEdit && (
+                <button
+                  type="button"
+                  onClick={l.onEdit}
+                  aria-label={`Edit what to build for ${l.name}`}
+                  className="inline-flex min-h-[24px] items-center rounded-sm px-[2px] font-semibold text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  Edit
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="text-sm text-text-secondary">
         {allReady
           ? `${products < total ? `${products} of ${total}` : products} product${
               (products < total ? total : products) === 1 ? "" : "s"
-            } · ${cost} credits`
+            } · ${creditsLabel(cost)} · ${aboutTime(seconds)}`
           : failedName
             ? "A chosen concept didn't come through"
             : "Waiting for every concept to land"}

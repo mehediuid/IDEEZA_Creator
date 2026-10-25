@@ -18,6 +18,7 @@ import {
   CpuIcon,
   CubeIcon,
   ElectricWireIcon,
+  Layers01Icon,
   FavouriteIcon,
   PackageIcon,
   MagicWand01Icon,
@@ -724,6 +725,7 @@ const DELIVERABLE_ICON: Record<BuildItemKind, IconValue> = {
   "3d": CubeIcon,
   pcb: CpuIcon,
   code: CodeIcon,
+  assembly: Layers01Icon,
   wiring: ElectricWireIcon,
   parts: PackageIcon,
 };

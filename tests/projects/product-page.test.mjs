@@ -140,7 +140,15 @@ const item = (kind, status) => ({ kind, status, progress: status === "ready" ? 1
 
 test("productPiecesOf counts what the build made for this product", () => {
   const items = [item("3d", "ready"), item("pcb", "ready"), item("code", "skipped"), item("wiring", "failed"), item("parts", "ready")];
-  assert.deepEqual(productPiecesOf(items), { ready: 3, total: 4 });
+  assert.deepEqual(productPiecesOf(items), { ready: 3, total: 4, leftOut: 0 });
+});
+
+test("productPiecesOf counts a piece the maker left out toward the five", () => {
+  // PCB only: the 3D model, Firmware code and Wiring were left out in What
+  // to build, so "2 of 5 pieces ready", with three to add later.
+  const out = (kind) => ({ kind, status: "skipped", progress: 0, omitted: true });
+  const items = [out("3d"), item("pcb", "ready"), out("code"), out("wiring"), item("parts", "ready")];
+  assert.deepEqual(productPiecesOf(items), { ready: 2, total: 5, leftOut: 3 });
 });
 
 // ── URL
