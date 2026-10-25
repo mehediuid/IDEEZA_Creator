@@ -280,6 +280,7 @@ export function LibraryPanel() {
             <button
               type="button"
               className="ix-btn"
+              data-tour="pcb-place"
               onClick={() => actions.openPicker(commonTab === "pcb" ? "Parts" : "Parts")}
               style={{ width: "100%", padding: "var(--spacing-4)", borderRadius: "var(--radius-lg)", border: "var(--border-width-1) solid var(--color-violet-600)", background: "var(--color-bg-brand-subtle)", color: "var(--color-text-brand)", fontWeight: 600, fontSize: "var(--font-size-sm)", cursor: "pointer", fontFamily: "inherit" }}
             >

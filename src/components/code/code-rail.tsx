@@ -14,6 +14,7 @@ export function CodeRail({ topOffset = 152 }: { topOffset?: number } = {}) {
 
   return (
     <div
+      data-tour="editor-rail"
       style={{
         position: "absolute",
         top: topOffset,

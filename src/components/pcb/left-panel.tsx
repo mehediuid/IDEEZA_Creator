@@ -219,6 +219,7 @@ export function LeftPanel({
               type="button"
               role="tab"
               aria-selected={t.active}
+              data-tour={t.label === "Library" ? "pcb-library-tab" : undefined}
               className="ix-tab"
               title={t.label}
               // Picking a tab while the AI view is open used to change the tab

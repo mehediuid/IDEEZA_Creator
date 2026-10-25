@@ -20,8 +20,11 @@
 // animates; ending fades everything out. Under reduced motion every change is immediate.
 //
 // A step whose control isn't on screen waits a moment for it, then asks to be skipped. A control
-// that goes away mid-step (the page changed, a dialog opened over it) pauses the chapter there. A
-// tip (the chat's chapter) is the same card with one way on, Got it, and Turn off tips.
+// that goes away mid-step (the page changed, a dialog opened over it) pauses the chapter there.
+// The last card hands the user the next real step on their path (Up next), with "Done for now" as
+// the quiet way out. A tip (the chat's, an editor module's) is the same card with one way on, Got
+// it, and Turn off tips; it rings its control without dimming the page or taking the focus, since
+// the page is being worked in (and in a chat, still being drawn).
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -31,7 +34,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { Button, PopoverArrow, linkVariants, type PopoverPlacement } from "@/components/ideeza";
 import { scrollWithin } from "@/components/create/anchors";
 import { cn } from "@/lib/utils";
-import type { TourChapter, TourStep as Step } from "@/lib/tour/types";
+import type { TourStep as Step } from "@/lib/tour/types";
 import { findTargets, inkBox, isPhone, isShown, unionBox } from "./targets";
 
 /** How long a step waits for its control to appear before it is skipped: the first step of a run
@@ -130,14 +133,16 @@ export function TourStep({
   total,
   first,
   tips = false,
-  nextPart,
+  single = false,
+  upNext = null,
+  doneLabel = "Done",
   leaving = false,
   waiting = false,
   onPrev,
   onNext,
   onDone,
   onSkip,
-  onNextPart,
+  onUpNext,
   onShown,
   onMissing,
   onLost,
@@ -147,10 +152,14 @@ export function TourStep({
   total: number;
   /** Nothing of this run is on screen yet. */
   first: boolean;
-  /** A tip of the chat's chapter: Got it and Turn off tips. */
+  /** A tip (the chat's, an editor module's): Got it and Turn off tips, no dimming, no focus. */
   tips?: boolean;
-  /** The chapter the last step offers next, if any. */
-  nextPart: TourChapter | null;
+  /** One card on its own (where the tours live): no count, no way out but its button. */
+  single?: boolean;
+  /** The next real step on the user's path, offered by the last card (`onUpNext`). */
+  upNext?: { label: string } | null;
+  /** The last card's only button when there is nothing up next. */
+  doneLabel?: string;
   /** The tour is ending: everything fades out, and nothing answers any more. */
   leaving?: boolean;
   /** The step's page is opening: the card stays with the step's words, the old page's holes
@@ -158,11 +167,11 @@ export function TourStep({
   waiting?: boolean;
   onPrev: () => void;
   onNext: () => void;
-  /** Explore, on the last step. */
+  /** Done for now on the last card, or its only button when nothing is up next. */
   onDone: () => void;
-  /** Skip Tour Guide, or Escape. */
+  /** Skip tour, or Escape. */
   onSkip: () => void;
-  onNextPart: () => void;
+  onUpNext?: () => void;
   /** The step is on screen. */
   onShown: () => void;
   /** The control never showed up. */
@@ -306,6 +315,8 @@ export function TourStep({
     const land = () => {
       if (focusedFor.current?.index === shown.index && focusedFor.current.step === shown.step) return;
       focusedFor.current = { index: shown.index, step: shown.step };
+      // A tip is announced, not focused: the user is typing or reading in the page.
+      if (tips) return announceShown();
       titleRef.current?.focus({ preventScroll: true });
       // A menu opened for the step takes the focus once it is placed; it comes back to the card.
       // (Checked, not listened for: a window without focus fires no focus events.)
@@ -382,14 +393,21 @@ export function TourStep({
     const stop = floating ? autoUpdate(reference, floating, update) : (update(), () => undefined);
     const onResize = () => update();
     window.addEventListener("resize", onResize);
+    // A tip is done once its control is used: a press in it (opening its list, say) closes the tip
+    // instead of leaving it over what the press opens.
+    const onPress = (e: PointerEvent) => {
+      if (els.some((el) => el.contains(e.target as Node))) lost();
+    };
+    if (tips) document.addEventListener("pointerdown", onPress, true);
     return () => {
       alive = false;
       stop();
       reclaim?.();
       if (redraw !== null) window.clearTimeout(redraw);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("pointerdown", onPress, true);
     };
-  }, [shown, phone, waiting, index, step]);
+  }, [shown, phone, waiting, index, step, tips]);
 
   // A menu the tour opened is closed when the tour ends.
   React.useEffect(() => () => closeMenu(revealed), []);
@@ -398,7 +416,8 @@ export function TourStep({
   // the page (⌘K, the phone's menu) pauses it.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      // A tip leaves Escape to the page (a dialog, the composer); its own buttons close it.
+      if (e.key !== "Escape" || tips) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       skip();
@@ -413,7 +432,7 @@ export function TourStep({
       observer.disconnect();
       window.removeEventListener("keydown", onKey, true);
     };
-  }, []);
+  }, [tips]);
 
   // Ending: everything fades out together (the host takes the layer away a moment later).
   React.useEffect(() => {
@@ -452,7 +471,10 @@ export function TourStep({
 
   if (!content) return null;
   const counter = tips ? `Tip ${at + 1} of ${total}` : `${at + 1} of ${total}`;
-  const primary = tips ? (last ? "Done" : "Got it") : last ? "Explore" : "Next Tip";
+  const primary = tips ? (last ? "Done" : "Got it") : !last ? "Next" : (upNext?.label ?? doneLabel);
+  const onPrimary = tips ? (last ? onDone : onNext) : !last ? onNext : upNext && onUpNext ? onUpNext : onDone;
+  // The way out: a tip turns the tips off; the last card says it plainly; other cards skip.
+  const out = tips ? { label: "Turn off tips", act: onSkip } : last && upNext ? { label: "Done for now", act: onDone } : { label: "Skip tour", act: onSkip };
 
   // One layer above the popovers: a menu a step opens (the account menu) sits under the scrim
   // with only its lit part cut out.
@@ -467,7 +489,7 @@ export function TourStep({
         <path
           ref={scrimRef}
           fillRule="evenodd"
-          className="pointer-events-auto fill-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)]"
+          className={tips ? "fill-none" : "pointer-events-auto fill-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)]"}
         />
         <path ref={ringRef} className="fill-none stroke-[var(--color-border-focus)]" strokeWidth={2} />
       </svg>
@@ -494,33 +516,25 @@ export function TourStep({
             placed && (phone ? "motion-safe:slide-in-from-bottom-4" : ARRIVE[placement]),
           )}
         >
-          <div className="flex items-center justify-between gap-6">
-            <span className="text-sm font-medium leading-sm tabular-nums text-text-tertiary">{counter}</span>
-            <button
-              type="button"
-              onClick={onSkip}
-              className={linkVariants({ color: "neutral", size: "md", className: "font-medium" })}
-            >
-              {tips ? "Turn off tips" : "Skip Tour Guide"}
-            </button>
-          </div>
-          <div key={`${tips ? "tip" : "step"}-${at}`} className={cn("mt-4", FADE_IN)}>
+          {!single && (
+            <div className="mb-4 flex items-center justify-between gap-6">
+              <span className="text-sm font-medium leading-sm tabular-nums text-text-tertiary">{counter}</span>
+              <button
+                type="button"
+                onClick={out.act}
+                className={linkVariants({ color: "neutral", size: "md", className: "font-medium" })}
+              >
+                {out.label}
+              </button>
+            </div>
+          )}
+          <div key={`${tips ? "tip" : "step"}-${at}`} className={FADE_IN}>
             <h2 ref={titleRef} id={titleId} tabIndex={-1} className="text-lg font-semibold leading-lg text-text-primary outline-none">
               {content.step.title}
             </h2>
             <p id={bodyId} className="mt-2 text-md leading-md text-text-secondary">
               {content.step.body}
             </p>
-            {last && nextPart && !tips && (
-              <button
-                type="button"
-                onClick={press(onNextPart)}
-                className={linkVariants({ color: "brand", size: "md", className: "mt-4 font-semibold" })}
-              >
-                Next part: {nextPart.name}
-                <Icon icon={ArrowRight01Icon} size={14} />
-              </button>
-            )}
           </div>
           <div className="mt-8 flex items-center justify-end gap-4">
             {!tips && at > 0 && (
@@ -533,8 +547,8 @@ export function TourStep({
               hierarchy="primary"
               size="md"
               className={TAP}
-              onClick={press(last ? onDone : onNext)}
-              iconTrailing={!tips && !last ? <Icon icon={ArrowRight01Icon} size={16} /> : undefined}
+              onClick={press(onPrimary)}
+              iconTrailing={!tips && (!last || upNext) ? <Icon icon={ArrowRight01Icon} size={16} /> : undefined}
             >
               {primary}
             </Button>

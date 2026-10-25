@@ -3,7 +3,7 @@
 
 import { parseEditorPath } from "../manual/editor-scope";
 import { TOUR_CHAPTERS, chapterById } from "./chapters";
-import type { ChapterId, PageRef, Place, TourChapter, TourRecord, TourStep } from "./types";
+import type { ChapterId, JourneyFacts, PageRef, Place, TourChapter, TourRecord, TourStep, UpNext } from "./types";
 
 // The editors that also live at the app's root, outside a project (`/pcb`, `/code`, …).
 const ROOT_EDITORS: Record<string, Place> = { pcb: "pcb", code: "editor", "3d": "editor", preview: "editor", wiring: "editor" };
@@ -68,6 +68,7 @@ export function pageMatches(page: PageRef, pathname: string): boolean {
     case "earn-overview":
       return parts[0] === "projects" && parts[2] === "earn" && parts.length === 3;
     case "earn-sell":
+    case "earn-plan":
     case "earn-money":
       return parts[0] === "projects" && parts[2] === "earn" && parts[3] === page.slice(5) && parts.length === 4;
     case "post":
@@ -96,14 +97,16 @@ const PROJECT_PAGES: ReadonlySet<PageRef> = new Set<PageRef>([
   "product",
   "earn-overview",
   "earn-sell",
+  "earn-plan",
   "earn-money",
   ...(Object.keys(EDITOR_STEP) as PageRef[]),
 ]);
 
 /** The steps a chapter can show: one about a project's page is left out until there is a project
- *  (Share with the community then ends on its post). */
-export function runnableSteps(chapter: TourChapter, hasProject: boolean): TourStep[] {
-  return hasProject ? chapter.steps : chapter.steps.filter((s) => !s.page || !PROJECT_PAGES.has(s.page));
+ *  (Share with the community then ends on its post), and one about the menu's footer on a phone,
+ *  where it lives in the closed drawer. */
+export function runnableSteps(chapter: TourChapter, at: { hasProject: boolean; phone: boolean }): TourStep[] {
+  return chapter.steps.filter((s) => (at.hasProject || !s.page || !PROJECT_PAGES.has(s.page)) && !(at.phone && s.desktopOnly));
 }
 
 /** Whether a chapter can run on this kind of page. The sidebar's chapters run on every page that
@@ -120,14 +123,22 @@ export function placeFits(chapter: TourChapter, here: Place | null): boolean {
   }
 }
 
-/** The chapter to offer on a first visit here: one that is offered, never started, not answered
- *  with Not now, and fits this screen. The editors comes before Inside the PCB editor. */
-export function offerFor(rec: TourRecord | null, here: Place | null, phone: boolean): ChapterId | null {
+/** The chapter to offer on a visit here: one that is offered, never started, and fits this
+ *  screen. Answered Not now once, it waits for a later visit (`declinedThisVisit` holds what was
+ *  turned down in this tab); twice, it isn't offered again. The editors comes before Inside the
+ *  PCB editor. */
+export function offerFor(
+  rec: TourRecord | null,
+  here: Place | null,
+  phone: boolean,
+  declinedThisVisit: readonly ChapterId[] = [],
+): ChapterId | null {
   if (rec && !rec.offers) return null;
   for (const c of TOUR_CHAPTERS) {
     if (!c.offered || !placeFits(c, here)) continue;
     if (c.desktopOnly && phone) continue;
     if (rec?.chapters[c.id] || rec?.offered.includes(c.id)) continue;
+    if (rec?.snoozed.includes(c.id) && declinedThisVisit.includes(c.id)) continue;
     return c.id;
   }
   return null;
@@ -147,13 +158,61 @@ export function tipFrom(rec: TourRecord | null): number {
   return rec?.chapters.chat?.state === "paused" ? rec.chapters.chat.step : 0;
 }
 
+/** The editor modules' tips are on: turned on from the panel (or under way), or, untouched, once
+ *  The editors' own tour has been taken or answered, while first-visit tours are offered. */
+export function moduleTipsOn(rec: TourRecord | null, phone: boolean): boolean {
+  if (phone) return false;
+  const at = rec?.chapters.modules;
+  if (at) return at.state === "paused";
+  if (!rec || !rec.offers) return false;
+  return !!rec.chapters.editors || rec.offered.includes("editors") || rec.snoozed.includes("editors");
+}
+
+/** The module tip for this page, when it hasn't been shown yet. */
+export function moduleTipFor(rec: TourRecord | null, pathname: string): number | null {
+  const seen = rec?.chapters.modules?.seen ?? [];
+  const i = chapterById("modules").steps.findIndex((s, n) => !!s.page && pageMatches(s.page, pathname) && !seen.includes(n));
+  return i < 0 ? null : i;
+}
+
+/** A chapter is behind the user: seen to the end, or skipped. */
+const seenOf = (rec: TourRecord | null, id: ChapterId) => {
+  const state = rec?.chapters[id]?.state;
+  return state === "done" || state === "skipped";
+};
+
+/** The parts whose pages the full tour walks: seeing it to the end counts them as seen. */
+const IN_FULL_TOUR: ReadonlySet<ChapterId> = new Set<ChapterId>(["start", "project", "editors", "earn", "share", "way", "account"]);
+
+/** The next real step on the user's path from idea to product, worked out from what they have
+ *  done (`after`, the part just finished, counts as seen): their first idea, their build, their
+ *  project, the editors, Earn and minting, sharing, then the side tours. `null` when all of it is
+ *  behind them. The path never leads into a part this screen can't show (the editors on a phone). */
+export function nextFor(f: JourneyFacts, rec: TourRecord | null, after: ChapterId | null): UpNext | null {
+  const toured = after === "tour" || rec?.chapters.tour?.state === "done";
+  const seen = (id: ChapterId) => id === after || (toured && IN_FULL_TOUR.has(id)) || seenOf(rec, id);
+  const chapter = (id: ChapterId): UpNext => ({ kind: "chapter", id, label: `Next: ${chapterById(id).name}` });
+  if (!f.hasProject) {
+    if (!f.hasChat) return { kind: "write", label: "Write your first idea" };
+    return { kind: "chat", label: "Back to your build" };
+  }
+  if (!seen("project")) return chapter("project");
+  if (!f.phone && !seen("editors")) return chapter("editors");
+  if (!seen("earn")) return chapter("earn");
+  if (!f.minted) return { kind: "mint", label: "Mint your project" };
+  if (!seen("share")) return chapter("share");
+  if (!seen("way")) return chapter("way");
+  if (!seen("account")) return chapter("account");
+  return null;
+}
+
 export type Readiness = { ok: true } | { ok: false; why: string; home: boolean };
 
 /** Whether the panel can start a chapter here and now, and if not, why. */
 export function readinessOf(id: ChapterId, at: { phone: boolean; hasProject: boolean; hasChat: boolean }): Readiness {
   const c = chapterById(id);
   if (c.desktopOnly && at.phone) return { ok: false, why: "Open IDEEZA on a computer to see the editors.", home: false };
-  if (c.needsProject && !at.hasProject) return { ok: false, why: "Make your first project to open this.", home: true };
-  if (c.tips && !at.hasChat) return { ok: false, why: "Send your first idea from Home to see these.", home: true };
+  if (c.needsProject && !at.hasProject) return { ok: false, why: "Opens once you save your first project.", home: true };
+  if (c.id === "chat" && !at.hasChat) return { ok: false, why: "These tips show in your first AI chat. Write an idea to start one.", home: true };
   return { ok: true };
 }

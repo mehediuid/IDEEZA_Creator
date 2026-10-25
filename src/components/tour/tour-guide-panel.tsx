@@ -1,22 +1,26 @@
 "use client";
 
-// The Tour Guide panel (spec D5): every chapter, under Start, Build and Earn & share, with Start,
-// Replay or Resume where it stopped — or, when it can't start yet, why and the way there (D6).
-// Below them,
-// whether a page's tour is offered on a first visit, and Reset tours. From the sidebar's Support ›
-// Tour Guide it floats beside the sidebar, the way the footer's account popover does; from ⌘K or
-// the phone's menu it is a dialog (a bottom sheet on a phone).
+// The Tour Guide panel (spec D5): first, until the first product is made, the first-product guide —
+// how far along it is and the button that brings its card back; after that, Up next, the next real
+// step on the user's path, one line (no stepper: the owner removed the journey row). Then every
+// chapter, the full tour first, then the parts in the order of the path,
+// under Start, Build, Earn & share and Look around, with Start, Replay or Resume where it stopped —
+// or, when it can't start yet, why and the way there (D6). Below them, whether a page's tour is
+// offered on a visit, and Reset tours. From the sidebar's Support › Tour Guide it floats beside the
+// sidebar, the way the footer's account popover does; from ⌘K, an editor's Help or the phone's menu
+// it is a dialog (a bottom sheet on a phone).
 
 import * as React from "react";
 import { ArrowRight01Icon, Cancel01Icon, CheckmarkCircle02Icon, CircleIcon, LockIcon, PlayCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { FloatingPanel } from "@/components/dashboard/sidebar-account";
-import { ModalFrame, Toggle, linkVariants } from "@/components/ideeza";
+import { Button, ModalFrame, ProgressBar, Toggle, linkVariants } from "@/components/ideeza";
 import { TOUR_CHAPTERS } from "@/lib/tour/chapters";
-import { readinessOf } from "@/lib/tour/places";
+import { readinessOf, runnableSteps } from "@/lib/tour/places";
 import { chapterStatus } from "@/lib/tour/state";
-import type { ChapterId, TourRecord } from "@/lib/tour/types";
+import type { ChapterId, GuideState, TourRecord, UpNext } from "@/lib/tour/types";
 import { cn } from "@/lib/utils";
+import { GUIDE_TITLE } from "./guide-card";
 import { isPhone, isShown } from "./targets";
 
 const OFFERS_LABEL = "Offer a tour the first time I open a page";
@@ -29,6 +33,13 @@ type PanelProps = {
   ready: { hasProject: boolean; hasChat: boolean };
   /** Home is open: a locked chapter's "Go to Home" would go nowhere. */
   atHome: boolean;
+  /** The next step on the path; null once all of it is behind the user. */
+  upNext: UpNext | null;
+  onUpNext: () => void;
+  /** The first-product guide, until the first product is done: the step it is on, and whether it
+   *  was never started, is up, or was closed. */
+  guide: { index: number; total: number; title: string; state: GuideState } | null;
+  onGuide: () => void;
   onStart: (id: ChapterId, step: number) => void;
   onGoHome: () => void;
   onOffers: (on: boolean) => void;
@@ -110,19 +121,71 @@ function BesideSidebar(props: PanelProps & { anchor: HTMLElement }) {
   );
 }
 
-function ChapterList({ rec, ready, atHome, onStart, onGoHome, onOffers, onReset }: PanelProps) {
+const GUIDE_BUTTON: Record<GuideState, string> = {
+  off: "Start the guide",
+  open: "Show the guide",
+  small: "Show the guide",
+  closed: "Show the guide again",
+  done: "Show the guide",
+};
+
+function ChapterList({ rec, ready, atHome, upNext, onUpNext, guide, onGuide, onStart, onGoHome, onOffers, onReset }: PanelProps) {
   const [phone] = React.useState(isPhone);
   const [reset, setReset] = React.useState(false);
   const groups = [...new Set(TOUR_CHAPTERS.map((c) => c.group))];
   const offers = rec?.offers ?? true;
   return (
     <div>
+      {guide ? (
+        <section aria-label={GUIDE_TITLE} className="mt-4 flex flex-col gap-4 rounded-lg bg-bg-brand-subtle p-6">
+          <div className="flex items-center gap-4">
+            <span className="min-w-0 flex-1 text-sm font-semibold leading-sm text-text-brand">{GUIDE_TITLE}</span>
+            <span className="shrink-0 text-sm tabular-nums leading-sm text-text-secondary">
+              {guide.index + 1} of {guide.total}
+            </span>
+          </div>
+          <ProgressBar value={(guide.index / guide.total) * 100} label={`${guide.index} of ${guide.total} steps done`} />
+          <p className="text-md leading-md text-text-primary">
+            {guide.state === "off" ? "A guide stays with you until your first product is made." : `Now: ${guide.title}`}
+          </p>
+          <Button
+            type="button"
+            hierarchy="primary"
+            size="sm"
+            className="self-start"
+            onClick={onGuide}
+            iconTrailing={<Icon icon={ArrowRight01Icon} size={16} />}
+          >
+            {GUIDE_BUTTON[guide.state]}
+          </Button>
+        </section>
+      ) : (
+        <section aria-label="Up next" className="mt-4 flex flex-col gap-4 rounded-lg bg-bg-brand-subtle p-6">
+          <span className="text-sm font-semibold leading-sm text-text-brand">Up next</span>
+          {upNext ? (
+            <Button
+              type="button"
+              hierarchy="primary"
+              size="sm"
+              className="self-start"
+              onClick={onUpNext}
+              iconTrailing={<Icon icon={ArrowRight01Icon} size={16} />}
+            >
+              {upNext.label}
+            </Button>
+          ) : (
+            <p className="text-md leading-md text-text-primary">You have seen the whole path. Replay any tour below.</p>
+          )}
+        </section>
+      )}
       {groups.map((group) => (
         <section key={group} aria-label={group} className="mt-6 first:mt-4">
           <h3 className="mb-2 text-sm font-semibold leading-sm text-text-tertiary">{group}</h3>
           <ul role="list" className="-mx-4 flex flex-col gap-1">
             {TOUR_CHAPTERS.filter((c) => c.group === group).map((c) => {
-              const steps = c.steps;
+              // What will really run here: a project's pages wait for a project, the editors for a computer.
+              const runnable = runnableSteps(c, { hasProject: ready.hasProject, phone });
+              const steps = runnable.length ? runnable : c.steps;
               const status = chapterStatus(rec, c.id);
               const at = Math.min(status.step, steps.length - 1);
               const readiness = readinessOf(c.id, { phone, ...ready });

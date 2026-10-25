@@ -9,6 +9,7 @@ import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
 import { openReportProblem } from "@/lib/support/open-report";
+import { openTourGuide, openTutorialTab, startTourChapter } from "@/lib/tour/open";
 
 type MenuItem = {
   label: string;
@@ -82,6 +83,10 @@ const MENUS: Record<string, MenuItem[]> = {
       action: "help:shortcuts",
       shortcut: "⌘K ⌘S",
     },
+    { label: "Tutorials", run: () => openTutorialTab("/tutorials/code-tech/3d-and-enclosure") },
+    { label: "Tour of this editor", run: () => startTourChapter("editors") },
+    { label: "Tour Guide…", run: () => openTourGuide(null) },
+    { label: "", divider: true },
     { label: "Report a problem…", run: openReportProblem },
     { label: "About 3D Module", action: "help:about" },
   ],

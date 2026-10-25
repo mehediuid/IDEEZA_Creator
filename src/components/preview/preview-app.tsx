@@ -257,6 +257,7 @@ function PreviewBody() {
         </button>
         <button
           type="button"
+          data-tour="editor-finish"
           onClick={() => goStep("brief")}
           className="absolute bottom-5 right-5 z-[6] inline-flex items-center gap-3 rounded-3xl border-0 bg-bg-brand px-8 py-3 text-md font-bold leading-md text-text-on-brand shadow-3 hover:bg-bg-brand-hover"
         >
