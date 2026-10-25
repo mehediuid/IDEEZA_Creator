@@ -688,7 +688,7 @@ export function TourHost() {
         }}
         onLookAround={() => {
           updateTour((prev) => withWelcome(prev, "started"));
-          begin("way", 0, null);
+          begin("tour", 0, null);
         }}
         onByHand={() => {
           updateTour((prev) => withWelcome(prev, "started"));
@@ -732,8 +732,11 @@ export function TourHost() {
           onUpNext={() => {
             if (!upNext) return;
             updateTour((prev) => withChapter(prev, run.id, "done", run.steps.length - 1));
-            if (upNext.kind !== "chapter") leave(() => setRun(null));
-            if (!takeNext(upNext, run.opener)) leave(() => setRun(null));
+            const started = takeNext(upNext, run.opener);
+            // An action (the guide, the build, the mint) ends the chapter here, after whatever it
+            // started, so that start can't cancel the ending and the step isn't left to close later
+            // and take the focus back. A chapter that started took its place.
+            if (upNext.kind !== "chapter" || !started) leave(() => setRun(null));
           }}
           onShown={() => setRun((r) => r && { ...r, shown: r.shown + 1, navigated: false })}
           onMissing={onMissing}
