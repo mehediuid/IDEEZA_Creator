@@ -1,8 +1,9 @@
 "use client";
 
 // What to build, on a concept card (owner, 2026-10-22): under the Spec, the
-// pieces this product's build makes — each with what it costs and about how
-// long it takes — and the product's total, with Edit beside the title. Edit
+// five pieces as chips — the ones this product's build makes ticked, the
+// rest dashed (owner picked chips over a list, 2026-10-25) — and the
+// product's total, with Edit beside the title. Edit
 // opens the What to build panel (pieces-sheet.tsx), its own panel, apart
 // from the spec sheet. The choices live only there; this is what they add
 // up to, where the maker already looks before building.
@@ -10,17 +11,15 @@
 import * as React from "react";
 import { CheckmarkCircle02Icon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { Tag } from "@/components/ideeza/tag";
 import {
+  PICKABLE_KINDS,
   PIECES,
   aboutTime,
   creditsLabel,
   pickCost,
   pickSeconds,
   pickSummary,
-  pickedKinds,
-  pieceCost,
-  pieceSeconds,
-  pieceTimeLabel,
   type PiecePick,
 } from "@/lib/create/pieces";
 import { OUTLINE_BUTTON_SM } from "./buttons";
@@ -37,10 +36,16 @@ export function pieceLine(kind: keyof typeof PIECES, c: { quality: string; optim
   note: string;
 } {
   const p = PIECES[kind];
+  return { name: p.name, note: (p.note ? ` · ${p.note}` : "") + pieceExtras(kind, c) };
+}
+
+/** " · High, optimized" — only what was chosen beyond the plain piece. */
+function pieceExtras(kind: keyof typeof PIECES, c: { quality: string; optimize: boolean }): string {
+  const p = PIECES[kind];
   const bits = [p.quality && c.quality === "high" ? "High" : null, p.optimize && c.optimize ? "optimized" : null].filter(
     Boolean,
   );
-  return { name: p.name, note: [p.note, bits.length ? bits.join(", ") : null].filter(Boolean).map((x) => ` · ${x}`).join("") };
+  return bits.length ? ` · ${bits.join(", ")}` : "";
 }
 
 export type PiecesCard = {
@@ -56,13 +61,19 @@ export type PiecesCard = {
 
 export function PiecesBlock({ card }: { card: PiecesCard }) {
   const { pick } = card;
-  // The five a maker picks; the Parts list comes with any of them and is
-  // said on the total's line.
-  const kinds = pickedKinds(pick).filter((k) => k !== "parts");
+  // The five a maker picks, always all five: ticked ones solid, left-out ones
+  // dashed, so what is in and what is out reads at a glance. What each costs
+  // and takes is in the panel, where they are chosen; the card keeps the total.
+  const any = PICKABLE_KINDS.some((k) => pick[k].on);
   return (
     <section className="flex flex-col gap-[8px] border-t border-solid border-border pt-[12px]">
-      <div className="flex items-center gap-[8px]">
+      <div className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
         <h4 className="min-w-0 flex-1 text-sm font-semibold text-text-secondary">What to build</h4>
+        {any && (
+          <span className="text-sm font-semibold tabular-nums text-text-primary">
+            {creditsLabel(pickCost(pick))} · {aboutTime(pickSeconds(pick))}
+          </span>
+        )}
         <button
           id={piecesButtonId(card.productId)}
           type="button"
@@ -77,34 +88,39 @@ export function PiecesBlock({ card }: { card: PiecesCard }) {
           Edit
         </button>
       </div>
-      {kinds.length ? (
-        <>
-          <ul role="list" className="flex flex-col gap-[6px]">
-            {kinds.map((k) => {
-              const line = pieceLine(k, pick[k]);
-              return (
-                <li key={k} className="flex items-center gap-[8px] text-sm">
-                  <span aria-hidden className="inline-flex shrink-0 text-text-success">
-                    <Icon icon={CheckmarkCircle02Icon} size={16} />
+      <ul role="list" aria-label="Pieces" className="flex flex-wrap gap-[6px]">
+        {PICKABLE_KINDS.map((k) => {
+          const on = pick[k].on;
+          const extra = on ? pieceExtras(k, pick[k]) : "";
+          return (
+            <li key={k} className="flex">
+              {on ? (
+                <Tag
+                  icon={
+                    <span className="inline-flex text-text-success">
+                      <Icon icon={CheckmarkCircle02Icon} size={16} />
+                    </span>
+                  }
+                >
+                  <span>
+                    {PIECES[k].name}
+                    {extra && <span className="text-text-tertiary">{extra}</span>}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-text-primary">
-                    {line.name}
-                    <span className="text-text-tertiary">{line.note}</span>
+                </Tag>
+              ) : (
+                <Tag className="bg-transparent text-text-tertiary ring-0 outline-dashed outline-1 -outline-offset-1 outline-border-strong">
+                  <span>
+                    {PIECES[k].name}
+                    <span className="sr-only">, left out</span>
                   </span>
-                  <span className="shrink-0 tabular-nums text-text-tertiary">
-                    {creditsLabel(pieceCost(k, pick[k]))} · {pieceTimeLabel(pieceSeconds(k, pick[k]))}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="flex flex-wrap items-baseline gap-x-[8px] border-t border-dashed border-border pt-[6px] text-sm">
-            <span className="min-w-0 flex-1 text-text-secondary">{pickSummary(pick)} · Parts list included</span>
-            <span className="font-semibold tabular-nums text-text-primary">
-              {creditsLabel(pickCost(pick))} · {aboutTime(pickSeconds(pick))}
-            </span>
-          </div>
-        </>
+                </Tag>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {any ? (
+        <p className="text-xs text-text-tertiary">{pickSummary(pick)} · Parts list included</p>
       ) : (
         <p className="text-sm text-text-warning">Nothing picked — pick at least one piece to build it.</p>
       )}
