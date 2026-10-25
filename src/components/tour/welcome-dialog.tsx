@@ -4,8 +4,8 @@
 // 512): the whole platform on one screen — the path from idea to product as five stages, each with
 // its icon and one line — then straight into doing. Start with my idea opens the first-product guide
 // (the cursor in the prompt box, and a card that stays until the first product is made); Look
-// around first runs Find your way; "start by hand" opens
-// Build manually for someone who knows electronics. The starting credits are the app's own number.
+// around first runs the full tour (every page, one by one); "start by hand" opens Build manually
+// for someone who knows electronics. The starting credits are the app's own number.
 // Closed without an answer it comes back once, on a later visit, and points at where tours live.
 
 import * as React from "react";
