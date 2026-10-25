@@ -137,7 +137,9 @@ export function AddPiecesDialog({
         aria-modal="true"
         aria-labelledby="add-pieces-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[90dvh] w-full max-w-[520px] flex-col gap-[16px] overflow-y-auto rounded-2xl border border-solid border-border bg-bg-surface p-[24px] shadow-3"
+        // The dialog scrolls as a whole; nothing in it shrinks to fit and
+        // clips its last rows, as the What to build list did.
+        className="relative flex max-h-[90dvh] w-full max-w-[520px] flex-col gap-[16px] overflow-y-auto rounded-2xl border border-solid border-border bg-bg-surface p-[24px] shadow-3 [&>*]:shrink-0"
       >
         <button
           type="button"

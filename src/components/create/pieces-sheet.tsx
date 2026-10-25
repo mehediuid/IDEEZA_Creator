@@ -156,7 +156,11 @@ function PiecesPanel({
         </button>
       </header>
 
-      <div key={productId} className="flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto overscroll-contain px-[16px] py-[16px] md:px-[24px]">
+      {/* The panel's body scrolls, never what is in it: as flex items the
+          list and the lines around it shrank to the panel's height, and the
+          list — clipping its own corners — cut off its last pieces with no
+          way to reach them (owner, 2026-10-25). */}
+      <div key={productId} className="flex min-h-0 flex-1 flex-col gap-[16px] overflow-y-auto overscroll-contain px-[16px] py-[16px] md:px-[24px] [&>*]:shrink-0">
         <p className="text-sm text-text-secondary">
           Pick the pieces {product.name} gets. Each shows what it costs and about how long it takes.
         </p>
