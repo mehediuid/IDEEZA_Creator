@@ -177,9 +177,10 @@ export function productPiecesOf(items: BuildItem[]): { ready: number; total: num
  *  `?tab=` (it's what an unknown or absent one reads as). */
 export const PRODUCT_TABS = [
   "media",
-  "3d",
   "pcb",
   "code",
+  "3d",
+  "assembly",
   "wiring",
   "parts",
   "contributors",
@@ -187,10 +188,13 @@ export const PRODUCT_TABS = [
 ] as const;
 export type ProductTabId = (typeof PRODUCT_TABS)[number];
 
+// The build's own order (history.ts ITEM_KINDS): the editor's modules, then
+// the Parts list. A build from before Assembly has no Assembly tab.
 const PIECE_TABS: ReadonlyArray<{ kind: BuildItemKind; tab: ProductTabId }> = [
-  { kind: "3d", tab: "3d" },
   { kind: "pcb", tab: "pcb" },
   { kind: "code", tab: "code" },
+  { kind: "3d", tab: "3d" },
+  { kind: "assembly", tab: "assembly" },
   { kind: "wiring", tab: "wiring" },
   { kind: "parts", tab: "parts" },
 ];

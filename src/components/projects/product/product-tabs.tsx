@@ -37,9 +37,10 @@ import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
 
 export const PRODUCT_TAB_LABEL: Record<ProductTabId, string> = {
   media: "Media",
-  "3d": "3D model",
   pcb: "PCB",
-  code: "Firmware code",
+  code: "Code",
+  "3d": "3D Module",
+  assembly: "Assembly",
   wiring: "Wiring",
   parts: "Parts",
   contributors: "Contributors",
@@ -54,6 +55,7 @@ const PIECE: Partial<Record<ProductTabId, BuildProduct["items"][number]["kind"]>
   "3d": "3d",
   pcb: "pcb",
   code: "code",
+  assembly: "assembly",
   wiring: "wiring",
   parts: "parts",
 };
