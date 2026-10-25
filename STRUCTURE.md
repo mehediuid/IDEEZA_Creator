@@ -100,7 +100,8 @@ ideeza-creator-panel/
    │  │                      Page Content), the video card with its reward
    │  ├─ tour/               Tour Guide: the host (root layout), the Welcome, a step or tip (scrim
    │  │                      cut-out + M10 Popover), the corner card (visit offer, resume, arrival),
-   │  │                      the Tour Guide panel, finding data-tour controls, the visit memory
+   │  │                      the first-product guide's card, pill and ring, the Tour Guide panel,
+   │  │                      finding data-tour controls, the visit memory
    │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, report dialog
@@ -220,7 +221,8 @@ ideeza-creator-panel/
    │  │                      the local store (ideeza:blog + rev'd bodies), IndexedDB files (ideeza-blog)
    │  ├─ tutorials/          Tutorials: the content, the catalog (pages, counts, IDZ totals, headings),
    │  │                      progress (ideeza:tutorials:progress) and paying a reward into the demo wallet
-   │  ├─ tour/               Tour Guide: the chapters' steps and copy, the ideeza:tour record and its
+   │  ├─ tour/               Tour Guide: the chapters' steps and copy (the full tour built from them),
+   │  │                      the first-product guide's steps and rules, the ideeza:tour record and its
    │  │                      rules (who gets the Welcome, Resume, snoozes), places (offers, tips,
    │  │                      readiness, each step's page, Up next on the path), openTourGuide()
    │  ├─ people/             the creator profile's people layer: one person id and handles, profile

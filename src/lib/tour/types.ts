@@ -1,6 +1,6 @@
 // The Tour Guide's shapes (spec docs/superpowers/specs/2026-10-22-tour-guide-design.md).
 
-export type ChapterId = "start" | "way" | "account" | "chat" | "project" | "editors" | "modules" | "pcb" | "earn" | "share";
+export type ChapterId = "tour" | "start" | "way" | "account" | "chat" | "project" | "editors" | "modules" | "pcb" | "earn" | "share";
 
 /** Where a chapter happens: Home, any page with the sidebar, a concept chat, a project's own page,
  *  any editor module, the PCB editor itself, a project's Earn area, or the Innovations feed. */
@@ -76,6 +76,10 @@ export type TourChapter = {
 
 export type ChapterState = "done" | "skipped" | "paused";
 
+/** The first-product guide (`lib/tour/guide.ts`): never started; on screen as its card or folded
+ *  into a pill; closed with ✕ (the panel brings it back); or finished. */
+export type GuideState = "off" | "open" | "small" | "closed" | "done";
+
 export type TourRecord = {
   v: 1;
   /** "later": closed once; it comes back once, on a later visit, before it counts as declined. */
@@ -92,6 +96,7 @@ export type TourRecord = {
   pointed: boolean;
   /** The card for someone who arrived from a shared link has been shown. */
   arrival: boolean;
+  guide: GuideState;
 };
 
 /** What the tour knows of the user's own work, for the next step on their path. */

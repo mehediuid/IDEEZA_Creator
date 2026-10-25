@@ -10,17 +10,24 @@
 // once at where the tours live; and opens the Tour Guide panel when Support › Tour Guide, ⌘K or an
 // editor's Help asks (openTourGuide, lib/tour/open.ts). What was seen is kept in `ideeza:tour`, what
 // was turned down on this visit in the visit memory (visit.ts).
+//
+// The first-product guide (lib/tour/guide.ts, guide-card.tsx) is the Welcome's Start with my idea:
+// a card that stays with a new user on every page and moves on as they make their first product.
+// While it is up it is the one voice: the chat's and the editors' tips, visit offers and the
+// resume card wait.
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCredits } from "@/lib/create/credits";
-import { useCreateHistory } from "@/lib/create/history";
+import { useCreateHistory, type ChatTurn } from "@/lib/create/history";
+import { PROJECTS as FEED_POSTS } from "@/lib/feed";
 import { editorHref, parseEditorPath } from "@/lib/manual/editor-scope";
 import { earnHref } from "@/lib/manual/earn-route";
 import type { EditorStep } from "@/lib/manual/p2-types";
 import { productRowsOf } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { TOUR_CHAPTERS, chapterById } from "@/lib/tour/chapters";
+import { guideNow, type GuideFacts, type GuideStep } from "@/lib/tour/guide";
 import { TOUR_EVENT, type TourRequest } from "@/lib/tour/open";
 import {
   editorStepOf,
@@ -43,6 +50,7 @@ import {
   shouldWelcome,
   withArrival,
   withChapter,
+  withGuide,
   withOffered,
   withOffers,
   withPointed,
@@ -52,7 +60,9 @@ import {
   withWelcomeClosed,
 } from "@/lib/tour/state";
 import type { ChapterId, ChapterState, JourneyFacts, PageRef, TourChapter, TourStep as Step, UpNext } from "@/lib/tour/types";
+import { scrollWithin } from "@/components/create/anchors";
 import { ChapterOffer, CornerCard } from "./chapter-offer";
+import { GuideCard, GuideDone, GuidePill, GuideRing } from "./guide-card";
 import { findTargets, isPhone, isShown } from "./targets";
 import { TourGuidePanel } from "./tour-guide-panel";
 import { TourStep } from "./tour-step";
@@ -92,6 +102,8 @@ const TYPING_MS = 2500;
 const LEAVE_MS = 120;
 /** How long Up next waits for a control it hands the focus to (the prompt box on Home). */
 const FOCUS_WAIT_MS = 5000;
+/** How long the guide's Show me waits for its control on a page just opened for it. */
+const SEEK_MS = 6000;
 
 const still = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduce";
@@ -109,6 +121,17 @@ function focusWhenReady(selector: string) {
   };
   window.setTimeout(look, 0);
 }
+
+/** Show me puts the focus on the control itself, or the first thing in it that takes focus (the
+ *  prompt box's textarea). */
+function focusIn(el: HTMLElement) {
+  const own = el.matches("button, a[href], input, textarea, select, [tabindex]");
+  const t = own ? el : el.querySelector<HTMLElement>("textarea, input, button, a[href], [tabindex]:not([tabindex='-1'])");
+  t?.focus({ preventScroll: true });
+}
+
+type SetupTurn = Extract<ChatTurn, { role: "setup" }>;
+type ImageTurn = Extract<ChatTurn, { role: "assistant" }>;
 
 /** The page's own heading takes the focus when a tour ends with nothing to give it back to. */
 function focusPage() {
@@ -145,7 +168,7 @@ export function TourHost() {
   const pathname = usePathname();
   const router = useRouter();
   const { hydrated: projectsReady, projects } = useManualProjects();
-  const { hydrated: historyReady, chats } = useCreateHistory();
+  const { hydrated: historyReady, chats, builds } = useCreateHistory();
   const { hydrated: creditsReady, balance } = useCredits();
   const [run, setRun] = React.useState<Run | null>(null);
   const [panel, setPanel] = React.useState<{ anchor: HTMLElement | null } | null>(null);
@@ -155,6 +178,11 @@ export function TourHost() {
   const [pointer, setPointer] = React.useState(false);
   const [card, setCard] = React.useState<"resume" | "arrival" | null>(null);
   const [leaving, setLeaving] = React.useState(false);
+  // The guide's Show me: the control it is looking for (on a page still opening, or one that comes
+  // as the user works), and the ring round it once found. `reveal` scrolls to it and focuses it.
+  const [seek, setSeek] = React.useState<{ id: GuideStep["id"]; reveal: boolean } | null>(null);
+  const [ring, setRing] = React.useState<{ id: GuideStep["id"]; el: HTMLElement } | null>(null);
+  const [stepSeen, setStepSeen] = React.useState<string | null>(null);
   // The visit memory is read on each render; this bumps a render after it changes.
   const [, setVisitTick] = React.useState(0);
   const here = placeOf(pathname);
@@ -227,9 +255,10 @@ export function TourHost() {
       case "earn-money":
         return project ? earnHref(project.id, "money") : null;
       case "post": {
-        // The first post on the feed the step before showed.
+        // The first post on the feed the step before showed; the feed's first post while it is
+        // still drawing its cards.
         const link = document.querySelector<HTMLAnchorElement>('[data-tour~="feed-card"] a[href^="/innovations/"]');
-        return link?.getAttribute("href") ?? null;
+        return link?.getAttribute("href") ?? (FEED_POSTS[0] ? `/innovations/${FEED_POSTS[0].slug}` : null);
       }
       default: {
         const step = editorStepOf(page) as EditorStep | null;
@@ -331,6 +360,11 @@ export function TourHost() {
    *  False when a chapter couldn't start. */
   const takeNext = (next: UpNext, opener: HTMLElement | null): boolean => {
     if (next.kind === "chapter") return begin(next.id, 0, opener);
+    // Before a first project, the path is the guide's.
+    if ((next.kind === "write" || next.kind === "chat") && rec?.guide !== "done") {
+      openGuide(true);
+      return true;
+    }
     if (next.kind === "write") {
       if (pathname !== "/") router.push("/");
       focusWhenReady('[data-tour~="home-composer"] textarea');
@@ -342,6 +376,65 @@ export function TourHost() {
       if (project) router.push(earnHref(project.id));
     }
     return true;
+  };
+
+  // ── The first-product guide ──
+  const guideOn = rec?.guide === "open" || rec?.guide === "small";
+  const chatNow = newest(chats);
+
+  /** Where the user's first product stands, read from the app itself. */
+  const guideFacts = (): GuideFacts => {
+    const turns = chatNow?.turns ?? [];
+    const setup = turns.find((t): t is SetupTurn => t.role === "setup");
+    const images = turns.filter((t): t is ImageTurn => t.role === "assistant");
+    const jobs = chatNow ? builds.filter((b) => b.chatId === chatNow.id) : [];
+    return {
+      hasChat: !!chatNow,
+      reading: setup?.status === "loading",
+      answered: setup ? setup.status === "answered" : images.length > 0,
+      drawing: images.some((t) => t.status === "pending"),
+      conceptReady: images.some((t) => t.status === "ready"),
+      buildStarted: jobs.length > 0,
+      building: jobs.some((b) => b.status === "queued" || b.status === "running"),
+      hasProject: projects.length > 0,
+      editorSeen: here === "editor" || here === "pcb" || projects.some((p) => Object.keys(p.editorOpened ?? {}).length > 0),
+      minted: projects.some((p) => !!p.mint),
+      shared: projects.some((p) => typeof p.showcasedAt === "number"),
+      phone: isPhone(),
+    };
+  };
+  const guideHref = (step: GuideStep): string | null =>
+    step.place === "chat" ? (chatNow ? `/chat/${chatNow.id}` : null) : hrefOf(step.place);
+  const onGuidePlace = (step: GuideStep): boolean =>
+    step.place === "chat" ? !!chatNow && pathname === `/chat/${chatNow.id}` : pageMatches(step.place, pathname);
+
+  /** The guide's way on: Show me where the step happens, else (`go`) Take me there and show it there. */
+  const guideGo = (go: boolean) => {
+    const now = guideNow(guideFacts());
+    if (!now) return;
+    if (onGuidePlace(now.step)) {
+      if (!now.waiting) setSeek({ id: now.step.id, reveal: true });
+      return;
+    }
+    const href = go ? guideHref(now.step) : null;
+    if (!href) return;
+    router.push(href);
+    if (!now.waiting) setSeek({ id: now.step.id, reveal: true });
+  };
+
+  /** Opens the guide (the Welcome's Start with my idea, the panel, Up next before a first project);
+   *  `go` also takes the user to where the step happens. */
+  const openGuide = (go: boolean) => {
+    leaveToken.current++;
+    setLeaving(false);
+    setPanel(null);
+    setWelcome(false);
+    setOffer(null);
+    setTip(null);
+    setPointer(false);
+    setCard(null);
+    updateTour((prev) => withGuide(prev, "open"));
+    guideGo(go);
   };
 
   // Asked from the sidebar, ⌘K, an editor's Help and the phone's menu.
@@ -401,7 +494,7 @@ export function TourHost() {
   // The tips: the chat's first tip not yet seen whose part of the chat is on screen, or the
   // module tip for the editor module just opened.
   const phoneNow = typeof window !== "undefined" && isPhone();
-  const tipsLive = rec !== undefined && !run && !panel && !welcomeOpen && !pointer;
+  const tipsLive = rec !== undefined && !run && !panel && !welcomeOpen && !pointer && !guideOn;
   const chatTips = tipsLive && here === "chat" && historyReady && tipsOn(rec, chats.length);
   const moduleTip = tipsLive && (here === "editor" || here === "pcb") && moduleTipsOn(rec, phoneNow) ? moduleTipFor(rec, pathname) : null;
   if (tip && !(tip.id === "chat" ? chatTips : moduleTip === tip.index)) setTip(null);
@@ -448,7 +541,7 @@ export function TourHost() {
   // A visit's offer: one chapter, after the page settles, while nothing else is up. Not now once
   // waits for a later visit.
   const offerDue =
-    rec !== undefined && projectsReady && !run && !panel && !welcomeOpen && tip === null && !pointer && card === null
+    rec !== undefined && projectsReady && !run && !panel && !welcomeOpen && tip === null && !pointer && card === null && !guideOn
       ? offerFor(rec, here, phoneNow, visit.declined)
       : null;
   React.useEffect(() => {
@@ -465,7 +558,7 @@ export function TourHost() {
 
   // A part left half-way on an earlier visit comes back once, on a page where it can run.
   const resumable =
-    rec && projectsReady && historyReady && !run && !panel && !welcomeOpen && tip === null && !pointer && !offerDue
+    rec && projectsReady && historyReady && !run && !panel && !welcomeOpen && tip === null && !pointer && !offerDue && !guideOn
       ? (TOUR_CHAPTERS.find((c) => {
           const at = rec.chapters[c.id];
           if (c.tips || !at || at.state !== "paused" || at.step === 0) return false;
@@ -513,6 +606,76 @@ export function TourHost() {
 
   const panelNext = panel ? nextFor(facts(), rec ?? null, null) : null;
 
+  // The guide on screen: on every page with a place (not the mint flow or the brief), under a
+  // chapter, the panel and the Welcome, which take its place while they are up.
+  const guideReady = rec !== undefined && projectsReady && historyReady;
+  const guide = guideReady && guideOn ? guideNow(guideFacts()) : null;
+  const guideShown = guideReady && guideOn && !run && !panel && !welcomeOpen && here !== null;
+  const panelGuide = panel && guideReady && rec?.guide !== "done" ? guideNow(guideFacts()) : null;
+  const guideId = guide?.step.id ?? null;
+  // A new step (the user did the last one), or the end of a wait (the question came, the build
+  // finished), rings its control once it is there, without moving the page or the focus; a ring
+  // from an earlier step goes.
+  const guideAt = guide ? `${guide.step.id}:${guide.waiting}` : null;
+  if (guideAt !== stepSeen) {
+    setStepSeen(guideAt);
+    if (guide && !guide.waiting && stepSeen !== null && rec?.guide === "open") setSeek({ id: guide.step.id, reveal: false });
+  }
+  if (ring && (!guide || ring.id !== guide.step.id || guide.waiting)) setRing(null);
+  if (seek && guide && seek.id !== guide.step.id) setSeek(null);
+  const guideAction = guide
+    ? onGuidePlace(guide.step)
+      ? guide.waiting
+        ? null
+        : "Show me"
+      : guideHref(guide.step)
+        ? "Take me there"
+        : null
+    : null;
+  // Said once as each step comes (or a wait ends), in the host's one live region below.
+  const guideSaid = !guideShown
+    ? ""
+    : guide
+      ? `Your first product, step ${guide.index + 1} of ${guide.total}: ${guide.step.title}. ${guide.waiting && guide.step.waiting ? guide.step.waiting : guide.step.body}`
+      : "Your first product is done.";
+
+  // Show me finds its control, waiting for a page that is opening or a part still being drawn.
+  const findSought = React.useEffectEvent((): "found" | "wait" => {
+    if (!seek || !guide || seek.id !== guide.step.id || !onGuidePlace(guide.step)) return "wait";
+    const el = findTargets(guide.step.target)?.[0];
+    if (!el) return "wait";
+    if (seek.reveal) {
+      scrollWithin(el, "nearest", still() ? "auto" : "smooth");
+      focusIn(el);
+    }
+    setSeek(null);
+    setRing({ id: guide.step.id, el });
+    return "found";
+  });
+  React.useEffect(() => {
+    if (!seek) return;
+    const since = performance.now();
+    let timer = 0;
+    const look = () => {
+      timer = 0;
+      if (findSought() === "found") return observer.disconnect();
+      if (performance.now() - since > SEEK_MS) {
+        observer.disconnect();
+        setSeek(null);
+      }
+    };
+    const observer = new MutationObserver(() => {
+      if (!timer) timer = window.setTimeout(look, 150);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    look();
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [seek, pathname, guideId, guide?.waiting]);
+
+
   return (
     <>
       <WelcomeDialog
@@ -521,7 +684,7 @@ export function TourHost() {
         phone={phoneNow}
         onStart={() => {
           updateTour((prev) => withWelcome(prev, "started"));
-          begin("start", 0, null);
+          openGuide(true);
         }}
         onLookAround={() => {
           updateTour((prev) => withWelcome(prev, "started"));
@@ -615,6 +778,50 @@ export function TourHost() {
           onLost={() => setPointer(false)}
         />
       ) : null}
+      {guideShown && guide && (rec?.guide === "small" ? (
+        <GuidePill
+          index={guide.index}
+          total={guide.total}
+          title={guide.step.title}
+          waiting={guide.waiting}
+          avoid={guide.step.target}
+          inEditor={here === "editor" || here === "pcb"}
+          onOpen={() => updateTour((prev) => withGuide(prev, "open"))}
+        />
+      ) : (
+        <GuideCard
+          index={guide.index}
+          total={guide.total}
+          title={guide.step.title}
+          body={guide.waiting && guide.step.waiting ? guide.step.waiting : guide.step.body}
+          waiting={guide.waiting}
+          action={guideAction}
+          avoid={guide.step.target}
+          inEditor={here === "editor" || here === "pcb"}
+          onAction={() => guideGo(true)}
+          onFold={() => updateTour((prev) => withGuide(prev, "small"))}
+          onClose={() => {
+            updateTour((prev) => withGuide(prev, "closed"));
+            setRing(null);
+            setSeek(null);
+            point();
+          }}
+        />
+      ))}
+      {guideShown && !guide && (
+        <GuideDone
+          inEditor={here === "editor" || here === "pcb"}
+          onTour={() => {
+            updateTour((prev) => withGuide(prev, "done"));
+            begin("tour", 0, null);
+          }}
+          onClose={() => {
+            updateTour((prev) => withGuide(prev, "done"));
+            point();
+          }}
+        />
+      )}
+      {guideShown && ring && <GuideRing key={ring.id} target={ring.el} onGone={() => setRing(null)} />}
       {offered && (
         <ChapterOffer
           key={offered.id}
@@ -678,6 +885,8 @@ export function TourHost() {
           ready={{ hasProject: projects.length > 0, hasChat: chats.length > 0 }}
           atHome={here === "home"}
           upNext={panelNext}
+          guide={panelGuide ? { index: panelGuide.index, total: panelGuide.total, title: panelGuide.step.title, state: rec?.guide ?? "off" } : null}
+          onGuide={() => openGuide(false)}
           onUpNext={() => {
             if (!panelNext) return;
             const opener = panel.anchor;
@@ -698,9 +907,10 @@ export function TourHost() {
           }}
         />
       )}
-      {/* Each step and tip is said once as it opens; an offer, once as it appears. */}
+      {/* Each step and tip is said once as it opens; an offer, once as it appears; the guide's step
+          as it comes. */}
       <div aria-live="polite" className="sr-only">
-        {said}
+        {said || guideSaid}
       </div>
     </>
   );

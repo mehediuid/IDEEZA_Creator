@@ -2,16 +2,17 @@
 // gets the Welcome, and where each chapter starts again.
 
 import { TOUR_CHAPTERS, isChapterId } from "./chapters";
-import type { ChapterId, ChapterState, TourRecord } from "./types";
+import type { ChapterId, ChapterState, GuideState, TourRecord } from "./types";
 
 export const TOUR_KEY = "ideeza:tour";
 
 export function emptyTour(): TourRecord {
-  return { v: 1, welcome: "unseen", chapters: {}, offers: true, offered: [], snoozed: [], pointed: false, arrival: false };
+  return { v: 1, welcome: "unseen", chapters: {}, offers: true, offered: [], snoozed: [], pointed: false, arrival: false, guide: "off" };
 }
 
 const WELCOME = new Set(["unseen", "started", "later", "declined"]);
 const STATES = new Set<ChapterState>(["done", "skipped", "paused"]);
+const GUIDE = new Set<GuideState>(["off", "open", "small", "closed", "done"]);
 
 /** A stored record, or `null` when there is none worth reading (none at all, or not ours). */
 export function normalizeTour(raw: unknown): TourRecord | null {
@@ -36,6 +37,7 @@ export function normalizeTour(raw: unknown): TourRecord | null {
   if (Array.isArray(r.snoozed)) rec.snoozed = [...new Set(r.snoozed.filter(isChapterId))].filter((id) => !rec.offered.includes(id));
   if (typeof r.pointed === "boolean") rec.pointed = r.pointed;
   if (typeof r.arrival === "boolean") rec.arrival = r.arrival;
+  if (typeof r.guide === "string" && GUIDE.has(r.guide as GuideState)) rec.guide = r.guide as GuideState;
   return rec;
 }
 
@@ -102,6 +104,11 @@ export function withPointed(rec: TourRecord | null): TourRecord {
 /** The shared-link arrival card has been shown. */
 export function withArrival(rec: TourRecord | null): TourRecord {
   return { ...(rec ?? emptyTour()), arrival: true };
+}
+
+/** The first-product guide opened, folded, closed or finished. */
+export function withGuide(rec: TourRecord | null, guide: GuideState): TourRecord {
+  return { ...(rec ?? emptyTour()), guide };
 }
 
 /** The panel's "Offer a tour the first time I open a page". */

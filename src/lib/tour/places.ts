@@ -181,12 +181,16 @@ const seenOf = (rec: TourRecord | null, id: ChapterId) => {
   return state === "done" || state === "skipped";
 };
 
+/** The parts whose pages the full tour walks: seeing it to the end counts them as seen. */
+const IN_FULL_TOUR: ReadonlySet<ChapterId> = new Set<ChapterId>(["start", "project", "editors", "earn", "share", "way", "account"]);
+
 /** The next real step on the user's path from idea to product, worked out from what they have
  *  done (`after`, the part just finished, counts as seen): their first idea, their build, their
  *  project, the editors, Earn and minting, sharing, then the side tours. `null` when all of it is
  *  behind them. The path never leads into a part this screen can't show (the editors on a phone). */
 export function nextFor(f: JourneyFacts, rec: TourRecord | null, after: ChapterId | null): UpNext | null {
-  const seen = (id: ChapterId) => id === after || seenOf(rec, id);
+  const toured = after === "tour" || rec?.chapters.tour?.state === "done";
+  const seen = (id: ChapterId) => id === after || (toured && IN_FULL_TOUR.has(id)) || seenOf(rec, id);
   const chapter = (id: ChapterId): UpNext => ({ kind: "chapter", id, label: `Next: ${chapterById(id).name}` });
   if (!f.hasProject) {
     if (!f.hasChat) return { kind: "write", label: "Write your first idea" };

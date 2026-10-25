@@ -6,12 +6,12 @@
 
 import { CONCEPT_COST } from "../create/credits";
 import { IDEEZA_FEE_BPS } from "../market/fee";
-import type { ChapterId, TourChapter } from "./types";
+import type { ChapterId, TourChapter, TourStep } from "./types";
 
 /** IDEEZA's cut of a sale, as the sale itself charges it (`lib/market/fee.ts`). */
 const IDEEZA_FEE_PERCENT = IDEEZA_FEE_BPS / 100;
 
-export const TOUR_CHAPTERS: TourChapter[] = [
+const PARTS: TourChapter[] = [
   {
     // The first win: three steps on Home, then the user writes their idea (its last card's Up
     // next puts the cursor in the prompt box).
@@ -414,6 +414,42 @@ export const TOUR_CHAPTERS: TourChapter[] = [
     ],
   },
 ];
+
+/** The full tour (owner, 2026-10-25): every page one by one, in the sidebar's order, a project's
+ *  own pages (its page, the editors, Earn) under My projects. It is made of the parts' own steps,
+ *  so their words are said once; each step opens its page. Without a project those pages are left
+ *  out, and the editors on a phone. The chat isn't in it: its tips need a chat of the user's own. */
+function fullTour(): TourChapter {
+  const part = (id: ChapterId) => PARTS.find((c) => c.id === id)!.steps;
+  const desktop = (steps: TourStep[]) => steps.map((s) => ({ ...s, desktopOnly: true }));
+  const [rail, saved, finish] = part("editors");
+  const [projects, history, parts, marketplace, messages, blog] = part("way");
+  const [feed, post] = part("share");
+  return {
+    id: "tour",
+    name: "Full tour of IDEEZA",
+    group: "Start",
+    where: "Every page, one by one",
+    place: "sidebar",
+    steps: [
+      ...part("start"),
+      history,
+      projects,
+      ...part("project"),
+      ...desktop([{ ...rail, page: "editor-pcb" }, ...part("modules"), { ...saved, page: "editor-preview" }, finish]),
+      ...part("earn"),
+      parts,
+      marketplace,
+      feed,
+      post,
+      blog,
+      messages,
+      ...part("account"),
+    ],
+  };
+}
+
+export const TOUR_CHAPTERS: TourChapter[] = [fullTour(), ...PARTS];
 
 export function chapterById(id: ChapterId): TourChapter {
   const chapter = TOUR_CHAPTERS.find((c) => c.id === id);

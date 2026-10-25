@@ -18,8 +18,10 @@ const {
   withTipSeen,
   withPointed,
   withArrival,
+  withGuide,
   chapterStatus,
 } = await import("../../.tmp-test/lib/tour/state.js");
+const { GUIDE_STEPS, guideNow, guideSteps } = await import("../../.tmp-test/lib/tour/guide.js");
 const {
   placeOf,
   placeFits,
@@ -49,6 +51,7 @@ test("the chapters, in the order of the path, then the side tours", () => {
   assert.deepEqual(
     TOUR_CHAPTERS.map((c) => [c.group, c.id, c.name]),
     [
+      ["Start", "tour", "Full tour of IDEEZA"],
       ["Start", "start", "Start here"],
       ["Build", "chat", "From idea to concepts"],
       ["Build", "project", "Your project"],
@@ -186,7 +189,8 @@ test("Share with the community: the feed, an open post, then your project's ⋯ 
 
 test("every chapter is short and every step says something", () => {
   for (const c of TOUR_CHAPTERS) {
-    assert.ok(c.steps.length >= 1 && c.steps.length <= 6, `${c.id} has 1–6 steps`);
+    // The full tour is the parts' own steps, one after another.
+    if (c.id !== "tour") assert.ok(c.steps.length >= 1 && c.steps.length <= 6, `${c.id} has 1–6 steps`);
     for (const s of c.steps) {
       const targets = Array.isArray(s.target) ? s.target : [s.target];
       assert.ok(targets.length >= 1 && targets.length <= 2, `${c.id}: one or two things lit`);
@@ -448,7 +452,10 @@ test("a stored record is read defensively", () => {
   assert.equal(normalizeTour({ v: 1, welcome: "nope", chapters: [] }).welcome, "unseen");
   assert.equal(rec.offers, true, "offers default on");
   assert.deepEqual(rec.offered, []);
-  assert.deepEqual([rec.snoozed, rec.pointed, rec.arrival], [[], false, false], "new fields default off");
+  assert.deepEqual([rec.snoozed, rec.pointed, rec.arrival, rec.guide], [[], false, false, "off"], "new fields default off");
+  assert.equal(normalizeTour({ v: 1, guide: "small" }).guide, "small");
+  assert.equal(normalizeTour({ v: 1, guide: "huge" }).guide, "off");
+  assert.equal(withGuide(null, "open").guide, "open");
   const off = normalizeTour({ v: 1, offers: false, offered: ["pcb", "pcb", "notes", 3] });
   assert.equal(off.offers, false);
   assert.deepEqual(off.offered, ["pcb"]);
@@ -467,4 +474,113 @@ test("a stored record is read defensively", () => {
   assert.deepEqual(more.chapters.modules.seen, [0, 3]);
   assert.equal(withPointed(null).pointed, true);
   assert.equal(withArrival(null).arrival, true);
+});
+
+test("the full tour: every page one by one, in the sidebar's order, made of the parts' own steps", () => {
+  const tour = chapterById("tour");
+  assert.equal(tour.place, "sidebar");
+  assert.ok(!tour.offered && !tour.needsProject && !tour.tips, "started from the panel, never offered");
+  const pages = [...new Set(tour.steps.map((s) => s.page).filter(Boolean))];
+  assert.deepEqual(pages, [
+    "home",
+    "history",
+    "projects",
+    "project",
+    "product",
+    "editor-pcb",
+    "editor-code",
+    "editor-3d",
+    "editor-assembly",
+    "editor-preview",
+    "earn-overview",
+    "earn-sell",
+    "earn-plan",
+    "earn-money",
+    "parts",
+    "marketplace",
+    "innovations",
+    "post",
+    "blog",
+    "messages",
+    "profile",
+    "credits",
+    "balance",
+    "tutorials",
+  ]);
+  // Every step opens its page, but the level, which lives in the account menu it opens.
+  assert.deepEqual(tour.steps.filter((s) => !s.page).map((s) => s.target), ["account-level"]);
+  // Said once: each step is a part's own words.
+  const parts = TOUR_CHAPTERS.filter((c) => c.id !== "tour").flatMap((c) => c.steps.map((s) => s.title));
+  for (const s of tour.steps) assert.ok(parts.includes(s.title), `"${s.title}" comes from a part`);
+  assert.equal(tour.steps.length, 34);
+  // The editors are left out on a phone; a project's pages without a project.
+  const phone = runnableSteps(tour, { hasProject: true, phone: true });
+  assert.ok(phone.every((s) => !(s.page ?? "").startsWith("editor-")));
+  assert.equal(phone.length, 34 - 8 - 1, "no editors, no level on a phone");
+  const none = runnableSteps(tour, { hasProject: false, phone: false });
+  assert.ok(none.every((s) => !["project", "product", "earn-overview", "earn-sell", "earn-plan", "earn-money"].includes(s.page)));
+  assert.equal(none.length, 3 + 2 + 2 + 2 + 2 + 5, "Home, History, My projects, Parts, Marketplace, the feed, a post, Blog, Messages, the account");
+  assert.ok(readinessOf("tour", { phone: true, hasProject: false, hasChat: false }).ok, "it runs for anyone, anywhere");
+  // Finished, its parts count as seen: Up next doesn't send the user round them again.
+  const all = { hasChat: true, hasProject: true, minted: false, phone: false };
+  assert.deepEqual(nextFor(all, null, "tour"), { kind: "mint", label: "Mint your project" });
+  assert.equal(nextFor({ ...all, minted: true }, null, "tour"), null);
+  assert.equal(nextFor({ ...all, minted: true }, withChapter(null, "tour", "done", 33), null), null, "the panel knows it too");
+  assert.equal(nextFor({ ...all, minted: true }, withChapter(null, "tour", "skipped", 3), null)?.id, "project", "a skipped tour saw nothing");
+});
+
+const fresh = {
+  hasChat: false,
+  reading: false,
+  answered: false,
+  drawing: false,
+  conceptReady: false,
+  buildStarted: false,
+  building: false,
+  hasProject: false,
+  editorSeen: false,
+  minted: false,
+  shared: false,
+  phone: false,
+};
+
+test("the first-product guide: eight real steps, from the idea to sharing it", () => {
+  assert.deepEqual(
+    GUIDE_STEPS.map((s) => [s.id, s.place, s.target]),
+    [
+      ["idea", "home", "home-composer"],
+      ["answer", "chat", "chat-question"],
+      ["concept", "chat", "chat-concept"],
+      ["build", "chat", "chat-build"],
+      ["save", "chat", "chat-save"],
+      ["editor", "product", "product-editor"],
+      ["mint", "earn-overview", "earn-step-mint"],
+      ["share", "project", "project-actions"],
+    ],
+  );
+  for (const s of GUIDE_STEPS) {
+    assert.ok(words(s.title) <= 6 && words(s.body) <= 25, `${s.id} is short`);
+    if (s.waiting) assert.ok(words(s.waiting) <= 25, `${s.id}'s wait is short`);
+  }
+  assert.deepEqual(guideSteps(true).map((s) => s.id), ["idea", "answer", "concept", "build", "save", "mint", "share"], "a phone skips the editor");
+});
+
+test("the guide moves on by itself as the user does each thing, and waits while the app works", () => {
+  const at = (f) => {
+    const now = guideNow({ ...fresh, ...f });
+    return now && [now.step.id, now.index + 1, now.total, now.waiting];
+  };
+  assert.deepEqual(at({}), ["idea", 1, 8, false]);
+  assert.deepEqual(at({ hasChat: true, reading: true }), ["answer", 2, 8, true], "the question is loading");
+  assert.deepEqual(at({ hasChat: true }), ["answer", 2, 8, false]);
+  assert.deepEqual(at({ hasChat: true, answered: true, drawing: true }), ["concept", 3, 8, true]);
+  assert.deepEqual(at({ hasChat: true, answered: true }), ["concept", 3, 8, false], "a drawing that stopped");
+  assert.deepEqual(at({ hasChat: true, answered: true, conceptReady: true }), ["build", 4, 8, false]);
+  assert.deepEqual(at({ hasChat: true, answered: true, conceptReady: true, buildStarted: true, building: true }), ["save", 5, 8, true]);
+  assert.deepEqual(at({ hasChat: true, answered: true, conceptReady: true, buildStarted: true }), ["save", 5, 8, false]);
+  assert.deepEqual(at({ hasProject: true }), ["editor", 6, 8, false], "a project made by hand counts for the save");
+  assert.deepEqual(at({ hasProject: true, phone: true }), ["mint", 6, 7, false], "a phone goes from the save to the mint");
+  assert.deepEqual(at({ hasProject: true, editorSeen: true }), ["mint", 7, 8, false]);
+  assert.deepEqual(at({ hasProject: true, editorSeen: true, minted: true }), ["share", 8, 8, false]);
+  assert.equal(at({ hasProject: true, editorSeen: true, minted: true, shared: true }), null, "the first product is done");
 });

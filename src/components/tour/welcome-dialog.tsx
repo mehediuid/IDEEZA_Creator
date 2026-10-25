@@ -2,8 +2,9 @@
 
 // The Tour Guide's Welcome (plan Rm6aBk8ieNSUpHgtS9JMu5; study W6TzTM8bS39MuDB5YyPxW7; DS M07 Modal,
 // 512): the whole platform on one screen — the path from idea to product as five stages, each with
-// its icon and one line — then straight into doing. Start with my idea runs Start here (three steps
-// on Home, ending in the prompt box); Look around first runs Find your way; "start by hand" opens
+// its icon and one line — then straight into doing. Start with my idea opens the first-product guide
+// (the cursor in the prompt box, and a card that stays until the first product is made); Look
+// around first runs Find your way; "start by hand" opens
 // Build manually for someone who knows electronics. The starting credits are the app's own number.
 // Closed without an answer it comes back once, on a later visit, and points at where tours live.
 
@@ -113,7 +114,7 @@ export function WelcomeDialog({
           </button>
         )}
         <p className="text-sm leading-sm text-text-tertiary">
-          We&apos;ll show you each step when you get there. Find this tour any time in Support › Tour Guide.
+          A guide stays with you until your first product is made. Find every tour in Support › Tour Guide.
         </p>
       </div>
     </ModalFrame>
