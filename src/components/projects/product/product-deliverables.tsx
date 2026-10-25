@@ -335,7 +335,7 @@ function ModelTab({ job, product, kind }: { job: BuildJob; product: BuildProduct
             </Button>
           </div>
         }
-        aside={<Covers kind="3d" job={job} product={product} ready />}
+        aside={<Covers kind={kind} job={job} product={product} ready />}
       />
     );
   }
@@ -344,10 +344,10 @@ function ModelTab({ job, product, kind }: { job: BuildJob; product: BuildProduct
   // aside follows it below.
   return (
     <div className="flex flex-col gap-10">
-      <div ref={viewerRef} tabIndex={-1} role="region" aria-label={`3D model of ${product.name}`} className="outline-none">
+      <div ref={viewerRef} tabIndex={-1} role="region" aria-label={`${kind === "assembly" ? "Assembly" : "3D Module"} of ${product.name}`} className="outline-none">
         <ModelPanelLazy key={product.id} assembly={assembly} shellNote={shellNote} />
       </div>
-      <Covers kind="3d" job={job} product={product} ready />
+      <Covers kind={kind} job={job} product={product} ready />
     </div>
   );
 }

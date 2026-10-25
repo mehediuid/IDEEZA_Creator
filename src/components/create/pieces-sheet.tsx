@@ -15,7 +15,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Cancel01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { Segmented } from "@/components/ideeza/segmented";
@@ -24,7 +24,6 @@ import {
   OPTIMIZE_COST,
   PICKABLE_KINDS,
   PIECES,
-  PIECE_KINDS,
   PRESET_LABEL,
   aboutTime,
   creditsLabel,
@@ -176,7 +175,9 @@ function PiecesPanel({
         )}
 
         <ul role="list" className="flex flex-col overflow-hidden rounded-xl border border-solid border-border">
-          {PIECE_KINDS.map((kind, i) => (
+          {/* The five a maker picks (owner, 2026-10-22); the Parts list comes
+              with any of them and is said in the footer. */}
+          {PICKABLE_KINDS.map((kind, i) => (
             <PieceRow
               key={kind}
               kind={kind}
@@ -274,8 +275,7 @@ function PiecesPanel({
 }
 
 /** One piece: the tick, what it is, what it costs and takes; ticked, its
- *  Quality and Optimize under it. The Parts list is no choice: it comes with
- *  any picked piece, free — its row says so, with no tick to change. */
+ *  Quality and Optimize under it. */
 function PieceRow({
   kind,
   pick,
@@ -293,22 +293,6 @@ function PieceRow({
 }) {
   const p = PIECES[kind];
   const c = pick[kind];
-  if (kind === "parts") {
-    return (
-      <li className={["flex items-start gap-[12px] px-[12px] py-[12px]", first ? "" : "border-t border-solid border-border", "bg-bg-page"].join(" ")}>
-        <span aria-hidden className={`mt-[2px] inline-flex shrink-0 ${c.on ? "text-text-success" : "text-text-tertiary"}`}>
-          <Icon icon={CheckmarkCircle02Icon} size={20} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
-          <span className="text-md font-medium text-text-primary">{p.name} list</span>
-          <span className="text-sm text-text-tertiary">
-            {p.sub}. {c.on ? "Comes with every build." : "Comes with any piece you pick."}
-          </span>
-        </span>
-        <span className="shrink-0 text-md font-semibold text-text-tertiary">Free</span>
-      </li>
-    );
-  }
   const cost = pieceCost(kind, c.on ? c : { quality: "medium", optimize: false });
   const secs = pieceSeconds(kind, c.on ? c : { quality: "medium", optimize: false });
   const qualityId = `${PIECES_SHEET_ID}-${kind}-quality`;

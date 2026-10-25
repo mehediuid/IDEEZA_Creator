@@ -502,7 +502,7 @@ export function ChatThread({
                 answer
                   ? selected.map((t) => {
                       const pick = picks.get(productIdOf(t)) ?? cleanPick(undefined);
-                      const kinds = pickedKinds(pick);
+                      const kinds = pickedKinds(pick).filter((k) => k !== "parts");
                       return {
                         productId: productIdOf(t),
                         name: productNameOf(t) ?? `Concept ${labels.get(t.id) ?? "1"}`,

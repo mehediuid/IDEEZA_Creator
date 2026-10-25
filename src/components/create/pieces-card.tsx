@@ -56,7 +56,9 @@ export type PiecesCard = {
 
 export function PiecesBlock({ card }: { card: PiecesCard }) {
   const { pick } = card;
-  const kinds = pickedKinds(pick);
+  // The five a maker picks; the Parts list comes with any of them and is
+  // said on the total's line.
+  const kinds = pickedKinds(pick).filter((k) => k !== "parts");
   return (
     <section className="flex flex-col gap-[8px] border-t border-solid border-border pt-[12px]">
       <div className="flex items-center gap-[8px]">
@@ -97,7 +99,7 @@ export function PiecesBlock({ card }: { card: PiecesCard }) {
             })}
           </ul>
           <div className="flex flex-wrap items-baseline gap-x-[8px] border-t border-dashed border-border pt-[6px] text-sm">
-            <span className="min-w-0 flex-1 text-text-secondary">{pickSummary(pick)}</span>
+            <span className="min-w-0 flex-1 text-text-secondary">{pickSummary(pick)} · Parts list included</span>
             <span className="font-semibold tabular-nums text-text-primary">
               {creditsLabel(pickCost(pick))} · {aboutTime(pickSeconds(pick))}
             </span>

@@ -1773,7 +1773,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // The What to build panel's product — the pick from the rail's project
   // model, the one the cards and the Build line read too.
   const piecesProduct = React.useMemo((): PiecesSheetProduct | null => {
-    if (!piecesFor) return null;
+    // Once the build holds its concepts there is nothing left to pick: a
+    // piece left out is added from the build (Add pieces), so the panel goes.
+    if (!piecesFor || buildHolds(activeBuild)) return null;
     const turn = sheetTurnOf(railState, piecesFor);
     if (!turn) return null;
     const setupId = railState.setup?.answer ? railState.setup.id : null;
@@ -1782,12 +1784,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       name: sheetNameOf(railState.setup, turn, labels),
       conceptLabel: labels.get(turn.id) ?? "1",
       pick: railState.picks.get(piecesFor) ?? cleanPick(undefined),
-      // A build that holds its concepts made what it made; pieces left out
-      // are added from the review, not picked here again.
-      onChange:
-        chat && setupId && !buildHolds(activeBuild)
-          ? (pick) => setPieces(chat.id, setupId, piecesFor, pick)
-          : undefined,
+      onChange: chat && setupId ? (pick) => setPieces(chat.id, setupId, piecesFor, pick) : undefined,
     };
   }, [piecesFor, railState, labels, chat, activeBuild, setPieces]);
   if (piecesFor && !piecesProduct) setPiecesFor(null);
@@ -1800,7 +1797,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     return ids.map((id, i) => {
       const pick = railState.picks.get(id) ?? cleanPick(undefined);
       const turn = sheetTurnOf(railState, id);
-      const kinds = pickedKinds(pick);
+      const kinds = pickedKinds(pick).filter((k) => k !== "parts");
       return {
         productId: id,
         name: gateNames[i] ?? (turn ? sheetNameOf(railState.setup, turn, labels) : id),
