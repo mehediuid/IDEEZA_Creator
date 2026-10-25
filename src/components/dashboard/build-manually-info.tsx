@@ -93,6 +93,7 @@ export function BuildManuallyInfo({
         </p>
         <button
           type="button"
+          data-tour="home-create"
           onClick={onCreate}
           className="inline-flex h-[44px] items-center gap-[8px] rounded-lg bg-violet-600 px-[20px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
         >

@@ -191,6 +191,7 @@ function AddProductTile({ projectId, projectName }: { projectId: string; project
   return (
     <li>
       <div
+        data-tour="project-add"
         className={cn(
           CARD,
           "min-h-[160px] items-center justify-center gap-3 border-dashed p-7 text-center",

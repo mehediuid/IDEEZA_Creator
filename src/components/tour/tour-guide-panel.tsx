@@ -1,21 +1,22 @@
 "use client";
 
-// The Tour Guide panel (spec D5): every chapter, under Start, Build and Earn & share, with Start,
-// Replay or Resume where it stopped — or, when it can't start yet, why and the way there (D6).
-// Below them,
-// whether a page's tour is offered on a first visit, and Reset tours. From the sidebar's Support ›
-// Tour Guide it floats beside the sidebar, the way the footer's account popover does; from ⌘K or
-// the phone's menu it is a dialog (a bottom sheet on a phone).
+// The Tour Guide panel (spec D5): first, Up next — the next real step on the user's path, one line
+// (no stepper: the owner removed the journey row) — then every chapter in the order of the path,
+// under Start, Build, Earn & share and Look around, with Start, Replay or Resume where it stopped —
+// or, when it can't start yet, why and the way there (D6). Below them, whether a page's tour is
+// offered on a visit, and Reset tours. From the sidebar's Support › Tour Guide it floats beside the
+// sidebar, the way the footer's account popover does; from ⌘K, an editor's Help or the phone's menu
+// it is a dialog (a bottom sheet on a phone).
 
 import * as React from "react";
 import { ArrowRight01Icon, Cancel01Icon, CheckmarkCircle02Icon, CircleIcon, LockIcon, PlayCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { FloatingPanel } from "@/components/dashboard/sidebar-account";
-import { ModalFrame, Toggle, linkVariants } from "@/components/ideeza";
+import { Button, ModalFrame, Toggle, linkVariants } from "@/components/ideeza";
 import { TOUR_CHAPTERS } from "@/lib/tour/chapters";
 import { readinessOf } from "@/lib/tour/places";
 import { chapterStatus } from "@/lib/tour/state";
-import type { ChapterId, TourRecord } from "@/lib/tour/types";
+import type { ChapterId, TourRecord, UpNext } from "@/lib/tour/types";
 import { cn } from "@/lib/utils";
 import { isPhone, isShown } from "./targets";
 
@@ -29,6 +30,9 @@ type PanelProps = {
   ready: { hasProject: boolean; hasChat: boolean };
   /** Home is open: a locked chapter's "Go to Home" would go nowhere. */
   atHome: boolean;
+  /** The next step on the path; null once all of it is behind the user. */
+  upNext: UpNext | null;
+  onUpNext: () => void;
   onStart: (id: ChapterId, step: number) => void;
   onGoHome: () => void;
   onOffers: (on: boolean) => void;
@@ -110,13 +114,30 @@ function BesideSidebar(props: PanelProps & { anchor: HTMLElement }) {
   );
 }
 
-function ChapterList({ rec, ready, atHome, onStart, onGoHome, onOffers, onReset }: PanelProps) {
+function ChapterList({ rec, ready, atHome, upNext, onUpNext, onStart, onGoHome, onOffers, onReset }: PanelProps) {
   const [phone] = React.useState(isPhone);
   const [reset, setReset] = React.useState(false);
   const groups = [...new Set(TOUR_CHAPTERS.map((c) => c.group))];
   const offers = rec?.offers ?? true;
   return (
     <div>
+      <section aria-label="Up next" className="mt-4 flex flex-col gap-4 rounded-lg bg-bg-brand-subtle p-6">
+        <span className="text-sm font-semibold leading-sm text-text-brand">Up next</span>
+        {upNext ? (
+          <Button
+            type="button"
+            hierarchy="primary"
+            size="sm"
+            className="self-start"
+            onClick={onUpNext}
+            iconTrailing={<Icon icon={ArrowRight01Icon} size={16} />}
+          >
+            {upNext.label}
+          </Button>
+        ) : (
+          <p className="text-md leading-md text-text-primary">You have seen the whole path. Replay any tour below.</p>
+        )}
+      </section>
       {groups.map((group) => (
         <section key={group} aria-label={group} className="mt-6 first:mt-4">
           <h3 className="mb-2 text-sm font-semibold leading-sm text-text-tertiary">{group}</h3>

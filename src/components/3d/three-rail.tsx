@@ -13,6 +13,7 @@ export function ThreeRail({ topOffset = 132 }: { topOffset?: number } = {}) {
 
   return (
     <div
+      data-tour="editor-rail"
       style={{
         position: "absolute",
         top: topOffset,

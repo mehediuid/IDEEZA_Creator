@@ -29,6 +29,7 @@ export function LeftRail({
 
   return (
     <div
+      data-tour="editor-rail"
       style={{
         position: "absolute",
         top: resolvedTop,

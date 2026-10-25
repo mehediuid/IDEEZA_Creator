@@ -21,3 +21,8 @@ export function openTourGuide(anchor: HTMLElement | null = null): void {
 export function startTourChapter(id: ChapterId, step = 0): void {
   ask({ kind: "start", id, step });
 }
+
+/** A Tutorials page, opened in a new tab so the editor stays as it is (an editor's Help). */
+export function openTutorialTab(path: string): void {
+  if (typeof window !== "undefined") window.open(path, "_blank", "noopener");
+}

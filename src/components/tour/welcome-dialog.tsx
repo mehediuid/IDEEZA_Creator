@@ -1,31 +1,52 @@
 "use client";
 
-// The Tour Guide's Welcome (plan Rm6aBk8ieNSUpHgtS9JMu5; DS M07 Modal, 512): shown once, on Home,
-// to a browser that hasn't made anything yet. It shows the path from idea to product as five
-// stages, each with its icon and one line of what happens there, and offers the first chapter.
-// Declining is final, and says where the tour lives from then on.
+// The Tour Guide's Welcome (plan Rm6aBk8ieNSUpHgtS9JMu5; study W6TzTM8bS39MuDB5YyPxW7; DS M07 Modal,
+// 512): the whole platform on one screen — the path from idea to product as five stages, each with
+// its icon and one line — then straight into doing. Start with my idea runs Start here (three steps
+// on Home, ending in the prompt box); Look around first runs Find your way; "start by hand" opens
+// Build manually for someone who knows electronics. The starting credits are the app's own number.
+// Closed without an answer it comes back once, on a later visit, and points at where tours live.
 
 import * as React from "react";
 import { AiImageIcon, ArrowRight01Icon, Coins01Icon, CpuIcon, Idea01Icon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
-import { Button, ModalFrame } from "@/components/ideeza";
+import { Button, ModalFrame, linkVariants } from "@/components/ideeza";
+import { CONCEPT_COST } from "@/lib/create/credits";
 
 const PATH: { icon: IconValue; label: string; line: string }[] = [
   { icon: Idea01Icon, label: "Describe your idea", line: "In plain words, or start by hand." },
-  { icon: AiImageIcon, label: "Pick a concept", line: "AI draws a few ways to make it." },
-  { icon: CpuIcon, label: "Build it", line: "PCB, firmware, 3D model, wiring and parts." },
+  { icon: AiImageIcon, label: "See your concept", line: "AI draws each product; change it in plain words." },
+  { icon: CpuIcon, label: "Build it", line: "AI makes the PCB, code, 3D model, assembly, wiring and parts list." },
   { icon: PencilEdit02Icon, label: "Make it yours", line: "Change anything in the editors." },
-  { icon: Coins01Icon, label: "Mint, sell or share", line: "Own it, sell copies, or show it off." },
+  { icon: Coins01Icon, label: "Own it, sell it or share it", line: "Mint it as yours, sell it or copies, or show it off." },
 ];
 
-export function WelcomeDialog({ open, onStart, onDecline }: { open: boolean; onStart: () => void; onDecline: () => void }) {
+export function WelcomeDialog({
+  open,
+  credits,
+  phone,
+  onStart,
+  onLookAround,
+  onByHand,
+  onClose,
+}: {
+  open: boolean;
+  /** The credits this browser has to start with, once read. */
+  credits: number | null;
+  phone: boolean;
+  onStart: () => void;
+  onLookAround: () => void;
+  onByHand: () => void;
+  /** ✕, Escape or the scrim: not now. */
+  onClose: () => void;
+}) {
   const startRef = React.useRef<HTMLButtonElement>(null);
   const introId = React.useId();
   const tap = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
   return (
     <ModalFrame
       open={open}
-      onClose={onDecline}
+      onClose={onClose}
       size="sm"
       sheet
       title="Welcome to IDEEZA"
@@ -33,8 +54,8 @@ export function WelcomeDialog({ open, onStart, onDecline }: { open: boolean; onS
       initialFocus={startRef}
       footer={
         <div className="ml-auto flex flex-wrap items-center justify-end gap-4">
-          <Button type="button" hierarchy="ghost" size="lg" className={tap} onClick={onDecline}>
-            I&apos;ll explore on my own
+          <Button type="button" hierarchy="ghost" size="lg" className={tap} onClick={onLookAround}>
+            Look around first
           </Button>
           <Button
             ref={startRef}
@@ -45,14 +66,26 @@ export function WelcomeDialog({ open, onStart, onDecline }: { open: boolean; onS
             onClick={onStart}
             iconTrailing={<Icon icon={ArrowRight01Icon} size={16} />}
           >
-            Show me around
+            Start with my idea
           </Button>
         </div>
       }
     >
-      <p id={introId} className="text-md leading-md text-text-secondary">
-        From an idea to a real product in five steps. A short tour shows you where each one happens.
-      </p>
+      <div id={introId} className="flex flex-col gap-2">
+        <p className="text-md leading-md text-text-secondary">
+          Turn an idea into a real electronic product, with AI or by hand. No electronics knowledge needed.
+        </p>
+        {credits !== null && (
+          <p className="text-md font-medium leading-md text-text-primary">
+            You have {credits} free {credits === 1 ? "credit" : "credits"} to start. A concept uses {CONCEPT_COST}.
+          </p>
+        )}
+        {phone && (
+          <p className="text-md leading-md text-text-secondary">
+            On a phone you can send ideas, follow builds, sell and share. Editing a design needs a computer.
+          </p>
+        )}
+      </div>
       <ol className="mt-8 flex flex-col">
         {PATH.map(({ icon, label, line }, i) => (
           <li key={label} className="relative flex gap-6 pb-6 last:pb-0">
@@ -73,7 +106,16 @@ export function WelcomeDialog({ open, onStart, onDecline }: { open: boolean; onS
           </li>
         ))}
       </ol>
-      <p className="mt-8 text-sm leading-sm text-text-tertiary">You can find it again under Support › Tour Guide.</p>
+      <div className="mt-8 flex flex-col gap-2">
+        {!phone && (
+          <button type="button" onClick={onByHand} className={linkVariants({ color: "brand", size: "md", className: "self-start font-semibold" })}>
+            I know hardware — start by hand
+          </button>
+        )}
+        <p className="text-sm leading-sm text-text-tertiary">
+          We&apos;ll show you each step when you get there. Find this tour any time in Support › Tour Guide.
+        </p>
+      </div>
     </ModalFrame>
   );
 }

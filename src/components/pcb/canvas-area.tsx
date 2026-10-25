@@ -1092,6 +1092,7 @@ export function CanvasArea() {
           toolbar is hidden, so the toggle is never duplicated. */}
       {state.viewTog["Top Toolbar"] === false && (
         <div
+          data-tour="pcb-mode"
           style={{
             position: "absolute",
             top: 30,

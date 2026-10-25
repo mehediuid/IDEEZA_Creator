@@ -699,7 +699,7 @@ function SupportAction({
         data-tour={tour}
         aria-current={current ? "page" : undefined}
         onClick={onLeave}
-        className={linkVariants({ color: current ? "brand" : "neutral", size: "md", className: cn("min-h-[24px]", current ? "font-semibold" : "font-regular") })}
+        className={linkVariants({ color: current ? "brand" : "neutral", size: "md", className: cn("min-h-[24px] max-md:min-h-[var(--touch-min)]", current ? "font-semibold" : "font-regular") })}
       >
         {label}
       </Link>
@@ -724,7 +724,7 @@ function SupportAction({
         aria-haspopup="dialog"
         onClick={onClick}
         data-tour={tour}
-        className={linkVariants({ color: "neutral", size: "md", className: "min-h-[24px] font-regular" })}
+        className={linkVariants({ color: "neutral", size: "md", className: "min-h-[24px] max-md:min-h-[var(--touch-min)] font-regular" })}
       >
         {label}
       </button>

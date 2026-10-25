@@ -69,7 +69,7 @@ export function EarnPlan({ project, view, viewer, announce }: SlotProps) {
   );
 
   return (
-    <div className={EARN_STACK}>
+    <div data-tour="earn-plan-doc" className={EARN_STACK}>
       {writes && state === "writing" && plan?.run && (
         <RunRow
           text={`Writing business plan · ${plan.run.next} of ${TOTAL}`}

@@ -2,6 +2,7 @@
 // IDEEZA PCB Software — data builders (menus, tree, context menu).
 // Ported from the prototype. `iconEl(x)` is reduced to the raw SVG string `x`,
 // which components render via <Icon html={...} />. Handlers route through the store.
+import { openTourGuide, openTutorialTab, startTourChapter } from "@/lib/tour/open";
 import { ic } from "./icons";
 import { C } from "./colors";
 import { exportKicadPcb, exportGerberViaKicad } from "./kicad-export";
@@ -446,7 +447,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       key: "H",
       items: [
         item("Community", { icon: "community" }),
-        item("Tutorials", { k: "F1", icon: "tutorial" }),
+        item("Tutorials", { k: "F1", icon: "tutorial", onClick: () => { close(); openTutorialTab("/tutorials/code-tech/pcb-editor"); } }),
+        item("Tour of this editor", { icon: "tutorial", onClick: () => { close(); startTourChapter("pcb"); } }),
+        item("Tour Guide…", { icon: "tutorial", onClick: () => { close(); openTourGuide(null); } }),
         item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
         item("Online chat", { icon: "chat" }),
         item("About", { icon: "about" }),
@@ -986,7 +989,9 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       key: "H",
       items: [
         item("Community", { icon: "community" }),
-        item("Tutorials", { k: "F1", icon: "tutorial" }),
+        item("Tutorials", { k: "F1", icon: "tutorial", onClick: () => { close(); openTutorialTab("/tutorials/code-tech/pcb-editor"); } }),
+        item("Tour of this editor", { icon: "tutorial", onClick: () => { close(); startTourChapter("pcb"); } }),
+        item("Tour Guide…", { icon: "tutorial", onClick: () => { close(); openTourGuide(null); } }),
         item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
         item("Online chat", { icon: "chat" }),
         item("About", { icon: "about" }),
@@ -1106,7 +1111,9 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       key: "H",
       items: [
         item("Community", { icon: "community" }),
-        item("Tutorials", { k: "F1", icon: "tutorial" }),
+        item("Tutorials", { k: "F1", icon: "tutorial", onClick: () => { close(); openTutorialTab("/tutorials/code-tech/pcb-editor"); } }),
+        item("Tour of this editor", { icon: "tutorial", onClick: () => { close(); startTourChapter("pcb"); } }),
+        item("Tour Guide…", { icon: "tutorial", onClick: () => { close(); openTourGuide(null); } }),
         item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
         item("Online Chat", { icon: "chat", onClick: () => actions.toggleChat() }),
         item("About", { icon: "about" }),

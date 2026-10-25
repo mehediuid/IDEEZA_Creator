@@ -949,7 +949,7 @@ export function Toolbar() {
       }}
     >
       {/* Schematic | PCB (+ 2D / 3D) mode toggle */}
-      <div style={{ display: "flex", background: "var(--color-bg-brand-subtle)", borderRadius: "var(--radius-full)", padding: 3, flex: "0 0 auto" }}>
+      <div data-tour="pcb-mode" style={{ display: "flex", background: "var(--color-bg-brand-subtle)", borderRadius: "var(--radius-full)", padding: 3, flex: "0 0 auto" }}>
         {modeTabs.map((mt) => {
           const active = mt.active;
           return (

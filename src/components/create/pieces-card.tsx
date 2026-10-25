@@ -66,7 +66,7 @@ export function PiecesBlock({ card }: { card: PiecesCard }) {
   // and takes is in the panel, where they are chosen; the card keeps the total.
   const any = PICKABLE_KINDS.some((k) => pick[k].on);
   return (
-    <section className="flex flex-col gap-[8px] border-t border-solid border-border pt-[12px]">
+    <section data-tour="chat-pick" className="flex flex-col gap-[8px] border-t border-solid border-border pt-[12px]">
       <div className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
         <h4 className="min-w-0 flex-1 text-sm font-semibold text-text-secondary">What to build</h4>
         {any && (

@@ -1,14 +1,40 @@
 // Tour Guide (spec docs/superpowers/specs/2026-10-22-tour-guide-design.md; Figma User Panel V2 ›
-// Tour Guide 16838:307342): the chapters' content, who gets the Welcome, and what the panel offers.
+// Tour Guide 16838:307342; study https://claude.ai/artifact/W6TzTM8bS39MuDB5YyPxW7): the chapters'
+// content, the path's Up next, who gets the Welcome, and what is offered when.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { TOUR_CHAPTERS, chapterById, nextChapterOf } = await import("../../.tmp-test/lib/tour/chapters.js");
-const { TOUR_KEY, emptyTour, normalizeTour, shouldWelcome, withWelcome, withChapter, withOffered, withOffers, chapterStatus } =
-  await import("../../.tmp-test/lib/tour/state.js");
-const { placeOf, placeFits, offerFor, tipsOn, tipFrom, readinessOf, pageMatches, fixedHrefOf, editorStepOf, runnableSteps } = await import(
-  "../../.tmp-test/lib/tour/places.js"
-);
+const { TOUR_CHAPTERS, chapterById } = await import("../../.tmp-test/lib/tour/chapters.js");
+const {
+  TOUR_KEY,
+  emptyTour,
+  normalizeTour,
+  shouldWelcome,
+  withWelcome,
+  withWelcomeClosed,
+  withChapter,
+  withOffered,
+  withOffers,
+  withTipSeen,
+  withPointed,
+  withArrival,
+  chapterStatus,
+} = await import("../../.tmp-test/lib/tour/state.js");
+const {
+  placeOf,
+  placeFits,
+  offerFor,
+  tipsOn,
+  tipFrom,
+  moduleTipsOn,
+  moduleTipFor,
+  nextFor,
+  readinessOf,
+  pageMatches,
+  fixedHrefOf,
+  editorStepOf,
+  runnableSteps,
+} = await import("../../.tmp-test/lib/tour/places.js");
 const { IDEEZA_FEE_BPS } = await import("../../.tmp-test/lib/market/fee.js");
 const { BUILD_COST, CONCEPT_COST } = await import("../../.tmp-test/lib/create/credits.js");
 
@@ -19,46 +45,50 @@ test("the store key", () => {
   assert.equal(TOUR_KEY, "ideeza:tour");
 });
 
-test("the chapters, in the panel's order and groups", () => {
+test("the chapters, in the order of the path, then the side tours", () => {
   assert.deepEqual(
     TOUR_CHAPTERS.map((c) => [c.group, c.id, c.name]),
     [
       ["Start", "start", "Start here"],
-      ["Start", "way", "Find your way"],
-      ["Start", "account", "Your account"],
       ["Build", "chat", "From idea to concepts"],
       ["Build", "project", "Your project"],
       ["Build", "editors", "The editors"],
+      ["Build", "modules", "Editor tips"],
       ["Build", "pcb", "Inside the PCB editor"],
       ["Earn & share", "earn", "Mint and sell"],
       ["Earn & share", "share", "Share with the community"],
+      ["Look around", "way", "Find your way"],
+      ["Look around", "account", "Your account"],
     ],
   );
 });
 
-test("Start here runs on Home in the Figma's order, then opens My projects", () => {
+test("Start here is three steps on Home: the prompt box, AI or by hand, examples", () => {
   assert.equal(chapterById("start").place, "home");
   assert.deepEqual(steps("start"), [
     ["home-composer", "home"],
     ["home-mode", "home"],
     ["home-examples", "home"],
-    ["home-get", "home"],
-    [["nav-projects", "page-head"], "projects"],
   ]);
+  assert.match(chapterById("start").steps[0].body, new RegExp(`${CONCEPT_COST} credit`), "the cost of a first idea, from the app");
 });
 
-test("Find your way opens each page it names, lighting the row and the page together", () => {
+test("Find your way is a side tour: My projects first, each page opened with its row lit", () => {
   assert.deepEqual(steps("way"), [
+    [["nav-projects", "page-head"], "projects"],
     [["nav-history", "page-head"], "history"],
     [["nav-parts", "page-head"], "parts"],
     [["nav-marketplace", "page-head"], "marketplace"],
-    [["nav-innovations", "page-head"], "innovations"],
     [["nav-messages", "page-head"], "messages"],
     [["nav-blog", "page-head"], "blog"],
   ]);
 });
 
-test("Your account opens the profile, credits, the level menu, the wallet and Tutorials", () => {
+test("the product's words: creators, not makers (Maker the level name aside)", () => {
+  for (const c of TOUR_CHAPTERS) for (const s of c.steps) assert.doesNotMatch(s.body, /\bmakers?\b/, `${c.id}: ${s.title}`);
+});
+
+test("Your account: profile, credits, level (not on a phone), wallet, Tutorials", () => {
   assert.deepEqual(steps("account"), [
     [["account", "profile-head"], "profile"],
     [["plan", "plan-credits"], "credits"],
@@ -66,32 +96,51 @@ test("Your account opens the profile, credits, the level menu, the wallet and Tu
     [["wallet", "balance-card"], "balance"],
     [["support-tutorial", "page-head"], "tutorials"],
   ]);
-  assert.equal(chapterById("account").steps[2].reveal, "account", "the level step opens the account menu");
+  const level = chapterById("account").steps[2];
+  assert.equal(level.reveal, "account");
+  assert.equal(level.desktopOnly, true);
+  assert.deepEqual(
+    runnableSteps(chapterById("account"), { hasProject: false, phone: true }).map((s) => s.title),
+    ["Your profile", "Credits pay for AI", "Your wallet", "Learn in Tutorials"],
+    "a phone skips the step its closed drawer hides, so the count never jumps",
+  );
+  assert.doesNotMatch(chapterById("account").steps[4].body, /^Tutorials explain.*watching their videos earns IDZ/i);
 });
 
-test("the chat's tips follow the chat on its own page: question, concepts, build, save", () => {
+test("the chat's tips: the choices, the concept, What to build, Build, Save — in order", () => {
   const chat = chapterById("chat");
-  assert.equal(chat.tips, true);
+  assert.equal(chat.tips, "in-order");
   assert.deepEqual(steps("chat"), [
     ["chat-question", null],
     ["chat-concept", null],
+    ["chat-pick", null],
     ["chat-build", null],
     ["chat-save", null],
   ]);
+  assert.match(chat.steps[1].body, /one product's concept/, "one concept per product, as the chat draws it");
+  assert.doesNotMatch(chat.steps[4].body, /opens with every part/, "Save opens the Saved dialog, not the page");
 });
 
-test("Your project walks the project page, then opens a product's page for its editor button", () => {
+test("Your project walks the project page, Add a product included, then a product's Open in editor", () => {
   assert.deepEqual(steps("project"), [
     ["project-tabs", "project"],
+    ["project-add", "project"],
     ["project-earn", "project"],
     ["project-actions", "project"],
     ["product-editor", "product"],
   ]);
 });
 
-test("the editors chapter opens each module in the rail's order; the PCB chapter stays in the PCB editor", () => {
+test("The editors maps the rail without hopping; each module gets its own tip the first time it opens", () => {
+  assert.deepEqual(steps("editors"), [
+    ["editor-rail", null],
+    ["editor-saved", null],
+    ["editor-finish", "editor-preview"],
+  ]);
+  const modules = chapterById("modules");
+  assert.equal(modules.tips, "any-order");
   assert.deepEqual(
-    chapterById("editors").steps.map((s) => [s.target, s.page, s.title]),
+    modules.steps.map((s) => [s.target, s.page, s.title]),
     [
       ["rail-pcb", "editor-pcb", "PCB Design"],
       ["rail-code", "editor-code", "Code"],
@@ -100,30 +149,34 @@ test("the editors chapter opens each module in the rail's order; the PCB chapter
       ["rail-preview", "editor-preview", "Product Preview"],
     ],
   );
+});
+
+test("Inside the PCB editor teaches the task in order: parts, the board, properties, help", () => {
   assert.deepEqual(steps("pcb"), [
+    [["pcb-library-tab", "pcb-place"], "editor-pcb"],
+    ["pcb-mode", "editor-pcb"],
     ["pcb-properties", "editor-pcb"],
-    ["pcb-price", "editor-pcb"],
-    ["editor-saved", "editor-pcb"],
     ["editor-help", "editor-pcb"],
   ]);
 });
 
-test("Mint and sell walks Earn page by page: Overview twice, then Sell, then Money", () => {
-  const earn = chapterById("earn");
-  assert.equal(earn.place, "earn");
+test("Mint and sell: Overview twice, Sell, Business plan, Money — with the fee a sale really takes", () => {
   assert.deepEqual(steps("earn"), [
     ["earn-path", "earn-overview"],
     ["earn-step-mint", "earn-overview"],
     [["earn-sell", "earn-sell-rules"], "earn-sell"],
+    [["earn-plan", "earn-plan-doc"], "earn-plan"],
     [["earn-money", "earn-sales"], "earn-money"],
   ]);
-  const sell = earn.steps.find((s) => s.page === "earn-sell");
-  assert.match(sell.body, new RegExp(`${IDEEZA_FEE_BPS / 100}% of each sale`));
+  const earn = chapterById("earn");
+  const pct = new RegExp(`${IDEEZA_FEE_BPS / 100}%`);
+  assert.match(earn.steps[2].body, pct);
+  assert.match(earn.steps[4].body, /Get paid/, "a sale joins the balance in Get paid");
+  assert.doesNotMatch(earn.steps[4].body, /wallet directly/);
 });
 
-test("Share with the community: the feed, an open post, then a project's ⋯ menu", () => {
-  const share = chapterById("share");
-  assert.equal(share.place, "feed");
+test("Share with the community: the feed, an open post, then your project's ⋯ menu", () => {
+  assert.equal(chapterById("share").place, "feed");
   assert.deepEqual(steps("share"), [
     [["feed-modes", "feed-categories"], "innovations"],
     [["post-media", "post-head"], "post"],
@@ -145,12 +198,12 @@ test("every chapter is short and every step says something", () => {
   }
 });
 
-test("the credits steps quote the real prices", () => {
+test("no step types a build price the screen could contradict", () => {
+  for (const c of TOUR_CHAPTERS) {
+    for (const s of c.steps) assert.doesNotMatch(s.body, new RegExp(`${BUILD_COST} (credits )?(for|per) each product`), `${c.id}: ${s.title}`);
+  }
   const credits = chapterById("account").steps.find((s) => s.page === "credits");
   assert.match(credits.body, new RegExp(`${CONCEPT_COST} credit`));
-  assert.match(credits.body, new RegExp(`${BUILD_COST} for each product`));
-  const build = chapterById("chat").steps.find((s) => s.target === "chat-build");
-  assert.match(build.body, new RegExp(`${BUILD_COST} credits for each product`));
 });
 
 test("a step's page: which addresses it is, and where a fixed one lives", () => {
@@ -171,6 +224,7 @@ test("a step's page: which addresses it is, and where a fixed one lives", () => 
   assert.ok(!pageMatches("earn-overview", "/projects/p-1/earn/sell"));
   assert.ok(pageMatches("earn-sell", "/projects/p-1/earn/sell"));
   assert.ok(!pageMatches("earn-sell", "/projects/p-1/earn/money"));
+  assert.ok(pageMatches("earn-plan", "/projects/p-1/earn/plan"));
   assert.ok(pageMatches("earn-money", "/projects/p-1/earn/money"));
   assert.ok(pageMatches("post", "/innovations/hexapod-robot"));
   assert.ok(!pageMatches("post", "/innovations"));
@@ -189,37 +243,53 @@ test("a step's page: which addresses it is, and where a fixed one lives", () => 
 
 test("without a project, a step about a project's page is left out instead of going nowhere", () => {
   const share = chapterById("share");
+  const none = { hasProject: false, phone: false };
   assert.deepEqual(
-    runnableSteps(share, false).map((s) => s.page),
+    runnableSteps(share, none).map((s) => s.page),
     ["innovations", "post"],
     "Share ends on its post: no project to open ⋯ on",
   );
-  assert.equal(runnableSteps(share, true).length, 3);
-  for (const id of ["project", "editors", "pcb", "earn"]) assert.equal(runnableSteps(chapterById(id), false).length, 0, id);
-  for (const id of ["start", "way", "account", "chat"]) assert.deepEqual(runnableSteps(chapterById(id), false), chapterById(id).steps, id);
+  assert.equal(runnableSteps(share, { hasProject: true, phone: false }).length, 3);
+  for (const id of ["project", "pcb", "earn"]) assert.equal(runnableSteps(chapterById(id), none).length, 0, id);
+  for (const id of ["start", "way", "account", "chat"]) assert.deepEqual(runnableSteps(chapterById(id), none), chapterById(id).steps, id);
 });
 
 test("every fixed page a step names has its address, and the address is that page", () => {
+  const named = ["project", "product", "earn-overview", "earn-sell", "earn-plan", "earn-money", "post"];
   for (const c of TOUR_CHAPTERS) {
     for (const s of c.steps) {
       if (!s.page) continue;
       const href = fixedHrefOf(s.page);
       if (href) assert.ok(pageMatches(s.page, href.split("?")[0]), `${c.id}: ${s.page} → ${href}`);
-      else assert.ok(["project", "product", "earn-overview", "earn-sell", "earn-money", "post"].includes(s.page) || editorStepOf(s.page), s.page);
+      else assert.ok(named.includes(s.page) || editorStepOf(s.page), s.page);
     }
   }
 });
 
-test("the next part stays in its group and passes the tips: start → way → account; project → editors → pcb", () => {
-  assert.equal(nextChapterOf("start")?.id, "way");
-  assert.equal(nextChapterOf("way")?.id, "account");
-  assert.equal(nextChapterOf("account"), null);
-  assert.equal(nextChapterOf("chat")?.id, "project");
-  assert.equal(nextChapterOf("project")?.id, "editors");
-  assert.equal(nextChapterOf("editors")?.id, "pcb");
-  assert.equal(nextChapterOf("pcb"), null);
-  assert.equal(nextChapterOf("earn")?.id, "share");
-  assert.equal(nextChapterOf("share"), null);
+test("Up next follows the user's path from what they have done, across groups", () => {
+  const f = (o = {}) => ({ hasChat: false, hasProject: false, minted: false, phone: false, ...o });
+  // Nothing made yet: every ending hands over the prompt box.
+  assert.deepEqual(nextFor(f(), null, "start"), { kind: "write", label: "Write your first idea" });
+  assert.deepEqual(nextFor(f(), null, "way"), { kind: "write", label: "Write your first idea" }, "a side tour leads back to the path");
+  // A chat but nothing saved: back to the build.
+  assert.deepEqual(nextFor(f({ hasChat: true }), null, "start"), { kind: "chat", label: "Back to your build" });
+  // A project: its page, then the editors, then Earn.
+  const p = f({ hasChat: true, hasProject: true });
+  assert.deepEqual(nextFor(p, null, "start"), { kind: "chapter", id: "project", label: "Next: Your project" });
+  assert.deepEqual(nextFor(p, null, "project"), { kind: "chapter", id: "editors", label: "Next: The editors" });
+  let rec = withChapter(null, "project", "done", 4);
+  assert.deepEqual(nextFor(p, rec, "editors"), { kind: "chapter", id: "earn", label: "Next: Mint and sell" });
+  // A phone never goes into the editors.
+  assert.deepEqual(nextFor({ ...p, phone: true }, null, "project"), { kind: "chapter", id: "earn", label: "Next: Mint and sell" });
+  // Earn seen but not minted: mint it; minted: share it; then the side tours, then nothing.
+  rec = withChapter(withChapter(rec, "editors", "done", 2), "earn", "skipped", 1);
+  assert.deepEqual(nextFor(p, rec, null), { kind: "mint", label: "Mint your project" });
+  const m = { ...p, minted: true };
+  assert.deepEqual(nextFor(m, rec, null), { kind: "chapter", id: "share", label: "Next: Share with the community" });
+  rec = withChapter(rec, "share", "done", 2);
+  assert.deepEqual(nextFor(m, rec, null), { kind: "chapter", id: "way", label: "Next: Find your way" });
+  assert.deepEqual(nextFor(m, withChapter(rec, "way", "done", 5), null), { kind: "chapter", id: "account", label: "Next: Your account" });
+  assert.equal(nextFor(m, withChapter(withChapter(rec, "way", "done", 5), "account", "done", 4), null), null, "the whole path is behind them");
 });
 
 test("an address's place", () => {
@@ -254,7 +324,7 @@ test("where a chapter can run", () => {
   assert.ok(placeFits(chapterById("start"), "home") && !placeFits(chapterById("start"), "sidebar"));
 });
 
-test("first-visit offers: once per chapter, The editors before the PCB editor, never on a phone's editor", () => {
+test("visit offers: The editors before the PCB editor, never on a phone's editor; Not now once waits, twice ends", () => {
   assert.equal(offerFor(null, "project", false), "project");
   assert.equal(offerFor(null, "editor", false), "editors");
   assert.equal(offerFor(null, "pcb", false), "editors");
@@ -262,8 +332,12 @@ test("first-visit offers: once per chapter, The editors before the PCB editor, n
   assert.equal(offerFor(null, "home", false), null);
   assert.equal(offerFor(null, "chat", false), null, "the chat has its tips, not an offer");
   let rec = withOffered(emptyTour(), "editors");
-  assert.equal(offerFor(rec, "pcb", false), "pcb", "Not now on one leaves the next");
-  assert.equal(offerFor(rec, "editor", false), null);
+  assert.equal(offerFor(rec, "pcb", false, ["editors"]), "pcb", "Not now on one leaves the next");
+  assert.equal(offerFor(rec, "editor", false, ["editors"]), null, "not again on this visit");
+  assert.equal(offerFor(rec, "editor", false, []), "editors", "Not now once: offered once more on a later visit");
+  rec = withOffered(rec, "editors");
+  assert.deepEqual([rec.snoozed, rec.offered], [[], ["editors"]]);
+  assert.equal(offerFor(rec, "editor", false, []), null, "Not now twice: never again");
   rec = withChapter(rec, "pcb", "done", 3);
   assert.equal(offerFor(rec, "pcb", false), null);
   assert.equal(offerFor(withChapter(null, "project", "paused", 1), "project", false), null, "started is never offered");
@@ -286,32 +360,57 @@ test("the chat's tips: on for a first chat, on when turned on, off once seen or 
   assert.equal(tipFrom(withChapter(null, "chat", "done", 3)), 0);
 });
 
+test("the editor modules' tips: once each, in any order, after The editors was taken or answered", () => {
+  assert.equal(moduleTipsOn(null, false), false, "nothing answered yet: the offer comes first");
+  let rec = withOffered(emptyTour(), "editors");
+  assert.equal(moduleTipsOn(rec, false), true);
+  assert.equal(moduleTipsOn(rec, true), false, "never on a phone");
+  assert.equal(moduleTipsOn(withOffers(rec, false), false), false);
+  assert.equal(moduleTipFor(rec, "/project/lamp/products/p1/code"), 1);
+  rec = withTipSeen(rec, "modules", 1, 5);
+  assert.equal(moduleTipFor(rec, "/project/lamp/products/p1/code"), null, "seen once is enough");
+  assert.equal(moduleTipFor(rec, "/project/lamp/products/p1/pcb"), 0);
+  assert.equal(moduleTipsOn(rec, false), true);
+  for (const i of [0, 2, 3, 4]) rec = withTipSeen(rec, "modules", i, 5);
+  assert.equal(rec.chapters.modules.state, "done");
+  assert.equal(moduleTipsOn(rec, false), false);
+});
+
 test("why a chapter can't start yet", () => {
   const at = { phone: false, hasProject: false, hasChat: false };
   assert.deepEqual(readinessOf("start", at), { ok: true });
-  assert.deepEqual(readinessOf("project", at), { ok: false, why: "Make your first project to open this.", home: true });
-  assert.deepEqual(readinessOf("chat", at), { ok: false, why: "Send your first idea from Home to see these.", home: true });
+  assert.deepEqual(readinessOf("project", at), { ok: false, why: "Opens once you save your first project.", home: true });
+  assert.deepEqual(readinessOf("chat", at), { ok: false, why: "These tips show in your first AI chat. Write an idea to start one.", home: true });
+  assert.deepEqual(readinessOf("modules", { ...at, hasProject: true }), { ok: true }, "the editors' tips need a project, not a chat");
   assert.deepEqual(readinessOf("editors", { ...at, phone: true, hasProject: true }), {
     ok: false,
     why: "Open IDEEZA on a computer to see the editors.",
     home: false,
   });
   assert.deepEqual(readinessOf("pcb", { ...at, hasProject: true }), { ok: true });
-  assert.deepEqual(readinessOf("earn", at), { ok: false, why: "Make your first project to open this.", home: true });
+  assert.deepEqual(readinessOf("earn", at), { ok: false, why: "Opens once you save your first project.", home: true });
   assert.deepEqual(readinessOf("share", at), { ok: true });
 });
 
-test("the Welcome: a new browser on Home, with nothing made yet", () => {
+test("the Welcome: a new browser on Home, with nothing made yet; closed once, it comes back once", () => {
   const fresh = { pathname: "/", hasActivity: false };
   assert.equal(shouldWelcome(null, fresh), true);
   assert.equal(shouldWelcome(null, { pathname: "/projects", hasActivity: false }), false);
   // Someone who has already made things isn't new.
   assert.equal(shouldWelcome(null, { pathname: "/", hasActivity: true }), false);
-  // Answered once, never again.
+  // Answered, never again.
   assert.equal(shouldWelcome(withWelcome(emptyTour(), "started"), fresh), false);
   assert.equal(shouldWelcome(withWelcome(emptyTour(), "declined"), fresh), false);
   // Reset tours writes an empty record: the Welcome comes back, projects or not.
   assert.equal(shouldWelcome(emptyTour(), { pathname: "/", hasActivity: true }), true);
+  // Closed without an answer: not again on this visit, once more on a later one, then never.
+  let rec = withWelcomeClosed(emptyTour());
+  assert.equal(rec.welcome, "later");
+  assert.equal(shouldWelcome(rec, { ...fresh, laterThisVisit: true }), false);
+  assert.equal(shouldWelcome(rec, { ...fresh, laterThisVisit: false }), true);
+  rec = withWelcomeClosed(rec);
+  assert.equal(rec.welcome, "declined");
+  assert.equal(shouldWelcome(rec, fresh), false);
 });
 
 test("a chapter's state: new, done, or resume where it stopped", () => {
@@ -323,7 +422,7 @@ test("a chapter's state: new, done, or resume where it stopped", () => {
   assert.deepEqual(chapterStatus(rec, "way"), { kind: "new", step: 0 }, "skipped on step 1 starts over");
   rec = withChapter(rec, "way", "skipped", 3);
   assert.deepEqual(chapterStatus(rec, "way"), { kind: "resume", step: 3 });
-  rec = withChapter(rec, "start", "done", 4);
+  rec = withChapter(rec, "start", "done", 2);
   assert.deepEqual(chapterStatus(rec, "start"), { kind: "done", step: 0 });
   assert.deepEqual(chapterStatus(rec, "way"), { kind: "resume", step: 3 }, "others are kept");
 });
@@ -345,10 +444,27 @@ test("a stored record is read defensively", () => {
   assert.equal(rec.welcome, "started");
   assert.deepEqual(Object.keys(rec.chapters).sort(), ["account", "start"]);
   assert.equal(rec.chapters.account.step, 4, "a step past the end is clamped to the last");
+  assert.equal(rec.chapters.start.step, 2, "Start here is three steps now");
   assert.equal(normalizeTour({ v: 1, welcome: "nope", chapters: [] }).welcome, "unseen");
   assert.equal(rec.offers, true, "offers default on");
   assert.deepEqual(rec.offered, []);
+  assert.deepEqual([rec.snoozed, rec.pointed, rec.arrival], [[], false, false], "new fields default off");
   const off = normalizeTour({ v: 1, offers: false, offered: ["pcb", "pcb", "notes", 3] });
   assert.equal(off.offers, false);
   assert.deepEqual(off.offered, ["pcb"]);
+  const more = normalizeTour({
+    v: 1,
+    welcome: "later",
+    offered: ["earn"],
+    snoozed: ["earn", "project", "junk"],
+    pointed: true,
+    arrival: true,
+    chapters: { modules: { state: "paused", step: 0, seen: [0, 0, 3, 9, "x"] } },
+  });
+  assert.equal(more.welcome, "later");
+  assert.deepEqual(more.snoozed, ["project"], "a chapter never offered again isn't also waiting");
+  assert.deepEqual([more.pointed, more.arrival], [true, true]);
+  assert.deepEqual(more.chapters.modules.seen, [0, 3]);
+  assert.equal(withPointed(null).pointed, true);
+  assert.equal(withArrival(null).arrival, true);
 });

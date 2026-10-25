@@ -16,15 +16,22 @@ A step-by-step popup tour that shows a new user the whole journey, split into sh
 
 | | Decision |
 |---|---|
-| D1 | 9 short chapters + the panel; a chapter's end offers the next one |
-| D2 | Chapters after Start here are offered on the first visit to their place (P2/P3) |
+| D1 | ~~9 short chapters + the panel; a chapter's end offers the next one~~ — changed 2026-10-25 (study W6TzTM8bS39MuDB5YyPxW7, owner "build"): a chapter's end offers **Up next**, the next real step on the user's path from what they have done, across groups (`nextFor`); Explore → "Done for now" |
+| D2 | Chapters after Start here are offered on the first visit to their place (P2/P3); since 2026-10-25 Not now once waits for a later visit, twice ends it |
 | D3 | Figma 15/19 "My Notes" is not shipped (no Notes in the app) |
 | D4 | Skip Tour Guide is the DS A03 Link (brand), not Figma's pink |
 | D5 | The panel floats beside the sidebar from Support › Tour Guide (a dialog elsewhere), no new page |
 | D6 | Chapters that need a project are locked with the reason until one exists (P2/P3) |
 | D7 | ~~The panel's journey ticks come from real actions (P3)~~ — removed at the owner's request (2026-10-22): the panel lists the chapters only |
 | D8 | Our own engine on the DS M10 Popover; `@floating-ui/dom` (already a dependency) places it; nothing new installed |
-| D9 | The editors chapter spotlights the five rail modules in one editor (P2) |
+| D10 | (2026-10-25) The Welcome is the whole-platform map: plain words, the real starting credits, "Start with my idea" / "Look around first" / "I know hardware — start by hand"; closed, it comes back once on a later visit |
+| D11 | (2026-10-25) Start here is 3 steps on Home ending with the cursor in the prompt box; Find your way (now led by My projects, Figma 11/19) and Your account are side tours outside the first run |
+| D12 | (2026-10-25) Tips never dim the page or take focus, and close once their control is pressed; chat tips cover What to build; their copy matches the app (one concept per product, no typed build price) |
+| D13 | (2026-10-25) Inside the PCB editor teaches the task (parts → board → properties → help); Pro 7/8 (premium price) is the price chip's tooltip |
+| D14 | (2026-10-25) Mint and sell adds Business plan; Money says the share joins one balance withdrawn in Get paid |
+| D15 | (2026-10-25) Every editor's Help lists Tutorials (its topic), Tour of this editor and Tour Guide |
+| D16 | (2026-10-25) A resume card (once, a later visit), an arrival card for shared links, and one pointer to where the tours live; the panel opens with Up next (one line, no stepper — D7 stays removed). Connect your wallet (3/19) stays in Your account, which no longer runs in the first chain |
+| D9 | ~~The editors chapter spotlights the five rail modules in one editor (P2)~~ — changed 2026-10-25: The editors maps the rail, the save status and Finish without hopping; each module gets its own tip the first time it opens (Editor tips) |
 
 ## Figma steps → chapters
 

@@ -8,6 +8,7 @@
 // Profile dropdown hosts the Earn IDZ + Connect Wallet actions when the
 // menu bar takes the middle slot, so the user never loses access to them.
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -28,6 +29,8 @@ import { ProfileDropdown } from "@/components/app-chrome/profile-dropdown";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useMe } from "@/lib/people/profile-store";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
+import { Tooltip } from "@/components/ideeza/tooltip";
+import { cn } from "@/lib/utils";
 import { ProductNameField } from "@/components/manual/product-name-field";
 import { ProductSwitcher } from "@/components/manual/product-switcher";
 import { EditorSaveStatus } from "@/components/manual/editor-save-status";
@@ -263,14 +266,25 @@ export function TopBar() {
 // PremiumPartsChip — running tally of premium parts in the current product.
 // Lives in the TopBar so it's the same chip on every flow route. Value is
 // hardcoded to $0.00 for now; swap to a real selector when the parts catalog
-// + cart store land. Non-interactive — labeled for screen readers and uses
-// tabular-nums so the digits don't shift the layout when the value updates.
+// + cart store land. Labeled for screen readers and uses tabular-nums so the
+// digits don't shift the layout when the value updates. What it means (the
+// Figma's Pro 7/8 tour step) is its DS A19 tooltip, on hover or focus.
+const PRICE_HINT = "The total for premium parts in this product. Every library part is free today, so it reads $0.00.";
 function PremiumPartsChip() {
+  const [hint, setHint] = React.useState(false);
+  const hintId = React.useId();
   return (
     <span
       role="status"
+      tabIndex={0}
       aria-label="Price for premium parts: $0.00"
+      aria-describedby={hintId}
       data-tour="pcb-price"
+      onMouseEnter={() => setHint(true)}
+      onMouseLeave={() => setHint(false)}
+      onFocus={() => setHint(true)}
+      onBlur={() => setHint(false)}
+      className="relative outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -304,6 +318,12 @@ function PremiumPartsChip() {
       </svg>
       Premium parts:{" "}
       <span style={{ color: VIOLET, fontWeight: 700 }}>$0.00</span>
+      <Tooltip
+        id={hintId}
+        label={PRICE_HINT}
+        wrap
+        className={cn("absolute left-1/2 top-full z-popover mt-[6px] -translate-x-1/2 flex-col-reverse [&_svg]:rotate-180", !hint && "invisible")}
+      />
     </span>
   );
 }
