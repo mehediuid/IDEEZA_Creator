@@ -1,13 +1,12 @@
 "use client";
 
-// Usability testing (lib/research/tester.ts): asks a tester once (their link is read before the
-// app hydrates, instrumentation-client.ts), and for a tester who said yes starts PostHog and
-// Clarity (trackers.ts) and reports the journey's milestones, the
-// Welcome's answer and the guide's state, Report a problem opening, and the app's calls that
-// failed or kept the tester waiting. Renders only the consent question.
+// Usability testing (lib/research/tester.ts): every browser on the deployed site is a tester from
+// its first visit (its record is settled before the app hydrates, instrumentation-client.ts).
+// While it is on, this starts PostHog and Clarity (trackers.ts) and reports the journey's
+// milestones, the Welcome's answer and the guide's state, Report a problem opening, and the app's
+// calls that failed or kept the tester waiting. Renders only the notice, until it is answered.
 //
-// Off on a developer's machine, and paused while a tour plays (owner, 2026-10-26). In the root
-// layout before the Tour Guide, which holds its Welcome until the question is answered.
+// Off on a developer's machine, and paused while a tour plays (owner, 2026-10-26).
 
 import * as React from "react";
 import { useCreateHistory } from "@/lib/create/history";
@@ -15,11 +14,21 @@ import { useManualProjects } from "@/lib/manual/projects";
 import { REPORT_EVENT } from "@/lib/support/open-report";
 import { REPORT_OPENED, apiEvent, apiRouteOf, callProblem, journeyEvent, tourEvents } from "@/lib/research/events";
 import { JOURNEY, journeyFacts, newMilestones } from "@/lib/research/journey";
-import { isAsking, isTracking, withConsent, withSent } from "@/lib/research/tester";
+import { isTracking, showsNotice, turnedOff, withBaseline, withNoticed, withPersona, withSent } from "@/lib/research/tester";
 import { useTourRecord } from "@/components/tour/use-tour";
-import { ConsentDialog } from "./consent-dialog";
-import { consentAsking, tourPlaying, useSignal } from "./signals";
-import { pauseTrackers, researchConfig, researchRunsHere, send, startTrackers, watchCalls, type ResearchConfig } from "./trackers";
+import { ResearchNotice } from "./research-notice";
+import { tourPlaying, useSignal } from "./signals";
+import {
+  pauseTrackers,
+  renameTrackers,
+  researchConfig,
+  researchRunsHere,
+  send,
+  startTrackers,
+  stopTrackers,
+  watchCalls,
+  type ResearchConfig,
+} from "./trackers";
 import { updateTester, useTesterRecord } from "./use-tester";
 
 const CONFIG = researchConfig();
@@ -40,32 +49,38 @@ function ResearchRun({ config }: { config: ResearchConfig }) {
   const playing = useSignal(tourPlaying);
   const { hydrated: projectsReady, projects } = useManualProjects();
   const { hydrated: historyReady, chats, builds } = useCreateHistory();
-  const [later, setLater] = React.useState(false);
 
   const facts = React.useMemo(
     () => (projectsReady && historyReady ? journeyFacts({ chats, builds, projects }) : null),
     [projectsReady, historyReady, chats, builds, projects],
   );
-  const asking = here && isAsking(rec) && !later && facts !== null;
   const on = here && isTracking(rec);
 
   React.useEffect(() => {
-    consentAsking.set(asking);
-  }, [asking]);
+    if (on && rec) startTrackers(config, rec);
+    else if (here && rec && !isTracking(rec)) stopTrackers();
+  }, [here, on, rec, config]);
 
   React.useEffect(() => {
-    if (on && rec) startTrackers(config, rec);
-  }, [on, rec, config]);
+    if (rec) renameTrackers(rec);
+  }, [rec]);
 
   React.useEffect(() => {
     pauseTrackers(playing);
   }, [playing]);
 
-  // The journey: each milestone the first time it is reached. `reported` keeps a second run of
-  // this effect (before the record's write comes back) from sending one twice.
+  // The journey: first, what this browser had already done counts as the starting point; then each
+  // milestone the first time it is reached. `reported` keeps a second run of this effect (before
+  // the record's write comes back) from sending one twice.
   const reported = React.useRef(new Set<string>());
   React.useEffect(() => {
     if (!on || !rec || !facts) return;
+    if (!rec.baseline) {
+      const already = JOURNEY.filter((id) => facts[id]);
+      already.forEach((id) => reported.current.add(id));
+      updateTester((prev) => (prev ? withBaseline(prev, already) : prev));
+      return;
+    }
     const fresh = newMilestones(facts, rec.sent).filter((id) => !reported.current.has(id));
     if (fresh.length === 0) return;
     fresh.forEach((id) => {
@@ -103,19 +118,12 @@ function ResearchRun({ config }: { config: ResearchConfig }) {
     };
   }, [on]);
 
-  const answer = (consent: "yes" | "no") => {
-    const already = facts ? JOURNEY.filter((id) => facts[id]) : [];
-    updateTester((prev) => (prev ? withConsent(prev, consent, Date.now(), already) : prev));
-  };
-
-  if (!rec) return null;
+  if (!here || !showsNotice(rec) || playing) return null;
   return (
-    <ConsentDialog
-      open={asking}
-      code={rec.code}
-      onAgree={() => answer("yes")}
-      onDecline={() => answer("no")}
-      onLater={() => setLater(true)}
+    <ResearchNotice
+      onPersona={(id) => updateTester((prev) => (prev ? withPersona(prev, id) : prev))}
+      onGotIt={() => updateTester((prev) => (prev ? withNoticed(prev) : prev))}
+      onTurnOff={() => updateTester((prev) => (prev ? turnedOff(prev) : prev))}
     />
   );
 }

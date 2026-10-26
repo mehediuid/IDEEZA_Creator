@@ -1,6 +1,5 @@
-// Two facts the research host and the Tour Guide share, each written by one side only: the
-// consent question is up (the Welcome waits until it is answered), and a tour is playing
-// (recording pauses until it ends).
+// A fact the Tour Guide shares with the research host: a tour is playing (recording pauses until
+// it ends, and the notice steps aside).
 
 import * as React from "react";
 
@@ -27,8 +26,6 @@ function signal(): Signal {
   };
 }
 
-/** Written by the research host. */
-export const consentAsking = signal();
 /** Written by the Tour Guide: a chapter (the overview tour or one of its parts) is playing. */
 export const tourPlaying = signal();
 

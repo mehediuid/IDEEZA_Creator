@@ -1,28 +1,69 @@
-// Usability testing (owner, 2026-10-26): a tester opens a personal link, says yes once, and only
-// then are their pages, clicks and the journey's milestones sent to PostHog and Clarity.
+// Usability testing (owner, 2026-10-26): the app's own link is shared, and every browser that
+// opens it is a tester with a code of its own. Recording is on from the first visit (owner: a small
+// notice, on by default); the notice offers Turn off and an optional "what describes you best".
+// Pages, clicks and the journey's milestones go to PostHog and Clarity.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
   readTesterLink,
   normalizeTester,
+  newCode,
   arrive,
-  withConsent,
+  withBaseline,
+  withPersona,
+  withNoticed,
+  turnedOff,
   withSent,
-  isAsking,
+  showsNotice,
   isTracking,
   isLocalHost,
+  PERSONAS,
 } = await import("../../.tmp-test/lib/research/tester.js");
 const { JOURNEY, journeyFacts, newMilestones } = await import("../../.tmp-test/lib/research/journey.js");
 const { tourEvents, journeyEvent, apiRouteOf, callProblem, apiEvent, SLOW_MS, isTourNoise } = await import(
   "../../.tmp-test/lib/research/events.js"
 );
 
-test("a tester link carries a code and, optionally, a persona", () => {
+/** A fixed sequence standing in for Math.random. */
+const rng = (...values) => {
+  let i = 0;
+  return () => values[i++ % values.length];
+};
+
+test("a browser's code: B- and five letters or digits that can't be misread", () => {
+  assert.equal(newCode(rng(0)), "B-22222");
+  assert.equal(newCode(rng(0.999)), "B-ZZZZZ");
+  const code = newCode(Math.random);
+  assert.match(code, /^B-[2-9A-HJ-NP-Z]{5}$/);
+});
+
+test("the first visit makes a record that is on, with the notice still to show", () => {
+  const rec = arrive(null, null, 10, rng(0));
+  assert.deepEqual(rec, { code: "B-22222", persona: null, consent: "yes", noticed: false, baseline: false, at: 10, sent: [] });
+  assert.equal(isTracking(rec), true);
+  assert.equal(showsNotice(rec), true);
+  assert.equal(arrive(rec, null, 20, rng(0.5)), rec, "later visits keep the same code");
+});
+
+test("a link still names a tester (a moderated session); the same code keeps its record", () => {
   assert.deepEqual(readTesterLink("?tester=T07"), { code: "T07", persona: null });
   assert.deepEqual(readTesterLink("?tester=T07&persona=Maker"), { code: "T07", persona: "maker" });
   assert.equal(readTesterLink(""), null);
   assert.equal(readTesterLink("?foo=1"), null);
+
+  const browser = arrive(null, null, 1, rng(0));
+  const named = arrive(browser, { code: "T07", persona: "maker" }, 2, rng(0));
+  assert.deepEqual(named, { code: "T07", persona: "maker", consent: "yes", noticed: false, baseline: false, at: 2, sent: [] });
+  assert.equal(arrive(named, { code: "T07", persona: null }, 3, rng(0)), named);
+  assert.equal(arrive(named, { code: "T07", persona: "designer" }, 3, rng(0)).persona, "designer");
+});
+
+test("a code that isn't a short plain word is ignored, not stored", () => {
+  assert.equal(readTesterLink("?tester="), null);
+  assert.equal(readTesterLink("?tester=<script>"), null);
+  assert.equal(readTesterLink(`?tester=${"x".repeat(33)}`), null);
+  assert.deepEqual(readTesterLink("?tester=T07&persona=a b"), { code: "T07", persona: null });
 });
 
 test("nothing is tracked on a developer's own machine (owner: no need to run it locally)", () => {
@@ -34,66 +75,55 @@ test("nothing is tracked on a developer's own machine (owner: no need to run it 
   }
 });
 
-test("a code that isn't a short plain word is ignored, not stored", () => {
-  assert.equal(readTesterLink("?tester="), null);
-  assert.equal(readTesterLink("?tester=<script>"), null);
-  assert.equal(readTesterLink(`?tester=${"x".repeat(33)}`), null);
-  assert.deepEqual(readTesterLink("?tester=T07&persona=a b"), { code: "T07", persona: null });
-});
+test("Turn off, or ?tester=off, keeps the browser off on later visits", () => {
+  const rec = arrive(null, null, 1, rng(0));
+  const off = turnedOff(rec);
+  assert.equal(isTracking(off), false);
+  assert.equal(showsNotice(off), false);
+  assert.equal(arrive(off, null, 2, rng(0)), off);
 
-test("?tester=off forgets the tester on this browser", () => {
   assert.equal(readTesterLink("?tester=off"), "off");
   assert.equal(readTesterLink("?tester=OFF"), "off");
-  const rec = arrive(null, { code: "T07", persona: null }, 1);
-  assert.equal(arrive(rec, "off", 2), null);
+  const viaLink = arrive(null, "off", 3, rng(0));
+  assert.equal(isTracking(viaLink), false);
+  assert.equal(arrive(viaLink, null, 4, rng(0)), viaLink);
+  assert.equal(isTracking(arrive(rec, "off", 5, rng(0))), false);
 });
 
-test("a new code asks for consent; the same code again keeps the answer", () => {
-  const first = arrive(null, { code: "T07", persona: "maker" }, 10);
-  assert.deepEqual(first, { code: "T07", persona: "maker", consent: "asked", at: 10, sent: [] });
-  assert.equal(isAsking(first), true);
-  assert.equal(isTracking(first), false);
-
-  const yes = withConsent(first, "yes", 20, ["idea_sent"]);
-  assert.equal(isTracking(yes), true);
-  assert.equal(isAsking(yes), false);
-  assert.deepEqual(yes.sent, ["idea_sent"]);
-
-  const again = arrive(yes, { code: "T07", persona: null }, 30);
-  assert.equal(again, yes, "same code, no persona: nothing changes");
-  const relabelled = arrive(yes, { code: "T07", persona: "designer" }, 30);
-  assert.equal(relabelled.consent, "yes");
-  assert.equal(relabelled.persona, "designer");
-
-  const other = arrive(yes, { code: "T08", persona: null }, 40);
-  assert.equal(other.consent, "asked");
-  assert.deepEqual(other.sent, []);
+test("Got it or a persona answers the notice; a persona is one of four words", () => {
+  const rec = arrive(null, null, 1, rng(0));
+  assert.equal(showsNotice(withNoticed(rec)), false);
+  const maker = withPersona(rec, "maker");
+  assert.equal(maker.persona, "maker");
+  assert.equal(showsNotice(maker), false);
+  assert.equal(isTracking(maker), true);
+  assert.deepEqual(PERSONAS.map((p) => p.id), ["maker", "designer", "engineer", "idea"]);
+  assert.equal(withPersona(rec, "pirate").persona, null);
 });
 
-test("no link leaves the record as it is", () => {
-  const rec = arrive(null, { code: "T07", persona: null }, 1);
-  assert.equal(arrive(rec, null, 2), rec);
-  assert.equal(arrive(null, null, 2), null);
-});
-
-test("a no is kept: the same link doesn't ask again", () => {
-  const no = withConsent(arrive(null, { code: "T07", persona: null }, 1), "no", 2, []);
-  assert.equal(isTracking(no), false);
-  assert.equal(isAsking(no), false);
-  assert.equal(arrive(no, { code: "T07", persona: null }, 3), no);
+test("the starting point: what this browser had already done isn't reported as new", () => {
+  const rec = arrive(null, null, 1, rng(0));
+  const based = withBaseline(rec, ["idea_sent", "project_saved"]);
+  assert.equal(based.baseline, true);
+  assert.deepEqual(based.sent, ["idea_sent", "project_saved"]);
 });
 
 test("a stored record is read back only when it is whole", () => {
-  const rec = { code: "T07", persona: null, consent: "yes", at: 5, sent: ["idea_sent", "nope"] };
+  const rec = { code: "B-7F3K2", persona: null, consent: "yes", noticed: true, baseline: true, at: 5, sent: ["idea_sent", "nope"] };
   assert.deepEqual(normalizeTester(rec), { ...rec, sent: ["idea_sent"] });
   assert.equal(normalizeTester(null), null);
   assert.equal(normalizeTester({ code: "T07" }), null);
   assert.equal(normalizeTester({ ...rec, consent: "maybe" }), null);
   assert.equal(normalizeTester({ ...rec, code: "<b>" }), null);
+  // The first build's records (consent asked / yes / no, no notice or starting point).
+  const old = normalizeTester({ code: "CHECK01", persona: "internal", consent: "asked", at: 5, sent: [] });
+  assert.equal(old.consent, "yes");
+  assert.equal(old.noticed, false);
+  assert.equal(old.baseline, false);
 });
 
 test("withSent adds milestones once", () => {
-  const rec = withConsent(arrive(null, { code: "T07", persona: null }, 1), "yes", 2, []);
+  const rec = withBaseline(arrive(null, null, 1, rng(0)), []);
   const next = withSent(rec, ["idea_sent", "concept_ready"]);
   assert.deepEqual(next.sent, ["idea_sent", "concept_ready"]);
   assert.deepEqual(withSent(next, ["idea_sent"]).sent, ["idea_sent", "concept_ready"]);
