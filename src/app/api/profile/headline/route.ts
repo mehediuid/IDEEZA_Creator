@@ -5,8 +5,8 @@
 // sends only what is already public (each shared project's title and story);
 // the dialog shows the reply as a labelled draft that is saved only when the
 // maker presses Use this, then Save profile. Same client settings as
-// /api/concept/summarize: Pollinations' keyless text model on its
-// OpenAI-shaped endpoint, low reasoning effort, Node runtime, a 45 s bound.
+// /api/concept/summarize: the app's text model (lib/server/text-model.ts),
+// low reasoning effort, Node runtime, a 45 s bound.
 //
 // Request:  { projects: { title: string; story: string }[] }
 // Response: { headline } — or 400 with nothing to write from, or 503
@@ -14,36 +14,16 @@
 //           reply isn't a headline. Never fallback text.
 
 import { NextResponse } from "next/server";
+import { askText } from "@/lib/server/text-model";
 import { HEADLINE_SYSTEM, cleanHeadline, headlinePrompt } from "@/lib/people/headline";
 
 export const runtime = "nodejs";
 
 async function draft(prompt: string): Promise<string | null> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45_000);
-  try {
-    const res = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai-fast",
-        reasoning_effort: "low",
-        messages: [
-          { role: "system", content: HEADLINE_SYSTEM },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-    if (!res.ok) return null;
-    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-    const content = envelope.choices?.[0]?.message?.content;
-    return typeof content === "string" && content.length <= 2000 ? cleanHeadline(content) : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  // The text model (lib/server/text-model.ts): Groq first when GROQ_API_KEY is set, then
+  // Pollinations, inside one 45 s budget on Node; null when neither answered.
+  const content = await askText({ system: HEADLINE_SYSTEM, user: prompt });
+  return content && content.length <= 2000 ? cleanHeadline(content) : null;
 }
 
 export async function POST(req: Request) {

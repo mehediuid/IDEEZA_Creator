@@ -159,7 +159,7 @@ ideeza-creator-panel/
    │  │                      (ideeza:account:identity: the legal name) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
-   │  ├─ server/             server-only: Vercel Blob driver, report store
+   │  ├─ server/             server-only: Vercel Blob driver, report store, the text model (Groq, then Pollinations)
    │  ├─ data/               Your data: search history, Download your information (export plan,
    │  │                      HTML pages, zip writer), the backup inside it + zip reader +
    │  │                      restore plan, last download + storage status (backup.ts), the

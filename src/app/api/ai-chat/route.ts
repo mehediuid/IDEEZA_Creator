@@ -1,7 +1,7 @@
 // POST /api/ai-chat
 //
 // Real LLM backend for the module AI assistants (PCB / Code / 3D / Preview)
-// — same FREE, keyless Pollinations text API the /api/refine route uses.
+// — the same text model /api/refine uses (lib/server/text-model.ts).
 // The model replies with a strict JSON envelope so the assistant can not
 // only answer but ACT (place parts, route tracks, add shapes/blocks/code)
 // and classify which module a request belongs to (for cross-tab handoff).
@@ -14,6 +14,7 @@
 //             actions: unknown[] }   (say === "" → client uses its fallback)
 
 import { NextResponse } from "next/server";
+import { askText } from "@/lib/server/text-model";
 
 // Which product tab each chat context lives in.
 const MODULE_OF: Record<string, "pcb" | "code" | "3d" | "preview"> = {
@@ -93,41 +94,16 @@ export async function POST(req: Request) {
   const context = body.context ?? "pcb";
   const mod = MODULE_OF[context] ?? "pcb";
   const history = (body.messages ?? []).slice(-8).map((m) => ({
-    role: m.role === "user" ? "user" : "assistant",
+    role: m.role === "user" ? ("user" as const) : ("assistant" as const),
     content: String(m.text ?? "").slice(0, 2000),
   }));
   if (!history.length || history[history.length - 1].role !== "user") {
     return NextResponse.json({ say: "", module: mod, actions: [] });
   }
 
-  // The anonymous model reasons before it answers, and under load that takes
-  // 15–40 s on either endpoint — past the old 20 s cut-off, so a third of
-  // these replies were the client's fallback. The OpenAI-shaped endpoint keeps
-  // the reasoning out of `content`. Node, not edge: Vercel ends an edge
-  // function that has not started answering in 25 s, before this 45 s bound.
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45_000);
-  try {
-    const res = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai-fast",
-        reasoning_effort: "low",
-        response_format: { type: "json_object" },
-        messages: [{ role: "system", content: systemFor(context) }, ...history],
-      }),
-    });
-    clearTimeout(timer);
-    if (!res.ok) return NextResponse.json({ say: "", module: mod, actions: [] });
-    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-    const content = envelope.choices?.[0]?.message?.content;
-    const text = typeof content === "string" ? content.trim() : "";
-    if (!text || text.length > 8000) return NextResponse.json({ say: "", module: mod, actions: [] });
-    return NextResponse.json(parseEnvelope(text, mod));
-  } catch {
-    clearTimeout(timer);
-    return NextResponse.json({ say: "", module: mod, actions: [] });
-  }
+  // The text model (lib/server/text-model.ts): Groq first when GROQ_API_KEY is set, then
+  // Pollinations, inside one 45 s budget on Node; nothing when neither answered.
+  const text = (await askText({ system: systemFor(context), user: history, json: true })) ?? "";
+  if (!text || text.length > 8000) return NextResponse.json({ say: "", module: mod, actions: [] });
+  return NextResponse.json(parseEnvelope(text, mod));
 }

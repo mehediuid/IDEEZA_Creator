@@ -1,7 +1,7 @@
 // POST /api/refine
 //
-// Rewrites the user's raw text — using a FREE LLM (Pollinations text API, no
-// API key) — into whichever thing the caller asked for: a project brief
+// Rewrites the user's raw text — using the app's text model (Groq, then
+// Pollinations: lib/server/text-model.ts) — into whichever thing the caller asked for: a project brief
 // ("brief", the default), a 10-second product-video scene ("video", the Prompt
 // Help modal), or one precise instruction for a change to a concept already
 // on screen ("change", the chat composer), or one overview of a project from
@@ -18,6 +18,7 @@
 //           sentences joined (joinDescriptions, the save step's prefill too).
 
 import { NextResponse } from "next/server";
+import { askText } from "@/lib/server/text-model";
 import { refinePromptTemplate } from "@/lib/dashboard/refine";
 import { videoScenePrompt } from "@/lib/brief/video-prompt";
 import {
@@ -82,50 +83,23 @@ function tidyChange(prompt: string): string {
 }
 
 async function refineWithAI(prompt: string, mode: RefineMode): Promise<string> {
-  // The anonymous model reasons before it answers, and under load that takes
-  // 15–40 s on either endpoint — past the old 20 s cut-off, so the template
-  // answered most of the time. The OpenAI-shaped endpoint keeps the reasoning
-  // out of `content`. Node, not edge: Vercel ends an edge function that has
-  // not started answering in 25 s, before this 45 s bound.
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45_000);
-  try {
-    const res = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai-fast",
-        reasoning_effort: "low",
-        messages: [
-          { role: "system", content: SYSTEM[mode] },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-    clearTimeout(timer);
-    if (!res.ok) return "";
-    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-    const content = envelope.choices?.[0]?.message?.content;
-    const text = typeof content === "string" ? content.trim() : "";
-    // Reject error JSON / runaway output; we want a short plain-text answer.
-    if (!text || text.startsWith("{") || text.startsWith("[") || text.length > 900) {
-      return "";
-    }
-    // The provider answers 200 with prose when the shared key is out of
-    // budget or rate-limited. That prose is not a brief — fall through to
-    // the deterministic template rather than pasting it into the user's box.
-    if (
-      /\b(api key|key budget|rate limit|quota|too many requests)\b/i.test(text) ||
-      /pollinations\.ai/i.test(text)
-    ) {
-      return "";
-    }
-    return text.replace(/^["']+|["']+$/g, "").trim();
-  } catch {
-    clearTimeout(timer);
+  // The text model (lib/server/text-model.ts): Groq first when GROQ_API_KEY is set, then
+  // Pollinations, inside one 45 s budget on Node; null when neither answered.
+  const text = (await askText({ system: SYSTEM[mode], user: prompt })) ?? "";
+  // Reject error JSON / runaway output; we want a short plain-text answer.
+  if (!text || text.startsWith("{") || text.startsWith("[") || text.length > 900) {
     return "";
   }
+  // The provider answers 200 with prose when the shared key is out of
+  // budget or rate-limited. That prose is not a brief — fall through to
+  // the deterministic template rather than pasting it into the user's box.
+  if (
+    /\b(api key|key budget|rate limit|quota|too many requests)\b/i.test(text) ||
+    /pollinations\.ai/i.test(text)
+  ) {
+    return "";
+  }
+  return text.replace(/^["']+|["']+$/g, "").trim();
 }
 
 export async function POST(req: Request) {

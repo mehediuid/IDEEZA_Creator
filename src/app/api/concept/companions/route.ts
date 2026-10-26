@@ -2,8 +2,8 @@
 //
 // Part 4 spec §4.4.3 — after a concept is accepted, decide whether it
 // describes a multi-product *system* and, if so, which other products
-// that system needs. Same shape as /api/concept/summarize: the free
-// Pollinations text model, strict JSON, and a deterministic answer when
+// that system needs. Same shape as /api/concept/summarize: the app's
+// text model (lib/server/text-model.ts), strict JSON, and a deterministic answer when
 // the model is unreachable or replies with something we cannot parse.
 //
 // The fallback here is **no companions**, not an invented list. The spec
@@ -21,6 +21,7 @@
 //             network?: { links: { from, to, carries, twoWay }[], app } }
 
 import { NextResponse } from "next/server";
+import { askText } from "@/lib/server/text-model";
 import {
   classifyByRule,
   parseCompanions,
@@ -57,49 +58,22 @@ function unfence(text: string): string {
 type Answer = CompanionPlan & { network?: NetworkReply };
 
 async function classifyWithAI(prompt: string): Promise<Answer | null> {
-  // The anonymous model reasons before it answers, and under load that takes
-  // 15–40 s on either endpoint — past the old 20 s cut-off, so the rule
-  // answered about half the time. The OpenAI-shaped endpoint keeps the
-  // reasoning out of `content`. Node, not edge: Vercel ends an edge function
-  // that has not started answering in 25 s, before this 45 s bound.
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45_000);
+  // The text model (lib/server/text-model.ts): Groq first when GROQ_API_KEY is set, then
+  // Pollinations, inside one 45 s budget on Node; null when neither answered.
+  const answer = await askText({ system: SYSTEM, user: prompt, json: true });
+  const text = unfence(answer ?? "");
+  if (!text || text.length > 4000) return null;
+  let raw: unknown;
   try {
-    const res = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai-fast",
-        reasoning_effort: "low",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-    const content = envelope.choices?.[0]?.message?.content;
-    const text = unfence(typeof content === "string" ? content : "");
-    if (!text || text.length > 4000) return null;
-    let raw: unknown;
-    try {
-      raw = JSON.parse(text);
-    } catch {
-      return null;
-    }
-    const plan = parseCompanions(raw);
-    if (!plan) return null;
-    const product = typeof (raw as { product?: unknown })?.product === "string" ? (raw as { product: string }).product : undefined;
-    const network = parseNetworkReply(raw, plan.companions, product);
-    return network ? { ...plan, network } : plan;
+    raw = JSON.parse(text);
   } catch {
-    clearTimeout(timer);
     return null;
   }
+  const plan = parseCompanions(raw);
+  if (!plan) return null;
+  const product = typeof (raw as { product?: unknown })?.product === "string" ? (raw as { product: string }).product : undefined;
+  const network = parseNetworkReply(raw, plan.companions, product);
+  return network ? { ...plan, network } : plan;
 }
 
 export async function POST(req: Request) {

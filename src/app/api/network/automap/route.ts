@@ -1,6 +1,6 @@
 // POST /api/network/automap
 //
-// Asks the app's free text model (keyless Pollinations, the provider
+// Asks the app's text model (lib/server/text-model.ts, the one
 // /api/ai-chat and /api/concept/summarize use) to propose a connection map
 // for the products a maker picked and the goal they chose. The route only
 // relays: the client validates every link against the boxes on its map
@@ -12,6 +12,7 @@
 // Response: { links: unknown[] }
 
 import { NextResponse } from "next/server";
+import { askText } from "@/lib/server/text-model";
 import { PROTOCOLS, intentInfo } from "@/lib/network/catalog";
 import type { Intent } from "@/lib/network/types";
 
@@ -67,41 +68,18 @@ export async function POST(req: Request) {
     })
     .join("\n");
 
-  // The anonymous model reasons before it answers; asked for low effort on
-  // the OpenAI-shaped endpoint it maps four products in about ten seconds
-  // and six in under thirty, where the plain endpoint took thirty for four
-  // and wrapped the answer in its reasoning.
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45_000);
+  // The text model (lib/server/text-model.ts): Groq first when GROQ_API_KEY is set, then
+  // Pollinations, inside one 45 s budget on Node; no links when neither answered.
+  const text = (await askText({ system: system(intent), user: `Nodes on the map:\n${listing}`, json: true })) ?? "";
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const inner = fenced ? fenced[1] : text;
+  const start = inner.indexOf("{");
+  const end = inner.lastIndexOf("}");
+  if (start < 0 || end <= start) return NextResponse.json({ links: [] });
   try {
-    const res = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai-fast",
-        reasoning_effort: "low",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system(intent) },
-          { role: "user", content: `Nodes on the map:\n${listing}` },
-        ],
-      }),
-    });
-    clearTimeout(timer);
-    if (!res.ok) return NextResponse.json({ links: [] });
-    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-    const content = envelope.choices?.[0]?.message?.content;
-    const text = typeof content === "string" ? content.trim() : "";
-    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    const inner = fenced ? fenced[1] : text;
-    const start = inner.indexOf("{");
-    const end = inner.lastIndexOf("}");
-    if (start < 0 || end <= start) return NextResponse.json({ links: [] });
     const parsed = JSON.parse(inner.slice(start, end + 1)) as { links?: unknown };
     return NextResponse.json({ links: Array.isArray(parsed.links) ? parsed.links : [] });
   } catch {
-    clearTimeout(timer);
     return NextResponse.json({ links: [] });
   }
 }
