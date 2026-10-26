@@ -75,7 +75,7 @@ test("nothing is tracked on a developer's own machine (owner: no need to run it 
   }
 });
 
-test("Turn off, or ?tester=off, keeps the browser off on later visits", () => {
+test("?tester=off (the team) keeps the browser off on later visits", () => {
   const rec = arrive(null, null, 1, rng(0));
   const off = turnedOff(rec);
   assert.equal(isTracking(off), false);

@@ -1,7 +1,7 @@
 // The two tools every tester's session goes to (owner, 2026-10-26, both on free plans): PostHog
 // for the replay, the journey's events and the funnel; Microsoft Clarity for heatmaps on every
-// page. Every browser on the deployed site is a tester until it is turned off; a browser that
-// turned it off, and a developer's machine, download nothing from either.
+// page. Every browser on the deployed site is a tester; a browser turned off with `?tester=off`
+// (the team's own) and a developer's machine download nothing from either.
 //
 // PostHog goes through this app's own `/ixp` (a rewrite in next.config.ts), so an ad blocker that
 // blocks PostHog's own address doesn't lose the tester's data. Clarity can't be routed that way.
@@ -128,7 +128,7 @@ export function renameTrackers(rec: TesterRecord): void {
   }
 }
 
-/** Turn off: nothing more is sent from this page on, and Clarity forgets its cookies. */
+/** Turned off (`?tester=off`): nothing more is sent from this page on, and Clarity forgets its cookies. */
 export function stopTrackers(): void {
   if (!startedFor) return;
   startedFor = null;

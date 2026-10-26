@@ -5,6 +5,7 @@
 // While it is on, this starts PostHog and Clarity (trackers.ts) and reports the journey's
 // milestones, the Welcome's answer and the guide's state, Report a problem opening, and the app's
 // calls that failed or kept the tester waiting. Renders only the notice, until it is answered.
+// A browser turned off (`?tester=off`, for the team) loads nothing.
 //
 // Off on a developer's machine, and paused while a tour plays (owner, 2026-10-26).
 
@@ -14,7 +15,7 @@ import { useManualProjects } from "@/lib/manual/projects";
 import { REPORT_EVENT } from "@/lib/support/open-report";
 import { REPORT_OPENED, apiEvent, apiRouteOf, callProblem, journeyEvent, tourEvents } from "@/lib/research/events";
 import { JOURNEY, journeyFacts, newMilestones } from "@/lib/research/journey";
-import { isTracking, showsNotice, turnedOff, withBaseline, withNoticed, withPersona, withSent } from "@/lib/research/tester";
+import { isTracking, showsNotice, withBaseline, withNoticed, withPersona, withSent } from "@/lib/research/tester";
 import { useTourRecord } from "@/components/tour/use-tour";
 import { ResearchNotice } from "./research-notice";
 import { tourCovering, tourPlaying, useSignal } from "./signals";
@@ -124,7 +125,6 @@ function ResearchRun({ config }: { config: ResearchConfig }) {
     <ResearchNotice
       onPersona={(id) => updateTester((prev) => (prev ? withPersona(prev, id) : prev))}
       onGotIt={() => updateTester((prev) => (prev ? withNoticed(prev) : prev))}
-      onTurnOff={() => updateTester((prev) => (prev ? turnedOff(prev) : prev))}
     />
   );
 }

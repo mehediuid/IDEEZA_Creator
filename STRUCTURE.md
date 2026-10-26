@@ -98,7 +98,7 @@ ideeza-creator-panel/
    │  │                      renderer, preview), send/ (Send for review, cover picker, Change cover)
    │  ├─ tutorials/          Tutorials: the categories page and card, the topic page (menu, article,
    │  │                      Page Content), the video card with its reward
-   │  ├─ research/           usability testing: the host (root layout), the notice (Turn off, persona),
+   │  ├─ research/           usability testing: the host (root layout), the notice (optional persona),
    │  │                      PostHog + Clarity, the tester record hook, the tour-playing signal
    │  ├─ tour/               Tour Guide: the host (root layout), the Welcome, a step or tip (scrim
    │  │                      cut-out + M10 Popover), the corner card (visit offer, resume, arrival),
