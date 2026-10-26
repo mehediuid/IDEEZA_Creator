@@ -19,6 +19,7 @@ import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
 import { ReportProblemHost } from "@/components/support/report-problem";
 import { TourHost } from "@/components/tour/tour-host";
+import { ResearchHost } from "@/components/research/research-host";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NoticePopups } from "@/components/notifications/notice-popups";
 import { SIDEBAR_PREPAINT } from "@/components/dashboard/sidebar-state";
@@ -155,6 +156,11 @@ export default function RootLayout({
                                   the app shell. Opened by
                                   openReportProblem() from anywhere. */}
                               <ReportProblemHost />
+                              {/* Usability testing: a tester link's consent
+                                  question, then PostHog and Clarity for that
+                                  tester only. Before the Tour Guide, whose
+                                  Welcome waits for the answer. */}
+                              <ResearchHost />
                               {/* The Tour Guide: the Welcome on Home, the
                                   chapters' steps, and the panel Support ›
                                   Tour Guide and ⌘K open (openTourGuide()). */}
