@@ -3,7 +3,7 @@
 // Turns the user's concept prompt into the three things every build
 // carries: a short title, the one-line parts summary under it, and the
 // parts themselves (which every deliverable is derived from). Uses the
-// same free Pollinations text model as /api/refine, and falls back to a
+// app's one text model (lib/server/text-model.ts), and falls back to a
 // real four-part concept when the model is unreachable or answers with
 // something we can't parse — the build must never start on an empty
 // parts list.
@@ -15,6 +15,7 @@
 //             fallback?: true — the parts are the stand-in, not a reading }
 
 import { NextResponse } from "next/server";
+import { askText } from "@/lib/server/text-model";
 import {
   CONCEPT_CATEGORIES,
   fallbackConcept,
@@ -51,45 +52,18 @@ function unfence(text: string): string {
 async function summarizeWithAI(
   prompt: string,
 ): Promise<ConceptSummary | null> {
-  // The anonymous model reasons before it answers, and under load that takes
-  // 15–40 s on either endpoint — past the old 20 s cut-off, so every build
-  // started on the fallback parts. The OpenAI-shaped endpoint keeps the
-  // reasoning out of `content`. Node, not edge: Vercel ends an edge function
-  // that has not started answering in 25 s, before this 45 s bound.
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45_000);
+  // The text model (lib/server/text-model.ts): Groq first when GROQ_API_KEY is set, then
+  // Pollinations, inside one 45 s budget on Node; null when neither answered.
+  const answer = await askText({ system: SYSTEM, user: prompt, json: true });
+  const text = unfence(answer ?? "");
+  if (!text || text.length > 4000) return null;
+  let raw: unknown;
   try {
-    const res = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai-fast",
-        reasoning_effort: "low",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-    const content = envelope.choices?.[0]?.message?.content;
-    const text = unfence(typeof content === "string" ? content : "");
-    if (!text || text.length > 4000) return null;
-    let raw: unknown;
-    try {
-      raw = JSON.parse(text);
-    } catch {
-      return null;
-    }
-    return parseConcept(raw, prompt);
+    raw = JSON.parse(text);
   } catch {
-    clearTimeout(timer);
     return null;
   }
+  return parseConcept(raw, prompt);
 }
 
 export async function POST(req: Request) {

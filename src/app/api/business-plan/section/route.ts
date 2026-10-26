@@ -4,7 +4,7 @@
 // (plan-runner.tsx) calls this once per section rather than asking for the
 // whole plan in one shot, so progress is real and a bad reply only loses one
 // section, not the run. Same client settings as /api/concept/summarize:
-// Pollinations' free text model, Node runtime, a 45 s bound, one request at a
+// the app's text model (lib/server/text-model.ts), a 45 s bound, one request at a
 // time (the runner never calls this twice in parallel for one project).
 //
 // Request:  { prompt, section: SectionKind | { title, brief }, context, instruction? }
@@ -22,6 +22,7 @@
 // `parsePlanSection` is the one source of truth for what actually validates.
 
 import { NextResponse } from "next/server";
+import { askText } from "@/lib/server/text-model";
 import { PLAN_SECTIONS, parsePlanSection, type SectionKind } from "@/lib/manual/business-plan";
 
 export const runtime = "nodejs";
@@ -114,32 +115,10 @@ function unfence(text: string): string {
 }
 
 async function writeWithAI(system: string, userText: string): Promise<string | null> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45_000);
-  try {
-    const res = await fetch("https://text.pollinations.ai/openai", {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai-fast",
-        reasoning_effort: "low",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userText },
-        ],
-      }),
-    });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
-    const content = envelope.choices?.[0]?.message?.content;
-    const text = unfence(typeof content === "string" ? content : "");
-    return text || null;
-  } catch {
-    clearTimeout(timer);
-    return null;
-  }
+  // The text model (lib/server/text-model.ts): Groq first when GROQ_API_KEY is set, then
+  // Pollinations, inside one 45 s budget on Node; null when neither answered.
+  const text = unfence((await askText({ system, user: userText })) ?? "");
+  return text || null;
 }
 
 type SectionArg = SectionKind | { title: string; brief: string };

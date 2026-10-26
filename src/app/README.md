@@ -9,7 +9,7 @@ Next App Router (modified Next 16: read `node_modules/next/dist/docs/` before to
 | `(dashboard)/page.tsx` | `/` — home prompt (`components/dashboard/workspace-prompt.tsx`) | features/ai-create-flow.md |
 | `(dashboard)/parts/`, `parts/new/`, `parts/[id]/` | `/parts` library, New Package flow, one part | [features/parts-package.md](../../docs/guides/features/parts-package.md) |
 | `(dashboard)/creators/[handle]/` | A creator's profile; `me` is yours | features/platform-and-projects.md › Creator profile; spec `2026-10-14-creator-profile-design.md` |
-| `api/profile/headline/` | Suggest from my work: a headline from your shared projects (Pollinations, 503 on failure) | same |
+| `api/profile/headline/` | Suggest from my work: a headline from your shared projects (the app's text model, 503 on failure) | same |
 | `(dashboard)/innovations/`, `innovations/[slug]/`, `innovations/[slug]/products/[productId]/` | Community feed, one post, and one product of a post | features/platform-and-projects.md |
 | `(create)/chat/[chatId]/` | Concept chat — the build also runs here | features/ai-create-flow.md |
 | `(create)/build/[jobId]/`, `build/[jobId]/brief/` | Standalone build surface (only for a job whose chat is gone); `brief/` redirects to the project's mint flow | features/ai-create-flow.md; [features/editor-modules.md](../../docs/guides/features/editor-modules.md) › The mint flow |
