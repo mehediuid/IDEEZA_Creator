@@ -2,10 +2,11 @@
 
 // The Tour Guide's Welcome (plan Rm6aBk8ieNSUpHgtS9JMu5; study W6TzTM8bS39MuDB5YyPxW7; DS M07 Modal,
 // 512): the whole platform on one screen — the path from idea to product as five stages, each with
-// its icon and one line — then straight into doing. Start with my idea opens the first-product guide
-// (the cursor in the prompt box, and a card that stays until the first product is made); Look
-// around first runs the full tour (every page, one by one); "start by hand" opens Build manually
-// for someone who knows electronics. The starting credits are the app's own number.
+// its icon and one line. The platform comes first (owner, 2026-10-26): Look around first (primary)
+// runs the full tour, every page one by one, which ends by handing over to the guide; Start with my
+// idea opens the first-product guide straight away (the cursor in the prompt box, and a card that
+// stays until the first product is made); "start by hand" opens Build manually for someone who
+// knows electronics. The starting credits are the app's own number.
 // Closed without an answer it comes back once, on a later visit, and points at where tours live.
 
 import * as React from "react";
@@ -41,7 +42,7 @@ export function WelcomeDialog({
   /** ✕, Escape or the scrim: not now. */
   onClose: () => void;
 }) {
-  const startRef = React.useRef<HTMLButtonElement>(null);
+  const lookRef = React.useRef<HTMLButtonElement>(null);
   const introId = React.useId();
   const tap = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
   return (
@@ -52,22 +53,22 @@ export function WelcomeDialog({
       sheet
       title="Welcome to IDEEZA"
       describedBy={introId}
-      initialFocus={startRef}
+      initialFocus={lookRef}
       footer={
         <div className="ml-auto flex flex-wrap items-center justify-end gap-4">
-          <Button type="button" hierarchy="ghost" size="lg" className={tap} onClick={onLookAround}>
-            Look around first
+          <Button type="button" hierarchy="ghost" size="lg" className={tap} onClick={onStart}>
+            Start with my idea
           </Button>
           <Button
-            ref={startRef}
+            ref={lookRef}
             type="button"
             hierarchy="primary"
             size="lg"
             className={tap}
-            onClick={onStart}
+            onClick={onLookAround}
             iconTrailing={<Icon icon={ArrowRight01Icon} size={16} />}
           >
-            Start with my idea
+            Look around first
           </Button>
         </div>
       }
