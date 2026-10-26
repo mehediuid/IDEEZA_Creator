@@ -43,7 +43,8 @@ export function researchRunsHere(): boolean {
 }
 
 let posthog: PostHog | null = null;
-let startedFor: string | null = null;
+let startedFor: TesterRecord | null = null;
+let clarityOn = false;
 let paused = false;
 const waiting: ResearchEvent[] = [];
 
@@ -65,17 +66,23 @@ function loadClarity(id: string) {
   document.head.appendChild(script);
 }
 
+/** Who this is, told to Clarity again after each start: a stop forgets it. */
+function nameForClarity(rec: TesterRecord) {
+  clarity("consent");
+  clarity("identify", rec.code, undefined, undefined, rec.code);
+  clarity("set", "tester", rec.code);
+  if (rec.persona) clarity("set", "persona", rec.persona);
+}
+
 /** Starts both tools for a tester who said yes. Once per tester per page load. */
 export function startTrackers(config: ResearchConfig, rec: TesterRecord): void {
-  if (startedFor === rec.code) return;
-  startedFor = rec.code;
+  if (startedFor?.code === rec.code) return;
+  startedFor = rec;
   if (config.clarityId) {
+    clarityOn = true;
     loadClarity(config.clarityId);
-    clarity("consent");
-    clarity("identify", rec.code, undefined, undefined, rec.code);
-    clarity("set", "tester", rec.code);
-    if (rec.persona) clarity("set", "persona", rec.persona);
-    if (paused) clarity("pause");
+    nameForClarity(rec);
+    if (paused) clarity("stop");
   }
   if (config.posthogKey) {
     const key = config.posthogKey;
@@ -113,12 +120,17 @@ export function send(event: ResearchEvent): void {
   else waiting.push(event);
 }
 
-/** While a tour plays: no replay, no pages or clicks; on again when it ends. */
+/** While a tour plays: no replay, no pages or clicks; on again when it ends. Clarity's own pause
+ *  only holds its work back and sends the tour's clicks on resume, so it is stopped and started
+ *  again, as Clarity itself does on every page change: the session carries on with a new page. */
 export function pauseTrackers(on: boolean): void {
   if (on === paused) return;
   paused = on;
   if (!startedFor) return;
-  clarity(on ? "pause" : "resume");
+  if (clarityOn) {
+    clarity(on ? "stop" : "start");
+    if (!on) nameForClarity(startedFor);
+  }
   if (on) posthog?.stopSessionRecording();
   else posthog?.startSessionRecording();
 }
