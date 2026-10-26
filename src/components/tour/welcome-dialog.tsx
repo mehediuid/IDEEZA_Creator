@@ -115,7 +115,7 @@ export function WelcomeDialog({
           </button>
         )}
         <p className="text-sm leading-sm text-text-tertiary">
-          A guide stays with you until your first product is made. Find every tour in Support › Tour Guide.
+          The tour shows every page, one by one; then a guide helps you make your first product. Find every tour in Support › Tour Guide.
         </p>
       </div>
     </ModalFrame>
