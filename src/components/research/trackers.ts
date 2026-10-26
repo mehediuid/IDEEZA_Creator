@@ -1,7 +1,7 @@
-// The two tools a consenting tester's session goes to (owner, 2026-10-26, both on free plans):
-// PostHog for the replay, the journey's events and the funnel; Microsoft Clarity for heatmaps on
-// every page. Neither is loaded for anyone else, so a visitor, the team and anyone who said no
-// download nothing from either.
+// The two tools every tester's session goes to (owner, 2026-10-26, both on free plans): PostHog
+// for the replay, the journey's events and the funnel; Microsoft Clarity for heatmaps on every
+// page. Every browser on the deployed site is a tester until it is turned off; a browser that
+// turned it off, and a developer's machine, download nothing from either.
 //
 // PostHog goes through this app's own `/ixp` (a rewrite in next.config.ts), so an ad blocker that
 // blocks PostHog's own address doesn't lose the tester's data. Clarity can't be routed that way.
@@ -87,6 +87,8 @@ export function startTrackers(config: ResearchConfig, rec: TesterRecord): void {
   if (config.posthogKey) {
     const key = config.posthogKey;
     void import("posthog-js").then(({ default: ph }) => {
+      // Turned off while the library was still on its way.
+      if (startedFor?.code !== rec.code) return;
       ph.init(key, {
         api_host: POSTHOG_PROXY,
         ui_host: config.posthogUi,
@@ -104,6 +106,8 @@ export function startTrackers(config: ResearchConfig, rec: TesterRecord): void {
         },
         before_send: (event) => (paused && event && isTourNoise(event.event) ? null : event),
       });
+      // A browser turned off once and named again by a tester link: PostHog kept the opt-out.
+      if (ph.has_opted_out_capturing()) ph.opt_in_capturing();
       ph.identify(rec.code, rec.persona ? { persona: rec.persona } : undefined);
       ph.register({ tester: rec.code, persona: rec.persona ?? "none" });
       if (paused) ph.stopSessionRecording();
@@ -111,6 +115,31 @@ export function startTrackers(config: ResearchConfig, rec: TesterRecord): void {
       waiting.splice(0).forEach(send);
     });
   }
+}
+
+/** The persona the tester picked on the notice, told to both tools. */
+export function renameTrackers(rec: TesterRecord): void {
+  if (!startedFor || startedFor.code !== rec.code || startedFor.persona === rec.persona) return;
+  startedFor = rec;
+  if (clarityOn && !paused && rec.persona) clarity("set", "persona", rec.persona);
+  if (rec.persona) {
+    posthog?.setPersonProperties({ persona: rec.persona });
+    posthog?.register({ persona: rec.persona });
+  }
+}
+
+/** Turn off: nothing more is sent from this page on, and Clarity forgets its cookies. */
+export function stopTrackers(): void {
+  if (!startedFor) return;
+  startedFor = null;
+  waiting.length = 0;
+  if (clarityOn) {
+    clarity("consent", false);
+    clarity("stop");
+    clarityOn = false;
+  }
+  posthog?.stopSessionRecording();
+  posthog?.opt_out_capturing();
 }
 
 export function send(event: ResearchEvent): void {

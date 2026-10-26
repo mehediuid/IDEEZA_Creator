@@ -56,9 +56,9 @@ export function updateTester(change: (rec: TesterRecord | null) => TesterRecord 
   window.dispatchEvent(new Event(EVENT));
 }
 
-/** This page load's tester link, applied before the app hydrates (instrumentation-client.ts), so
- *  the first render already knows who is testing: read any later, the previous tester's yes would
- *  start their tracking for one render. A new code asks; `?tester=off` forgets. */
+/** This page load's tester, settled before the app hydrates (instrumentation-client.ts), so the
+ *  first render already knows who is testing: read any later, a browser turned off by
+ *  `?tester=off` would still be recorded for one render. A first visit gets its code here. */
 export function applyTesterLink(): void {
-  updateTester((prev) => arrive(prev, readTesterLink(window.location.search), Date.now()));
+  updateTester((prev) => arrive(prev, readTesterLink(window.location.search), Date.now(), Math.random));
 }
