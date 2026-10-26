@@ -1,12 +1,17 @@
-// Runs before the app hydrates (Next instrumentation-client). It only keeps
-// the last few uncaught errors of this tab, so a problem report can say what
+// Runs before the app hydrates (Next instrumentation-client). It keeps the
+// last few uncaught errors of this tab, so a problem report can say what
 // broke: nothing is sent anywhere until the maker sends a report with
-// "Send page and device details" ticked.
+// "Send page and device details" ticked. It also reads a tester link, so the
+// first render already knows who is testing (components/research).
 
+import { researchConfig, researchRunsHere } from "@/components/research/trackers";
+import { applyTesterLink } from "@/components/research/use-tester";
 import { cleanMessage, isNoise, recordError, whereOf } from "@/lib/support/recent-errors";
 import { pageRefFor } from "@/lib/support/page-context";
 
 const pageNow = () => pageRefFor(location.pathname, location.search).page;
+
+if (researchConfig() && researchRunsHere()) applyTesterLink();
 
 window.addEventListener("error", (e) => {
   const message = String(e.message ?? "");

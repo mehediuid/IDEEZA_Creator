@@ -61,6 +61,7 @@ import {
 } from "@/lib/tour/state";
 import type { ChapterId, ChapterState, JourneyFacts, PageRef, TourChapter, TourStep as Step, UpNext } from "@/lib/tour/types";
 import { scrollWithin } from "@/components/create/anchors";
+import { consentAsking, tourPlaying, useSignal } from "@/components/research/signals";
 import { ChapterOffer, CornerCard } from "./chapter-offer";
 import { GuideCard, GuideDone, GuidePill, GuideRing } from "./guide-card";
 import { findTargets, isPhone, isShown } from "./targets";
@@ -186,6 +187,14 @@ export function TourHost() {
   // The visit memory is read on each render; this bumps a render after it changes.
   const [, setVisitTick] = React.useState(0);
   const here = placeOf(pathname);
+  // A tester's consent question (components/research) comes before the Welcome.
+  const consentUp = useSignal(consentAsking);
+
+  // A playing chapter moves through the pages by itself: a tester's recording pauses meanwhile.
+  const playing = run !== null;
+  React.useEffect(() => {
+    tourPlaying.set(playing);
+  }, [playing]);
 
   // What is on screen fades out before it goes; anything started meanwhile cancels the going.
   const leaveToken = React.useRef(0);
@@ -481,6 +490,7 @@ export function TourHost() {
     historyReady &&
     !run &&
     !panel &&
+    !consentUp &&
     shouldWelcome(rec, { pathname, hasActivity, laterThisVisit: visit.welcomeLater });
   React.useEffect(() => {
     if (!due) return;
