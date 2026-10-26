@@ -1,9 +1,9 @@
 // Usability testing (owner, 2026-10-26): the app's own link is shared, and every browser that
 // opens it is one tester, known by a short code it is given on its first visit (`B-7F3K2`).
-// Recording is on from that first visit (owner: a small notice, on by default): the notice says
-// what is seen, offers Turn off, and asks, optionally, what describes the tester. Turned off, the
-// browser stays off. A personal link still names a tester — `?tester=T07&persona=maker`, for a
-// moderated session — and `?tester=off` turns recording off on that browser.
+// Recording is on from that first visit (owner: a small notice, on by default, no Turn off on it):
+// the notice says what is seen and asks, optionally, what describes the tester. A personal link
+// still names a tester — `?tester=T07&persona=maker`, for a moderated session — and `?tester=off`
+// turns recording off on that browser for good (the team's own browsers).
 //
 // The record lives in this browser only, like the rest of the app's data. `sent` holds the journey
 // milestones already reported, so a reload never reports one twice; `baseline` marks that what the
@@ -20,7 +20,7 @@ export type TesterRecord = {
   persona: string | null;
   /** On unless the tester turned it off. */
   consent: "yes" | "no";
-  /** The notice has been answered: Got it, a persona, or Turn off. */
+  /** The notice has been answered: Got it or a persona (`?tester=off` too). */
   noticed: boolean;
   baseline: boolean;
   /** When this code arrived on this browser. */

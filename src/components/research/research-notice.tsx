@@ -1,8 +1,8 @@
 "use client";
 
-// The notice every new browser gets (owner, 2026-10-26: a small notice, recording on by default):
-// what is recorded and what stays hidden, Turn off, and one optional question — what describes
-// the tester best — that answers the notice in one tap. One card, not another dialog: it never
+// The notice every new browser gets (owner, 2026-10-26: a small notice, recording on by default,
+// and no Turn off on it): what is recorded and what stays hidden, and one optional question — what
+// describes the tester best — that answers the notice in one tap. One card, not another dialog: it never
 // takes the focus or dims the page. Drawn like the first-product guide's card (DS surface, 16 px
 // inside), in the opposite corner: the foot of the page on the left, clear of the sidebar, since
 // the guide card and the render toasts hold the right; at the top on a phone, where the guide
@@ -39,15 +39,7 @@ function useMainLeft(): number | null {
   return left;
 }
 
-export function ResearchNotice({
-  onPersona,
-  onGotIt,
-  onTurnOff,
-}: {
-  onPersona: (id: string) => void;
-  onGotIt: () => void;
-  onTurnOff: () => void;
-}) {
+export function ResearchNotice({ onPersona, onGotIt }: { onPersona: (id: string) => void; onGotIt: () => void }) {
   const left = useMainLeft();
   const titleId = React.useId();
   if (left === null) return null;
@@ -84,10 +76,7 @@ export function ResearchNotice({
           </Tag>
         ))}
       </div>
-      <div className="mt-6 flex items-center justify-end gap-3">
-        <Button type="button" hierarchy="ghost" size="sm" className={TAP} onClick={onTurnOff}>
-          Turn off
-        </Button>
+      <div className="mt-6 flex items-center justify-end">
         <Button type="button" hierarchy="secondary" size="sm" className={TAP} onClick={onGotIt}>
           Got it
         </Button>
