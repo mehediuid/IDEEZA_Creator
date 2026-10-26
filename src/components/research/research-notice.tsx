@@ -6,7 +6,8 @@
 // takes the focus or dims the page. Drawn like the first-product guide's card (DS surface, 16 px
 // inside), in the opposite corner: the foot of the page on the left, clear of the sidebar, since
 // the guide card and the render toasts hold the right; at the top on a phone, where the guide
-// card and the attention toast hold the foot. Hidden while a tour plays.
+// card and the attention toast hold the foot. Hidden while a tour plays or "Tours live here" points
+// at the sidebar (its card sits in the same corner).
 
 import * as React from "react";
 import { ViewIcon } from "@hugeicons/core-free-icons";

@@ -1,5 +1,5 @@
-// A fact the Tour Guide shares with the research host: a tour is playing (recording pauses until
-// it ends, and the notice steps aside).
+// Two facts the Tour Guide shares with the research host: a tour is playing (recording pauses
+// until it ends), and a tour card is on screen (the notice steps aside meanwhile).
 
 import * as React from "react";
 
@@ -28,6 +28,9 @@ function signal(): Signal {
 
 /** Written by the Tour Guide: a chapter (the overview tour or one of its parts) is playing. */
 export const tourPlaying = signal();
+/** Written by the Tour Guide: a chapter is playing, or "Tours live here" points at the sidebar,
+ *  whose card sits where the notice does. */
+export const tourCovering = signal();
 
 const never = () => false;
 
