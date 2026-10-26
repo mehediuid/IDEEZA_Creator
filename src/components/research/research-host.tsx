@@ -17,7 +17,7 @@ import { JOURNEY, journeyFacts, newMilestones } from "@/lib/research/journey";
 import { isTracking, showsNotice, turnedOff, withBaseline, withNoticed, withPersona, withSent } from "@/lib/research/tester";
 import { useTourRecord } from "@/components/tour/use-tour";
 import { ResearchNotice } from "./research-notice";
-import { tourPlaying, useSignal } from "./signals";
+import { tourCovering, tourPlaying, useSignal } from "./signals";
 import {
   pauseTrackers,
   renameTrackers,
@@ -47,6 +47,7 @@ function ResearchRun({ config }: { config: ResearchConfig }) {
   const rec = useTesterRecord() ?? null;
   const tour = useTourRecord();
   const playing = useSignal(tourPlaying);
+  const covered = useSignal(tourCovering);
   const { hydrated: projectsReady, projects } = useManualProjects();
   const { hydrated: historyReady, chats, builds } = useCreateHistory();
 
@@ -118,7 +119,7 @@ function ResearchRun({ config }: { config: ResearchConfig }) {
     };
   }, [on]);
 
-  if (!here || !showsNotice(rec) || playing) return null;
+  if (!here || !showsNotice(rec) || covered) return null;
   return (
     <ResearchNotice
       onPersona={(id) => updateTester((prev) => (prev ? withPersona(prev, id) : prev))}

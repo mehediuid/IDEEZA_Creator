@@ -61,7 +61,7 @@ import {
 } from "@/lib/tour/state";
 import type { ChapterId, ChapterState, JourneyFacts, PageRef, TourChapter, TourStep as Step, UpNext } from "@/lib/tour/types";
 import { scrollWithin } from "@/components/create/anchors";
-import { tourPlaying } from "@/components/research/signals";
+import { tourCovering, tourPlaying } from "@/components/research/signals";
 import { ChapterOffer, CornerCard } from "./chapter-offer";
 import { GuideCard, GuideDone, GuidePill, GuideRing } from "./guide-card";
 import { findTargets, isPhone, isShown } from "./targets";
@@ -189,10 +189,12 @@ export function TourHost() {
   const here = placeOf(pathname);
 
   // A playing chapter moves through the pages by itself: a tester's recording pauses meanwhile.
+  // The recording notice steps aside while a chapter or "Tours live here" is on screen.
   const playing = run !== null;
   React.useEffect(() => {
     tourPlaying.set(playing);
-  }, [playing]);
+    tourCovering.set(playing || pointer);
+  }, [playing, pointer]);
 
   // What is on screen fades out before it goes; anything started meanwhile cancels the going.
   const leaveToken = React.useRef(0);
