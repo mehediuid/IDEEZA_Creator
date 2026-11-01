@@ -908,6 +908,21 @@ function BuildLogList({
               <p className="whitespace-pre-wrap text-md text-text-primary">
                 {e.detail}
               </p>
+              {/* The picture sent with the idea, so the chat shows what its
+                  concepts were drawn from. */}
+              {e.image && (
+                <figure className="mt-[6px] flex items-center gap-[8px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- our own image route, already 512 × 384 */}
+                  <img
+                    src={e.image}
+                    alt="Your inspiration image"
+                    width={96}
+                    height={72}
+                    className="h-[72px] w-[96px] rounded-lg border border-solid border-border object-cover"
+                  />
+                  <figcaption className="text-sm text-text-tertiary">Inspiration</figcaption>
+                </figure>
+              )}
             </div>
           ) : (
             <>

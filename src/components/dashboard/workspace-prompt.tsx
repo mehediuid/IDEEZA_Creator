@@ -20,6 +20,7 @@ import {
   ElectricWireIcon,
   Layers01Icon,
   FavouriteIcon,
+  ImageAdd01Icon,
   PackageIcon,
   MagicWand01Icon,
   Mic01Icon,
@@ -44,6 +45,8 @@ import {
 } from "@/lib/create/quality";
 import { creditsLabel, defaultPick, pickCost } from "@/lib/create/pieces";
 import { QualityMenu } from "@/components/create/quality-menu";
+import { INSPIRATION_TYPES, pickProblem } from "@/lib/create/inspiration";
+import { shrinkInspiration, uploadInspiration } from "@/lib/create/inspiration-client";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
@@ -152,6 +155,29 @@ export function WorkspacePrompt() {
   // uses it, and each product is built at it unless its card changes it
   // (lib/create/quality.ts). The next idea starts at the one picked last.
   const [quality, setQuality] = useLastQuality();
+  // The inspiration image (lib/create/inspiration.ts), shrunk in the page and
+  // kept here until Generate stores it with the idea.
+  const [inspiration, setInspiration] = React.useState<{ dataUrl: string; name: string } | null>(null);
+  const [imageError, setImageError] = React.useState<string | null>(null);
+  const takeImage = React.useCallback(async (file: File) => {
+    const problem = pickProblem(file);
+    if (problem) {
+      setImageError(problem);
+      return;
+    }
+    try {
+      const dataUrl = await shrinkInspiration(file);
+      setInspiration({ dataUrl, name: file.name || "Pasted picture" });
+      setImageError(null);
+    } catch {
+      setImageError("We couldn't open that picture — try a JPG or PNG.");
+    }
+  }, []);
+  const dropImage = React.useCallback(() => {
+    setInspiration(null);
+    setImageError(null);
+    requestAnimationFrame(() => taRef.current?.focus());
+  }, []);
   const [refining, setRefining] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   // Manual-mode modal lives at this level so a click on "Create
@@ -181,8 +207,25 @@ export function WorkspacePrompt() {
     // component unmounts on the navigation, so there is nothing to clear;
     // if the push throws, the catch hands the control back.
     setSubmitting(true);
+    // The picture goes up first, so the chat opens already holding it; if it
+    // can't be kept, the idea waits here with the reason rather than
+    // opening without what the maker asked for.
+    let inspirationUrl: string | undefined;
+    if (inspiration) {
+      const up = await uploadInspiration(inspiration.dataUrl);
+      if ("error" in up) {
+        setImageError(up.error);
+        setSubmitting(false);
+        return;
+      }
+      inspirationUrl = up.url;
+    }
     try {
-      const session = createChat(trimmed, { quality, ...(addTo ? { addTo: addTo.id } : null) });
+      const session = createChat(trimmed, {
+        quality,
+        ...(inspirationUrl ? { inspiration: inspirationUrl } : null),
+        ...(addTo ? { addTo: addTo.id } : null),
+      });
       router.push(`/chat/${session.id}`);
     } catch {
       setSubmitting(false);
@@ -281,6 +324,10 @@ export function WorkspacePrompt() {
               canRender={canRender}
               quality={quality}
               onQuality={setQuality}
+              inspiration={inspiration}
+              onImage={takeImage}
+              onDropImage={dropImage}
+              imageError={imageError}
             />
           ) : (
             <BuildManuallyInfo onCreate={() => setProjectModalOpen(true)} />
@@ -437,12 +484,35 @@ const PromptCard = React.forwardRef<
     canRender: boolean;
     quality: RenderQuality;
     onQuality: (q: RenderQuality) => void;
+    /** The inspiration image, as it will go with the idea. */
+    inspiration: { dataUrl: string; name: string } | null;
+    onImage: (file: File) => void;
+    onDropImage: () => void;
+    imageError: string | null;
   }
 >(function PromptCard(
-  { value, onChange, onSubmit, submitting, placeholder, mode, onRefine, refining, canRender, quality, onQuality },
+  {
+    value,
+    onChange,
+    onSubmit,
+    submitting,
+    placeholder,
+    mode,
+    onRefine,
+    refining,
+    canRender,
+    quality,
+    onQuality,
+    inspiration,
+    onImage,
+    onDropImage,
+    imageError,
+  },
   ref,
 ) {
   const localRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const fileRef = React.useRef<HTMLInputElement | null>(null);
+  const [dragging, setDragging] = React.useState(false);
   // No dep array on purpose. The listening view below replaces this
   // whole card, so the textarea is unmounted and remounted once per
   // dictation; a handle computed only at mount would hand the parent a
@@ -537,7 +607,56 @@ const PromptCard = React.forwardRef<
     <div>
       {/* Focus shows: the brand border the chat composer already wears. It
           was border → border, which changed nothing. */}
-      <div className="rounded-2xl border border-border bg-bg-surface focus-within:border-border-brand">
+      {/* A picture can also be dropped on the card or pasted into the box —
+          the brand border says a drop will land. */}
+      <div
+        className={cn(
+          "rounded-2xl border bg-bg-surface focus-within:border-border-brand",
+          dragging ? "border-dashed border-border-brand" : "border-border",
+        )}
+        onDragOver={(e) => {
+          if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDrop={(e) => {
+          const file = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/")) ?? e.dataTransfer.files[0];
+          setDragging(false);
+          if (!file) return;
+          e.preventDefault();
+          onImage(file);
+        }}
+      >
+        {/* The picture going with the idea: what the concepts are drawn
+            from, with the way to take it off again. */}
+        {inspiration && (
+          <div className="flex items-center gap-[12px] px-[20px] pt-[16px]">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a data URL made in this page */}
+            <img
+              src={inspiration.dataUrl}
+              alt="Your inspiration image"
+              width={64}
+              height={48}
+              className="h-[48px] w-[64px] shrink-0 rounded-lg border border-solid border-border object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-text-primary">Inspiration image</p>
+              <p className="truncate text-xs text-text-tertiary">The concept takes its shape and feel · {inspiration.name}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onDropImage}
+              aria-label="Remove the inspiration image"
+              title="Remove"
+              className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[44px]"
+            >
+              <Icon icon={Cancel01Icon} size={16} />
+            </button>
+          </div>
+        )}
         <label htmlFor="ws-prompt" className="sr-only">
           Describe your electronics project
         </label>
@@ -547,6 +666,13 @@ const PromptCard = React.forwardRef<
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKey}
+          onPaste={(e) => {
+            // A pasted picture is an inspiration image; pasted text stays text.
+            const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+            if (!file) return;
+            e.preventDefault();
+            onImage(file);
+          }}
           placeholder={placeholder}
           rows={3}
           className="block w-full resize-none bg-transparent px-[20px] pt-[20px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
@@ -556,9 +682,9 @@ const PromptCard = React.forwardRef<
             than the card, so Enhance and Generate take a second line, still
             at the right. On anything wider it is the one row it always was. */}
         <div className="flex flex-wrap items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
-          {/* No attach button: it was permanently disabled — the picked file
-              was never sent to the generator — so it offered nothing but a
-              reason. It comes back when an image can go with the prompt. */}
+          {/* The attach button is back now that the picture goes with the
+              prompt: the main product's concept is drawn from it (owner,
+              2026-11-01). It was taken out while the file went nowhere. */}
           <div className="flex shrink-0 items-center gap-[4px]">
             <ToolbarIconButton
               ariaLabel={
@@ -570,6 +696,28 @@ const PromptCard = React.forwardRef<
               icon={Mic01Icon}
               disabled={!voice.supported}
             />
+            {mode === "ai" && (
+              <>
+                <ToolbarIconButton
+                  ariaLabel={inspiration ? "Change the inspiration image" : "Add an inspiration image"}
+                  onClick={() => fileRef.current?.click()}
+                  icon={ImageAdd01Icon}
+                />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept={INSPIRATION_TYPES.join(",")}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) onImage(file);
+                  }}
+                />
+              </>
+            )}
             {mode === "ai" && (
               <QualityMenu value={quality} onChange={onQuality} variant="toolbar" price={buildPrice} />
             )}
@@ -603,10 +751,10 @@ const PromptCard = React.forwardRef<
         role="status"
         className={cn(
           "px-[4px] text-sm text-text-error",
-          voiceError && "mt-[10px]",
+          (voiceError || imageError) && "mt-[10px]",
         )}
       >
-        {voiceError}
+        {voiceError ?? imageError}
       </p>
     </div>
   );
