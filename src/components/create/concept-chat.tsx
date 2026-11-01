@@ -722,6 +722,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         parentImageUrl?: string;
         /** The chat's Quality, from Home. */
         quality?: RenderQuality;
+        /** The inspiration image from Home — the main product's fresh
+         *  concepts only: a companion is another product, and a refine
+         *  evolves its parent. */
+        inspiration?: string;
       },
     ) => {
       try {
@@ -1002,6 +1006,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         kind: turn.kind,
         parentImageUrl,
         quality: chat.quality,
+        ...(chat.inspiration && turn.kind === "fresh" && !turn.companionOf ? { inspiration: chat.inspiration } : null),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
