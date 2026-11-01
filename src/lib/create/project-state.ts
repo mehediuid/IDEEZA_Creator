@@ -994,8 +994,9 @@ export type BuildLogEntry = {
   tone: BuildLogTone;
   title: string;
   detail?: string;
-  /** The inspiration image sent with what the maker typed. */
+  /** The inspiration image sent with what the maker typed, and its name. */
   image?: string;
+  imageName?: string;
   ts: number;
 };
 
@@ -1019,7 +1020,7 @@ export function buildLogOf(
     const t = turns[i];
 
     if (t.role === "user") {
-      entries.push({ id: t.id, tone: "plain", title: "You", detail: t.text, ...(t.image ? { image: t.image } : null), ts: t.ts });
+      entries.push({ id: t.id, tone: "plain", title: "You", detail: t.text, ...(t.image ? { image: t.image, imageName: t.imageName } : null), ts: t.ts });
       continue;
     }
 

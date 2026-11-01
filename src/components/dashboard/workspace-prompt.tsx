@@ -167,7 +167,7 @@ export function WorkspacePrompt() {
     }
     try {
       const dataUrl = await shrinkInspiration(file);
-      setInspiration({ dataUrl, name: file.name || "Pasted picture" });
+      setInspiration({ dataUrl, name: file.name || "Pasted image" });
       setImageError(null);
     } catch {
       setImageError("We couldn't open that picture — try a JPG or PNG.");
@@ -223,7 +223,7 @@ export function WorkspacePrompt() {
     try {
       const session = createChat(trimmed, {
         quality,
-        ...(inspirationUrl ? { inspiration: inspirationUrl } : null),
+        ...(inspirationUrl && inspiration ? { inspiration: inspirationUrl, inspirationName: inspiration.name } : null),
         ...(addTo ? { addTo: addTo.id } : null),
       });
       router.push(`/chat/${session.id}`);
@@ -630,31 +630,31 @@ const PromptCard = React.forwardRef<
           onImage(file);
         }}
       >
-        {/* The picture going with the idea: what the concepts are drawn
-            from, with the way to take it off again. */}
+        {/* The picture going with the idea, small: a thumbnail, its own file
+            name and the way to take it off (owner, 2026-11-01: no title or
+            explanation beside it). */}
         {inspiration && (
-          <div className="flex items-center gap-[12px] px-[20px] pt-[16px]">
-            {/* eslint-disable-next-line @next/next/no-img-element -- a data URL made in this page */}
-            <img
-              src={inspiration.dataUrl}
-              alt="Your inspiration image"
-              width={64}
-              height={48}
-              className="h-[48px] w-[64px] shrink-0 rounded-lg border border-solid border-border object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-text-primary">Inspiration image</p>
-              <p className="truncate text-xs text-text-tertiary">The concept takes its shape and feel · {inspiration.name}</p>
+          <div className="px-[20px] pt-[16px]">
+            <div className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-solid border-border py-[4px] pl-[4px] pr-[2px]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a data URL made in this page */}
+              <img
+                src={inspiration.dataUrl}
+                alt="Your inspiration image"
+                width={32}
+                height={24}
+                className="h-[24px] w-[32px] shrink-0 rounded-sm object-cover"
+              />
+              <span className="min-w-0 truncate text-sm text-text-secondary">{inspiration.name}</span>
+              <button
+                type="button"
+                onClick={onDropImage}
+                aria-label={`Remove ${inspiration.name}`}
+                title="Remove"
+                className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+              >
+                <Icon icon={Cancel01Icon} size={14} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onDropImage}
-              aria-label="Remove the inspiration image"
-              title="Remove"
-              className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[44px]"
-            >
-              <Icon icon={Cancel01Icon} size={16} />
-            </button>
           </div>
         )}
         <label htmlFor="ws-prompt" className="sr-only">

@@ -98,8 +98,10 @@ export type ChatTurn =
       id: string;
       role: "user";
       text: string;
-      /** The inspiration image sent with the idea (inspiration.ts). */
+      /** The inspiration image sent with the idea (inspiration.ts), and its
+       *  file name, which is what the chat shows beside it. */
       image?: string;
+      imageName?: string;
       ts: number;
     }
   | {
@@ -787,7 +789,7 @@ type Ctx = {
    *  the setup question opens on it. */
   createChat: (
     initialPrompt: string,
-    opts?: { addTo?: string; quality?: RenderQuality; inspiration?: string },
+    opts?: { addTo?: string; quality?: RenderQuality; inspiration?: string; inspirationName?: string },
   ) => ChatSession;
   appendUserTurn: (chatId: string, text: string) => void;
   appendAssistantTurn: (
@@ -986,7 +988,7 @@ export function CreateHistoryProvider({
   // ── Chat ops ──────────────────────────────────────────────────
   const createChat = React.useCallback((
     initialPrompt: string,
-    opts?: { addTo?: string; quality?: RenderQuality; inspiration?: string },
+    opts?: { addTo?: string; quality?: RenderQuality; inspiration?: string; inspirationName?: string },
   ) => {
     const now = Date.now();
     const addTo = opts?.addTo?.trim();
@@ -999,7 +1001,9 @@ export function CreateHistoryProvider({
           id: makeId("turn"),
           role: "user",
           text: initialPrompt,
-          ...(opts?.inspiration ? { image: opts.inspiration } : null),
+          ...(opts?.inspiration
+            ? { image: opts.inspiration, ...(opts.inspirationName ? { imageName: opts.inspirationName } : null) }
+            : null),
           ts: now,
         },
         // Questions, not a render. The first image costs a credit and is
