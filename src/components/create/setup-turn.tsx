@@ -442,7 +442,7 @@ function Footer({
   const blocked = !ready && !!reason;
   return (
     <CanvasFooter>
-      <div className="flex w-full max-w-[640px] items-center justify-end gap-[12px] pt-[2px]">
+      <div className="flex w-full items-center justify-end gap-[12px] pt-[2px]">
         <span
           id={blocked ? reasonId : undefined}
           className="inline-flex items-center gap-[6px] text-sm text-text-tertiary"
