@@ -55,6 +55,7 @@ import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMyProfile } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
 import { Icon, type IconValue } from "./icon";
+import { useSignOut } from "@/components/auth/auth-gate";
 
 /** Who you are, as your profile says (Creators: name, Latin name for the initials, photo). */
 export function useMe(): { name: string; initials: string; photo: string | undefined } {
@@ -249,23 +250,6 @@ const ROW =
 const ROW_LIVE =
   "cursor-pointer hover:bg-bg-surface hover:text-text-brand focus-visible:bg-bg-surface focus-visible:text-text-brand focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus";
 
-/** A row that isn't open yet: in the list, disabled, with why. */
-function SoonRow({ icon, label, why }: { icon: IconValue; label: string; why: string }) {
-  return (
-    <button
-      type="button"
-      disabled
-      aria-label={`${label} — ${why}`}
-      title={why}
-      className={cn(ROW, "cursor-not-allowed text-text-disabled")}
-    >
-      <Icon icon={icon} size={20} />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 text-sm font-regular leading-sm text-text-tertiary">Soon</span>
-    </button>
-  );
-}
-
 // ────────────────────────────────── account ─────────────────────────────
 
 /** Whether the "Get the mobile app" flyout fits beside the panel. Where it
@@ -299,6 +283,7 @@ export function AccountPopover({
 }) {
   const planLabel = usePlanLabel();
   const me = useMe();
+  const signOutNow = useSignOut();
   const { ledger, hydrated } = useCredits();
   const totals = creditTotals(ledger);
   const level = levelOf(xpOf(ledger));
@@ -443,7 +428,19 @@ export function AccountPopover({
           {/* On the raised panel border/subtle is the panel's own colour, so the line takes border/default. */}
           <Divider tone="default" className="my-[4px]" />
 
-          <SoonRow icon={Logout01Icon} label="Sign out" why="there is no sign-in yet; your work stays in this browser" />
+          {/* The demo sign-in: the account and the work stay in this browser. */}
+          <button
+            type="button"
+            data-nav-item
+            onClick={() => {
+              leave();
+              signOutNow();
+            }}
+            className={cn(ROW, ROW_LIVE)}
+          >
+            <Icon icon={Logout01Icon} size={20} />
+            <span className="min-w-0 flex-1 truncate">Sign out</span>
+          </button>
         </div>
       </FloatingPanel>
 

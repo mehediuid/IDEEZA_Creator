@@ -56,15 +56,19 @@ export interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInput
   invalid?: boolean;
   /** Unit or action adornment rendered inside the field, on the right. */
   suffix?: React.ReactNode;
+  /** A control inside the field, on the right, that the keyboard and screen
+   *  readers reach (a show-password toggle) — `suffix` is decoration only. */
+  action?: React.ReactNode;
   containerClassName?: string;
 }
 
 export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
-  { value, onValueChange, size = "md", invalid, suffix, disabled, className, containerClassName, ...props },
+  { value, onValueChange, size = "md", invalid, suffix, action, disabled, className, containerClassName, ...props },
   ref,
 ) {
   const s = SIZES[size];
   const unit = typeof suffix === "string" || typeof suffix === "number";
+  const trailing = suffix || action;
   return (
     <div
       className={cn(shell(invalid, disabled), containerClassName)}
@@ -77,9 +81,10 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
         onChange={(e) => onValueChange?.(e.target.value)}
         className={cn(field(s), className)}
         // Figma keeps 8 between the value and whatever trails it.
-        style={{ paddingLeft: s.px, paddingRight: suffix ? "var(--spacing-4)" : s.px }}
+        style={{ paddingLeft: s.px, paddingRight: trailing ? "var(--spacing-4)" : s.px }}
         {...props}
       />
+      {action ? <span className="inline-flex shrink-0 items-center pr-[var(--spacing-2)]">{action}</span> : null}
       {suffix ? (
         unit ? (
           <span

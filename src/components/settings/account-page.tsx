@@ -11,8 +11,9 @@
 //     back to it, and an invoice prints it when Billing details names no one.
 //   wallet   — the connected demo wallet, its network and the Testnet demo
 //     badge; Manage or Connect opens the wallet dialog.
-//   sign-in  — one honest line: there is no sign-in yet, so your work lives in
-//     this browser; Download your information keeps a copy.
+//   sign-in  — the email you're signed in with and Sign out (the demo sign-in,
+//     lib/account/auth.ts); your work lives in this browser, and Download your
+//     information keeps a copy.
 
 import * as React from "react";
 import Link from "next/link";
@@ -20,6 +21,8 @@ import { CheckmarkCircle02Icon, Copy01Icon, Download04Icon, PencilEdit02Icon, Ti
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar, Button, Skeleton, TestnetDemoBadge, TextInput, buttonVariants } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
+import { useSignOut } from "@/components/auth/auth-gate";
+import { useAuth } from "@/lib/account/auth";
 import { LEGAL_NAME_MAX, saveLegalName, useIdentity } from "@/lib/account/identity";
 import { cleanHandle, HANDLE_MAX } from "@/lib/people/handle";
 import { displayNameOf, handleProblem, initialsOf, ownHandleOf } from "@/lib/people/ids";
@@ -193,7 +196,7 @@ function HandleCard() {
           </div>
           <p className={QUIET}>
             {fields.handle ? "" : "Choose a handle to give your profile an address of its own. "}
-            Until sign-in arrives, this address opens your profile in this browser only.
+            This address opens your profile in this browser only.
           </p>
         </div>
       ) : (
@@ -397,20 +400,31 @@ function WalletCard() {
 // ─────────────────────────── sign-in ───────────────────────────
 
 function SignInCard() {
+  const { hydrated, account } = useAuth();
+  const signOut = useSignOut();
   return (
     <SettingsCard
       id="sign-in"
       title="Sign-in and security"
-      description="Sign-in isn't in the app yet. Password, 2-step sign-in, your devices and deleting your account come with it."
+      description="Your account and your work live in this browser only, and clearing its data removes them. Keep a copy."
     >
       <div className="flex flex-col items-start gap-[12px] py-[8px]">
-        <p className={cn(VALUE, "max-w-[62ch] text-text-secondary")}>
-          Until then your work lives in this browser only, and clearing its data removes it. Keep a copy.
-        </p>
-        <Link href="/settings/data#download" className={buttonVariants({ hierarchy: "tonal", size: "md", className: TAP })}>
-          <Icon icon={Download04Icon} size={16} />
-          Download your information
-        </Link>
+        {hydrated ? (
+          <p className={VALUE}>
+            Signed in as <strong className="font-semibold">{account?.email}</strong>
+          </p>
+        ) : (
+          <Skeleton shape="text" size="md" className="my-[2px] w-[240px] max-w-full" />
+        )}
+        <div className="flex flex-wrap gap-[8px]">
+          <Link href="/settings/data#download" className={buttonVariants({ hierarchy: "tonal", size: "md", className: TAP })}>
+            <Icon icon={Download04Icon} size={16} />
+            Download your information
+          </Link>
+          <Button hierarchy="secondary" size="md" onClick={signOut} className={TAP}>
+            Sign out
+          </Button>
+        </div>
       </div>
     </SettingsCard>
   );

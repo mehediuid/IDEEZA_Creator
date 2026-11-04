@@ -5,14 +5,15 @@
 // Every row is real (settings spec 2026-10-19 §5.13): your profile, Settings,
 // Notification settings and Plan & pricing are links; the wallet row is the
 // same WalletMenuEntry the dashboard sidebar carries (P2-MINT-2) and opens the
-// Demo wallet dialog; Sign out is shown disabled with the sidebar's reason,
-// since there is no sign-in yet. The trigger is a keyboard button, so every
+// Demo wallet dialog; Sign out signs you out (the demo sign-in, your work
+// stays in this browser). The trigger is a keyboard button, so every
 // row — and the dialog behind the wallet — can be reached without a mouse.
 
 import * as React from "react";
 import Link from "next/link";
 import { WalletMenuEntry } from "@/components/wallet/wallet-menu-entry";
 import { useMe } from "@/lib/people/profile-store";
+import { useSignOut } from "@/components/auth/auth-gate";
 
 export function ProfileDropdown({
   trigger,
@@ -21,6 +22,7 @@ export function ProfileDropdown({
 }) {
   const [open, setOpen] = React.useState(false);
   const me = useMe();
+  const signOutNow = useSignOut();
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLDivElement>(null);
 
@@ -159,7 +161,27 @@ export function ProfileDropdown({
 
           <Separator />
 
-          <SoonItem label="Sign out" why={SIGN_OUT_WHY} icon={<SignOutIcon />} />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              close();
+              signOutNow();
+            }}
+            className={ROW_CLASS}
+            style={{ ...ROW_STYLE, color: "var(--color-text-primary)", cursor: "pointer" }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--color-bg-surface-raised)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <span style={{ ...ICON_STYLE, color: "var(--color-text-secondary)" }}>
+              <SignOutIcon />
+            </span>
+            <span style={{ flex: 1 }}>Sign out</span>
+          </button>
 
           <style>{`
             @keyframes ix-profile-in {
@@ -211,9 +233,6 @@ const ICON_STYLE: React.CSSProperties = {
 // 44 px rows on a phone, like the wallet row beside them.
 const ROW_CLASS = "max-md:min-h-[var(--touch-min)] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus";
 
-/** The sidebar account popover's own reason (dashboard/sidebar-account.tsx). */
-const SIGN_OUT_WHY = "there is no sign-in yet; your work stays in this browser";
-
 function LinkItem({
   href,
   label,
@@ -242,25 +261,6 @@ function LinkItem({
       <span style={{ ...ICON_STYLE, color: "var(--color-text-secondary)" }}>{icon}</span>
       <span style={{ flex: 1 }}>{label}</span>
     </Link>
-  );
-}
-
-/** A row that isn't open yet: in the menu, disabled, with why (as the sidebar's SoonRow). */
-function SoonItem({ label, why, icon }: { label: string; why: string; icon: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled
-      aria-label={`${label}, not available yet: ${why}`}
-      title={why}
-      className={ROW_CLASS}
-      style={{ ...ROW_STYLE, color: "var(--color-text-disabled)", cursor: "not-allowed" }}
-    >
-      <span style={{ ...ICON_STYLE, color: "var(--color-text-disabled)" }}>{icon}</span>
-      <span style={{ flex: 1 }}>{label}</span>
-      <span style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>Soon</span>
-    </button>
   );
 }
 

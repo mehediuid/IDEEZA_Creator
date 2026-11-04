@@ -142,6 +142,12 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
     }
     case "balance":
       return b === "buy" ? { page: "Balance › Buy IDZ", route: "/balance/buy" } : { page: "Balance", route: "/balance" };
+    case "sign-in":
+      return { page: "Sign in", route: "/sign-in" };
+    case "sign-up":
+      if (b === "check-email") return { page: "Sign up › Check your email", route: "/sign-up/check-email" };
+      if (b === "welcome") return { page: "Sign up › Welcome", route: "/sign-up/welcome" };
+      return { page: "Sign up", route: "/sign-up" };
     case "tutorials":
       if (!b) return { page: "Tutorials", route: "/tutorials" };
       return c

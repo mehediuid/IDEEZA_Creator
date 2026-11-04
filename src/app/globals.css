@@ -168,3 +168,18 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
   animation: ix-hero-sweep 22s ease-in-out infinite;
   will-change: transform, opacity;
 }
+
+/* The sign-in stage (components/auth/auth-stage.tsx): the brand's deep violet,
+ * lit by its two colours (violet primary, blue secondary) from opposite
+ * corners, the 3D board drawn over it. One surface in both themes — it is the
+ * brand, not a page. The veil darkens the foot so the words stay readable. */
+.ix-auth-stage {
+  background:
+    radial-gradient(90% 70% at 85% 10%, color-mix(in srgb, var(--color-blue-600) 45%, transparent) 0%, transparent 60%),
+    radial-gradient(90% 80% at 10% 95%, color-mix(in srgb, var(--color-violet-600) 55%, transparent) 0%, transparent 60%),
+    linear-gradient(165deg, var(--color-violet-900) 0%, var(--color-violet-950) 55%, var(--color-gray-950) 100%);
+}
+
+.ix-auth-stage-veil {
+  background: linear-gradient(to top, color-mix(in srgb, var(--color-gray-950) 88%, transparent) 0%, color-mix(in srgb, var(--color-gray-950) 40%, transparent) 38%, transparent 62%);
+}
