@@ -261,3 +261,10 @@ export function NewPasswordField({
     </div>
   );
 }
+
+/** An address on the sign-in pages with its query: empty values left out. */
+export function authHref(path: string, query: Record<string, string>): string {
+  const q = new URLSearchParams(Object.entries(query).filter(([, v]) => v));
+  const text = q.toString();
+  return text ? `${path}?${text}` : path;
+}

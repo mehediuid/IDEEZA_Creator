@@ -11,6 +11,10 @@ globalThis.localStorage = {
   getItem: (k) => (store.has(k) ? store.get(k) : null),
   setItem: (k, v) => store.set(k, String(v)),
   removeItem: (k) => store.delete(k),
+  key: (i) => [...store.keys()][i] ?? null,
+  get length() {
+    return store.size;
+  },
 };
 globalThis.dispatchEvent = () => true;
 globalThis.Event = class {};
@@ -91,20 +95,20 @@ test("an email that already has an account is refused, so Sign up can point to S
 
 test("a second person can make their own account in the same browser", async () => {
   await auth.createAccount(INPUT, "", NOW);
-  auth.verifyEmail(NOW);
-  auth.signOut();
+  await auth.verifyEmail(NOW);
+  await auth.signOut();
   assert.equal(await auth.createAccount({ ...INPUT, firstName: "Nila", email: "nila@example.com" }, "", NOW), "ok");
-  auth.verifyEmail(NOW);
+  await auth.verifyEmail(NOW);
   assert.equal(auth.readAccounts().length, 2);
   assert.equal(auth.currentAccount(auth.readAccounts(), auth.readSession()).email, "nila@example.com");
-  auth.signOut();
+  await auth.signOut();
   assert.equal(await auth.signIn("rafiq@example.com", PW, NOW), "ok");
   assert.equal(auth.currentAccount(auth.readAccounts(), auth.readSession()).firstName, "Rafiq");
 });
 
 test("verifying signs you in, clears the wait, and fills the profile's empty name and country", async () => {
   await auth.createAccount(INPUT, "", NOW);
-  assert.equal(auth.verifyEmail(NOW + 1).ok, true);
+  assert.equal((await auth.verifyEmail(NOW + 1)).ok, true);
   const [a] = auth.readAccounts();
   assert.equal(a.verifiedAt, NOW + 1);
   assert.equal(signedIn(), true);
@@ -117,7 +121,7 @@ test("verifying signs you in, clears the wait, and fills the profile's empty nam
 test("verifying keeps a name the profile already has", async () => {
   store.set(PROFILE_KEY, JSON.stringify({ v: 2, name: "Maker R", location: "Dhaka" }));
   await auth.createAccount(INPUT, "", NOW);
-  auth.verifyEmail(NOW);
+  await auth.verifyEmail(NOW);
   const profile = JSON.parse(store.get(PROFILE_KEY));
   assert.equal(profile.name, "Maker R");
   assert.equal(profile.location, "Dhaka");
@@ -128,7 +132,7 @@ test("Wrong email?: the unverified account goes, a verified one is never touched
   assert.equal(auth.discardUnverified().ok, true);
   assert.equal(auth.readAccounts().length, 0);
   await auth.createAccount(INPUT, "", NOW);
-  auth.verifyEmail(NOW);
+  await auth.verifyEmail(NOW);
   store.set(auth.VERIFY_KEY, JSON.stringify({ v: 1, email: "rafiq@example.com" }));
   auth.discardUnverified();
   assert.equal(auth.readAccounts().length, 1);
@@ -139,8 +143,8 @@ test("sign in: right pair in, unknown email and wrong password one answer, unver
   store.delete(auth.VERIFY_KEY);
   assert.equal(await auth.signIn("rafiq@example.com", PW, NOW), "unverified");
   assert.equal(JSON.parse(store.get(auth.VERIFY_KEY)).email, "rafiq@example.com");
-  auth.verifyEmail(NOW);
-  auth.signOut();
+  await auth.verifyEmail(NOW);
+  await auth.signOut();
   assert.equal(signedIn(), false);
   assert.equal(await auth.signIn("rafiq@example.com", "Wrong-Horse-9", NOW), "wrong");
   assert.equal(await auth.signIn("someone@example.com", PW, NOW), "wrong");
@@ -150,14 +154,14 @@ test("sign in: right pair in, unknown email and wrong password one answer, unver
 
 test("signing out keeps the accounts; a reset needs the rules, sets the password and signs you in", async () => {
   await auth.createAccount(INPUT, "", NOW);
-  auth.verifyEmail(NOW);
-  auth.signOut();
+  await auth.verifyEmail(NOW);
+  await auth.signOut();
   assert.equal(auth.readAccounts().length, 1);
   assert.equal((await auth.resetPassword("rafiq@example.com", "short", NOW)).ok, false);
   assert.equal((await auth.resetPassword("nobody@example.com", "New-Horse-77", NOW)).ok, false);
   assert.equal((await auth.resetPassword("rafiq@example.com", "New-Horse-77", NOW)).ok, true);
   assert.equal(signedIn(), true);
-  auth.signOut();
+  await auth.signOut();
   assert.equal(await auth.signIn("rafiq@example.com", PW, NOW), "wrong");
   assert.equal(await auth.signIn("rafiq@example.com", "New-Horse-77", NOW), "ok");
 });
@@ -173,7 +177,7 @@ test("a link's utm_source answers the question, so it is never asked", async () 
 
 test("the one question: asked once; Skip moves it to Home's nudge until answered or closed", async () => {
   await auth.createAccount(INPUT, "", NOW);
-  auth.verifyEmail(NOW);
+  await auth.verifyEmail(NOW);
   const me = () => auth.currentAccount(auth.readAccounts(), auth.readSession());
   assert.equal(auth.needsSourceQuestion(me()), true);
   auth.skipSource();
@@ -223,7 +227,26 @@ test("junk in storage reads as no account and no session; duplicate emails keep 
   assert.equal(auth.normalizeSession({ email: "" }), null);
 });
 
-test("the pre-paint gate lets a signed-in visitor through and sends others on, with where they were going", () => {
+test("the front door: signed out, Home's address shows the landing page; any other page asks you in with where you were going", () => {
+  assert.equal(auth.signedOutPath("/", "", []), "/landing");
+  assert.equal(auth.signedOutPath("/", "?utm_source=yt&utm_medium=video", []), "/landing?utm_source=yt&utm_medium=video");
+  assert.equal(auth.signedOutPath("/", "?prompt=a%20lamp", []), "/sign-up?next=%2F%3Fprompt%3Da%2520lamp");
+  assert.equal(auth.signedOutPath("/marketplace", "", []), "/sign-up?next=%2Fmarketplace");
+  assert.equal(auth.signedOutPath("/marketplace", "", [{ email: "a@b.co" }]), "/sign-in?next=%2Fmarketplace");
+});
+
+test("where they were going survives Sign up: kept with the waiting account, safe paths only", async () => {
+  assert.equal(await auth.createAccount(INPUT, "", NOW, "/settings/plan"), "ok");
+  assert.equal(auth.verifyNextOf(JSON.parse(store.get(auth.VERIFY_KEY))), "/settings/plan");
+  store.clear();
+  await auth.createAccount(INPUT, "", NOW, "//evil.example");
+  assert.equal(auth.verifyNextOf(JSON.parse(store.get(auth.VERIFY_KEY))), "");
+  store.delete(auth.VERIFY_KEY);
+  assert.equal(await auth.signIn("rafiq@example.com", PW, NOW, "/marketplace"), "unverified");
+  assert.equal(auth.verifyNextOf(JSON.parse(store.get(auth.VERIFY_KEY))), "/marketplace");
+});
+
+test("the pre-paint gate lets a signed-in visitor through and sends others on, as signedOutPath does", () => {
   const run = (path, search = "") => {
     let went = null;
     const html = { style: {} };
@@ -231,14 +254,17 @@ test("the pre-paint gate lets a signed-in visitor through and sends others on, w
     fn({ pathname: path, search, replace: (u) => (went = u) }, globalThis.localStorage, { documentElement: html });
     return went;
   };
-  assert.equal(run("/projects", "?utm_source=yt"), "/sign-up?utm_source=yt");
+  for (const [path, search] of [["/", ""], ["/", "?utm_source=yt"], ["/", "?prompt=x"], ["/projects", "?tab=draft"], ["/marketplace", ""]]) {
+    assert.equal(run(path, search), auth.signedOutPath(path, search, []), `${path}${search}, no account`);
+  }
   assert.equal(run("/sign-up"), null);
   assert.equal(run("/landing"), null);
   store.set(auth.ACCOUNTS_KEY, JSON.stringify([{ email: "a@b.co", verifiedAt: NOW }]));
   assert.equal(run("/projects", "?tab=draft"), "/sign-in?next=%2Fprojects%3Ftab%3Ddraft");
-  assert.equal(run("/"), "/sign-in");
+  assert.equal(run("/"), "/landing");
   store.set(auth.SESSION_KEY, JSON.stringify({ v: 1, email: "A@B.co", at: NOW }));
   assert.equal(run("/projects"), null);
+  assert.equal(run("/"), null);
   store.set(auth.ACCOUNTS_KEY, JSON.stringify([{ email: "a@b.co", verifiedAt: null }]));
   assert.equal(run("/projects"), "/sign-in?next=%2Fprojects");
 });

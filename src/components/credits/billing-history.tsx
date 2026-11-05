@@ -3,7 +3,8 @@
 // Billing history (User Panel V2 › Billing History 41549:164343): every
 // payment, for a plan or for credits (lib/account/invoices.ts) — search by
 // order or invoice number on the left, the year on the right, then
-// Transaction ID · Date & time · Payment by · Plan name · Status and the
+// Transaction ID · Date & time · Payment by · Plan name · Amount (with the
+// coupon a plan was bought with under it) · Status and the
 // invoice to download (read, print or save as PDF), ten to a page.
 
 import * as React from "react";
@@ -128,7 +129,14 @@ export function BillingHistory() {
                       </span>
                     </td>
                     <td className="px-[16px] py-[12px] text-text-primary">{r.item}</td>
-                    <td className="px-[16px] py-[12px] tabular-nums text-text-primary">{usd(r.total)}</td>
+                    <td className="px-[16px] py-[12px] tabular-nums text-text-primary">
+                      {usd(r.total)}
+                      {r.coupon && (
+                        <span className="block text-sm leading-sm text-text-secondary">
+                          Coupon {r.coupon.code} <span className="whitespace-nowrap">−{usd(r.coupon.amount)}</span>
+                        </span>
+                      )}
+                    </td>
                     <td className={cn("px-[16px] py-[12px]", r.status === "Paid" ? "text-text-success" : "text-text-secondary")}>
                       {r.status === "Paid" ? "Successful" : r.status}
                     </td>

@@ -19,6 +19,7 @@ import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
 import { ReportProblemHost } from "@/components/support/report-problem";
 import { TourHost } from "@/components/tour/tour-host";
+import { WelcomeOfferHost } from "@/components/credits/welcome-offer";
 import { ResearchHost } from "@/components/research/research-host";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NoticePopups } from "@/components/notifications/notice-popups";
@@ -171,6 +172,9 @@ export default function RootLayout({
                                   chapters' steps, and the panel Support ›
                                   Tour Guide and ⌘K open (openTourGuide()). */}
                               <TourHost />
+                              {/* The welcome offer: on Home after the Welcome, once
+                                  (components/credits/welcome-offer.tsx). */}
+                              <WelcomeOfferHost />
                             </BuyCreditsProvider>
                           </WalletProvider>
                           {/* A build is a background job: it has to keep

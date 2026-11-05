@@ -183,3 +183,15 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
 .ix-auth-stage-veil {
   background: linear-gradient(to top, color-mix(in srgb, var(--color-gray-950) 88%, transparent) 0%, color-mix(in srgb, var(--color-gray-950) 40%, transparent) 38%, transparent 62%);
 }
+
+/* The welcome offer's surface (components/credits/welcome-offer.tsx: the pop-up's
+ * hero, the Plan & pricing banner, the sidebar card): the same brand stage the
+ * sign-in page stands on, so the gift reads as IDEEZA's own, with a faint dot
+ * grid. One surface in both themes; words on it are white. */
+.ix-offer-stage {
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-white) 9%, transparent) 1px, transparent 0) 0 0 / 16px 16px,
+    radial-gradient(80% 100% at 100% 0%, color-mix(in srgb, var(--color-blue-600) 50%, transparent) 0%, transparent 62%),
+    radial-gradient(70% 100% at 0% 100%, color-mix(in srgb, var(--color-violet-600) 65%, transparent) 0%, transparent 66%),
+    linear-gradient(160deg, var(--color-violet-900) 0%, var(--color-violet-950) 60%, var(--color-gray-950) 100%);
+}

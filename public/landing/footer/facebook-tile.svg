@@ -1,0 +1,20 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Frame 2147225561">
+<path d="M0 8C0 3.58172 3.58172 0 8 0H28C32.4183 0 36 3.58172 36 8V28C36 32.4183 32.4183 36 28 36H8C3.58172 36 0 32.4183 0 28V8Z" fill="#020513"/>
+<path d="M0 8C0 3.58172 3.58172 0 8 0H28C32.4183 0 36 3.58172 36 8V28C36 32.4183 32.4183 36 28 36H8C3.58172 36 0 32.4183 0 28V8Z" fill="url(#paint0_linear_0_122)" fill-opacity="0.6"/>
+<path d="M8 0.5H28C32.1421 0.5 35.5 3.85786 35.5 8V28C35.5 32.1421 32.1421 35.5 28 35.5H8C3.85786 35.5 0.5 32.1421 0.5 28V8C0.5 3.85786 3.85786 0.5 8 0.5Z" stroke="url(#paint1_linear_0_122)" stroke-opacity="0.6"/>
+<path id="facebook" d="M25 18C25 14.15 21.85 11 18 11C14.15 11 11 14.15 11 18C11 21.5 13.5375 24.3875 16.8625 24.9125V20.0125H15.1125V18H16.8625V16.425C16.8625 14.675 17.9125 13.7125 19.4875 13.7125C20.275 13.7125 21.0625 13.8875 21.0625 13.8875V15.6375H20.1875C19.3125 15.6375 19.05 16.1625 19.05 16.6875V18H20.975L20.625 20.0125H18.9625V25C22.4625 24.475 25 21.5 25 18Z" fill="white"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_122" x1="4.5" y1="40.05" x2="46.871" y2="5.06663" gradientUnits="userSpaceOnUse">
+<stop offset="0.206514" stop-color="#AF94FD" stop-opacity="0.16"/>
+<stop offset="0.462473" stop-color="#AF94FB" stop-opacity="0.8"/>
+<stop offset="0.748825" stop-color="#AF94FD" stop-opacity="0.24"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_122" x1="-8.5" y1="52.5" x2="43.5" y2="-18.5" gradientUnits="userSpaceOnUse">
+<stop offset="0.206514" stop-color="#DFD4FE" stop-opacity="0"/>
+<stop offset="0.462473" stop-color="#DFD4FE"/>
+<stop offset="0.748825" stop-color="#DFD4FE" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>

@@ -140,6 +140,9 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
         ? { page: `${label} › Invoice`, route: `${base}/invoice/[orderId]` }
         : { page: `${label} › ${humanize(sub)}`, route: `${base}/${sub}` };
     }
+    case "landing":
+      if (!b) return { page: "Landing page", route: "/landing" };
+      break;
     case "balance":
       return b === "buy" ? { page: "Balance › Buy IDZ", route: "/balance/buy" } : { page: "Balance", route: "/balance" };
     case "sign-in":

@@ -35,6 +35,8 @@ import { Icon } from "@/components/dashboard/icon";
 import { useMe } from "@/components/dashboard/sidebar-account";
 import { Avatar, Badge, Banner, Button, ModalFrame, ProgressBar, Segmented } from "@/components/ideeza";
 import { checkoutHref } from "@/lib/create/checkout-route";
+import { offerPrice } from "@/lib/account/welcome-offer";
+import { OfferBanner, OfferSticker, useWelcomeOffer } from "./welcome-offer";
 import { discountFor, usd, type BillingCycle } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -66,6 +68,8 @@ type Dialog = { kind: "downgrade"; tier: PlanTier; cycle: BillingCycle } | { kin
 export function PlansPanel() {
   const router = useRouter();
   const { hydrated, sub } = useCreatePlan();
+  const offer = useWelcomeOffer();
+  const offerLive = offer.ready && offer.live;
   const [cycle, setCycle] = React.useState<BillingCycle>("monthly");
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const [synced, setSynced] = React.useState(false);
@@ -85,6 +89,7 @@ export function PlansPanel() {
   return (
     <div className="flex flex-col gap-[56px]">
       <section aria-labelledby="choose-plan" className="flex flex-col items-center gap-[32px]">
+        <OfferBanner />
         <div className="flex flex-col items-center gap-[12px] text-center">
           <h2 id="choose-plan" className="text-5xl font-semibold leading-5xl text-text-primary">
             Choose a plan
@@ -119,6 +124,7 @@ export function PlansPanel() {
               below={i === 0 ? FREE : PAID[i - 1]}
               cycle={cycle}
               hydrated={hydrated}
+              offer={offerLive}
               onAct={() => act(p, cycle)}
             />
           ))}
@@ -126,7 +132,7 @@ export function PlansPanel() {
         <FreeCard hydrated={hydrated} onAct={() => act(FREE, "monthly")} />
       </section>
 
-      <CompareTable cycle={cycle} hydrated={hydrated} onAct={act} />
+      <CompareTable cycle={cycle} hydrated={hydrated} offer={offerLive} onAct={act} />
 
       <Faq />
 
@@ -162,16 +168,30 @@ function useCta(p: Plan, cycle: BillingCycle, hydrated: boolean) {
   return { rel, label, hierarchy, enabled };
 }
 
-/** "$10/ month" or "$8/ mo, billed yearly". */
-function PriceLine({ plan: p, cycle, big = true }: { plan: Plan; cycle: BillingCycle; big?: boolean }) {
+/** "$10/ month" or "$8/ mo, billed yearly". With the welcome offer running, a paid plan
+ *  shows its first payment at the offer's price, the usual price struck through under it. */
+function PriceLine({ plan: p, cycle, big = true, offer = false }: { plan: Plan; cycle: BillingCycle; big?: boolean; offer?: boolean }) {
   const per = priceOf(p.tier, cycle).perMonth;
+  const offered = offer && p.monthly > 0;
+  const shown = offered ? offerPrice(per).final : per;
   return (
-    <p className="flex flex-wrap items-baseline gap-x-[6px]">
-      <span className={cn("font-bold tabular-nums text-text-primary", big ? "text-5xl leading-5xl" : "text-3xl leading-3xl")}>
-        {price(per)}/
-      </span>
-      <span className="text-lg leading-lg text-text-secondary">{p.monthly > 0 && cycle === "yearly" ? "mo, billed yearly" : "month"}</span>
-    </p>
+    <div className="flex flex-col gap-[4px]">
+      <p className="flex flex-wrap items-baseline gap-x-[6px]">
+        <span className={cn("font-bold tabular-nums text-text-primary", big ? "text-5xl leading-5xl" : "text-3xl leading-3xl")}>
+          {price(shown)}/
+        </span>
+        <span className="text-lg leading-lg text-text-secondary">{p.monthly > 0 && cycle === "yearly" ? "mo, billed yearly" : "month"}</span>
+      </p>
+      {offered ? (
+        <p className="flex flex-wrap items-center gap-x-[10px] gap-y-[4px] text-md leading-md">
+          <OfferSticker size="md" />
+          <span className="tabular-nums text-text-tertiary line-through">{price(per)}</span>
+          <span className="font-semibold text-text-success">
+            your {cycle === "yearly" ? "first year" : "first month"}
+          </span>
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -220,12 +240,14 @@ function PlanCard({
   below,
   cycle,
   hydrated,
+  offer,
   onAct,
 }: {
   plan: Plan;
   below: Plan;
   cycle: BillingCycle;
   hydrated: boolean;
+  offer: boolean;
   onAct: () => void;
 }) {
   const cta = useCta(p, cycle, hydrated);
@@ -245,7 +267,7 @@ function PlanCard({
       )}
       <div className="flex flex-col gap-[12px] pt-[24px]">
         <h3 className="text-3xl font-semibold leading-3xl text-text-primary">{p.name}</h3>
-        <PriceLine plan={p} cycle={cycle} />
+        <PriceLine plan={p} cycle={cycle} offer={offer} />
         <p className="text-lg leading-lg text-text-secondary">{p.tagline}</p>
       </div>
       <Button hierarchy={cta.hierarchy} size="lg" className="w-full" disabled={!cta.enabled} onClick={onAct}>
@@ -351,10 +373,12 @@ function CellValue({ value, chip }: { value: Cell; chip?: boolean }) {
 function CompareTable({
   cycle,
   hydrated,
+  offer,
   onAct,
 }: {
   cycle: BillingCycle;
   hydrated: boolean;
+  offer: boolean;
   onAct: (p: Plan, c: BillingCycle) => void;
 }) {
   return (
@@ -371,7 +395,7 @@ function CompareTable({
             </th>
             {PLANS.map((p) => (
               <th key={p.tier} scope="col" className="px-[8px] pb-[20px] text-center font-regular">
-                <CompareHead plan={p} cycle={cycle} hydrated={hydrated} onAct={() => onAct(p, p.tier === "free" ? "monthly" : cycle)} />
+                <CompareHead plan={p} cycle={cycle} hydrated={hydrated} offer={offer} onAct={() => onAct(p, p.tier === "free" ? "monthly" : cycle)} />
               </th>
             ))}
           </tr>
@@ -402,16 +426,24 @@ function CompareTable({
   );
 }
 
-function CompareHead({ plan: p, cycle, hydrated, onAct }: { plan: Plan; cycle: BillingCycle; hydrated: boolean; onAct: () => void }) {
+function CompareHead({ plan: p, cycle, hydrated, offer, onAct }: { plan: Plan; cycle: BillingCycle; hydrated: boolean; offer: boolean; onAct: () => void }) {
   const c = p.tier === "free" ? "monthly" : cycle;
   const cta = useCta(p, c, hydrated);
-  const per = priceOf(p.tier, c).perMonth;
+  const list = priceOf(p.tier, c).perMonth;
+  const offered = offer && p.monthly > 0;
+  const per = offered ? offerPrice(list).final : list;
   return (
     <div className="flex flex-col items-center gap-[8px]">
       <span className="text-lg font-semibold leading-lg text-text-primary">{p.name}</span>
       <span className="text-md leading-md text-text-secondary">
         {p.monthly === 0 ? "$0" : `${price(per)} mo${c === "yearly" ? ", billed yearly" : ""}`}
       </span>
+      {offered ? (
+        <span className="flex items-center gap-[8px] text-sm leading-sm">
+          <span className="tabular-nums text-text-tertiary line-through">{price(list)}</span>
+          <OfferSticker />
+        </span>
+      ) : null}
       {cta.rel === "current" ? (
         <span className="inline-flex h-[40px] items-center text-md font-semibold leading-md text-text-tertiary">Current plan</span>
       ) : (

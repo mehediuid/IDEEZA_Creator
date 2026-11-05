@@ -27,9 +27,9 @@ function filesUnder(dir) {
 }
 
 /** The pages inside the app shell and the components they render. The full-screen studios (the
- *  editors, the package flow) sit outside the shell and keep their own chrome; a dialog, drawer or
- *  palette is sized for itself, not the page. */
-const STUDIO = /^components\/(3d|assembly|code|manual|package|pcb|preview|product-flow|wiring)\//;
+ *  editors, the package flow) and the public landing page sit outside the shell and keep their own
+ *  chrome; a dialog, drawer or palette is sized for itself, not the page. */
+const STUDIO = /^components\/(3d|assembly|code|landing|manual|package|pcb|preview|product-flow|wiring)\//;
 const OVERLAY = /(dialog|modal|drawer|lightbox|palette|popover)[^/]*\.tsx$/;
 const SHELL_PAGES = [
   ...filesUnder("app/(dashboard)"),

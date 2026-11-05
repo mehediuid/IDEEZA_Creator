@@ -183,6 +183,21 @@ export function WorkspacePrompt() {
   const [chipOffset, setChipOffset] = React.useState(0);
   const taRef = React.useRef<HTMLTextAreaElement>(null);
 
+  // `/?prompt=<idea>` — the landing page's "Describe your hardware idea" box
+  // hands its text here. It fills the box (nothing is sent: a render costs
+  // credits) and drops out of the address, so a reload starts clean.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const handed = params.get("prompt")?.trim();
+    if (!handed) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the address after hydration
+    setPrompt(handed);
+    params.delete("prompt");
+    const rest = params.toString();
+    router.replace(rest ? `/?${rest}` : "/", { scroll: false });
+    requestAnimationFrame(() => taRef.current?.focus());
+  }, [router]);
+
   // AI mode is the only mode that uses the prompt textarea today. The
   // manual path is driven by the BuildManuallyInfo panel + the
   // Project Information modal mounted at the bottom of this component.

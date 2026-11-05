@@ -321,8 +321,13 @@
 /* ============================================================
  * Light theme (default) — semantic & component tokens
  * ============================================================ */
+/* Every [data-theme], not only "light": a nested theme (the landing page's
+   dark wrapper, the editor shell) recomputes the aliases below from its own
+   values, as <html> does; the dark block after this one then overrides. With
+   "light" only, a nested dark took aliases the dark block doesn't repeat
+   (--color-button-primary-bg…) already resolved to the light page's colours. */
 :root,
-[data-theme="light"] {
+[data-theme] {
   color-scheme: light;
 
   /* Backgrounds */

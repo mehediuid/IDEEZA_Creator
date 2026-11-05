@@ -22,6 +22,7 @@ import {
   birthDateOf,
   isEmail,
   normalizeEmail,
+  safeNext,
   createAccount,
   signUpProblems,
   useAuth,
@@ -29,7 +30,7 @@ import {
   type SignUpInput,
 } from "@/lib/account/auth";
 import { cn } from "@/lib/utils";
-import { AuthHeading, FIELD_ERROR, FIELD_LABEL, Field, NewPasswordField, PasswordInput, errorProps, useFieldIds } from "./auth-parts";
+import { AuthHeading, FIELD_ERROR, FIELD_LABEL, Field, NewPasswordField, PasswordInput, authHref, errorProps, useFieldIds } from "./auth-parts";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
@@ -51,6 +52,8 @@ export function SignUpForm() {
     lastName: params.get("last") ?? "",
   }));
   const [taken, setTaken] = React.useState("");
+  // Where they were going before Sign up asked them in (?next=), to go on to after.
+  const [next] = React.useState(() => safeNext(params.get("next")));
   const [shown, setShown] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [refused, setRefused] = React.useState(false);
@@ -62,8 +65,8 @@ export function SignUpForm() {
   }, []);
 
   React.useEffect(() => {
-    if (hydrated && signedIn && !busy) router.replace("/");
-  }, [hydrated, signedIn, busy, router]);
+    if (hydrated && signedIn && !busy) router.replace(next || "/");
+  }, [hydrated, signedIn, busy, router, next]);
 
   if (!hydrated || (signedIn && !busy)) return null;
 
@@ -71,7 +74,7 @@ export function SignUpForm() {
   const problems = signUpProblems(input, now);
   const show = (k: SignUpField) => (shown ? problems[k] : undefined);
   const badDate = !!input.day && !!input.month && !!input.year && !birthDateOf(input.day, input.month, input.year, now);
-  const signInHref = isEmail(input.email) ? `/sign-in?email=${encodeURIComponent(normalizeEmail(input.email))}` : "/sign-in";
+  const signInHref = authHref("/sign-in", { email: isEmail(input.email) ? normalizeEmail(input.email) : "", next });
   const emailError: React.ReactNode =
     taken && taken === normalizeEmail(input.email) ? (
       <>
@@ -101,7 +104,7 @@ export function SignUpForm() {
     setBusy(true);
     setRefused(false);
     const utm = params.get("utm_source") ?? "";
-    const result = await createAccount(input, utm, Date.now());
+    const result = await createAccount(input, utm, Date.now(), next);
     if (result === "ok") return router.push("/sign-up/check-email");
     setBusy(false);
     if (result === "exists") {

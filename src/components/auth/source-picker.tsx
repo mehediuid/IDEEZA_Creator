@@ -7,7 +7,7 @@
 // choices, with the same icons, as tags (SourceNudge).
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Cancel01Icon,
   CheckmarkCircle02Icon,
@@ -30,6 +30,7 @@ import {
   answerSource,
   closeSourceNudge,
   needsSourceQuestion,
+  safeNext,
   showsSourceNudge,
   skipSource,
   useAuth,
@@ -150,19 +151,22 @@ function SourcePicker({ onAnswered, variant }: { onAnswered: () => void; variant
 /** The page right after verifying. Skip goes to Home, which asks again later. */
 export function SourceQuestion() {
   const router = useRouter();
+  const params = useSearchParams();
+  // Where they set out for before signing up (?next=), to go on to after.
+  const [next] = React.useState(() => safeNext(params.get("next")));
   const { hydrated, account, signedIn } = useAuth();
   const [leaving, setLeaving] = React.useState(false);
 
   React.useEffect(() => {
     if (!hydrated || leaving) return;
-    if (!signedIn || !account || !needsSourceQuestion(account)) router.replace("/");
-  }, [hydrated, account, signedIn, leaving, router]);
+    if (!signedIn || !account || !needsSourceQuestion(account)) router.replace(next || "/");
+  }, [hydrated, account, signedIn, leaving, router, next]);
 
   if (!hydrated || !signedIn || !account || (!leaving && !needsSourceQuestion(account))) return null;
 
   const home = () => {
     setLeaving(true);
-    router.replace("/");
+    router.replace(next || "/");
   };
 
   return (

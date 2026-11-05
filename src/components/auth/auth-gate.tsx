@@ -1,14 +1,14 @@
 "use client";
 
 // Every page but Sign up, Sign in and the landing page (`isOpenPath`) needs
-// you signed in. AUTH_PREPAINT turns a signed-out visitor away before the
-// first paint; this catches what happens after it: signing out here or in
-// another tab. Sign in carries the page they
-// were on (`next`), so signing in goes back to it. Renders nothing.
+// you signed in (`signedOutPath`): signed out, Home's own address shows the
+// landing page and any other page asks you in, carrying where you were going
+// (`next`). AUTH_PREPAINT does it before the first paint; this catches what
+// happens after: signing out here or in another tab. Renders nothing.
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { isOpenPath, signOut, signedOutHome, useAuth } from "@/lib/account/auth";
+import { isOpenPath, signOut, signedOutPath, useAuth } from "@/lib/account/auth";
 
 // Set while Sign out takes you to Sign in itself, so the gate doesn't race it there.
 let signingOut = false;
@@ -24,20 +24,17 @@ export function AuthGate() {
       return;
     }
     if (!hydrated || signedIn || signingOut) return;
-    const home = signedOutHome(accounts);
-    const back = home === "/sign-in" && pathname !== "/" ? `?next=${encodeURIComponent(pathname + window.location.search)}` : "";
-    router.replace(home + back);
+    router.replace(signedOutPath(pathname, window.location.search, accounts));
   }, [hydrated, accounts, signedIn, pathname, router]);
 
   return null;
 }
 
-/** Sign out: the account and every piece of work stay in this browser; Sign in says so. */
+/** Sign out: the account's work is parked in this browser (Sign in says so), and the page
+ *  reloads so nothing of it stays in memory. */
 export function useSignOut(): () => void {
-  const router = useRouter();
   return React.useCallback(() => {
     signingOut = true;
-    signOut();
-    router.replace("/sign-in?signed-out=1");
-  }, [router]);
+    void signOut().then(() => window.location.replace("/sign-in?signed-out=1"));
+  }, []);
 }

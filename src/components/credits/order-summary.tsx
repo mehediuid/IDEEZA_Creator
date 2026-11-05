@@ -1,7 +1,8 @@
 "use client";
 
 // The right column of a checkout (User Panel V2 "Payment details": "Pay
-// Monthly $10.00", the plan, Auto renewal, Subtotal, the button) and the
+// Monthly $10.00", the plan, Auto renewal, "Have a Coupon?" under the divider,
+// Subtotal, the button) and the
 // screens after it ("Upgrade Completed" 41549:167626, "Payment Failed"
 // 41549:167678 / 167704).
 
@@ -19,6 +20,7 @@ export function OrderSummary({
   lines,
   renewal,
   adjustments = [],
+  coupon,
   subtotal,
   total,
   cta,
@@ -29,6 +31,8 @@ export function OrderSummary({
   /** A plan: whether it renews at the end of the period. */
   renewal?: { on: boolean; onChange: () => void };
   adjustments?: SummaryLine[];
+  /** A plan's coupon field (coupon-field.tsx): under the divider, above what is taken off. */
+  coupon?: React.ReactNode;
   subtotal: string;
   total: string;
   cta: { label: string; onClick: () => void; disabled?: boolean; loading?: boolean; hint?: string };
@@ -70,22 +74,25 @@ export function OrderSummary({
         )}
       </dl>
 
-      <dl className="flex flex-col gap-[14px] border-t border-solid border-border pt-[20px] text-lg leading-lg">
-        {adjustments.map((l, i) => (
-          <div key={i} className="flex items-baseline justify-between gap-[12px]">
-            <dt className="text-text-secondary">{l.label}</dt>
-            <dd className={cn("tabular-nums", l.tone === "success" ? "text-text-success" : "text-text-primary")}>{l.value}</dd>
+      <div className="flex flex-col gap-[14px] border-t border-solid border-border pt-[20px]">
+        {coupon}
+        <dl className="flex flex-col gap-[14px] text-lg leading-lg">
+          {adjustments.map((l, i) => (
+            <div key={i} className="flex items-baseline justify-between gap-[12px]">
+              <dt className="text-text-secondary">{l.label}</dt>
+              <dd className={cn("tabular-nums", l.tone === "success" ? "text-text-success" : "text-text-primary")}>{l.value}</dd>
+            </div>
+          ))}
+          <div className="flex items-baseline justify-between gap-[12px]">
+            <dt className="text-text-secondary">Subtotal</dt>
+            <dd className="tabular-nums text-text-primary">{subtotal}</dd>
           </div>
-        ))}
-        <div className="flex items-baseline justify-between gap-[12px]">
-          <dt className="text-text-secondary">Subtotal</dt>
-          <dd className="tabular-nums text-text-primary">{subtotal}</dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-[12px] font-semibold">
-          <dt className="text-text-primary">Due today</dt>
-          <dd className="text-xl leading-xl tabular-nums text-text-primary">{total}</dd>
-        </div>
-      </dl>
+          <div className="flex items-baseline justify-between gap-[12px] font-semibold">
+            <dt className="text-text-primary">Due today</dt>
+            <dd className="text-xl leading-xl tabular-nums text-text-primary">{total}</dd>
+          </div>
+        </dl>
+      </div>
 
       <div className="flex flex-col gap-[8px]">
         <Button
