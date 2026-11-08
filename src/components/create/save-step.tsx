@@ -44,7 +44,7 @@ import {
 } from "@/components/projects/project-details-fields";
 import { useStoreWrite } from "@/components/projects/details/use-store-write";
 import { ProjectRow, SavedDialog } from "@/components/projects/saved-dialog";
-import { ProjectLimitNotice, useProjectRoom } from "@/components/projects/project-limit";
+import { ProjectLimitCard, useProjectRoom } from "@/components/projects/project-limit";
 import { useProjectBrief } from "@/lib/brief/project-brief";
 import { useCreateHistory, type BuildJob } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
@@ -244,6 +244,15 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
 
   // ── the plan's allowance (upgrade plan C5) ──
   const room = useProjectRoom();
+  const newBlocked = kind === "new" && room.full;
+  const switchToJoin = () => {
+    setRefusal(null);
+    // The project that went is out of the list; the maker picks another.
+    setGone(null);
+    patch({ mode: "join", joinId: null });
+    setChanging(true);
+    window.requestAnimationFrame(() => chooserRef.current?.querySelector<HTMLElement>("button")?.focus());
+  };
 
   // ── saving ──
   const busy = React.useRef(false);
@@ -389,7 +398,9 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
     kind === "new" ? "Save project" : kind === "version" ? `Save version ${n}` : joinTarget ? `Add to ${joinTarget.name}` : "Add to a project";
   const description =
     kind === "new"
-      ? "Name it and say what it's for. You can change both later on the project page."
+      ? newBlocked
+        ? "Your build is safe here. Upgrade to save it as a new project, or add it to one you have."
+        : "Name it and say what it's for. You can change both later on the project page."
       : kind === "version" && version
         ? `This is a rebuild in the chat “${version.chatTitle}”, so it becomes version ${n} of ${version.project.name}. Version ${n - 1} stays in the project's history.`
         : joinTarget
@@ -472,12 +483,12 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
                 size="lg"
                 onClick={submit}
                 aria-busy={saving || undefined}
-                aria-disabled={saving || blocked !== null || undefined}
+                aria-disabled={saving || blocked !== null || newBlocked || undefined}
                 aria-describedby={reason ? reasonId : undefined}
                 className={cn(
                   TOUCH,
                   "w-full [@container(min-width:360px)]:w-auto",
-                  blocked !== null && "cursor-not-allowed opacity-60",
+                  (blocked !== null || newBlocked) && "cursor-not-allowed opacity-60",
                   saving && "cursor-wait",
                 )}
               >
@@ -504,9 +515,11 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
         <div className="flex flex-col gap-10 [container-type:inline-size]">
           {gone && <Banner tone="attention">{gone}</Banner>}
           {kind === "new" && info.broken && <Banner tone="attention">{info.broken}</Banner>}
-          {kind === "new" && <ProjectLimitNotice canJoin={canJoin} />}
+          {/* Upgrade plan C5: with every project slot in use, the card takes the new
+              project's fields' place; adding it to a project you have stays one press away. */}
+          {newBlocked && <ProjectLimitCard onUseExisting={canJoin ? switchToJoin : undefined} useExistingLabel="Add it to a project I have" />}
 
-          {kind === "new" && (
+          {kind === "new" && !newBlocked && (
             <>
               <ProjectDetailsFields
                 ref={fieldsRef}
@@ -525,16 +538,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
                     <button
                       type="button"
                       className={QUIET_TEXT_BUTTON}
-                      onClick={() => {
-                        setRefusal(null);
-                        // The project that went is out of the list; the maker picks another.
-                        setGone(null);
-                        patch({ mode: "join", joinId: null });
-                        setChanging(true);
-                        window.requestAnimationFrame(() =>
-                          chooserRef.current?.querySelector<HTMLElement>("button")?.focus(),
-                        );
-                      }}
+                      onClick={switchToJoin}
                     >
                       Add it to a project you already have instead
                     </button>

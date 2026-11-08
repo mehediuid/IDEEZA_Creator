@@ -35,7 +35,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "./icon";
 import { Button, ModalFrame } from "@/components/ideeza";
-import { ProjectLimitNotice, useProjectRoom } from "@/components/projects/project-limit";
+import { ProjectLimitCard, useProjectRoom } from "@/components/projects/project-limit";
 import {
   ProjectDetailsFields,
   type DetailsField,
@@ -198,7 +198,19 @@ function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {newBlocked && <ProjectLimitNotice canJoin={openable.length > 0} />}
+        {newBlocked && (
+          <ProjectLimitCard
+            onUseExisting={
+              openable.length > 0
+                ? () => {
+                    setChoice("");
+                    selectRef.current?.focus();
+                  }
+                : undefined
+            }
+            useExistingLabel="Open a project I have"
+          />
+        )}
         {isNew && !newBlocked && (
           <ProjectDetailsFields
             ref={fieldsRef}

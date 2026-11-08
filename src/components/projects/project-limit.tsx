@@ -3,25 +3,35 @@
 // The one plan allowance that is enforced (upgrade plan, decision 2): a new
 // project past the plan's projects (Free 3 · Tinkerer 5 · Builder 20 ·
 // Disruptor 50). Only a NEW project waits — existing projects, adding to
-// one, minting and selling never do. Where a new project is made (Save
-// project after an AI build, Build manually's Project Information) the notice
-// says how many are used, what the next plan gives, and the ways on: Upgrade,
-// or My projects to make room; the dialog's own "add to a project you have"
-// stays open, so a build is never lost.
+// one, minting and selling never do.
+//
+// Where a new project would be made (the setup question's "Start a new
+// project", Save project, Build manually's Project Information) the
+// ProjectLimitCard takes the place of the new project's fields — never a
+// warning hung under them (owner, 2026-11-08): the plan's project slots as
+// tiles, all in use, and the slots the next plan adds; one primary action,
+// Upgrade (at the welcome offer's price while it runs), then using a project
+// you have, then making room. Neutral surface and brand tints, so it reads the
+// same in light and dark.
 
 import * as React from "react";
 import Link from "next/link";
-import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { Folder01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { buttonVariants } from "@/components/ideeza";
+import { Button, buttonVariants } from "@/components/ideeza";
+import { useWelcomeOffer } from "@/components/credits/welcome-offer";
+import { offerPrice } from "@/lib/account/welcome-offer";
 import { checkoutHref } from "@/lib/create/checkout-route";
+import { usd } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
-import { planOf } from "@/lib/create/plans";
+import { planOf, priceOf } from "@/lib/create/plans";
 import { pitchCycle, pitchPlan, projectRoom } from "@/lib/create/upsell";
 import { useManualProjects } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 
 const MY_PROJECTS_HREF = "/projects";
+/** Tiles drawn for the plan's slots; past this many, the count says the rest. */
+const MAX_TILES = 5;
 
 /** Whether one more project fits the plan, and what to say when it doesn't. */
 export function useProjectRoom() {
@@ -31,50 +41,115 @@ export function useProjectRoom() {
   const plan = planOf(sub.tier);
   const pitch = pitchPlan(sub.tier);
   const ready = planReady && projectsReady;
-  const line = `You've made ${room.held} of ${room.allowed} projects on ${plan.name}.${
-    pitch ? ` ${pitch.name} gives you ${pitch.projects}.` : " Delete one in My projects to start another."
-  }`;
+  const cycle = pitchCycle(sub);
   return {
     ready,
     full: ready && room.full,
-    line,
+    held: room.held,
+    allowed: room.allowed,
+    plan,
     pitch,
-    upgradeHref: pitch ? checkoutHref({ kind: "plan", tier: pitch.tier, cycle: pitchCycle(sub) }) : null,
+    tier: sub.tier,
+    cycle,
+    names: projects.map((p) => p.name),
+    upgradeHref: pitch ? checkoutHref({ kind: "plan", tier: pitch.tier, cycle }) : null,
   };
 }
 
-export function ProjectLimitNotice({ canJoin, className }: { canJoin?: boolean; className?: string }) {
+/** "3 of 3 used on Free · Builder gives you 20" — the new-project option's own line when it's full. */
+export function useNewProjectHint(): string | null {
   const room = useProjectRoom();
   if (!room.full) return null;
+  return `${room.held} of ${room.allowed} used on ${room.plan.name}${room.pitch ? ` · ${room.pitch.name} gives you ${room.pitch.projects}` : ""}`;
+}
+
+export function ProjectLimitCard({
+  onUseExisting,
+  useExistingLabel = "Use a project I have",
+  className,
+}: {
+  /** The dialog's own way to pick a project you have; shown when there is one. */
+  onUseExisting?: () => void;
+  useExistingLabel?: string;
+  className?: string;
+}) {
+  const room = useProjectRoom();
+  const offer = useWelcomeOffer();
+  const headingId = React.useId();
+  if (!room.full) return null;
+
+  const { pitch, plan } = room;
+  const tiles = Math.min(room.allowed, MAX_TILES);
+  const more = pitch ? pitch.projects - room.allowed : 0;
+  // The welcome offer halves the first payment while it runs (Free only).
+  const offerLive = offer.ready && offer.live && room.tier === "free";
+  const price = pitch
+    ? offerLive
+      ? `${usd(offerPrice(priceOf(pitch.tier, "monthly").period).final)} first month`
+      : `${usd(priceOf(pitch.tier, room.cycle).perMonth)} a month`
+    : null;
+  const extra = pitch?.tier === "disruptor" ? " and 720p video" : pitch ? " and your builds go first" : "";
+
   return (
-    <aside
-      role="note"
-      className={cn(
-        "flex items-start gap-[12px] rounded-xl border border-solid border-[var(--color-border-warning)] bg-bg-warning-subtle p-[16px]",
-        className,
-      )}
+    <section
+      aria-labelledby={headingId}
+      className={cn("flex flex-col gap-[20px] rounded-2xl border border-solid border-border bg-bg-surface p-[20px]", className)}
     >
-      <span aria-hidden className="mt-[2px] shrink-0 text-[var(--color-icon-warning)]">
-        <Icon icon={Alert02Icon} size={20} />
-      </span>
-      <div className="flex min-w-0 flex-col gap-[10px]">
-        <p className="text-md font-semibold leading-md text-text-primary">{room.line}</p>
-        {canJoin && <p className="text-md leading-md text-text-secondary">Or add it to a project you have.</p>}
-        <div className="flex flex-wrap items-center gap-[12px]">
-          {room.pitch && room.upgradeHref && (
-            <Link href={room.upgradeHref} className={buttonVariants({ hierarchy: "tonal", size: "md" })}>
-              Upgrade to {room.pitch.name}
-            </Link>
-          )}
-          <Link
-            href={MY_PROJECTS_HREF}
-            className="rounded-sm text-md font-semibold leading-md text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+      <div className="flex flex-wrap items-center gap-[8px]">
+        {Array.from({ length: tiles }, (_, i) => (
+          <span
+            key={i}
+            aria-hidden
+            title={room.names[i]}
+            className="inline-flex size-[40px] items-center justify-center rounded-lg bg-bg-brand-subtle text-text-brand"
           >
-            Open My projects
-          </Link>
-        </div>
+            <Icon icon={Folder01Icon} size={20} />
+          </span>
+        ))}
+        {more > 0 && pitch && (
+          <span
+            aria-hidden
+            className="inline-flex h-[40px] items-center rounded-lg border border-dashed border-border-strong px-[12px] text-md font-medium leading-md text-text-tertiary"
+          >
+            +{more.toLocaleString("en-US")} with {pitch.name}
+          </span>
+        )}
+        <span className="ml-auto text-md font-medium leading-md tabular-nums text-text-secondary">
+          {room.held} of {room.allowed} used
+        </span>
       </div>
-    </aside>
+
+      <div className="flex flex-col gap-[4px]">
+        <h3 id={headingId} className="text-lg font-semibold leading-lg text-text-primary">
+          {room.allowed === 1 ? `Your ${plan.name} project is in use` : `All ${room.allowed} of your ${plan.name} projects are in use`}
+        </h3>
+        <p className="text-md leading-md text-text-secondary">
+          {pitch
+            ? `${pitch.name} gives you ${pitch.projects.toLocaleString("en-US")} projects, ${pitch.credits.toLocaleString("en-US")} AI credits a month${extra}.`
+            : "Delete one in My projects to start another."}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-[12px]">
+        {pitch && room.upgradeHref && (
+          <Link href={room.upgradeHref} className={buttonVariants({ hierarchy: "primary", size: "md" })}>
+            Upgrade to {pitch.name}
+            {price && <span className="font-regular opacity-90">· {price}</span>}
+          </Link>
+        )}
+        {onUseExisting && (
+          <Button type="button" hierarchy="secondary" size="md" onClick={onUseExisting}>
+            {useExistingLabel}
+          </Button>
+        )}
+        <Link
+          href={MY_PROJECTS_HREF}
+          className="rounded-sm text-md font-semibold leading-md text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+        >
+          Make room in My projects
+        </Link>
+      </div>
+    </section>
   );
 }
 

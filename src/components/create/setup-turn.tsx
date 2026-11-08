@@ -27,7 +27,7 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import { SelectMenu } from "@/components/ideeza";
 import { CreditBadge } from "@/components/credits/credit-badge";
-import { ProjectLimitNotice } from "@/components/projects/project-limit";
+import { ProjectLimitCard, useNewProjectHint, useProjectRoom } from "@/components/projects/project-limit";
 import { CanvasFooter } from "./canvas-footer";
 import type { Companion } from "@/lib/create/companions";
 import type { SetupAnswer } from "@/lib/create/history";
@@ -96,6 +96,11 @@ export function SetupTurn({
   const [chosenId, setProjectId] = React.useState<string | null>(null);
   const [projectName, setProjectName] = React.useState("");
   const projectId = chosenId ?? (projectName === "" ? (addTo?.id ?? "") : "");
+  // The plan's projects (upgrade plan C5): when they're all in use, a new project
+  // can't start — the card takes the name field's place, before any credit is spent.
+  const room = useProjectRoom();
+  const newHint = useNewProjectHint();
+  const pickerRef = React.useRef<HTMLDivElement>(null);
 
   // A chat started from a project's "Add a product" already knows its project: the maker chose
   // it on that page and started the concept there, its credit in view. So the project is never
@@ -195,7 +200,15 @@ export function SetupTurn({
   // Several products without a project to add to name one new project (§4.4.8); otherwise the
   // question is which project — the one this chat was started from, unless the maker picks another.
   const choosing = !multi || addTo !== null;
-  const ready = choosing ? projectId !== "" || projectName.trim().length > 0 : projectName.trim().length > 0;
+  const newChosen = choosing ? projectId === "" && projectName !== "" : true;
+  const newBlocked = room.full && newChosen;
+  const ready =
+    !newBlocked && (choosing ? projectId !== "" || projectName.trim().length > 0 : projectName.trim().length > 0);
+  const useExisting = () => {
+    setProjectName("");
+    setProjectId(null);
+    window.requestAnimationFrame(() => pickerRef.current?.querySelector<HTMLElement>("[role=combobox]")?.click());
+  };
 
   return (
     <Card>
@@ -223,12 +236,16 @@ export function SetupTurn({
         }
       >
         {!choosing ? (
-          <NameField
-            label="Project name"
-            value={projectName}
-            onChange={setProjectName}
-            placeholder="e.g. Field survey drone"
-          />
+          newBlocked ? (
+            <ProjectLimitCard className="mt-[12px]" />
+          ) : (
+            <NameField
+              label="Project name"
+              value={projectName}
+              onChange={setProjectName}
+              placeholder="e.g. Field survey drone"
+            />
+          )
         ) : (
           <>
             {/* A dropdown, not a row per project. The rows were fine for the
@@ -237,39 +254,41 @@ export function SetupTurn({
                 of a chat, and the question they were answering scrolled off
                 the top. Same control the Brief's own project chooser uses, so
                 picking a project reads the same in both places. */}
-            <SelectMenu
-              placeholder="Choose a project"
-              ariaLabel="Project"
-              value={
-                projectId ? projectId : projectName !== "" ? NEW_PROJECT : null
-              }
-              onChange={(v) => {
-                if (v === NEW_PROJECT) {
-                  setProjectId("");
-                  setProjectName((n) => n || " ");
-                } else {
-                  setProjectId(v);
-                  setProjectName("");
+            <div ref={pickerRef}>
+              <SelectMenu
+                placeholder="Choose a project"
+                ariaLabel="Project"
+                value={
+                  projectId ? projectId : projectName !== "" ? NEW_PROJECT : null
                 }
-              }}
-              options={[
-                {
-                  value: NEW_PROJECT,
-                  label: "+ Start a new project",
-                  sub: multi ? "These products become its first." : "This product becomes its first.",
-                },
-                // Two projects can share a name, so each row says what it
-                // holds and when it last changed — four "Drone" rows with
-                // nothing else on them could not be told apart.
-                ...projects.map((pr) => ({
-                  value: pr.id,
-                  label: pr.name,
-                  sub: pr.detail,
-                  section: "Existing projects",
-                })),
-              ]}
-            />
-            {projectId === "" && projectName !== "" && (
+                onChange={(v) => {
+                  if (v === NEW_PROJECT) {
+                    setProjectId("");
+                    setProjectName((n) => n || " ");
+                  } else {
+                    setProjectId(v);
+                    setProjectName("");
+                  }
+                }}
+                options={[
+                  {
+                    value: NEW_PROJECT,
+                    label: "+ Start a new project",
+                    sub: newHint ?? (multi ? "These products become its first." : "This product becomes its first."),
+                  },
+                  // Two projects can share a name, so each row says what it
+                  // holds and when it last changed — four "Drone" rows with
+                  // nothing else on them could not be told apart.
+                  ...projects.map((pr) => ({
+                    value: pr.id,
+                    label: pr.name,
+                    sub: pr.detail,
+                    section: "Existing projects",
+                  })),
+                ]}
+              />
+            </div>
+            {newChosen && !newBlocked && (
               <NameField
                 label="New project name"
                 value={projectName.trim()}
@@ -277,9 +296,7 @@ export function SetupTurn({
                 placeholder="e.g. Bench tools"
               />
             )}
-            {/* Upgrade plan C5, said before any credit is spent: drawing and building still
-                work; only saving it as a new project waits for room. */}
-            {projectId === "" && projectName !== "" && <ProjectLimitNotice canJoin={projects.length > 0} />}
+            {newBlocked && <ProjectLimitCard className="mt-[12px]" onUseExisting={projects.length > 0 ? useExisting : undefined} />}
           </>
         )}
       </Question>
@@ -289,7 +306,15 @@ export function SetupTurn({
         spends
         label="Start drawing"
         ready={ready}
-        reason={choosing ? "Pick a project first" : "Name the project first"}
+        reason={
+          newBlocked
+            ? choosing && projects.length > 0
+              ? "Pick a project you have, or upgrade"
+              : `Upgrade to start a new project`
+            : choosing
+              ? "Pick a project first"
+              : "Name the project first"
+        }
         onGo={() =>
           onAnswer({
             projectId: choosing ? projectId : "",
