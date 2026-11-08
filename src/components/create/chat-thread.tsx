@@ -20,7 +20,11 @@
 // every landing place draws the arrival ring the host sets for 1.2 s.
 
 import * as React from "react";
-import { Add01Icon, Refresh01Icon, Undo02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Alert02Icon, Refresh01Icon, Undo02Icon } from "@hugeicons/core-free-icons";
+import { buttonVariants } from "@/components/ideeza";
+import { cn } from "@/lib/utils";
+import { BuyCreditsButton } from "@/components/credits/buy-credits";
+import { PlanPitchLine } from "@/components/credits/plan-pitch";
 import { Icon } from "@/components/dashboard/icon";
 import { TextInput } from "@/components/ideeza/text-input";
 import {
@@ -56,7 +60,7 @@ import {
 } from "./anchors";
 import { useMinuteClock } from "./build-status";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
-import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
+import { ImageTurn } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
 import { ReviewOutputs } from "./review-outputs";
 import { SpecFacts } from "./spec-panel";
@@ -289,7 +293,6 @@ export function ChatThread({
   // runs after ours, so it reads a render behind here.
   const { hydrated: creditsHydrated, balance } = useCredits();
   const cost = state.cost;
-  const shortForBuild = creditsHydrated && balance < cost;
   const shortForRender = creditsHydrated && balance < CONCEPT_COST;
 
   // Top-aligned: a stand-in line or a size that doesn't fit makes one card
@@ -527,11 +530,6 @@ export function ChatThread({
               }
             />
           )}
-          {offerBuild && allReady && shortForBuild && (
-            <div id={CREDITS_NOTICE_ID} tabIndex={-1} className={`w-full max-w-[640px] ${LANDING}`}>
-              <InsufficientCreditsBanner cost={cost} />
-            </div>
-          )}
         </div>
       )}
       <div ref={endRef} />
@@ -691,6 +689,10 @@ function BuildAction({
 }) {
   const { hydrated, balance } = useCredits();
   const short = hydrated && balance < cost;
+  // Short of credits with everything drawn (owner, 2026-11-08 — no warning box hung
+  // under the bar): Buy credits becomes the bar's one filled button, beside Build
+  // off, and one line in the bar says what's missing and offers the next plan up.
+  const shortRow = short && allReady && !preparing;
   // Preparing is busy, not disabled: a disabled button drops focus to <body>,
   // so the gate that opens next had nowhere to hand focus back to.
   const blocked = short || !allReady || !!emptyName;
@@ -744,10 +746,9 @@ function BuildAction({
           : failedName
             ? "A chosen concept didn't come through"
             : "Waiting for every concept to land"}
-        {short ? (
-          <span className="text-text-error"> · you have {balance}</span>
-        ) : null}
       </p>
+      {/* The bar's actions stay together; on a phone they stack full width, the filled one first. */}
+      <div className="ml-auto flex items-center gap-[12px] max-sm:w-full max-sm:flex-col-reverse max-sm:items-stretch max-sm:[&>*]:ml-0 max-sm:[&>*]:justify-center">
       {/* Busy looks like the gate's own busy: the brand fill, dimmed, turning
           — not a grey that reads as disabled while the work is under way. */}
       <button
@@ -778,10 +779,32 @@ function BuildAction({
         {/* The build's price, on the button that pays it. */}
         {!preparing && !specBlock && allReady && <CreditBadge credits={cost} onBrand={!blocked} />}
       </button>
-      {/* The reason a disabled button is off, where the keyboard and a touch
-          screen can reach it — a title on a disabled button reaches neither. */}
-      {reason && !preparing && (
-        <p className="w-full text-right text-sm text-text-tertiary">{reason}</p>
+      {shortRow && (
+        // The rail's "Buy credits to build" lands here (CREDITS_NOTICE_ID).
+        <BuyCreditsButton
+          id={CREDITS_NOTICE_ID}
+          need={cost}
+          className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), "scroll-mt-[16px]", ARRIVAL_RING)}
+        >
+          Buy credits
+        </BuyCreditsButton>
+      )}
+      </div>
+      {shortRow ? (
+        <div role="status" className="flex w-full flex-wrap items-center justify-between gap-x-[16px] gap-y-[6px]">
+          <p className="flex items-center gap-[8px] text-md leading-md text-text-primary">
+            <span aria-hidden className="inline-flex shrink-0 text-[color:var(--color-icon-warning)]">
+              <Icon icon={Alert02Icon} size={16} />
+            </span>
+            This build costs {cost} credits. You have {balance}, so {cost - balance} more.
+          </p>
+          <PlanPitchLine />
+        </div>
+      ) : (
+        // The reason a disabled button is off, where the keyboard and a touch
+        // screen can reach it — a title on a disabled button reaches neither.
+        reason &&
+        !preparing && <p className="w-full text-right text-sm text-text-tertiary">{reason}</p>
       )}
     </div>
   );

@@ -25,7 +25,6 @@ import Link from "next/link";
 import {
   Alert02Icon,
   CheckmarkBadge01Icon,
-  Coins01Icon,
   Copy01Icon,
   Delete02Icon,
   LockIcon,
@@ -33,8 +32,6 @@ import {
   Refresh01Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
-import { BuyCreditsButton } from "@/components/credits/buy-credits";
-import { PlanPitchLine } from "@/components/credits/plan-pitch";
 import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
@@ -359,42 +356,6 @@ function BuiltChip() {
       <Icon icon={CheckmarkBadge01Icon} size={14} />
       In this build
     </span>
-  );
-}
-
-// Shown once per thread while the balance can't cover a build — every
-// ready card's CTA is off, and one notice explains all of them. The
-// thread places it under the newest concept that could still be built
-// (see chat-thread.tsx); per card it would repeat the same sentence
-// down the whole conversation.
-export function InsufficientCreditsBanner({ cost }: { cost: number }) {
-  return (
-    <aside
-      role="note"
-      data-testid="credits-banner"
-      className="flex w-full max-w-[640px] items-start gap-[12px] rounded-2xl border border-[var(--color-border-warning)] bg-bg-warning-subtle p-[16px]"
-    >
-      <span className="mt-[2px] shrink-0 text-[var(--color-icon-warning)]">
-        <Icon icon={Coins01Icon} size={20} />
-      </span>
-      <div className="flex min-w-0 flex-col gap-[4px]">
-        <p className="text-md font-semibold text-text-primary">
-          Not enough credits to build this
-        </p>
-        <p className="text-sm text-text-secondary">
-          Building it costs {cost} credits — what each product&apos;s picked
-          pieces cost — and each concept render costs {CONCEPT_COST}.
-        </p>
-        <BuyCreditsButton
-          need={cost}
-          className="w-fit text-left text-sm font-semibold text-text-warning outline-none transition-opacity duration-fast hover:opacity-80 focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          Buy credits →
-        </BuyCreditsButton>
-        {/* Upgrade plan C1: the next plan up beside the quick fix. */}
-        <PlanPitchLine className="w-fit" />
-      </div>
-    </aside>
   );
 }
 
