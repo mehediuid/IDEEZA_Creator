@@ -26,6 +26,7 @@ import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
 import { cn } from "@/lib/utils";
 import type { SlotProps } from "./slots";
+import { ContributorsPlanNote } from "@/components/projects/project-limit";
 
 /** 44 px at phone width and on a coarse pointer (the page's other phone targets). */
 const PHONE_TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
@@ -66,6 +67,8 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
             ) : undefined
           }
         />
+        {/* Upgrade plan C7, on the build side (Earn carries no upgrade talk): soft, adding still works. */}
+        {manages && <ContributorsPlanNote count={0} />}
       </div>
     );
   }
@@ -104,6 +107,7 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
           </li>
         ))}
       </ul>
+      {manages && <ContributorsPlanNote count={team.length} />}
       {manages && (
         <Link href={splits} className={cn(QUIET_LINK, PHONE_TAP)}>
           Add people or change shares in Splits

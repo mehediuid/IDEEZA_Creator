@@ -298,6 +298,14 @@ export type CoinInput = {
   /** The paid plan, or null on Free. */
   plan: { subId: string; tier: string; name: string; renewsAt: number | null; autoRenew: boolean; pendingName: string | null } | null;
   now: number;
+  /** When the month's plan credits come back (upgrade plan C4). */
+  refillAt?: number | null;
+  /** The next plan up, named beside a fix (upgrade plan C4, D3); null on the top plan. */
+  pitch?: { name: string; credits: number } | null;
+  /** On Free: a refill's notice names the next plan up (upgrade plan D3). */
+  onFree?: boolean;
+  /** The welcome offer while it runs: its last hour gets one notice (upgrade plan F1). */
+  offer?: { startedAt: number; endsAt: number } | null;
 };
 
 const credits = (n: number) => `${n} credit${n === 1 ? "" : "s"}`;
@@ -328,7 +336,12 @@ export function coinNotices(c: CoinInput): Notice[] {
       kind: "coin",
       tag: "Coin · Credits",
       title: `You have ${credits(c.balance)} left`,
-      body: `Your low mark is ${c.lowAt}. Buy credits to keep building.`,
+      body:
+        c.refillAt || c.pitch
+          ? `Your low mark is ${c.lowAt}.${c.refillAt ? ` They refill on ${shortDate(c.refillAt)}.` : ""} Need more now? Buy credits${
+              c.pitch ? `, or get ${c.pitch.name} for ${c.pitch.credits.toLocaleString("en-US")} a month` : ""
+            }.`
+          : `Your low mark is ${c.lowAt}. Buy credits to keep building.`,
       href: CREDITS_HREF,
       at: line?.ts ?? c.now,
     });
@@ -349,6 +362,36 @@ export function coinNotices(c: CoinInput): Notice[] {
         at: Math.max(lot.ts, lot.expiresAt - window),
       });
     }
+  }
+
+  // The month's plan credits arriving (upgrade plan D3): every grant of the
+  // last week but the account's very first.
+  const grants = c.ledger.filter((l) => l.reason === "grant").sort((a, b) => a.ts - b.ts);
+  for (const g of grants.slice(1)) {
+    if (g.ts > c.now || c.now - g.ts > 7 * DAY) continue;
+    out.push({
+      id: `coin:grant:${g.id}`,
+      kind: "coin",
+      tag: "Coin · Credits",
+      title: c.onFree ? `Your ${g.delta} free credits are back` : `Your ${credits(g.delta)} for this month are here`,
+      ...(c.onFree && c.pitch ? { body: `Want ${c.pitch.credits.toLocaleString("en-US")} a month? See ${c.pitch.name}.` } : {}),
+      href: c.onFree ? PLAN_PRICING_HREF : CREDITS_HREF,
+      at: g.ts,
+    });
+  }
+
+  // The welcome offer's last hour (upgrade plan F1): its clock is real, so this is too.
+  const o = c.offer;
+  if (o && c.now >= o.endsAt - HOUR && c.now < o.endsAt) {
+    out.push({
+      id: `coin:offer-ending:${o.startedAt}`,
+      kind: "coin",
+      tag: "Coin · Plan",
+      title: "Your 50% off ends in less than an hour",
+      body: "Half off your first payment on any plan.",
+      href: PLAN_PRICING_HREF,
+      at: o.endsAt - HOUR,
+    });
   }
 
   const p = c.plan;

@@ -27,6 +27,7 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import { SelectMenu } from "@/components/ideeza";
 import { CreditBadge } from "@/components/credits/credit-badge";
+import { ProjectLimitNotice } from "@/components/projects/project-limit";
 import { CanvasFooter } from "./canvas-footer";
 import type { Companion } from "@/lib/create/companions";
 import type { SetupAnswer } from "@/lib/create/history";
@@ -276,6 +277,9 @@ export function SetupTurn({
                 placeholder="e.g. Bench tools"
               />
             )}
+            {/* Upgrade plan C5, said before any credit is spent: drawing and building still
+                work; only saving it as a new project waits for room. */}
+            {projectId === "" && projectName !== "" && <ProjectLimitNotice canJoin={projects.length > 0} />}
           </>
         )}
       </Question>

@@ -38,6 +38,8 @@ import { Avatar, Button, Divider, ProgressBar, TestnetDemoBadge, buttonVariants 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CREDITS_HREF } from "@/lib/create/credit-pricing";
+import { checkoutHref } from "@/lib/create/checkout-route";
+import { pitchCycle, pitchPlan } from "@/lib/create/upsell";
 import { useTheme } from "@/components/theme-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { creditTotals, levelOf, xpOf } from "@/lib/account/summary";
@@ -282,6 +284,9 @@ export function AccountPopover({
   onLeave?: () => void;
 }) {
   const planLabel = usePlanLabel();
+  // Upgrade plan B2: the way up sits beside the plan's name (none on Disruptor).
+  const { sub } = useCreatePlan();
+  const pitch = pitchPlan(sub.tier);
   const me = useMe();
   const signOutNow = useSignOut();
   const { ledger, hydrated } = useCredits();
@@ -351,7 +356,22 @@ export function AccountPopover({
             <Avatar initials={me.initials} src={me.photo} size="sm" />
             <span className="flex min-w-0 flex-col gap-[2px]">
               <span className="truncate text-md font-medium leading-md text-text-primary">{me.name}</span>
-              <span className="truncate text-sm font-regular leading-xs text-text-secondary">{planLabel}</span>
+              <span className="flex min-w-0 items-center gap-[6px] text-sm font-regular leading-xs text-text-secondary">
+                <span className="truncate">{planLabel}</span>
+                {pitch && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <Link
+                      href={checkoutHref({ kind: "plan", tier: pitch.tier, cycle: pitchCycle(sub) })}
+                      data-nav-item
+                      onClick={onLeave}
+                      className="shrink-0 font-semibold text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                    >
+                      Upgrade to {pitch.name}
+                    </Link>
+                  </>
+                )}
+              </span>
             </span>
           </div>
 

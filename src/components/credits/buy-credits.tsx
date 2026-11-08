@@ -8,7 +8,8 @@
 // pack cards' look, the payment column (payment-picker) and the order
 // summary (order-summary), so the two read as one checkout.
 //
-//   choose — the three packs, the smallest that covers the shortfall chosen
+//   choose — the three packs, the smallest that covers the shortfall chosen,
+//            and under them the next plan up (plan-pitch.tsx, upgrade plan C2)
 //   pay    — how to pay | the order and Pay $N
 // then "Payment successful" (N credits added, a paused build starting) or
 // "Payment failed" with Try again.
@@ -47,6 +48,7 @@ import { useSettings } from "@/lib/settings/use-settings";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
 import { OrderSummary, PaymentResult } from "./order-summary";
+import { PlanPitch } from "./plan-pitch";
 import { CHOICE, CHOICE_OFF, CHOICE_ON, PaymentPicker, useWalletStatus, type PayCoin } from "./payment-picker";
 import { PurchaseConfirm } from "./purchase-confirm";
 
@@ -115,7 +117,7 @@ export function orderOf(pick: CreditPick, discount: number) {
   return { name: "Custom credits", pack: undefined, base: pick.credits, bonus: 0, price: customPrice(pick.credits, discount) };
 }
 
-/** "550 credits (500 + 50 bonus)" */
+/** "200 credits (180 + 20 bonus)" */
 export function creditsLine(base: number, bonus: number): string {
   return bonus > 0 ? `${plural(base + bonus, "credit")} (${base.toLocaleString("en-US")} + ${bonus} bonus)` : plural(base, "credit");
 }
@@ -329,6 +331,8 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
               );
             })}
           </div>
+          {/* Upgrade plan C2: the packs stay the quick fix; the next plan up sits under them. */}
+          <PlanPitch />
         </div>
       )}
 

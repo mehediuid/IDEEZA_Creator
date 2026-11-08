@@ -44,6 +44,7 @@ import {
 } from "@/components/projects/project-details-fields";
 import { useStoreWrite } from "@/components/projects/details/use-store-write";
 import { ProjectRow, SavedDialog } from "@/components/projects/saved-dialog";
+import { ProjectLimitNotice, useProjectRoom } from "@/components/projects/project-limit";
 import { useProjectBrief } from "@/lib/brief/project-brief";
 import { useCreateHistory, type BuildJob } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
@@ -241,6 +242,9 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const aiProducts = React.useMemo(() => describedProductsOf(job), [job]);
   const choices = React.useMemo(() => coverChoicesOf(job), [job]);
 
+  // ── the plan's allowance (upgrade plan C5) ──
+  const room = useProjectRoom();
+
   // ── saving ──
   const busy = React.useRef(false);
   const [pending, setPending] = React.useState<{ projectId: string; revert: () => void; unpause: () => boolean } | null>(null);
@@ -331,6 +335,15 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const submit = () => {
     if (busy.current || saving) return;
     setRefusal(null);
+    if (kind === "new" && room.full) {
+      // Upgrade plan decision 2: a new project past the plan's allowance waits; joining doesn't.
+      setRefusal(
+        room.pitch
+          ? `To save it as a new project, upgrade to ${room.pitch.name} or make room in My projects. Or add it to a project you have.`
+          : "To save it as a new project, make room in My projects. Or add it to a project you have.",
+      );
+      return;
+    }
     if (kind === "new") {
       const check = checkSaveDraft(draft, otherNames);
       if (!check.ok) {
@@ -491,6 +504,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
         <div className="flex flex-col gap-10 [container-type:inline-size]">
           {gone && <Banner tone="attention">{gone}</Banner>}
           {kind === "new" && info.broken && <Banner tone="attention">{info.broken}</Banner>}
+          {kind === "new" && <ProjectLimitNotice canJoin={canJoin} />}
 
           {kind === "new" && (
             <>

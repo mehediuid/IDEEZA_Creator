@@ -53,6 +53,7 @@ import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { RenderQuality } from "@/lib/create/quality";
 import { CreditBadge } from "@/components/credits/credit-badge";
+import { OutOfCreditsLine } from "@/components/credits/out-of-credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useGuards } from "@/lib/manual/use-write-guard";
 import {
@@ -2009,11 +2010,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                   : undefined
             }
           />
-          {!heldShows && (
+          {!heldShows && !canRender && <OutOfCreditsLine className="mt-[8px]" />}
+          {!heldShows && canRender && (
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
-            {!canRender
-              ? "You are out of credits — top them up to draw another concept."
-              : setupPending
+            {setupPending
                 ? "Answer the question on the canvas first — nothing is drawn or charged until you do."
                 : target.kind === "blocked"
                   ? `${target.hint}.`

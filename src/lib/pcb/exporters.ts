@@ -7,6 +7,7 @@
 import type { CanvasObject, PcbState } from "./types";
 import { PAD_OFFSETS } from "./schematic-to-pcb";
 import { mountingHoleDrillPx } from "./pcb-3d";
+import { recordExport } from "../create/export-count";
 
 // Canvas board origin (matches pcb-canvas.tsx top:60/left:60) + px→mm scale.
 const BOARD_X0 = 60;
@@ -178,6 +179,8 @@ export function collectPcbModel(state: PcbState, opts?: { onlySelected?: boolean
 
 // ── downloads ────────────────────────────────────────────────────────────────
 export function downloadBlob(filename: string, data: BlobPart, mime: string) {
+  // Counted against the plan's exports a month (upgrade plan C6; soft, never stops one).
+  recordExport();
   const blob = new Blob([data], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -189,6 +192,7 @@ export function downloadBlob(filename: string, data: BlobPart, mime: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 export function downloadDataUrl(filename: string, dataUrl: string) {
+  recordExport();
   const a = document.createElement("a");
   a.href = dataUrl;
   a.download = filename;

@@ -214,8 +214,8 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
           ),
           list(
             "Starter: 100 credits for $5.",
-            "Pro: 500 credits plus 50 bonus for $10.",
-            "Power: 1,000 credits plus 150 bonus for $20.",
+            "Pro: 180 credits plus 20 bonus for $10.",
+            "Power: 400 credits plus 50 bonus for $20.",
           ),
           p(
             "You can also enter a custom amount of at least 50 credits. Credits you buy last 12 months, and IDEEZA always spends the ones that expire first.",

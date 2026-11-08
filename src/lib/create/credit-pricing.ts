@@ -31,10 +31,15 @@ export type CreditPack = {
   popular?: boolean;
 };
 
+// Owner decision 1 of the upgrade plan (2026-11-08): a plan is always the
+// better buy per credit. The design's packs (Pro 550 for $10, Power 1,150 for
+// $20) gave more credits than the $10 Builder plan's 300 a month, so "get a
+// plan for more credits" wasn't true. Now: about 5¢ a credit in a pack
+// (4.4¢ for Power), against 3.3¢ on Builder and 1.7¢ on Disruptor.
 export const CREDIT_PACKS: readonly CreditPack[] = [
   { id: "starter", name: "Starter", price: 5, base: 100, bonus: 0 },
-  { id: "pro", name: "Pro", price: 10, base: 500, bonus: 50, popular: true },
-  { id: "power", name: "Power", price: 20, base: 1000, bonus: 150 },
+  { id: "pro", name: "Pro", price: 10, base: 180, bonus: 20, popular: true },
+  { id: "power", name: "Power", price: 20, base: 400, bonus: 50 },
 ];
 
 /** A custom amount: dollars per credit, and the least that can be bought. */

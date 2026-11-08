@@ -34,6 +34,7 @@ import {
   betterDeal,
   customAmountError,
   customPrice,
+  discountFor,
   discountRows,
   packPrice,
   usd,
@@ -142,7 +143,10 @@ export function CreditsPanel() {
               </div>
               <div className="flex flex-col items-center gap-[4px] border-t border-solid border-border px-[24px] py-[20px] text-center">
                 <span className="text-md leading-md text-text-primary">
-                  {discount > 0 ? `You're saving ${pct(discount)} with your ${plan.name} plan` : `Save up to ${pct(MAX_DISCOUNT)} with an IDEEZA plan`}
+                  {/* Upgrade plan E2: on a plan without a discount, the pack's price with Builder, not a vague "up to". */}
+                  {discount > 0
+                    ? `You're saving ${pct(discount)} with your ${plan.name} plan`
+                    : `With Builder: ${usd(packPrice(p, discountFor("builder", "monthly")).final)}`}
                 </span>
                 <button
                   type="button"

@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import type { AsmScene } from "@/lib/assembly/scene";
 import type { Solid } from "@/lib/assembly/types";
+import { recordExport } from "@/lib/create/export-count";
 
 function meshOf(s: Solid): THREE.Mesh {
   let geo: THREE.BufferGeometry;
@@ -92,6 +93,7 @@ export function exportGlb(scene: AsmScene, fileName: string): Promise<number> {
         const link = document.createElement("a");
         link.href = url;
         link.download = fileName;
+        recordExport(); // the plan's exports a month (upgrade plan C6)
         document.body.appendChild(link);
         link.click();
         link.remove();

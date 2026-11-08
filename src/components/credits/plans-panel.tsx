@@ -40,6 +40,8 @@ import { OfferBanner, OfferSticker, useWelcomeOffer } from "./welcome-offer";
 import { discountFor, usd, type BillingCycle } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { useManualProjects } from "@/lib/manual/projects";
+import { useCredits } from "@/lib/create/credits";
+import { fitsYou, usageOf } from "@/lib/create/upsell";
 import {
   HIGH_VIDEO_TIER,
   PLANS,
@@ -62,6 +64,7 @@ const price = (v: number) => (Number.isInteger(v) ? `$${v}` : usd(v));
 
 const PAID = PLANS.filter((p) => p.monthly > 0);
 const FREE = planOf("free");
+const PLAN_ORDER: readonly PlanTier[] = ["free", "tinkerer", "builder", "disruptor"];
 
 type Dialog = { kind: "downgrade"; tier: PlanTier; cycle: BillingCycle } | { kind: "cancel" } | null;
 
@@ -73,6 +76,15 @@ export function PlansPanel() {
   const [cycle, setCycle] = React.useState<BillingCycle>("monthly");
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const [synced, setSynced] = React.useState(false);
+  // Upgrade plan E1: what you used in the last 30 days, and the smallest plan that covers it.
+  const { hydrated: creditsReady, ledger } = useCredits();
+  const { hydrated: projectsReady, projects } = useManualProjects();
+  const [now] = React.useState(() => Date.now());
+  const usage = usageOf(ledger, projects.length, now);
+  // A plan above yours that covers it is named; otherwise your own plan covers it (never a nudge down).
+  const fitTier = fitsYou(usage);
+  const fit = PLAN_ORDER.indexOf(fitTier) > PLAN_ORDER.indexOf(sub.tier) ? fitTier : sub.tier;
+  const showUse = hydrated && creditsReady && projectsReady && (usage.credits > 0 || usage.projects > 0);
 
   // Open on the cycle you pay by, once the plan is read.
   if (hydrated && !synced) {
@@ -97,6 +109,15 @@ export function PlansPanel() {
           <p className="max-w-[62ch] text-lg leading-lg text-text-secondary">
             Break creative boundaries with flexible plans made just for you.
           </p>
+          {showUse && (
+            <p className="max-w-[62ch] text-md leading-md text-text-secondary">
+              Last 30 days: {usage.credits.toLocaleString("en-US")} {usage.credits === 1 ? "credit" : "credits"} ·{" "}
+              {usage.projects.toLocaleString("en-US")} {usage.projects === 1 ? "project" : "projects"}.{" "}
+              <strong className="font-semibold text-text-primary">
+                {fit === sub.tier ? `Your ${planOf(fit).name} plan covers that.` : `${planOf(fit).name} fits you.`}
+              </strong>
+            </p>
+          )}
         </div>
         <Segmented
           label="Billing"
@@ -125,6 +146,7 @@ export function PlansPanel() {
               cycle={cycle}
               hydrated={hydrated}
               offer={offerLive}
+              fits={showUse && fit === p.tier && fit !== sub.tier}
               onAct={() => act(p, cycle)}
             />
           ))}
@@ -241,6 +263,7 @@ function PlanCard({
   cycle,
   hydrated,
   offer,
+  fits,
   onAct,
 }: {
   plan: Plan;
@@ -248,6 +271,8 @@ function PlanCard({
   cycle: BillingCycle;
   hydrated: boolean;
   offer: boolean;
+  /** The smallest plan that covers the last 30 days' use (upgrade plan E1). */
+  fits?: boolean;
   onAct: () => void;
 }) {
   const cta = useCta(p, cycle, hydrated);
@@ -260,10 +285,11 @@ function PlanCard({
           : "border-border bg-bg-surface",
       )}
     >
-      {p.popular && (
-        <Badge tone="brand-solid" className="absolute right-[24px] top-[24px]">
-          Most popular
-        </Badge>
+      {(p.popular || fits) && (
+        <span className="absolute right-[24px] top-[24px] flex items-center gap-[8px]">
+          {fits && <Badge tone="success">Fits you</Badge>}
+          {p.popular && <Badge tone="brand-solid">Most popular</Badge>}
+        </span>
       )}
       <div className="flex flex-col gap-[12px] pt-[24px]">
         <h3 className="text-3xl font-semibold leading-3xl text-text-primary">{p.name}</h3>
@@ -500,7 +526,7 @@ const FAQ: Record<FaqTab, { q: string; a: string }[]> = {
   disruptor: [
     {
       q: "What's the biggest advantage of the Disruptor plan?",
-      a: "1,200 AI credits a month, the fast-track queue with the shortest waits, 200 projects, 720p AI video, and 25% off credits (35% yearly).",
+      a: "1,200 AI credits a month, the fast-track queue with the shortest waits, 50 projects, 720p AI video, and 25% off credits (35% yearly).",
     },
     { q: "Can I make 720p videos on other plans?", a: "No. Other plans make 480p videos; 720p comes with Disruptor." },
   ],

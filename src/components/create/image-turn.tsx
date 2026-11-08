@@ -34,6 +34,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
+import { PlanPitchLine } from "@/components/credits/plan-pitch";
 import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
@@ -390,6 +391,8 @@ export function InsufficientCreditsBanner({ cost }: { cost: number }) {
         >
           Buy credits →
         </BuyCreditsButton>
+        {/* Upgrade plan C1: the next plan up beside the quick fix. */}
+        <PlanPitchLine className="w-fit" />
       </div>
     </aside>
   );

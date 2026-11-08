@@ -12,11 +12,13 @@ const T0 = Date.UTC(2026, 3, 15, 12); // 15 Apr 2026, as the design's history
 
 // ── pricing ──────────────────────────────────────────────────────────────
 
-test("the three packs, as the design prices them", () => {
+test("the three packs, priced so a plan is always the better buy (upgrade plan, decision 1)", () => {
   assert.deepEqual(
     P.CREDIT_PACKS.map((p) => [p.name, p.price, p.base + p.bonus]),
-    [["Starter", 5, 100], ["Pro", 10, 550], ["Power", 20, 1150]],
+    [["Starter", 5, 100], ["Pro", 10, 200], ["Power", 20, 450]],
   );
+  // Builder: 300 credits for $10 a month — cheaper per credit than any pack.
+  for (const p of P.CREDIT_PACKS) assert.ok(p.price / (p.base + p.bonus) > 10 / 300, `${p.name} costs more per credit than Builder`);
   assert.equal(P.CREDIT_PACKS.find((p) => p.popular).id, "pro");
 });
 
@@ -44,7 +46,8 @@ test("a custom amount: $0.10 a credit, at least 50", () => {
 
 test("a better deal: 60 custom credits ($6) → Starter, 100 for $5", () => {
   assert.equal(P.betterDeal(60).id, "starter");
-  assert.equal(P.betterDeal(500).id, "pro"); // $50 custom vs 550 for $10
+  assert.equal(P.betterDeal(200).id, "pro"); // $20 custom vs 200 for $10
+  assert.equal(P.betterDeal(500), null); // more than any pack holds
   assert.equal(P.betterDeal(5000), null); // more than any pack holds
   assert.equal(P.betterDeal(40), null); // not a valid amount
 });

@@ -29,6 +29,7 @@ import { editorHref } from "@/lib/manual/editor-scope";
 import { PROJECT_NAME_MAX, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 import { CreditBadge } from "@/components/credits/credit-badge";
+import { PlanPitchLine } from "@/components/credits/plan-pitch";
 
 type Step = "choose" | "ai" | "manual";
 
@@ -223,9 +224,13 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
         </p>
       </div>
       {!canRender && (
-        <a href="/settings/plan?tab=credits" className="self-start text-md font-medium text-text-brand underline underline-offset-2">
-          Top up credits
-        </a>
+        <div className="flex flex-col items-start gap-[4px]">
+          <a href="/settings/plan?tab=credits" className="self-start text-md font-medium text-text-brand underline underline-offset-2">
+            Top up credits
+          </a>
+          {/* Upgrade plan C1: the next plan up beside the quick fix. */}
+          <PlanPitchLine />
+        </div>
       )}
       <StepFooter onBack={onBack}>
         <Button type="button" hierarchy="primary" size="lg" onClick={start} aria-disabled={!canRender || undefined} disabled={starting}>
