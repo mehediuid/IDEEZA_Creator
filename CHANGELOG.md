@@ -6,7 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
-| [CL-006](#cl-006-coupon-codes-when-buying-a-plan) | Coupon codes when buying a plan | 5 Nov 2026 (staging) | [PR-9062](https://ideeza.atlassian.net/browse/PR-9062) | To do |
+| [CL-006](#cl-006-coupon-codes-when-buying-a-plan) | Coupon codes when buying a plan | 5 Nov 2026 | [PR-9062](https://ideeza.atlassian.net/browse/PR-9062) | Ready for development |
 | [CL-005](#cl-005-each-account-has-its-own-work-a-new-account-starts-fresh) | Each account has its own work; a new account starts fresh | 4 Nov 2026 | None: prototype only | Nothing to build |
 | [CL-004](#cl-004-welcome-offer-50-off-the-first-payment-for-12-hours) | Welcome offer: 50% off the first payment, for 12 hours | 4 Nov 2026 | [PR-9013](https://ideeza.atlassian.net/browse/PR-9013) | Ready for development |
 | [CL-003](#cl-003-landing-page-the-way-into-ideeza) | Landing page, the way into IDEEZA | 4 Nov 2026 | [PR-9009](https://ideeza.atlassian.net/browse/PR-9009) | Ready for development |
@@ -39,7 +39,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 ## CL-006 Coupon codes when buying a plan
 
-**In the prototype:** 5 November 2026, on staging · **Jira:** [PR-9062](https://ideeza.atlassian.net/browse/PR-9062) · **Production:** To do
+**In the prototype:** 5 November 2026 · **Jira:** [PR-9062](https://ideeza.atlassian.net/browse/PR-9062) · **Production:** Ready for development
 
 **Screen:** Settings › Plan & pricing › Checkout (`/settings/plan/checkout?plan=…&cycle=…`),
 the invoice and Billing history. From the User Panel V2 Figma, ✅ Pricing ›

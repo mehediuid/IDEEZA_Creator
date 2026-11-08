@@ -196,8 +196,8 @@ test("Notion's chips, in its order", () => {
 });
 
 test("only Sign up, Sign in and the landing page are open without signing in; signed out goes to Sign in once an account exists", () => {
-  for (const p of ["/sign-up", "/sign-up/check-email", "/sign-up/welcome", "/sign-in", "/landing"]) assert.equal(auth.isOpenPath(p), true, p);
-  for (const p of ["/", "/projects", "/sign-upx", "/landings", "/settings/account", "/project/x/pcb"]) assert.equal(auth.isOpenPath(p), false, p);
+  for (const p of ["/sign-up", "/sign-up/check-email", "/sign-up/welcome", "/sign-in", "/landing", "/events", "/events/national-tour"]) assert.equal(auth.isOpenPath(p), true, p);
+  for (const p of ["/", "/projects", "/sign-upx", "/landings", "/eventsx", "/settings/account", "/project/x/pcb"]) assert.equal(auth.isOpenPath(p), false, p);
   assert.equal(auth.signedOutHome([]), "/sign-up");
   assert.equal(auth.signedOutHome([{ email: "a@b.co" }]), "/sign-in");
 });
@@ -259,6 +259,7 @@ test("the pre-paint gate lets a signed-in visitor through and sends others on, a
   }
   assert.equal(run("/sign-up"), null);
   assert.equal(run("/landing"), null);
+  assert.equal(run("/events/hardware-hackathon"), null);
   store.set(auth.ACCOUNTS_KEY, JSON.stringify([{ email: "a@b.co", verifiedAt: NOW }]));
   assert.equal(run("/projects", "?tab=draft"), "/sign-in?next=%2Fprojects%3Ftab%3Ddraft");
   assert.equal(run("/"), "/landing");

@@ -173,10 +173,11 @@ export function safeNext(raw: string | null | undefined): string {
   return isOpenPath(raw.split(/[?#]/)[0]) ? "" : raw;
 }
 
-/** The pages anyone can open: Sign up, Sign in and the public landing page
- *  (/landing, feat/landing-page). Every other page needs you signed in. */
+/** The pages anyone can open: Sign up, Sign in and the public website — the
+ *  landing page (/landing) and the Events pages (/events, /events/<slug>).
+ *  Every other page needs you signed in. */
 export function isOpenPath(pathname: string): boolean {
-  return /^\/(sign-up|sign-in|landing)(\/|$)/.test(pathname);
+  return /^\/(sign-up|sign-in|landing|events)(\/|$)/.test(pathname);
 }
 
 /** The one question is asked once, right after verifying, when the link didn't say. */
@@ -516,4 +517,4 @@ export function useAuth(): {
  *  visitor to Home's own address (nothing but utm_ tags) sees the landing page;
  *  to any other page but the open ones (`isOpenPath`), Sign in, or Sign up when
  *  this browser has no account, carrying the page they opened (`next`). */
-export const AUTH_PREPAINT = `(function(){try{var p=location.pathname;if(/^\\/(sign-up|sign-in|landing)(\\/|$)/.test(p))return;var a=JSON.parse(localStorage.getItem("${ACCOUNTS_KEY}")||"[]"),s=JSON.parse(localStorage.getItem("${SESSION_KEY}")||"null");if(!Array.isArray(a))a=[];var e=s&&typeof s.email==="string"?s.email.trim().toLowerCase():"";for(var i=0;i<a.length;i++)if(a[i]&&e&&a[i].email===e&&a[i].verifiedAt)return;document.documentElement.style.visibility="hidden";var q=location.search,t=!q||q.slice(1).split("&").every(function(k){return k.indexOf("utm_")===0});location.replace(p==="/"&&t?"/landing"+q:(a.length?"/sign-in":"/sign-up")+"?next="+encodeURIComponent(p+q));}catch(x){}})();`;
+export const AUTH_PREPAINT = `(function(){try{var p=location.pathname;if(/^\\/(sign-up|sign-in|landing|events)(\\/|$)/.test(p))return;var a=JSON.parse(localStorage.getItem("${ACCOUNTS_KEY}")||"[]"),s=JSON.parse(localStorage.getItem("${SESSION_KEY}")||"null");if(!Array.isArray(a))a=[];var e=s&&typeof s.email==="string"?s.email.trim().toLowerCase():"";for(var i=0;i<a.length;i++)if(a[i]&&e&&a[i].email===e&&a[i].verifiedAt)return;document.documentElement.style.visibility="hidden";var q=location.search,t=!q||q.slice(1).split("&").every(function(k){return k.indexOf("utm_")===0});location.replace(p==="/"&&t?"/landing"+q:(a.length?"/sign-in":"/sign-up")+"?next="+encodeURIComponent(p+q));}catch(x){}})();`;

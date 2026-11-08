@@ -63,7 +63,7 @@ ideeza-creator-panel/
    │  │                      sign in), the 3D stage beside them, the Demo email, AuthGate +
    │  │                      useSignOut, Home's SourceNudge
    │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), hero-glow (its wash, shared with sign-in), deliverable-icon, command-palette (⌘K)
-   │  ├─ landing/            the public landing page /landing: nav, section-header, one file per section (art: public/landing/)
+   │  ├─ landing/            the public landing page /landing: nav, section-header, one file per section (art: public/landing/); events/ = /events + /events/[slug] (photos: public/events/)
    │  ├─ credits/            Settings › Plan & pricing (User Panel V2 layouts): pricing-frame (sheet,
    │  │                      breadcrumb, pill tabs), plan-pricing-page, plans-panel, credits-panel,
    │  │                      billing-history, payment-method-panel, plan-banner (+ plan details),
