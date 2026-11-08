@@ -54,21 +54,24 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
           body="People you add to this project show here with their role. You add them, and any share of ownership, in Earn › Money › Splits."
           action={
             manages ? (
-              <Link
-                href={splits}
-                className={cn(
-                  buttonVariants({ hierarchy: "secondary" }),
-                  "hover:text-[color:var(--color-button-secondary-text)]",
-                  PHONE_TAP,
-                )}
-              >
-                Open Splits
-              </Link>
+              // Upgrade plan C7 sits inside the card, under its action (Earn carries no
+              // upgrade talk): soft, adding people still works.
+              <div className="flex flex-col items-center gap-[12px]">
+                <Link
+                  href={splits}
+                  className={cn(
+                    buttonVariants({ hierarchy: "secondary" }),
+                    "hover:text-[color:var(--color-button-secondary-text)]",
+                    PHONE_TAP,
+                  )}
+                >
+                  Open Splits
+                </Link>
+                <ContributorsPlanNote count={0} className="text-center" />
+              </div>
             ) : undefined
           }
         />
-        {/* Upgrade plan C7, on the build side (Earn carries no upgrade talk): soft, adding still works. */}
-        {manages && <ContributorsPlanNote count={0} />}
       </div>
     );
   }
@@ -107,12 +110,15 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
           </li>
         ))}
       </ul>
-      {manages && <ContributorsPlanNote count={team.length} />}
       {manages && (
-        <Link href={splits} className={cn(QUIET_LINK, PHONE_TAP)}>
-          Add people or change shares in Splits
-          <Icon icon={ArrowRight02Icon} size={14} />
-        </Link>
+        <div className="flex flex-col items-start gap-[8px]">
+          <Link href={splits} className={cn(QUIET_LINK, PHONE_TAP)}>
+            Add people or change shares in Splits
+            <Icon icon={ArrowRight02Icon} size={14} />
+          </Link>
+          {/* Upgrade plan C7: with the plan's contributors in use, which plans give more (soft). */}
+          <ContributorsPlanNote count={team.length} />
+        </div>
       )}
     </div>
   );
