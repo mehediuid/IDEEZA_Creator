@@ -483,12 +483,14 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
                 size="lg"
                 onClick={submit}
                 aria-busy={saving || undefined}
-                aria-disabled={saving || blocked !== null || newBlocked || undefined}
+                // Every project slot in use: the card says why, so the button takes the DS disabled look.
+                disabled={newBlocked || undefined}
+                aria-disabled={saving || blocked !== null || undefined}
                 aria-describedby={reason ? reasonId : undefined}
                 className={cn(
                   TOUCH,
                   "w-full [@container(min-width:360px)]:w-auto",
-                  (blocked !== null || newBlocked) && "cursor-not-allowed opacity-60",
+                  blocked !== null && "cursor-not-allowed opacity-60",
                   saving && "cursor-wait",
                 )}
               >
