@@ -140,6 +140,9 @@ function useAttention(pathname: string): number {
   return attentionBuilds.filter((a) => a.job.chatId !== open).length;
 }
 
+/** Each tab's link carries its root path here, so the phone's tour can point at it. */
+export const TAB_ATTR = "data-tab";
+
 const DOT = "pointer-events-none absolute right-0 top-0 size-[8px] rounded-full";
 /** The unread count on a tab's icon: a 16 px brand pill, Caption/SM in text/on-brand. */
 const COUNT = cn(
@@ -174,6 +177,7 @@ export function TabBar() {
                 href={current ? t.href : (last[t.href] ?? t.href)}
                 aria-current={current ? "page" : undefined}
                 aria-label={said}
+                {...{ [TAB_ATTR]: t.href }}
                 onClick={(e) => {
                   if (!signedIn && t.gate) {
                     e.preventDefault();
