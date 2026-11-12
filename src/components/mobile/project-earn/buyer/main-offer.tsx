@@ -43,7 +43,8 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { CardNote, Disclosure, NftActivityLine, OfferCard, OfferRowsCard, WalletLine, type OfferRow } from "./parts";
-import { LIST_CARD } from "../../project/parts";
+import { LIST_CARD } from "../../kit/list";
+import { T } from "../../type";
 
 export const BID_FORM_ID = "market-bid-form";
 
@@ -213,8 +214,8 @@ export function AuctionCard({
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-lg font-semibold leading-lg text-text-primary">{title}</p>
-          <p className="text-sm leading-sm text-text-secondary">{`Main NFT · ${listing.percentSelling}% of the project`}</p>
+          <p className={T.section}>{title}</p>
+          <p className={T.meta}>{`Main NFT · ${listing.percentSelling}% of the project`}</p>
         </div>
         {!ended && (
           <Badge tone={state.phase === "endingSoon" ? "warning" : "success"} className="shrink-0">
@@ -225,11 +226,11 @@ export function AuctionCard({
       <OfferRowsCard rows={facts} label="Auction facts" />
       <BidHistory listing={listing} rows={rows} buyerId={buyerId} now={clock} />
       {leads && !ended ? (
-        <p ref={leaderRef} tabIndex={-1} className="text-md font-medium leading-md text-text-success outline-none">
+        <p ref={leaderRef} tabIndex={-1} className={cn(T.rowTitle, "outline-none text-text-success")}>
           You&apos;re the highest bidder.
         </p>
       ) : (
-        status && <p className="text-md font-medium leading-md text-text-primary">{status}</p>
+        status && <p className={T.rowTitle}>{status}</p>
       )}
       {!ended && buyerId !== null && canBid && (
         <BidForm
@@ -291,11 +292,11 @@ function BidHistory({ listing, rows, buyerId, now }: { listing: Listing; rows: B
       <Disclosure title={`Bid history (${rows.length})`} open={open} onToggle={() => setOpen((v) => !v)} controls={id} />
       <div id={id} hidden={!open}>
         {rows.length === 0 ? (
-          <p className="text-md leading-md text-text-secondary">No bids yet.</p>
+          <p className={T.body}>No bids yet.</p>
         ) : (
           <ol className={cn(LIST_CARD, "px-8 py-2")}>
             {shown.map((b) => (
-              <li key={b.id} className="flex flex-wrap items-baseline gap-x-2 border-b-[length:var(--border-width-1)] border-solid border-border-subtle py-4 text-md leading-md text-text-primary last:border-b-0">
+              <li key={b.id} className={cn(T.body, "flex flex-wrap items-baseline gap-x-2 border-b-[length:var(--border-width-1)] border-solid border-border py-4 last:border-b-0 text-text-primary")}>
                 <span className="font-semibold tabular-nums">{formatAmount(b.amount, listing.token)}</span>
                 <span>·</span>
                 <span>{b.bidderId === buyerId ? `You (${buyerNameOf(b.bidderId)})` : buyerLabel(b.bidderId)}</span>
@@ -311,7 +312,7 @@ function BidHistory({ listing, rows, buyerId, now }: { listing: Listing; rows: B
           <button
             type="button"
             onClick={() => setAll(true)}
-            className="inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline"
+            className={cn(T.rowTitle, "inline-flex min-h-[44px] items-center outline-none hover:underline focus-visible:underline text-text-brand")}
           >
             {`Show all (${rows.length})`}
           </button>
@@ -374,7 +375,7 @@ function BidForm({
 
   return (
     <form id={BID_FORM_ID} onSubmit={submit} noValidate className="flex flex-col gap-3">
-      <label htmlFor={fieldId} className="text-md font-medium leading-md text-text-primary">
+      <label htmlFor={fieldId} className={T.rowTitle}>
         Your bid
       </label>
       <TextInput
@@ -402,7 +403,7 @@ function BidForm({
         className="tabular-nums"
       />
       {error && (
-        <p id={errorId} className="text-sm leading-sm text-text-error">
+        <p id={errorId} className={cn(T.meta, "text-text-error")}>
           {error}
         </p>
       )}
@@ -457,7 +458,7 @@ export function PurchaseSummary({ holding, toggleRef }: { holding: { sharePct: n
             { label: "Purchased", value: formatDateTime(latest.at) },
           ]}
         />
-        <p className="text-sm leading-sm text-text-secondary">Not on a blockchain — this is a testnet demo.</p>
+        <p className={T.meta}>Not on a blockchain — this is a testnet demo.</p>
       </div>
     </section>
   );

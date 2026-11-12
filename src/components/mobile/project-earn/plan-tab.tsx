@@ -25,7 +25,7 @@ import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { resumePlanRun, startPlanRun, stopPlanRun, useIsPlanLive } from "@/components/projects/business-plan/plan-runner";
+import { startPlanRun, stopPlanRun, useIsPlanLive } from "@/components/projects/business-plan/plan-runner";
 import { useBusinessPlan, writeBusinessPlan } from "@/lib/manual/business-plan-store";
 import { can } from "@/lib/manual/permissions";
 import { currentVersionOf, phonePlanState, planPromptSeed, runLineOf, runProgressOf, withoutVersion } from "@/lib/manual/phone-plan-money";
@@ -34,7 +34,8 @@ import { cn } from "@/lib/utils";
 import { useEarn } from "./context";
 import { EARN_CARD, EARN_H2_CLASS, EARN_LEAD } from "./parts";
 import { PlanDoc } from "./plan/plan-doc";
-import { GenerateSheet, ReadySheet, WritingSheet } from "./plan/plan-sheets";
+import { GenerateSheet, ReadySheet, WritingSheet, finishPlan } from "./plan/plan-sheets";
+import { T } from "../type";
 
 export function EarnPlanTab() {
   const { project, view, viewer, announce } = useEarn();
@@ -129,7 +130,7 @@ export function EarnPlanTab() {
 
       {writes && plan?.run && (state === "writing" || state === "interrupted") && (
         <div className={EARN_CARD}>
-          <p className="text-md font-medium leading-md text-text-primary">{runLineOf(plan.run, live)}</p>
+          <p className={T.rowTitle}>{runLineOf(plan.run, live, plan.versions.find((v) => v.n === plan.run?.version))}</p>
           {state === "writing" && <ProgressBar value={runProgressOf(plan.run)} label={runLineOf(plan.run, live)} />}
           {state === "writing" ? (
             <div className="flex flex-col gap-4">
@@ -146,7 +147,8 @@ export function EarnPlanTab() {
                 size="xl"
                 className="w-full"
                 onClick={() => {
-                  resumePlanRun(project.id);
+                  // Every section the version still lacks, not only the ones the run had queued.
+                  finishPlan(project.id, plan.run?.version);
                   setWritingOpen(true);
                 }}
               >
@@ -204,6 +206,14 @@ export function EarnPlanTab() {
               setReadyN(null);
               announce("Business plan discarded");
               requestAnimationFrame(() => emptyRef.current?.focus());
+            }}
+            onFinish={() => {
+              const n = readyN;
+              setReadyN(null);
+              if (n !== null && finishPlan(project.id, n)) {
+                setWritingOpen(true);
+                announce("Writing the missing sections");
+              }
             }}
           />
         </>

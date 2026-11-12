@@ -48,10 +48,11 @@ import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
-import { Chevron, LIST_ROW, ListCard } from "../../project/parts";
+import { Chevron, ListCard } from "../../kit/list";
 import { useEarn } from "../context";
 import { EARN_CARD, EARN_LEAD, EARN_NOTE } from "../parts";
 import { MoneySection, ROW_BUTTON } from "./parts";
+import { T } from "../../type";
 
 const ROLE_ORDER: readonly ContributorRole[] = ["viewer", "editor", "coOwner"];
 
@@ -105,9 +106,9 @@ export function Splits() {
     <MoneySection id="splits" title="Splits" lead="Who owns what share of the project. Co-owners get their share of every sale.">
       {own && (
         <dl className="flex flex-col gap-1">
-          <dt className="text-sm font-medium leading-sm text-text-secondary">{own.label}</dt>
-          <dd className="text-lg font-semibold leading-lg text-text-primary">{own.value}</dd>
-          {own.note && <dd className="text-sm leading-sm text-text-secondary">{own.note}</dd>}
+          <dt className={T.meta}>{own.label}</dt>
+          <dd className={T.section}>{own.value}</dd>
+          {own.note && <dd className={T.meta}>{own.note}</dd>}
         </dl>
       )}
       {view.ownership.overAllocated && (
@@ -127,14 +128,14 @@ export function Splits() {
                 const body = (
                   <>
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-md leading-md text-text-primary">{row.name}</span>
-                      {row.sub && <span className="text-sm leading-sm text-text-secondary">{row.sub}</span>}
+                      <span className={cn(T.body, "truncate text-text-primary")}>{row.name}</span>
+                      {row.sub && <span className={T.meta}>{row.sub}</span>}
                     </span>
-                    <span className="shrink-0 text-md leading-md text-text-primary">{value}</span>
+                    <span className={cn(T.body, "shrink-0 text-text-primary")}>{value}</span>
                   </>
                 );
                 return (
-                  <li key={row.key} className={LIST_ROW}>
+                  <li key={row.key}>
                     {row.contributorId && canManage ? (
                       <button type="button" aria-label={`Edit ${row.name}, ${value}`} className={ROW_BUTTON} onClick={() => setOpen({ mode: "edit", id: row.contributorId! })}>
                         {body}
@@ -295,7 +296,7 @@ function ContributorSheet({ editing, onClose }: { editing: Contributor | null; o
           />
         </Field>
         <div className="flex flex-col gap-3">
-          <span id={`${roleId}-label`} className="text-md font-medium leading-md text-text-primary">
+          <span id={`${roleId}-label`} className={T.rowTitle}>
             Role
           </span>
           <div
@@ -326,16 +327,16 @@ function ContributorSheet({ editing, onClose }: { editing: Contributor | null; o
                 >
                   <Radio checked={checked} disabled={off} decorative className="shrink-0" />
                   <span className="flex min-w-0 flex-col gap-1">
-                    <span className="text-md font-medium leading-md text-text-primary">{ROLE_WORD[role]}</span>
-                    <span className="text-sm leading-sm text-text-secondary">{ROLE_INFO[role]}</span>
-                    {off && <span className="text-sm leading-sm text-text-secondary">You have no share left to give.</span>}
+                    <span className={T.rowTitle}>{ROLE_WORD[role]}</span>
+                    <span className={T.meta}>{ROLE_INFO[role]}</span>
+                    {off && <span className={T.meta}>You have no share left to give.</span>}
                   </span>
                 </button>
               );
             })}
           </div>
           {errors.role && (
-            <p id={roleErrId} className="text-sm leading-sm text-text-error">
+            <p id={roleErrId} className={cn(T.meta, "text-text-error")}>
               {errors.role}
             </p>
           )}

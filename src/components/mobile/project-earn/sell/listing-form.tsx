@@ -51,6 +51,8 @@ import { BottomBar } from "../../kit/bottom-bar";
 import { useEarn } from "../context";
 import { ListingFields } from "../listing-fields";
 import { FullLayer, SUB } from "./parts";
+import { cn } from "@/lib/utils";
+import { T } from "../../type";
 
 const NETWORK_UNKNOWN = "This mint's network isn't known, so it can't be listed. Check it in the Brief.";
 const GONE = "This project no longer exists.";
@@ -238,13 +240,13 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
       }
     >
       <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-8 px-8 pb-12">
-        <p className="text-sm leading-sm text-text-secondary">{`Main NFT · ${project.name}`}</p>
-        <p className="flex flex-wrap items-center gap-3 text-md leading-md text-text-secondary">
+        <p className={T.meta}>{`Main NFT · ${project.name}`}</p>
+        <p className={cn(T.body, "flex flex-wrap items-center gap-3")}>
           <TestnetDemoBadge />
           {DEMO_LINE}
         </p>
         {error && <Banner tone="error">{error}</Banner>}
-        {!editing && <p className="text-md font-medium leading-md text-text-success">{VIDEOS_READY_LINE}</p>}
+        {!editing && <p className={cn(T.rowTitle, "text-text-success")}>{VIDEOS_READY_LINE}</p>}
         <ListingFields
           mode={editing ? "edit" : "add"}
           value={input}
@@ -261,12 +263,12 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
           <div className="flex flex-col gap-6">
             {editing ? (
               <section className="flex flex-col gap-3 rounded-xl bg-bg-surface-raised p-8">
-                <span className="text-sm font-semibold leading-sm text-text-tertiary">Cost</span>
-                <p className="text-md leading-md text-text-secondary">
+                <span className={cn(T.label, "text-text-tertiary")}>Cost</span>
+                <p className={T.body}>
                   {editing.mintingType === "instant" ? "Changing an on-chain listing costs a network fee." : "Nothing to pay — you sign the new terms."}
                 </p>
                 {editing.mintingType === "instant" && gas && (
-                  <p className="flex flex-wrap justify-between gap-x-6 text-md font-medium leading-md text-text-secondary">
+                  <p className={cn(T.rowTitle, "flex flex-wrap justify-between gap-x-6 text-text-secondary")}>
                     <span>{gas.label}</span>
                     <span className="tabular-nums">{`${gas.fee} ${gas.native} ${gas.note}`}</span>
                   </p>
@@ -274,8 +276,8 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
               </section>
             ) : mintStatus === "onChain" ? (
               <section className="flex flex-col gap-3 rounded-xl bg-bg-surface-raised p-8">
-                <span className="text-sm font-semibold leading-sm text-text-tertiary">Cost</span>
-                <p className="text-md leading-md text-text-secondary">Nothing to pay now — the token is already on chain. You sign the listing.</p>
+                <span className={cn(T.label, "text-text-tertiary")}>Cost</span>
+                <p className={T.body}>Nothing to pay now — the token is already on chain. You sign the listing.</p>
               </section>
             ) : (
               <MintCostRows type={input.mintingType} network={network} intent="sell" listing={costRow} />
@@ -283,10 +285,10 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
             <WalletFactLine type={(editing ? editing.mintingType === "instant" : mints && input.mintingType === "instant") ? "instant" : "lazy"} network={network} />
           </div>
         )}
-        <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default p-6">
-          <span className="text-sm font-semibold leading-sm text-text-tertiary">Each sale</span>
+        <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-6">
+          <span className={cn(T.label, "text-text-tertiary")}>Each sale</span>
           {summary.map((r, i) => (
-            <p key={i} className="text-md leading-md text-text-secondary">
+            <p key={i} className={T.body}>
               {r.label ? (
                 <>
                   <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>

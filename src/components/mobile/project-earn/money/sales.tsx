@@ -15,11 +15,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircleIcon, Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
-import { StateCard } from "@/components/ideeza/state-card";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { earningsOf, formatUsd, type Earning } from "@/lib/account/payout";
 import { customerRowText, customersEmptyCopy, customersSummaryText, type CustomerRow } from "@/lib/manual/customers";
@@ -33,10 +32,12 @@ import { addAmounts, formatAmount } from "@/lib/wallet/money";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { cn } from "@/lib/utils";
 import { Sheet } from "../../kit/sheet";
-import { Chevron, LIST_ROW, ListCard } from "../../project/parts";
+import { ErrorState } from "../../kit/state";
+import { Chevron, ListCard } from "../../kit/list";
 import { useEarn } from "../context";
 import { EARN_CARD, EARN_H3_CLASS, EARN_LEAD, EARN_NOTE } from "../parts";
 import { MoneySection, ROW_BUTTON } from "./parts";
+import { T } from "../../type";
 
 export function Sales() {
   const { project, view, viewer, now } = useEarn();
@@ -64,13 +65,7 @@ export function Sales() {
       aside={<TestnetDemoBadge />}
     >
       {view.marketUnreadable ? (
-        <StateCard
-          tone="error"
-          className="w-full"
-          icon={<Icon icon={AlertCircleIcon} size={32} />}
-          title="Sales can't be shown"
-          body="This browser's sales record couldn't be read. It's been left as it is."
-        />
+        <ErrorState title="Sales can't be shown" body="This browser's sales record couldn't be read. It's been left as it is." />
       ) : rows.length === 0 ? (
         <div className={EARN_CARD}>
           <p className={EARN_LEAD}>{`${customersEmptyCopy({ scope: { kind: "project" }, status, projectId: project.id }).title}.`}</p>
@@ -84,7 +79,7 @@ export function Sales() {
         <>
           {view.sales.length > 0 && <Earnings />}
           <div className="flex flex-col gap-2">
-            <p className="text-md font-medium leading-md text-text-secondary">{customersSummaryText(view.customers)}</p>
+            <p className={cn(T.rowTitle, "text-text-secondary")}>{customersSummaryText(view.customers)}</p>
             <p className={EARN_NOTE}>Demo purchases from Explore marketplace, made in this browser. Nothing is on a blockchain.</p>
             <p className={EARN_NOTE}>
               To tell everyone who bought at once,{" "}
@@ -98,14 +93,14 @@ export function Sales() {
             {rows.map((row) => {
               const text = customerRowText(row, { projectName: project.name, now });
               return (
-                <li key={row.saleId} className={LIST_ROW}>
+                <li key={row.saleId}>
                   <button type="button" aria-label={`${text.buyer}, ${text.price}, sale details`} aria-haspopup="dialog" className={ROW_BUTTON} onClick={() => setOpenId(row.saleId)}>
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="flex items-baseline justify-between gap-4">
-                        <span className="min-w-0 truncate text-md font-semibold leading-md text-text-primary">{text.buyer}</span>
-                        <span className="shrink-0 text-md font-semibold leading-md tabular-nums text-text-primary">{text.price}</span>
+                        <span className={cn(T.rowTitle, "min-w-0 truncate")}>{text.buyer}</span>
+                        <span className={cn(T.rowTitle, "shrink-0 tabular-nums")}>{text.price}</span>
                       </span>
-                      <span className="flex items-baseline justify-between gap-4 text-sm leading-sm text-text-secondary">
+                      <span className={cn(T.meta, "flex items-baseline justify-between gap-4")}>
                         <span className="min-w-0 truncate">{saleItemLine(text)}</span>
                         <span className="shrink-0">{saleWhenLine(row.at, text.benefits)}</span>
                       </span>
@@ -146,12 +141,12 @@ function Earnings() {
       </h3>
       <dl className="grid grid-cols-2 gap-6">
         <div className="flex flex-col gap-1">
-          <dt className="text-sm font-medium leading-sm text-text-secondary">Paid to you from sales</dt>
-          <dd className="text-md font-semibold leading-md tabular-nums text-text-primary">{coins || "Nothing yet"}</dd>
+          <dt className={T.meta}>Paid to you from sales</dt>
+          <dd className={cn(T.section, "tabular-nums")}>{coins || "Nothing yet"}</dd>
         </div>
         <div className="flex flex-col gap-1">
-          <dt className="text-sm font-medium leading-sm text-text-secondary">In dollars, at demo rates</dt>
-          <dd className="text-md font-semibold leading-md tabular-nums text-text-primary">{formatUsd(usd)}</dd>
+          <dt className={T.meta}>In dollars, at demo rates</dt>
+          <dd className={cn(T.section, "tabular-nums")}>{formatUsd(usd)}</dd>
         </div>
       </dl>
       <p className={EARN_NOTE}>
@@ -203,9 +198,9 @@ function SaleSheet({ row, onClose }: { row: CustomerRow; onClose: () => void }) 
     >
       <dl className="flex flex-col">
         {lines.map((d, i) => (
-          <div key={`${d.term}-${i}`} className="flex min-h-[44px] items-center justify-between gap-6 border-b-[length:var(--border-width-1)] border-solid border-border-subtle py-3 last:border-b-0">
-            <dt className="shrink-0 text-md leading-md text-text-secondary">{d.term}</dt>
-            <dd className="flex min-w-0 items-center justify-end gap-2 text-right text-md leading-md text-text-primary">
+          <div key={`${d.term}-${i}`} className="flex min-h-[44px] items-center justify-between gap-6 border-b-[length:var(--border-width-1)] border-solid border-border py-3 last:border-b-0">
+            <dt className={cn(T.body, "shrink-0")}>{d.term}</dt>
+            <dd className={cn(T.body, "flex min-w-0 items-center justify-end gap-2 text-right text-text-primary")}>
               {d.term === "Wallet" ? (
                 <>
                   <span className="min-w-0 truncate font-mono">{d.value}</span>

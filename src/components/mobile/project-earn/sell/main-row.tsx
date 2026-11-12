@@ -36,7 +36,7 @@ import { makerShareNow, refusedCopy, sellRecheckOf } from "@/components/projects
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useMint } from "@/components/wallet/use-mint";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import type { SettleResult } from "@/lib/market/auction";
+import { auctionStateOf, type SettleResult } from "@/lib/market/auction";
 import { earnPairOf, mainRowStateOf } from "@/lib/manual/earn-view";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { can } from "@/lib/manual/permissions";
@@ -74,7 +74,8 @@ import { useEarn } from "../context";
 import { FactRows, LevelCheck } from "../parts";
 import { ListingFormLayer } from "./listing-form";
 import { NftActivityLine } from "./nft-activity";
-import { LINK_SM, ReadinessSheet, RowButton, RowLink, SellRow, StateLines, SUB } from "./parts";
+import { LINK_MD, LINK_SM, ReadinessSheet, RowButton, RowLink, SellRow, StateLines, SUB } from "./parts";
+import { T } from "../../type";
 
 const LIST_HANDLED = ["videos", "ownership"] as const;
 const RELIST_HANDLED = ["videos"] as const;
@@ -173,7 +174,7 @@ export function MainRow() {
         </div>
       )}
       {state.action === "manage" && manage && listing && (
-        <div id={panelId} className="flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-8 py-6">
+        <div id={panelId} className="flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border px-8 py-6">
           <ListingPanel listing={listing} onOpen={setOpen} />
         </div>
       )}
@@ -196,7 +197,7 @@ function ListingPanel({ listing, onOpen }: { listing: Listing; onOpen: (o: Open)
   const hintId = React.useId();
   const head = (
     <div className="flex items-center justify-between gap-4">
-      <h3 className="text-md font-medium leading-md text-text-primary">Your project</h3>
+      <h3 className={T.section}>Your project</h3>
       {card.kind === "auction" && <Badge tone={card.pill.tone}>{card.pill.text}</Badge>}
     </div>
   );
@@ -229,6 +230,7 @@ function ListingPanel({ listing, onOpen }: { listing: Listing; onOpen: (o: Open)
     return (
       <>
         {head}
+        {auctionStateOf(listing, view.bids, now).phase === "endingSoon" && <Banner tone="attention">Ends in under an hour. You can close it once it ends.</Banner>}
         <FactRows rows={card.facts.filter((f) => AUCTION_FACTS.has(f.label)).map((f) => ({ label: f.label, value: <Parts parts={f.value} /> }))} />
         <p className={SUB}>{card.fixedNote}</p>
         {manage && (
@@ -254,11 +256,11 @@ function ListingPanel({ listing, onOpen }: { listing: Listing; onOpen: (o: Open)
     return (
       <>
         {head}
-        <p className="text-md leading-md text-text-secondary">
+        <p className={T.body}>
           <Parts parts={card.since} />
         </p>
-        <p className="text-md leading-md text-text-secondary">{card.changed}</p>
-        <p className="text-md leading-md text-text-secondary">{card.terms}</p>
+        <p className={T.body}>{card.changed}</p>
+        <p className={T.body}>{card.terms}</p>
         {manage && <RelistBlock listing={listing} onOpen={onOpen} />}
       </>
     );
@@ -319,10 +321,10 @@ function RelistBlock({ listing, onOpen }: { listing: Listing; onOpen: (o: Open) 
   return (
     <>
       <section className="flex flex-col gap-3">
-        <h4 className="text-md font-medium leading-md text-text-primary">To relist:</h4>
+        <h4 className={T.rowTitle}>To relist:</h4>
         <ul className="flex flex-col gap-3">
           {items.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 text-md leading-md">
+            <li key={item.id} className={cn(T.body, "flex flex-wrap items-start gap-x-3 gap-y-1")}>
               <span aria-hidden className={cn("w-[16px] shrink-0 pt-px text-center", item.id === "metadata" ? "text-text-tertiary" : item.ok ? "text-text-success" : "text-text-error")}>
                 {item.id === "metadata" ? "•" : <Icon icon={item.ok ? Tick02Icon : Delete02Icon} size={16} />}
               </span>
@@ -331,7 +333,7 @@ function RelistBlock({ listing, onOpen }: { listing: Listing; onOpen: (o: Open) 
                 {item.id !== "metadata" && <span className={cn("font-semibold", item.ok ? "text-text-success" : "text-text-error")}>{` · ${item.ok ? "Ready" : "Missing"}`}</span>}
               </span>
               {item.href === "generate-videos" && (
-                <button type="button" onClick={() => setGate(true)} className={cn(LINK_SM, "-my-3 min-h-[44px] pl-8 text-md leading-md")}>
+                <button type="button" onClick={() => setGate(true)} className={cn(LINK_MD, "-my-3 min-h-[44px] pl-8")}>
                   Generate videos
                 </button>
               )}
@@ -428,8 +430,8 @@ function RemoveSheet({ listing, onClose, onDone }: { listing: Listing; onClose: 
         </>
       }
     >
-      <p className="text-md leading-md text-text-secondary">Nobody can see or buy it now. Its terms are kept, so you can list it again.</p>
-      {onChain && <p className="text-md leading-md text-text-secondary">Removing an on-chain listing costs a network fee (test tokens — no real cost).</p>}
+      <p className={T.body}>Nobody can see or buy it now. Its terms are kept, so you can list it again.</p>
+      {onChain && <p className={T.body}>Removing an on-chain listing costs a network fee (test tokens — no real cost).</p>}
       {error && <Banner tone="error">{error}</Banner>}
     </Sheet>
   );
@@ -452,12 +454,12 @@ function BidsSheet({ listing, onClose }: { listing: Listing; onClose: () => void
     >
       <TestnetDemoBadge className="self-start" />
       {rows.length === 0 ? (
-        <p className="text-md leading-md text-text-secondary">No bids yet.</p>
+        <p className={T.body}>No bids yet.</p>
       ) : (
         <table className="w-full border-collapse text-left">
           <caption className="sr-only">{`Bids on ${project.name}, newest first`}</caption>
           <thead>
-            <tr className="border-b-[length:var(--border-width-1)] border-solid border-border-default text-sm leading-sm text-text-tertiary">
+            <tr className={cn(T.meta, "border-b-[length:var(--border-width-1)] border-solid border-border text-text-tertiary")}>
               <th scope="col" className="py-4 pr-6 font-regular">
                 Bid
               </th>
@@ -471,10 +473,10 @@ function BidsSheet({ listing, onClose }: { listing: Listing; onClose: () => void
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-b-[length:var(--border-width-1)] border-solid border-border-subtle last:border-b-0">
-                <td className="py-5 pr-6 align-top text-md font-medium leading-md tabular-nums text-text-primary">{r.bid}</td>
-                <td className="py-5 pr-6 align-top text-md leading-md text-text-primary">{r.bidder}</td>
-                <td className="py-5 align-top text-sm leading-sm text-text-secondary">
+              <tr key={r.id} className="border-b-[length:var(--border-width-1)] border-solid border-border last:border-b-0">
+                <td className={cn(T.rowTitle, "py-5 pr-6 align-top tabular-nums")}>{r.bid}</td>
+                <td className={cn(T.body, "py-5 pr-6 align-top text-text-primary")}>{r.bidder}</td>
+                <td className={cn(T.meta, "py-5 align-top")}>
                   <time dateTime={new Date(r.at).toISOString()} title={r.time}>
                     <span className="block">{r.date}</span>
                     <span className="block">{r.clock}</span>
@@ -598,8 +600,8 @@ function CloseAuctionSheet({ listing, now, onClose, onDone }: { listing: Listing
         </>
       }
     >
-      <p className="text-md leading-md text-text-secondary">{copy.body}</p>
-      {copy.skipped && <p className="text-md leading-md text-text-secondary">{copy.skipped}</p>}
+      <p className={T.body}>{copy.body}</p>
+      {copy.skipped && <p className={T.body}>{copy.skipped}</p>}
       {refused && <Banner tone="error">{refused}</Banner>}
       {error && <Banner tone="error">{error}</Banner>}
     </Sheet>
@@ -618,31 +620,30 @@ function MintRows() {
     <div className="flex flex-col gap-2">
       <dl className="flex flex-col">
         {minted.rows.map((row) => (
-          <MintRow key={row.key} row={row} mintStatus={outcome.mint} demo={outcome.demo} projectId={project.id} />
+          <MintRow key={row.key} row={row} mintStatus={outcome.mint} projectId={project.id} />
         ))}
       </dl>
       {copies.map((r) => (
         <CopyLink key={r.key} label={r.copy!.label} value={r.copy!.value} onCopied={() => announce("Copied")} />
       ))}
-      <p className="text-sm leading-sm text-text-tertiary">{minted.footnote}</p>
+      <p className={cn(T.meta, "text-text-tertiary")}>{minted.footnote}</p>
     </div>
   );
 }
 
-function MintRow({ row, mintStatus, demo, projectId }: { row: OutcomeRow; mintStatus: ReturnType<typeof outcomeView>["mint"]; demo: boolean; projectId: string }) {
+function MintRow({ row, mintStatus, projectId }: { row: OutcomeRow; mintStatus: ReturnType<typeof outcomeView>["mint"]; projectId: string }) {
   const { view } = useEarn();
   return (
     <div className="flex min-h-[44px] flex-col gap-1 p-6">
       <div className="flex items-start justify-between gap-6">
-        <dt className="shrink-0 text-md leading-md text-text-secondary">{row.label}</dt>
-        <dd className="flex min-w-0 flex-wrap items-center justify-end gap-2 text-right text-md leading-md text-text-primary">
+        <dt className={cn(T.body, "shrink-0")}>{row.label}</dt>
+        <dd className={cn(T.body, "flex min-w-0 flex-wrap items-center justify-end gap-2 text-right text-text-primary")}>
           <span className="break-words">
             <Parts parts={row.value} />
           </span>
-          {row.key === "mint" && demo && <TestnetDemoBadge />}
         </dd>
       </div>
-      {row.note && <p className="text-sm leading-sm text-text-secondary">{row.note}</p>}
+      {row.note && <p className={T.meta}>{row.note}</p>}
       {row.key === "wallet" && mintStatus === "lazyMinted" && view.mint.record && <PayoutChange projectId={projectId} account={view.mint.record.wallet.account} />}
     </div>
   );
@@ -678,7 +679,7 @@ function PayoutChange({ projectId, account }: { projectId: string; account: numb
   const active = wallet.account;
   const connected = wallet.identities[makerId(active)]?.connected === true;
   if (!connected || active === account) {
-    return <p className="text-sm leading-sm text-text-secondary">{`You can change it until the token is on chain — ${connected ? "switch account in your wallet" : "connect your wallet"} first.`}</p>;
+    return <p className={T.meta}>{`You can change it until the token is on chain — ${connected ? "switch account in your wallet" : "connect your wallet"} first.`}</p>;
   }
   const label = DEMO_ACCOUNTS.find((a) => a.index === active)?.label ?? "Demo account";
   return (
@@ -714,7 +715,7 @@ export function MintDetails() {
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((o) => !o)}
-        className="-my-3 inline-flex min-h-[44px] items-center gap-2 self-start text-md font-medium leading-md text-text-primary outline-none focus-visible:underline"
+        className={cn(T.rowTitle, "-my-3 inline-flex min-h-[44px] items-center gap-2 self-start outline-none focus-visible:underline")}
       >
         Mint details
         <span aria-hidden className={cn("inline-flex transition-transform duration-normal", open && "rotate-180")}>

@@ -9,15 +9,15 @@
 // own action (Start mint, Choose what to sell), the screen's one primary,
 // shown only once nothing above it is missing. A later step's tasks show
 // dimmed. Once something is live (listed, paused, given, sold, or copies on
-// sale) the card is "You're selling" (12b): the state in words, its facts
-// and where it is managed — both steps are done then, so the checklist goes.
+// sale) the live card leads (12b): the state in words, its facts and where
+// it is managed — and, as on the web, the checklist stays under it, folded
+// with both steps Done. The progress fill is the success tone (the web's).
 
 import * as React from "react";
 import Link from "next/link";
 import { CheckmarkCircle01Icon, CircleIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { buttonVariants } from "@/components/ideeza/button";
-import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { earnSourceOf, useEarnFacts } from "@/components/projects/earn/ladder/use-earn-facts";
 import type { License } from "@/lib/brief/types";
@@ -28,6 +28,7 @@ import { phoneHrefOf } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
 import { useEarn } from "./context";
 import { EARN_CARD, EARN_H2_CLASS, EARN_LEAD, EARN_NOTE, FactRows, StepFix } from "./parts";
+import { T } from "../type";
 
 type Task = LadderStep & { ok: boolean };
 
@@ -59,6 +60,7 @@ export function EarnOverviewTab() {
   const next = earnNextOf(project.id, commercial, copiesOnSale);
   const steps = earnPathOf(commercial, copiesOnSale);
   const headingId = React.useId();
+  let liveCard: React.ReactNode = null;
 
   if (next.point === null) {
     const live = earnLiveFactsOf({
@@ -69,7 +71,17 @@ export function EarnOverviewTab() {
       editions: view.editions,
       buyers: view.customers.buyerCount,
     });
-    return <LiveCard title={next.title} why={next.why} facts={live} manage={next.action} given={commercial === "given"} projectId={project.id} />;
+    liveCard = (
+      <LiveCard
+        label={commercial === "given" ? "Given away" : commercial === "soldOut" ? "Sold" : "You're selling"}
+        title={next.title}
+        why={next.why}
+        facts={live}
+        manage={next.action}
+        given={commercial === "given"}
+        projectId={project.id}
+      />
+    );
   }
 
   const all = steps.map((s) => ({ step: s, tasks: ready ? tasksOf(s.id, facts) : [] }));
@@ -77,11 +89,25 @@ export function EarnOverviewTab() {
   const done = all.reduce((n, g) => n + (g.step.state === "done" ? g.tasks.length + 1 : g.tasks.filter((t) => t.ok).length), 0);
 
   return (
+    <div className="flex flex-col gap-12">
+    {liveCard}
     <section aria-labelledby={headingId} className={EARN_CARD}>
       <h2 id={headingId} className={EARN_H2_CLASS}>{`Get ${project.name} earning`}</h2>
       <p className={EARN_LEAD}>Two steps: mint it, then put it on sale.</p>
-      {ready && <p className="text-sm font-medium leading-sm tabular-nums text-text-secondary">{`${done} of ${total} done`}</p>}
-      <ProgressBar value={total ? (done / total) * 100 : 0} label="Progress to earning" />
+      {ready && <p className={cn(T.meta, "tabular-nums")}>{`${done} of ${total} done`}</p>}
+      <div
+        role="progressbar"
+        aria-label="Progress to earning"
+        aria-valuemin={0}
+        aria-valuemax={total || 1}
+        aria-valuenow={done}
+        className="h-[8px] w-full shrink-0 overflow-hidden rounded-sm bg-bg-subtle"
+      >
+        <span
+          className="block h-full rounded-sm bg-bg-success transition-[width] duration-normal ease-out motion-reduce:transition-none"
+          style={{ width: `${total ? Math.round((done / total) * 100) : 0}%` }}
+        />
+      </div>
       <ol className="flex flex-col">
         {all.map(({ step, tasks }) => (
           <StepGroup
@@ -98,6 +124,7 @@ export function EarnOverviewTab() {
         ))}
       </ol>
     </section>
+    </div>
   );
 }
 
@@ -129,23 +156,24 @@ function StepGroup({
   return (
     <li
       aria-current={current ? "step" : undefined}
-      className="flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border-subtle py-6 first:border-t-0 first:pt-0 last:pb-0"
+      className="flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border py-6 first:border-t-0 first:pt-0 last:pb-0"
     >
       <div className="flex items-center gap-4">
         <span
           aria-hidden
           className={cn(
-            "inline-flex size-[24px] shrink-0 items-center justify-center rounded-full text-sm font-medium leading-sm tabular-nums",
+            T.meta,
+            "inline-flex size-[24px] shrink-0 items-center justify-center rounded-full tabular-nums",
             step.state === "done" ? "bg-bg-success-subtle text-text-success" : current ? "bg-bg-inverse text-text-inverse" : "bg-bg-subtle text-text-secondary",
           )}
         >
           {step.state === "done" ? <Icon icon={Tick02Icon} size={14} /> : step.n}
         </span>
-        <h3 className="min-w-0 flex-1 text-md font-semibold leading-md text-text-primary">
+        <h3 className={cn(T.section, "min-w-0 flex-1")}>
           <span className="sr-only">{`Step ${step.n}: `}</span>
           {step.title}
         </h3>
-        <span className={cn("text-sm font-medium leading-sm", current ? "text-text-brand" : step.state === "done" ? "text-text-success" : "text-text-secondary")}>
+        <span className={cn(T.meta, current ? "text-text-brand" : step.state === "done" ? "text-text-success" : "text-text-secondary")}>
           {note}
         </span>
       </div>
@@ -160,7 +188,7 @@ function StepGroup({
               <li key={t.id} className="flex items-start gap-4 py-2">
                 <TaskMark ok={t.ok} />
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  <span className="text-md leading-md text-text-primary">
+                  <span className={cn(T.body, "text-text-primary")}>
                     {TASK_WORD[t.id] ?? t.label}
                     <span className="sr-only">{t.ok ? ", done" : ", not done yet"}</span>
                   </span>
@@ -178,7 +206,7 @@ function StepGroup({
             <li className="flex items-start gap-4 py-2">
               <TaskMark ok={false} />
               <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <span className="text-md leading-md text-text-primary">{action.label}</span>
+                <span className={cn(T.body, "text-text-primary")}>{action.label}</span>
                 {canAct ? (
                   <>
                     <span className={EARN_NOTE}>{ACTION_LINE[step.id]}</span>
@@ -206,8 +234,9 @@ function TaskMark({ ok }: { ok: boolean }) {
   );
 }
 
-/** 12b "You're selling": what is live, its facts, and where it is managed. */
+/** 12b: what is live (selling, given away or sold), its facts, and where it is managed. */
 function LiveCard({
+  label,
   title,
   why,
   facts,
@@ -215,6 +244,7 @@ function LiveCard({
   given,
   projectId,
 }: {
+  label: string;
   title: string;
   why: string;
   facts: { label: string; value: string }[];
@@ -227,7 +257,7 @@ function LiveCard({
   return (
     <section aria-labelledby={headingId} className={EARN_CARD}>
       <div className="flex items-center justify-between gap-4">
-        <p className="text-md leading-md text-text-secondary">You&apos;re selling</p>
+        <p className={T.body}>{label}</p>
         <TestnetDemoBadge />
       </div>
       <h2 id={headingId} className={EARN_H2_CLASS}>

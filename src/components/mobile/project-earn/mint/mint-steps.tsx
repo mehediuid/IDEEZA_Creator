@@ -69,11 +69,12 @@ import { cn } from "@/lib/utils";
 import { SheetSelect } from "../../kit/sheet-select";
 import { Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
-import { LIST_ROW, ListCard } from "../../project/parts";
+import { ListCard } from "../../kit/list";
 import { useEarn } from "../context";
 import { ListingFields, MintTypeCards } from "../listing-fields";
 import { FactRows, LevelCheck } from "../parts";
 import { useLiveReadiness } from "../sell/parts";
+import { T } from "../../type";
 
 export type MintGate = {
   /** Every current product's video state, and — when `gated` — whether the commit may go ahead. */
@@ -82,8 +83,9 @@ export type MintGate = {
   gated: boolean;
 };
 
-const LABEL = "text-md font-medium leading-md text-text-primary";
-const NOTE = "text-sm leading-sm text-text-secondary";
+/** A section heading inside the flow. */
+const H3 = T.section;
+const NOTE = T.meta;
 
 // ─────────────────────────── the intro ───────────────────────────
 
@@ -116,10 +118,10 @@ export function MintIntro({ step, intent, skipChoose }: { step: MintStepId; inte
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <h2 className="text-md font-semibold leading-md text-text-primary">{title}</h2>
-        <p className="text-md leading-md text-text-secondary">{line}</p>
+        <h2 className={T.section}>{title}</h2>
+        <p className={T.body}>{line}</p>
       </div>
-      <p className="text-sm font-medium leading-sm text-text-secondary">{stepLineOf(step, skipChoose)}</p>
+      <p className={T.meta}>{stepLineOf(step, skipChoose)}</p>
     </div>
   );
 }
@@ -136,13 +138,13 @@ export function MintChoose({ intent, onPick }: { intent: Intent | null; onPick: 
             key={it.id}
             className={cn(
               "relative flex cursor-pointer items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid p-6",
-              on ? "border-border-brand bg-bg-brand-subtle" : "border-border-default bg-bg-surface",
+              on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface",
             )}
           >
             <input type="radio" name="m-mint-intent" className="sr-only" checked={on} onChange={() => onPick(it.id)} />
             <Radio checked={on} decorative className="mt-1" />
             <span className="flex flex-col gap-1">
-              <span className="text-md font-medium leading-md text-text-primary">{it.label}</span>
+              <span className={T.rowTitle}>{it.label}</span>
               <span className={NOTE}>{it.sub}</span>
               <span className={NOTE}>{it.requirement}</span>
             </span>
@@ -234,11 +236,11 @@ export function MintDetails({
     />
   );
   const blockchain = (
-    <Field label="Blockchain Mint" htmlFor={ids.network.id}>
+    <Field label="Blockchain" htmlFor={ids.network.id}>
       <SheetSelect
         id={ids.network.id}
         title="Blockchain"
-        placeholder="Choose your prefer blockchain"
+        placeholder="Choose a blockchain"
         value={state.network}
         options={NETWORK_OPTIONS}
         onChange={(v) => {
@@ -325,10 +327,10 @@ function OwnerCheck({ checked, onChange, error }: { checked: boolean; onChange: 
           onChange={(e) => onChange(e.target.checked)}
         />
         <Checkbox checked={checked} decorative />
-        <span className="text-md leading-md text-text-primary">I confirm I am the rightful owner of this idea</span>
+        <span className={cn(T.body, "text-text-primary")}>I confirm I am the rightful owner of this idea</span>
       </label>
       {error && (
-        <span id={errId} className="text-sm leading-sm text-text-error">
+        <span id={errId} className={cn(T.meta, "text-text-error")}>
           {error}
         </span>
       )}
@@ -340,7 +342,7 @@ function ShareToggle({ checked, onChange }: { checked: boolean; onChange: (v: bo
   const id = React.useId();
   return (
     <div className="flex min-h-[44px] items-center justify-between gap-4">
-      <span id={id} className="text-md leading-md text-text-primary">
+      <span id={id} className={cn(T.body, "text-text-primary")}>
         Share to Feed
       </span>
       <Toggle checked={checked} onChange={() => onChange(!checked)} aria-label="Share to Feed" />
@@ -351,7 +353,7 @@ function ShareToggle({ checked, onChange }: { checked: boolean; onChange: (v: bo
 function StoryPanel({ id, value, onChange, note }: { id: string; value: string; onChange: (v: string) => void; note?: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl bg-bg-subtle p-6">
-      <label htmlFor={id} className={LABEL}>
+      <label htmlFor={id} className={T.label}>
         Write your story
       </label>
       <Textarea
@@ -362,7 +364,7 @@ function StoryPanel({ id, value, onChange, note }: { id: string; value: string; 
         onValueChange={(v) => onChange(v.slice(0, STORY_MAX))}
         placeholder="Why did you build this? What should others do with it?"
       />
-      <div className="flex justify-between gap-6 text-sm leading-sm text-text-secondary">
+      <div className={cn(T.meta, "flex justify-between gap-6")}>
         <span>Shown with your post in Feed.</span>
         <span className="tabular-nums">
           {value.length}/{STORY_MAX}
@@ -524,10 +526,10 @@ export function MintReview({
       {mintError && <Banner tone="error">{mintError}</Banner>}
 
       <section className="flex flex-col gap-4">
-        <h3 className={LABEL}>What is minted</h3>
-        <div className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default bg-bg-surface p-8">
-          <p className="text-md font-semibold leading-md text-text-primary">{project.name}</p>
-          <p className="line-clamp-3 text-sm leading-sm text-text-secondary">{project.description.trim() || "No description yet."}</p>
+        <h3 className={H3}>What is minted</h3>
+        <div className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
+          <p className={T.name}>{project.name}</p>
+          <p className={cn(T.meta, "line-clamp-3")}>{project.description.trim() || "No description yet."}</p>
           <p className={NOTE}>{detail}</p>
         </div>
       </section>
@@ -535,8 +537,8 @@ export function MintReview({
       <VideosBlock projectId={project.id} readiness={gate.readiness} gated={gate.gated} />
 
       <section className="flex flex-col gap-4">
-        <h3 className={LABEL}>Shared as</h3>
-        <FactRows rows={termsOf(state, intent, type, input)} label="Shared as" />
+        <h3 className={H3}>Terms</h3>
+        <FactRows rows={termsOf(state, intent, type, input)} label="Terms" />
         {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
       </section>
 
@@ -544,8 +546,8 @@ export function MintReview({
       <WalletLine type={type} network={state.network} badge={intent === "save"} />
 
       {selling && (
-        <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default bg-bg-surface p-8">
-          <h3 className={LABEL}>Each sale</h3>
+        <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
+          <h3 className={H3}>Each sale</h3>
           {eachSale.map((r, i) => (
             <p key={i} className={NOTE}>
               {r.label ? `${r.label} · ${r.value}` : r.value}
@@ -570,10 +572,10 @@ function VideosBlock({ projectId, readiness, gated }: { projectId: string; readi
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-4">
-        <h3 className={LABEL}>Product videos</h3>
+        <h3 className={H3}>Product videos</h3>
         <span className={NOTE}>{`${readiness.counts.ready} of ${readiness.counts.total} ready`}</span>
       </div>
-      <p className="flex items-start gap-4 text-md leading-md text-text-primary">
+      <p className={cn(T.body, "flex items-start gap-4 text-text-primary")}>
         {ok && (
           <span aria-hidden className="text-text-success">
             <Icon icon={CheckmarkCircle01Icon} size={20} />
@@ -589,11 +591,11 @@ function VideosBlock({ projectId, readiness, gated }: { projectId: string; readi
               const copy = statusCopy(p.video);
               const label = actionLabel(copy.action);
               return (
-                <li key={p.productId} className={cn(LIST_ROW, "flex flex-col gap-3 p-6")}>
-                  <span className="text-md font-medium leading-md text-text-primary">{displayProductName(p.name)}</span>
+                <li key={p.productId} className="flex flex-col gap-3 p-6">
+                  <span className={T.rowTitle}>{displayProductName(p.name)}</span>
                   <span className={NOTE}>{copy.text}</span>
                   {label && (
-                    <Link href={phoneProductVideoHref(projectId, p.productId)} className="self-start text-md font-medium leading-md text-text-brand hover:underline">
+                    <Link href={phoneProductVideoHref(projectId, p.productId)} className={cn(T.rowTitle, "self-start hover:underline text-text-brand")}>
                       {label}
                     </Link>
                   )}
@@ -601,11 +603,11 @@ function VideosBlock({ projectId, readiness, gated }: { projectId: string; readi
               );
             })}
           {pv && pvCopy && !pv.ok && (
-            <li className={cn(LIST_ROW, "flex flex-col gap-3 p-6")}>
-              <span className="text-md font-medium leading-md text-text-primary">Project video</span>
+            <li className="flex flex-col gap-3 p-6">
+              <span className={T.rowTitle}>Project video</span>
               <span className={NOTE}>{pvCopy.text}</span>
               {pvAction && (
-                <Link href={phoneProjectPath(projectId, "video")} className="self-start text-md font-medium leading-md text-text-brand hover:underline">
+                <Link href={phoneProjectPath(projectId, "video")} className={cn(T.rowTitle, "self-start hover:underline text-text-brand")}>
                   {pvAction}
                 </Link>
               )}
@@ -627,7 +629,7 @@ function CostCard({ type, network, intent, listing }: { type: MintType; network:
   return (
     <section aria-label="Cost" className="flex flex-col gap-3 rounded-xl bg-bg-surface-raised p-8">
       <div className="flex items-center justify-between gap-4">
-        <h3 className={LABEL}>Cost</h3>
+        <h3 className={H3}>Cost</h3>
         <TestnetDemoBadge />
       </div>
       {rows.map((r, i) =>
@@ -640,7 +642,7 @@ function CostCard({ type, network, intent, listing }: { type: MintType; network:
             key={`${r.label}-${i}`}
             className={cn(
               "flex flex-wrap justify-between gap-x-6",
-              r.bold ? "border-t-[length:var(--border-width-1)] border-solid border-border-strong pt-3 text-md font-semibold leading-md text-text-primary" : "text-md leading-md text-text-secondary",
+              r.bold ? cn(T.name, "border-t-[length:var(--border-width-1)] border-solid border-border-strong pt-3") : T.body,
             )}
           >
             <span>{r.label}</span>
@@ -687,13 +689,11 @@ export function MintDone({
   project,
   products,
   warning,
-  skipChoose,
 }: {
   state: MintState;
   project: ManualProject;
   products: ProjectProduct[];
   warning: string | null;
-  skipChoose: boolean;
 }) {
   const { jobs, now } = useVideoJobs();
   const { record: videos } = useProjectVideos(project.id);
@@ -720,18 +720,16 @@ export function MintDone({
         <span aria-hidden className="inline-flex size-[56px] items-center justify-center rounded-full bg-bg-success-subtle text-text-success">
           <Icon icon={Tick02Icon} size={28} />
         </span>
-        <h2 className="text-lg font-semibold leading-lg text-text-primary">{title}</h2>
+        <h2 className={T.section}>{title}</h2>
         {badge && <Badge tone="success">{badge}</Badge>}
         <p className={NOTE}>{subline}</p>
       </div>
-      <p className="text-sm font-medium leading-sm text-text-secondary">
-        {intent === "give" && state.mintedAt ? `Done · ${formatDate(state.mintedAt)}` : `Step ${skipChoose ? 3 : 4} of ${skipChoose ? 3 : 4} · Done`}
-      </p>
+      {state.mintedAt && <p className={T.meta}>{`Done · ${formatDate(state.mintedAt)}`}</p>}
 
       {project.mint && (
         <section className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
-            <h3 className={LABEL}>Ownership proof</h3>
+            <h3 className={H3}>Ownership proof</h3>
             <TestnetDemoBadge />
           </div>
           <FactRows
@@ -746,7 +744,7 @@ export function MintDone({
 
       {listed && (
         <section className="flex flex-col gap-4">
-          <h3 className={LABEL}>Listing</h3>
+          <h3 className={H3}>Listing</h3>
           <FactRows
             label="Listing"
             rows={[
@@ -760,7 +758,7 @@ export function MintDone({
           />
           <p className={NOTE}>Change the price or remove the listing in Earn › Sell.</p>
           {onMarket && (
-            <Link href={phoneMarketHref(project.id)} className="self-start text-md font-medium leading-md text-text-brand hover:underline">
+            <Link href={phoneMarketHref(project.id)} className={cn(T.rowTitle, "self-start hover:underline text-text-brand")}>
               View on marketplace
             </Link>
           )}
@@ -769,7 +767,7 @@ export function MintDone({
 
       {intent === "give" && (
         <section className="flex flex-col gap-4">
-          <h3 className={LABEL}>What others can do</h3>
+          <h3 className={H3}>What others can do</h3>
           <FactRows
             label="What others can do"
             rows={[
@@ -785,15 +783,15 @@ export function MintDone({
       {!live && <Banner tone="info">{pendingCardLine(rendering)}</Banner>}
 
       <section className="flex flex-col gap-4">
-        <h3 className={LABEL}>Videos</h3>
-        <p className="flex items-start gap-4 text-md leading-md text-text-primary">
+        <h3 className={H3}>Videos</h3>
+        <p className={cn(T.body, "flex items-start gap-4 text-text-primary")}>
           <span aria-hidden className={ready === products.length && products.length > 0 ? "text-text-success" : "text-[color:var(--color-icon-secondary)]"}>
             <Icon icon={ready === products.length && products.length > 0 ? CheckmarkCircle01Icon : CircleIcon} size={20} />
           </span>
           {ready === products.length && products.length > 0 ? VIDEOS_READY : `${ready} of ${products.length} product videos ready.`}
         </p>
       </section>
-      <Link href={phoneEarnHref(project.id)} className="self-start text-md font-medium leading-md text-text-brand hover:underline">
+      <Link href={phoneEarnHref(project.id)} className={cn(T.rowTitle, "self-start hover:underline text-text-brand")}>
         Open Earn
       </Link>
     </div>

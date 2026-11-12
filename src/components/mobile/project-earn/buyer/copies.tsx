@@ -30,7 +30,8 @@ import { buyerLabel } from "@/lib/wallet/identities";
 import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
-import { LIST_CARD } from "../../project/parts";
+import { LIST_CARD } from "../../kit/list";
+import { T } from "../../type";
 
 const TIERS: EditionTier[] = ["regular", "extended"];
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
@@ -87,9 +88,9 @@ function Copies({
     <section ref={anchorRef} aria-label="Copies on sale" className="flex scroll-mt-[48px] flex-col gap-4">
       {groups.map((g, gi) => (
         <div key={g.productId} className="flex flex-col gap-4">
-          <h3 className="text-md font-medium leading-md text-text-primary">{isProjectScope(g.productId) ? "Whole project" : g.name}</h3>
+          <h3 className={T.section}>{isProjectScope(g.productId) ? "Whole project" : g.name}</h3>
           {gi === 0 && twoTiers && buyerId && (
-            <p className="text-sm leading-sm text-text-secondary">Choose This version, or With future updates to get every new version too.</p>
+            <p className={T.meta}>Choose This version, or With future updates to get every new version too.</p>
           )}
           {g.tracks.map((t) => (
             <CopyCard key={t.id} project={project} view={view} viewer={viewer} buyerId={buyerId} track={t as Listed} onBought={onBought} />
@@ -123,13 +124,13 @@ function CopyCard({
   return (
     <section aria-label={name} className={cn(LIST_CARD, "gap-4 p-6")}>
       <div className="flex items-baseline justify-between gap-4">
-        <span className="min-w-0 text-md font-medium leading-md text-text-primary">{name}</span>
-        <span className="shrink-0 text-sm leading-sm tabular-nums text-text-secondary">{card.soldOut ? "Sold out" : `${card.sold} of ${card.total} sold`}</span>
+        <span className={cn(T.rowTitle, "min-w-0")}>{name}</span>
+        <span className={cn(T.meta, "shrink-0 tabular-nums")}>{card.soldOut ? "Sold out" : `${card.sold} of ${card.total} sold`}</span>
       </div>
       {oneTier ? (
         <div className="flex items-baseline justify-between gap-4">
-          <span className="text-sm leading-sm text-text-secondary">{TIER_HELP.extended}</span>
-          <span className="shrink-0 text-md font-medium leading-md tabular-nums text-text-primary">{price("extended")}</span>
+          <span className={T.meta}>{TIER_HELP.extended}</span>
+          <span className={cn(T.rowTitle, "shrink-0 tabular-nums")}>{price("extended")}</span>
         </div>
       ) : buyerId ? (
         <div role="radiogroup" aria-label={`${name}: choose`} className="flex flex-col gap-4">
@@ -140,16 +141,16 @@ function CopyCard({
                 key={t}
                 className={cn(
                   "relative flex min-h-[44px] cursor-pointer items-start gap-4 rounded-lg border-[length:var(--border-width-1)] border-solid px-6 py-4 transition-colors duration-fast",
-                  on ? "border-border-brand bg-bg-brand-subtle" : "border-border-default bg-bg-surface hover:bg-bg-subtle",
+                  on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface hover:bg-bg-subtle",
                 )}
               >
                 <input type="radio" name={`tier-${track.id}`} checked={on} onChange={() => setTier(t)} className="peer sr-only" />
                 <Radio checked={on} decorative size="sm" className="mt-px peer-focus-visible:ring-2 peer-focus-visible:ring-border-focus" />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="text-md font-medium leading-md text-text-primary">{TIER_WORD[t]}</span>
-                  {t === "extended" && <span className="text-sm leading-sm text-text-secondary">{TIER_HELP.extended}</span>}
+                  <span className={T.rowTitle}>{TIER_WORD[t]}</span>
+                  {t === "extended" && <span className={T.meta}>{TIER_HELP.extended}</span>}
                 </span>
-                <span className="shrink-0 text-md font-medium leading-md tabular-nums text-text-primary">{price(t)}</span>
+                <span className={cn(T.rowTitle, "shrink-0 tabular-nums")}>{price(t)}</span>
               </label>
             );
           })}
@@ -158,8 +159,8 @@ function CopyCard({
         <div className="flex flex-col gap-2">
           {TIERS.map((t) => (
             <div key={t} className="flex items-baseline justify-between gap-4">
-              <span className="text-md leading-md text-text-secondary">{TIER_WORD[t]}</span>
-              <span className="text-md font-medium leading-md tabular-nums text-text-primary">{price(t)}</span>
+              <span className={T.body}>{TIER_WORD[t]}</span>
+              <span className={cn(T.rowTitle, "tabular-nums")}>{price(t)}</span>
             </div>
           ))}
         </div>
@@ -195,7 +196,7 @@ function BuyCopy({
 }) {
   const { busyId, buy } = useEditionPurchase({ project, view, buyerId });
   const canBuy = !soldOut && can(viewer, "listing.buy", { ...view.canCtx, listingLive: true });
-  if (soldOut) return <p className="text-md leading-md text-text-secondary">{`All ${total} are sold.`}</p>;
+  if (soldOut) return <p className={T.body}>{`All ${total} are sold.`}</p>;
   if (!canBuy) return null;
   const busy = busyId === track.id;
   return (
@@ -226,5 +227,5 @@ function CopyActivity({ project, track, sales }: { project: ManualProject; track
     : entry
       ? `${labelOf(entry)} · ${formatDate(entry.createdAt)}`
       : `No activity yet · listed ${formatDate(track.listing.listedAt)}`;
-  return <p className="text-sm leading-sm text-text-secondary">{line}</p>;
+  return <p className={T.meta}>{line}</p>;
 }

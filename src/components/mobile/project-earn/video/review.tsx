@@ -18,25 +18,26 @@ import { describeClip } from "@/lib/video/frames";
 import type { ProductVideo, VideoTake } from "@/lib/video/types";
 import { clipMetaLine, honestyLine, resolutionOf } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
-import { Chevron, LIST_CARD, LIST_ROW } from "../../project/parts";
+import { Chevron, LIST_CARD, LIST_DIVIDERS } from "../../kit/list";
 import { PhoneVideo } from "../../project/video";
+import { T } from "../../type";
 
 export type ReviewChoice = { title: string; text: string; onClick: () => void };
 
 /** The "Other choices" card: each row a title, what it does, and a chevron. */
 export function ChoiceList({ choices, label }: { choices: ReviewChoice[]; label: string }) {
   return (
-    <ul aria-label={label} className={LIST_CARD}>
+    <ul aria-label={label} className={cn(LIST_CARD, LIST_DIVIDERS)}>
       {choices.map((c) => (
-        <li key={c.title} className={LIST_ROW}>
+        <li key={c.title}>
           <button
             type="button"
             onClick={c.onClick}
             className="flex min-h-[56px] w-full items-center gap-6 px-8 py-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle"
           >
             <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="text-md font-semibold leading-md text-text-primary">{c.title}</span>
-              <span className="text-sm leading-sm text-text-secondary">{c.text}</span>
+              <span className={T.rowTitle}>{c.title}</span>
+              <span className={T.meta}>{c.text}</span>
             </span>
             <Chevron />
           </button>
@@ -50,10 +51,10 @@ export function ChoiceList({ choices, label }: { choices: ReviewChoice[]; label:
 function WhatsIn({ lines }: { lines: string[] }) {
   return (
     <details className="group">
-      <summary className="-my-6 flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-md font-medium leading-md text-text-primary outline-none focus-visible:underline">
+      <summary className={cn(T.rowTitle, "-my-6 flex min-h-[44px] cursor-pointer list-none items-center gap-2 outline-none focus-visible:underline")}>
         What&apos;s in this video
       </summary>
-      <ul className="mt-4 flex list-disc flex-col gap-2 pl-8 text-sm leading-sm text-text-secondary">
+      <ul className={cn(T.meta, "mt-4 flex list-disc flex-col gap-2 pl-8")}>
         {lines.map((line) => (
           <li key={line}>{line}</li>
         ))}
@@ -84,18 +85,18 @@ export function TakeReview({
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
         <PhoneVideo takeId={take.id} label={`${productName} video, take ${take.n}`} />
-        <p className="text-sm leading-sm text-text-secondary">{clipMetaLine(take, formatDate(take.readyAt ?? take.createdAt))}</p>
+        <p className={T.meta}>{clipMetaLine(take, formatDate(take.readyAt ?? take.createdAt))}</p>
         <WhatsIn lines={describeClip(take, productName, take.source !== null)} />
-        <p className="text-sm leading-sm text-text-tertiary">{honestyLine(productName)}</p>
+        <p className={cn(T.meta, "text-text-tertiary")}>{honestyLine(productName)}</p>
       </div>
       <div className="flex flex-col gap-6">
-        <h2 className="text-lg font-semibold leading-lg text-text-primary">Is this the video you want?</h2>
+        <h2 className={T.section}>Is this the video you want?</h2>
         <Button size="xl" className="w-full" onClick={() => onUse(take)}>
           Use this video
         </Button>
-        {inUse && <p className="text-md leading-md text-text-secondary">Take {inUse.n} stays in use until you choose.</p>}
+        {inUse && <p className={T.body}>Take {inUse.n} stays in use until you choose.</p>}
         {error && (
-          <p role="alert" className="text-md leading-md text-text-error">
+          <p role="alert" className={cn(T.body, "text-text-error")}>
             {error}
           </p>
         )}
@@ -103,15 +104,15 @@ export function TakeReview({
       </div>
       {finished.length > 1 && (
         <div className="flex flex-col gap-4">
-          <h3 className="text-md font-medium leading-md text-text-secondary">Your takes</h3>
-          <ul aria-label="Your takes" className={LIST_CARD}>
+          <h3 className={cn(T.section, "text-text-secondary")}>Your takes</h3>
+          <ul aria-label="Your takes" className={cn(LIST_CARD, LIST_DIVIDERS)}>
             {[...finished].reverse().map((t) => (
-              <li key={t.id} className={cn(LIST_ROW, "flex min-h-[56px] items-center gap-6 px-8 py-4")}>
-                <span className="min-w-0 flex-1 text-md leading-md text-text-primary">
+              <li key={t.id} className="flex min-h-[56px] items-center gap-6 px-8 py-4">
+                <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>
                   Take {t.n} · {resolutionOf(t.quality)} · {t.clip ? Math.round(t.clip.durationMs / 1000) : 10} s
                 </span>
                 {t.id === take.id ? (
-                  <span className="text-sm leading-sm text-text-tertiary">This one</span>
+                  <span className={cn(T.meta, "text-text-tertiary")}>This one</span>
                 ) : t.id === video?.inUseId ? (
                   <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
                     In use

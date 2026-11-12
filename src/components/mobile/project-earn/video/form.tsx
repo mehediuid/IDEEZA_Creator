@@ -11,6 +11,7 @@
 // web's (`VideoFormValue`, `videoFormBlocker`).
 
 import * as React from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { Radio } from "@/components/ideeza/checkbox";
@@ -21,10 +22,11 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { VIDEO_QUALITY, qualityOpen, type VideoQuality } from "@/lib/video/types";
 import { HIGH_LOCKED_NOTE } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import { T } from "../../type";
 
 /** A03 Link MD Brand on the kit's 44 px tap area. */
 export const TAP_LINK =
-  "-my-6 inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline";
+  cn(T.rowTitle, "-my-6 inline-flex min-h-[44px] items-center outline-none hover:underline focus-visible:underline text-text-brand");
 
 /** A selection card (Figma: radius/xl, 12 padding and gap, border/default on bg/surface; picked:
  *  border/brand on bg/brand-subtle). */
@@ -49,7 +51,7 @@ function ChoiceCard({
     <label
       className={cn(
         "relative flex items-center gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid p-6 transition-colors duration-fast motion-reduce:transition-none",
-        checked ? "border-border-brand bg-bg-brand-subtle" : "border-border-default bg-bg-surface",
+        checked ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface",
         disabled ? "cursor-not-allowed" : "cursor-pointer",
       )}
     >
@@ -57,10 +59,10 @@ function ChoiceCard({
       <Radio checked={checked} disabled={disabled} decorative className="peer-focus-visible:shadow-focus-brand" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex items-center gap-4">
-          <span className={cn("text-md font-semibold leading-md", disabled ? "text-text-secondary" : "text-text-primary")}>{title}</span>
+          <span className={cn(T.rowTitle, disabled ? "text-text-secondary" : "text-text-primary")}>{title}</span>
           {badge && <Badge tone="brand">{badge}</Badge>}
         </span>
-        <span className="text-sm leading-sm text-text-secondary">{text}</span>
+        <span className={T.meta}>{text}</span>
       </span>
     </label>
   );
@@ -70,7 +72,7 @@ export function MethodField({ value, onChange }: { value: VideoMethod; onChange:
   const id = React.useId();
   return (
     <div role="radiogroup" aria-labelledby={`${id}-label`} className="flex flex-col gap-4">
-      <p id={`${id}-label`} className="text-md font-medium leading-md text-text-primary">
+      <p id={`${id}-label`} className={T.label}>
         How should it be made?
       </p>
       <ChoiceCard name={`${id}-method`} checked={value === "ar"} onPick={() => onChange("ar")} title="AR" badge="Recommended" text="Record a video of the real product with your phone." />
@@ -109,7 +111,7 @@ function PromptField({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-6">
-        <label htmlFor={id} className="text-md font-medium leading-md text-text-primary">
+        <label htmlFor={id} className={T.label}>
           {label}
         </label>
         {action}
@@ -127,7 +129,7 @@ function PromptField({
         className="resize-none"
       />
       <div className="flex items-center gap-4">
-        <span aria-hidden className="flex-1 text-md leading-md text-text-primary">
+        <span aria-hidden className={cn(T.body, "flex-1 text-text-primary")}>
           {autoLabel}
         </span>
         <Toggle
@@ -147,7 +149,7 @@ export function QualityField({ value, onChange }: { value: VideoQuality; onChang
   const locked = !qualityOpen("high", sub.tier);
   return (
     <div role="radiogroup" aria-labelledby={`${id}-label`} className="flex flex-col gap-4">
-      <p id={`${id}-label`} className="text-md font-medium leading-md text-text-primary">
+      <p id={`${id}-label`} className={T.label}>
         Select video quality · {VIDEO_QUALITY.low.seconds} seconds
       </p>
       {(["low", "high"] as const).map((q) => (
@@ -162,7 +164,14 @@ export function QualityField({ value, onChange }: { value: VideoQuality; onChang
           text={`${VIDEO_QUALITY[q].seconds} sec · ${VIDEO_QUALITY[q].resolution}`}
         />
       ))}
-      {locked && <p className="text-sm leading-sm text-text-secondary">{HIGH_LOCKED_NOTE}</p>}
+      {locked && (
+        <p className={T.meta}>
+          {HIGH_LOCKED_NOTE}{" "}
+          <Link href="/m/plans" className={cn(T.caption, "-my-6 inline-flex min-h-[44px] items-center text-text-brand outline-none hover:underline focus-visible:underline")}>
+            See plans
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

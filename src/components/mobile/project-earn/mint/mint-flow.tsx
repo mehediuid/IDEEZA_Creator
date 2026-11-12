@@ -61,12 +61,13 @@ import { readWallet } from "@/lib/wallet/demo-wallet";
 import { mintViewOf, normalizeMintRecord } from "@/lib/wallet/mint";
 import { requestCopy } from "@/lib/wallet/request";
 import type { MintType, Proof, RequestResult } from "@/lib/wallet/types";
-import { cn } from "@/lib/utils";
 import { BottomBar } from "../../kit/bottom-bar";
 import { OfflineBanner } from "../../kit/states";
+import { useGoBack } from "../../nav-trail";
 import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
 import { MintChoose, MintDetails, MintDone, MintIntro, MintReview, MintShare, type MintGate } from "./mint-steps";
+import { T } from "../../type";
 
 const NO_METADATA: ListingMetadata = { name: "", description: "", products: [], cover: null, at: 0 };
 const GONE = "This project no longer exists.";
@@ -77,8 +78,10 @@ const NOT_MINTED_REJECTED = "Not minted — you rejected it in your wallet. Noth
 const DRAFT_NOT_SAVED =
   "Minted and saved on the project, but this browser couldn't save the brief itself — storage is full or blocked. After a reload the brief opens on an earlier step.";
 
+/** The reason follows a dash, so its sentence starts in lower case ("Not minted — your wallet …"). */
 function notMintedLine(reason: string): string {
-  return `Not minted — ${reason} Nothing was charged.`;
+  const lower = /^[A-Z][a-z]/.test(reason) ? reason.charAt(0).toLowerCase() + reason.slice(1) : reason;
+  return `Not minted — ${lower} Nothing was charged.`;
 }
 
 function readRaw(key: string): string | null {
@@ -104,6 +107,11 @@ export function MintFlow({ projectId }: { projectId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
+  const projectHref = `/m/projects/${encodeURIComponent(projectId)}`;
+  const leave = useGoBack(projectHref);
+  const backToSell = useGoBack(phoneEarnHref(projectId, "sell"));
+  const backFromReview = useGoBack(withoutStep(pathname, search));
+  const pushedReview = React.useRef(false);
   const { jobs, now: videoNow } = useVideoJobs();
   const { projects, markStepCompleted, setStatus, setShowcase, setMint, setOwnerConfirmed, updateProject } = useManualProjects();
   const { builds } = useCreateHistory();
@@ -292,7 +300,10 @@ export function MintFlow({ projectId }: { projectId: string }) {
         const at = mintedAt;
         setState((cur) => ({ ...cur, mintedAt: at }));
         setBase("success");
-        router.replace(withoutStep(pathname, search));
+        // Done takes the place of the flow: when Review was pushed over Details here, step back
+        // onto that entry (so one Back from Done leaves the mint); else drop the step in place.
+        if (pushedReview.current) router.back();
+        else router.replace(withoutStep(pathname, search));
       }
     } finally {
       mintingRef.current = false;
@@ -303,26 +314,12 @@ export function MintFlow({ projectId }: { projectId: string }) {
   if (!project || !scope) return null;
   const intent = state.intent ?? "sell";
 
-  const projectHref = `/m/projects/${encodeURIComponent(projectId)}`;
-  const leave = () => {
-    if (window.history.length > 1) router.back();
-    else router.push(projectHref);
+  const toReview = () => {
+    pushedReview.current = true;
+    router.push(withStep(pathname, search, "review"));
   };
-  const toReview = () => router.push(withStep(pathname, search, "review"));
-  const backFromReview = () => {
-    if (window.history.length > 1) router.back();
-    else router.replace(withoutStep(pathname, search));
-  };
-  const back =
-    step === "review"
-      ? backFromReview
-      : step === "details"
-        ? asked
-          ? leave
-          : () => setBase("choose")
-        : step === "choose"
-          ? () => router.push(phoneEarnHref(projectId, "sell"))
-          : () => router.push(projectHref);
+  // Back never pushes (nav-trail): the previous screen, else the step's parent in place.
+  const back = step === "review" ? backFromReview : step === "details" ? (asked ? leave : () => setBase("choose")) : step === "choose" ? backToSell : leave;
 
   const title = step === "success" && intent === "give" ? "Give to the community" : "Mint";
 
@@ -343,7 +340,7 @@ export function MintFlow({ projectId }: { projectId: string }) {
           onChoose={() => setBase("details")}
           onReview={toReview}
           onSign={() => void commit()}
-          onDone={() => router.push(projectHref)}
+          onDone={() => router.replace(projectHref)}
         />
       }
     >
@@ -367,7 +364,7 @@ export function MintFlow({ projectId }: { projectId: string }) {
         {step === "review" && (
           <MintReview state={state} project={project} products={products} gate={gate} type={type} now={now} creatorPct={creatorPct} mintError={minting ? null : mintError} />
         )}
-        {step === "success" && <MintDone state={state} project={project} products={products} warning={draftNotSaved ? DRAFT_NOT_SAVED : null} skipChoose={asked !== null} />}
+        {step === "success" && <MintDone state={state} project={project} products={products} warning={draftNotSaved ? DRAFT_NOT_SAVED : null} />}
       </div>
     </Screen>
   );
@@ -430,13 +427,13 @@ function MintFooter({
   const reason = step === "choose" ? (state.intent ? null : "Pick how it goes out.") : step === "details" ? detailsReason : reviewReason;
   const primary =
     step === "choose" ? (
-      <Button size="xl" className="min-w-0 flex-1" disabled={!state.intent} onClick={onChoose}>
+      <Button size="xl" className="flex-[2_0_auto]" disabled={!state.intent} onClick={onChoose}>
         Continue
       </Button>
     ) : step === "details" ? (
       <Button
         size="xl"
-        className="min-w-0 flex-1"
+        className="flex-[2_0_auto]"
         disabled={tried && !!detailsReason}
         aria-describedby={detailsReason ? reasonId : undefined}
         onClick={() => {
@@ -451,19 +448,20 @@ function MintFooter({
         Continue to review
       </Button>
     ) : (
-      <Button size="xl" className="min-w-0 flex-1" disabled={!!reviewReason || minting} loading={minting} aria-describedby={reviewReason ? reasonId : undefined} onClick={onSign}>
+      <Button size="xl" className="flex-[2_0_auto]" disabled={!!reviewReason || minting} loading={minting} aria-describedby={reviewReason ? reasonId : undefined} onClick={onSign}>
         {minting ? "Waiting for your wallet…" : ctaOf(state, type)}
       </Button>
     );
   return (
     <BottomBar className="pt-8">
-      <div className="flex gap-6">
-        <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" disabled={minting} onClick={onBack}>
+      {/* Side by side while both fit; a long primary takes its own line over Back (320 px). */}
+      <div className="flex flex-wrap-reverse gap-x-6 gap-y-4">
+        <Button hierarchy="secondary" size="xl" className="flex-[1_0_96px]" disabled={minting} onClick={onBack}>
           Back
         </Button>
         {primary}
       </div>
-      <p id={reasonId} className={cn("text-sm leading-sm text-text-secondary")}>
+      <p id={reasonId} className={T.meta}>
         {reason ? `${reason} · ` : ""}Saved as you go
       </p>
     </BottomBar>

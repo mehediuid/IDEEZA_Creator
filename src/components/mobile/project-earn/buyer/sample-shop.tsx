@@ -51,10 +51,12 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../../kit/bottom-bar";
-import { LIST_CARD, SectionHeading } from "../../project/parts";
+import { LIST_CARD } from "../../kit/list";
+import { SectionHeading } from "../../project/parts";
 import { PhoneWalletScope } from "../phone-wallet";
 import { readSampleSales, useSampleSales, writeSampleSales } from "./sample-sales-store";
 import { CardNote, ClosedCard, DemoShopBanner, Disclosure, NftActivityLine, OfferCard, OfferRowsCard, PurchaseDoneSheet, WalletLine, type DoneFacts } from "./parts";
+import { T } from "../../type";
 
 /** The web's words for a project sold in full (lib/market/purchase.ts). */
 const LOCKED = "This project was sold in full, so its NFTs aren't for sale any more.";
@@ -214,7 +216,7 @@ export function SampleMarketSection() {
       )}
       {copies.length > 0 && (
         <div className="flex flex-col gap-4">
-          <h3 className="text-md font-medium leading-md text-text-primary">Whole project</h3>
+          <h3 className={T.section}>Whole project</h3>
           {copies.map((o) => {
             const state = offerStateOf(o, id, sales);
             const why = sampleBuyBlock(o, id, sales);
@@ -222,18 +224,18 @@ export function SampleMarketSection() {
             return (
               <section key={o.kind} aria-label={o.name} className={cn(LIST_CARD, "gap-4 p-6")}>
                 <div className="flex items-baseline justify-between gap-4">
-                  <span className="min-w-0 text-md font-medium leading-md text-text-primary">{o.name}</span>
+                  <span className={cn(T.rowTitle, "min-w-0")}>{o.name}</span>
                   {state.count !== null && state.of !== null && (
-                    <span className="shrink-0 text-sm leading-sm tabular-nums text-text-secondary">{state.soldOut ? "Sold out" : `${state.count} of ${state.of} sold`}</span>
+                    <span className={cn(T.meta, "shrink-0 tabular-nums")}>{state.soldOut ? "Sold out" : `${state.count} of ${state.of} sold`}</span>
                   )}
                 </div>
-                <p className="text-sm leading-sm text-text-secondary">
+                <p className={T.meta}>
                   {last ? `Bought by ${buyerLabel(last.buyerId)} · ${formatAmount(last.price, last.token)} · ${formatDate(last.at)}` : "No activity yet"}
                 </p>
                 {state.locked ? (
-                  <p className="text-md leading-md text-text-secondary">{LOCKED}</p>
+                  <p className={T.body}>{LOCKED}</p>
                 ) : state.soldOut ? (
-                  <p className="text-md leading-md text-text-secondary">{`All ${state.of} are sold.`}</p>
+                  <p className={T.body}>{`All ${state.of} are sold.`}</p>
                 ) : (
                   <Button
                     hierarchy="secondary"
@@ -282,7 +284,7 @@ function SamplePurchaseSummary({ holding, creator, copies }: { holding: SampleSa
             ]}
           />
         ))}
-        <p className="text-sm leading-sm text-text-secondary">Not on a blockchain — this is a testnet demo.</p>
+        <p className={T.meta}>Not on a blockchain — this is a testnet demo.</p>
       </div>
     </section>
   );

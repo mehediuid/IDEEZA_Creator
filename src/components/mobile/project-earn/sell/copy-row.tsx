@@ -55,6 +55,8 @@ import { FactRows } from "../parts";
 import { NftActivityLine } from "./nft-activity";
 import { CheckRow, DoneNote, RowButton, SellRow, StateLines, SUB } from "./parts";
 import { SellCopiesSheet, type CopyScope } from "./sell-copies";
+import { cn } from "@/lib/utils";
+import { T } from "../../type";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
 type Dialog = { kind: "edit"; track: Listed } | { kind: "add"; track: EditionTrack } | { kind: "remove"; track: EditionTrack } | null;
@@ -116,7 +118,7 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
         </div>
       )}
       {state.kind === "manage" && open && chain && (
-        <div id={panelId} className="flex flex-col gap-8 border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-8 py-6">
+        <div id={panelId} className="flex flex-col gap-8 border-t-[length:var(--border-width-1)] border-solid border-border px-8 py-6">
           <Tracks kind={kind} scope={scope} chain={chain} more={state.more} onSell={startSell} onNote={(m) => {
             setNote(m);
             announce(m);
@@ -174,9 +176,9 @@ function Tracks({
         const name = `${KIND_LABEL[kind]} · ${USE_LABEL[use]}`;
         if (!t && more !== use) return null;
         return (
-          <section key={use} aria-label={name} className={i > 0 ? "flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-8" : "flex flex-col gap-4"}>
+          <section key={use} aria-label={name} className={i > 0 ? "flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border pt-8" : "flex flex-col gap-4"}>
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <h4 className="text-md font-medium leading-md text-text-primary">{name}</h4>
+              <h4 className={T.rowTitle}>{name}</h4>
               <Badge tone={t?.listing ? "success" : "neutral"}>{t?.listing ? "On the marketplace" : "Not selling"}</Badge>
             </div>
             {t ? (
@@ -236,7 +238,7 @@ function TrackBody({
   const listing = track.listing;
   return (
     <>
-      <p className={card.soldOut ? "text-sm leading-sm text-text-success" : SUB}>{copiesSoldLineOf(card)}</p>
+      <p className={card.soldOut ? cn(T.meta, "text-text-success") : SUB}>{copiesSoldLineOf(card)}</p>
       {listing ? (
         <>
           <FactRows
@@ -353,7 +355,7 @@ function EditCopiesSheet({
             Cancel
           </Button>
           {problem && (
-            <p role="alert" className="text-sm leading-sm text-text-error">
+            <p role="alert" className={cn(T.meta, "text-text-error")}>
               {problem.message}
             </p>
           )}
@@ -397,10 +399,10 @@ function EditCopiesSheet({
         />
         {!err("royalties") && <span className={SUB}>Paid to you on every resale.</span>}
       </Field>
-      <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default p-6">
-        <span className="text-sm font-semibold leading-sm text-text-tertiary">Each sale</span>
+      <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-6">
+        <span className={cn(T.label, "text-text-tertiary")}>Each sale</span>
         {each.map((r) => (
-          <p key={r} className="text-md leading-md tabular-nums text-text-secondary">
+          <p key={r} className={cn(T.body, "tabular-nums")}>
             {r}
           </p>
         ))}
@@ -476,7 +478,7 @@ function AddCopiesSheet({
             Cancel
           </Button>
           {boxProblem && (
-            <p id={`${prefix}-reason`} role="alert" className="text-sm leading-sm text-text-error">
+            <p id={`${prefix}-reason`} role="alert" className={cn(T.meta, "text-text-error")}>
               {boxProblem}
             </p>
           )}

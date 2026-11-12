@@ -31,7 +31,7 @@ import { AS_PARAM, VIEW_PARAM } from "@/lib/manual/buyer-preview";
 import { ROLE_WORD } from "@/lib/manual/contributors";
 import { can } from "@/lib/manual/permissions";
 import { phoneEarnHref, phoneMarketHref } from "@/lib/manual/phone-earn";
-import { PHONE_TABS, parsePhoneTab, phoneProjectHref, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
+import { PHONE_TABS, phoneProjectHref, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
 import { engineeringMetaOf, stageLineOf } from "@/lib/manual/project-header";
 import { aboutRowsOf, detailsRows } from "@/lib/manual/rail-copy";
 import { headerText } from "@/lib/manual/project-summary";
@@ -42,16 +42,19 @@ import { ProjectProvider, type Ready } from "../../project/context";
 import { ActivityTab } from "../../project/activity-tab";
 import { MediaTab } from "../../project/media-tab";
 import { ProductsTab } from "../../project/products-tab";
-import { LINK_MD, SectionHeading } from "../../project/parts";
+import { SectionHeading } from "../../project/parts";
 import { usePhoneWriteGate } from "../../project/write-gate";
 import { OfflineBanner } from "../../kit/states";
+import { tabPanelProps, useTabParam } from "../../kit/tabs";
+import { useGoBack } from "../../nav-trail";
+import { LINK_MD } from "../sell/parts";
 import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
 import { PhoneWalletScope } from "../phone-wallet";
 import { PhoneCopies } from "./copies";
 import { AuctionCard, BuyNowCard, closedLineOf, MainActivity } from "./main-offer";
 import { ProductsSection } from "./market-screen";
-import { AboutRows, ClosedCard, HolderBenefits, LegalSection, PreviewBanner, ProjectActivity, ProjectTop, useScrolledPast, ViewerTabs, type OfferRow } from "./parts";
+import { AboutRows, ClosedCard, HolderBenefits, LegalSection, PreviewBanner, ProjectActivity, ProjectTop, useScrolledPast, ViewerTabs, VIEWER_TABS_ID, type OfferRow } from "./parts";
 
 export function PreviewScreen({ id }: { id: string }) {
   const data = useProjectPageData(id, "project");
@@ -95,30 +98,17 @@ const NO_SHEET = () => {};
 function PreviewReady({ data }: { data: Ready }) {
   const { project, view, viewer } = data;
   const params = useSearchParams();
-  const router = useRouter();
   const gate = usePhoneWriteGate(project.id);
   const ctx = { ...data, gate, open: NO_SHEET };
   const contributor = viewer.kind === "contributor-preview" ? viewer : null;
   const tabs = contributor ? PHONE_TABS : VIEWER_TABS;
-  const asked = parsePhoneTab(params.get("tab"));
-  const tab: PhoneTab = tabs.some((t) => t.id === asked) ? asked : "overview";
+  // Client-state tabs: the address follows by replaceState, keeping ?view= and ?as=.
+  const [tab, goTab] = useTabParam<PhoneTab>("tab", tabs.map((t) => t.id), "overview");
   const titleRef = React.useRef<HTMLHeadingElement>(null);
   const titleGone = useScrolledPast(titleRef);
 
   const fallback = contributor ? phoneEarnHref(project.id, "money") : phoneEarnHref(project.id);
-  const exit = () => {
-    if (window.history.length > 1) router.back();
-    else router.replace(fallback);
-  };
-  const goTab = (t: PhoneTab) => {
-    const q = new URLSearchParams();
-    const v = params.get(VIEW_PARAM);
-    const as = params.get(AS_PARAM);
-    if (v) q.set(VIEW_PARAM, v);
-    if (as) q.set(AS_PARAM, as);
-    if (t !== "overview") q.set("tab", t);
-    router.replace(`/m/projects/${encodeURIComponent(project.id)}/preview?${q.toString()}`, { scroll: false });
-  };
+  const exit = useGoBack(fallback);
 
   const text = headerText(view.summary, { viewer });
   const time = engineeringMetaOf(view.summary, null)
@@ -138,7 +128,7 @@ function PreviewReady({ data }: { data: Ready }) {
 
   return (
     <ProjectProvider value={ctx}>
-      <Screen top={<TopBar back title={titleGone ? project.name : undefined} />}>
+      <Screen top={<TopBar back={fallback} title={titleGone ? project.name : undefined} />}>
         <OfflineBanner />
         {contributor ? (
           <PreviewBanner
@@ -155,7 +145,7 @@ function PreviewReady({ data }: { data: Ready }) {
         )}
         <ProjectTop name={project.name} chips={chips} meta={meta} description={project.description} titleRef={titleRef} />
         <ViewerTabs tabs={tabs} tab={tab} onChange={goTab} />
-        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="px-8 pb-12 pt-8">
+        <div {...tabPanelProps(VIEWER_TABS_ID, tab)} className="px-8 pb-12 pt-8 outline-none">
           {tab === "overview" && (
             <div className="flex flex-col gap-12">
               <PreviewMarket data={data} />

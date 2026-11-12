@@ -8,9 +8,11 @@
 // phone's wallet sheet (PhoneWalletScope).
 // · Top bar: Back; the name comes into it once the header scrolls away.
 // · The Testnet demo banner and its "Shop as someone else".
-// · The header: name and status chip, "Created by you · Listed {date}" (and
-//   "You own n%" for a holder), the description.
-// · Tabs Overview · Products · Media (`?tab=`); the Overview holds the
+// · The header: name and status chip, "Created by {the creator's name} ·
+//   Listed {date}" — the page speaks to the buyer, never "you" for the
+//   creator — (and "You own n%" for a holder), the description.
+// · Tabs Overview · Products · Media (`?tab=`, the kit's client-state tabs);
+//   the Overview holds the
 //   Marketplace block (main-offer.tsx, copies.tsx), Project activity, the
 //   products, Legal information, Holder benefits and About.
 // · The bottom bar: the one primary for where the buyer stands — Buy now (Buy
@@ -18,23 +20,24 @@
 //   projects — beside Ask the creator, or Get creator support for a holder.
 // · 18d: a confirmed purchase ends on Purchase successful, a bid on its toast.
 // Not on the marketplace (never listed, or listed in another browser): the
-// web's "This project isn't on the marketplace".
+// web's "This project isn't on the marketplace". A Feed sample's market
+// address opens the sample's own page on its Marketplace block, where it sells.
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { BubbleChatIcon, Coins01Icon, Store01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { StateCard } from "@/components/ideeza/state-card";
 import { useAuctionClock } from "@/components/marketplace/bid-card";
 import { usePurchase } from "@/components/marketplace/purchase-dialog";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { StatusChip } from "@/components/projects/status-chip";
+import { useAuth } from "@/lib/account/auth";
 import { can } from "@/lib/manual/permissions";
 import { phoneMarketHref } from "@/lib/manual/phone-earn";
-import { parseViewerTab, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
+import { sampleProjectOf, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
 import { detailsRows } from "@/lib/manual/rail-copy";
 import { headerText } from "@/lib/manual/project-summary";
 import { auctionStateOf } from "@/lib/market/auction";
@@ -43,11 +46,15 @@ import { holdingOf } from "@/lib/market/sales";
 import type { EditionTrack, Listing, Sale } from "@/lib/market/types";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
+import { displayNameOf } from "@/lib/people/ids";
+import { useMyProfile } from "@/lib/people/profile-store";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../../kit/bottom-bar";
+import { EmptyState } from "../../kit/state";
+import { tabPanelProps, useTabParam } from "../../kit/tabs";
 import { OfflineBanner } from "../../kit/states";
 import { useToast } from "../../kit/toast";
 import { Screen } from "../../screen";
@@ -55,7 +62,8 @@ import { TopBar } from "../../top-bar";
 import { ProjectProvider, type Ready } from "../../project/context";
 import { MediaTab } from "../../project/media-tab";
 import { BuildCheckLine, useProductRows } from "../../project/product-rows";
-import { ListCard, ProductRow, SectionHeading, SubLine } from "../../project/parts";
+import { ListCard } from "../../kit/list";
+import { ProductRow, SectionHeading, SubLine } from "../../project/parts";
 import { ProductsTab } from "../../project/products-tab";
 import { usePhoneWriteGate } from "../../project/write-gate";
 import { PhoneWalletScope } from "../phone-wallet";
@@ -82,8 +90,10 @@ import {
   PurchaseDoneSheet,
   useScrolledPast,
   ViewerTabs,
+  VIEWER_TABS_ID,
   type DoneFacts,
 } from "./parts";
+import { T } from "../../type";
 
 export const MARKET_BANNER_BODY =
   "Every listing here is yours, so a demo creator does the buying — test tokens in a test wallet. Nothing is sent to a blockchain.";
@@ -91,7 +101,7 @@ export const MARKET_BANNER_BODY =
 export function MarketScreen({ id }: { id: string }) {
   const data = useProjectPageData(id, "market");
   if (data.state === "loading") return <MarketLoading />;
-  if (data.state === "missing") return <NotOnMarketplace />;
+  if (data.state === "missing") return <NotOnMarketplace id={id} />;
   return (
     <PhoneWalletScope>
       <MarketReady data={data} />
@@ -113,21 +123,21 @@ function MarketLoading() {
   );
 }
 
-function NotOnMarketplace() {
+function NotOnMarketplace({ id }: { id: string }) {
+  const router = useRouter();
+  const sample = sampleProjectOf(id) !== null;
+  // A Feed sample sells on its own page (`?tab=marketplace` opens its Marketplace block).
+  React.useEffect(() => {
+    if (sample) router.replace(`/m/projects/${encodeURIComponent(id)}?tab=marketplace`);
+  }, [sample, id, router]);
+  if (sample) return <MarketLoading />;
   return (
     <Screen top={<TopBar back />} className="px-8 pb-8">
-      <StateCard
-        tone="empty"
-        className="w-full"
-        titleAs="h1"
-        icon={<Icon icon={Store01Icon} size={32} />}
+      <EmptyState
+        icon={Store01Icon}
         title="This project isn't on the marketplace"
         body="This page shows only projects their creator added to Explore marketplace. This one may never have been listed, or it was listed in a different browser."
-        action={
-          <Link href="/m/projects" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-            Back to My projects
-          </Link>
-        }
+        action={{ label: "Browse the Feed", href: "/m" }}
       />
     </Screen>
   );
@@ -152,10 +162,9 @@ const NO_SHEET = () => {};
 function MarketReady({ data }: { data: Ready }) {
   const { project, view, viewer, now } = data;
   const buyerId: DemoBuyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : DEMO_BUYERS[0].id;
-  const params = useSearchParams();
-  const router = useRouter();
   const toast = useToast();
-  const tab = parseViewerTab(params.get("tab"));
+  const [tab, goTab] = useTabParam<PhoneTab>("tab", VIEWER_TABS.map((t) => t.id), "overview");
+  const creator = useCreatorName();
   const gate = usePhoneWriteGate(project.id);
   const ctx = { ...data, gate, open: NO_SHEET };
   const titleRef = React.useRef<HTMLHeadingElement>(null);
@@ -176,8 +185,6 @@ function MarketReady({ data }: { data: Ready }) {
   const copiesLive = view.lock === null && view.editions.some((t) => t.listing !== null);
   const { busy, buy } = usePurchase({ project, view, buyerId });
 
-  const goTab = (t: PhoneTab) => router.replace(`${phoneMarketHref(project.id)}${t === "overview" ? "" : `?tab=${t}`}`, { scroll: false });
-
   const purchase = async (via: "buyNow" | "auctionBuyNow") => {
     if (!listing || busy) return;
     const sentence = await buy(listing, via);
@@ -191,7 +198,9 @@ function MarketReady({ data }: { data: Ready }) {
   };
 
   const text = headerText(view.summary, { viewer, context: "market" });
-  const meta = [text.createdBy ?? "Created by you", holding ? `You own ${holding.sharePct}%` : null].filter(Boolean).join(" · ");
+  // The header names the creator: every listing here is the signed-in person's own, shopped by a demo creator.
+  const createdBy = (text.createdBy ?? "Created by you").replace(/^Created by you/, `Created by ${creator}`);
+  const meta = [createdBy, holding ? `You own ${holding.sharePct}%` : null].filter(Boolean).join(" · ");
 
   // Bring the Overview's block into view (the bar's controls live there).
   const onOverview = (then: () => void) => {
@@ -252,7 +261,7 @@ function MarketReady({ data }: { data: Ready }) {
         <DemoShopBanner body={MARKET_BANNER_BODY} />
         <ProjectTop name={project.name} chips={<StatusChip status={view.summary.status} word={text.chip.word} />} meta={meta} description={project.description} titleRef={titleRef} />
         <ViewerTabs tabs={VIEWER_TABS} tab={tab} onChange={goTab} />
-        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="px-8 pb-12 pt-8">
+        <div {...tabPanelProps(VIEWER_TABS_ID, tab)} className="px-8 pb-12 pt-8 outline-none">
           {tab === "overview" && (
             <div className="flex flex-col gap-12">
               <section aria-labelledby="bv-market" className="flex flex-col gap-4">
@@ -261,7 +270,7 @@ function MarketReady({ data }: { data: Ready }) {
                 {holding && can(viewer, "purchase.seeSummary", view.canCtx) && <PurchaseSummary holding={holding} toggleRef={summaryRef} />}
                 {listing && live && listing.type === "buyNow" ? (
                   <div className="flex flex-col gap-4">
-                    {holding && <h3 className="text-md font-semibold leading-md text-text-primary">Buy another share</h3>}
+                    {holding && <h3 className={T.section}>Buy another share</h3>}
                     <BuyNowCard listing={listing} view={view} buyerId={buyerId} />
                   </div>
                 ) : listing && auction ? (
@@ -304,6 +313,14 @@ function MarketReady({ data }: { data: Ready }) {
       <PurchaseDoneSheet done={done} onClose={() => setDone(null)} />
     </ProjectProvider>
   );
+}
+
+/** The creator's name as buyers read it: the profile name, else the account's (Settings › Account's rule). */
+function useCreatorName(): string {
+  const { account } = useAuth();
+  const { fields } = useMyProfile();
+  const name = displayNameOf(fields.name || `${account?.firstName ?? ""} ${account?.lastName ?? ""}`.trim());
+  return name === "You" ? "the creator" : name;
 }
 
 function ClosedOrNothing({ view, holdsSale }: { view: Ready["view"]; holdsSale: boolean }) {
@@ -374,7 +391,7 @@ function MarketBar({ projectId, sales, buyerId, primary }: { projectId: string; 
           ))}
         {ask}
       </div>
-      {reason && <p className="text-sm leading-sm text-text-secondary">{reason}</p>}
+      {reason && <p className={T.meta}>{reason}</p>}
     </BottomBar>
   );
 }

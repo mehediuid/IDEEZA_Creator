@@ -16,9 +16,10 @@ import { ESTIMATE_NOTE, labelize, provenanceLabel } from "@/components/projects/
 import type { PlanSection, PricingTier } from "@/lib/manual/business-plan";
 import { cn } from "@/lib/utils";
 import { EARN_CARD } from "../parts";
+import { T } from "../../type";
 
-export const FIELD_LABEL = "text-sm font-medium leading-sm text-text-secondary";
-const FIELD_TEXT = "text-md leading-md text-text-primary";
+export const FIELD_LABEL = T.meta;
+const FIELD_TEXT = cn(T.body, "text-text-primary");
 
 function isTiers(v: unknown): v is PricingTier[] {
   return Array.isArray(v) && (v.length === 0 || (typeof v[0] === "object" && v[0] !== null && "name" in (v[0] as object)));
@@ -35,7 +36,7 @@ function FieldValue({ value }: { value: PlanSection["fields"][string] }) {
               {t.name} · {t.price}
               {t.cadence ? ` / ${t.cadence}` : ""}
             </span>
-            {t.features.length > 0 && <span className="text-sm leading-sm text-text-secondary">{t.features.join(" · ")}</span>}
+            {t.features.length > 0 && <span className={T.meta}>{t.features.join(" · ")}</span>}
           </li>
         ))}
       </ul>
@@ -68,7 +69,7 @@ export function SectionCard({
   return (
     <section aria-labelledby={headingId} id={headingId ? `${headingId}-card` : undefined} className={cn(EARN_CARD, "scroll-mt-40", className)}>
       <div className="flex items-start justify-between gap-4">
-        <h3 id={headingId} className="min-w-0 break-words text-lg font-semibold leading-lg text-text-primary">
+        <h3 id={headingId} className={cn(T.section, "min-w-0 break-words")}>
           {section.title}
         </h3>
         {section.state === "done" && (
@@ -78,14 +79,14 @@ export function SectionCard({
         )}
       </div>
       {section.state === "pending" && (
-        <p className="flex items-center gap-4 text-md leading-md text-text-tertiary">
+        <p className={cn(T.body, "flex items-center gap-4 text-text-tertiary")}>
           <Spinner size={16} />
           Writing…
         </p>
       )}
       {section.state === "failed" && (
         <div className="flex flex-col items-start gap-4">
-          <p className="text-md leading-md text-text-error">{`Couldn't write ${section.title}.`}</p>
+          <p className={cn(T.body, "text-text-error")}>{`Couldn't write ${section.title}.`}</p>
           {retry}
         </div>
       )}
@@ -96,7 +97,7 @@ export function SectionCard({
             <FieldValue value={value} />
           </div>
         ))}
-      {estimate && <p className="text-sm leading-sm text-text-tertiary">{ESTIMATE_NOTE}</p>}
+      {estimate && <p className={cn(T.meta, "text-text-tertiary")}>{ESTIMATE_NOTE}</p>}
     </section>
   );
 }

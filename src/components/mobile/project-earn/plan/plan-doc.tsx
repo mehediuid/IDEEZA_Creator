@@ -16,9 +16,10 @@ import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
+import { finishPlan } from "./plan-sheets";
 import { clearBusinessPlan, regeneratePlanRun, restorePlanVersion, retryPlanSection } from "@/components/projects/business-plan/plan-runner";
 import { regenerateImpact, type BusinessPlan, type PlanVersion } from "@/lib/manual/business-plan";
-import { editableSections, planMenuNote, planMetaLine } from "@/lib/manual/phone-plan-money";
+import { editableSections, planMenuNote, planMetaLine, sectionsWord, unwrittenCountOf } from "@/lib/manual/phone-plan-money";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { ActionSheet, type ActionSheetItem } from "../../kit/sheet";
@@ -28,6 +29,7 @@ import { useEarn } from "../context";
 import { VersionsSheet } from "./plan-sheets";
 import { SectionEditSheet, SectionPickSheet } from "./section-edit";
 import { SectionCard } from "./section-view";
+import { T } from "../../type";
 
 const RESTORE_MID_RUN = "Restore is available once the plan has finished writing.";
 
@@ -80,7 +82,7 @@ export function PlanDoc({
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-4">
-            <h2 id="plan-title" ref={titleRef} tabIndex={-1} className="min-w-0 flex-1 text-lg font-semibold leading-lg text-text-primary outline-none">
+            <h2 id="plan-title" ref={titleRef} tabIndex={-1} className={cn(T.section, "min-w-0 flex-1 outline-none")}>
               Business plan
             </h2>
             <IconButton
@@ -97,7 +99,7 @@ export function PlanDoc({
               }}
             />
           </div>
-          <p className="text-sm leading-sm text-text-secondary">{planMetaLine(project.name, current)}</p>
+          <p className={T.meta}>{planMetaLine(project.name, current)}</p>
         </div>
         {lockReason && (
           <div id={lockId}>
@@ -120,6 +122,11 @@ export function PlanDoc({
             Print or save as PDF
           </Button>
         </div>
+        {writes && !locked && !midRun && !live && unwrittenCountOf(current) > 0 && (
+          <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => finishPlan(project.id, current.n)}>
+            {`Write the missing sections (${unwrittenCountOf(current)})`}
+          </Button>
+        )}
       </div>
 
       <div className="sticky top-0 z-10 -mx-8 bg-bg-page px-8 py-4">
@@ -184,7 +191,7 @@ export function PlanDoc({
         open={open === "regenerate"}
         onClose={() => setOpen(null)}
         title="Regenerate this business plan?"
-        body={`${impact.kept} sections you edited or added stay; ${impact.rewritten} AI sections are rewritten.`}
+        body={`${sectionsWord(impact.kept)} you edited or added stay; ${impact.rewritten} AI ${impact.rewritten === 1 ? "section is" : "sections are"} rewritten.`}
         verb="Regenerate"
         onConfirm={() => {
           regeneratePlanRun(project.id);

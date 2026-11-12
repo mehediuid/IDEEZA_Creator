@@ -10,18 +10,14 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { FolderSearchIcon, NoteRemoveIcon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { buttonVariants } from "@/components/ideeza/button";
+import { NoteRemoveIcon } from "@hugeicons/core-free-icons";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { StateCard } from "@/components/ideeza/state-card";
 import { useBriefOpens } from "@/components/brief/use-brief-opens";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { commercialFactsOf, commercialStateOf } from "@/lib/commerce/state";
 import { phoneEarnHref } from "@/lib/manual/phone-earn";
 import { useMarket } from "@/lib/market/market-store";
-import { cn } from "@/lib/utils";
+import { EmptyState, NotFoundState } from "../../kit/state";
 import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
 import { EarnProvider, type EarnCtx } from "../context";
@@ -72,38 +68,19 @@ export function MintLoading() {
 function MintMissing() {
   return (
     <Screen top={<TopBar back="/m/projects" title="Mint" />} className="px-8 pb-8">
-      <StateCard
-        tone="empty"
-        className="w-full"
-        titleAs="h1"
-        icon={<Icon icon={FolderSearchIcon} size={32} />}
-        title="We couldn't find this project"
-        body="It may have been deleted, or it was made in another browser."
-        action={
-          <Link href="/m/projects" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-            Back to My projects
-          </Link>
-        }
-      />
+      <NotFoundState thing="project" body="It may have been deleted, or it was made in another browser." action={{ label: "Go to My projects", href: "/m/projects" }} />
     </Screen>
   );
 }
 
 function AlreadyMinted({ name, projectId }: { name: string; projectId: string }) {
   return (
-    <Screen top={<TopBar back title="Mint" />} className="px-8 pb-8">
-      <StateCard
-        tone="empty"
-        className="w-full"
-        titleAs="h1"
-        icon={<Icon icon={NoteRemoveIcon} size={32} />}
+    <Screen top={<TopBar back={phoneEarnHref(projectId)} title="Mint" />} className="px-8 pb-8">
+      <EmptyState
+        icon={NoteRemoveIcon}
         title={`${name} is already minted`}
         body="It was minted from its page, so there's no mint flow to open. Its proof and its sale are in Earn › Sell."
-        action={
-          <Link href={phoneEarnHref(projectId, "sell")} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-            Open Sell
-          </Link>
-        }
+        action={{ label: "Open Sell", href: phoneEarnHref(projectId, "sell") }}
       />
     </Screen>
   );

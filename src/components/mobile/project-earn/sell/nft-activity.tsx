@@ -58,9 +58,10 @@ import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { ActionSheet, Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
 import { useMediaUrl } from "../../project/activity-tab";
-import { LIST_CARD, LIST_ROW } from "../../project/parts";
+import { LIST_CARD, LIST_DIVIDERS } from "../../kit/list";
 import { useEarn } from "../context";
 import { FullLayer, LINK_SM } from "./parts";
+import { T } from "../../type";
 
 const NAME_MAX = 40;
 const DESCRIPTION_MAX = 400;
@@ -118,7 +119,7 @@ export function NftActivityLine({ target }: { target: NftTarget }) {
   const name = nameOf(target, project.name, view.products);
   return (
     <div className="flex flex-col gap-1">
-      <p className="flex flex-wrap items-center gap-x-4 text-sm leading-sm">
+      <p className={cn(T.meta, "flex flex-wrap items-center gap-x-4")}>
         <span className="text-text-secondary">Activity</span>
         {canWrite && (
           <button type="button" onClick={() => setOpen("add")} aria-label={`Add activity for ${name}`} className={cn(LINK_SM, "-my-6 inline-flex min-h-[44px] items-center gap-1")}>
@@ -167,22 +168,22 @@ function NftHistory({ target, onClose }: { target: NftTarget; onClose: () => voi
     <>
       <FullLayer title={`${NFT_WORD[target.kind]} activity`} onBack={onClose}>
         <div className="flex flex-col gap-8 px-8 pb-12 pt-8">
-          <p className="text-sm leading-sm text-text-secondary">{`${project.name} · ${name} · newest first. Buyers see these on the listing.`}</p>
+          <p className={T.meta}>{`${project.name} · ${name} · newest first. Buyers see these on the listing.`}</p>
           {canWrite && (
             <Button hierarchy="tonal" size="xl" className="w-full" iconLeading={<Icon icon={Add01Icon} size={20} />} onClick={() => setForm({ entry: null })}>
               Add activity
             </Button>
           )}
           {entries.length === 0 ? (
-            <p className="text-sm leading-sm text-text-secondary">
+            <p className={T.meta}>
               No activity yet. Add what buyers should know — an award, a deal, a sales report or what’s next.
             </p>
           ) : (
-            <ul aria-label={`${NFT_WORD[target.kind]} activity`} className={LIST_CARD}>
+            <ul aria-label={`${NFT_WORD[target.kind]} activity`} className={cn(LIST_CARD, LIST_DIVIDERS)}>
               {entries.map((e) => (
-                <li key={e.id} className={cn(LIST_ROW, "flex flex-col gap-2 px-8 pb-8 pt-4")}>
+                <li key={e.id} className="flex flex-col gap-2 px-8 pb-8 pt-4">
                   <div className="flex min-h-[44px] items-center">
-                    <span className="text-md font-semibold leading-md text-text-primary">{labelOf(e)}</span>
+                    <span className={T.rowTitle}>{labelOf(e)}</span>
                     {typeDefOf(e.target, e.type) && (
                       <button
                         type="button"
@@ -207,10 +208,10 @@ function NftHistory({ target, onClose }: { target: NftTarget; onClose: () => voi
                       </button>
                     )}
                   </div>
-                  <time dateTime={new Date(e.createdAt).toISOString()} className="text-sm leading-sm text-text-secondary">
+                  <time dateTime={new Date(e.createdAt).toISOString()} className={T.meta}>
                     {formatDate(e.createdAt)}
                   </time>
-                  <p className="whitespace-pre-line break-words text-md leading-md text-text-primary">{e.description}</p>
+                  <p className={cn(T.body, "whitespace-pre-line break-words text-text-primary")}>{e.description}</p>
                   {e.media.length > 0 && (
                     <ul className="flex flex-wrap gap-4 pt-3">
                       {e.media.map((m) => (
@@ -265,7 +266,7 @@ function NftHistory({ target, onClose }: { target: NftTarget; onClose: () => voi
         }}
       />
       <Sheet open={help !== null} onClose={() => setHelp(null)} title={help ? `What is ${labelOf(help)}?` : ""}>
-        {help && <p className="pb-8 text-md leading-md text-text-secondary">{typeDefOf(help.target, help.type)?.help}</p>}
+        {help && <p className={cn(T.body, "pb-8")}>{typeDefOf(help.target, help.type)?.help}</p>}
       </Sheet>
       {form && <NftActivityForm target={target} entry={form.entry} onClose={() => setForm(null)} />}
     </>
@@ -459,7 +460,7 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
         }
       >
         <form id={formId} onSubmit={submit} noValidate className="flex flex-col gap-8 px-8 pb-12">
-          <p className="text-md leading-md text-text-secondary">
+          <p className={T.body}>
             {mode === "add"
               ? "Add at least one photo, video, PDF or document as proof — people who buy it see it in the journey. Everything is required unless it says optional."
               : "Changes update this entry in the journey. It keeps at least one file."}
@@ -476,7 +477,7 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
                 typeError ? "border-[var(--color-input-border-error)]" : "border-[var(--color-input-border)]",
               )}
             >
-              <span className={cn("truncate text-lg leading-lg", picked ? "text-[color:var(--color-input-text)]" : "text-[color:var(--color-input-placeholder)]")}>
+              <span className={cn(T.bodyLg, "truncate", picked ? "text-[color:var(--color-input-text)]" : "text-[color:var(--color-input-placeholder)]")}>
                 {picked?.label ?? "Choose a type"}
               </span>
               <Icon icon={ArrowDown01Icon} size={16} className="shrink-0 text-[color:var(--color-icon-default)]" />
@@ -485,19 +486,19 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
           {isOthers && (
             <Field label="Activity Name" htmlFor={ids.name.id} error={nameError} errorId={ids.name.errorId}>
               <TextInput id={ids.name.id} size="xl" value={customName} onValueChange={setCustomName} autoComplete="off" {...errorProps(nameError, ids.name.errorId)} />
-              <span className="text-sm leading-sm text-text-secondary">
+              <span className={T.meta}>
                 {nameLen}/{NAME_MAX}
               </span>
             </Field>
           )}
           <Field label="Description" htmlFor={ids.description.id} error={descError} errorId={ids.description.errorId}>
             <Textarea id={ids.description.id} rows={4} value={description} onValueChange={setDescription} {...errorProps(descError, ids.description.errorId)} />
-            <span className="text-sm leading-sm text-text-secondary">
+            <span className={T.meta}>
               {descLen}/{DESCRIPTION_MAX}
             </span>
           </Field>
           <div className="flex flex-col gap-3">
-            <p className="text-md font-medium leading-md text-text-primary">Attach links (optional)</p>
+            <p className={T.rowTitle}>Attach links (optional)</p>
             {urls.map((u, i) => (
               <div key={i} className="flex flex-col gap-2">
                 <div className="flex items-center gap-4">
@@ -516,7 +517,7 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
                     <Icon icon={Cancel01Icon} size={20} />
                   </Button>
                 </div>
-                {urlErrors[i] && <p className="text-sm leading-sm text-text-error">{urlErrors[i]}</p>}
+                {urlErrors[i] && <p className={cn(T.meta, "text-text-error")}>{urlErrors[i]}</p>}
               </div>
             ))}
             <div>
@@ -526,7 +527,7 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
             </div>
           </div>
           <div className="flex flex-col gap-3">
-            <p id={ids.media.id} className="text-md font-medium leading-md text-text-primary">
+            <p id={ids.media.id} className={T.rowTitle}>
               Attach media
             </p>
             <button
@@ -535,12 +536,12 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
               onClick={() => fileRef.current?.click()}
               className={cn(
                 "flex flex-col items-center gap-2 rounded-xl border-[length:var(--border-width-1-5)] border-dashed px-8 py-8 text-center outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
-                mediaError ? "border-[var(--color-input-border-error)]" : "border-border-default",
+                mediaError ? "border-[var(--color-input-border-error)]" : "border-border",
               )}
             >
               <Icon icon={CloudUploadIcon} size={24} className="text-[color:var(--color-icon-default)]" />
-              <span className="text-md font-medium leading-md text-text-primary">Tap to add a photo, video or file</span>
-              <span className="text-sm leading-sm text-text-secondary">PNG, JPG, PDF, DOC, GIF, Video or DOCX</span>
+              <span className={T.rowTitle}>Tap to add a photo, video or file</span>
+              <span className={T.meta}>PNG, JPG, PDF, DOC, GIF, Video or DOCX</span>
             </button>
             <input
               ref={fileRef}
@@ -557,7 +558,7 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
               }}
             />
             {mediaError && (
-              <p id={ids.media.errorId} className="text-sm leading-sm text-text-error">
+              <p id={ids.media.errorId} className={cn(T.meta, "text-text-error")}>
                 {mediaError}
               </p>
             )}
@@ -566,7 +567,7 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
                 {files.map((f) => {
                   const lastProof = mode === "edit" && files.filter((x) => x.status !== "error").length <= 1 && f.status !== "error";
                   return (
-                    <li key={f.id} className="flex items-center gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default p-4">
+                    <li key={f.id} className="flex items-center gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-4">
                       <span className="relative flex size-[40px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-bg-surface-raised text-[color:var(--color-icon-secondary)]">
                         {f.preview ? (
                           // eslint-disable-next-line @next/next/no-img-element -- the picked file, before it is saved
@@ -576,8 +577,8 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
                         )}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="truncate text-md leading-md text-text-primary">{f.name}</span>
-                        <span className={cn("text-sm leading-sm", f.status === "error" ? "text-text-error" : "text-text-secondary")}>
+                        <span className={cn(T.body, "truncate text-text-primary")}>{f.name}</span>
+                        <span className={cn(T.meta, f.status === "error" ? "text-text-error" : "text-text-secondary")}>
                           {sizeOf(f.size)}
                           {f.status === "saving" ? " · Saving…" : f.status === "error" ? " · Couldn't save this file" : ""}
                         </span>
@@ -590,7 +591,7 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
                 })}
               </ul>
             )}
-            {mode === "edit" && count <= 1 && <p className="text-sm leading-sm text-text-secondary">Keep at least one file as proof. Add another to remove this one.</p>}
+            {mode === "edit" && count <= 1 && <p className={T.meta}>Keep at least one file as proof. Add another to remove this one.</p>}
             {(failed > 0 || rejected > 0) && (
               <Banner tone="error" title={failed > 0 ? "Couldn't save — this browser's storage is full." : "Some files weren't added."}>
                 {[
@@ -622,8 +623,8 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
                 />
                 <Radio checked={type === t.id} decorative className="mt-1" />
                 <span className="flex flex-col gap-1">
-                  <span className="text-lg leading-lg text-text-primary">{t.label}</span>
-                  <span className="text-sm leading-sm text-text-secondary">{t.help}</span>
+                  <span className={T.bodyLg}>{t.label}</span>
+                  <span className={T.meta}>{t.help}</span>
                 </span>
               </label>
             </li>

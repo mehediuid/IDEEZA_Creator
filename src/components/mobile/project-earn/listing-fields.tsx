@@ -30,8 +30,9 @@ import type { UtilityBenefit } from "@/lib/market/types";
 import { mintTypeOptions } from "@/lib/wallet/mint";
 import { cn } from "@/lib/utils";
 import { SheetSelect } from "../kit/sheet-select";
+import { T } from "../type";
 
-const HINT = "text-sm leading-sm text-text-secondary";
+const HINT = T.meta;
 
 /** Digits and one dot; the rules decide what's wrong with what's left. */
 function decimal(raw: string): string {
@@ -157,7 +158,7 @@ export function ListingFields({
         <LockedField label="Listing type" value={typeLabel} />
       ) : (
         <div className="flex flex-col gap-3">
-          <span id={ids.type} className="text-md font-medium leading-md text-text-primary">
+          <span id={ids.type} className={T.label}>
             Listing type
           </span>
           <ButtonGroup
@@ -250,7 +251,7 @@ export function ListingFields({
       </Field>
 
       <section aria-labelledby={ids.benefits} className="flex flex-col gap-3">
-        <h3 id={ids.benefits} className="text-md font-medium leading-md text-text-primary">
+        <h3 id={ids.benefits} className={T.label}>
           Holder benefits (optional)
         </h3>
         <p className={HINT}>
@@ -303,13 +304,13 @@ export function ListingFields({
             }}
           />
           <Checkbox checked={value.confirmOwner} decorative className="mt-1" />
-          <span className="text-sm leading-sm text-text-primary">
+          <span className={cn(T.meta, "text-text-primary")}>
             I confirm I&apos;m the rightful owner of this project, virtually and physically, and I take responsibility for any legal or
             intellectual-property issue it raises.
           </span>
         </label>
         {errors.confirmOwner && (
-          <span id={ids.confirm} className="text-sm leading-sm text-text-error">
+          <span id={ids.confirm} className={cn(T.meta, "text-text-error")}>
             {errors.confirmOwner}
           </span>
         )}
@@ -340,7 +341,7 @@ export function MintTypeCards({
   const opts = mintTypeOptions({ intent, current, network, locked, address });
   const label = (
     <div className="flex items-center gap-4">
-      <span id={labelId} className="text-md font-medium leading-md text-text-primary">
+      <span id={labelId} className={T.label}>
         Minting type
       </span>
       <TestnetDemoBadge />
@@ -351,9 +352,9 @@ export function MintTypeCards({
     return (
       <div role="group" aria-labelledby={labelId} className="flex flex-col gap-4">
         {label}
-        <div className="flex flex-col gap-1 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default bg-bg-surface-raised p-6">
-          <span className="text-md font-semibold leading-md text-text-primary">{title}</span>
-          {opts.lockedText?.note && <span className="text-sm leading-sm text-text-secondary">{opts.lockedText.note}</span>}
+        <div className="flex flex-col gap-1 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface-raised p-6">
+          <span className={T.rowTitle}>{title}</span>
+          {opts.lockedText?.note && <span className={T.meta}>{opts.lockedText.note}</span>}
         </div>
       </div>
     );
@@ -369,15 +370,15 @@ export function MintTypeCards({
               key={o.type}
               className={cn(
                 "relative flex cursor-pointer items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid p-6",
-                on ? "border-border-brand bg-bg-brand-subtle" : "border-border-default bg-bg-surface",
+                on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface",
               )}
             >
               <input type="radio" name={labelId} className="sr-only" checked={on} onChange={() => onChange(o.type)} />
               <Radio checked={on} decorative className="mt-1" />
               <span className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="text-md font-semibold leading-md text-text-primary">{o.title}</span>
-                <span className="text-sm leading-sm text-text-secondary">{o.sub}</span>
-                <span className="text-sm font-medium leading-sm text-text-primary">{o.cost}</span>
+                <span className={T.rowTitle}>{o.title}</span>
+                <span className={T.meta}>{o.sub}</span>
+                <span className={cn(T.meta, "text-text-primary")}>{o.cost}</span>
               </span>
             </label>
           );
@@ -409,7 +410,7 @@ function BenefitRow({
   const durId = React.useId();
   const name = benefit.name.trim();
   return (
-    <li className="flex flex-col gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default p-6">
+    <li className="flex flex-col gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-6">
       <div className="flex items-end gap-4">
         <div className="min-w-0 flex-1">
           <Field label={`Benefit ${n} name`} htmlFor={nameId} error={error} errorId={errId}>

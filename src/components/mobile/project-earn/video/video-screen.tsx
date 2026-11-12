@@ -61,6 +61,8 @@ import { PromptHelpSheet } from "./prompt-help";
 import { ChoiceList, TakeReview, clipKeptLine } from "./review";
 import { StoryboardEditor } from "./storyboard";
 import { VideoLoading, VideoUnavailable, useLeave, useRecordedTakes, useVideoScope } from "./target";
+import { cn } from "@/lib/utils";
+import { T } from "../../type";
 
 const TITLE = "Generate video";
 /** The web's RENDER_KEEPS_RUNNING, where the phone shows the render: its tray, at the foot. */
@@ -290,7 +292,7 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
   };
 
   const forLine = (
-    <p className="pb-8 text-sm leading-sm text-text-secondary">{renderTitle(`For ${target.productName}`, target.projectName)}</p>
+    <p className={cn(T.meta, "pb-8")}>{renderTitle(`For ${target.productName}`, target.projectName)}</p>
   );
 
   let body: React.ReactNode;
@@ -312,7 +314,17 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     footer = (
       <>
         {value.method === "ai" ? (
-          <Button size="xl" className="w-full" disabled={!!blocker} aria-describedby={shownBlocker ? blockId : undefined} onClick={() => void draftStoryboardNow(null)}>
+          <Button
+            size="xl"
+            className={cn("w-full", blocker && "cursor-not-allowed opacity-60")}
+            aria-disabled={!!blocker || undefined}
+            aria-describedby={shownBlocker ? blockId : undefined}
+            onClick={() => {
+              // Stays pressable while something is missing: the press marks the empty prompt and goes to it (the web, and the mint's 13h).
+              if (blocker) requestAnimationFrame(() => document.querySelector<HTMLElement>('textarea[aria-invalid="true"]')?.focus());
+              void draftStoryboardNow(null);
+            }}
+          >
             Generate video storyboard
           </Button>
         ) : (
@@ -324,7 +336,7 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
           Cancel
         </Button>
         {shownBlocker && (
-          <p id={blockId} className="text-sm leading-sm text-text-secondary">
+          <p id={blockId} className={T.meta}>
             {shownBlocker}
           </p>
         )}
@@ -334,8 +346,8 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     body = (
       <div role="status" className="flex flex-col items-center gap-4 pt-8 text-center">
         <Spinner size={32} />
-        <p className="text-lg font-semibold leading-lg text-text-primary">Drafting your storyboard…</p>
-        <p className="text-md leading-md text-text-secondary">
+        <p className={T.section}>Drafting your storyboard…</p>
+        <p className={T.body}>
           AI is writing 3 scenes for {target.productName} from your prompts. This can take up to 40 seconds.
         </p>
       </div>
@@ -350,7 +362,7 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     body = (
       <div className="flex flex-col gap-8">
         <StoryboardEditor storyboard={sb} onChange={(next) => setMode({ kind: "storyboard", storyboard: next, edited: true })} />
-        <p className="text-sm leading-sm text-text-tertiary">{storyboardHonesty(target.productName)}</p>
+        <p className={cn(T.meta, "text-text-tertiary")}>{storyboardHonesty(target.productName)}</p>
       </div>
     );
     footer = (
@@ -367,18 +379,18 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     const { total, etaSec } = progressOf(job, now);
     body = (
       <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default bg-bg-surface p-8">
-          <h2 className="text-md font-medium leading-md text-text-primary">{stageLine(take.n, job.stage)}</h2>
+        <div className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
+          <h2 className={T.section}>{stageLine(take.n, job.stage)}</h2>
           <ProgressBar value={total} label={`${target.productName} video`} />
-          <p className="text-sm leading-sm text-text-secondary">{trayProgressLine(total, etaSec)}</p>
+          <p className={T.meta}>{trayProgressLine(total, etaSec)}</p>
           <label className="relative -my-3 flex min-h-[44px] cursor-pointer items-center gap-4">
             <input type="checkbox" className="peer sr-only" checked={job.browserNotify} onChange={() => setBrowserNotify(job.id, !job.browserNotify)} />
             <Checkbox checked={job.browserNotify} decorative className="peer-focus-visible:shadow-focus-brand" />
-            <span className="text-md leading-md text-text-primary">Notify me when it&apos;s ready</span>
+            <span className={cn(T.body, "text-text-primary")}>Notify me when it&apos;s ready</span>
           </label>
         </div>
-        <p className="text-sm leading-sm text-text-secondary">{KEEPS_RUNNING}</p>
-        <p className="text-sm leading-sm text-text-tertiary">{honestyLine(target.productName)}</p>
+        <p className={T.meta}>{KEEPS_RUNNING}</p>
+        <p className={cn(T.meta, "text-text-tertiary")}>{honestyLine(target.productName)}</p>
       </div>
     );
     footer = (
@@ -414,16 +426,16 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-4">
           <PhoneVideo takeId={take.id} label={`${target.productName} clip, take ${take.n}`} />
-          <p className="text-sm leading-sm text-text-secondary">{clipMetaOf(take.clip?.durationMs ?? 0, how, formatDate(take.readyAt ?? take.createdAt))}</p>
-          <p className="text-sm leading-sm text-text-secondary">{clipKeptLine(target.productName)}</p>
+          <p className={T.meta}>{clipMetaOf(take.clip?.durationMs ?? 0, how, formatDate(take.readyAt ?? take.createdAt))}</p>
+          <p className={T.meta}>{clipKeptLine(target.productName)}</p>
         </div>
         <div className="flex flex-col gap-6">
-          <h2 className="text-lg font-semibold leading-lg text-text-primary">Is this the clip you want?</h2>
+          <h2 className={T.section}>Is this the clip you want?</h2>
           <Button size="xl" className="w-full" onClick={() => chooseTake(take, take)}>
             Use this clip
           </Button>
           {error && (
-            <p role="alert" className="text-md leading-md text-text-error">
+            <p role="alert" className={cn(T.body, "text-text-error")}>
               {error}
             </p>
           )}
@@ -464,7 +476,7 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
       {forLine}
       {body}
       {error && view !== "review" && view !== "clip" && (
-        <p role="alert" className="pt-6 text-md leading-md text-text-error">
+        <p role="alert" className={cn(T.body, "pt-6 text-text-error")}>
           {error}
         </p>
       )}

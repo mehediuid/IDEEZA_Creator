@@ -17,12 +17,11 @@ import * as React from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { ArrowLeft02Icon, CheckmarkCircle02Icon, LockIcon, PlayIcon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, LockIcon, PlayIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
-import { IconButton } from "@/components/ideeza/icon-button";
 import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import type { ReadinessPurpose } from "@/lib/manual/p2-types";
@@ -38,16 +37,20 @@ import { cn } from "@/lib/utils";
 import { MOBILE_APP_ID } from "../../mobile-root";
 import { Sheet } from "../../kit/sheet";
 import { Screen } from "../../screen";
-import { LIST_ROW, ListCard, Thumb } from "../../project/parts";
+import { LIST_CARD, LIST_DIVIDERS, ListCard } from "../../kit/list";
+import { MEDIA_CHIP } from "../../kit/media";
+import { Thumb } from "../../project/parts";
+import { TopBar } from "../../top-bar";
 import { useEarn } from "../context";
+import { T } from "../../type";
 
-/** A card of rows: radius/xl, border/default. */
-export const ROWS_CARD = "flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default bg-bg-surface";
-/** A row of a ROWS_CARD: the line under every row but the last. */
-export const ROW_LINE = "border-b-[length:var(--border-width-1)] border-solid border-border-subtle last:border-b-0";
-export const H2 = "text-lg font-semibold leading-lg text-text-primary";
-export const SUB = "text-sm leading-sm text-text-secondary";
-export const LINK_SM = "text-sm font-medium leading-sm text-text-brand outline-none hover:underline focus-visible:underline";
+/** A card of rows: the kit's list card, its rows split by the kit's line. */
+export const ROWS_CARD = cn(LIST_CARD, LIST_DIVIDERS);
+export const SUB = T.meta;
+/** A03 Link SM. */
+export const LINK_SM = cn(T.caption, "text-text-brand outline-none hover:underline focus-visible:underline");
+/** A03 Link MD. */
+export const LINK_MD = cn(T.rowTitle, "text-text-brand outline-none hover:underline focus-visible:underline");
 
 /** One sellable thing: kind · state · its one button, and what opens under it. */
 export function SellRow({
@@ -64,10 +67,10 @@ export function SellRow({
   children?: React.ReactNode;
 }) {
   return (
-    <li className={ROW_LINE}>
+    <li>
       <div className="flex items-center gap-4 px-8 py-6">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-md font-semibold leading-md text-text-primary">{label}</span>
+          <span className={T.name}>{label}</span>
           <div id={stateId} className="min-w-0">
             {state}
           </div>
@@ -84,7 +87,7 @@ export function StateLines({ lines, live = false }: { lines: readonly string[]; 
   return (
     <ul className="flex flex-col">
       {lines.map((line, i) => (
-        <li key={i} className={cn("break-words text-sm leading-sm tabular-nums", live ? "text-text-success" : "text-text-secondary")}>
+        <li key={i} className={cn(T.meta, "break-words tabular-nums", live ? "text-text-success" : "text-text-secondary")}>
           {line}
         </li>
       ))}
@@ -138,7 +141,7 @@ export function RowLink({ href, label }: { href: string; label: string }) {
 /** The sentence a write leaves under its row ("On sale: …"). */
 export function DoneNote({ note }: { note: string }) {
   return (
-    <p className="flex items-start gap-2 text-sm font-medium leading-sm text-text-success">
+    <p className={cn(T.meta, "flex items-start gap-2 text-text-success")}>
       <span aria-hidden className="mt-px inline-flex">
         <Icon icon={CheckmarkCircle02Icon} size={14} />
       </span>
@@ -172,7 +175,7 @@ export function CheckRow({
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}
       onClick={onToggle}
-      className="flex min-h-[44px] items-start gap-4 rounded-md py-2 text-left text-md leading-md text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+      className={cn(T.body, "flex min-h-[44px] items-start gap-4 rounded-md py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus text-text-primary")}
     >
       <Checkbox checked={checked} decorative className="mt-1 shrink-0" />
       <span className={cn(invalid && "text-text-error")}>{children}</span>
@@ -204,7 +207,7 @@ export function FullLayer({
   if (!host) return null;
   return createPortal(
     <div role="region" aria-label={title} className="absolute inset-0 z-overlay bg-bg-page motion-safe:animate-in motion-safe:slide-in-from-right-8 motion-safe:duration-normal">
-      <Screen top={<TopBarBack title={title} onBack={onBack} />} footer={footer}>
+      <Screen top={<LayerBar title={title} onBack={onBack} />} footer={footer}>
         {children}
       </Screen>
     </div>,
@@ -212,18 +215,14 @@ export function FullLayer({
   );
 }
 
-/** Mobile / Top bar for a layer: Back (A02 Secondary 44) closes it; the title centred. */
-function TopBarBack({ title, onBack }: { title: string; onBack: () => void }) {
-  const ref = React.useRef<HTMLButtonElement>(null);
-  React.useEffect(() => ref.current?.focus(), []);
+/** The kit's top bar for a layer: its Back closes the layer (no navigation) and takes focus on arrival. */
+function LayerBar({ title, onBack }: { title: string; onBack: () => void }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => ref.current?.querySelector("button")?.focus(), []);
   return (
-    <header className="flex h-[56px] shrink-0 items-center justify-between gap-4 px-8">
-      <div className="flex min-w-[44px] shrink-0 items-center">
-        <IconButton ref={ref} hierarchy="secondary" size="xl" aria-label="Back" icon={<Icon icon={ArrowLeft02Icon} size={22} />} onClick={onBack} />
-      </div>
-      <h1 className="min-w-0 flex-1 truncate text-center text-lg font-semibold leading-lg text-text-primary">{title}</h1>
-      <div className="min-w-[44px] shrink-0" />
-    </header>
+    <div ref={ref}>
+      <TopBar back title={title} onBack={() => onBack()} />
+    </div>
   );
 }
 
@@ -254,14 +253,9 @@ export function ReadinessSheet({
   onPass: () => void;
   onClose: () => void;
 }) {
-  const { project } = useEarn();
-  const router = useRouter();
   const readiness = useLiveReadiness(purpose, product);
   const copy = readinessCopy(purpose, product ? displayProductName(product.name) : undefined);
   const blocker = dialogBlockerOf(readiness);
-  const pv = readiness.project;
-  const pvCopy = pv ? projectRowCopy(pv) : null;
-  const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
   return (
     <Sheet
       open
@@ -280,8 +274,44 @@ export function ReadinessSheet({
       }
     >
       <Banner tone="info">{copy.info}</Banner>
+      <ReadinessRows readiness={readiness} />
+      {extra}
+    </Sheet>
+  );
+}
+
+/** Earn › Overview's "Make videos" (the web's dialog as a sheet): every product's video with its
+ *  one action, which opens that product's video maker, and the project video under them. */
+export function MakeVideosSheet({ onClose }: { onClose: () => void }) {
+  const readiness = useLiveReadiness("videos");
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title="Make videos"
+      description="Each product needs its own video before the project can be sold."
+      actions={
+        <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <ReadinessRows readiness={readiness} />
+    </Sheet>
+  );
+}
+
+/** The products' videos and the project video, each with the one action that moves it on. */
+function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveReadiness> }) {
+  const { project } = useEarn();
+  const router = useRouter();
+  const pv = readiness.project;
+  const pvCopy = pv ? projectRowCopy(pv) : null;
+  const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
+  return (
+    <>
       <div className="flex items-baseline justify-between">
-        <h3 className="text-md font-medium leading-md text-text-primary">Products</h3>
+        <h3 className={T.section}>Products</h3>
         <span className={SUB}>{readyOfLine(readiness.counts.ready, readiness.counts.total)}</span>
       </div>
       <ListCard label="Products">
@@ -290,17 +320,17 @@ export function ReadinessSheet({
           const label = actionLabel(c.action);
           const ready = p.video.state === "ready";
           return (
-            <li key={p.productId} className={cn(LIST_ROW, "flex items-start gap-6 p-6")}>
+            <li key={p.productId} className="flex items-start gap-6 p-6">
               <Thumb url={p.thumb}>
                 {ready && (
-                  <span aria-hidden className="absolute inline-flex size-[28px] items-center justify-center rounded-full bg-bg-inverse text-text-inverse">
+                  <span aria-hidden className={cn(MEDIA_CHIP, "absolute size-[28px] justify-center p-0")}>
                     <Icon icon={PlayIcon} size={16} />
                   </span>
                 )}
               </Thumb>
               <span className="flex min-w-0 flex-1 flex-col gap-2">
-                <span className="truncate text-md font-medium leading-md text-text-primary">{displayProductName(p.name)}</span>
-                <span className={cn("text-sm leading-sm", ready ? "text-text-success" : "text-text-secondary")}>{c.text}</span>
+                <span className={cn(T.rowTitle, "truncate")}>{displayProductName(p.name)}</span>
+                <span className={cn(T.meta, ready ? "text-text-success" : "text-text-secondary")}>{c.text}</span>
                 {label && (
                   <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(phoneProductVideoHref(project.id, p.productId))}>
                     {label}
@@ -313,8 +343,8 @@ export function ReadinessSheet({
       </ListCard>
       {pv && pvCopy && (
         <>
-          <h3 className="text-md font-medium leading-md text-text-primary">Project video</h3>
-          <div className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-dashed border-border-default p-6">
+          <h3 className={T.section}>Project video</h3>
+          <div className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-dashed border-border p-6">
             <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
               <Icon icon={LockIcon} size={16} />
             </span>
@@ -329,7 +359,6 @@ export function ReadinessSheet({
           </div>
         </>
       )}
-      {extra}
-    </Sheet>
+    </>
   );
 }
