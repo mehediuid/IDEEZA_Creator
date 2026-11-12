@@ -2,22 +2,25 @@
 
 // Someone else's product, as the Feed links it (`/m/projects/p1/products/
 // remote`; Product Details 10h, 10x–10z read as a visitor): the web's sample
-// post (`samplePostOf`) and its sample journey, on the buyer's page —
-// Media first, then Overview (the Marketplace block from the post's copies,
-// the Testnet demo badge, Specs) and Build (the pieces it was built with; the
-// PCB, firmware and wiring come with a copy, D2 — the parts list is open).
-// The header carries the product's activity (Now, Earlier). The sticky bar
-// says what copies start at; a sample's copies can't be bought anywhere (the
-// web's marketplace lists only this browser's own projects), so Buy a copy is
-// off and says so.
+// post (`samplePostOf`) and its sample journey, on the buyer's page.
+//
+// Laid out as a product page (owner 2026-11-12: the Feed's pill opened a page
+// with no picture, a table and a Buy a copy that was off — "can't be
+// bought" — after the Feed had shown its price): the product's video on top
+// (the Feed's clip, muted and looping), the project link, the name and its
+// line, the summary, then its copies as rows with a Buy each and the Testnet
+// demo line (project-earn/buyer/sample-shop.tsx — the same demo buying as
+// the project's page), then the product's activity. Tabs: Media, Overview
+// (the collection's chain and license, Specs) and Build (the pieces it was
+// built with; the PCB, firmware and wiring come with a copy, D2 — the parts
+// list is open). The bar says what copies start at; Buy a copy buys the one
+// copy, or brings the copies into view to pick from.
 
 import * as React from "react";
 import Link from "next/link";
 import { ArrowRight01Icon, SquareLock02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
-import { Button } from "@/components/ideeza/button";
-import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { historyOf } from "@/lib/manual/journey";
 import { formatDate } from "@/lib/manual/project-summary";
 import { parseProductTab, phoneProductPath, productTabsOf, type ProductTab } from "@/lib/manual/phone-product";
@@ -26,8 +29,10 @@ import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import type { InnovationPost, PostPiece, PostProduct } from "@/lib/innovations/types";
 import { ITEM_LABELS, type BuildItemKind } from "@/lib/create/history";
 import { cn } from "@/lib/utils";
-import { BottomBar } from "../kit/bottom-bar";
 import { ListCard } from "../kit/list";
+import { DemoShopBanner } from "../project-earn/buyer/parts";
+import { SampleCopies, SampleCopyBar, SampleShop } from "../project-earn/buyer/sample-shop";
+import { MediaHero } from "../project/sample-project";
 import { MEDIA_GROUND } from "../kit/media";
 import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
 import { Screen } from "../screen";
@@ -37,15 +42,10 @@ import { SectionHeading } from "../project/parts";
 import { ActivityCardBlock } from "./activity";
 import { FactCard, TABS_FIT, TABS_SCROLL } from "./parts";
 
-/** Why a sample's Buy a copy is off: nothing sells it — said as it is. */
-const SAMPLE_BUY = "This is a sample — its copies can’t be bought.";
-
 /** Copies only: a product has no Main NFT (owner, 2026-10-12). */
 function copiesOf(post: InnovationPost): ClipOffer[] {
   return (post.listing?.rows ?? []).map((r) => offerOf(r, post.license)).filter((o): o is ClipOffer => o !== null && o.kind !== "main");
 }
-
-const amountOf = (price: string) => Number.parseFloat(price);
 
 /** The pieces a visitor may open (D2): the 3D model and the parts list. */
 const OPEN: ReadonlySet<PostPiece> = new Set<PostPiece>(["3d", "parts"]);
@@ -62,28 +62,12 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
     [post, product.id],
   );
   const copies = copiesOf(post);
-  const from = copies.length ? copies.reduce((a, o) => (amountOf(o.price) < amountOf(a.price) ? o : a), copies[0]) : null;
+  const video = product.video?.kind === "video" ? product.video : null;
 
   return (
-    <Screen
-      top={<TopBar back={`/m/projects/${encodeURIComponent(id)}`} />}
-      footer={
-        from ? (
-          <BottomBar className="gap-2 pt-6">
-            <div className="flex items-center gap-6">
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className={T.meta}>Copies from</span>
-                <span className={T.section}>{from.price}</span>
-              </span>
-              <Button size="xl" className="min-w-0 flex-1" disabled>
-                Buy a copy
-              </Button>
-            </div>
-            <p className={T.meta}>{SAMPLE_BUY}</p>
-          </BottomBar>
-        ) : undefined
-      }
-    >
+    <SampleShop post={post} id={id}>
+    <Screen top={<TopBar back={`/m/projects/${encodeURIComponent(id)}`} />} footer={<SampleCopyBar />}>
+      <MediaHero video={video} picture={video?.poster ?? product.image} name={product.name} />
       <header className="flex flex-col gap-6 px-8 pb-8">
         <div className="flex flex-col gap-2">
           <Link href={`/m/projects/${encodeURIComponent(id)}`} className={cn(T.meta, "self-start outline-none hover:underline focus-visible:underline")}>
@@ -95,6 +79,12 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
           </p>
         </div>
         <p className={cn(T.body, "text-text-primary")}>{product.summary}</p>
+        {copies.length > 0 && (
+          <div className="flex flex-col gap-4">
+            <SampleCopies sub="Each with its own NFT." />
+            <DemoShopBanner body="A demo creator does the buying — test tokens in a test wallet. Nothing is sent to a blockchain." line />
+          </div>
+        )}
         <ActivityCardBlock name={product.name} entries={entries} />
       </header>
       <div className={cn("sticky top-0 z-10 bg-bg-page", TABS_SCROLL)}>
@@ -102,10 +92,11 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
       </div>
       <div {...tabPanelProps("pd", tab)} className="px-8 pb-12 pt-8 outline-none">
         {tab === "media" && <SampleMedia product={product} />}
-        {tab === "overview" && <SampleOverview post={post} product={product} copies={copies} />}
+        {tab === "overview" && <SampleOverview post={post} product={product} />}
         {tab === "build" && <SampleBuild product={product} base={base} />}
       </div>
     </Screen>
+    </SampleShop>
   );
 }
 
@@ -136,32 +127,16 @@ function SampleMedia({ product }: { product: PostProduct }) {
   );
 }
 
-function SampleOverview({ post, product, copies }: { post: InnovationPost; product: PostProduct; copies: ClipOffer[] }) {
+function SampleOverview({ post, product }: { post: InnovationPost; product: PostProduct }) {
   return (
     <div className="flex flex-col gap-12">
-      {copies.length > 0 && (
-        <section aria-labelledby="sp-market" className="flex flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <h2 id="sp-market" className={T.section}>
-              Marketplace
-            </h2>
-            <span className={T.body}>· {copies.length} on sale</span>
-            <span className="flex-1" />
-            <TestnetDemoBadge />
-          </div>
+      {(post.chain || post.license) && (
+        <section aria-labelledby="sp-collection" className="flex flex-col gap-4">
+          <SectionHeading id="sp-collection" title="Collection" />
           <FactCard
-            label="Marketplace"
-            rows={copies.map((o) => [
-              [o.kind === "physical" ? "Physical NFT" : "Virtual NFT", o.use].filter(Boolean).join(" · "),
-              o.sold ? `${o.price} · ${o.sold.count}/${o.sold.of} sold` : o.price,
-            ])}
+            label="Collection"
+            rows={[...(post.chain ? [["Blockchain", post.chain] as const] : []), ...(post.license ? [["License", post.license] as const] : [])]}
           />
-          {(post.chain || post.license) && (
-            <FactCard
-              label="Collection"
-              rows={[...(post.chain ? [["Blockchain", post.chain] as const] : []), ...(post.license ? [["License", post.license] as const] : [])]}
-            />
-          )}
         </section>
       )}
       {product.specs.length > 0 && (

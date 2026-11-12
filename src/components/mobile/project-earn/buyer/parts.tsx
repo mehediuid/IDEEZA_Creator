@@ -17,7 +17,7 @@
 // · PurchaseDoneSheet — 18d, after the wallet sheet confirms.
 
 import * as React from "react";
-import { ArrowDown01Icon, CheckmarkCircle01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, CheckmarkCircle01Icon, TestTube01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
@@ -55,21 +55,35 @@ const TEXT_ACTION =
 // ─────────────────────────── banners ───────────────────────────
 
 /** 18b–18h: the Testnet demo banner, one line, and its one switch of who is shopping. Why a demo
- *  creator does the buying (`body`) is said in the Shop-as sheet (Note MFR-10: one line). */
-export function DemoShopBanner({ body }: { body: string }) {
+ *  creator does the buying (`body`) is said in the Shop-as sheet (Note MFR-10: one line). `line`
+ *  draws it as a quiet line with a test-tube mark and "Change" (the sample page's buy box). */
+export function DemoShopBanner({ body, line = false }: { body: string; line?: boolean }) {
   const { buyer, setActiveBuyer } = useActiveBuyer();
   const [open, setOpen] = React.useState(false);
   return (
-    <div className="px-8 pb-6">
-      <Banner
-        tone="attention"
-        title={`Testnet demo · shopping as ${buyer.name}`}
-        action={
-          <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={TEXT_ACTION}>
-            Shop as someone else
+    <div className={line ? undefined : "px-8 pb-6"}>
+      {line ? (
+        <p className={cn(T.meta, "flex flex-wrap items-center gap-x-2")}>
+          <span aria-hidden className="text-[color:var(--color-icon-warning)]">
+            <Icon icon={TestTube01Icon} size={16} />
+          </span>
+          <span>Testnet demo · shopping as {buyer.name}</span>
+          <span aria-hidden>·</span>
+          <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={cn(TEXT_ACTION, T.meta, "-my-4 font-medium text-text-brand")}>
+            Change<span className="sr-only"> who is shopping</span>
           </button>
-        }
-      />
+        </p>
+      ) : (
+        <Banner
+          tone="attention"
+          title={`Testnet demo · shopping as ${buyer.name}`}
+          action={
+            <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={TEXT_ACTION}>
+              Shop as someone else
+            </button>
+          }
+        />
+      )}
       <Sheet open={open} onClose={() => setOpen(false)} title="Shopping as" description={`${body} Mira, Leo and Sam are demo creators.`}>
         <ul role="listbox" aria-label="Shopping as" className="-mx-8 flex flex-col">
           {DEMO_BUYERS.map((b) => (

@@ -3,18 +3,22 @@
 // Someone else's project, as a viewer sees it (Figma 18 / 18b, read-only):
 // the Feed links each shared sample project here by its feed id
 // (`/m/projects/p1`), and the page reads the web's sample post for it
-// (`samplePostOf`). No owner control shows. The tabs are Overview · Products
-// · Media; the Overview has the Marketplace block when it is listed (the
-// Feed's `?tab=marketplace` lands there), the project's activity, the
-// products, the legal and chain facts, and About; the creator's name opens
-// their profile. Buying is a testnet demo by
-// the active demo creator (project-earn/buyer/sample-shop.tsx: the banner, the
-// Marketplace block and the bar); Ask the creator opens a conversation about
-// the post.
+// (`samplePostOf`). No owner control shows.
+//
+// Laid out as a product page (owner 2026-11-12, after the Feed's pill opened
+// a wall of tables): the project's video on top — the clip the Feed played,
+// muted and looping (still with Data saver or reduced motion; a tap pauses or
+// plays) — then the name with its chip and the creator line, the
+// marketplace's buy box and copies when it is listed
+// (project-earn/buyer/sample-shop.tsx; the Feed's `?tab=marketplace` opens
+// the page as it is, the box already in view), the description, and the tabs
+// Overview · Products · Media: the project's activity, the products, About.
+// Buying is a testnet demo by the active demo creator; the bottom bar buys
+// the Main NFT, and Ask the creator opens a conversation about the post.
 
 import * as React from "react";
 import Link from "next/link";
-import { PlayIcon } from "@hugeicons/core-free-icons";
+import { PauseIcon, PlayIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { CATALOGUES } from "@/lib/manual/journey";
@@ -25,14 +29,15 @@ import { feedPersonId } from "@/lib/messages/people";
 import { ME } from "@/lib/messages/types";
 import { profileHrefOf } from "@/lib/people/ids";
 import { PIECE_LABEL, type InnovationPost, type PostMedia } from "@/lib/innovations/types";
+import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
-import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
+import { MEDIA_CHIP, MEDIA_GROUND, MEDIA_INK } from "../kit/media";
 import { Sheet } from "../kit/sheet";
 import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { SampleMarketSection, SampleShop, SampleShopBanner, SampleShopBar } from "../project-earn/buyer/sample-shop";
+import { SampleMarketSection, SampleShop, SampleShopBar } from "../project-earn/buyer/sample-shop";
 import { InfoRow, LIST_CARD, ListCard, PhoneStatusChip, ProductRow, SectionHeading, SubLine } from "./parts";
 import { Description } from "./project-screen";
 
@@ -70,8 +75,8 @@ export function SampleProject({ post, id }: { post: InnovationPost; id: string }
   return (
     <SampleShop post={post} id={id}>
     <Screen top={<TopBar back />} footer={<SampleShopBar ask={ask} />}>
-      <SampleShopBanner />
-      <header className="flex flex-col gap-4 px-8 pb-8">
+      <ProjectHero post={post} />
+      <header className="flex flex-col gap-2 px-8 pb-6">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <h1 className={cn(T.title, "min-w-0 break-words")}>{post.title}</h1>
           {status && <PhoneStatusChip status={status} word={status === "listed" ? "Listed" : "Minted"} />}
@@ -87,8 +92,11 @@ export function SampleProject({ post, id }: { post: InnovationPost; id: string }
           )}
           {facts ? ` · ${facts}` : ""}
         </p>
-        <Description text={post.description ?? ""} />
       </header>
+      <SampleMarketSection />
+      <div className="px-8 pb-8">
+        <Description text={post.description ?? ""} />
+      </div>
       <div className="sticky top-0 z-10 bg-bg-page">
         <MobileTabs label="Project" idBase="viewer-project" tabs={TABS} value={tab} onChange={setTab} />
       </div>
@@ -102,6 +110,71 @@ export function SampleProject({ post, id }: { post: InnovationPost; id: string }
   );
 }
 
+/** The project's video, the clip the Feed played (the first product's, lib/innovations/clips.ts). */
+function ProjectHero({ post }: { post: InnovationPost }) {
+  const lead = post.products[0]?.video;
+  const video = lead?.kind === "video" ? lead : (post.media.find((m): m is VideoMedia => m.kind === "video") ?? null);
+  return <MediaHero video={video} picture={video?.poster ?? post.products[0]?.image ?? null} name={post.title} />;
+}
+
+type VideoMedia = Extract<PostMedia, { kind: "video" }>;
+
+/** A page's video on top, as the Feed played it: muted and looping, still under Data saver or
+ *  reduced motion; the chip pauses or plays it. With no video, the picture. */
+export function MediaHero({ video, picture, name }: { video: VideoMedia | null; picture: string | null; name: string }) {
+  const first = video;
+  const dataSaver = useSettings().appearance.dataSaver;
+  const player = React.useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = React.useState(false);
+  React.useEffect(() => {
+    const v = player.current;
+    if (!v || dataSaver || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    v.play().catch(() => setPlaying(false));
+  }, [dataSaver]);
+  if (!first && !picture) return null;
+  const toggle = () => {
+    const v = player.current;
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => undefined);
+    else v.pause();
+  };
+  return (
+    <div className="px-8 pb-6">
+      <div className={cn(MEDIA_GROUND, "relative aspect-video w-full overflow-hidden rounded-xl")}>
+        {first ? (
+          <video
+            ref={player}
+            src={first.src}
+            poster={picture ?? undefined}
+            muted
+            loop
+            playsInline
+            preload={dataSaver ? "none" : "metadata"}
+            aria-label={first.alt}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element -- a sample post's picture
+          <img src={picture ?? ""} alt={`${name}, its picture`} className="absolute inset-0 size-full object-cover" />
+        )}
+        {first && (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={playing ? "Pause the video" : "Play the video"}
+            className={cn(MEDIA_CHIP, "absolute bottom-4 right-4 min-h-[32px] gap-2 px-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+          >
+            <Icon icon={playing ? PauseIcon : PlayIcon} size={14} />
+            {playing ? "Pause" : "Play"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function stageLabel(stage: string | null): string | null {
   if (!stage) return null;
   return CATALOGUES.project.find((t) => t.id === stage)?.label ?? null;
@@ -111,7 +184,6 @@ function SampleOverview({ post, id }: { post: InnovationPost; id: string }) {
   const stage = stageLabel(post.stage);
   return (
     <div className="flex flex-col gap-12">
-      <SampleMarketSection />
       <section aria-labelledby="sv-activity" className="flex flex-col gap-4">
         <SectionHeading id="sv-activity" title="Project activity" />
         {/* A sample post carries one stage (no earlier entries); with neither a stage nor a story

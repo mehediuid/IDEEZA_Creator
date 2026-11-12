@@ -94,7 +94,9 @@ function MobileApp({ framed, children }: { framed: boolean; children: React.Reac
     <FramedProvider value={framed}>
       <div
         id={MOBILE_APP_ID}
-        className="relative h-dvh overflow-hidden bg-bg-page font-sans text-text-primary"
+        // `clip`, not `hidden`: a hidden box can still be scrolled by a scrollIntoView inside it,
+        // which slid the whole app up (top bar gone, a gap under the bottom bar).
+        className="relative h-dvh overflow-clip bg-bg-page font-sans text-text-primary"
         style={keyboard ? { height: keyboard.height, ...(keyboard.top ? { transform: `translateY(${keyboard.top}px)` } : {}) } : undefined}
       >
         <ToastProvider rootId={MOBILE_APP_ID}>
