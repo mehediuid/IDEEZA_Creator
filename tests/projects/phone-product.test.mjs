@@ -64,6 +64,8 @@ test("the Build list: the build's order, every state, a never-built piece nowher
   assert.equal(rows.find((r) => r.kind === "wiring").progress, 64);
   assert.deepEqual(p.pieceRowsOf(items, { firmware: false }).map((r) => r.kind), ["pcb", "3d", "wiring", "parts"]);
   assert.equal(p.pieceRowsOf([item("code", "pending")], { firmware: true })[0].state, "waiting");
+  // Nobody but the owner who can still build reads the maker's left-out pieces.
+  assert.deepEqual(p.pieceRowsOf(items, { firmware: true, leftOut: false }).map((r) => r.kind), ["pcb", "code", "wiring", "parts"]);
 });
 
 test("the line under each piece", () => {
@@ -81,7 +83,10 @@ test("the line under each piece", () => {
   assert.equal(line("code", "waiting"), "This piece is waiting to be built.");
   assert.equal(line("assembly", "notBuilt"), "Not built · 1 credit to add");
   assert.equal(line("3d", "notBuilt"), "Not built · 2 credits to add");
-  assert.equal(p.notBuiltCostLine("3d"), "2 credits · ~30 s at Medium");
+  assert.equal(p.notBuiltCostLine("3d"), "2 credits · about 30 s at Medium");
+  assert.equal(p.aboutPieceTime(75), "about 1 min 15 s");
+  assert.equal(p.aboutPieceTime(120), "about 2 min");
+  assert.equal(p.notBuiltTitle("3d"), "3D Module isn’t built yet");
   assert.equal(p.piecesLine({ ready: 6, total: 6 }), "All 6 pieces ready");
   assert.equal(p.piecesLine({ ready: 2, total: 6 }), "2 of 6 pieces ready");
   assert.equal(p.PIECE_BADGE.notBuilt, "Not built");
@@ -146,4 +151,19 @@ test("the version sheet: newest first, with the web's sub lines", () => {
       ["Version 1 of 3", "day 10"],
     ],
   );
+});
+
+test("10p's sentence names the ready pieces only, in its own words", () => {
+  const ready = (kind) => item(kind, "ready", { progress: 100 });
+  assert.equal(p.hasPiecesLine([ready("pcb"), ready("code"), ready("wiring"), ready("parts")]), "It has a PCB, code, wiring and parts.");
+  assert.equal(p.hasPiecesLine([item("pcb", "failed"), item("code", "building"), ready("parts")]), "It has parts.");
+  assert.equal(p.hasPiecesLine([item("pcb", "failed")]), "");
+});
+
+test("a product typed by hand reads as made by hand, a legacy build row doesn't", () => {
+  assert.equal(p.madeByHand("hand", null), true);
+  assert.equal(p.madeByHand("unmatched", { id: "prd_ab12cd34" }), true);
+  assert.equal(p.madeByHand("unmatched", { id: "p2" }), false);
+  assert.equal(p.madeByHand("unmatched", { id: "prd_ab12cd34", source: { buildId: "b", productId: "primary" } }), false);
+  assert.equal(p.madeByHand("build-gone", { id: "prd_ab12cd34" }), false);
 });

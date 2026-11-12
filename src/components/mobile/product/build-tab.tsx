@@ -9,8 +9,9 @@
 //   transaction) and Get creator support, which opens the conversation about
 //   that purchase in Messages;
 // - one row per piece, in the build's order and state — Ready, Failed,
-//   Building with its progress, Waiting, Not built with + Add (the owner) —
-//   each opening its own view-only screen;
+//   Building with its progress, Waiting, and for the owner who can still
+//   build, Not built with + Add (nobody else reads the maker's left-out
+//   pieces) — each opening its own view-only screen;
 // - Downloads: the firmware, the parts list and the netlist, made from this
 //   product's parts in this browser, for whoever may take them away; for
 //   anyone else "Firmware and downloads come with a purchase." (O12).
@@ -27,7 +28,7 @@ import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { Segmented } from "@/components/ideeza/segmented";
 import { Toggle } from "@/components/ideeza/toggle";
 import { fileFor, save, type DownloadFile } from "@/components/projects/product/product-deliverables";
-import { TIER_LINE } from "@/components/marketplace/purchase-dialog";
+import { TIER_WORD } from "@/components/marketplace/purchase-dialog";
 import { bomFor, specOfSource } from "@/lib/create/build-artifacts";
 import { useCredits } from "@/lib/create/credits";
 import { ITEM_LABELS, useCreateHistory, type BuildItemKind, type BuildProduct } from "@/lib/create/history";
@@ -40,10 +41,8 @@ import {
   cleanPick,
   creditsLabel,
   isLeftOut,
-  namesOf,
   pieceCost,
   pieceSeconds,
-  pieceTimeLabel,
   togglePiece,
   type PiecePick,
   type PieceQuality,
@@ -51,7 +50,7 @@ import {
 import { piecesOf as seedPiecesOf, seedCaptionOf } from "@/lib/manual/build-load";
 import { readSeed } from "@/lib/manual/build-load-io";
 import { formatDate } from "@/lib/manual/project-summary";
-import { PIECE_BADGE, pieceLineOf, pieceRowsOf, type PieceRow, type PieceState } from "@/lib/manual/phone-product";
+import { PIECE_BADGE, aboutPieceTime, hasPiecesLine, pieceLineOf, pieceRowsOf, type PieceRow, type PieceState } from "@/lib/manual/phone-product";
 import { KIND_WORD } from "@/lib/market/editions";
 import { USE_LABEL } from "@/lib/market/sell-flow";
 import { startHref } from "@/lib/messages/links";
@@ -60,10 +59,14 @@ import { boardLabel, mcuOf } from "@/lib/spec/format";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
 import { formatAmount } from "@/lib/wallet/money";
 import { cn } from "@/lib/utils";
+import { Eyebrow } from "../kit/eyebrow";
+import { LIST_DIVIDERS, ListCard } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
-import { InfoRow, LIST_CARD, LIST_ROW, ListCard, SectionHeading } from "../project/parts";
+import { T } from "../type";
+import { SectionHeading } from "../project/parts";
 import { BuyCreditsSheet } from "./credits-sheet";
+import { BANNER_LINK, CARD } from "./parts";
 import { useProduct } from "./use-product";
 
 export const BADGE_TONE: Record<PieceState, BadgeTone> = {
@@ -105,13 +108,13 @@ export function BuildTab() {
     return seedCaptionOf(product.state, record, product.built?.ref.version ?? version.shown, seedPiecesOf(bp));
   }, [mode, bp, version, project.id, product]);
   if (!bp) return null;
-  const rows = pieceRowsOf(bp.items, { firmware: downloads });
+  const rows = pieceRowsOf(bp.items, { firmware: downloads, leftOut: canEdit });
   const facts = pieceFactsOf(bp);
   const files = filesOf(bp);
 
   return (
     <div className="flex flex-col gap-12">
-      {caption && <p className="text-sm leading-sm text-text-secondary">{caption.lines.join(" ")} View only on a phone.</p>}
+      {caption && <p className={T.meta}>{caption.lines.join(" ")} View only on a phone.</p>}
       {copies.length > 0 && <YourCopy />}
       <ListCard label="Pieces">
         {rows.map((r) => (
@@ -128,18 +131,18 @@ export function BuildTab() {
         <SectionHeading id="pd-downloads" title="Downloads" />
         {downloads ? (
           files.length ? (
-            <div className="flex flex-col items-start gap-4">
+            <div className="flex flex-col gap-4">
               {files.map((f) => (
-                <Button key={f.filename} hierarchy="secondary" size="xl" iconLeading={<Icon icon={Download04Icon} size={20} />} onClick={() => save(f)}>
+                <Button key={f.filename} hierarchy="secondary" size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} onClick={() => save(f)}>
                   {f.label}
                 </Button>
               ))}
             </div>
           ) : (
-            <p className="text-md leading-md text-text-secondary">Nothing to download yet — the files come once their pieces are ready.</p>
+            <p className={T.body}>Nothing to download yet — the files come once their pieces are ready.</p>
           )
         ) : (
-          <p className="text-md leading-md text-text-secondary">Firmware and downloads come with a purchase.</p>
+          <p className={T.body}>Firmware and downloads come with a purchase.</p>
         )}
       </section>
       {adding && <AddPiecesSheet bp={bp} preselect={adding} onClose={() => setAdding(null)} />}
@@ -149,23 +152,26 @@ export function BuildTab() {
 
 function PieceListRow({ row, line, href, onAdd }: { row: PieceRow; line: string; href: string; onAdd?: () => void }) {
   return (
-    <li className={cn(LIST_ROW, "flex items-center")}>
+    <li className="flex items-center">
       <Link
         href={href}
         className="flex min-w-0 flex-1 items-center gap-4 p-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle"
       >
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-md font-semibold leading-md text-text-primary">{ITEM_LABELS[row.kind]}</span>
-          <span className="text-sm leading-sm text-text-secondary">{line}</span>
+          <span className={T.name}>{ITEM_LABELS[row.kind]}</span>
+          <span className={T.meta}>{line}</span>
           {row.state === "building" && <ProgressBar value={row.progress} label={`${ITEM_LABELS[row.kind]} build`} className="mt-2" />}
         </span>
-        <Badge tone={BADGE_TONE[row.state]} className="shrink-0">
-          {PIECE_BADGE[row.state]}
-        </Badge>
+        {/* A Not built row's line and its Add button already say it: no third "Not built". */}
         {!onAdd && (
-          <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
-            <Icon icon={ArrowRight01Icon} size={20} />
-          </span>
+          <>
+            <Badge tone={BADGE_TONE[row.state]} className="shrink-0">
+              {PIECE_BADGE[row.state]}
+            </Badge>
+            <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+              <Icon icon={ArrowRight01Icon} size={24} />
+            </span>
+          </>
         )}
       </Link>
       {onAdd && (
@@ -181,6 +187,7 @@ function PieceListRow({ row, line, href, onAdd }: { row: PieceRow; line: string;
 
 // ─────────────────────────── Your copy (23d) ───────────────────────────
 
+/** 23d: a small "Your copy" eyebrow over plain rows — the same words the buy sheet used. */
 function YourCopy() {
   const { project, view, copies, buyerId } = useProduct();
   const latest = copies.reduce((a, s) => (s.at > a.at ? s : a), copies[0]);
@@ -190,19 +197,29 @@ function YourCopy() {
   const support = buyerId
     ? `/m${startHref({ kind: "direct", to: ME, projectId: project.id, about: { kind: "purchase", saleId: latest.id } }, buyerId)}`
     : null;
+  const rows: [string, string][] = [
+    ["Type", `${KIND_WORD[item.nft]} NFT · #${item.serial}${track ? ` of ${track.supply.total}` : ""}`],
+    ["Use", USE_LABEL[item.use]],
+    ["Tier", TIER_WORD[item.tier]],
+    ["Paid", `${formatAmount(latest.price, latest.token)} · ${formatDate(latest.at)}`],
+    ["Transaction", shortAddress(latest.txHash)],
+  ];
   return (
-    <section aria-labelledby="pd-copy" className="flex flex-col gap-4">
-      <SectionHeading id="pd-copy" title="Your copy" />
-      <ListCard label="Your copy">
-        <InfoRow label="Type" value={`${KIND_WORD[item.nft]} NFT · #${item.serial}${track ? ` of ${track.supply.total}` : ""}`} />
-        <InfoRow label="Use" value={USE_LABEL[item.use]} />
-        <InfoRow label="Tier" value={TIER_LINE[item.tier]} />
-        <InfoRow label="Paid" value={`${formatAmount(latest.price, latest.token)} · ${formatDate(latest.at)}`} />
-        <InfoRow label="Transaction" value={shortAddress(latest.txHash)} />
-      </ListCard>
-      {copies.length > 1 && <p className="text-sm leading-sm text-text-secondary">You hold {copies.length} copies of this product; this is the newest.</p>}
+    <section aria-labelledby="pd-copy" className="flex flex-col gap-3">
+      <Eyebrow as="h2" id="pd-copy" tone="tertiary">
+        Your copy
+      </Eyebrow>
+      <dl className={cn("flex flex-col", LIST_DIVIDERS)}>
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex items-center justify-between gap-6 py-4">
+            <dt className={cn(T.body, "shrink-0")}>{k}</dt>
+            <dd className={cn(T.body, "min-w-0 break-words text-right text-text-primary")}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {copies.length > 1 && <p className={T.meta}>You hold {copies.length} copies of this product; this is the newest.</p>}
       {support && (
-        <Link href={support} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full")}>
+        <Link href={support} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "mt-3 w-full border-solid")}>
           Get creator support
         </Link>
       )}
@@ -224,10 +241,13 @@ export function AddPiecesSheet({ bp, preselect, onClose }: { bp: BuildProduct; p
   const toast = useToast();
   const [buying, setBuying] = React.useState(false);
 
+  // What the build already has (ready or on its way): these stay ticked, so what is added fits them.
   const has = PIECE_KINDS.filter((k) => {
     const it = bp.items.find((i) => i.kind === k);
     return !!it && it.status !== "skipped";
   });
+  // 10p's sentence names only what is ready, in its own lower-case words.
+  const hasLine = hasPiecesLine(bp.items);
   const open = PIECE_KINDS.filter((k) => {
     const it = bp.items.find((i) => i.kind === k);
     return k !== "parts" && !!it && isLeftOut(it);
@@ -275,11 +295,7 @@ export function AddPiecesSheet({ bp, preselect, onClose }: { bp: BuildProduct; p
         open={!buying}
         onClose={onClose}
         title={`Add pieces to ${name}`}
-        description={
-          has.length
-            ? `It has ${namesOf(has)}. Each piece below is made for ${has.length > 1 ? "those" : "it"}, so it fits.`
-            : "Each piece below is made from this product's concept and spec."
-        }
+        description={hasLine ? `${hasLine} Each piece below is made for ${has.length > 1 ? "those" : "it"}, so it fits.` : "Each piece below is made from this product's concept and spec."}
         actions={
           <>
             <Button size="xl" className="w-full" disabled={!chosen.length || short} onClick={build}>
@@ -291,34 +307,35 @@ export function AddPiecesSheet({ bp, preselect, onClose }: { bp: BuildProduct; p
           </>
         }
       >
-        <ul className={LIST_CARD}>
+        <ul className={CARD}>
           {open.map((k) => {
             const p = PIECES[k];
             const c = pick[k];
             const shown = c.on ? c : { quality: "medium" as const, optimize: false };
             return (
-              <li key={k} className={cn(LIST_ROW, "flex flex-col gap-4 p-6")}>
+              <li key={k} className="flex flex-col gap-4 p-6">
                 <label className="relative flex cursor-pointer items-start gap-4">
                   <input type="checkbox" className="sr-only" checked={c.on} onChange={() => toggle(k)} />
                   <Checkbox checked={c.on} decorative className="mt-1" />
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="text-md font-semibold leading-md text-text-primary">{p.name}</span>
-                    <span className="text-sm leading-sm text-text-secondary">
-                      {creditsLabel(pieceCost(k, shown))} · {pieceTimeLabel(pieceSeconds(k, shown))}
+                  {/* 10p: the price and time sit right of the name (under it when the row is too narrow). */}
+                  <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <span className={T.name}>{p.name}</span>
+                    <span className={T.meta}>
+                      {creditsLabel(pieceCost(k, shown))} · {aboutPieceTime(pieceSeconds(k, shown))}
                     </span>
                   </span>
                 </label>
-                <p className="text-sm leading-sm text-text-secondary">{p.addsLater}</p>
+                <p className={T.meta}>{p.addsLater}</p>
                 {c.on && p.quality && (
-                  <div className="flex flex-col gap-2">
-                    <span className="text-sm leading-sm text-text-secondary">Quality</span>
+                  <div className="flex min-h-[44px] flex-wrap items-center gap-x-4 gap-y-2">
+                    <span className={cn(T.meta, "w-[64px] shrink-0")}>Quality</span>
                     <Segmented<PieceQuality>
                       label={`${p.name} quality`}
                       size="md"
                       value={c.quality}
                       options={[
                         { value: "medium", label: "Medium" },
-                        { value: "high", label: `High · +${p.price.high - p.price.medium} credit` },
+                        { value: "high", label: `High · +${p.price.high - p.price.medium}` },
                       ]}
                       onChange={(q) => setPick({ ...pick, [k]: { ...c, quality: q } })}
                     />
@@ -326,13 +343,13 @@ export function AddPiecesSheet({ bp, preselect, onClose }: { bp: BuildProduct; p
                 )}
                 {c.on && p.optimize && (
                   <label className="relative flex min-h-[44px] cursor-pointer items-center gap-4">
-                    <span className="w-[64px] shrink-0 text-sm leading-sm text-text-secondary">Optimize</span>
+                    <span className={cn(T.meta, "w-[64px] shrink-0")}>Optimize</span>
                     <Toggle
                       checked={c.optimize}
                       onChange={() => setPick({ ...pick, [k]: { ...c, optimize: !c.optimize } })}
                       aria-label={`Optimize ${p.name} — ${p.optimize}, +${OPTIMIZE_COST} credit`}
                     />
-                    <span className="min-w-0 flex-1 text-sm leading-sm text-text-secondary">
+                    <span className={cn(T.meta, "min-w-0 flex-1")}>
                       {p.optimize} · +{OPTIMIZE_COST} credit
                     </span>
                   </label>
@@ -342,12 +359,12 @@ export function AddPiecesSheet({ bp, preselect, onClose }: { bp: BuildProduct; p
           })}
         </ul>
         {note && (
-          <p role="status" className="text-sm leading-sm text-text-secondary">
+          <p role="status" className={T.meta}>
             {note}
           </p>
         )}
-        <p className="pb-4 text-md leading-md text-text-primary">
-          <span className="font-semibold">{count}</span>
+        <p className={cn(T.body, "pb-4 text-text-primary")}>
+          <span className={T.name}>{count}</span>
           {chosen.length ? ` · ${creditsLabel(cost)} · ${aboutTime(seconds)}` : ""}
           {youHave ? ` · ${youHave}` : ""}
         </p>
@@ -357,7 +374,7 @@ export function AddPiecesSheet({ bp, preselect, onClose }: { bp: BuildProduct; p
               tone="error"
               title="Not enough credits"
               action={
-                <button type="button" onClick={() => setBuying(true)} className="-my-6 inline-flex min-h-[44px] items-center text-md font-medium leading-md outline-none hover:underline focus-visible:underline">
+                <button type="button" onClick={() => setBuying(true)} className={BANNER_LINK}>
                   Buy credits
                 </button>
               }

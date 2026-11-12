@@ -18,7 +18,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertCircleIcon, CheckmarkCircle02Icon, Delete02Icon, PlayCircleIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, CheckmarkCircle02Icon, Delete02Icon, Image02Icon, PlayCircleIcon, Tick02Icon, Video01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button, buttonVariants } from "@/components/ideeza/button";
@@ -38,28 +38,33 @@ import type { VideoTake } from "@/lib/video/types";
 import { FAILURE_COPY, clipMetaLine, honestyLine, statusCopy, takeLabel } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { ImageViewer } from "../kit/image-viewer";
 import { Sheet } from "../kit/sheet";
+import { EmptyState } from "../kit/state";
 import { useToast } from "../kit/toast";
-import { ImageViewer } from "../project/media-tab";
-import { LIST_CARD, LIST_ROW, SectionHeading } from "../project/parts";
+import { T } from "../type";
+import { SectionHeading } from "../project/parts";
 import { PhoneVideo } from "../project/video";
-import { usePhoneWriteGate } from "../project/write-gate";
+import { CARD, LinkButton } from "./parts";
 import { useProduct } from "./use-product";
 
 const BOX = "flex aspect-video w-full flex-col items-center justify-center gap-4 rounded-md border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface-raised px-8 text-center";
 
-export function MediaTab() {
+/** `oneHeading`: the page of a product no build stands behind has no tab strip, so "Media" heads
+ *  the panel and the two empty cards sit under it without a heading each (10t). */
+export function MediaTab({ oneHeading = false }: { oneHeading?: boolean }) {
   return (
-    <div className="flex flex-col gap-12">
-      <VideoSection />
-      <ImagesSection />
+    <div className={cn("flex flex-col", oneHeading ? "gap-6" : "gap-12")}>
+      {oneHeading && <SectionHeading title="Media" />}
+      <VideoSection bare={oneHeading} />
+      <ImagesSection bare={oneHeading} />
     </div>
   );
 }
 
 // ─────────────────────────── Video ───────────────────────────
 
-function VideoSection() {
+function VideoSection({ bare }: { bare: boolean }) {
   const { project, view, product, version, viewer, name, path } = useProduct();
   const owner = can(viewer, "video.generate", view.canCtx);
   const { record, hydrated } = useProjectVideos(project.id);
@@ -112,37 +117,38 @@ function VideoSection() {
     return view.refs.find((r) => r.buildId === src.buildId)?.version ?? null;
   })();
 
+  if (status.state === "none") {
+    return (
+      <section aria-label="Video" className="flex flex-col gap-4">
+        {!bare && <SectionHeading title="Video" />}
+        <EmptyState
+          icon={Video01Icon}
+          title="No video yet"
+          body="Every product needs one before you can share or sell the project."
+          action={{ label: "Generate AI video", href: videoHref }}
+        />
+      </section>
+    );
+  }
+
   return (
     <section aria-labelledby="pd-video" className="flex flex-col gap-4">
       <SectionHeading
         id="pd-video"
         title="Video"
         action={
-          status.state !== "none" ? (
-            <Link href={path("video", (inUse ?? latest) ? { from: (inUse ?? latest)!.id } : {})} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-              Regenerate
-            </Link>
-          ) : undefined
+          <Link href={path("video", (inUse ?? latest) ? { from: (inUse ?? latest)!.id } : {})} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "border-solid")}>
+            Regenerate
+          </Link>
         }
       />
-      {status.state === "none" ? (
-        <div className={cn(LIST_CARD, "gap-4 border-dashed p-8")}>
-          <p className="flex flex-col gap-1">
-            <span className="text-md font-semibold leading-md text-text-primary">No video yet</span>
-            <span className="text-md leading-md text-text-secondary">Every product needs one before you can share or sell the project.</span>
-          </p>
-          <Link href={videoHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "self-start")}>
-            Generate AI video
-          </Link>
-        </div>
-      ) : (
-        <>
+      <>
           {inUse && waiting && (
             <div className="flex items-center gap-4 rounded-md bg-bg-surface-raised px-6 py-4">
               <span aria-hidden className="text-[color:var(--color-icon-success)]">
                 <Icon icon={CheckmarkCircle02Icon} size={20} />
               </span>
-              <span className="min-w-0 flex-1 text-md leading-md text-text-primary">{copy.text}</span>
+              <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>{copy.text}</span>
               <Link href={path("video", { review: waiting.id })} className={cn(buttonVariants({ hierarchy: "secondary", size: "lg" }))}>
                 Review
               </Link>
@@ -153,32 +159,32 @@ function VideoSection() {
           ) : status.state === "rendering" ? (
             <div className={BOX} role="status">
               <Spinner />
-              <span className="text-md font-semibold leading-md text-text-primary">{copy.text}</span>
+              <span className={T.name}>{copy.text}</span>
               <ProgressBar value={status.progress} label={`${name} video render`} className="w-[220px] max-w-full" />
-              <span className="text-sm leading-sm text-text-secondary">{copy.sub}</span>
+              <span className={T.meta}>{copy.sub}</span>
             </div>
           ) : status.state === "failed" ? (
             <div className={BOX}>
               <span aria-hidden className="text-[color:var(--color-icon-error)]">
                 <Icon icon={AlertCircleIcon} size={28} />
               </span>
-              <span className="text-md font-semibold leading-md text-text-primary">{copy.text}</span>
-              <span className="text-sm leading-sm text-text-secondary">{copy.sub}</span>
+              <span className={T.name}>{copy.text}</span>
+              <span className={T.meta}>{copy.sub}</span>
               <Link href={path("video", { from: status.take.id })} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
                 Try again
               </Link>
             </div>
           ) : waiting ? (
             <div className={BOX}>
-              <span className="text-md font-semibold leading-md text-text-primary">Ready to review</span>
+              <span className={T.name}>Ready to review</span>
               <Link href={path("video", { review: waiting.id })} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
                 Review
               </Link>
             </div>
           ) : null}
           <div className="flex flex-col gap-4">
-            <h3 className="text-md font-semibold leading-md text-text-primary">Takes</h3>
-            <ul aria-label="Takes" className={LIST_CARD}>
+            <h3 className={T.name}>Takes</h3>
+            <ul aria-label="Takes" className={CARD}>
               {[...takes].reverse().map((t) => {
                 const job = jobs.find((j) => j.id === t.id);
                 const prog = job && job.stage !== "done" && job.stage !== "failed" ? progressOf(job, now) : null;
@@ -202,8 +208,7 @@ function VideoSection() {
               })}
             </ul>
           </div>
-        </>
-      )}
+      </>
       <WhatSheet take={showing} onClose={() => setShowing(null)} />
       <ConfirmSheet
         open={deleting !== null}
@@ -231,19 +236,14 @@ function Player({ take, onWhat, madeFrom = null }: { take: VideoTake; onWhat: ()
   return (
     <div className="flex flex-col gap-3">
       <PhoneVideo takeId={take.id} label={`${name} video`} />
-      <p className="text-sm leading-sm text-text-secondary">{clipMetaLine(take, formatDate(take.readyAt ?? take.createdAt))}</p>
-      {madeFrom !== null && <p className="text-sm leading-sm text-text-secondary">Made from version {madeFrom}</p>}
+      <p className={T.meta}>{clipMetaLine(take, formatDate(take.readyAt ?? take.createdAt))}</p>
+      {madeFrom !== null && <p className={T.meta}>Made from version {madeFrom}</p>}
       <div>
-        <button
-          type="button"
-          aria-haspopup="dialog"
-          onClick={onWhat}
-          className="-my-6 inline-flex min-h-[44px] items-center text-sm font-medium leading-sm text-text-brand outline-none hover:underline focus-visible:underline"
-        >
+        <LinkButton aria-haspopup="dialog" onClick={onWhat}>
           What&apos;s in this video
-        </button>
+        </LinkButton>
       </div>
-      <p className="text-sm leading-sm text-text-secondary">{honestyLine(name)}</p>
+      <p className={T.meta}>{honestyLine(name)}</p>
     </div>
   );
 }
@@ -254,7 +254,7 @@ function WhatSheet({ take, onClose }: { take: VideoTake | null; onClose: () => v
   const lines = take ? describeClip(take, name, clip.state === "ready" ? clip.usedImage : take.source !== null) : [];
   return (
     <Sheet open={take !== null} onClose={onClose} title="What's in this video" description={take ? `Take ${take.n}` : undefined}>
-      <ul className="flex list-disc flex-col gap-2 pb-8 pl-8 text-md leading-md text-text-secondary">
+      <ul className={cn(T.body, "flex list-disc flex-col gap-2 pb-8 pl-8")}>
         {lines.map((l) => (
           <li key={l}>{l}</li>
         ))}
@@ -287,12 +287,12 @@ function TakeLine({
       : progress
         ? `Take ${take.n} · rendering ${Math.round(progress.total)} % · ${etaLabel(progress.etaSec)} left`
         : `Take ${take.n} · ${FAILURE_COPY.interrupted}`;
-    return <li className={cn(LIST_ROW, "p-6 text-md leading-md text-text-secondary")}>{line}</li>;
+    return <li className={cn(T.body, "p-6")}>{line}</li>;
   }
   return (
-    <li className={cn(LIST_ROW, "flex items-center gap-4 p-4")}>
+    <li className="flex items-center gap-4 p-4">
       <TakePoster take={take} playing={playing} onPlay={onPlay} />
-      <span className="min-w-0 flex-1 text-sm leading-sm text-text-primary">{takeLabel(take, formatDate(take.readyAt!))}</span>
+      <span className={cn(T.meta, "min-w-0 flex-1 text-text-primary")}>{takeLabel(take, formatDate(take.readyAt!))}</span>
       {inUse ? (
         <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
           In use
@@ -338,9 +338,8 @@ function TakePoster({ take, playing, onPlay }: { take: VideoTake; playing: boole
 
 // ─────────────────────────── Images ───────────────────────────
 
-function ImagesSection() {
-  const { project, view, product, version, viewer, name } = useProduct();
-  const gate = usePhoneWriteGate(project.id);
+function ImagesSection({ bare }: { bare: boolean }) {
+  const { view, product, version, viewer, name } = useProduct();
   const tiles = React.useMemo(
     () =>
       productImageTiles({
@@ -352,52 +351,51 @@ function ImagesSection() {
     [view, product, version, viewer],
   );
   const [at, setAt] = React.useState<number | null>(null);
+  const shown = at !== null ? (tiles[at] ?? null) : null;
+  if (tiles.length === 0) {
+    return (
+      <section aria-label="Images" className="flex flex-col gap-4">
+        {!bare && <SectionHeading title="Images" />}
+        <EmptyState icon={Image02Icon} title="No images yet" body="Concept images from its AI builds show here." />
+      </section>
+    );
+  }
   return (
     <section aria-labelledby="pd-images" className="flex flex-col gap-4">
       <SectionHeading id="pd-images" title="Images" />
-      {tiles.length === 0 ? (
-        <div className={cn(LIST_CARD, "gap-1 border-dashed p-8")}>
-          <span className="text-md font-semibold leading-md text-text-primary">No images yet</span>
-          <span className="text-md leading-md text-text-secondary">Concept images from its AI builds show here.</span>
-        </div>
-      ) : (
-        <>
-          <ul className="grid grid-cols-2 gap-6">
-            {tiles.map((t, i) => (
-              <li key={t.key}>
-                <button
-                  type="button"
-                  aria-haspopup="dialog"
-                  aria-label={`${name}, version ${t.version}`}
-                  onClick={() => setAt(i)}
-                  className="flex w-full flex-col gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-                >
-                  <span className="relative block aspect-[4/3] w-full overflow-hidden rounded-md bg-bg-surface-raised">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- a concept image from the build store */}
-                    <img src={t.url} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
-                  </span>
-                  <span className="text-sm leading-sm text-text-secondary">
-                    {name} · v{t.version}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="text-sm leading-sm text-text-secondary">Tap an image to see it full size.</p>
-        </>
-      )}
-      {at !== null && tiles[at] && (
-        <ImageViewer
-          tiles={tiles}
-          index={at}
-          coverUrl={null}
-          canCover={false}
-          gate={gate}
-          projectId={project.id}
-          onIndex={setAt}
-          onClose={() => setAt(null)}
-        />
-      )}
+      <ul className="grid grid-cols-2 gap-6">
+        {tiles.map((t, i) => (
+          <li key={t.key}>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-label={`${name}, version ${t.version}`}
+              onClick={() => setAt(i)}
+              className="flex w-full flex-col gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              <span className="relative block aspect-[4/3] w-full overflow-hidden rounded-md bg-bg-surface-raised">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a concept image from the build store */}
+                <img src={t.url} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
+              </span>
+              <span className={T.meta}>
+                {name} · v{t.version}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className={T.meta}>Tap an image to see it full size.</p>
+      <ImageViewer
+        open={shown !== null}
+        onClose={() => setAt(null)}
+        index={at ?? 0}
+        count={tiles.length}
+        onIndex={setAt}
+        src={shown?.url ?? null}
+        alt={shown ? `${name}, version ${shown.version}` : ""}
+        caption={shown ? `${name} · v${shown.version}` : undefined}
+        noun="Image"
+      />
     </section>
   );
 }
