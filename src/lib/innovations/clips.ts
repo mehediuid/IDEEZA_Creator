@@ -6,7 +6,11 @@
 // - every post is a Project clip, playing its first video;
 // - every further product with its own video is a Product clip;
 // - the post's listing rows are the clip's offers: a project offers its Main
-//   NFT and copies, a product only copies ("a product has no Main NFT").
+//   NFT and copies, a product only copies ("a product has no Main NFT");
+// - only what is on the marketplace is on the Feed (owner 2026-10-31, again
+//   2026-11-12): a clip with nothing on sale (a post with no listing, or a
+//   product whose project sells only its Main NFT) stays off it. A listing
+//   goes live only after the mint, so every clip here is minted.
 // Reactions and comments are the post's, so a Product clip's heart is its
 // project's (one count everywhere, plan §7).
 //
@@ -166,9 +170,14 @@ export function clipsOfPost(post: InnovationPost): FeedClip[] {
   return out;
 }
 
-/** Every sample clip on the Feed, in post order. Your own shared projects join them through
- *  `mineClipsOf` (the Feed's screens read both with `useFeedClips`). */
-export const FEED_CLIPS: readonly FeedClip[] = SAMPLE_POSTS.flatMap(clipsOfPost);
+/** A clip is on the marketplace when it has something on sale. */
+export function onMarketplace(clip: FeedClip): boolean {
+  return clip.offers.length > 0;
+}
+
+/** Every sample clip on the Feed, in post order: only what is on the marketplace. Your own shared
+ *  projects join them through `mineClipsOf` (the Feed's screens read both with `useFeedClips`). */
+export const FEED_CLIPS: readonly FeedClip[] = SAMPLE_POSTS.flatMap(clipsOfPost).filter(onMarketplace);
 
 /** A sample clip by its id; a project you shared (`mine:…`) is found in `useFeedClips`. */
 export function clipById(id: string): FeedClip | null {

@@ -12,10 +12,12 @@ const phone = await import("../../.tmp-test/lib/notifications/phone.js");
 const stats = await import("../../.tmp-test/lib/market/activity-stats.js");
 const { SAMPLE_POSTS } = await import("../../.tmp-test/lib/innovations/sample-posts.js");
 const { NO_REACTIONS, withFollow } = await import("../../.tmp-test/lib/innovations/reactions.js");
+/** Every post's clips, on the marketplace or not: the order and Saved rules work on any clip. */
+const ALL_CLIPS = SAMPLE_POSTS.flatMap(clips.clipsOfPost);
 
 test("every post is a Project clip; a further product with its own video is a Product clip", () => {
-  assert.equal(clips.FEED_CLIPS.filter((c) => c.kind === "project").length, SAMPLE_POSTS.length);
-  const hexapod = clips.FEED_CLIPS.filter((c) => c.postId === "sample:p1");
+  assert.equal(SAMPLE_POSTS.flatMap(clips.clipsOfPost).filter((c) => c.kind === "project").length, SAMPLE_POSTS.length);
+  const hexapod = clips.clipsOfPost(SAMPLE_POSTS.find((p) => p.id === "sample:p1"));
   assert.deepEqual(
     hexapod.map((c) => [c.id, c.kind, c.productId]),
     [
@@ -26,8 +28,18 @@ test("every post is a Project clip; a further product with its own video is a Pr
   assert.equal(hexapod[0].video.src, "/innovations/videos/hexapod-walking-robot--hexapod.mp4");
   assert.equal(hexapod[1].video.src, "/innovations/videos/hexapod-walking-robot--remote.mp4");
   assert.equal(hexapod[1].title, "Handheld Remote");
-  assert.equal(clips.clipById("p1~remote")?.postId, "sample:p1");
   assert.equal(clips.clipById("nope"), null);
+});
+
+test("the Feed shows only what is on the marketplace, so every clip is minted", () => {
+  assert.ok(clips.FEED_CLIPS.length > 0);
+  assert.ok(clips.FEED_CLIPS.every((c) => c.offers.length > 0 && c.minted));
+  // Hexapod has no listing: its clips stay off the Feed, and its address finds none.
+  assert.equal(clips.clipById("p1"), null);
+  assert.equal(clips.clipById("p1~remote"), null);
+  const listed = SAMPLE_POSTS.filter((p) => p.listing?.rows.length);
+  assert.equal(clips.FEED_CLIPS.filter((c) => c.kind === "project").length, listed.length);
+  assert.equal(clips.clipById("p3")?.postId, "sample:p3");
 });
 
 test("offers come from the listing rows; a product clip never offers the Main NFT", () => {
@@ -294,14 +306,14 @@ test("the Feed leads with your shares, then your shared projects, then everyone'
   const creator = { id: "you", name: "You", initials: "YO", color: "var(--color-gray-700)", pro: false };
   const mine = clips.mineClipsOf({ projectId: "m7", title: "Lamp", description: "", creator, sharedAt: 5, cover: null, stage: null, minted: false, videos: [], offers: [] });
   const share = { id: "s1", clipId: "p1", caption: "Look", audience: "public", at: 9 };
-  const list = clips.feedClips(clips.FEED_CLIPS, mine, [share]);
+  const list = clips.feedClips(ALL_CLIPS, mine, [share]);
   assert.equal(list[0].id, "p1");
   assert.equal(list[0].share.caption, "Look");
   assert.equal(list[1].id, "mine:m7");
   assert.equal(list.filter((c) => c.id === "p1").length, 1);
-  assert.equal(list.length, clips.FEED_CLIPS.length + 1);
+  assert.equal(list.length, ALL_CLIPS.length + 1);
   // A hidden clip never leads.
-  const hidden = clips.feedClips(clips.FEED_CLIPS, mine, [share], { interested: [], notInterested: [], hidden: ["p1"] });
+  const hidden = clips.feedClips(ALL_CLIPS, mine, [share], { interested: [], notInterested: [], hidden: ["p1"] });
   assert.ok(!hidden.some((c) => c.id === "p1"));
 });
 
@@ -314,11 +326,11 @@ test("offers: prices written as the marketplace writes them; an auction says Pla
   );
   assert.equal(clips.stageLabelOf("prototype"), "Prototype");
   assert.equal(clips.stageLabelOf(null), null);
-  assert.equal(clips.FEED_CLIPS.find((c) => c.id === "p1").stage, clips.stageLabelOf(SAMPLE_POSTS[0].stage));
+  assert.equal(ALL_CLIPS.find((c) => c.id === "p1").stage, clips.stageLabelOf(SAMPLE_POSTS[0].stage));
 });
 
 test("Saved: one clip at a time; a post saved on the web is its Project clip", () => {
-  const all = clips.FEED_CLIPS.filter((c) => c.postId === "sample:p1");
+  const all = ALL_CLIPS.filter((c) => c.postId === "sample:p1");
   let p = prefs.NO_FEED_PREFS;
   // Saved on the web: listed as the Project clip, date unknown.
   assert.deepEqual(prefs.savedRows(["sample:p1"], p.savedAt, all).map((r) => [r.clip.id, r.at]), [["p1", null]]);

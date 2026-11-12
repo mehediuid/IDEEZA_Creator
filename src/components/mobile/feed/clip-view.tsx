@@ -21,15 +21,15 @@
 //
 // Owner 2026-11-12: no chip row over the video. Whether it is a project or a
 // product is an icon in front of the title (layers: a project, a chip: a
-// product), and a minted one carries a seal after the title; both are said
-// in words to screen readers. The project's Activity ("Ready for
+// product), said in words to screen readers. Nothing says Minted: the Feed
+// shows only what is on the marketplace, and a listing goes live only after
+// the mint, so every clip is minted. The project's Activity ("Ready for
 // manufacture") is left to its details page.
 
 import * as React from "react";
 import {
   Alert02Icon,
   Blockchain01Icon,
-  CheckmarkBadge01Icon,
   CommentAdd02Icon,
   CpuIcon,
   FavouriteIcon,
@@ -115,12 +115,6 @@ export function ClipText({
           <span className="min-w-0 [overflow-wrap:anywhere]">
             <span className="sr-only">{kind}: </span>
             {clip.title}
-            {clip.minted && (
-              <span title="Minted" className="ml-2 inline-flex translate-y-[3px] text-[color:var(--color-icon-success)]">
-                <Icon icon={CheckmarkBadge01Icon} size={18} />
-                <span className="sr-only">, minted</span>
-              </span>
-            )}
           </span>
         </span>
         {clip.description && (
