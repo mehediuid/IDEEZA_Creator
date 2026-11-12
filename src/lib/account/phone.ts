@@ -1,14 +1,16 @@
 // The mobile prototype's own way in (mobile Figma "Account · 2026 update",
 // AU-01…33). The accounts themselves are the web's (auth.ts) — one person, one
-// account, on either — and this keeps only what the phone adds: its four
-// password rules, the six-digit codes for verifying and resetting, the
-// sign-in tries, how each account signs in on the phone (Apple, Google,
-// Facebook, a password) and Face ID, and what this phone remembers (Explore
-// first, the Face ID offer). Relative imports only, so node:test can load it.
+// account, on either — and this keeps only what the phone adds: the six-digit
+// codes for verifying and resetting, the sign-in tries, how each account signs
+// in on the phone (Apple, Google, Facebook, a password) and Face ID, and what
+// this phone remembers (the Face ID offer, who signed in last, the tour to
+// start, the link's campaign tag). The password rules are the web's, so a
+// password made on the phone works on the web too. Relative imports only, so
+// node:test can load it.
 
 import * as React from "react";
 import { parseStored, readStoredKey, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
-import { PASSWORD_MAX, normalizeEmail } from "./auth";
+import { PASSWORD_RULES, normalizeEmail, passwordProblem, readSession, sourceFromUtm, type PasswordRuleId } from "./auth";
 import { handleProblem } from "../people/ids";
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -22,24 +24,19 @@ export function clockOf(ms: number): string {
 
 // ─────────────────────────── the password (AU-10, AU-32) ───────────────────────────
 
-export const PHONE_PASSWORD_RULES = [
-  { id: "length", label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-  { id: "letter", label: "A letter", test: (p: string) => /\p{L}/u.test(p) },
-  { id: "number", label: "A number", test: (p: string) => /\p{N}/u.test(p) },
-  { id: "symbol", label: "A symbol", test: (p: string) => /[^\p{L}\p{N}\s]/u.test(p) },
-] as const;
+/** The web's five rules (auth.ts), in the checklist's order: one account works on both. */
+export const PHONE_PASSWORD_RULES = PASSWORD_RULES;
 
-export type PhonePasswordRule = (typeof PHONE_PASSWORD_RULES)[number]["id"];
+export type PhonePasswordRule = PasswordRuleId;
 
 /** Each rule, in the checklist's order, and whether the password meets it. */
 export function phonePasswordChecks(password: string): { id: PhonePasswordRule; label: string; met: boolean }[] {
   return PHONE_PASSWORD_RULES.map((r) => ({ id: r.id, label: r.label, met: r.test(password) }));
 }
 
-/** "" when the password meets every rule; otherwise what is wrong, in a sentence. */
+/** "" when the password meets every rule; otherwise what it still needs, in the web's sentence. */
 export function phonePasswordProblem(password: string): string {
-  if (password.length > PASSWORD_MAX) return `Use at most ${PASSWORD_MAX} characters.`;
-  return PHONE_PASSWORD_RULES.every((r) => r.test(password)) ? "" : "Your password doesn’t meet every rule yet.";
+  return passwordProblem(password);
 }
 
 // ─────────────────────────── six-digit codes (AU-12, AU-31) ───────────────────────────
@@ -188,9 +185,11 @@ export type PhoneAccount = {
   passwordless: boolean;
   /** "Use Face ID" was chosen (AU-08). */
   faceId: boolean;
+  /** Signed in with no handle chosen yet: Name and handle (AU-13) comes before the tabs. */
+  handleOwed: boolean;
 };
 
-const NO_PHONE_ACCOUNT: PhoneAccount = { providers: [], passwordless: false, faceId: false };
+const NO_PHONE_ACCOUNT: PhoneAccount = { providers: [], passwordless: false, faceId: false, handleOwed: false };
 
 export function normalizePhoneAccounts(raw: unknown): Record<string, PhoneAccount> {
   if (!isObj(raw)) return {};
@@ -198,7 +197,7 @@ export function normalizePhoneAccounts(raw: unknown): Record<string, PhoneAccoun
   for (const [email, v] of Object.entries(raw)) {
     if (!isObj(v)) continue;
     const providers = Array.isArray(v.providers) ? PROVIDERS.filter((p) => (v.providers as unknown[]).includes(p)) : [];
-    out[normalizeEmail(email)] = { providers, passwordless: v.passwordless === true, faceId: v.faceId === true };
+    out[normalizeEmail(email)] = { providers, passwordless: v.passwordless === true, faceId: v.faceId === true, handleOwed: v.handleOwed === true };
   }
   return out;
 }
@@ -270,6 +269,10 @@ export type PhoneState = {
   faceIdOffered: boolean;
   /** Show the Face ID offer on the next screen (set by the first sign-in here). */
   faceIdPending: boolean;
+  /** Who signed in here last: Log In offers Face ID for them when they chose it (AU-08). */
+  lastEmail: string;
+  /** Look around first was chosen on the Welcome map: the tour starts on the next tab screen. */
+  tourPending: boolean;
   /** The kit's pre-prompts (KIT-PM-01 camera, PM-02 photos, PM-03 microphone) come once, at
    *  first use; PM-04 notifications once, after the first build starts. */
   cameraAsked: boolean;
@@ -286,6 +289,8 @@ export function normalizePhone(raw: unknown): PhoneState {
     forgetSession: r.forgetSession === true,
     faceIdOffered: r.faceIdOffered === true,
     faceIdPending: r.faceIdPending === true,
+    lastEmail: typeof r.lastEmail === "string" ? normalizeEmail(r.lastEmail) : "",
+    tourPending: r.tourPending === true,
     cameraAsked: r.cameraAsked === true,
     photosAsked: r.photosAsked === true,
     micAsked: r.micAsked === true,
@@ -325,14 +330,47 @@ export function usePhone(): { hydrated: boolean; phone: PhoneState } {
   return React.useMemo(() => ({ hydrated: k.hydrated, phone: normalizePhone(parseStored(k.raw).value) }), [k.hydrated, k.raw]);
 }
 
-/** After a sign-in: the Face ID offer, once per phone. */
-/** After any sign-in on the phone: the Face ID offer once, and Remember me —
- *  `remember` false (Log In with the box unticked) makes this sign-in last
- *  only while the tab does; every other way in is remembered. */
+/** After any sign-in on the phone: the Face ID offer once, who it was (so Log
+ *  In can offer Face ID next time), and Remember me — `remember` false (Log In
+ *  with the box unticked) makes this sign-in last only while the tab does;
+ *  every other way in is remembered. */
 export function afterPhoneSignIn(remember = true): void {
   const p = readPhone();
-  updatePhone({ ...(!p.faceIdOffered ? { faceIdPending: true } : null), forgetSession: !remember });
+  const email = readSession()?.email ?? p.lastEmail;
+  updatePhone({ ...(!p.faceIdOffered ? { faceIdPending: true } : null), forgetSession: !remember, lastEmail: email });
   markAlive();
+}
+
+/** The email Log In may offer Face ID for: the one typed, else whoever signed in
+ *  here last — when that account chose "Use Face ID". "" when there is none. */
+export function faceIdEmailFor(typed: string, lastEmail: string, accounts: Record<string, PhoneAccount>): string {
+  const email = typed.trim() ? normalizeEmail(typed) : lastEmail;
+  return email && phoneAccountOf(accounts, email).faceId ? email : "";
+}
+
+// ─────────────────────────── the link's campaign tag ───────────────────────────
+
+/** A link's utm_source, kept for this tab from the first screen it opens until
+ *  the account is made (the web keeps it on Sign up's own address). */
+export const UTM_KEY = "ideeza:m:utm";
+
+/** Keeps the address's utm_source, when it has one. */
+export function keepUtm(search: string): void {
+  const source = sourceFromUtm(new URLSearchParams(search).get("utm_source"));
+  if (!source) return;
+  try {
+    window.sessionStorage.setItem(UTM_KEY, source);
+  } catch {
+    // Storage refused: the question is asked instead.
+  }
+}
+
+export function readUtm(): string {
+  try {
+    return sourceFromUtm(window.sessionStorage.getItem(UTM_KEY));
+  } catch {
+    return "";
+  }
 }
 
 // ─────────────────────────── a provider's answer, between its sheet and "Signing you in" ───────────────────────────

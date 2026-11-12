@@ -5,10 +5,13 @@
 // · offline or refused → back where they started, with the provider's error (AU-04c);
 // · Facebook shared no email → Add your email (AU-04e);
 // · the email has an account that hasn't linked this provider → Link accounts (AU-06);
-// · otherwise signed in — a new account goes on to Name and handle (AU-13).
+// · otherwise signed in — a new account (and one that never chose its handle)
+//   goes on to Name and handle (AU-13). A new account keeps the link's
+//   utm_source, as the web's does.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { landingAfterSignIn } from "@/components/mobile/account/parts";
 import { SplashScreen } from "@/components/mobile/screen";
 import { accountOf, providerSignIn, readAccounts } from "@/lib/account/auth";
 import {
@@ -17,6 +20,7 @@ import {
   phoneAccountOf,
   readPhoneAccounts,
   readProviderAnswer,
+  readUtm,
   saveProviderAnswer,
   type ProviderAnswer,
 } from "@/lib/account/phone";
@@ -36,12 +40,12 @@ async function finish(a: ProviderAnswer): Promise<string> {
   if (!a.email) return "/m/add-email";
   const existing = accountOf(readAccounts(), a.email);
   if (existing && !phoneAccountOf(readPhoneAccounts(), a.email).providers.includes(a.provider)) return "/m/link";
-  const result = await providerSignIn(a.email, { first: a.first, last: a.last }, Date.now());
+  const result = await providerSignIn(a.email, { first: a.first, last: a.last }, Date.now(), readUtm());
   if (result === "refused") return withError(a.from, a);
   linkProvider(a.email, a.provider, result === "new");
   afterPhoneSignIn();
   saveProviderAnswer(null);
-  return result === "new" ? `/m/handle${a.next === "/m" ? "" : `?next=${encodeURIComponent(a.next)}`}` : a.next;
+  return landingAfterSignIn(a.next);
 }
 
 export default function SigningInPage() {

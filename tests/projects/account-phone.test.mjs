@@ -1,7 +1,8 @@
 // The mobile prototype's way in (mobile Figma "Account · 2026 update"): the
-// phone's four password rules, six-digit codes with their resend wait, tries
+// web's five password rules on the phone, six-digit codes with their resend wait, tries
 // and lock, the sign-in lock, a phone account (email + password, name later),
-// a provider's sign-in, and where the phone goes next.
+// a provider's sign-in, Face ID, the link's campaign tag, and where the phone
+// goes next.
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
@@ -27,15 +28,18 @@ const signedInAs = () => auth.currentAccount(auth.readAccounts(), auth.readSessi
 
 beforeEach(() => store.clear());
 
-test("the phone's four password rules tick one by one", () => {
+test("the phone holds a password to the web's five rules, ticking one by one", () => {
   const met = (p) => phone.phonePasswordChecks(p).filter((c) => c.met).map((c) => c.id);
-  assert.deepEqual(phone.PHONE_PASSWORD_RULES.map((r) => r.label), ["At least 8 characters", "A letter", "A number", "A symbol"]);
+  assert.deepEqual(phone.PHONE_PASSWORD_RULES.map((r) => r.label), auth.PASSWORD_RULES.map((r) => r.label));
+  assert.equal(phone.PHONE_PASSWORD_RULES.length, 5);
   assert.deepEqual(met(""), []);
-  assert.deepEqual(met("abc1"), ["letter", "number"]);
-  assert.deepEqual(met("abcdefg1!"), ["length", "letter", "number", "symbol"]);
-  assert.equal(phone.phonePasswordProblem("abcdefg1!"), "");
-  assert.notEqual(phone.phonePasswordProblem("abcdefgh"), "");
-  assert.equal(phone.phonePasswordProblem("a1!" + "x".repeat(130)), "Use at most 128 characters.");
+  assert.deepEqual(met("abc1"), ["lower", "number"]);
+  assert.deepEqual(met("Abcdefg1!"), ["length", "upper", "lower", "number", "symbol"]);
+  assert.equal(phone.phonePasswordProblem("Abcdefg1!"), "");
+  // The web refuses a password with no uppercase letter; so does the phone now.
+  assert.equal(phone.phonePasswordProblem("abcdefg1!"), auth.passwordProblem("abcdefg1!"));
+  assert.notEqual(phone.phonePasswordProblem("abcdefg1!"), "");
+  assert.equal(phone.phonePasswordProblem("Aa1!" + "x".repeat(130)), "Use at most 128 characters.");
 });
 
 test("a code: wrong tries count, the fifth locks for 10 minutes, and it expires after 10", () => {
@@ -83,21 +87,21 @@ test("five wrong sign-ins lock that email for 5 minutes; a right one clears it",
 
 test("the phone's Create account: email and password only, waiting for the code", async () => {
   assert.equal(await auth.createPhoneAccount("Rafi@Mail.com", "abcdefgh", phone.phonePasswordProblem, NOW), "invalid");
-  assert.equal(await auth.createPhoneAccount("rafi@mail.com", "abcdefg1!", phone.phonePasswordProblem, NOW, "/m/ai"), "ok");
-  assert.equal(await auth.createPhoneAccount("RAFI@mail.com", "abcdefg1!", phone.phonePasswordProblem, NOW), "exists");
+  assert.equal(await auth.createPhoneAccount("rafi@mail.com", "Abcdefg1!", phone.phonePasswordProblem, NOW, "/m/ai"), "ok");
+  assert.equal(await auth.createPhoneAccount("RAFI@mail.com", "Abcdefg1!", phone.phonePasswordProblem, NOW), "exists");
   const a = auth.accountOf(auth.readAccounts(), "rafi@mail.com");
   assert.equal(a.verifiedAt, null);
   assert.equal(a.firstName, "");
   assert.equal(signedInAs(), null);
-  assert.equal(await auth.signIn("rafi@mail.com", "abcdefg1!", NOW), "unverified");
+  assert.equal(await auth.signIn("rafi@mail.com", "Abcdefg1!", NOW), "unverified");
   assert.equal((await auth.verifyEmail(NOW)).ok, true);
   assert.equal(signedInAs(), "rafi@mail.com");
   assert.equal(auth.saveAccountName("Rafi", "Ahmed").ok, true);
   assert.equal(auth.accountOf(auth.readAccounts(), "rafi@mail.com").firstName, "Rafi");
-  assert.equal(await auth.isCurrentPassword("rafi@mail.com", "abcdefg1!"), true);
-  assert.equal(await auth.isCurrentPassword("rafi@mail.com", "abcdefg2!"), false);
-  assert.equal((await auth.resetPassword("rafi@mail.com", "newpass1!", NOW, phone.phonePasswordProblem)).ok, true);
-  assert.equal(await auth.signIn("rafi@mail.com", "newpass1!", NOW), "ok");
+  assert.equal(await auth.isCurrentPassword("rafi@mail.com", "Abcdefg1!"), true);
+  assert.equal(await auth.isCurrentPassword("rafi@mail.com", "Abcdefg2!"), false);
+  assert.equal((await auth.resetPassword("rafi@mail.com", "Newpass1!", NOW, phone.phonePasswordProblem)).ok, true);
+  assert.equal(await auth.signIn("rafi@mail.com", "Newpass1!", NOW), "ok");
 });
 
 test("a provider signs in to its email's account, or makes a verified one", async () => {
@@ -107,11 +111,74 @@ test("a provider signs in to its email's account, or makes a verified one", asyn
   assert.equal(a.firstName, "Maya");
   assert.equal(signedInAs(), "maya@gmail.com");
   assert.equal(phone.linkProvider("maya@gmail.com", "google", true).ok, true);
-  assert.deepEqual(phone.phoneAccountOf(phone.readPhoneAccounts(), "MAYA@gmail.com"), { providers: ["google"], passwordless: true, faceId: false });
+  assert.deepEqual(phone.phoneAccountOf(phone.readPhoneAccounts(), "MAYA@gmail.com"), { providers: ["google"], passwordless: true, faceId: false, handleOwed: false });
   await auth.signOut();
   assert.equal(await auth.providerSignIn("maya@gmail.com", { first: "", last: "" }, NOW + 1), "in");
   assert.equal(signedInAs(), "maya@gmail.com");
   assert.equal(await auth.providerSignIn("not-an-email", { first: "", last: "" }, NOW), "refused");
+});
+
+test("a link's utm_source is kept with the account made from it, so the question isn't asked", async () => {
+  assert.equal(await auth.createPhoneAccount("rafi@mail.com", "Abcdefg1!", phone.phonePasswordProblem, NOW, "", "YouTube Ads!"), "ok");
+  const byEmail = auth.accountOf(auth.readAccounts(), "rafi@mail.com");
+  assert.equal(byEmail.source, "youtubeads");
+  assert.equal(byEmail.sourceVia, "link");
+  assert.equal(auth.needsSourceQuestion(byEmail), false);
+  assert.equal(await auth.providerSignIn("maya@gmail.com", { first: "Maya", last: "" }, NOW, "newsletter"), "new");
+  assert.equal(auth.accountOf(auth.readAccounts(), "maya@gmail.com").source, "newsletter");
+  // No tag: the account is asked once, and a Skip is remembered.
+  assert.equal(await auth.providerSignIn("sora@gmail.com", { first: "Sora", last: "" }, NOW + 1), "new");
+  assert.equal(auth.needsSourceQuestion(auth.accountOf(auth.readAccounts(), "sora@gmail.com")), true);
+  assert.equal(auth.skipSource().ok, true);
+  assert.equal(auth.needsSourceQuestion(auth.accountOf(auth.readAccounts(), "sora@gmail.com")), false);
+
+  const session = new Map();
+  globalThis.sessionStorage = { getItem: (k) => session.get(k) ?? null, setItem: (k, v) => session.set(k, String(v)) };
+  assert.equal(phone.readUtm(), "");
+  phone.keepUtm("?next=%2Fm&utm_source=LinkedIn");
+  assert.equal(phone.readUtm(), "linkedin");
+  phone.keepUtm("?next=%2Fm");
+  assert.equal(phone.readUtm(), "linkedin", "a later screen without the tag keeps it");
+  delete globalThis.sessionStorage;
+});
+
+test("Face ID: Log In offers it for the email that chose it, and it signs in without the password", async () => {
+  assert.equal(await auth.providerSignIn("maya@gmail.com", { first: "Maya", last: "Karim" }, NOW), "new");
+  phone.afterPhoneSignIn();
+  assert.equal(phone.readPhone().lastEmail, "maya@gmail.com");
+  assert.equal(phone.readPhone().faceIdPending, true);
+  assert.equal(phone.faceIdEmailFor("", "maya@gmail.com", phone.readPhoneAccounts()), "", "not chosen yet");
+  phone.updatePhoneAccount("maya@gmail.com", (a) => ({ ...a, faceId: true }));
+  await auth.signOut();
+  const accounts = phone.readPhoneAccounts();
+  assert.equal(phone.faceIdEmailFor("", phone.readPhone().lastEmail, accounts), "maya@gmail.com");
+  assert.equal(phone.faceIdEmailFor(" MAYA@gmail.com ", "", accounts), "maya@gmail.com");
+  assert.equal(phone.faceIdEmailFor("someone@else.com", "maya@gmail.com", accounts), "", "the typed email wins");
+  assert.equal(await auth.deviceSignIn("maya@gmail.com", NOW + 5), "ok");
+  assert.equal(signedInAs(), "maya@gmail.com");
+  await auth.signOut();
+  // Never an account that is still waiting for its email, nor an unknown one.
+  assert.equal(await auth.createPhoneAccount("rafi@mail.com", "Abcdefg1!", phone.phonePasswordProblem, NOW), "ok");
+  assert.equal(await auth.deviceSignIn("rafi@mail.com", NOW), "refused");
+  assert.equal(await auth.deviceSignIn("nobody@mail.com", NOW), "refused");
+  assert.equal(signedInAs(), null);
+});
+
+test("an account that left before choosing its handle still owes Name and handle", () => {
+  assert.equal(phone.phoneAccountOf(phone.readPhoneAccounts(), "rafi@mail.com").handleOwed, false);
+  phone.updatePhoneAccount("rafi@mail.com", (a) => ({ ...a, handleOwed: true }));
+  assert.equal(phone.phoneAccountOf(phone.readPhoneAccounts(), "RAFI@mail.com").handleOwed, true);
+  assert.equal(phone.normalizePhoneAccounts({ "a@b.co": { providers: [] } })["a@b.co"].handleOwed, false);
+});
+
+test("this phone remembers the tour it owes and who signed in last", () => {
+  assert.deepEqual(
+    { tour: phone.normalizePhone({}).tourPending, last: phone.normalizePhone({}).lastEmail },
+    { tour: false, last: "" },
+  );
+  phone.updatePhone({ tourPending: true });
+  assert.equal(phone.readPhone().tourPending, true);
+  assert.equal(phone.normalizePhone({ lastEmail: " Maya@Gmail.com " }).lastEmail, "maya@gmail.com");
 });
 
 test("where the phone goes next: its own pages only, never back to a way-in screen", () => {
@@ -130,6 +197,8 @@ test("handle suggestions: three free ones near the name, never a taken one", () 
   assert.deepEqual(phone.handleSuggestions("Rafi Ahmed", "rafi", () => true), ["rafi-ahmed-1", "rafiahmed", "rafi-makes"]);
   assert.deepEqual(phone.handleSuggestions("Rafi Ahmed", "rafi", (h) => h !== "rafiahmed"), ["rafi-ahmed-1", "rafi-makes", "rafi-ahmed-2"]);
   assert.deepEqual(phone.handleSuggestions("রফি", "", () => true), []);
+  // Once they typed a handle of their own, Name and handle passes no name: near what they typed.
+  assert.deepEqual(phone.handleSuggestions("", "naim-rahman", () => true), ["naim-rahman-1", "naimrahman", "naim-makes"]);
 });
 
 test("the phone's way-in keys stay with the browser when accounts swap their work", async () => {

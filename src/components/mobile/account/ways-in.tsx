@@ -20,7 +20,9 @@ import { Checkbox } from "@/components/ideeza/checkbox";
 import { TextInput } from "@/components/ideeza/text-input";
 import { isEmail } from "@/lib/account/auth";
 import { PROVIDER_WORDS, relayAddress, saveProviderAnswer, type Provider } from "@/lib/account/phone";
+import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
+import { T } from "../type";
 import { TermsSheet } from "./terms-sheet";
 
 export type Way = Provider | "email";
@@ -66,7 +68,7 @@ export function WaysIn({ onProvider, onEmail }: { onProvider: (p: Provider) => v
           <WayButton key={w} way={w} onClick={() => (w === "email" ? onEmail() : onProvider(w))} />
         ))}
       </div>
-      <p className="text-center text-sm leading-sm text-text-tertiary">
+      <p className={cn(T.meta, "text-center text-text-tertiary")}>
         By continuing, you agree to the IDEEZA{" "}
         <button type="button" className="text-text-brand outline-none hover:underline focus-visible:underline" onClick={() => setTerms(true)}>
           Terms of Service
@@ -194,7 +196,7 @@ export function CheckRow({ checked, onChange, children }: { checked: boolean; on
     <label className="relative flex min-h-[44px] cursor-pointer items-start gap-8 rounded-md py-2 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus">
       <input type="checkbox" className="sr-only" checked={checked} onChange={onChange} />
       <Checkbox checked={checked} decorative className="mt-1" />
-      <span className="text-lg leading-lg text-text-primary">{children}</span>
+      <span className={T.bodyLg}>{children}</span>
     </label>
   );
 }

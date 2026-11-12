@@ -146,8 +146,8 @@ test("a new password replaces the old one without touching the session", async (
   await signUp("rafi@mail.com");
   const before = auth.readSession();
   assert.equal((await auth.setAccountPassword("rafi@mail.com", "short", phone.phonePasswordProblem)).ok, false);
-  assert.ok((await auth.setAccountPassword("rafi@mail.com", "new-horse-7!", phone.phonePasswordProblem)).ok);
-  assert.equal(await auth.isCurrentPassword("rafi@mail.com", "new-horse-7!"), true);
+  assert.ok((await auth.setAccountPassword("rafi@mail.com", "New-horse-7!", phone.phonePasswordProblem)).ok);
+  assert.equal(await auth.isCurrentPassword("rafi@mail.com", "New-horse-7!"), true);
   assert.equal(await auth.isCurrentPassword("rafi@mail.com", "Old-Horse-77"), false);
   assert.deepEqual(auth.readSession(), before);
 });

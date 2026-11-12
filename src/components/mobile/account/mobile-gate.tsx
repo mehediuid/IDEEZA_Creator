@@ -10,18 +10,39 @@
 //   first may browse; anyone else goes to Welcome, carrying where they were
 //   going. The Shared kit is open to all.
 // Signed in, a sign-in that still owes something goes there first: the 2-step
-// code (AU-07), then Restore for an account set to be deleted (AU-65).
-// Signed in, the Face ID offer comes once per phone, on the first tab screen.
+// code (AU-07), then Restore for an account set to be deleted (AU-65), then
+// Name and handle for an account that left before choosing its handle
+// (AU-13; the profile steps and the Welcome map stay skippable).
+// Signed in, on a tab screen, one thing at a time and in this order: the Face
+// ID offer (once per phone), the tour when Look around first asked for it,
+// then the welcome offer (on Home, once per account, as on the web).
+// A link's utm_source is kept from whatever screen it opens.
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { SESSION_KEY, signOut, useAuth } from "@/lib/account/auth";
-import { ENTRY_PATH, SETUP_PATH, isAlive, mobileNext, readPhone, updatePhone, updatePhoneAccount, usePhone } from "@/lib/account/phone";
+import { FaceIdIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import {
+  ENTRY_PATH,
+  SETUP_PATH,
+  isAlive,
+  keepUtm,
+  mobileNext,
+  phoneAccountOf,
+  updatePhone,
+  updatePhoneAccount,
+  usePhone,
+  usePhoneAccounts,
+} from "@/lib/account/phone";
 import { owedOf, readDeviceId, useSecurity } from "@/lib/account/security";
 import { parseStored, useStoredKey } from "@/lib/key-store";
 import { Button } from "@/components/ideeza/button";
 import { ForcedThemeContext, Sheet } from "../kit/sheet";
 import { SplashScreen } from "../screen";
+import { T } from "../type";
+import { PhoneTour } from "./phone-tour";
+import { WelcomeOfferSheet } from "./welcome-offer-sheet";
 
 /** The screens a sign-in may owe before the app opens. */
 const OWED_PATH = /^\/m\/(two-step|restore)(\/|$)/;
@@ -34,6 +55,7 @@ function redirectFor(
   explored: boolean,
   owes: "two-step" | "restore" | null,
   onboarded = true,
+  handleOwed = false,
 ): string | null {
   if (/^\/m\/kit(\/|$)/.test(pathname)) return null;
   const asked = new URLSearchParams(search).get("next");
@@ -46,12 +68,13 @@ function redirectFor(
   }
   if (OWED_PATH.test(pathname)) return signedIn ? mobileNext(asked) : "/m/welcome";
   if (ENTRY_PATH.test(pathname)) {
-    // Reset is also reached from Settings; the Shared kit's state demos open signed in too.
-    if (!signedIn || /^\/m\/(reset|verify)(\/|$)/.test(pathname) || /[?&](demo|error)=/.test(search)) return null;
+    // Reset is also reached from Settings; the Shared kit's state demos (`?demo=`) open signed in
+    // too. A provider's error (`?error=`) is only ever shown to someone signed out.
+    if (!signedIn || /^\/m\/(reset|verify)(\/|$)/.test(pathname) || /[?&]demo=/.test(search)) return null;
     return mobileNext(new URLSearchParams(search).get("next"));
   }
   if (SETUP_PATH.test(pathname)) return signedIn ? null : "/m/welcome";
-  if (signedIn) return null;
+  if (signedIn) return handleOwed ? `/m/handle${pathname === "/m" && !search ? "" : `?next=${encodeURIComponent(pathname + search)}`}` : null;
   if (pathname === "/m" && explored) return null;
   const here = pathname + search;
   // The first time, the onboarding comes before Welcome (and hands on to it).
@@ -78,6 +101,8 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { hydrated, signedIn, account } = useAuth();
   const { hydrated: phoneRead, phone } = usePhone();
+  const phoneAccounts = usePhoneAccounts();
+  const handleOwed = !!account && phoneAccountOf(phoneAccounts, account.email).handleOwed;
   const { hydrated: securityRead, security } = useSecurity(account?.email);
   const session = useStoredKey(SESSION_KEY);
   const sessionAt = (parseStored(session.raw).value as { at?: number } | null)?.at ?? 0;
@@ -85,11 +110,14 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   // All are read from this browser, so `ready` is never true on the server.
   const ready = hydrated && phoneRead && securityRead && session.hydrated;
   const owes = ready && signedIn ? owedOf(security, sessionAt, readDeviceId(), Math.max(openedAt, sessionAt)) : null;
-  const target = ready ? redirectFor(pathname, window.location.search, signedIn, phone.explored, owes, phone.onboarded) : null;
+  const target = ready ? redirectFor(pathname, window.location.search, signedIn, phone.explored, owes, phone.onboarded, handleOwed) : null;
 
   React.useEffect(() => {
     if (target) router.replace(target);
   }, [target, router]);
+
+  // The campaign tag of the link that opened the app, for the account made from it.
+  React.useEffect(() => keepUtm(window.location.search), []);
 
   const [holding, setHolding] = React.useState(true);
   React.useEffect(() => {
@@ -131,7 +159,10 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      {signedIn && account && tabScreen && phone.faceIdPending && !phone.faceIdOffered && <FaceIdOffer email={account.email} />}
+      {signedIn &&
+        account &&
+        tabScreen &&
+        (phone.faceIdPending && !phone.faceIdOffered ? <FaceIdOffer email={account.email} /> : phone.tourPending ? <PhoneTour /> : <WelcomeOfferSheet />)}
     </>
   );
 }
@@ -142,7 +173,7 @@ function FaceIdOffer({ email }: { email: string }) {
   const [open, setOpen] = React.useState(true);
   const done = (use: boolean) => {
     if (use) updatePhoneAccount(email, (a) => ({ ...a, faceId: true }));
-    updatePhone({ ...readPhone(), faceIdPending: false, faceIdOffered: true });
+    updatePhone({ faceIdPending: false, faceIdOffered: true });
     setOpen(false);
   };
   return (
@@ -161,9 +192,10 @@ function FaceIdOffer({ email }: { email: string }) {
         </>
       }
     >
-      <p className="text-md leading-md text-text-secondary">
-        Faster, and no password to type. Change it any time in Sign-in &amp; security.
-      </p>
+      <span aria-hidden className="flex justify-center py-2 text-[color:var(--color-icon-brand)]">
+        <Icon icon={FaceIdIcon} size={48} />
+      </span>
+      <p className={T.body}>Faster, and no password to type. Change it any time in Sign-in &amp; security.</p>
     </Sheet>
   );
 }

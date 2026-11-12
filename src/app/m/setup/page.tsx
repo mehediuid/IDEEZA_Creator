@@ -6,14 +6,15 @@
 // step and Skip moves on, both always on; four A22 segments show the step.
 // The photo menu (14b) asks the kit's pre-prompt the first time (KIT-PM-01
 // camera, PM-02 photos); a failed upload keeps the text (14e); a 4th
-// speciality is refused (16b); a failed save keeps what was typed (17b).
-// Finish → the Welcome map.
+// speciality is refused (16b); a failed save keeps what was typed (17b). A
+// link or a social profile that can't be saved says why under its field, and
+// Finish goes to the first one. Finish → the Welcome map.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Add01Icon, Camera01Icon, Delete02Icon, Image01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Field, useFieldIds } from "@/components/auth/auth-parts";
+import { FIELD_LABEL, Field, useFieldIds } from "@/components/auth/auth-parts";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Button } from "@/components/ideeza/button";
 import { Radio } from "@/components/ideeza/checkbox";
@@ -22,11 +23,13 @@ import { Tag } from "@/components/ideeza/tag";
 import { TextInput, Textarea } from "@/components/ideeza/text-input";
 import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, type AlertSpec } from "@/components/mobile/account/parts";
 import { BottomBar } from "@/components/mobile/kit/bottom-bar";
-import { ActionSheet, Sheet } from "@/components/mobile/kit/sheet";
+import { usePrePrompt } from "@/components/mobile/kit/permission-sheet";
+import { ActionSheet } from "@/components/mobile/kit/sheet";
 import { SheetSelect } from "@/components/mobile/kit/sheet-select";
 import { Screen } from "@/components/mobile/screen";
 import { TopBar } from "@/components/mobile/top-bar";
-import { mobileNext, readPhone, updatePhone } from "@/lib/account/phone";
+import { T } from "@/components/mobile/type";
+import { mobileNext } from "@/lib/account/phone";
 import {
   BIO_MAX,
   HEADLINE_MAX,
@@ -38,6 +41,7 @@ import {
   SOCIAL_WORDS,
   SPECIALITIES_MAX,
   YEARS,
+  YEARS_WORDS,
   cleanSkills,
   linkOf,
   socialNameOf,
@@ -51,6 +55,7 @@ import { initialsOf } from "@/lib/people/ids";
 import { spokenLanguageOptions } from "@/lib/people/languages";
 import { deletePhoto, putPhoto, resizePhoto, useMyPhoto } from "@/lib/people/photo-store";
 import { readProfileFields, saveProfile, type ProfilePatch } from "@/lib/people/profile-store";
+import { cn } from "@/lib/utils";
 
 const STEPS = ["Photo and headline", "About you", "Skills", "Links"] as const;
 
@@ -61,7 +66,10 @@ const SOCIAL_PREFIX: Record<SocialNetwork, string> = {
   linkedin: "linkedin.com/in/",
 };
 
-const YEARS_LABEL: Record<Years, string> = { "0-1": "0-1 years", "1-2": "1-2 years", "3-5": "3-5 years", "5+": "5+ years" };
+/** Why a social profile can't be saved: "Enter a Facebook username or a facebook.com link." */
+const socialError = (n: SocialNetwork) => `Enter a ${SOCIAL_WORDS[n]} username or a ${SOCIAL_PREFIX[n].split("/")[0]} link.`;
+
+const HELPER = cn(T.meta, "text-text-tertiary");
 
 const OPEN_TO: readonly { value: OpenTo; label: string }[] = [
   { value: "both", label: "Collaboration and questions" },
@@ -79,6 +87,8 @@ export default function SetupPage() {
   const [f, setF] = React.useState<ProfileFields>(readProfileFields);
   const [alert, setAlert] = React.useState<AlertSpec | null>(null);
   const [linkErrors, setLinkErrors] = React.useState<string[]>([]);
+  // Finish was pressed with a social profile that can't be saved: each one says why.
+  const [socialsTried, setSocialsTried] = React.useState(false);
   const [socials, setSocials] = React.useState<Record<SocialNetwork, string>>(() => {
     const p = readProfileFields();
     return Object.fromEntries(SOCIAL_NETWORKS.map((n) => [n, p.social[n] ? socialNameOf(n, p.social[n]) : ""])) as Record<SocialNetwork, string>;
@@ -101,7 +111,12 @@ export default function SetupPage() {
     const errs = links.map((raw) => (raw.trim() && !linkOf(raw) ? "Enter a web address like example.com." : ""));
     const social = Object.fromEntries(SOCIAL_NETWORKS.map((n) => [n, socialUrlOf(n, socials[n])])) as Record<SocialNetwork, string | null>;
     setLinkErrors(errs);
-    if (errs.some(Boolean) || Object.values(social).some((v) => v === null)) return null;
+    setSocialsTried(true);
+    if (errs.some(Boolean) || Object.values(social).some((v) => v === null)) {
+      // To the first field that says why.
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('#m-app [aria-invalid="true"]')?.focus());
+      return null;
+    }
     return { links: links.map((raw) => linkOf(raw)).filter((u): u is string => !!u), social: social as Record<SocialNetwork, string> };
   };
 
@@ -131,7 +146,7 @@ export default function SetupPage() {
     >
       <div className={ACCOUNT_CONTENT}>
         <div className="flex flex-col gap-2">
-          <p className="text-sm leading-sm text-text-secondary">
+          <p className={T.meta}>
             Step {step} of 4 · {STEPS[step - 1]}
           </p>
           <div className="flex gap-2">
@@ -144,7 +159,7 @@ export default function SetupPage() {
         {step === 2 && <AboutStep f={f} set={set} alert={alert} />}
         {step === 3 && <SkillsStep f={f} set={set} alert={alert} />}
         {step === 4 && (
-          <LinksStep links={links} setLinks={setLinks} errors={linkErrors} socials={socials} setSocials={setSocials} alert={alert} />
+          <LinksStep links={links} setLinks={setLinks} errors={linkErrors} socials={socials} setSocials={setSocials} socialsTried={socialsTried} alert={alert} />
         )}
       </div>
     </Screen>
@@ -155,7 +170,7 @@ type StepProps = { f: ProfileFields; set: (p: Partial<ProfileFields>) => void; a
 
 function Counter({ n, max }: { n: number; max: number }) {
   return (
-    <p className="text-sm leading-sm text-text-tertiary tabular-nums">
+    <p className={cn(HELPER, "tabular-nums")}>
       {n}/{max}
     </p>
   );
@@ -165,7 +180,8 @@ function PhotoStep({ f, set, alert, setAlert }: StepProps & { setAlert: (a: Aler
   const ids = useFieldIds(["latin", "headline"] as const);
   const photo = useMyPhoto();
   const [menu, setMenu] = React.useState(false);
-  const [ask, setAsk] = React.useState<"camera" | "photos" | null>(null);
+  const cameraAsk = usePrePrompt("camera");
+  const photosAsk = usePrePrompt("photos");
   const camera = React.useRef<HTMLInputElement>(null);
   const library = React.useRef<HTMLInputElement>(null);
   const last = React.useRef<File | null>(null);
@@ -190,11 +206,9 @@ function PhotoStep({ f, set, alert, setAlert }: StepProps & { setAlert: (a: Aler
     );
   };
 
-  const pick = (kind: "camera" | "photos") => {
-    const p = readPhone();
-    if (kind === "camera" ? !p.cameraAsked : !p.photosAsked) return setAsk(kind);
-    (kind === "camera" ? camera : library).current?.click();
-  };
+  // The kit's pre-prompt the first time (KIT-PM-01 camera, PM-02 photos), then the phone's own picker.
+  const pick = (kind: "camera" | "photos") =>
+    (kind === "camera" ? cameraAsk : photosAsk).ask(() => (kind === "camera" ? camera : library).current?.click());
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -216,7 +230,7 @@ function PhotoStep({ f, set, alert, setAlert }: StepProps & { setAlert: (a: Aler
       </div>
       <Field label="Name in English letters (optional)" htmlFor={ids.latin.id}>
         <TextInput id={ids.latin.id} size="xl" value={f.latinName} onValueChange={(v) => set({ latinName: v.slice(0, 60) })} />
-        <p className="text-sm leading-sm text-text-tertiary">Only if your name uses another script.</p>
+        <p className={HELPER}>Only if your name uses another script.</p>
       </Field>
       <Field label="Headline" htmlFor={ids.headline.id}>
         <Textarea
@@ -239,34 +253,8 @@ function PhotoStep({ f, set, alert, setAlert }: StepProps & { setAlert: (a: Aler
           ...(photo.url ? [{ label: "Remove photo", icon: Delete02Icon, destructive: true, onSelect: () => void deletePhoto() }] : []),
         ]}
       />
-      <Sheet
-        open={!!ask}
-        onClose={() => setAsk(null)}
-        title={ask === "camera" ? "Use your camera" : "Choose photos"}
-        actions={
-          <>
-            <Button
-              size="xl"
-              className="w-full"
-              onClick={() => {
-                const kind = ask;
-                updatePhone(kind === "camera" ? { cameraAsked: true } : { photosAsked: true });
-                setAsk(null);
-                (kind === "camera" ? camera : library).current?.click();
-              }}
-            >
-              Continue
-            </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setAsk(null)}>
-              Not now
-            </Button>
-          </>
-        }
-      >
-        <p className="text-md leading-md text-text-secondary">
-          {ask === "camera" ? "To record your product and take photos." : "To add photos to your project, profile or messages. You pick which ones."}
-        </p>
-      </Sheet>
+      {cameraAsk.sheet}
+      {photosAsk.sheet}
     </>
   );
 }
@@ -292,10 +280,12 @@ function AboutStep({ f, set, alert }: StepProps) {
           value={f.location}
           onValueChange={(v) => set({ location: v })}
         />
-        <p className="text-sm leading-sm text-text-tertiary">City, country</p>
+        <p className={HELPER}>City, country</p>
       </Field>
       <div className="flex flex-col gap-4">
-        <p className="text-lg leading-lg text-text-primary">Languages (up to {LANGUAGES_MAX})</p>
+        <label htmlFor={ids.languages.id} className={FIELD_LABEL}>
+          Languages (up to {LANGUAGES_MAX})
+        </label>
         {!full && (
           <SheetSelect
             id={ids.languages.id}
@@ -317,12 +307,12 @@ function AboutStep({ f, set, alert }: StepProps) {
         )}
       </div>
       <fieldset className="flex flex-col">
-        <legend className="pb-2 text-lg leading-lg text-text-primary">Open to</legend>
+        <legend className={cn(FIELD_LABEL, "pb-2")}>Open to</legend>
         {OPEN_TO.map((o) => (
           <label key={o.label} className="relative flex min-h-[44px] cursor-pointer items-center gap-8 rounded-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus">
             <input type="radio" name="open-to" className="sr-only" checked={f.openTo === o.value} onChange={() => set({ openTo: o.value })} />
             <Radio checked={f.openTo === o.value} decorative />
-            <span className="text-lg leading-lg text-text-primary">{o.label}</span>
+            <span className={T.bodyLg}>{o.label}</span>
           </label>
         ))}
       </fieldset>
@@ -369,7 +359,7 @@ function SkillsStep({ f, set, alert }: StepProps) {
               }
             }}
           />
-          <p className="text-sm leading-sm text-text-tertiary">
+          <p className={HELPER}>
             {f.skills.length} of {SKILLS_MAX}
           </p>
         </Field>
@@ -385,7 +375,7 @@ function SkillsStep({ f, set, alert }: StepProps) {
       </div>
       {f.skills.length > 0 && (
         <div className="flex flex-col gap-4">
-          <p className="text-md leading-md text-text-primary">Your top 3 specialities</p>
+          <p className={FIELD_LABEL}>Your top 3 specialities</p>
           <div className="flex flex-wrap gap-4">
             {f.skills.map((s) => (
               <Tag key={s} size="md" selected={f.specialities.some((p) => p.skill === s)} onClick={() => toggle(s)}>
@@ -393,14 +383,14 @@ function SkillsStep({ f, set, alert }: StepProps) {
               </Tag>
             ))}
           </div>
-          {refused && <p className="text-sm leading-sm text-text-error">You can pick 3. Remove one to add another.</p>}
+          {refused && <p className={cn(T.meta, "text-text-error")}>You can pick 3. Remove one to add another.</p>}
           {f.specialities.map((p) => (
             <div key={p.skill} className="flex flex-col gap-2">
-              <p className="text-lg leading-lg text-text-primary">{p.skill}</p>
+              <p className={FIELD_LABEL}>{p.skill}</p>
               <SheetSelect
                 title={`Years of ${p.skill}`}
                 value={p.years}
-                options={YEARS.map((y) => ({ value: y, label: YEARS_LABEL[y] }))}
+                options={YEARS.map((y) => ({ value: y, label: YEARS_WORDS[y] }))}
                 onChange={(y) => set({ specialities: f.specialities.map((x) => (x.skill === p.skill ? { ...x, years: y as Years } : x)) })}
               />
             </div>
@@ -417,6 +407,7 @@ function LinksStep({
   errors,
   socials,
   setSocials,
+  socialsTried,
   alert,
 }: {
   links: string[];
@@ -424,6 +415,8 @@ function LinksStep({
   errors: string[];
   socials: Record<SocialNetwork, string>;
   setSocials: (s: Record<SocialNetwork, string>) => void;
+  /** Finish was pressed: a profile that can't be saved says why. */
+  socialsTried: boolean;
   alert: AlertSpec | null;
 }) {
   const base = React.useId();
@@ -442,6 +435,8 @@ function LinksStep({
               autoCapitalize="none"
               value={l}
               invalid={!!errors[i]}
+              aria-invalid={!!errors[i] || undefined}
+              aria-describedby={errors[i] ? `${base}-link-${i}-error` : undefined}
               onValueChange={(v) => setLinks(links.map((x, j) => (j === i ? v : x)))}
             />
           </Field>
@@ -453,9 +448,12 @@ function LinksStep({
         )}
       </div>
       <div className="flex flex-col gap-4">
-        <p className="text-md leading-md text-text-primary">Social profiles</p>
-        {SOCIAL_NETWORKS.map((n) => (
-          <Field key={n} label={SOCIAL_WORDS[n]} htmlFor={`${base}-${n}`}>
+        <p className={FIELD_LABEL}>Social profiles</p>
+        {SOCIAL_NETWORKS.map((n) => {
+          const bad = socialUrlOf(n, socials[n]) === null;
+          const error = bad && socialsTried ? socialError(n) : "";
+          return (
+          <Field key={n} label={SOCIAL_WORDS[n]} htmlFor={`${base}-${n}`} error={error} errorId={`${base}-${n}-error`}>
             <TextInput
               id={`${base}-${n}`}
               size="xl"
@@ -464,11 +462,14 @@ function LinksStep({
               autoCorrect="off"
               placeholder="username"
               value={socials[n]}
-              invalid={socialUrlOf(n, socials[n]) === null}
+              invalid={bad}
+              aria-invalid={!!error || undefined}
+              aria-describedby={error ? `${base}-${n}-error` : undefined}
               onValueChange={(v) => setSocials({ ...socials, [n]: v })}
             />
           </Field>
-        ))}
+          );
+        })}
       </div>
     </>
   );

@@ -399,20 +399,23 @@ export async function createAccount(input: SignUpInput, utmSource: string, now: 
 }
 
 /** The phone's Create account (mobile Figma AU-10): only the email and a
- *  password checked by the phone's own rules (`problem`); the name comes after
- *  the email is verified, and the consent line carries the minimum age. Like
- *  `createAccount`, the account waits for its email and nobody is signed in. */
+ *  password checked by `problem`; the name comes after the email is verified,
+ *  and the consent line carries the minimum age. A link's utm_source is kept
+ *  as on the web. Like `createAccount`, the account waits for its email and
+ *  nobody is signed in. */
 export async function createPhoneAccount(
   email: string,
   password: string,
   problem: (password: string) => string,
   now: number,
   next = "",
+  utmSource = "",
 ): Promise<CreateResult> {
   if (!isEmail(email) || problem(password)) return "invalid";
   const e = normalizeEmail(email);
   if (accountOf(readAccounts(), e)) return "exists";
   const salt = newSalt();
+  const source = sourceFromUtm(utmSource);
   const saved = saveAccount({
     v: 1,
     firstName: "",
@@ -424,8 +427,8 @@ export async function createPhoneAccount(
     consentAt: now,
     createdAt: now,
     verifiedAt: null,
-    source: "",
-    sourceVia: "",
+    source,
+    sourceVia: source ? "link" : "",
     sourceOther: "",
     sourceSkipped: false,
     nudgeClosed: false,
@@ -439,7 +442,12 @@ export async function createPhoneAccount(
  *  demo provider sheet stands in for theirs): its account is signed in, and
  *  an account that has none is made, verified — the provider proved the email —
  *  with a password nobody knows, until one is added in Sign-in & security. */
-export async function providerSignIn(email: string, name: { first: string; last: string }, now: number): Promise<"in" | "new" | "refused"> {
+export async function providerSignIn(
+  email: string,
+  name: { first: string; last: string },
+  now: number,
+  utmSource = "",
+): Promise<"in" | "new" | "refused"> {
   const e = normalizeEmail(email);
   if (!isEmail(e)) return "refused";
   const found = accountOf(readAccounts(), e);
@@ -449,6 +457,7 @@ export async function providerSignIn(email: string, name: { first: string; last:
     return startSession(e, now).ok ? "in" : "refused";
   }
   const salt = newSalt();
+  const source = sourceFromUtm(utmSource);
   const saved = saveAccount({
     v: 1,
     firstName: str(name.first, NAME_PART_MAX),
@@ -460,8 +469,8 @@ export async function providerSignIn(email: string, name: { first: string; last:
     consentAt: now,
     createdAt: now,
     verifiedAt: now,
-    source: "",
-    sourceVia: "",
+    source,
+    sourceVia: source ? "link" : "",
     sourceOther: "",
     sourceSkipped: false,
     nudgeClosed: false,
@@ -470,6 +479,16 @@ export async function providerSignIn(email: string, name: { first: string; last:
   if (!saved.ok) return "refused";
   await comeIn(e, true);
   return startSession(e, now).ok ? "new" : "refused";
+}
+
+/** Face ID (the phone's "Use Face ID", AU-08): the phone vouches for whoever
+ *  chose it there, so their verified account is signed in with no password.
+ *  The caller checks that the account chose Face ID on this phone. */
+export async function deviceSignIn(email: string, now: number): Promise<"ok" | "refused"> {
+  const account = accountOf(readAccounts(), email);
+  if (!account || account.verifiedAt === null) return "refused";
+  await comeIn(account.email, false);
+  return startSession(account.email, now).ok ? "ok" : "refused";
 }
 
 /** Whether `password` is the account's password now (Reset: "That's your current password"). */
@@ -588,7 +607,7 @@ export async function signOut(): Promise<WriteResult> {
 
 /** The reset link: a new password for that email's account, and you're signed
  *  in. Opening the link proves the email, so it counts as verified. `problem`
- *  is the rules the password is held to (the phone has its own four). */
+ *  is the rules the password is held to. */
 export async function resetPassword(
   email: string,
   password: string,

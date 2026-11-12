@@ -10,36 +10,49 @@
 // a countdown, email not verified → Send code, offline with the input kept.
 // Suspended and session expired have no cause in this demo:
 // `?demo=suspended|expired` shows them (the Shared kit links there).
-// Remember me unticked: the sign-in lasts while this tab does.
+// Remember me unticked: the sign-in lasts while this tab does. A provider
+// that failed after starting here says so here (AU-04c), and a browser that
+// won't save the sign-in says that. Face ID (AU-08): once someone chose "Use
+// Face ID", Log In offers it for their email — the one typed, or whoever
+// signed in here last — and a Demo sheet stands in for the phone's check.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { FaceIdIcon } from "@hugeicons/core-free-icons";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
+import { Icon } from "@/components/dashboard/icon";
+import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { TextInput } from "@/components/ideeza/text-input";
-import { ACCOUNT_CONTENT, AccountAlert, type AlertSpec } from "@/components/mobile/account/parts";
+import { ACCOUNT_CONTENT, AccountAlert, REFUSED_ALERT, landingAfterSignIn, type AlertSpec } from "@/components/mobile/account/parts";
 import { WayMark, useProviderSheet } from "@/components/mobile/account/ways-in";
 import { SwitchLine, TEXT_LINK } from "@/components/mobile/kit/bottom-bar";
+import { Sheet } from "@/components/mobile/kit/sheet";
 import { useOnline } from "@/components/mobile/kit/states";
 import { Screen } from "@/components/mobile/screen";
 import { T } from "@/components/mobile/type";
-import { isEmail, signIn } from "@/lib/account/auth";
+import { deviceSignIn, isEmail, signIn } from "@/lib/account/auth";
 import {
+  PROVIDERS,
+  PROVIDER_WORDS,
   afterPhoneSignIn,
   afterRightSignIn,
   afterWrongSignIn,
   clockOf,
+  faceIdEmailFor,
   issueCode,
   mobileNext,
   readTries,
   saveTries,
   signInLockedFor,
+  usePhone,
+  usePhoneAccounts,
 } from "@/lib/account/phone";
 import { cn } from "@/lib/utils";
 
-type Outcome = null | "wrong" | "unverified" | "suspended";
+type Outcome = null | "wrong" | "unverified" | "suspended" | "refused";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -57,6 +70,17 @@ export default function SignInPage() {
   const [now, setNow] = React.useState(() => Date.now());
   const { start, sheet } = useProviderSheet({ from: `/m/sign-in${next === "/m" ? "" : `?next=${encodeURIComponent(next)}`}`, next });
   const suspended = outcome === "suspended";
+  // The provider that failed after starting from this screen, until they try something else.
+  const [failed, setFailed] = React.useState(() => PROVIDERS.find((p) => p === params.get("error")) ?? null);
+  const { phone } = usePhone();
+  const faceEmail = faceIdEmailFor(email, phone.lastEmail, usePhoneAccounts());
+  const [faceId, setFaceId] = React.useState(false);
+
+  /** Signed in: the account's own work comes back, so the page starts again. */
+  const enter = (remembered: boolean) => {
+    afterPhoneSignIn(remembered);
+    window.location.replace(landingAfterSignIn(next));
+  };
 
   const lockedFor = isEmail(email) ? signInLockedFor(readTries(), email, now) : 0;
   React.useEffect(() => {
@@ -74,20 +98,27 @@ export default function SignInPage() {
     setTouched({ email: true, submit: true });
     if (!email.trim() || !isEmail(email) || !password || !online || lockedFor || suspended) return;
     setBusy(true);
+    setFailed(null);
     const result = await signIn(email, password, Date.now(), next);
     if (result === "ok") {
       saveTries(afterRightSignIn(readTries(), email));
-      afterPhoneSignIn(remember);
-      // Signing in brings the account's own work back: start the page again.
-      window.location.replace(next);
-      return;
+      return enter(remember);
     }
     setBusy(false);
     if (result === "wrong") {
       saveTries(afterWrongSignIn(readTries(), email, Date.now()));
       setNow(Date.now());
     }
-    setOutcome(result === "unverified" ? "unverified" : result === "wrong" ? "wrong" : null);
+    setOutcome(result);
+  };
+
+  const withFaceId = async () => {
+    setFaceId(false);
+    setFailed(null);
+    setBusy(true);
+    if ((await deviceSignIn(faceEmail, Date.now())) === "ok") return enter(true);
+    setBusy(false);
+    setOutcome("refused");
   };
 
   const sendCode = () => {
@@ -105,7 +136,9 @@ export default function SignInPage() {
       ? { tone: "attention", title: "You’re offline", body: "Your details are kept. Log in when you’re back online." }
       : lockedFor
         ? { tone: "error", title: "Too many tries", body: `Try again in ${clockOf(lockedFor)}, or reset your password.` }
-        : outcome === "unverified"
+        : outcome === "refused"
+          ? REFUSED_ALERT
+          : outcome === "unverified"
           ? {
               tone: "attention",
               title: "Verify your email first",
@@ -116,17 +149,21 @@ export default function SignInPage() {
                 </button>
               ),
             }
-          : demo === "expired"
-            ? { tone: "info", title: "Your session expired", body: "Log in again to go back where you were." }
-            : null;
+          : failed
+            ? { tone: "error", title: `Couldn’t log in with ${PROVIDER_WORDS[failed]}`, body: "Try again, or use another way." }
+            : demo === "expired"
+              ? { tone: "info", title: "Your session expired", body: "Log in again to go back where you were." }
+              : null;
 
-  const resetHref = `/m/reset?${new URLSearchParams({ ...(isEmail(email) ? { email: email.trim() } : {}), ...(next === "/m" ? {} : { next }) })}`;
+  const carried = new URLSearchParams({ ...(isEmail(email) ? { email: email.trim() } : {}), ...(next === "/m" ? {} : { next }) });
+  const resetHref = `/m/reset?${carried}`;
+  const signUpHref = `/m/sign-up${carried.size ? `?${carried}` : ""}`;
 
   return (
     <Screen
       footer={
         <div className="px-8 pb-4 pt-4">
-          <SwitchLine text="Don’t Have an Account?" link="Sign Up" href={next === "/m" ? "/m/sign-up" : `/m/sign-up?next=${encodeURIComponent(next)}`} />
+          <SwitchLine text="Don’t Have an Account?" link="Sign Up" href={signUpHref} />
         </div>
       }
     >
@@ -155,6 +192,7 @@ export default function SignInPage() {
             <PasswordInput
               id={ids.password.id}
               autoComplete="current-password"
+              autoFocus={!!params.get("email")}
               placeholder="8 characters and more"
               value={password}
               onValueChange={(v) => {
@@ -179,6 +217,19 @@ export default function SignInPage() {
         <Button type="submit" size="xl" className="w-full" loading={busy} disabled={!online || !!lockedFor || suspended}>
           {suspended ? "Account Suspended" : "Log In"}
         </Button>
+        {faceEmail && !suspended && (
+          <Button
+            type="button"
+            hierarchy="secondary"
+            size="xl"
+            className="w-full"
+            iconLeading={<Icon icon={FaceIdIcon} size={20} />}
+            disabled={!online || busy}
+            onClick={() => setFaceId(true)}
+          >
+            Log In with Face ID
+          </Button>
+        )}
         <div className="flex items-center gap-4" role="separator" aria-label="Or login with">
           <span className="h-[1px] flex-1 bg-border" />
           <span className={T.caption}>Or login with</span>
@@ -186,13 +237,37 @@ export default function SignInPage() {
         </div>
         <div className="grid grid-cols-2 gap-4">
           {(["google", "facebook"] as const).map((p) => (
-            <Button key={p} type="button" hierarchy="secondary" size="lg" className="w-full" iconLeading={<WayMark way={p} />} onClick={() => start(p)} disabled={suspended}>
+            <Button key={p} type="button" hierarchy="secondary" size="lg" className="w-full" iconLeading={<WayMark way={p} />} onClick={() => {
+                setFailed(null);
+                start(p);
+              }} disabled={suspended}>
               {p === "google" ? "Google" : "Facebook"}
             </Button>
           ))}
         </div>
       </form>
       {sheet}
+      <Sheet
+        open={faceId}
+        onClose={() => setFaceId(false)}
+        title="Log In with Face ID"
+        description="On a phone, Face ID checks your face here. This demo asks you to confirm."
+        actions={
+          <>
+            <Button size="xl" className="w-full" onClick={() => void withFaceId()}>
+              Continue
+            </Button>
+            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setFaceId(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      >
+        <Badge tone="warning" className="self-start">
+          Demo
+        </Badge>
+        <p className={cn(T.bodyLg, "[overflow-wrap:anywhere]")}>{faceEmail}</p>
+      </Sheet>
     </Screen>
   );
 }
