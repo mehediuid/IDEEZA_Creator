@@ -10,6 +10,7 @@
 // products.
 
 import * as React from "react";
+import Image from "next/image";
 import { Alert02Icon, Link01Icon, Router01Icon, SmartPhone01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
@@ -27,9 +28,11 @@ import {
 import { RADIOS, radioKeyOf } from "@/lib/spec/catalog";
 import type { RadioKey } from "@/lib/spec/types";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
-import { CARD, Eyebrow } from "./parts";
+import { Eyebrow } from "../kit/eyebrow";
+import { LIST_CARD } from "../kit/list";
 import { PickField } from "./pick-sheet";
 import type { ConceptFlow } from "./use-concept-flow";
 
@@ -52,14 +55,14 @@ export function NetworkCard({ flow }: { flow: ConceptFlow }) {
       : "Connect it to a phone app — worked out from your prompt.";
   const link = editing ? net.links.find((l) => l.id === editing) ?? null : null;
   return (
-    <section aria-labelledby="network-title" className={cn(CARD, "flex flex-col gap-6 p-7")}>
+    <section aria-labelledby="network-title" className={cn(LIST_CARD, "flex flex-col gap-6 p-7")}>
       <div className="flex items-start gap-5">
         <span className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-lg bg-bg-brand-subtle text-[color:var(--color-icon-brand)]">
           <Icon icon={Router01Icon} size={20} />
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
           <Eyebrow>Network</Eyebrow>
-          <h2 id="network-title" className="text-xl font-medium leading-xl text-text-primary">
+          <h2 id="network-title" className={T.section}>
             {net.added ? "Connected" : lone ? "Connect it" : "Connect your products"}
           </h2>
         </div>
@@ -70,7 +73,7 @@ export function NetworkCard({ flow }: { flow: ConceptFlow }) {
               flow.removeNetwork();
               toast({ title: "Network removed. The radios it changed are back to their own." });
             }}
-            className="-my-2 min-h-[40px] text-sm leading-sm text-text-secondary hover:underline"
+            className={cn(T.meta, "-my-2 min-h-[40px] hover:underline")}
           >
             Remove network
           </button>
@@ -78,7 +81,7 @@ export function NetworkCard({ flow }: { flow: ConceptFlow }) {
       </div>
       {!net.added && net.links.length > 0 && (
         <>
-          <p className="text-sm leading-sm text-text-secondary">{offer}</p>
+          <p className={T.meta}>{offer}</p>
           {!locked && (
             <Button hierarchy="tonal" size="lg" className="w-full" iconLeading={<Icon icon={Link01Icon} size={18} />} onClick={flow.addNetwork}>
               Add network
@@ -89,11 +92,11 @@ export function NetworkCard({ flow }: { flow: ConceptFlow }) {
       {net.added && (
         <ul className="flex flex-col gap-5">
           {net.links.map((l) => (
-            <LinkRow key={l.id} link={l} net={net} onChange={() => setEditing(l.id)} onReset={() => flow.resetLink(l.id)} />
+            <LinkRow key={l.id} link={l} net={net} imageOf={(id) => flow.rail.rows.find((r) => r.productId === id)?.imageUrl ?? undefined} onChange={() => setEditing(l.id)} onReset={() => flow.resetLink(l.id)} />
           ))}
         </ul>
       )}
-      {net.working && <p className="text-sm leading-sm text-text-tertiary">Working out how the products talk…</p>}
+      {net.working && <p className={cn(T.meta, "text-text-tertiary")}>Working out how the products talk…</p>}
       {link && (
         <ChangeLinkSheet
           link={link}
@@ -110,36 +113,44 @@ export function NetworkCard({ flow }: { flow: ConceptFlow }) {
   );
 }
 
-function LinkRow({ link, net, onChange, onReset }: { link: ConceptLink; net: ConceptNetwork; onChange: () => void; onReset: () => void }) {
+function LinkRow({
+  link,
+  net,
+  imageOf,
+  onChange,
+  onReset,
+}: {
+  link: ConceptLink;
+  net: ConceptNetwork;
+  /** A product end's concept image (5602 draws the product's tile, not a glyph). */
+  imageOf: (endId: string) => string | undefined;
+  onChange: () => void;
+  onReset: () => void;
+}) {
   const problem = problemLine(link, net.peers);
   const connects = connectsLine(link);
-  const toApp = [link.from, link.to].some((e) => e === APP || e === CLOUD);
   return (
     <li className="flex flex-col gap-4">
       <div className="flex flex-col items-center gap-3 rounded-lg bg-bg-subtle p-6">
         <div className="flex w-full items-center gap-3" aria-hidden>
-          <span className="inline-flex size-[36px] items-center justify-center rounded-lg bg-bg-surface text-[color:var(--color-icon-default)] ring-1 ring-border-subtle">
-            <Icon icon={Router01Icon} size={18} />
-          </span>
+          <EndTile url={imageOf(link.from)} icon={link.from === APP || link.from === CLOUD ? SmartPhone01Icon : Router01Icon} />
           <span className="h-0 flex-1 border-t-[length:var(--border-width-1)] border-dashed border-border" />
           <span className="inline-flex size-[28px] items-center justify-center rounded-full bg-bg-surface text-[color:var(--color-icon-brand)] ring-1 ring-border-brand">
             <Icon icon={Link01Icon} size={14} />
           </span>
           <span className="h-0 flex-1 border-t-[length:var(--border-width-1)] border-dashed border-border" />
-          <span className="inline-flex size-[36px] items-center justify-center rounded-lg bg-bg-surface text-[color:var(--color-icon-default)] ring-1 ring-border-subtle">
-            <Icon icon={toApp ? SmartPhone01Icon : Router01Icon} size={18} />
-          </span>
+          <EndTile url={imageOf(link.to)} icon={link.to === APP || link.to === CLOUD ? SmartPhone01Icon : Router01Icon} />
         </div>
-        <p className="text-center text-sm font-medium leading-sm text-text-primary">{endsLine(link, net.peers)}</p>
+        <p className={cn(T.label, "text-center text-text-primary")}>{endsLine(link, net.peers)}</p>
         {problem ? (
-          <p className="flex items-start gap-2 text-center text-sm leading-sm text-text-warning">
+          <p className={cn(T.meta, "flex items-start gap-2 text-center text-text-warning")}>
             <Icon icon={Alert02Icon} size={14} />
             {problem}
           </p>
         ) : (
-          connects && <p className="text-sm leading-sm tabular-nums text-text-secondary">{connects}</p>
+          connects && <p className={cn(T.meta, "tabular-nums")}>{connects}</p>
         )}
-        <p className="text-center text-sm leading-sm text-text-secondary">{travelsLine(link, net.peers)}</p>
+        <p className={cn(T.meta, "text-center")}>{travelsLine(link, net.peers)}</p>
       </div>
       {!link.locked && (
         <div className="flex flex-col gap-2">
@@ -147,7 +158,7 @@ function LinkRow({ link, net, onChange, onReset }: { link: ConceptLink; net: Con
             Change link
           </Button>
           {link.edited && (
-            <button type="button" onClick={onReset} className="min-h-[40px] text-sm leading-sm text-text-secondary hover:underline">
+            <button type="button" onClick={onReset} className={cn(T.meta, "min-h-[40px] hover:underline")}>
               Back to suggested
             </button>
           )}
@@ -204,7 +215,7 @@ function ChangeLinkSheet({
       }
     >
       <div className="flex flex-col gap-3">
-        <p className="text-md font-medium leading-md text-text-primary">Protocol</p>
+        <p className={T.rowTitle}>Protocol</p>
         <PickField
           title="Protocol"
           placeholder="No protocol both can carry"
@@ -213,7 +224,7 @@ function ChangeLinkSheet({
           options={choices.map((k) => ({ value: k, label: RADIOS[k].label, sub: RADIOS[k].forWhat }))}
           onChange={(v) => setRadio(v as RadioKey)}
         />
-        <p className="text-sm leading-sm text-text-secondary">
+        <p className={T.meta}>
           {choices.length
             ? toApp
               ? "Changes this product's radio — its parts, cost and power follow."
@@ -222,7 +233,7 @@ function ChangeLinkSheet({
         </p>
       </div>
       <div className="flex flex-col gap-3">
-        <p className="text-md font-medium leading-md text-text-primary">Direction</p>
+        <p className={T.rowTitle}>Direction</p>
         <PickField
           title="Direction"
           value={direction}
@@ -235,10 +246,19 @@ function ChangeLinkSheet({
         />
       </div>
       <div className="flex flex-col gap-3">
-        <p className="text-md font-medium leading-md text-text-primary">What travels</p>
+        <p className={T.rowTitle}>What travels</p>
         <PickField title="What travels" value={carries} options={CARRIES_ORDER.map((c) => ({ value: c, label: CARRIES_LABEL[c] }))} onChange={(v) => setCarries(v as Carries)} />
       </div>
-      <p className="text-sm leading-sm text-text-tertiary">Everything else about the network is set on the project&apos;s Connection Map once it is saved.</p>
+      <p className={cn(T.meta, "text-text-tertiary")}>Everything else about the network is set on the project&apos;s Connection Map once it is saved.</p>
     </Sheet>
+  );
+}
+
+/** One end of a link: the product's concept image, else the glyph (the app, or a product not yet drawn). */
+function EndTile({ url, icon }: { url?: string; icon: typeof Router01Icon }) {
+  return (
+    <span className="relative inline-flex size-[36px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-bg-surface text-[color:var(--color-icon-default)] ring-1 ring-border">
+      {url ? <Image src={url} alt="" fill sizes="36px" className="object-cover" unoptimized /> : <Icon icon={icon} size={18} />}
+    </span>
   );
 }

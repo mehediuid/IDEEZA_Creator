@@ -1,71 +1,33 @@
 "use client";
 
-// A06 Select on a phone, as the kit's SheetSelect, for lists whose rows say
-// a little more (the AI tab's packs, chips, radios, projects): each option a
-// label with a line under it, an option that can't be picked greyed with its
-// reason, a heading between groups. A pick-one sheet applies on tap and has
-// no button (Shared kit rule).
+// A06 Select on a phone for the AI tab's forms (the project, a spec choice, a
+// link's protocol): a 44 px field that opens the kit's pick-one sheet
+// (kit/pick-list.tsx — one row look for every pick in /m). An option can say
+// a little more on a line under it, one that can't be picked is greyed, and
+// options may sit under a heading ("Existing projects"). A pick applies on
+// tap and closes the sheet (Shared kit rule: no button).
 
 import * as React from "react";
-import { ArrowDown01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
+import { Eyebrow } from "../kit/eyebrow";
+import { PickList } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
 
 export type PickOption = { value: string; label: string; sub?: string; disabled?: boolean; group?: string };
 
-export function PickList({
-  value,
-  options,
-  onPick,
-  label,
-}: {
-  value: string | null;
-  options: readonly PickOption[];
-  onPick: (value: string) => void;
-  label: string;
-}) {
-  return (
-    <ul role="listbox" aria-label={label} className="-mx-8 flex flex-col">
-      {options.map((o, i) => {
-        const head = o.group && (i === 0 || options[i - 1].group !== o.group) ? o.group : null;
-        return (
-          <React.Fragment key={o.value}>
-            {head && (
-              <li role="presentation" className="px-8 pb-2 pt-6 text-xs font-medium uppercase leading-xs text-text-tertiary">
-                {head}
-              </li>
-            )}
-            <li>
-              <button
-                type="button"
-                role="option"
-                aria-selected={o.value === value}
-                aria-disabled={o.disabled || undefined}
-                onClick={() => !o.disabled && onPick(o.value)}
-                className={cn(
-                  "flex min-h-[44px] w-full items-center justify-between gap-4 rounded-md px-8 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
-                  o.disabled ? "cursor-not-allowed" : "hover:bg-bg-subtle",
-                )}
-              >
-                <span className="flex min-w-0 flex-col">
-                  <span className={cn("text-lg leading-lg", o.disabled ? "text-text-disabled" : o.value === value ? "text-text-brand" : "text-text-primary")}>
-                    {o.label}
-                  </span>
-                  {o.sub && <span className="text-sm leading-sm text-text-secondary">{o.sub}</span>}
-                </span>
-                {o.value === value && (
-                  <span className="shrink-0 text-[color:var(--color-icon-brand)]">
-                    <Icon icon={Tick02Icon} size={16} />
-                  </span>
-                )}
-              </button>
-            </li>
-          </React.Fragment>
-        );
-      })}
-    </ul>
-  );
+/** The options in their groups, in order: one kit list per heading. */
+function groupsOf(options: readonly PickOption[]): { head: string | null; options: PickOption[] }[] {
+  const out: { head: string | null; options: PickOption[] }[] = [];
+  for (const o of options) {
+    const head = o.group ?? null;
+    const last = out[out.length - 1];
+    if (last && last.head === head) last.options.push(o);
+    else out.push({ head, options: [o] });
+  }
+  return out;
 }
 
 /** The field and its sheet. */
@@ -88,6 +50,10 @@ export function PickField({
 }) {
   const [open, setOpen] = React.useState(false);
   const picked = options.find((o) => o.value === value);
+  const pick = (v: string) => {
+    onChange(v);
+    setOpen(false);
+  };
   return (
     <>
       <button
@@ -99,7 +65,7 @@ export function PickField({
         onClick={() => setOpen(true)}
         className="flex h-[44px] w-full items-center justify-between gap-4 rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-6 text-left outline-none transition-[border-color,box-shadow] duration-fast focus-visible:border-[var(--color-input-border-focus)] focus-visible:shadow-focus-brand disabled:cursor-not-allowed disabled:bg-[var(--color-input-bg-disabled)]"
       >
-        <span className={cn("truncate text-lg leading-lg", picked ? "text-[color:var(--color-input-text)]" : "text-[color:var(--color-input-placeholder)]")}>
+        <span className={cn(T.bodyLg, "truncate", picked ? "text-[color:var(--color-input-text)]" : "text-[color:var(--color-input-placeholder)]")}>
           {picked?.label ?? placeholder}
         </span>
         <span className="text-[color:var(--color-icon-default)]">
@@ -107,15 +73,21 @@ export function PickField({
         </span>
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title={title}>
-        <PickList
-          value={value}
-          options={options}
-          label={title}
-          onPick={(v) => {
-            onChange(v);
-            setOpen(false);
-          }}
-        />
+        {groupsOf(options).map((g, i) => (
+          <div key={g.head ?? `group-${i}`} className="flex flex-col gap-2">
+            {g.head && (
+              <Eyebrow tone="tertiary" as="h3">
+                {g.head}
+              </Eyebrow>
+            )}
+            <PickList
+              label={g.head ?? title}
+              value={value}
+              options={g.options.map((o) => ({ value: o.value, label: o.label, helper: o.sub, disabled: o.disabled }))}
+              onPick={pick}
+            />
+          </div>
+        ))}
       </Sheet>
     </>
   );

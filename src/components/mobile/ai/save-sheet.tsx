@@ -34,6 +34,7 @@ import { networkForSave } from "@/lib/network/from-concept";
 import { networkProducts } from "@/lib/network/products";
 import { readNetwork, saveNetwork } from "@/lib/network/store";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 
 type Kind = "new" | "join" | "version";
@@ -170,8 +171,8 @@ function SavePanel({ job, info: infoProp, onClose }: { job: BuildJob; info: Save
             <Icon icon={Folder01Icon} size={20} />
           </span>
           <span className="flex min-w-0 flex-col">
-            <span className="truncate text-lg font-medium leading-lg text-text-primary">{project.name}</span>
-            <span className="text-sm leading-sm text-text-secondary">
+            <span className={cn(T.bodyStrong, "truncate")}>{project.name}</span>
+            <span className={T.meta}>
               {n} {n === 1 ? "product" : "products"} · Draft
             </span>
           </span>
@@ -222,11 +223,11 @@ function SavePanel({ job, info: infoProp, onClose }: { job: BuildJob; info: Save
             <Field label="Description" htmlFor={descId} aside={ai.pill} error={shown ? check.description.error ?? undefined : undefined}>
               <Textarea id={descId} value={description} onValueChange={setDescription} rows={4} invalid={shown && !!check.description.error} />
             </Field>
-            <p className="-mt-3 text-sm leading-sm text-text-tertiary">Optional.</p>
+            <p className={cn(T.meta, "-mt-3 text-text-tertiary")}>Optional.</p>
             {choices.length > 1 && (
               <div className="flex flex-col gap-3">
-                <p className="text-md font-medium leading-md text-text-primary">Cover</p>
-                <p className="text-sm leading-sm text-text-secondary">Shown on the project card in My projects.</p>
+                <p className={T.rowTitle}>Cover</p>
+                <p className={T.meta}>Shown on the project card in My projects.</p>
                 <div role="radiogroup" aria-label="Cover" className="flex gap-4 overflow-x-auto pb-1">
                   {choices.map((c) => (
                     <button

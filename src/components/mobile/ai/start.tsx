@@ -6,15 +6,18 @@
 // the ideas so the box can grow (02–04). Generate starts the web's chat
 // (createChat, with the Quality picked here, as Home does) and opens it; the
 // first render waits for the setup question, so nothing is charged yet.
-// ⋯ holds History and Buy credits.
+// ⋯ holds History and Buy credits. A tab root: no Back (the tab bar is the
+// way between tabs). `?chat=<id>` opens that chat in place of the start;
+// `?focus=1` puts the cursor in the Prompt Box.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { ArrowDown01Icon, Clock01Icon, Coins01Icon, Refresh01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Clock01Icon, Coins01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Button } from "@/components/ideeza/button";
+import { Tag } from "@/components/ideeza/tag";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { ITEM_KINDS, ITEM_LABELS, useCreateHistory } from "@/lib/create/history";
 import { creditsLabel, defaultPick, pickCost } from "@/lib/create/pieces";
@@ -22,7 +25,10 @@ import { DEFAULT_QUALITY, LAST_QUALITY_KEY, QUALITIES, QUALITY_INFO, readLastQua
 import { IDEAS, IDEAS_SHOWN, ideasAt } from "@/lib/mobile-ai/flow";
 import { Screen } from "../screen";
 import { MORE_ICON, TopBar } from "../top-bar";
-import { ActionSheet, Sheet } from "../kit/sheet";
+import { ActionSheet } from "../kit/sheet";
+import { PickSheet } from "../kit/pick-list";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { BuyCreditsSheet } from "./buy-credits-sheet";
 import { CreditsFoot } from "./parts";
 import { PromptBox } from "./prompt-box";
@@ -53,6 +59,18 @@ function useLastQuality(): [RenderQuality, (q: RenderQuality) => void] {
 
 export function AiStart() {
   const router = useRouter();
+  // An old link to a chat (`/m/ai?chat=<id>`, as a project's Add a product and a product's
+  // "Open chat" used to write) lands on that chat, not on an empty start.
+  const params = useSearchParams();
+  const linkedChat = params.get("chat");
+  React.useEffect(() => {
+    if (linkedChat) router.replace(`/m/ai/chat/${encodeURIComponent(linkedChat)}`);
+  }, [linkedChat, router]);
+  // `?focus=1` (the Welcome map's "Start with my idea"): the box is ready to type in.
+  const focus = params.get("focus") === "1";
+  React.useEffect(() => {
+    if (focus) requestAnimationFrame(() => document.getElementById("ai-start-prompt")?.focus());
+  }, [focus]);
   const { createChat } = useCreateHistory();
   const { hydrated, balance } = useCredits();
   const [prompt, setPrompt] = React.useState("");
@@ -88,7 +106,7 @@ export function AiStart() {
     <div className="relative isolate h-full">
       <AiWash />
       <Screen
-        top={<TopBar back actions={[{ icon: MORE_ICON, label: "More", onClick: () => setMenu(true) }]} />}
+        top={<TopBar actions={[{ icon: MORE_ICON, label: "More", onClick: () => setMenu(true) }]} />}
         footer={
           <div className="pt-4">
             <PromptBox
@@ -105,7 +123,7 @@ export function AiStart() {
                   type="button"
                   aria-haspopup="dialog"
                   onClick={() => setQualityOpen(true)}
-                  className="inline-flex min-h-[32px] items-center gap-1 rounded-md px-3 text-sm font-medium leading-sm text-text-secondary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                  className={cn(T.label, "inline-flex min-h-[32px] items-center gap-1 rounded-md px-3 text-text-secondary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
                 >
                   <span className="sr-only">Quality: </span>
                   {QUALITY_INFO[quality].label}
@@ -114,9 +132,9 @@ export function AiStart() {
               }
             />
             {hydrated && !canRender && (
-              <p className="flex items-center justify-between gap-4 px-8 pt-4 text-sm leading-sm text-text-error">
+              <p className={cn(T.meta, "flex items-center justify-between gap-4 px-8 pt-4 text-text-error")}>
                 Not enough credits for a concept.
-                <button type="button" onClick={() => setBuying(true)} className="-my-4 min-h-[44px] font-medium text-text-brand hover:underline">
+                <button type="button" onClick={() => setBuying(true)} className={cn(T.label, "-my-4 min-h-[44px] text-text-brand hover:underline")}>
                   Buy credits
                 </button>
               </p>
@@ -130,18 +148,18 @@ export function AiStart() {
             <span className="px-8 py-2">
               <IdeezaLogo mark height={45} decorative />
             </span>
-            <h2 className="text-5xl font-semibold leading-5xl text-text-primary">
+            <h2 className={T.hero}>
               What will you
               <br />
               <span className="text-text-brand">build today?</span>
             </h2>
-            <p className="text-md leading-md text-text-secondary">
+            <p className={T.body}>
               Describe a device in plain words. IDEEZA drafts the PCB, code, 3D module, assembly and wiring, plus a parts list.
             </p>
-            <ul aria-label="You'll get" className="flex flex-wrap justify-center gap-4">
+            <ul aria-label="You'll get" className="flex flex-wrap justify-center gap-2">
               {PIECES_SHOWN.map((k) => (
-                <li key={k} className="rounded-full border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-surface px-5 py-1 text-sm leading-sm text-text-primary">
-                  {ITEM_LABELS[k]}
+                <li key={k}>
+                  <Tag size="sm">{ITEM_LABELS[k]}</Tag>
                 </li>
               ))}
             </ul>
@@ -149,7 +167,7 @@ export function AiStart() {
           {!prompt.trim() && (
             <section aria-labelledby="ideas-title" className="mt-auto flex flex-col gap-5 pb-2 pt-12">
               <div className="flex items-center justify-between gap-4 px-8">
-                <h3 id="ideas-title" className="text-lg font-semibold leading-lg text-text-primary">
+                <h3 id="ideas-title" className={T.section}>
                   Start from an idea
                 </h3>
                 <Button
@@ -177,8 +195,8 @@ export function AiStart() {
                         )}
                       </span>
                       <span className="flex flex-col">
-                        <span className="truncate text-sm font-medium leading-sm text-text-primary">{idea.title}</span>
-                        <span className="truncate text-xs leading-xs text-text-tertiary">{idea.line}</span>
+                        <span className={cn(T.label, "truncate text-text-primary")}>{idea.title}</span>
+                        <span className={cn(T.micro, "truncate text-text-tertiary")}>{idea.line}</span>
                       </span>
                     </button>
                   </li>
@@ -197,36 +215,15 @@ export function AiStart() {
         ]}
       />
       <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={CONCEPT_COST} />
-      <Sheet open={qualityOpen} onClose={() => setQualityOpen(false)} title="Quality" description="Every concept of this idea is drawn at it, and each product is built at it.">
-        <ul role="listbox" aria-label="Quality" className="-mx-8 flex flex-col">
-          {QUALITIES.map((q) => (
-            <li key={q}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={q === quality}
-                onClick={() => {
-                  setQuality(q);
-                  setQualityOpen(false);
-                }}
-                className="flex min-h-[56px] w-full items-center gap-6 rounded-md px-8 py-3 text-left outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-lg leading-lg text-text-primary">{QUALITY_INFO[q].label}</span>
-                  <span className="text-sm leading-sm text-text-secondary">
-                    {QUALITY_INFO[q].hint} · Build {creditsLabel(pickCost(defaultPick(q)))} a product
-                  </span>
-                </span>
-                {q === quality && (
-                  <span className="text-[color:var(--color-icon-brand)]">
-                    <Icon icon={Tick02Icon} size={16} />
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Sheet>
+      <PickSheet
+        open={qualityOpen}
+        onClose={() => setQualityOpen(false)}
+        title="Quality"
+        description="Every concept of this idea is drawn at it, and each product is built at it."
+        value={quality}
+        options={QUALITIES.map((q) => ({ value: q, label: QUALITY_INFO[q].label, helper: `${QUALITY_INFO[q].hint} · Build ${creditsLabel(pickCost(defaultPick(q)))} a product` }))}
+        onPick={setQuality}
+      />
     </div>
   );
 }

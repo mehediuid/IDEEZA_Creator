@@ -5,21 +5,25 @@
 // queued (and how many are ahead), starting, building with its percentage
 // and time left, then ready to review, needing a retry, stopped or paused.
 // The words are the web's (attention-banner.tsx), worked out by `pillOf`.
-// A running build's pill stays while it runs; the rest say it once (6 s).
-// Tapping opens the build's chat; on that chat the pill says nothing, since
-// the build is already in front of the maker.
+// A running build's pill stays while it runs; the rest stay, as the web's
+// banner does, until tapped or dismissed (✕), and follow Settings ›
+// Notifications (quiet hours, a muted project, Builds off). Tapping opens the
+// build's chat; on that chat the pill says nothing, since the build is
+// already in front of the maker.
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Alert02Icon, CheckmarkCircle02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, Cancel01Icon, CheckmarkCircle02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { allItems, productsOf, queuedAhead, statusOf, useCreateHistory, ITEM_LABELS, type BuildJob } from "@/lib/create/history";
 import { chainSeconds, choiceOfItem, pieceSeconds } from "@/lib/create/pieces";
 import { pillOf, type Pill } from "@/lib/mobile-ai/flow";
+import { buildNotices } from "@/lib/notifications/sources";
+import { useToastGate } from "@/components/notifications/use-notices";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useFramed } from "../device";
 
-const SAY_ONCE_MS = 6_000;
 /** Under this long since it started, a running build is "just started". */
 const STARTING_MS = 4_000;
 
@@ -64,75 +68,111 @@ export function pillForJob(job: BuildJob, builds: BuildJob[], now: number): Pill
   });
 }
 
+// How many build pills are on screen now: the build watcher (build-watcher.tsx) says a build's
+// news in a toast only where no pill can (off the tabs).
+let pillsMounted = 0;
+export function pillOnScreen(): boolean {
+  return pillsMounted > 0;
+}
+
 export function BuildPill() {
-  const { hydrated, builds } = useCreateHistory();
+  const { hydrated, builds, attentionBuilds, dismissAttention, getChat } = useCreateHistory();
+  const allowed = useToastGate();
   const pathname = usePathname();
   const router = useRouter();
   const framed = useFramed();
   const [now, setNow] = React.useState(() => Date.now());
-  // The building one first; else the newest, whose news is said once.
+  React.useEffect(() => {
+    pillsMounted += 1;
+    return () => {
+      pillsMounted -= 1;
+    };
+  }, []);
+  // The building one first; else the newest that still asks for the maker (not dismissed, and
+  // allowed by Settings › Notifications — quiet hours, a muted project, Builds off: the web's gate).
   const job = React.useMemo(() => {
     const sorted = [...builds].sort((a, b) => b.updatedAt - a.updatedAt);
-    return sorted.find((b) => ["queued", "running"].includes(statusOf(b)) && !b.blocked) ?? sorted[0] ?? null;
-  }, [builds]);
+    const running = sorted.find((b) => ["queued", "running"].includes(statusOf(b)) && !b.blocked);
+    if (running) return running;
+    const att = attentionBuilds
+      .filter((a) => !a.job.attentionDismissedAt && allowed(buildNotices([a], (id) => !!getChat(id))[0]))
+      .sort((a, b) => b.job.updatedAt - a.job.updatedAt)[0];
+    return att?.job ?? null;
+  }, [builds, attentionBuilds, allowed, getChat]);
   const pill = job ? pillForJob(job, builds, now) : null;
-  const key = job && pill ? `${job.id}:${pill.tone}:${pill.lasting ? "on" : pill.title}` : null;
-  const [seenAt, setSeenAt] = React.useState<{ key: string; at: number } | null>(null);
-  if (key && seenAt?.key !== key) setSeenAt({ key, at: now });
 
-  // Ticks while something is shown, so "about 2 min left" and the one-time
-  // pills move on their own.
-  const showing = !!pill && (pill.lasting || (seenAt !== null && now - seenAt.at < SAY_ONCE_MS));
+  // Ticks while a lasting pill shows, so "about 2 min left" moves on its own.
+  const lasting = !!pill?.lasting;
   React.useEffect(() => {
-    if (!pill) return;
+    if (!lasting) return;
     const t = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(t);
-  }, [pill]);
+  }, [lasting]);
 
-  if (!hydrated || !job || !pill || !showing) return null;
-  // A build that was already finished before this screen opened has nothing new to say.
-  if (!pill.lasting && job.updatedAt < (seenAt?.at ?? now) - SAY_ONCE_MS) return null;
+  if (!hydrated || !job || !pill) return null;
   if (pathname === `/m/ai/chat/${job.chatId}`) return null;
   // Home's Feed draws its own queue pill (Feed "Popup when user is in queue").
   if (pathname === "/m" && statusOf(job) === "queued") return null;
 
   const glyph = pill.tone === "done" ? CheckmarkCircle02Icon : pill.tone === "working" ? Loading03Icon : Alert02Icon;
+  const ink = pill.tone === "error" ? "text-text-error" : "text-text-primary";
+  const open = () => {
+    // What happened is now in front of the maker: it doesn't ask again (a running build keeps its pill).
+    if (!pill.lasting) dismissAttention(job.id);
+    router.push(`/m/ai/chat/${job.chatId}`);
+  };
   return (
+    // Under the sheets (z-overlay): an open sheet's scrim covers it, as it covers the screen.
     <div
+      role="status"
+      aria-live="polite"
       className={cn(
-        "pointer-events-none fixed inset-x-0 z-toast flex justify-center px-8",
+        "pointer-events-none fixed inset-x-0 z-overlay flex justify-center px-8",
         framed ? "top-[117px]" : "top-[calc(env(safe-area-inset-top)_+_64px)]",
       )}
     >
-      <button
-        type="button"
-        role="status"
-        onClick={() => router.push(`/m/ai/chat/${job.chatId}`)}
+      <div
         className={cn(
-          "pointer-events-auto flex max-w-full items-center gap-4 rounded-md border-[length:var(--border-width-1)] border-solid px-6 py-3 text-left shadow-2 outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal focus-visible:ring-2 focus-visible:ring-border-focus",
+          "pointer-events-auto flex max-w-full items-center rounded-md border-[length:var(--border-width-1)] border-solid shadow-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal",
           pill.tone === "error"
-            ? "border-border-error bg-bg-error-subtle text-text-error"
+            ? "border-border-error bg-bg-error-subtle"
             : pill.tone === "attention"
-              ? "border-[var(--color-border-warning)] bg-bg-warning-subtle text-text-primary"
-              : "border-border-subtle bg-bg-surface text-text-primary",
+              ? "border-[var(--color-border-warning)] bg-bg-warning-subtle"
+              : "border-border bg-bg-surface",
         )}
       >
-        <span
-          className={cn(
-            "inline-flex shrink-0",
-            pill.tone === "working" && "text-[color:var(--color-icon-brand)] motion-safe:animate-spin",
-            pill.tone === "done" && "text-[color:var(--color-icon-success)]",
-            pill.tone === "error" && "text-[color:var(--color-icon-error)]",
-            pill.tone === "attention" && "text-[color:var(--color-icon-warning)]",
-          )}
+        <button
+          type="button"
+          onClick={open}
+          className="flex min-h-[44px] min-w-0 items-center gap-4 rounded-md px-6 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
         >
-          <Icon icon={glyph} size={16} />
-        </span>
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm leading-sm">{pill.title}</span>
-          {pill.detail && <span className="truncate text-sm leading-sm opacity-90">{pill.detail}</span>}
-        </span>
-      </button>
+          <span
+            className={cn(
+              "inline-flex shrink-0",
+              pill.tone === "working" && "text-[color:var(--color-icon-brand)] motion-safe:animate-spin",
+              pill.tone === "done" && "text-[color:var(--color-icon-success)]",
+              pill.tone === "error" && "text-[color:var(--color-icon-error)]",
+              pill.tone === "attention" && "text-[color:var(--color-icon-warning)]",
+            )}
+          >
+            <Icon icon={glyph} size={16} />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className={cn(T.meta, "truncate", ink)}>{pill.title}</span>
+            {pill.detail && <span className={cn(T.meta, "truncate", ink)}>{pill.detail}</span>}
+          </span>
+        </button>
+        {!pill.lasting && (
+          <button
+            type="button"
+            onClick={() => dismissAttention(job.id)}
+            aria-label="Dismiss"
+            className="-ml-2 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <Icon icon={Cancel01Icon} size={16} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

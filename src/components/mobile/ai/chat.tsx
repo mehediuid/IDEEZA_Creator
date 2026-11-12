@@ -4,24 +4,25 @@
 // flow 05–18, the single- and double-product rows, A1–A8): the step line,
 // the maker's idea, the reading card, the question, the concepts, the
 // network, the Build line, then the build itself and its summary; the
-// composer at the foot (held once a build holds the concepts). ⋯ has the
-// Build log, History, a new idea and Delete. All of it runs on the web's
-// stores through `useConceptFlow`.
+// composer at the foot (held once a build holds the concepts). The top bar
+// has the Build log one tap away (the Figma's chat frames) and ⋯ with
+// History, a new idea and Delete. All of it runs on the web's stores through
+// `useConceptFlow`.
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Add01Icon, AiMagicIcon, AnalyticsUpIcon, Clock01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { buttonVariants } from "@/components/ideeza/button";
+import { Add01Icon, AnalyticsUpIcon, Clock01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { StateCard } from "@/components/ideeza/state-card";
 import { useSecondClock } from "@/components/create/use-clock";
 import { CONCEPT_COST } from "@/lib/create/credits";
 import { jobCost } from "@/lib/create/history";
 import { Screen } from "../screen";
 import { MORE_ICON, TopBar } from "../top-bar";
+import { useNotifyPrePrompt } from "../kit/permission-sheet";
 import { ActionSheet } from "../kit/sheet";
+import { NotFoundState } from "../kit/state";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { OfflineBanner } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { BuildCard, BuildConfirmSheet, FinishedCard, FinishedFoot, isFinished } from "./build";
@@ -29,7 +30,7 @@ import { BuildLogSheet } from "./build-log-sheet";
 import { BuildBar, BuildOptionsSheet, ConceptImageViewer, ConceptSheet, ConceptStage, ConceptsMini, RefineSheet } from "./concepts";
 import { DeleteChatSheet } from "./delete-chat-sheet";
 import { NetworkCard } from "./network";
-import { CreditsFoot, PromptBubble, Stepper } from "./parts";
+import { CreditsFoot, OFFLINE_REASON, PromptBubble, Stepper } from "./parts";
 import { PromptBox } from "./prompt-box";
 import { SaveSheet } from "./save-sheet";
 import { ProductQuestion, ProjectSheet, ReadingCard, RequiredStep } from "./setup";
@@ -51,9 +52,15 @@ export function AiChat({ chatId }: { chatId: string }) {
   const [productsConfirmed, setProductsConfirmed] = React.useState(false);
   const [projectDismissed, setProjectDismissed] = React.useState(false);
   const asking = setup?.status === "asking";
-  const picked = picks ?? new Set(setup?.companions.map((c) => c.id) ?? []);
+  // A chat started from a project's Add a product adds to that project, never to a new one
+  // (owner, 2026-10-13); it exists to add one product, so nothing else starts ticked.
+  const addTo = flow.setupProjects.find((p) => p.preselect) ?? null;
+  const picked = picks ?? new Set(addTo ? [] : (setup?.companions.map((c) => c.id) ?? []));
+  // With one product the project was chosen on its page, so the question answers itself once
+  // the idea is read (the web's rule) — when a concept can be drawn now.
+  const answersItself = asking && !!addTo && (setup?.companions.length ?? 0) === 0 && flow.canRender && flow.online;
   const needsProductQ = asking && (setup?.companions.length ?? 0) > 0 && !productsConfirmed;
-  const projectOpen = asking && !needsProductQ && !projectDismissed;
+  const projectOpen = asking && !needsProductQ && !projectDismissed && !answersItself;
 
   // ── the sheets ──
   const [sheetFor, setSheetFor] = React.useState<string | null>(null);
@@ -71,6 +78,15 @@ export function AiChat({ chatId }: { chatId: string }) {
   const [imageFor, setImageFor] = React.useState<string | null>(null);
 
   const job = flow.activeBuild;
+  const notify = useNotifyPrePrompt();
+
+  const selfAnswered = React.useRef(false);
+  const { answerSetup } = flow;
+  React.useEffect(() => {
+    if (!answersItself || !addTo || selfAnswered.current) return;
+    selfAnswered.current = true;
+    answerSetup({ projectId: addTo.id, projectName: "", picked: [] });
+  }, [answersItself, addTo, answerSetup]);
 
   const startBuild = async () => {
     const result = await flow.prepareBuild();
@@ -97,18 +113,7 @@ export function AiChat({ chatId }: { chatId: string }) {
   if (!chat) {
     return (
       <Screen top={<TopBar back="/m/ai" title="AI Product Generate" />} className="p-8">
-        <StateCard
-          tone="empty"
-          className="w-full"
-          icon={<Icon icon={AiMagicIcon} size={32} />}
-          title="This chat isn't on this phone"
-          body="It may have been deleted, or it was started in another browser."
-          action={
-            <Link href="/m/ai" className={buttonVariants({ size: "lg" })}>
-              Start a new idea
-            </Link>
-          }
-        />
+        <NotFoundState thing="chat" body="It may have been deleted, or it was started in another browser." action={{ label: "Start a new idea", href: "/m/ai" }} />
       </Screen>
     );
   }
@@ -126,14 +131,16 @@ export function AiChat({ chatId }: { chatId: string }) {
     ? `Build · ${jobCost(job)} credits`
     : setup?.status === "answered"
       ? `${conceptsDrawn} ${conceptsDrawn === 1 ? "concept" : "concepts"} · ${conceptsDrawn * CONCEPT_COST} ${conceptsDrawn === 1 ? "credit" : "credits"}`
-      : "1 credit per concept";
+      : asking
+        ? `${1 + picked.size} ${picked.size === 0 ? "concept" : "concepts"} · ${(1 + picked.size) * CONCEPT_COST} ${picked.size === 0 ? "credit" : "credits"}`
+        : "1 credit per concept";
 
-  const answered = setup?.status === "answered";
+  const isAnswered = setup?.status === "answered";
   // Image first (the owner's approved sample): once the concepts are on the
   // page the composer gives way — changes go through each product's Change
   // sheet — and the Build line is pinned at the foot; once the build is
   // finished, Save is.
-  const conceptStage = answered && flow.rail.rows.length > 0;
+  const conceptStage = isAnswered && flow.rail.rows.length > 0;
   // A piece that failed doesn't hold the result back: the rest is shown and
   // can be saved, the failed piece with its Retry (Save what's ready).
   const finished = !!job && isFinished(job);
@@ -147,7 +154,7 @@ export function AiChat({ chatId }: { chatId: string }) {
   ) : buildBar ? (
     <div className="flex flex-col gap-3 pt-4">
       {job && flow.state.changedSinceBuild && (
-        <p className="px-8 text-sm leading-sm text-text-secondary">Changed since this build — build again to carry the change into the deliverables.</p>
+        <p className={cn(T.meta, "px-8")}>Changed since this build — build again to carry the change into the deliverables.</p>
       )}
       <div className="px-8">
         <BuildBar flow={flow} onBuild={startBuild} onOptions={() => setOptionsOpen(true)} />
@@ -189,7 +196,12 @@ export function AiChat({ chatId }: { chatId: string }) {
       <Screen
         top={
           <>
-            <TopBar back="/m/ai" title="AI Product Generate" actions={[{ icon: MORE_ICON, label: "More", onClick: () => setMenu(true) }]} />
+            <TopBar back="/m/ai" title="AI Product Generate" 
+              actions={[
+                { icon: AnalyticsUpIcon, label: "Build log", onClick: () => setLogOpen(true) },
+                { icon: MORE_ICON, label: "More", onClick: () => setMenu(true) },
+              ]}
+            />
             <Stepper stage={flow.stage} />
           </>
         }
@@ -209,7 +221,10 @@ export function AiChat({ chatId }: { chatId: string }) {
                 else next.add(id);
                 setPicks(next);
               }}
+              addTo={addTo}
+              held={!flow.online ? OFFLINE_REASON : flow.creditsHydrated && flow.balance < (1 + picked.size) * CONCEPT_COST ? "Not enough credits to draw these concepts" : null}
               onContinue={() => {
+                if (addTo) return flow.answerSetup({ projectId: addTo.id, projectName: "", picked: setup.companions.filter((c) => picked.has(c.id)).map((c) => c.id) });
                 setProductsConfirmed(true);
                 setProjectDismissed(false);
               }}
@@ -224,7 +239,7 @@ export function AiChat({ chatId }: { chatId: string }) {
             <ConceptStage flow={flow} now={now} selected={conceptProduct} onSelect={setConceptProduct} onChange={setSheetFor} onImage={setImageFor} />
           )}
           {conceptStage && job && <ConceptsMini flow={flow} onOpen={setSheetFor} />}
-          {answered && <NetworkCard flow={flow} />}
+          {isAnswered && <NetworkCard flow={flow} />}
         </div>
       </Screen>
 
@@ -233,6 +248,9 @@ export function AiChat({ chatId }: { chatId: string }) {
           open={projectOpen}
           onClose={() => setProjectDismissed(true)}
           products={1 + picked.size}
+          productNames={[setup.productName?.trim() || "Your product", ...setup.companions.filter((c) => picked.has(c.id)).map((c) => c.name)]}
+          onChangeProducts={() => setProductsConfirmed(false)}
+          held={flow.online ? null : OFFLINE_REASON}
           projects={flow.setupProjects}
           canAfford={(n) => flow.balance >= n || !flow.creditsHydrated}
           onStart={(a) => flow.answerSetup({ ...a, picked: [...picked].filter((id) => setup.companions.some((c) => c.id === id)) })}
@@ -262,16 +280,20 @@ export function AiChat({ chatId }: { chatId: string }) {
         onBooked={(blocked) => {
           setGate(null);
           if (blocked) setSpecFor(blocked);
-          else toast({ title: "Build started — it runs in the background", lead: "success" });
+          else {
+            toast({ title: "Build started — it runs in the background", lead: "success" });
+            // PM-04: once, after the first build starts — so "we'll notify you" can be true.
+            notify.offer();
+          }
         }}
       />
       {job && flow.saveInfo && <SaveSheet open={saveOpen} job={job} info={flow.saveInfo} onClose={() => setSaveOpen(false)} />}
+      {notify.sheet}
       <BuildLogSheet open={logOpen} onClose={() => setLogOpen(false)} flow={flow} />
       <ActionSheet
         open={menu}
         onClose={() => setMenu(false)}
         items={[
-          { label: "Build log", icon: AnalyticsUpIcon, onSelect: () => setLogOpen(true) },
           { label: "History", icon: Clock01Icon, onSelect: () => router.push("/m/ai/history") },
           { label: "New idea", icon: Add01Icon, onSelect: () => router.push("/m/ai") },
           { label: "Delete this chat", icon: Delete02Icon, onSelect: () => setDeleting(true), destructive: true },

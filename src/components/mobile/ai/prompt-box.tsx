@@ -28,6 +28,10 @@ import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { useVoiceInput } from "@/lib/voice/use-voice-input";
 import { cn } from "@/lib/utils";
+import { usePrePrompt } from "../kit/permission-sheet";
+import { useOnline } from "../kit/states";
+import { OFFLINE_REASON } from "./parts";
+import { T } from "../type";
 
 const BARS = 44;
 /** The box grows to about five lines, then scrolls inside. */
@@ -69,6 +73,10 @@ export function PromptBox({
   const [refining, setRefining] = React.useState(false);
   const [held, setHeld] = React.useState<string | null>(null);
   const [micOff, setMicOff] = React.useState(false);
+  const [enhanceFailed, setEnhanceFailed] = React.useState(false);
+  // Offline, nothing here reaches the model: send and Enhance are held with the reason.
+  const online = useOnline();
+  const mic = usePrePrompt("microphone", { body: "To describe your device by voice. You can always type it instead." });
   const valueRef = React.useRef(value);
   React.useEffect(() => {
     valueRef.current = value;
@@ -103,12 +111,16 @@ export function PromptBox({
   }, [value, listening]);
 
   const trimmed = value.trim();
-  const ready = !!trimmed && canSend && !disabled && !busy && !refining;
+  const ready = !!trimmed && canSend && online && !disabled && !busy && !refining;
 
   const send = () => {
     if (busy || disabled) return;
     if (!trimmed) {
       ta.current?.focus();
+      return;
+    }
+    if (!online) {
+      setHeld(OFFLINE_REASON);
       return;
     }
     if (!canSend) {
@@ -120,8 +132,9 @@ export function PromptBox({
   };
 
   const enhance = async () => {
-    if (!trimmed || refining || disabled) return;
+    if (!trimmed || refining || disabled || !online) return;
     setRefining(true);
+    setEnhanceFailed(false);
     try {
       const res = await fetch("/api/refine", {
         method: "POST",
@@ -129,20 +142,21 @@ export function PromptBox({
         body: JSON.stringify({ prompt: trimmed, mode: enhanceMode }),
       });
       const data = (await res.json()) as { refined?: string };
-      if (data.refined?.trim()) {
-        onChange(data.refined.trim());
-        requestAnimationFrame(() => ta.current?.focus());
-      }
+      if (!res.ok || !data.refined?.trim()) throw new Error("no rewrite");
+      onChange(data.refined.trim());
+      requestAnimationFrame(() => ta.current?.focus());
     } catch {
-      // The draft stays as it was.
+      // The draft stays as it was, and the maker is told so.
+      setEnhanceFailed(true);
     } finally {
       setRefining(false);
     }
   };
 
+  // KIT-PM-03: the first time, a pre-prompt says why before the browser asks.
   const startVoice = () => {
     setMicOff(false);
-    voice.start();
+    mic.ask(() => voice.start());
   };
 
   const recorded = voice.levels.length > BARS ? voice.levels.slice(-BARS) : voice.levels;
@@ -159,7 +173,7 @@ export function PromptBox({
             </button>
           }
         >
-          Microphone access was blocked — allow it in the browser to use voice. You can still type it.
+          Turn it on in your browser&apos;s settings to speak your idea. You can still type it.
         </Banner>
       )}
       <div
@@ -170,11 +184,11 @@ export function PromptBox({
       >
         {listening ? (
           <div className="flex min-h-[24px] flex-col gap-3" role="status" aria-live="polite">
-            <p className="inline-flex items-center gap-3 text-md leading-md text-text-secondary">
+            <p className={cn(T.body, "inline-flex items-center gap-3")}>
               <span aria-hidden className="size-[8px] rounded-full bg-bg-brand motion-safe:animate-pulse" />
               Listening…
             </p>
-            {voice.interim.trim() && <p className="text-md leading-md text-text-primary">{voice.interim.trim()}</p>}
+            {voice.interim.trim() && <p className={cn(T.body, "text-text-primary")}>{voice.interim.trim()}</p>}
           </div>
         ) : (
           <textarea
@@ -186,6 +200,7 @@ export function PromptBox({
             onChange={(e) => {
               onChange(e.target.value);
               if (held) setHeld(null);
+              if (enhanceFailed) setEnhanceFailed(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -195,7 +210,7 @@ export function PromptBox({
             }}
             placeholder={placeholder}
             aria-label={placeholder}
-            className="block min-h-[24px] w-full resize-none bg-transparent text-lg leading-lg text-text-primary outline-none placeholder:text-[color:var(--color-input-placeholder)] disabled:cursor-not-allowed"
+            className={cn(T.bodyLg, "block min-h-[24px] w-full resize-none bg-transparent outline-none placeholder:text-[color:var(--color-input-placeholder)] disabled:cursor-not-allowed")}
           />
         )}
 
@@ -249,10 +264,11 @@ export function PromptBox({
             <button
               type="button"
               onClick={enhance}
-              disabled={disabled || !trimmed || refining}
+              disabled={disabled || !trimmed || refining || !online}
               aria-busy={refining || undefined}
+              title={!online ? OFFLINE_REASON : undefined}
               className={cn(
-                "inline-flex min-h-[32px] items-center gap-2 rounded-md px-2 text-md leading-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed",
+                T.body, "inline-flex min-h-[32px] items-center gap-2 rounded-md px-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed",
                 refining ? "text-text-brand" : "text-text-primary disabled:text-text-disabled",
               )}
             >
@@ -281,11 +297,17 @@ export function PromptBox({
           </div>
         )}
       </div>
+      {enhanceFailed && (
+        <p role="status" className={T.meta}>
+          Couldn&apos;t enhance — your words are unchanged.
+        </p>
+      )}
       {held && (
-        <p role="status" className="text-sm leading-sm text-text-error">
+        <p role="status" className={cn(T.meta, "text-text-error")}>
           {held}
         </p>
       )}
+      {mic.sheet}
     </div>
   );
 }
