@@ -7,18 +7,19 @@
 // empty group says so, with the way to fill it in Edit profile.
 
 import * as React from "react";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import { Tag } from "@/components/ideeza/tag";
+import { cn } from "@/lib/utils";
 import { specialityLabelOf, type MoreAbout } from "@/lib/people/phone-profile";
+import { Chevron } from "../kit/list";
 import { Sheet } from "../kit/sheet";
+import { T } from "../type";
 
 function Group({ title, empty, children }: { title: string; empty: React.ReactNode | null; children: React.ReactNode | null }) {
   if (!children && !empty) return null;
   return (
     <section aria-label={title} className="flex flex-col gap-4">
-      <h3 className="text-md font-regular leading-md text-text-primary">{title}</h3>
-      {children ?? <p className="text-md leading-md text-text-tertiary">{empty}</p>}
+      <h3 className={T.section}>{title}</h3>
+      {children ?? <p className={cn(T.body, "text-text-tertiary")}>{empty}</p>}
     </section>
   );
 }
@@ -66,7 +67,7 @@ export function MoreAboutSheet({
             onClose();
             onEdit();
           }}
-          className="font-medium text-text-brand outline-none hover:underline focus-visible:underline"
+          className={cn(T.rowTitle, "text-text-brand outline-none hover:underline focus-visible:underline")}
         >
           Add in Edit profile
         </button>
@@ -86,7 +87,7 @@ export function MoreAboutSheet({
         </Group>
         <Group title="Built with" empty={own ? "Nothing yet. It fills in from the parts lists of the projects you share." : null}>
           {more.builtWith.length ? (
-            <p className="text-sm leading-sm text-text-secondary">
+            <p className={T.meta}>
               {more.builtWith.join(" · ")} — {builtWithNote}
             </p>
           ) : null}
@@ -103,13 +104,11 @@ export function MoreAboutSheet({
                     href={l.href}
                     target="_blank"
                     rel="noopener noreferrer nofollow ugc"
-                    className="flex h-[44px] items-center gap-4 rounded-md p-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className="flex min-h-[44px] items-center gap-4 rounded-md px-6 py-4 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
                   >
-                    <span className="shrink-0 text-md leading-md text-text-secondary">{l.label}</span>
-                    <span className="min-w-0 flex-1 truncate text-right text-md leading-md text-text-primary">{l.value}</span>
-                    <span className="shrink-0 text-[color:var(--color-icon-default)]">
-                      <Icon icon={ArrowRight01Icon} size={20} />
-                    </span>
+                    <span className={cn(T.body, "shrink-0")}>{l.label}</span>
+                    <span className={cn(T.body, "min-w-0 flex-1 truncate text-right text-text-primary")}>{l.value}</span>
+                    <Chevron />
                     <span className="sr-only">(opens in your browser)</span>
                   </a>
                 </li>

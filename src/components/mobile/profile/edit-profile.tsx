@@ -7,12 +7,15 @@
 // Suggest from my work, About, location, Open to), Skills (the skills,
 // top specialties and languages sheets), Links (up to 5) and Social accounts.
 // Save profile stays off until something changes and rides on the keyboard;
-// ✕ with changes asks "Discard changes?"; a refused write keeps every field
-// and says so; saved, it goes back to your profile with "Profile saved".
+// every way out with changes — ✕, the phone's Back or swipe, the browser's
+// Back — asks "Discard changes?" (PR-37), and closing the tab asks too; a
+// refused write keeps every field and says so; saved, it goes back to where
+// it was opened from (your profile, Settings › Account) with "Profile saved",
+// and a direct link's ✕ or Save lands on your profile, never outside the app.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Add01Icon, Camera01Icon, Cancel01Icon, Delete02Icon, Image01Icon, ImageAdd01Icon, Search01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Camera01Icon, Cancel01Icon, ImageAdd01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field, useFieldIds } from "@/components/auth/auth-parts";
 import { Avatar } from "@/components/ideeza/avatar";
@@ -21,11 +24,11 @@ import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { IconButton } from "@/components/ideeza/icon-button";
+import { Segmented } from "@/components/ideeza/segmented";
 import { Spinner } from "@/components/ideeza/spinner";
 import { Tag } from "@/components/ideeza/tag";
 import { TextInput, Textarea } from "@/components/ideeza/text-input";
 import { cn } from "@/lib/utils";
-import { readPhone, updatePhone } from "@/lib/account/phone";
 import {
   BIO_MAX,
   HEADLINE_MAX,
@@ -53,21 +56,27 @@ import {
 } from "@/lib/people/fields";
 import { displayNameOf, initialsOf, ownHandleOf } from "@/lib/people/ids";
 import { spokenLanguageOptions } from "@/lib/people/languages";
-import { phoneProfileHref } from "@/lib/people/phone-profile";
-import { deleteCover, deletePhoto, putCover, putPhoto, resizeCover, resizePhoto, useMyCover, useMyPhoto } from "@/lib/people/photo-store";
+import { languageMatches, phoneProfileHref } from "@/lib/people/phone-profile";
+import { deleteCover, deletePhoto, putCover, putPhoto, useMyCover, useMyPhoto } from "@/lib/people/photo-store";
 import { readProfileFields, saveProfile, useMyProfile } from "@/lib/people/profile-store";
 import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
-import { ActionSheet, Sheet } from "../kit/sheet";
+import { Sheet } from "../kit/sheet";
 import { SheetSelect } from "../kit/sheet-select";
 import { ListBones } from "../kit/states";
 import { useToast } from "../kit/toast";
+import { canGoBack, useGoBack } from "../nav-trail";
 import { Screen } from "../screen";
+import { T } from "../type";
 import { InfoRow } from "./parts";
+import { PICTURE_FILE_ERROR, usePicturePicker } from "./picture-picker";
 import { useOwnData } from "./use-profile";
 
-const HINT = "text-sm leading-sm text-text-tertiary";
-const SECTION = "text-md font-medium leading-md text-text-primary";
+const HINT = cn(T.caption, "text-text-tertiary");
+const SECTION = T.section;
+const FIELD_ERROR = cn(T.caption, "text-text-error");
+/** A text button under a field (A03 Link MD). */
+const TEXT_BUTTON = cn(T.rowTitle, "-my-4 inline-flex min-h-[44px] items-center self-start outline-none hover:underline focus-visible:underline");
 const LINK_ERROR = "Enter a web address, like yoursite.com";
 
 const SOCIAL_PREFIX: Record<SocialNetwork, string> = {
@@ -81,6 +90,9 @@ const OPEN_TO_OPTIONS: { value: OpenTo; label: string }[] = [
   ...(Object.entries(OPEN_TO_WORDS) as [Exclude<OpenTo, "">, string][]).map(([value, label]) => ({ value, label })),
   { value: "", label: "Don’t show this" },
 ];
+
+/** One more history entry at this same address, so the next Back lands here first. */
+const pushGuard = () => window.history.pushState(window.history.state, "", window.location.href);
 
 const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
@@ -132,20 +144,21 @@ function CloseBar({ onClose }: { onClose: () => void }) {
       <div className="flex min-w-[44px] shrink-0">
         <IconButton hierarchy="secondary" size="xl" aria-label="Close" icon={<Icon icon={Cancel01Icon} size={22} />} onClick={onClose} />
       </div>
-      <h1 className="min-w-0 flex-1 truncate text-center text-lg font-semibold leading-lg text-text-primary">Edit profile</h1>
+      <h1 className={cn(T.screenTitle, "min-w-0 flex-1 truncate text-center")}>Edit profile</h1>
       <div className="min-w-[44px] shrink-0" />
     </header>
   );
 }
 
 export function EditProfileScreen() {
-  const router = useRouter();
   const { hydrated, fields } = useMyProfile();
   const photo = useMyPhoto();
   const cover = useMyCover();
+  const from = useSearchParams().get("from");
+  const back = useGoBack(from === "settings" ? "/m/settings/account" : phoneProfileHref(ownHandleOf(fields.handle)));
   if (!hydrated || !photo.hydrated || !cover.hydrated) {
     return (
-      <Screen top={<CloseBar onClose={() => router.replace("/m/profile")} />}>
+      <Screen top={<CloseBar onClose={back} />}>
         <div className="px-8 pt-4">
           <ListBones rows={5} />
         </div>
@@ -169,8 +182,6 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
   const [pic, setPic] = React.useState<Picture>({ kind: "keep" });
   const [coverPic, setCoverPic] = React.useState<Picture>({ kind: "keep" });
   const [fileError, setFileError] = React.useState<{ what: "photo" | "cover"; text: string } | null>(null);
-  const [menu, setMenu] = React.useState<"photo" | "cover" | null>(null);
-  const [ask, setAsk] = React.useState<{ kind: "camera" | "photos"; what: "photo" | "cover" } | null>(null);
   const [sheet, setSheet] = React.useState<"skills" | "specialities" | "languages" | null>(null);
   const [suggest, setSuggest] = React.useState<Suggest>({ kind: "idle" });
   const [saving, setSaving] = React.useState(false);
@@ -178,9 +189,6 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
   const [discard, setDiscard] = React.useState(false);
   const abortRef = React.useRef<AbortController | null>(null);
   const inputs = React.useRef<Record<string, HTMLInputElement | null>>({});
-  const cameraRef = React.useRef<HTMLInputElement>(null);
-  const photosRef = React.useRef<HTMLInputElement>(null);
-  const picking = React.useRef<"photo" | "cover">("photo");
 
   React.useEffect(() => () => abortRef.current?.abort(), []);
   React.useEffect(() => () => {
@@ -206,12 +214,65 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
     pic.kind !== "keep" ||
     coverPic.kind !== "keep";
 
-  // Opened from your profile (`?from=profile`): back to it. Opened on its own: to your profile.
-  const fromProfile = useSearchParams().get("from") === "profile";
+  // ── the ways out ──
+  // In the app, ✕ and Save go back to the screen Edit was opened from (your profile, Settings ›
+  // Account). Opened on its own (a direct link, a reload), there is no screen behind it, so they
+  // put its parent in its place: Settings › Account for `?from=settings`, else your profile.
+  const from = useSearchParams().get("from");
   const me = phoneProfileHref(ownHandleOf(fields.handle));
+  const parent = from === "settings" ? "/m/settings/account" : me;
+  const go = React.useCallback(() => {
+    if (canGoBack()) router.back();
+    else router.replace(parent);
+  }, [router, parent]);
+
+  // While there are changes, one extra history entry (the same address) sits on top of this
+  // screen, so the phone's Back, a swipe back and the browser's Back land on it first: the entry
+  // is put back and "Discard changes?" asks, exactly as ✕ does.
+  const guarded = React.useRef(false);
+  const leaving = React.useRef(false);
+  const live = React.useRef({ dirty, saving });
+  React.useEffect(() => {
+    live.current = { dirty, saving };
+  });
+  React.useEffect(() => {
+    if (!dirty || guarded.current || leaving.current) return;
+    pushGuard();
+    guarded.current = true;
+  }, [dirty]);
+  React.useEffect(() => {
+    const onPop = () => {
+      if (leaving.current || !guarded.current) return;
+      if (live.current.dirty || live.current.saving) {
+        pushGuard();
+        if (!live.current.saving) setDiscard(true);
+        return;
+      }
+      // The changes were undone by hand: Back just leaves.
+      guarded.current = false;
+      leaving.current = true;
+      go();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [go]);
+  // Closing the tab or reloading with changes: the browser's own "Leave site?" prompt.
+  React.useEffect(() => {
+    if (!dirty) return;
+    const onUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, [dirty]);
+
   const leave = () => {
-    if (fromProfile) router.back();
-    else router.replace(me);
+    leaving.current = true;
+    if (!guarded.current) return go();
+    // Step off the guard entry first, then leave from the screen's own entry.
+    guarded.current = false;
+    window.addEventListener("popstate", () => window.setTimeout(go, 0), { once: true });
+    window.history.back();
   };
   const close = () => {
     if (saving) return;
@@ -223,25 +284,17 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
   const shownPhoto = pic.kind === "new" ? pic.url : pic.kind === "remove" ? null : photoUrl;
   const ownCover = coverPic.kind === "new" ? coverPic.url : coverPic.kind === "remove" ? null : coverUrl;
   const shownCover = ownCover ?? own.fallbackCover;
-
-  const pick = (kind: "camera" | "photos", what: "photo" | "cover") => {
-    const p = readPhone();
-    if (kind === "camera" ? !p.cameraAsked : !p.photosAsked) return setAsk({ kind, what });
-    picking.current = what;
-    (kind === "camera" ? cameraRef : photosRef).current?.click();
-  };
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const what = picking.current;
-    setFileError(null);
-    const blob = what === "photo" ? await resizePhoto(file) : await resizeCover(file);
-    if (!blob) return setFileError({ what, text: "Choose a JPG or PNG image under 10 MB." });
-    const next: Picture = { kind: "new", blob, url: URL.createObjectURL(blob) };
-    if (what === "photo") setPic(next);
-    else setCoverPic(next);
-  };
+  const picker = usePicturePicker({
+    has: { photo: !!shownPhoto, cover: !!ownCover },
+    onPick: (what, blob) => {
+      setFileError(null);
+      const next: Picture = { kind: "new", blob, url: URL.createObjectURL(blob) };
+      if (what === "photo") setPic(next);
+      else setCoverPic(next);
+    },
+    onRemove: (what) => (what === "photo" ? setPic({ kind: "remove" }) : setCoverPic({ kind: "remove" })),
+    onBadFile: (what) => setFileError({ what, text: PICTURE_FILE_ERROR }),
+  });
 
   // ── Suggest from my work (D7): your shared projects' titles and stories only ──
   const noShared = own.ready && own.shared.length === 0;
@@ -346,7 +399,7 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
             Try again. Your changes are kept.
           </Banner>
         )}
-        <p className="text-md leading-md text-text-secondary">Other creators see these on your profile.</p>
+        <p className={T.body}>Other creators see these on your profile.</p>
 
         {/* Photos */}
         <section aria-labelledby={`${base}-photos`} className="flex flex-col gap-6">
@@ -360,34 +413,32 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
                 <img src={shownCover} alt="Your cover" className="absolute inset-0 h-full w-full object-cover" />
               )}
             </div>
-            {!ownCover && <p className={HINT}>{shownCover ? "Showing your featured project’s picture until you add one." : "No cover yet. Others see a quiet tint until you add one."}</p>}
+            <p className={HINT}>{!ownCover && shownCover ? "Showing your featured project’s picture until you add one." : "A wide picture works best, at least 1200 px across."}</p>
             <div className="flex">
-              <Button hierarchy="secondary" size="md" iconLeading={<Icon icon={ImageAdd01Icon} size={16} />} onClick={() => setMenu("cover")}>
-                {ownCover ? "Change cover" : "Upload cover"}
+              <Button hierarchy="secondary" size="md" iconLeading={<Icon icon={ImageAdd01Icon} size={16} />} onClick={() => picker.open("cover")}>
+                {ownCover ? "Change cover" : "Add cover"}
               </Button>
             </div>
             {fileError?.what === "cover" && (
-              <p role="alert" className="text-sm leading-sm text-text-error">
+              <p role="alert" className={FIELD_ERROR}>
                 {fileError.text}
               </p>
             )}
           </div>
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-6">
-              <Avatar size="xl" initials={initialsOf(name, d.latinName || null)} src={shownPhoto ?? undefined} label="Your photo" />
-              <Button hierarchy="secondary" size="md" iconLeading={<Icon icon={Camera01Icon} size={16} />} onClick={() => setMenu("photo")}>
+              <Avatar size="xl" phone initials={initialsOf(name, d.latinName || null)} src={shownPhoto ?? undefined} label="Your photo" />
+              <Button hierarchy="secondary" size="md" iconLeading={<Icon icon={Camera01Icon} size={16} />} onClick={() => picker.open("photo")}>
                 {shownPhoto ? "Change photo" : "Add photo"}
               </Button>
             </div>
             <p className={HINT}>JPG or PNG. Resized on your device before it is saved.</p>
             {fileError?.what === "photo" && (
-              <p role="alert" className="text-sm leading-sm text-text-error">
+              <p role="alert" className={FIELD_ERROR}>
                 {fileError.text}
               </p>
             )}
           </div>
-          <input ref={cameraRef} type="file" accept="image/*" capture="user" className="sr-only" tabIndex={-1} aria-hidden onChange={onFile} />
-          <input ref={photosRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden onChange={onFile} />
         </section>
 
         {/* About you */}
@@ -396,7 +447,7 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
             About you
           </h2>
           <Field label={`Name (${d.name.length}/${NAME_MAX})`} htmlFor={ids.name.id}>
-            <TextInput id={ids.name.id} size="xl" maxLength={NAME_MAX} placeholder="Your name" autoComplete="name" value={d.name} onValueChange={(v) => set({ name: v.slice(0, NAME_MAX) })} />
+            <TextInput id={ids.name.id} size="xl" maxLength={NAME_MAX} placeholder="You" autoComplete="name" value={d.name} onValueChange={(v) => set({ name: v.slice(0, NAME_MAX) })} />
             <p className={HINT}>{d.name.trim() ? "Any script. This is the name other creators see." : "You can leave this empty. Others see “Unnamed creator”."}</p>
           </Field>
           <Field label="Name in English letters (optional)" htmlFor={ids.latin.id}>
@@ -408,7 +459,7 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
               id={ids.headline.id}
               rows={2}
               maxLength={HEADLINE_MAX}
-              placeholder="For example: Builds solar soil sensors for small farms"
+              placeholder="What you build, in a few words"
               value={d.headline}
               onValueChange={(v) => set({ headline: v.slice(0, HEADLINE_MAX) })}
             />
@@ -421,13 +472,13 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
             }} onDiscard={() => setSuggest({ kind: "idle" })} />
           </Field>
           <Field label="About" htmlFor={ids.bio.id}>
-            <Textarea id={ids.bio.id} rows={4} maxLength={BIO_MAX} value={d.bio} onValueChange={(v) => set({ bio: v.slice(0, BIO_MAX) })} />
+            <Textarea id={ids.bio.id} rows={4} maxLength={BIO_MAX} placeholder="What you build, who it is for, and what you are working on now" value={d.bio} onValueChange={(v) => set({ bio: v.slice(0, BIO_MAX) })} />
             <p className={cn(HINT, "tabular-nums")}>
               {d.bio.length}/{BIO_MAX}
             </p>
           </Field>
           <Field label="Location" htmlFor={ids.location.id}>
-            <TextInput id={ids.location.id} size="xl" maxLength={LOCATION_MAX} autoComplete="address-level2" value={d.location} onValueChange={(v) => set({ location: v.slice(0, LOCATION_MAX) })} />
+            <TextInput id={ids.location.id} size="xl" maxLength={LOCATION_MAX} placeholder="City, country" autoComplete="address-level2" value={d.location} onValueChange={(v) => set({ location: v.slice(0, LOCATION_MAX) })} />
             <p className={HINT}>A city is enough. Your local time shows next to it.</p>
           </Field>
           <Field label="Open to" htmlFor={ids.openTo.id}>
@@ -541,46 +592,7 @@ function EditForm({ fields, photoUrl, coverUrl }: { fields: ProfileFields; photo
         </section>
       </div>
 
-      <ActionSheet
-        open={menu !== null}
-        onClose={() => setMenu(null)}
-        title={menu === "cover" ? "Cover photo" : "Profile photo"}
-        items={[
-          { label: "Take photo", icon: Camera01Icon, onSelect: () => pick("camera", menu ?? "photo") },
-          { label: "Choose from library", icon: Image01Icon, onSelect: () => pick("photos", menu ?? "photo") },
-          ...(menu === "photo" && shownPhoto ? [{ label: "Remove photo", icon: Delete02Icon, destructive: true, onSelect: () => setPic({ kind: "remove" }) }] : []),
-          ...(menu === "cover" && ownCover ? [{ label: "Remove cover", icon: Delete02Icon, destructive: true, onSelect: () => setCoverPic({ kind: "remove" }) }] : []),
-        ]}
-      />
-      <Sheet
-        open={ask !== null}
-        onClose={() => setAsk(null)}
-        title={ask?.kind === "camera" ? "Use your camera" : "Choose photos"}
-        actions={
-          <>
-            <Button
-              size="xl"
-              className="w-full"
-              onClick={() => {
-                if (!ask) return;
-                updatePhone(ask.kind === "camera" ? { cameraAsked: true } : { photosAsked: true });
-                picking.current = ask.what;
-                setAsk(null);
-                (ask.kind === "camera" ? cameraRef : photosRef).current?.click();
-              }}
-            >
-              Continue
-            </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setAsk(null)}>
-              Not now
-            </Button>
-          </>
-        }
-      >
-        <p className="text-md leading-md text-text-secondary">
-          {ask?.kind === "camera" ? "To take your profile photo and cover." : "To add photos to your project, profile or messages. You pick which ones."}
-        </p>
-      </Sheet>
+      {picker.sheets}
       <SkillsSheet open={sheet === "skills"} onClose={() => setSheet(null)} skills={d.skills} onChange={(skills) => set({ skills, specialities: d.specialities.filter((x) => skills.includes(x.skill)) })} />
       <SpecialitiesSheet open={sheet === "specialities"} onClose={() => setSheet(null)} skills={d.skills} specialities={d.specialities} onChange={(specialities) => set({ specialities })} />
       <LanguagesSheet open={sheet === "languages"} onClose={() => setSheet(null)} languages={d.languages} onChange={(languages) => set({ languages })} />
@@ -617,15 +629,14 @@ function SuggestLine({
   onUse: (text: string) => void;
   onDiscard: () => void;
 }) {
-  const reasonId = React.useId();
   if (state.kind === "running") {
     return (
       <div className="flex flex-col gap-2" role="status">
-        <p className="flex items-start gap-4 text-sm leading-sm text-text-secondary">
+        <p className={cn(T.meta, "flex items-start gap-4")}>
           <Spinner size={16} />
           Reading your shared projects… this can take up to 40 seconds.
         </p>
-        <button type="button" onClick={onCancel} className="-my-4 inline-flex min-h-[44px] items-center self-start text-md font-medium leading-md text-text-primary outline-none hover:underline focus-visible:underline">
+        <button type="button" onClick={onCancel} className={TEXT_BUTTON}>
           Cancel
         </button>
       </div>
@@ -633,12 +644,12 @@ function SuggestLine({
   }
   if (state.kind === "draft") {
     return (
-      <div className="flex flex-col gap-4 rounded-lg border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-surface p-6">
+      <div className="flex flex-col gap-4 rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-6">
         <span className="self-start">
           <Badge tone="brand">AI draft</Badge>
         </span>
-        <p className="text-md leading-md text-text-primary">{state.text}</p>
-        <p className="text-sm leading-sm text-text-tertiary">Not saved until you save your profile.</p>
+        <p className={cn(T.body, "text-text-primary")}>{state.text}</p>
+        <p className={HINT}>Not saved until you save your profile.</p>
         <div className="grid grid-cols-2 gap-4">
           <Button size="md" className="w-full" onClick={() => onUse(state.text)}>
             Use this
@@ -650,6 +661,8 @@ function SuggestLine({
       </div>
     );
   }
+  // PR-34c: with nothing shared there is nothing to read, so the alert takes the link's place.
+  if (noShared) return <Banner tone="info">Share a project first, and the AI can suggest a headline from it.</Banner>;
   return (
     <div className="flex flex-col gap-2">
       {state.kind === "failed" && (
@@ -662,24 +675,13 @@ function SuggestLine({
             </button>
           }
         >
-          Try again.
+          Your headline is unchanged.
         </Banner>
       )}
       {state.kind === "idle" && (
-        <button
-          type="button"
-          disabled={!ready || noShared}
-          aria-describedby={noShared ? reasonId : undefined}
-          onClick={onRun}
-          className="-my-4 inline-flex min-h-[44px] items-center self-start text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline disabled:cursor-not-allowed disabled:text-text-disabled disabled:no-underline"
-        >
+        <button type="button" disabled={!ready} onClick={onRun} className={cn(TEXT_BUTTON, "text-text-brand disabled:cursor-not-allowed disabled:text-text-disabled disabled:no-underline")}>
           Suggest from my work
         </button>
-      )}
-      {noShared && (
-        <p id={reasonId} className="text-sm leading-sm text-text-tertiary">
-          Share a project first, and the AI can suggest a headline from it.
-        </p>
       )}
     </div>
   );
@@ -760,7 +762,7 @@ function SkillsSheet({ open, onClose, skills, onChange }: { open: boolean; onClo
           ))}
         </ul>
       )}
-      {full && <p className={HINT}>Remove a skill to add another.</p>}
+      <p className={HINT}>{full ? "Remove a skill to add another." : "Press Enter to add one. A comma separates several."}</p>
     </Sheet>
   );
 }
@@ -792,7 +794,7 @@ function SpecialitiesSheet({
       }
     >
       {skills.length === 0 ? (
-        <p className="text-md leading-md text-text-secondary">Add your skills first. Your top specialties come from them.</p>
+        <p className={T.body}>Add your skills first. Your top specialties come from them.</p>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-4 p-0">
           {skills.map((s) => {
@@ -809,15 +811,20 @@ function SpecialitiesSheet({
                     onChange={() => onChange(picked ? specialities.filter((x) => x.skill !== s) : [...specialities, { skill: s, years: "1-2" }])}
                   />
                   <Checkbox checked={!!picked} disabled={off} decorative />
-                  <span className={cn("text-lg leading-lg", off ? "text-text-disabled" : "text-text-primary")}>{s}</span>
+                  <span className={cn(T.bodyLg, off && "text-text-disabled")}>{s}</span>
                 </label>
                 {picked && (
-                  <SheetSelect
-                    title={`Years of ${s}`}
-                    value={picked.years}
-                    options={YEARS.map((y) => ({ value: y, label: YEARS_WORDS[y].replace("Years", "years") }))}
-                    onChange={(y) => onChange(specialities.map((x) => (x.skill === s ? { ...x, years: y as Years } : x)))}
-                  />
+                  // PR-35b: the years are picked in this sheet (one sheet, one scrim), not in a second one.
+                  <div className="flex items-center gap-4 pl-[32px]">
+                    <Segmented
+                      label={`Years of ${s}`}
+                      size="md"
+                      value={picked.years}
+                      options={YEARS.map((y) => ({ value: y, label: YEARS_WORDS[y].replace(/ Years$/, "") }))}
+                      onChange={(y: Years) => onChange(specialities.map((x) => (x.skill === s ? { ...x, years: y } : x)))}
+                    />
+                    <span className={T.meta}>years</span>
+                  </div>
                 )}
               </li>
             );
@@ -834,8 +841,8 @@ function LanguagesSheet({ open, onClose, languages, onChange }: { open: boolean;
   const [q, setQ] = React.useState("");
   const id = React.useId();
   const full = languages.length >= LANGUAGES_MAX;
-  const query = q.trim().toLowerCase();
-  const matches = query ? options.filter((l) => !languages.includes(l) && l.toLowerCase().includes(query)).slice(0, 8) : [];
+  const query = q.trim();
+  const matches = languageMatches(options, query).filter((l) => !languages.includes(l)).slice(0, 8);
   const done = () => {
     setQ("");
     onClose();
@@ -869,7 +876,7 @@ function LanguagesSheet({ open, onClose, languages, onChange }: { open: boolean;
       {query && !full && (
         <ul aria-label="Matching languages" className="-mx-8 m-0 flex list-none flex-col p-0">
           {matches.length === 0 ? (
-            <li className="px-8 py-4 text-md leading-md text-text-secondary">No language matches “{q.trim()}”.</li>
+            <li className={cn(T.body, "px-8 py-4")}>No language matches “{q.trim()}”.</li>
           ) : (
             matches.map((l) => (
               <li key={l}>
@@ -879,7 +886,7 @@ function LanguagesSheet({ open, onClose, languages, onChange }: { open: boolean;
                     onChange([...languages, l].slice(0, LANGUAGES_MAX));
                     setQ("");
                   }}
-                  className="flex h-[40px] w-full items-center rounded-md px-8 text-left text-lg leading-lg text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                  className={cn(T.bodyLg, "flex min-h-[44px] w-full items-center rounded-md px-8 text-left outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
                 >
                   {l}
                 </button>

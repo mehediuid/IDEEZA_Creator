@@ -4,7 +4,9 @@
 // you (no Followers list, no counts anywhere public). Each row opens the
 // person's profile and carries the same Follow control as their profile; the
 // list keeps who it opened with until it closes, so an Unfollow can be taken
-// back on the spot (the row turns to Follow, the toast offers Undo).
+// back on the spot (the row turns to Follow, the toast offers Undo). Rows are
+// the M26 person row (PR-40): brand-subtle initials, the name in Body/MD
+// Medium, small Follow buttons.
 
 import * as React from "react";
 import Link from "next/link";
@@ -13,9 +15,11 @@ import { Avatar } from "@/components/ideeza/avatar";
 import { Button } from "@/components/ideeza/button";
 import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
 import type { Person } from "@/lib/people/ids";
+import { cn } from "@/lib/utils";
 import { phoneProfileHref } from "@/lib/people/phone-profile";
 import { Sheet } from "../kit/sheet";
 import { ListBones } from "../kit/states";
+import { T } from "../type";
 import { useFollow } from "./follow";
 
 function lineOf(p: Person): string {
@@ -47,27 +51,27 @@ export function FollowingSheet({ open, onClose }: { open: boolean; onClose: () =
       {rows === null ? (
         <ListBones rows={4} />
       ) : rows.length === 0 ? (
-        <p className="text-md leading-md text-text-secondary">You don’t follow anyone yet. Follow a creator from their profile or a post.</p>
+        <p className={T.body}>You don’t follow anyone yet. Follow a creator from their profile or a post.</p>
       ) : (
         <ul aria-label="People you follow" className="m-0 flex list-none flex-col p-0">
           {rows.map((p) => {
             const on = follow.isOn(p);
             return (
               <li key={p.id} className="flex items-center gap-6 py-6">
-                <Avatar size="md" initials={p.initials} color={p.color ?? undefined} />
+                <Avatar size="md" initials={p.initials} />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <Link
                     href={phoneProfileHref(p.handle)}
                     onClick={onClose}
-                    className="self-start truncate rounded-xs text-md leading-md text-text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className={cn(T.bodyStrong, "self-start truncate rounded-xs outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus")}
                   >
                     {p.name}
                   </Link>
-                  <span className="truncate text-sm leading-sm text-text-secondary">{lineOf(p)}</span>
+                  <span className={cn(T.meta, "truncate")}>{lineOf(p)}</span>
                 </div>
                 <Button
                   hierarchy={on ? "secondary" : "primary"}
-                  size="md"
+                  size="sm"
                   aria-pressed={on}
                   aria-label={on ? `Following ${p.name}` : `Follow ${p.name}`}
                   disabled={!follow.hydrated}

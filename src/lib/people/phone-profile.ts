@@ -140,3 +140,47 @@ export const PROFILE_SEARCH_RECENT_KEY = "ideeza:m:profile-search:recent";
 
 /** How many recent searches show before See all. */
 export const RECENT_SHOWN = 5;
+
+/** Edit profile on the phone. Its ✕ and Save go back to where it was opened from, else to your profile. */
+export const PHONE_EDIT_PROFILE_HREF = "/m/profile/edit";
+
+/** The Profile hub's in-place Settings rows that open a list of their own (master "Profile
+ *  Settings" 10702:240249: General, Others). */
+export const PHONE_SETTINGS_GENERAL_HREF = "/m/profile/settings/general";
+export const PHONE_SETTINGS_OTHERS_HREF = "/m/profile/settings/others";
+
+/** The app's version as the master page prints it at the foot of Profile Settings. */
+export const PHONE_APP_VERSION = "1.1.5.451";
+
+/** Demo creators whose profile is locked (PR-17): someone who doesn't work with them sees who
+ *  they are and no more. Sample data only, like every Demo creator's words. */
+const LOCKED_SAMPLES: ReadonlySet<string> = new Set(["feed:c7"]);
+export const sampleProfileLocked = (personId: string) => LOCKED_SAMPLES.has(personId);
+
+/** Phone copy uses the typographic apostrophe; a few shared strings still carry the straight one. */
+export const curly = (text: string) => text.replace(/'/g, "’");
+
+/** Other names people type for a language `Intl` lists under one name ("Bengali" → Bangla). */
+const LANGUAGE_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  Bangla: ["bengali"],
+  Persian: ["farsi"],
+  Chinese: ["mandarin", "cantonese"],
+  Punjabi: ["panjabi"],
+  Malay: ["bahasa melayu"],
+  Indonesian: ["bahasa indonesia"],
+  Spanish: ["castilian", "espanol", "español"],
+  German: ["deutsch"],
+  French: ["francais", "français"],
+};
+
+/** The languages a typed search finds: by name, or by another name people use for it. */
+export function languageMatches(options: readonly string[], typed: string): string[] {
+  const q = typed.trim().toLowerCase();
+  if (!q) return [];
+  return options.filter((l) => l.toLowerCase().includes(q) || (LANGUAGE_ALIASES[l] ?? []).some((a) => a.includes(q)));
+}
+
+/** "Oct 12" for a tile's meta line, "Oct 12, 2026" where the year matters (the web's words). */
+export function shortDateOf(at: number, year = false): string {
+  return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}) });
+}

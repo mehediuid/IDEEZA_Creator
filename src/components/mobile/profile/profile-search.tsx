@@ -6,14 +6,17 @@
 // five, ⋮ → Delete); typing lists the creators (photo, name, what they do)
 // and the videos that match, from Global Search's own index. A creator opens
 // their profile, a video its clip. Recent searches stay on this phone, apart
-// from Global Search's.
+// from Global Search's. What you typed stays in the address (`?q=`), so Back
+// from a result finds the same results.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft02Icon, Cancel01Icon, Clock02Icon, Delete02Icon, MoreVerticalIcon, PlayIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft02Icon, Clock02Icon, Delete02Icon, MoreVerticalIcon, PlayIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
+import { Button } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
+import { SearchInput } from "@/components/ideeza/search-input";
 import { cn } from "@/lib/utils";
 import { parseStored, readStoredKey, useStoredKey, writeStoredKey } from "@/lib/key-store";
 import { clipHref } from "@/lib/innovations/clips";
@@ -22,7 +25,9 @@ import { PROFILE_SEARCH_RECENT_KEY, RECENT_SHOWN } from "@/lib/people/phone-prof
 import { ActionSheet } from "../kit/sheet";
 import { ListBones } from "../kit/states";
 import { useToast } from "../kit/toast";
+import { useGoBack } from "../nav-trail";
 import { Screen } from "../screen";
+import { T } from "../type";
 import { useSearchIndex, type SearchItem } from "../feed/use-search-index";
 import type { SearchEntry } from "@/lib/innovations/search";
 
@@ -39,11 +44,26 @@ function useRecent() {
   return { hydrated, recent, update };
 }
 
+/** The typed words into the address in place (no history step, no fetch), so Back restores them. */
+function keepInAddress(text: string) {
+  const q = new URLSearchParams(window.location.search);
+  if (text) q.set("q", text);
+  else q.delete("q");
+  const search = q.toString();
+  window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}`);
+}
+
 export function ProfileSearchScreen() {
   const router = useRouter();
   const toast = useToast();
+  const back = useGoBack("/m/profile");
   const field = React.useRef<HTMLInputElement>(null);
-  const [text, setText] = React.useState("");
+  const asked = useSearchParams().get("q") ?? "";
+  const [text, setTextState] = React.useState(asked);
+  const setText = (v: string) => {
+    setTextState(v);
+    keepInAddress(v.trim() ? v : "");
+  };
   const [all, setAll] = React.useState(false);
   const [menuFor, setMenuFor] = React.useState<RecentSearch | null>(null);
   const { hydrated, entries } = useSearchIndex();
@@ -86,44 +106,24 @@ export function ProfileSearchScreen() {
           }}
           className="flex h-[56px] shrink-0 items-center gap-4 px-8"
         >
-          <IconButton
-            type="button"
-            hierarchy="secondary"
+          <IconButton type="button" hierarchy="secondary" size="xl" aria-label="Back" icon={<Icon icon={ArrowLeft02Icon} size={22} />} onClick={back} />
+          <SearchInput
+            ref={field}
             size="xl"
-            aria-label="Back"
-            icon={<Icon icon={ArrowLeft02Icon} size={22} />}
-            onClick={() => (window.history.length > 1 ? router.back() : router.push("/m/profile"))}
+            type="search"
+            enterKeyHint="search"
+            aria-label="Search creators and videos"
+            autoFocus={!asked}
+            value={text}
+            maxLength={100}
+            placeholder="Search creators and videos"
+            onValueChange={setText}
+            onClear={() => {
+              setText("");
+              field.current?.focus();
+            }}
+            containerClassName="min-w-0 flex-1"
           />
-          <div className="flex h-[44px] min-w-0 flex-1 items-center gap-4 rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-6 focus-within:border-[var(--color-input-border-focus)] focus-within:shadow-focus-brand">
-            <span className="text-[color:var(--color-icon-default)]">
-              <Icon icon={Search01Icon} size={16} />
-            </span>
-            <input
-              ref={field}
-              type="search"
-              enterKeyHint="search"
-              aria-label="Search creators and videos"
-              autoFocus
-              value={text}
-              maxLength={100}
-              placeholder="Search creators and videos"
-              onChange={(e) => setText(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-lg leading-lg text-[color:var(--color-input-text)] outline-none placeholder:text-[color:var(--color-input-placeholder)] [&::-webkit-search-cancel-button]:hidden"
-            />
-            {text && (
-              <button
-                type="button"
-                aria-label="Clear the search"
-                onClick={() => {
-                  setText("");
-                  field.current?.focus();
-                }}
-                className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-secondary)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <Icon icon={Cancel01Icon} size={16} />
-              </button>
-            )}
-          </div>
         </form>
       }
     >
@@ -132,11 +132,11 @@ export function ProfileSearchScreen() {
           <ListBones rows={4} />
         ) : !q ? (
           recent.length === 0 ? (
-            <p className="text-md leading-md text-text-secondary">Find a creator or a video. What you search for stays here.</p>
+            <p className={T.body}>Find a creator or a video. What you search for stays here.</p>
           ) : (
             <section aria-labelledby="recent-heading" className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-4">
-                <h2 id="recent-heading" className="text-md font-medium leading-md text-text-primary">
+                <h2 id="recent-heading" className={T.section}>
                   Recent searches
                 </h2>
                 {recent.length > RECENT_SHOWN && (
@@ -144,7 +144,7 @@ export function ProfileSearchScreen() {
                     type="button"
                     aria-expanded={all}
                     onClick={() => setAll((v) => !v)}
-                    className="-my-6 inline-flex min-h-[44px] items-center text-md leading-md text-text-secondary outline-none hover:underline focus-visible:underline"
+                    className={cn(T.body, "-my-6 inline-flex min-h-[44px] items-center outline-none hover:underline focus-visible:underline")}
                   >
                     {all ? "Show less" : "See all"}
                   </button>
@@ -166,7 +166,7 @@ export function ProfileSearchScreen() {
                       <span className="shrink-0 text-[color:var(--color-icon-default)]">
                         <Icon icon={Clock02Icon} size={20} />
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-md leading-md text-text-primary">{r.kind === "person" ? r.name : r.text}</span>
+                      <span className={cn(T.bodyLg, "min-w-0 flex-1 truncate")}>{r.kind === "person" ? r.name : r.text}</span>
                     </button>
                     <IconButton
                       hierarchy="ghost"
@@ -181,9 +181,19 @@ export function ProfileSearchScreen() {
             </section>
           )
         ) : results.length === 0 ? (
-          <p role="status" className="text-md leading-md text-text-secondary">
-            No creators or videos match “{q}”.
-          </p>
+          <div role="status" className="flex flex-col items-start gap-4">
+            <p className={T.body}>No creators or videos match “{q}”.</p>
+            <Button
+              hierarchy="ghost"
+              size="xl"
+              onClick={() => {
+                setText("");
+                field.current?.focus();
+              }}
+            >
+              Clear search
+            </Button>
+          </div>
         ) : (
           <ul aria-label="Results" className="m-0 flex list-none flex-col gap-2 p-0">
             {results.map((e) => {
@@ -194,8 +204,8 @@ export function ProfileSearchScreen() {
                     <button type="button" className={cn(ROW, "py-2")} onClick={() => open(e)}>
                       <Avatar size="md" initials={it.person.initials} color={it.person.color ?? undefined} />
                       <span className="flex min-w-0 flex-col">
-                        <span className="truncate text-lg leading-lg text-text-primary">{it.person.name}</span>
-                        <span className="truncate text-md leading-md text-text-secondary">{it.subtitle}</span>
+                        <span className={cn(T.bodyStrong, "truncate")}>{it.person.name}</span>
+                        <span className={cn(T.body, "truncate")}>{it.subtitle}</span>
                       </span>
                     </button>
                   </li>
@@ -214,8 +224,8 @@ export function ProfileSearchScreen() {
                       )}
                     </span>
                     <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-lg leading-lg text-text-primary">{it.clip.title}</span>
-                      <span className="truncate text-md leading-md text-text-secondary">Video · {it.clip.creator.name}</span>
+                      <span className={cn(T.bodyStrong, "truncate")}>{it.clip.title}</span>
+                      <span className={cn(T.body, "truncate")}>Video · {it.clip.creator.name}</span>
                     </span>
                   </button>
                 </li>

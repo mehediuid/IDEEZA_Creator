@@ -1,7 +1,8 @@
 "use client";
 
 // What you can do with someone else's profile from its ⋯ (PR-12, the Shared
-// kit's KIT-RB-01 / RB-10…22): Share profile, Report profile (the kit's
+// kit's KIT-RB-01 / RB-10…22): Share profile (the one public link, the web's
+// `/creators/<handle>`, as Settings › Account copies it), Report profile (the kit's
 // Report sheet with the web's profile reasons, saved where the web saves them,
 // `ideeza:people:reports`), and Block (the kit's destructive confirm, writing
 // the Messages blocked list, as the web does; Undo in the toast). Share
@@ -12,8 +13,8 @@ import { AlertCircleIcon, Share08Icon, UserBlock01Icon, UserCheck01Icon } from "
 import { parseStored, readStoredKey, writeStoredKey } from "@/lib/key-store";
 import { blockPerson, unblockPerson } from "@/lib/messages/actions";
 import { startHref, type StartParams } from "@/lib/messages/links";
-import { ME, type Person } from "@/lib/people/ids";
-import { firstNameOf, phoneProfileHref } from "@/lib/people/phone-profile";
+import { ME, profileHref, type Person } from "@/lib/people/ids";
+import { curly, firstNameOf } from "@/lib/people/phone-profile";
 import { REPORTS_KEY, REPORT_REASONS, normalizeReports, withReport, type ProfileReportReason } from "@/lib/people/reports";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { ReportSheet } from "../kit/report-sheet";
@@ -29,7 +30,7 @@ export function useShareProfile(): (person: Pick<Person, "handle" | "name">) => 
   const toast = useToast();
   return React.useCallback(
     (person) => {
-      const url = new URL(phoneProfileHref(person.handle), window.location.origin).toString();
+      const url = new URL(profileHref(person), window.location.origin).toString();
       const copy = () => {
         if (!navigator.clipboard) return toast({ title: "Couldn’t copy the link", lead: "error" });
         navigator.clipboard.writeText(url).then(
@@ -53,6 +54,9 @@ function saveProfileReport(who: string, reason: ProfileReportReason, note: strin
 }
 
 const WRITE_FAILED = "This phone couldn’t save that. Nothing changed.";
+
+/** The web's reasons, in the phone's typography (’, not '). */
+const PHONE_REASONS = REPORT_REASONS.map((r) => ({ ...r, label: curly(r.label) }));
 
 /** The viewer's ⋯ and the sheets it opens. */
 export function PersonMenu({
@@ -105,7 +109,7 @@ export function PersonMenu({
         onClose={() => setSheet(null)}
         title={`Report ${first}’s profile`}
         description={`${first} won’t know who reported.`}
-        reasons={REPORT_REASONS}
+        reasons={PHONE_REASONS}
         blockName={offerBlock ? first : undefined}
         onSend={async ({ reason, note, alsoBlock }) => {
           if (!saveProfileReport(person.id, reason as ProfileReportReason, note)) throw new Error("storage");
