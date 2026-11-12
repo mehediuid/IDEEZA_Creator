@@ -1,22 +1,20 @@
 "use client";
 
-// Feed · "NFT Sell" (states 2–6): what the clip's item is offered at, one card
-// at a time across the clip's text column, with the dots under it. A card is
-// the glass card (color/glass/shadow, radius/md, 12 padding, 8 apart): the NFT
-// (Label/MD) with "Selling n%" when the listing says, its price or its use
-// (Body/XS) on a line of its own so nothing is cut at 320, a Caption/SM line
-// (sold count, or the listing type — an auction adds the time left, counting
-// down), the Testnet demo pill on the first, and an A01 Primary SM button that
-// opens the item's marketplace, where buying and bidding happen (one home).
-// An auction reads in the marketplace's words: Current bid / Starting bid and
-// Place bid (the Figma's Max bid and Make an offer). A project starts at its
-// Main NFT; a product at its Physical NFT.
+// What the clip's item is on the marketplace for, as one slim pill under the
+// clip's text (owner 2026-11-12: the offer cards — up to three swiping glass
+// cards with a Testnet pill, a full-width button and dots — covered half the
+// video). The pill is the shop anchor short-video apps use: a brand disc with
+// a bag, the first offer in the marketplace's words ("Main NFT · 0.8 ETH";
+// an auction: "Current bid 0.3 ETH" and the time left, counting down), "+2"
+// when there are more, and a chevron. It sizes to its words, so the video
+// stays visible beside it. A tap opens the item's marketplace, where every
+// offer, the Testnet demo note, buying and bidding live (one home). A project
+// leads with its Main NFT, a product with its Physical NFT.
 
 import * as React from "react";
-import { Badge } from "@/components/ideeza/badge";
-import { Button } from "@/components/ideeza/button";
-import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
-import { OFFER_NAME, offerActionLabel, type ClipOffer } from "@/lib/innovations/clips";
+import { ArrowRight01Icon, ShoppingBag01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import { OFFER_NAME, type ClipOffer } from "@/lib/innovations/clips";
 import { cn } from "@/lib/utils";
 import { MEDIA_INK } from "../kit/media";
 import { T } from "../type";
@@ -43,79 +41,44 @@ function TimeLeft({ endsAt }: { endsAt: number }) {
   return <span className="tabular-nums text-text-warning">({countdown(endsAt - now)})</span>;
 }
 
-function linesOf(o: ClipOffer): { aside: string | null; caption: string | null } {
-  if (o.kind === "main") {
-    if (o.auction) return { aside: `${o.auction.bidLabel}: ${o.auction.bid}`, caption: "Listing type: Auction" };
-    return { aside: `Price: ${o.price}`, caption: "Listing type: Buy now" };
-  }
-  return { aside: o.use, caption: o.sold ? `NFT sold: ${o.sold.count}/${o.sold.of}` : null };
+/** The pill's words for an offer: what it is, and its price (an auction: its bid). */
+function wordsOf(o: ClipOffer): { name: string; price: string } {
+  if (o.kind === "main" && o.auction) return { name: OFFER_NAME.main, price: `${o.auction.bidLabel} ${o.auction.bid}` };
+  return { name: OFFER_NAME[o.kind], price: o.price };
 }
 
 export function ClipOffers({ offers, onBuy }: { offers: readonly ClipOffer[]; onBuy: (o: ClipOffer) => void }) {
-  const track = React.useRef<HTMLDivElement>(null);
-  const [at, setAt] = React.useState(0);
   if (!offers.length) return null;
-
-  const go = (i: number) => {
-    const el = track.current;
-    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
-  };
-
+  const first = offers[0];
+  const { name, price } = wordsOf(first);
+  const more = offers.length - 1;
   return (
-    <div className="flex w-full flex-col items-center gap-4">
-      <div
-        ref={track}
-        aria-label="On the marketplace"
-        role="group"
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          setAt(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
-        }}
-        className="flex w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {offers.map((o, i) => {
-          const { aside, caption } = linesOf(o);
-          return (
-            <div key={`${o.kind}-${i}`} className="w-full shrink-0 snap-start">
-              <div className="flex flex-col gap-4 rounded-md bg-[var(--color-glass-shadow)] p-6">
-                <div className="flex flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <span className={cn(T.label, MEDIA_INK, "whitespace-nowrap")}>{OFFER_NAME[o.kind]}</span>
-                    {o.sharePct ? <Badge tone="brand-solid">Selling {o.sharePct}%</Badge> : null}
-                    {i === 0 && <TestnetDemoBadge className="ml-auto shrink-0" />}
-                  </div>
-                  {aside && <p className={cn(T.meta, MEDIA_INK)}>{aside}</p>}
-                  {caption && (
-                    <p className={cn(T.micro, MEDIA_INK)}>
-                      {caption} {o.auction?.endsAt ? <TimeLeft endsAt={o.auction.endsAt} /> : null}
-                    </p>
-                  )}
-                </div>
-                <Button size="sm" className="w-full" onClick={() => onBuy(o)}>
-                  {offerActionLabel(o)}
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {offers.length > 1 && (
-        <div className="flex items-center gap-2">
-          {offers.map((o, i) => (
-            <button
-              key={`${o.kind}-${i}`}
-              type="button"
-              aria-label={`${OFFER_NAME[o.kind]}, ${i + 1} of ${offers.length}`}
-              aria-current={i === at ? "true" : undefined}
-              onClick={() => go(i)}
-              // A 16 px dot slot with a 44 px tall touch area around it (the dots don't grow).
-              className="relative flex size-[16px] items-center justify-center rounded-full outline-none after:absolute after:inset-x-0 after:-inset-y-[14px] after:content-[''] focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              <span className={cn("size-[8px] rounded-full bg-[var(--color-white)]", i !== at && "opacity-40")} />
-            </button>
-          ))}
-        </div>
+    <button
+      type="button"
+      onClick={() => onBuy(first)}
+      aria-label={`On the marketplace: ${name}, ${price}${more ? `, and ${more} more` : ""}. Open the marketplace`}
+      className="inline-flex h-[36px] max-w-full items-center gap-3 self-start rounded-full bg-[var(--color-modal-scrim)] py-1 pl-1 pr-4 outline-none backdrop-blur-sm transition-transform duration-fast active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-border-focus"
+    >
+      <span aria-hidden className="inline-flex size-[28px] shrink-0 items-center justify-center rounded-full bg-bg-brand text-[color:var(--color-white)]">
+        <Icon icon={ShoppingBag01Icon} size={16} />
+      </span>
+      <span aria-hidden className={cn(T.meta, MEDIA_INK, "min-w-0 truncate")}>
+        {name} · <span className="font-semibold tabular-nums">{price}</span>
+        {first.auction?.endsAt ? (
+          <>
+            {" "}
+            <TimeLeft endsAt={first.auction.endsAt} />
+          </>
+        ) : null}
+      </span>
+      {more > 0 && (
+        <span aria-hidden className={cn(T.micro, MEDIA_INK, "shrink-0 rounded-full bg-[var(--color-glass-border-strong)] px-2 tabular-nums")}>
+          +{more}
+        </span>
       )}
-    </div>
+      <span aria-hidden className={cn(MEDIA_INK, "shrink-0")}>
+        <Icon icon={ArrowRight01Icon} size={16} />
+      </span>
+    </button>
   );
 }

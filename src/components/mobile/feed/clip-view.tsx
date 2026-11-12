@@ -4,9 +4,11 @@
 // and "Play and pause a clip"). The video fills the screen under a dark scrim
 // at the top and the bottom; everything over it is the Dark semantic mode, so
 // its text is white (owner rule). At the foot, the creator (A16b, • Follow),
-// the title (H6) and two lines of the description with "more" — the title and
-// the description open the item's details; the
-// video itself plays or pauses. Under them, the item's marketplace offers. On
+// the title (H6, at most two lines) and one line of the description with
+// "more" — the title and the description open the item's details; the
+// video itself plays or pauses. Under them, one slim pill for the item's
+// marketplace offers (clip-offers.tsx). The text block keeps to the lower
+// fifth of the screen, so the video is what you see (owner 2026-11-12). On
 // the right, the clip side nav: 3D, AR/VR, appreciate (with its count),
 // comments (with theirs), share and ⋯.
 //
@@ -107,20 +109,20 @@ export function ClipText({
           </>
         )}
       </div>
-      <button type="button" onClick={onDetails} className="flex flex-col gap-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+      <button type="button" onClick={onDetails} className="flex w-full min-w-0 flex-col gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
         <span className={cn(T.section, MEDIA_INK, "flex items-start gap-3")}>
           <span aria-hidden title={kind} className="mt-[2px] shrink-0">
             <Icon icon={clip.kind === "project" ? Layers01Icon : CpuIcon} size={20} />
           </span>
-          <span className="min-w-0 [overflow-wrap:anywhere]">
+          <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">
             <span className="sr-only">{kind}: </span>
             {clip.title}
           </span>
         </span>
         {clip.description && (
-          <span className={cn(T.bodyLg, MEDIA_INK)}>
-            {shortOf(clip.description)}
-            <span className="text-text-tertiary">more</span>
+          <span className={cn(T.body, MEDIA_INK, "flex w-full min-w-0 gap-2")}>
+            <span className="min-w-0 truncate">{clip.description.trim()}</span>
+            <span className="shrink-0 text-text-tertiary">more</span>
           </span>
         )}
       </button>
@@ -152,18 +154,6 @@ export type ClipState = {
 };
 
 const SEEN_MS = 1000;
-/** About two lines of Body/MD in the clip's text column. */
-const SHORT_CHARS = 56;
-
-/** The description's first two lines, then "...": "more" follows it (Figma). */
-export function shortOf(text: string): string {
-  const t = text.trim();
-  if (t.length <= SHORT_CHARS) return `${t} `;
-  const cut = t.slice(0, SHORT_CHARS);
-  const space = cut.lastIndexOf(" ");
-  return `${(space > 30 ? cut.slice(0, space) : cut).replace(/[,.;:]$/, "")}...`;
-}
-
 export function ClipView({
   clip,
   state,
@@ -293,7 +283,7 @@ export function ClipView({
       )}
       {model && <ModelView clip={clip} poster={poster} />}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[140px] bg-gradient-to-b from-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)] to-transparent" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[56%] bg-gradient-to-b from-transparent from-[14%] to-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%] bg-gradient-to-b from-transparent from-[10%] to-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)]" />
 
       <button
         type="button"
@@ -339,7 +329,7 @@ export function ClipView({
         )}
 
         <div className="flex items-end gap-6 px-8 pb-6">
-          <div className="pointer-events-auto flex min-w-0 flex-1 flex-col gap-8">
+          <div className="pointer-events-auto flex min-w-0 flex-1 flex-col gap-5">
             <ClipText clip={clip} following={state.following} onCreator={handlers.onCreator} onFollow={handlers.onFollow} onDetails={handlers.onDetails} />
             <ClipOffers offers={clip.offers} onBuy={handlers.onBuy} />
           </div>
