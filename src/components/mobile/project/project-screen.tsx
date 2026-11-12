@@ -175,6 +175,7 @@ function ProjectReady({ data }: { data: Ready }) {
           <TopBar
             back="/m/projects"
             title={titleGone ? project.name : undefined}
+            titleAs="p"
             actions={owner ? [{ icon: MORE_ICON, label: "Project actions", onClick: () => setSheet({ kind: "menu" }) }] : []}
           />
         }

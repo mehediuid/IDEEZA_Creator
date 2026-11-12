@@ -66,7 +66,7 @@ function useAddingRows(projectId: string): { key: string; name: string; thumb: s
             : status === "failed" || status === "partial"
               ? "Open the chat to retry it."
               : `${ready} of ${total} pieces. You can leave this screen.`,
-        href: `/m/ai?chat=${encodeURIComponent(chat.id)}`,
+        href: `/m/ai/chat/${encodeURIComponent(chat.id)}`,
       });
     }
     return out;
@@ -261,7 +261,7 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
     setStarting(true);
     const chat = createChat(text, { addTo: project.id });
     onStarted();
-    router.push(`/m/ai?chat=${encodeURIComponent(chat.id)}`);
+    router.push(`/m/ai/chat/${encodeURIComponent(chat.id)}`);
     return true;
   };
 

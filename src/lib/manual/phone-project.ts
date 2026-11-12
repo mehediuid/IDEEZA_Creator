@@ -65,7 +65,7 @@ export function phoneProjectPath(projectId: string, rest: string): string {
  * - `/projects/<id>…` (Earn, a product, the mint) → `/m/projects/<id>…`, query and hash kept;
  * - `/build/<buildId>` (Review version n) → this project's Review version screen (05d), which
  *   needs the project, so it is null without one;
- * - `/chat/<chatId>` → the AI tab with that chat (`/m/ai?chat=<id>`);
+ * - `/chat/<chatId>` → the AI tab with that chat (`/m/ai/chat/<id>`);
  * - anything else → null: the phone has no screen for it.
  */
 export function phoneHrefOf(webHref: string, projectId?: string): string | null {
@@ -73,7 +73,7 @@ export function phoneHrefOf(webHref: string, projectId?: string): string | null 
   const build = /^\/build\/([^/?#]+)/.exec(webHref);
   if (build) return projectId ? `${phoneProjectPath(projectId, "review")}?build=${build[1]}` : null;
   const chat = /^\/chat\/([^/?#]+)/.exec(webHref);
-  if (chat) return `/m/ai?chat=${chat[1]}`;
+  if (chat) return `/m/ai/chat/${chat[1]}`;
   return null;
 }
 

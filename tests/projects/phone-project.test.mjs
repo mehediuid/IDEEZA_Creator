@@ -20,7 +20,7 @@ test("a web address opens its phone screen, or nothing", () => {
   assert.equal(p.phoneHrefOf("/projects/p1/earn/money#splits"), "/m/projects/p1/earn/money#splits");
   assert.equal(p.phoneHrefOf("/build/b9", "p1"), "/m/projects/p1/review?build=b9");
   assert.equal(p.phoneHrefOf("/build/b9"), null);
-  assert.equal(p.phoneHrefOf("/chat/c3"), "/m/ai?chat=c3");
+  assert.equal(p.phoneHrefOf("/chat/c3"), "/m/ai/chat/c3");
   assert.equal(p.phoneHrefOf("/innovations"), null);
 });
 

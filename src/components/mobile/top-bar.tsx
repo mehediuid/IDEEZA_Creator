@@ -25,6 +25,7 @@ export function TopBar({
   title,
   back,
   onBack,
+  titleAs: TitleTag = "h1",
   actions = [],
   className,
 }: {
@@ -34,6 +35,8 @@ export function TopBar({
   /** Called in place of Back, with the Back to run once it is safe: a form with unsaved
    *  changes asks first (`onBack={(goBack) => (dirty ? setLeaving(() => goBack) : goBack())}`). */
   onBack?: (goBack: () => void) => void;
+  /** The title's element: `p` when the page has its own h1 (a product page whose name scrolls into the bar). */
+  titleAs?: "h1" | "p";
   actions?: TopBarAction[];
   className?: string;
 }) {
@@ -53,7 +56,7 @@ export function TopBar({
         )}
       </div>
       {title != null && (
-        <h1 className={cn(T.screenTitle, "min-w-0 flex-1 truncate text-center")}>{title}</h1>
+        <TitleTag className={cn(T.screenTitle, "min-w-0 flex-1 truncate text-center")}>{title}</TitleTag>
       )}
       <div className={cn(slot, "justify-end")}>
         {actions.map((a) => (
