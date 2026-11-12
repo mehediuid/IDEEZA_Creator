@@ -4,8 +4,8 @@
 // and "Play and pause a clip"). The video fills the screen under a dark scrim
 // at the top and the bottom; everything over it is the Dark semantic mode, so
 // its text is white (owner rule). At the foot, the creator (A16b, • Follow),
-// the Project / Product chip, the title (H6) and two lines of the description
-// with "more" — the title and the description open the item's details; the
+// the title (H6) and two lines of the description with "more" — the title and
+// the description open the item's details; the
 // video itself plays or pauses. Under them, the item's marketplace offers. On
 // the right, the clip side nav: 3D, AR/VR, appreciate (with its count),
 // comments (with theirs), share and ⋯.
@@ -17,16 +17,23 @@
 //
 // A project you shared plays its video in use from this browser's clip store
 // (`takeId`); it carries no Follow, and says so when the video isn't here. A
-// clip you shared to your Feed leads with "You shared" and your caption. Next
-// to the Project / Product chip: the project's current Activity and Minted,
-// as the web's cards show them.
+// clip you shared to your Feed leads with "You shared" and your caption.
+//
+// Owner 2026-11-12: no chip row over the video. Whether it is a project or a
+// product is an icon in front of the title (layers: a project, a chip: a
+// product), and a minted one carries a seal after the title; both are said
+// in words to screen readers. The project's Activity ("Ready for
+// manufacture") is left to its details page.
 
 import * as React from "react";
 import {
   Alert02Icon,
   Blockchain01Icon,
+  CheckmarkBadge01Icon,
   CommentAdd02Icon,
+  CpuIcon,
   FavouriteIcon,
+  Layers01Icon,
   MoreHorizontalIcon,
   PauseIcon,
   PlayIcon,
@@ -35,10 +42,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
-import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { Spinner } from "@/components/ideeza/spinner";
-import { Tag } from "@/components/ideeza/tag";
 import { useClipUrl } from "@/components/video-jobs/video-player";
 import { formatCount } from "@/lib/feed";
 import type { ClipOffer, FeedClip } from "@/lib/innovations/clips";
@@ -64,6 +69,7 @@ export function ClipText({
   onDetails: () => void;
 }) {
   const audience = clip.share ? (AUDIENCES.find((a) => a.id === clip.share?.audience)?.label ?? "Public") : null;
+  const kind = clip.kind === "project" ? "Project" : "Product";
   return (
     <div className="flex min-w-0 flex-col items-start gap-4">
       {clip.share && (
@@ -101,13 +107,22 @@ export function ClipText({
           </>
         )}
       </div>
-      <div data-theme="light" className="flex flex-wrap items-center gap-2">
-        <Tag size="md">{clip.kind === "project" ? "Project" : "Product"}</Tag>
-        {clip.stage && <Tag size="md">{clip.stage}</Tag>}
-        {clip.minted && <Badge tone="success">Minted</Badge>}
-      </div>
       <button type="button" onClick={onDetails} className="flex flex-col gap-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-        <span className={cn(T.section, MEDIA_INK)}>{clip.title}</span>
+        <span className={cn(T.section, MEDIA_INK, "flex items-start gap-3")}>
+          <span aria-hidden title={kind} className="mt-[2px] shrink-0">
+            <Icon icon={clip.kind === "project" ? Layers01Icon : CpuIcon} size={20} />
+          </span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">
+            <span className="sr-only">{kind}: </span>
+            {clip.title}
+            {clip.minted && (
+              <span title="Minted" className="ml-2 inline-flex translate-y-[3px] text-[color:var(--color-icon-success)]">
+                <Icon icon={CheckmarkBadge01Icon} size={18} />
+                <span className="sr-only">, minted</span>
+              </span>
+            )}
+          </span>
+        </span>
         {clip.description && (
           <span className={cn(T.bodyLg, MEDIA_INK)}>
             {shortOf(clip.description)}
