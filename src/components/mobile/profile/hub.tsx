@@ -152,7 +152,7 @@ function WalletValue() {
   return (
     <span className="flex shrink-0 items-center gap-4">
       <TestnetDemoBadge />
-      <span className={cn(T.rowTitle, "tabular-nums text-text-brand")}>{compactCount(Number(idz.idz))} $IDZ</span>
+      <span className={cn(T.rowTitle, "tabular-nums text-text-brand")}>{compactCount(Number(idz.idz))} IDZ</span>
     </span>
   );
 }
