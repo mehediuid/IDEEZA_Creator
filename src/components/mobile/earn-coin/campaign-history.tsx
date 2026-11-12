@@ -1,19 +1,23 @@
 "use client";
 
-// Campaign History (Figma "Refer & Earn" 229289, Date range 229327): the
-// current campaign's referrals, searched by the referred creator's name and
-// filtered by Last week, Last month or a year (a pick-one sheet).
+// Campaign History (Figma "Refer & Earn" 229289, Date range 229327): every
+// campaign's referrals, each card with its campaign and Claimed / Not
+// Claimed, searched by the referred creator's name and filtered By Campaign
+// and by Last week, Last month or a year (pick-one sheets).
 
 import * as React from "react";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { cn } from "@/lib/utils";
-import { campaignOf, currentLinkOf, filterReferrals, referralRowsOf, referralYearsOf, type DateRange } from "@/lib/wallet/referral";
+import { Note01Icon } from "@hugeicons/core-free-icons";
+import { CAMPAIGNS, filterReferrals, linksOf, referralRowsOf, referralYearsOf, type DateRange } from "@/lib/wallet/referral";
 import { useReferralData } from "@/lib/wallet/use-earn-stores";
+import { EmptyState } from "../kit/state";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { EmptyCard, FilterButton, SECTION_TITLE, useEarnState } from "./parts";
+import { T } from "../type";
+import { FilterButton, useEarnState } from "./parts";
 import { ReferralCard } from "./refer-tab";
 
 export function CampaignHistory() {
@@ -21,21 +25,35 @@ export function CampaignHistory() {
   const data = useReferralData();
   const [search, setSearch] = React.useState("");
   const [range, setRange] = React.useState("all");
-  const link = data && id ? currentLinkOf(data, id) : null;
-  const rows = data && id && link ? referralRowsOf(data, wallet, id).filter((r) => r.campaign === link.campaign) : [];
+  const [campaign, setCampaign] = React.useState("all");
+  const joined = data && id ? linksOf(data, id) : [];
+  const rows = data && id ? referralRowsOf(data, wallet, id) : [];
   const picked: DateRange = range === "all" || range === "week" || range === "month" ? range : Number(range);
-  const shown = filterReferrals(rows, { campaign: "all", search, range: picked }, now);
-  const campaign = link ? campaignOf(link.campaign) : null;
+  const shown = filterReferrals(rows, { campaign, search, range: picked }, now);
+  const clear = () => {
+    setSearch("");
+    setRange("all");
+    setCampaign("all");
+  };
 
   return (
     <Screen top={<TopBar back title="Campaign History" />} className="px-8 pb-8 pt-4">
       <div className="flex flex-col gap-8">
         <div className="flex items-center justify-between gap-6">
-          <h2 className={cn(SECTION_TITLE, "min-w-0")}>History{campaign ? ` · ${campaign.name}` : ""}</h2>
+          <h2 className={cn(T.section, "min-w-0")}>History</h2>
           <TestnetDemoBadge />
         </div>
+        <SearchInput size="xl" value={search} onValueChange={setSearch} onClear={() => setSearch("")} placeholder="Search by user name" aria-label="Search by user name" />
         <div className="flex items-center gap-6">
-          <SearchInput value={search} onValueChange={setSearch} onClear={() => setSearch("")} placeholder="Search by user name" aria-label="Search by user name" containerClassName="min-w-0 flex-[1.4]" />
+          <FilterButton
+            label="By Campaign"
+            value={campaign}
+            onChange={setCampaign}
+            options={[
+              { value: "all", label: "Every campaign" },
+              ...CAMPAIGNS.filter((c) => joined.some((l) => l.campaign === c.id)).map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
           <FilterButton
             label="Date Range"
             value={range}
@@ -50,14 +68,18 @@ export function CampaignHistory() {
         </div>
         {!data ? (
           <Skeleton shape="block" className="h-[200px] w-full" />
-        ) : !link ? (
-          <EmptyCard lines={["No campaign yet.", "Generate your link on Refer & Earn."]} />
+        ) : joined.length === 0 ? (
+          <EmptyState icon={Note01Icon} title="No campaign yet" body="Generate your link on Refer & Earn." action={{ label: "Go to Refer & Earn", href: "/m/earn/refer" }} />
         ) : shown.length === 0 ? (
-          <EmptyCard lines={rows.length ? ["No referral matches."] : ["No data found."]} />
+          rows.length ? (
+            <EmptyState title="No referral matches" body="Try another name, campaign or date range." action={{ label: "Clear filters", onClick: clear }} />
+          ) : (
+            <EmptyState icon={Note01Icon} title="No data found" body="Referrals through your links show here." />
+          )
         ) : (
           <ul className="flex flex-col gap-8">
             {shown.map((r) => (
-              <ReferralCard key={r.id} r={r} title={false} />
+              <ReferralCard key={r.id} r={r} />
             ))}
           </ul>
         )}

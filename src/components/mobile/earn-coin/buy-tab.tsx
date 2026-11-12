@@ -2,16 +2,20 @@
 
 // Earn Coin › Buy $IDZ (Figma "Buy IDEEZA Coin" › Ideeza-Wallet 229495 not
 // connected, 229392 connected; the web's Balance › Buy IDZ Token): the
-// balance card with Import IDZ Token and Buy IDZ Coin, and every presale
-// purchase of the connected demo account, filtered by Chain Type and Status,
-// each with where it stands — Unlocks in … (Claim off), Ready to claim now
-// (Claim, through the wallet sheet), Claimed. After a purchase the presale
-// comes back here with `?bought=<tx>`, and the success sheet (Figma 230189)
-// counts down to its claim; View transaction log goes to the list.
+// balance card with Import IDZ Token and Buy $IDZ Coin, and every presale
+// purchase of the connected demo account, filtered by Chain Type and Status
+// (Figma) and by Month and Year (the web's table), ten at a time, each with
+// where it stands — Unlocks in … (Claim off), Ready to claim now (Claim,
+// through the wallet sheet), Claimed. After a purchase the presale comes back
+// here with `?bought=<tx>`, and the success sheet (Figma 230189) shows its
+// transaction and counts down to its claim; View transaction log goes to the
+// list. A `bought` that names no purchase of this wallet opens nothing.
+// The wallet sheet is the screen's, so a disconnect mid-claim still says so.
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlarmClockIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { AlarmClockIcon, Note01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
@@ -21,11 +25,22 @@ import { cn } from "@/lib/utils";
 import { demoAddress, readWallet } from "@/lib/wallet/demo-wallet";
 import { formatAmount } from "@/lib/wallet/money";
 import { LOCK_WORDS, claimRequestOf, countdownOf } from "@/lib/wallet/presale";
-import { PURCHASE_STATUSES, filterPurchases, purchaseStatusOf, purchasesOf, type Purchase, type PurchaseStatus } from "@/lib/wallet/presale-records";
+import {
+  PURCHASE_STATUSES,
+  filterPurchases,
+  purchaseStatusOf,
+  purchaseYearsOf,
+  purchasesOf,
+  type Purchase,
+  type PurchaseStatus,
+} from "@/lib/wallet/presale-records";
 import { Sheet } from "../kit/sheet";
+import { EmptyState } from "../kit/state";
+import { tabPanelProps } from "../kit/tabs";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { useEarnMenu } from "./earn-menu";
 import {
   BalanceCard,
@@ -35,14 +50,14 @@ import {
   ChainTitle,
   ConnectSheet,
   CopyChip,
-  EmptyCard,
+  EARN_TABS_ID,
+  EarnTabs,
   FilterButton,
   IdzFigure,
   ImportTokenSheet,
   InfoRow,
+  MONTH_OPTIONS,
   NoBalanceCard,
-  SECTION_TITLE,
-  EarnTabs,
   clockOf,
   useEarnState,
   whenOf,
@@ -50,19 +65,38 @@ import {
 import { useWalletSheet } from "./wallet-sheet";
 
 export const ACTIVITY_ID = "earn-activity";
+const PER_PAGE = 10;
+
+/** Report a problem, opened about this purchase (the web's "contact us"). */
+function reportHref(txHash: string | null): string {
+  const details = txHash ? `IDZ presale purchase ${txHash}` : "IDZ presale purchase";
+  return `/m/help/report?from=${encodeURIComponent("/m/earn/buy")}&details=${encodeURIComponent(details)}`;
+}
 
 export function BuyTab() {
   const router = useRouter();
   const params = useSearchParams();
+  const toast = useToast();
   const { wallet, now, id, connected, network, holdings } = useEarnState();
   const menu = useEarnMenu();
+  const sheet = useWalletSheet();
   const [importing, setImporting] = React.useState(false);
   const [connecting, setConnecting] = React.useState(false);
   const bought = params.get("bought");
+  const purchases = wallet && id && connected ? purchasesOf(wallet, id) : [];
+  const boughtPurchase = bought ? (purchases.find((p) => p.txHash === bought) ?? null) : null;
+
+  // `?bought=` that names no purchase of this wallet: no success to show, so it says so and leaves the address.
+  const stray = !!bought && !!wallet && !boughtPurchase;
+  React.useEffect(() => {
+    if (!stray) return;
+    toast({ title: "That purchase isn’t in this wallet.", lead: "error" });
+    router.replace("/m/earn/buy", { scroll: false });
+  }, [stray, toast, router]);
 
   const buyButton = (
     <Button size="xl" className="w-full px-4" onClick={() => router.push("/m/earn/presale")}>
-      Buy IDZ Coin
+      Buy $IDZ Coin
     </Button>
   );
 
@@ -70,71 +104,84 @@ export function BuyTab() {
     <Screen top={<TopBar back="/m/earn" title="Earn Coin" actions={[menu.action]} />} className="px-8 pb-8">
       <div className="flex flex-col gap-12">
         <EarnTabs />
-        <section className="flex flex-col gap-6" aria-label="Current Balance">
-          <BalanceHeading network={network} connected={connected} />
-          {!wallet ? (
-            <Skeleton shape="block" className="h-[242px] w-full" />
-          ) : holdings ? (
-            <BalanceCard network={network} holdings={holdings}>
-              <CardActions>
-                <Button hierarchy="secondary" size="xl" className="w-full px-4" onClick={() => setImporting(true)}>
-                  Import IDZ Token
-                </Button>
-                {buyButton}
-              </CardActions>
-            </BalanceCard>
-          ) : (
-            <NoBalanceCard>
-              <CardActions>
-                <Button hierarchy="secondary" size="xl" className="w-full px-4" onClick={() => setConnecting(true)}>
-                  Connect Wallet
-                </Button>
-                {buyButton}
-              </CardActions>
-            </NoBalanceCard>
-          )}
-        </section>
+        <div {...tabPanelProps(EARN_TABS_ID, "buy")} className="flex flex-col gap-12 outline-none">
+          <section className="flex flex-col gap-6" aria-label="Current Balance">
+            <BalanceHeading network={network} connected={connected} />
+            {!wallet ? (
+              <Skeleton shape="block" className="h-[242px] w-full" />
+            ) : holdings ? (
+              <BalanceCard network={network} holdings={holdings}>
+                <CardActions>
+                  <Button hierarchy="secondary" size="xl" className="w-full px-4" onClick={() => setImporting(true)}>
+                    Import IDZ Token
+                  </Button>
+                  {buyButton}
+                </CardActions>
+              </BalanceCard>
+            ) : (
+              <NoBalanceCard>
+                <CardActions>
+                  <Button hierarchy="secondary" size="xl" className="w-full px-4" onClick={() => setConnecting(true)}>
+                    Connect wallet
+                  </Button>
+                  {buyButton}
+                </CardActions>
+              </NoBalanceCard>
+            )}
+          </section>
 
-        <section className="flex flex-col gap-8" aria-labelledby={ACTIVITY_ID}>
-          <h2 id={ACTIVITY_ID} tabIndex={-1} className={cn(SECTION_TITLE, "outline-none")}>
-            Transaction Activity
-          </h2>
-          {!wallet ? null : connected && id ? (
-            <Purchases purchases={purchasesOf(wallet, id)} now={now} />
-          ) : (
-            <EmptyCard lines={["No data found.", "Please connect your wallet."]} />
-          )}
-        </section>
+          <section className="flex flex-col gap-8" aria-labelledby={ACTIVITY_ID}>
+            <h2 id={ACTIVITY_ID} tabIndex={-1} className={cn(T.section, "outline-none")}>
+              Transaction Activity
+            </h2>
+            {!wallet ? null : connected && id ? (
+              <Purchases purchases={purchases} now={now} sheet={sheet} />
+            ) : (
+              <EmptyState icon={Note01Icon} title="No data found" body="Connect your wallet to see your purchases." />
+            )}
+          </section>
+        </div>
       </div>
       <ImportTokenSheet open={importing} onClose={() => setImporting(false)} network={network} />
       <ConnectSheet open={connecting} onClose={() => setConnecting(false)} />
-      {bought && wallet && id && (
-        <PurchaseSuccess
-          purchase={purchasesOf(wallet, id).find((p) => p.txHash === bought) ?? null}
-          now={now}
-          onClose={() => router.replace("/m/earn/buy", { scroll: false })}
-        />
-      )}
+      {boughtPurchase && <PurchaseSuccess purchase={boughtPurchase} now={now} onClose={() => router.replace("/m/earn/buy", { scroll: false })} />}
+      {sheet.sheet}
       {menu.node}
     </Screen>
   );
 }
 
-function Purchases({ purchases, now }: { purchases: Purchase[]; now: number }) {
+function Purchases({ purchases, now, sheet }: { purchases: Purchase[]; now: number; sheet: ReturnType<typeof useWalletSheet> }) {
   const [chain, setChain] = React.useState("all");
   const [status, setStatus] = React.useState("all");
-  const filter = {
-    network: chain === "all" ? "all" : (chain as Network),
-    status: status === "all" ? "all" : (status as PurchaseStatus),
-    month: "all",
-    year: "all",
-  } as const;
-  const shown = filterPurchases(purchases, filter, now);
-  const wallet = useWalletSheet();
+  const [month, setMonth] = React.useState("all");
+  const [year, setYear] = React.useState("all");
+  const [count, setCount] = React.useState(PER_PAGE);
+  const shown = filterPurchases(
+    purchases,
+    {
+      network: chain === "all" ? "all" : (chain as Network),
+      status: status === "all" ? "all" : (status as PurchaseStatus),
+      month: month === "all" ? "all" : Number(month),
+      year: year === "all" ? "all" : Number(year),
+    },
+    now,
+  );
   const toast = useToast();
+  const pick = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    setCount(PER_PAGE);
+  };
+  const clear = () => {
+    setChain("all");
+    setStatus("all");
+    setMonth("all");
+    setYear("all");
+    setCount(PER_PAGE);
+  };
 
   const claim = async (p: Purchase) => {
-    const result = await wallet.request(claimRequestOf(p), {
+    const result = await sheet.request(claimRequestOf(p), {
       recheck: () => {
         const fresh = purchasesOf(readWallet(), p.identity).find((x) => x.id === p.id);
         if (!fresh) return "This purchase isn't in this wallet any more.";
@@ -148,46 +195,49 @@ function Purchases({ purchases, now }: { purchases: Purchase[]; now: number }) {
 
   return (
     <>
-      <div className="flex gap-6">
-        <FilterButton
-          label="Chain Type"
-          value={chain}
-          onChange={setChain}
-          options={[{ value: "all", label: "All chains" }, ...NETWORKS.map((n) => ({ value: n.value, label: n.label }))]}
-        />
-        <FilterButton
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          options={[{ value: "all", label: "Every status" }, ...PURCHASE_STATUSES.map((s) => ({ value: s.value, label: s.label }))]}
-        />
+      <div className="flex flex-col gap-6">
+        <div className="flex gap-6">
+          <FilterButton
+            label="Chain Type"
+            value={chain}
+            onChange={pick(setChain)}
+            options={[{ value: "all", label: "All chains" }, ...NETWORKS.map((n) => ({ value: n.value, label: n.label }))]}
+          />
+          <FilterButton
+            label="Status"
+            value={status}
+            onChange={pick(setStatus)}
+            options={[{ value: "all", label: "Every status" }, ...PURCHASE_STATUSES.map((s) => ({ value: s.value, label: s.label }))]}
+          />
+        </div>
+        <div className="flex gap-6">
+          <FilterButton label="Month" value={month} onChange={pick(setMonth)} options={MONTH_OPTIONS} />
+          <FilterButton
+            label="Year"
+            value={year}
+            onChange={pick(setYear)}
+            options={[{ value: "all", label: "Every year" }, ...purchaseYearsOf(purchases, now).map((y) => ({ value: String(y), label: String(y) }))]}
+          />
+        </div>
       </div>
       {shown.length === 0 ? (
-        <EmptyCard
-          lines={purchases.length ? ["No purchases match these filters."] : ["No purchases yet.", "Buy IDZ in the presale to see it here."]}
-          action={
-            purchases.length ? (
-              <Button
-                hierarchy="secondary"
-                size="lg"
-                onClick={() => {
-                  setChain("all");
-                  setStatus("all");
-                }}
-              >
-                Clear filters
-              </Button>
-            ) : undefined
-          }
-        />
+        purchases.length ? (
+          <EmptyState title="No purchases match" body="No purchase matches these filters." action={{ label: "Clear filters", onClick: clear }} />
+        ) : (
+          <EmptyState icon={Note01Icon} title="No purchases yet" body="Buy IDZ in the presale to see it here." />
+        )
       ) : (
         <ul className="flex flex-col gap-8">
-          {shown.map((p) => (
-            <PurchaseCard key={p.id} p={p} now={now} busy={wallet.busy} onClaim={() => claim(p)} />
+          {shown.slice(0, count).map((p) => (
+            <PurchaseCard key={p.id} p={p} now={now} busy={sheet.busy} onClaim={() => claim(p)} />
           ))}
         </ul>
       )}
-      {wallet.sheet}
+      {shown.length > count && (
+        <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setCount((n) => n + PER_PAGE)}>
+          Show more
+        </Button>
+      )}
     </>
   );
 }
@@ -206,34 +256,35 @@ function PurchaseCard({ p, now, busy, onClaim }: { p: Purchase; now: number; bus
         <InfoRow label="Wallet Address">
           <CopyChip value={demoAddress(p.identity)} what="Wallet address" />
         </InfoRow>
-        <InfoRow label="YOU PAID">{formatAmount(p.buy.paid.amount, p.buy.paid.coin)}</InfoRow>
+        <InfoRow label="You paid">{formatAmount(p.buy.paid.amount, p.buy.paid.coin)}</InfoRow>
         <InfoRow label="Date">{whenOf(p.at)}</InfoRow>
       </dl>
-      <div className="flex min-h-[36px] items-center justify-between gap-6 border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-8">
+      <div className="flex min-h-[36px] flex-wrap items-center justify-between gap-x-6 gap-y-4 border-t-[length:var(--border-width-1)] border-solid border-border pt-8">
         {status === "claimed" ? (
           <>
-            <span className="text-md leading-md text-text-secondary">In your balance</span>
+            <span className={T.body}>In your balance</span>
             <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
               Claimed
             </Badge>
           </>
         ) : status === "claimable" ? (
           <>
-            <span className="text-md font-medium leading-md text-text-success">Ready to claim now</span>
-            <Button size="md" className="w-[80px]" disabled={busy} onClick={onClaim} aria-label={`Claim ${formatAmount(p.buy.idz, "IDZ")}`}>
+            <span className={cn(T.rowTitle, "text-text-success")}>Ready to claim now</span>
+            <Button size="sm" disabled={busy} onClick={onClaim} aria-label={`Claim ${formatAmount(p.buy.idz, "IDZ")}`}>
               Claim
             </Button>
           </>
         ) : (
           <>
-            <span id={lockId} className="flex items-center gap-3 text-md leading-md text-text-primary">
+            <span id={lockId} className={cn(T.body, "flex items-center gap-3 text-text-primary")}>
               Unlocks in:
-              <span role="timer" className="inline-flex h-[24px] items-center gap-2 rounded-full bg-bg-error-subtle px-4 text-sm leading-xs tabular-nums text-text-error">
-                <Icon icon={AlarmClockIcon} size={14} />
-                {clockOf(p.buy.unlocksAt - now)}
+              <span role="timer">
+                <Badge tone="error" icon={<Icon icon={AlarmClockIcon} size={12} />} className="tabular-nums">
+                  {clockOf(p.buy.unlocksAt - now)}
+                </Badge>
               </span>
             </span>
-            <Button size="md" className="w-[80px]" disabled aria-describedby={lockId}>
+            <Button size="sm" disabled aria-describedby={lockId}>
               Claim
             </Button>
           </>
@@ -250,8 +301,8 @@ const UNITS = [
 ] as const;
 
 /** Figma 230189 (as a sheet): the purchase went through; its IDZ can be claimed when the countdown ends. */
-function PurchaseSuccess({ purchase, now, onClose }: { purchase: Purchase | null; now: number; onClose: () => void }) {
-  const left = purchase ? purchase.buy.unlocksAt - now : 0;
+function PurchaseSuccess({ purchase, now, onClose }: { purchase: Purchase; now: number; onClose: () => void }) {
+  const left = purchase.buy.unlocksAt - now;
   const c = countdownOf(left);
   const hours = c.days * 24 + c.hours;
   const viewLog = () => {
@@ -262,23 +313,22 @@ function PurchaseSuccess({ purchase, now, onClose }: { purchase: Purchase | null
       h?.focus();
     }, 0);
   };
-  const subject = encodeURIComponent(`IDZ presale purchase ${purchase?.txHash ?? ""}`.trim());
   return (
     <Sheet
       open
       onClose={onClose}
       title="Purchase successful"
-      description={purchase ? `${formatAmount(purchase.buy.idz, "IDZ")} for ${formatAmount(purchase.buy.paid.amount, purchase.buy.paid.coin)}.` : undefined}
+      description={`${formatAmount(purchase.buy.idz, "IDZ")} for ${formatAmount(purchase.buy.paid.amount, purchase.buy.paid.coin)}.`}
       actions={
         <>
           <Button size="xl" className="w-full" onClick={viewLog}>
             View transaction log
           </Button>
-          <p className="text-center text-sm leading-sm text-text-secondary">
-            If you have any questions or need support, please{" "}
-            <a href={`mailto:support@ideeza.com?subject=${subject}`} className="text-text-brand underline underline-offset-2">
+          <p className={cn(T.meta, "text-center")}>
+            If you have any questions or need support,{" "}
+            <Link href={reportHref(purchase.txHash)} className="text-text-brand underline underline-offset-2">
               contact us
-            </a>
+            </Link>
             .
           </p>
         </>
@@ -288,25 +338,31 @@ function PurchaseSuccess({ purchase, now, onClose }: { purchase: Purchase | null
         <span aria-hidden className="inline-flex size-[56px] items-center justify-center rounded-full bg-bg-success-subtle text-text-success">
           <Icon icon={Tick02Icon} size={28} />
         </span>
-        {purchase && left > 0 ? (
+        {left > 0 ? (
           <>
-            <p className="text-3xl font-semibold leading-3xl text-text-primary">Your IDZ will be available to claim in</p>
+            <p className={T.title}>Your IDZ will be available to claim in</p>
             <div role="timer" aria-label={`${hours} hours ${c.minutes} minutes ${c.seconds} seconds`} className="flex gap-4">
               {UNITS.map((u) => (
-                <span key={u.key} aria-hidden className="inline-flex h-[28px] items-center gap-1 rounded-md bg-bg-subtle px-4 text-md leading-md tabular-nums text-text-primary">
-                  <span className="font-semibold">{String(u.key === "hours" ? hours : c[u.key]).padStart(2, "0")}</span>
-                  <span className="text-sm leading-sm text-text-secondary">{u.name}</span>
+                <span key={u.key} aria-hidden className="inline-flex h-[28px] items-center gap-1 rounded-md bg-bg-subtle px-4 tabular-nums">
+                  <span className={T.name}>{String(u.key === "hours" ? hours : c[u.key]).padStart(2, "0")}</span>
+                  <span className={T.meta}>{u.name}</span>
                 </span>
               ))}
             </div>
-            <p className="text-lg leading-lg text-text-primary">Once the countdown reaches zero, you’ll be able to claim your IDZ.</p>
+            <p className={T.body}>Once the countdown reaches zero, you’ll be able to claim your IDZ.</p>
           </>
         ) : (
-          <p role="status" className="text-3xl font-semibold leading-3xl text-text-primary">
+          <p role="status" className={T.title}>
             Your IDZ is ready to claim.
           </p>
         )}
-        <p className="text-sm leading-sm text-text-secondary">
+        {purchase.txHash && (
+          <p className={cn(T.body, "flex flex-wrap items-center justify-center gap-3")}>
+            Transaction
+            <CopyChip value={purchase.txHash} what="Transaction hash" />
+          </p>
+        )}
+        <p className={T.meta}>
           Bought IDZ unlocks {LOCK_WORDS} after the purchase confirms. Then you claim it here, on Buy $IDZ.
         </p>
       </div>

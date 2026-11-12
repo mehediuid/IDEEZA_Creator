@@ -13,6 +13,7 @@ import { STAKE_CONTRACTS, contractStatusOf, withContractStatus, type ContractSta
 import { readStakeAdmin, useStakeAdmin, writeStakeAdmin } from "@/lib/wallet/use-earn-stores";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { T } from "../type";
 
 const STATES: { value: ContractStatus; label: string }[] = [
   { value: "active", label: "Active" },
@@ -45,7 +46,7 @@ export function StakeAdminSheet({ open, onClose }: { open: boolean; onClose: () 
       <ul className="flex flex-col gap-8">
         {STAKE_CONTRACTS.map((c) => (
           <li key={c.id} className="flex flex-col gap-3">
-            <span className="text-lg font-medium leading-lg text-text-primary">{c.name}</span>
+            <span className={T.bodyStrong}>{c.name}</span>
             <Segmented label={`${c.name} state`} value={contractStatusOf(admin, c.id)} options={STATES} onChange={(v) => set(c.id, c.name, v)} size="md" />
           </li>
         ))}

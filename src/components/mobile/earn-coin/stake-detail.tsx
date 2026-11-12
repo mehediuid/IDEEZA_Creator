@@ -8,13 +8,13 @@
 // ready share at once (one wallet transaction).
 
 import * as React from "react";
-import { Note01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import Link from "next/link";
+import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { IdzCoin } from "@/components/balance/idz-coin";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { StateCard } from "@/components/ideeza/state-card";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { cn } from "@/lib/utils";
 import { formatWhen } from "@/lib/wallet/idz";
@@ -34,9 +34,11 @@ import {
   tranchesOf,
 } from "@/lib/wallet/staking";
 import { useStakeAdmin } from "@/lib/wallet/use-earn-stores";
+import { NotFoundState } from "../kit/state";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { CARD, CopyChip, InfoRow, SECTION_TITLE, clockOf, useEarnState } from "./parts";
+import { T } from "../type";
+import { CARD, CopyChip, InfoRow, clockOf, useEarnState } from "./parts";
 import { supportHref, useStakeActions } from "./stake-tab";
 
 export function StakeDetail({ stakeKey }: { stakeKey: string }) {
@@ -60,12 +62,10 @@ export function StakeDetail({ stakeKey }: { stakeKey: string }) {
   if (!s || !c) {
     return (
       <Screen top={<TopBar back title="Stake" />} className="px-8 pb-8 pt-4">
-        <StateCard
-          tone="empty"
-          className="w-full"
-          icon={<Icon icon={Note01Icon} size={32} />}
-          title="This stake isn’t in this wallet"
+        <NotFoundState
+          thing="stake"
           body="Stakes belong to the demo account that made them. Switch account in the Demo wallet to see its own."
+          action={{ label: "Go to Stake", href: "/m/earn/stake" }}
         />
       </Screen>
     );
@@ -78,14 +78,14 @@ export function StakeDetail({ stakeKey }: { stakeKey: string }) {
   const withdrawBlock = stakeActionBlockOf(s, status, now, "withdraw");
   const claimBlock = stakeActionBlockOf(s, status, now, "claim");
   const share = tranches[0]?.amount ?? "0";
-  const link = "rounded-xs text-md leading-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus";
+  const link = cn(T.rowTitle, "rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-border-focus");
 
   return (
     <Screen top={<TopBar back title={c.name} />} className="px-8 pb-8 pt-4">
       <div className="flex flex-col gap-12">
         <section className="flex flex-col gap-8" aria-labelledby="stake-details">
           <div className="flex items-center justify-between gap-6">
-            <h2 id="stake-details" className={SECTION_TITLE}>
+            <h2 id="stake-details" className={T.section}>
               Stake Details
             </h2>
             <TestnetDemoBadge />
@@ -95,9 +95,9 @@ export function StakeDetail({ stakeKey }: { stakeKey: string }) {
               {status === "blocked" ? (
                 <>
                   {STATUS_WORDS.blocked}.{" "}
-                  <a href={supportHref(s)} className="text-text-brand underline underline-offset-2">
+                  <Link href={supportHref(s)} className="text-text-brand underline underline-offset-2">
                     Get support
-                  </a>
+                  </Link>
                 </>
               ) : (
                 `${STATUS_WORDS.paused}. Claims and withdrawals wait until it resumes.`
@@ -114,7 +114,7 @@ export function StakeDetail({ stakeKey }: { stakeKey: string }) {
             <InfoRow label="Stake Amount">
               {formatAmount(s.record.amount, "IDZ")}
               {phase === "withdrawn" ? (
-                <span className="text-md leading-md text-text-disabled">Withdrawn</span>
+                <span className={cn(T.rowTitle, "text-text-disabled")}>Withdrawn</span>
               ) : (
                 <button
                   type="button"
@@ -136,7 +136,7 @@ export function StakeDetail({ stakeKey }: { stakeKey: string }) {
             </InfoRow>
           </dl>
           {withdrawBlock && phase !== "withdrawn" && (
-            <p id="withdraw-why" className="text-sm leading-sm text-text-secondary">
+            <p id="withdraw-why" className={T.meta}>
               Withdraw: {withdrawBlock}
             </p>
           )}
@@ -144,7 +144,7 @@ export function StakeDetail({ stakeKey }: { stakeKey: string }) {
 
         <section className="flex flex-col gap-8" aria-labelledby="reward-claimed">
           <div className="flex items-center justify-between gap-6">
-            <h2 id="reward-claimed" className={SECTION_TITLE}>
+            <h2 id="reward-claimed" className={T.section}>
               Reward Claimed
             </h2>
             <button
@@ -152,43 +152,45 @@ export function StakeDetail({ stakeKey }: { stakeKey: string }) {
               onClick={claimBlock ? undefined : () => actions.claim(s, () => adminRef.current)}
               aria-disabled={claimBlock || actions.busy ? true : undefined}
               aria-describedby={claimBlock ? "claim-why" : undefined}
-              className={cn("rounded-xs text-lg font-medium leading-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus", claimBlock ? "cursor-not-allowed text-text-disabled" : "text-text-brand")}
+              className={cn(link, claimBlock ? "cursor-not-allowed text-text-disabled" : "text-text-brand")}
             >
               Claim All
             </button>
           </div>
           {claimBlock && (
-            <p id="claim-why" className="-mt-4 text-sm leading-sm text-text-secondary">
+            <p id="claim-why" className={cn(T.meta, "-mt-4")}>
               {claimBlock}
             </p>
           )}
           {tranches.length === 0 ? (
-            <p className="text-md leading-md text-text-secondary">It was withdrawn before any reward unlocked.</p>
+            <p className={T.body}>It was withdrawn before any reward unlocked.</p>
           ) : (
             <ul className="flex flex-col gap-6">
               {tranches.map((t) => (
                 <li key={t.index} className={cn(CARD, "flex items-center gap-6 p-6")}>
                   <IdzCoin height={40} />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-2xl font-medium leading-2xl tabular-nums text-text-primary">{formatAmount(t.amount, "IDZ")}</span>
-                    <span className="text-md leading-md text-text-secondary">{formatWhen(t.unlocksAt)}</span>
+                    <span className={cn(T.section, "tabular-nums")}>{formatAmount(t.amount, "IDZ")}</span>
+                    <span className={T.meta}>{formatWhen(t.unlocksAt)}</span>
                   </span>
                   {t.status === "claimed" ? (
                     <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
                       Claimed
                     </Badge>
                   ) : t.status === "ready" ? (
-                    <span className="inline-flex h-[24px] items-center rounded-full bg-bg-brand-subtle px-4 text-sm leading-xs text-text-brand">Ready</span>
+                    <Badge tone="brand">Ready</Badge>
                   ) : (
-                    <span role="timer" className="inline-flex h-[24px] items-center rounded-full bg-bg-brand-subtle px-4 text-sm leading-xs tabular-nums text-text-brand">
-                      Claim in {clockOf(t.unlocksAt - now)}
+                    <span role="timer" className="inline-flex shrink-0">
+                      <Badge tone="brand" className="tabular-nums">
+                        Claim in {clockOf(t.unlocksAt - now)}
+                      </Badge>
                     </span>
                   )}
                 </li>
               ))}
             </ul>
           )}
-          <p className="text-sm leading-sm text-text-secondary">{STAKE_TIME_LINE}</p>
+          <p className={T.meta}>{STAKE_TIME_LINE}</p>
         </section>
       </div>
       {actions.sheet}

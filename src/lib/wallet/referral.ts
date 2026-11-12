@@ -9,7 +9,9 @@
 // reads: one balance everywhere. Then the next campaign can be joined.
 //
 // Nobody else uses a link in a demo, so a Demo sheet stands in for them: one
-// of the demo creators (Mira, Leo, Sam) comes through the link and buys.
+// of the demo creators (Mira, Leo, Sam) comes through the link and buys. The
+// link itself works too: another demo account that opens it and buys in the
+// presale is counted for the link's owner (`referralFromLink`).
 // The links and the referrals are stored (`ideeza:wallet:referral`); a
 // campaign is claimed when its claim line is in the wallet.
 //
@@ -18,7 +20,7 @@
 import type { Network } from "../brief/types";
 import { estimateGas } from "../commerce/gas";
 import { demoHex } from "./demo-wallet";
-import { buyerLabel } from "./identities";
+import { DEMO_ACCOUNTS, buyerLabel } from "./identities";
 import { addAmounts, compareAmounts, formatAmount, fromMicros, toMicros } from "./money";
 import type { AccountIndex, Amount, DemoBuyerId, DemoWallet, IdentityId, WalletRequest } from "./types";
 
@@ -60,7 +62,8 @@ export const REFERRED: readonly DemoBuyerId[] = ["buyer-mira", "buyer-leo", "buy
 export const REFERRAL_MAX_BUY = "100000";
 
 export type ReferralLink = { identity: IdentityId; campaign: string; code: string; at: number };
-export type Referral = { id: string; identity: IdentityId; campaign: string; who: DemoBuyerId; bought: Amount; at: number };
+/** `who`: a demo creator from the Demo sheet, or another demo account that bought through the link. */
+export type Referral = { id: string; identity: IdentityId; campaign: string; who: IdentityId; bought: Amount; at: number };
 export type ReferralData = { v: 1; links: ReferralLink[]; referrals: Referral[] };
 
 export function emptyReferralData(): ReferralData {
@@ -87,9 +90,9 @@ export function normalizeReferralData(raw: unknown): ReferralData {
   }
   for (const r of Array.isArray(raw.referrals) ? raw.referrals : []) {
     if (!isDict(r) || typeof r.id !== "string" || !isIdentity(r.identity) || typeof r.campaign !== "string") continue;
-    if (!(REFERRED as readonly unknown[]).includes(r.who) || typeof r.bought !== "string" || toMicros(r.bought) === null) continue;
+    if (!isIdentity(r.who) || r.who === r.identity || typeof r.bought !== "string" || toMicros(r.bought) === null) continue;
     if (typeof r.at !== "number" || !Number.isFinite(r.at)) continue;
-    out.referrals.push({ id: r.id, identity: r.identity, campaign: r.campaign, who: r.who as DemoBuyerId, bought: r.bought, at: r.at });
+    out.referrals.push({ id: r.id, identity: r.identity, campaign: r.campaign, who: r.who, bought: r.bought, at: r.at });
   }
   return out;
 }
@@ -157,9 +160,34 @@ export function generateLink(d: ReferralData, w: DemoWallet | undefined, identit
   return { ok: true, value: { ...d, links: [...d.links, link] } };
 }
 
-/** "Mira (demo creator)" */
-export function referredNameOf(who: DemoBuyerId): string {
-  return buyerLabel(who);
+/** "Mira (demo creator)" · "Demo account 2" */
+export function referredNameOf(who: IdentityId): string {
+  if (who.startsWith("maker-")) return DEMO_ACCOUNTS.find((a) => `maker-${a.index}` === who)?.label ?? "Demo account";
+  return buyerLabel(who as DemoBuyerId);
+}
+
+/** The link a code belongs to (`?ref=` on the presale), or null. */
+export function linkByCodeOf(d: ReferralData, code: string): ReferralLink | null {
+  return d.links.find((l) => l.code === code) ?? null;
+}
+
+/**
+ * A presale purchase made through `code`'s link, counted for the link's
+ * owner: only by another account, only while that link is the owner's
+ * current campaign and its lock-up runs. Null when it doesn't count.
+ */
+export function referralFromLink(
+  d: ReferralData,
+  w: DemoWallet | undefined,
+  code: string,
+  r: { id: string; who: IdentityId; bought: Amount; at: number },
+): ReferralData | null {
+  const link = linkByCodeOf(d, code);
+  if (!link || link.identity === r.who) return null;
+  const current = currentLinkOf(d, link.identity);
+  if (!current || current.campaign !== link.campaign) return null;
+  const added = addReferral(d, w, { ...r, identity: link.identity });
+  return added.ok ? added.value : null;
 }
 
 /** What the demo creator buying `text` IDZ through the link would add, or why it can't. */
@@ -177,7 +205,7 @@ export function demoReferralCheckOf(text: string): Result<Amount> {
 export function addReferral(
   d: ReferralData,
   w: DemoWallet | undefined,
-  r: { id: string; identity: IdentityId; who: DemoBuyerId; bought: Amount; at: number },
+  r: { id: string; identity: IdentityId; who: IdentityId; bought: Amount; at: number },
 ): Result<ReferralData> {
   const link = currentLinkOf(d, r.identity);
   if (!link) return { ok: false, error: "Generate your link first." };

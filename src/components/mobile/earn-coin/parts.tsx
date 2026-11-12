@@ -6,11 +6,12 @@
 // lib/wallet): the balance card (the IDZ figure, its dollars at the one IDZ
 // price, the holdings line, the demo IDZ contract), the Buy $IDZ · Stake ·
 // Refer & Earn tabs (M14), the copy chips, the info rows, the Figma's white
-// filter buttons (each a pick-one sheet), the empty card, and the sheets every
-// screen shares: Connect your wallet, the Demo wallet, Import IDZ token.
+// filter buttons (each a kit pick-one sheet), and the sheets every screen
+// shares: Connect your wallet, the Demo wallet, Import IDZ token. Text takes
+// its role from the one type scale (T.*); the mono face on a row's label is
+// the Figma's. Empty and not-found states are the kit's (kit/state.tsx).
 
 import * as React from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowDown01Icon,
@@ -39,11 +40,19 @@ import { TIMING } from "@/lib/wallet/request";
 import { balanceLineOf, networkLabelOf } from "@/lib/wallet/request-view";
 import type { AccountIndex } from "@/lib/wallet/types";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { PickSheet } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
+import { MobileTabs } from "../kit/tabs";
 import { useToast } from "../kit/toast";
+import { T } from "../type";
 
-export const CARD = "rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-surface";
-export const SECTION_TITLE = "text-2xl font-medium leading-2xl text-text-primary";
+/** A card that isn't a list: the kit's surface, border/default edge and radius/xl (kit/list.tsx LIST_CARD). */
+export const CARD = "rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface";
+
+/** "Base Sepolia": a network's name without its "(Testnet)" tail, for a chip or a card title. */
+export function shortNetworkOf(n: Network): string {
+  return networkLabelOf(n).replace(/\s*\(.*\)$/, "");
+}
 
 /** The current demo account, its wallet, and its IDZ, live to the second. */
 export function useEarnState() {
@@ -107,36 +116,48 @@ export function whenOf(at: number): string {
 }
 
 // ── M14 Tabs: Buy $IDZ · Stake · Refer & Earn ───────────────────────────
+// One screen holds the three tabs (earn-tabs-screen.tsx), so a tap never
+// navigates: the tab is client state, and the address follows by
+// history.replaceState (/m/earn/buy · /stake · /refer), which Next keeps in
+// step with usePathname. No fetch, no history entry, works offline; a reload
+// or a link to any of the three addresses opens that tab.
 
-const EARN_TABS = [
-  { href: "/m/earn/buy", label: "Buy $IDZ" },
-  { href: "/m/earn/stake", label: "Stake" },
-  { href: "/m/earn/refer", label: "Refer & Earn" },
-] as const;
+export type EarnTab = "buy" | "stake" | "refer";
 
-export function EarnTabs() {
+const EARN_TABS: readonly { value: EarnTab; label: string; href: string }[] = [
+  { value: "buy", label: "Buy $IDZ", href: "/m/earn/buy" },
+  { value: "stake", label: "Stake", href: "/m/earn/stake" },
+  { value: "refer", label: "Refer & Earn", href: "/m/earn/refer" },
+];
+
+/** The tab the address names, and its setter (the tab changes at once; the address follows). */
+export function useEarnTab(): [EarnTab, (tab: EarnTab) => void] {
   const pathname = usePathname();
-  return (
-    <nav aria-label="Earn Coin" className="flex border-b-[length:var(--border-width-1)] border-solid border-border-subtle">
-      {EARN_TABS.map((t) => {
-        const current = pathname === t.href;
-        return (
-          <Link
-            key={t.href}
-            href={t.href}
-            replace
-            aria-current={current ? "page" : undefined}
-            className={cn(
-              "-mb-[var(--border-width-1)] flex h-[40px] flex-1 items-center justify-center border-b-[length:var(--border-width-2)] border-solid text-lg leading-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
-              current ? "border-border-brand font-medium text-text-brand" : "border-transparent text-text-secondary",
-            )}
-          >
-            {t.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  const parsed = EARN_TABS.find((t) => t.href === pathname)?.value ?? "buy";
+  // Shown at once; dropped as soon as the address (or Back) says otherwise.
+  const [picked, setPicked] = React.useState<EarnTab | null>(null);
+  const [seen, setSeen] = React.useState(pathname);
+  if (pathname !== seen) {
+    setSeen(pathname);
+    setPicked(null);
+  }
+  const set = React.useCallback((tab: EarnTab) => {
+    setPicked(tab);
+    const href = EARN_TABS.find((t) => t.value === tab)?.href;
+    if (href && window.location.pathname !== href) window.history.replaceState(null, "", href);
+  }, []);
+  return [picked ?? parsed, set];
+}
+
+export const EarnTabContext = React.createContext<{ tab: EarnTab; setTab: (tab: EarnTab) => void } | null>(null);
+
+export const EARN_TABS_ID = "earn";
+
+/** The strip; the screen that holds the three tabs provides the state. */
+export function EarnTabs() {
+  const ctx = React.useContext(EarnTabContext);
+  if (!ctx) return null;
+  return <MobileTabs label="Earn Coin" idBase={EARN_TABS_ID} tabs={EARN_TABS} value={ctx.tab} onChange={ctx.setTab} />;
 }
 
 // ── small pieces ────────────────────────────────────────────────────────
@@ -150,7 +171,8 @@ export function CopyChip({ value, what, tone = "brand", lead }: { value: string;
       onClick={() => copy(value, `${what} copied`)}
       aria-label={`Copy ${what.toLowerCase()} ${value}`}
       className={cn(
-        "inline-flex h-[24px] max-w-full items-center gap-2 rounded-full px-4 text-sm leading-xs tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+        T.caption,
+        "inline-flex h-[24px] max-w-full items-center gap-2 rounded-full px-4 tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
         tone === "brand" && "bg-bg-brand-subtle text-text-brand",
         tone === "error" && "bg-bg-error-subtle text-text-error",
         tone === "warning" && "bg-badge-warning-bg text-badge-warning-text",
@@ -167,8 +189,8 @@ export function CopyChip({ value, what, tone = "brand", lead }: { value: string;
 export function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-h-[24px] items-center justify-between gap-6">
-      <dt className="shrink-0 font-mono text-sm leading-sm text-text-secondary">{label}</dt>
-      <dd className="flex min-w-0 items-center justify-end gap-2 text-right text-lg leading-lg text-text-primary">{children}</dd>
+      <dt className={cn(T.meta, "shrink-0 font-mono")}>{label}</dt>
+      <dd className={cn(T.body, "flex min-w-0 flex-wrap items-center justify-end gap-2 text-right text-text-primary")}>{children}</dd>
     </div>
   );
 }
@@ -176,9 +198,18 @@ export function InfoRow({ label, children }: { label: string; children: React.Re
 /** "● Amoy Testnet (Polygon)": a card's chain. */
 export function ChainTitle({ network, tone = "brand" }: { network: Network | null; tone?: "brand" | "error" }) {
   return (
-    <p className="flex min-w-0 items-center gap-3 text-lg font-medium leading-lg text-text-primary">
+    <p className={cn(T.name, "flex min-w-0 items-center gap-3")}>
       <span aria-hidden className={cn("size-[8px] shrink-0 rounded-full", tone === "brand" ? "bg-bg-brand" : "bg-bg-error")} />
-      <span className="truncate">{network ? networkLabelOf(network) : "Every network"}</span>
+      {network ? (
+        <>
+          <span aria-hidden className="truncate">
+            {shortNetworkOf(network)}
+          </span>
+          <span className="sr-only">{networkLabelOf(network)}</span>
+        </>
+      ) : (
+        <span className="truncate">Every network</span>
+      )}
     </p>
   );
 }
@@ -186,38 +217,18 @@ export function ChainTitle({ network, tone = "brand" }: { network: Network | nul
 /** "100 IDZ" with the coin: a card's amount. */
 export function IdzFigure({ amount, sign = "" }: { amount: string; sign?: string }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-2 text-2xl font-medium leading-2xl tabular-nums text-text-primary">
+    <span className={cn(T.section, "inline-flex shrink-0 items-center gap-2 tabular-nums")}>
       <IdzCoin height={20} />
       {sign}
       {formatAmount(amount, "IDZ").replace(/ IDZ$/, "")}
-      <span className="text-sm leading-sm text-text-brand">IDZ</span>
+      <span className={cn(T.meta, "text-text-brand")}>IDZ</span>
     </span>
-  );
-}
-
-/** The Figma's empty card: a note icon and a line or two, with an optional way out. */
-export function EmptyCard({ lines, action }: { lines: string[]; action?: React.ReactNode }) {
-  return (
-    <div role="status" className={cn(CARD, "flex flex-col items-center gap-6 px-8 py-12 text-center")}>
-      <span aria-hidden className="text-[color:var(--color-icon-default)]">
-        <Icon icon={Note01Icon} size={24} />
-      </span>
-      <p className="text-lg leading-lg text-text-primary">
-        {lines.map((l, i) => (
-          <React.Fragment key={l}>
-            {i > 0 && <br />}
-            {l}
-          </React.Fragment>
-        ))}
-      </p>
-      {action}
-    </div>
   );
 }
 
 export type FilterOption = { value: string; label: string };
 
-/** The Figma's white filter button ("Chain Type ⌄"): its list is a pick-one sheet. */
+/** The Figma's white filter button ("Chain Type ⌄"): its list is the kit's pick-one sheet. */
 export function FilterButton({ label, value, options, onChange }: { label: string; value: string; options: FilterOption[]; onChange: (v: string) => void }) {
   const [open, setOpen] = React.useState(false);
   const picked = options.find((o) => o.value === value);
@@ -228,36 +239,15 @@ export function FilterButton({ label, value, options, onChange }: { label: strin
         aria-haspopup="dialog"
         aria-label={picked ? `${label}: ${picked.label}` : label}
         onClick={() => setOpen(true)}
-        className="flex h-[40px] min-w-0 flex-1 items-center justify-center gap-3 rounded-xl bg-bg-surface px-6 text-lg leading-lg text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        className={cn(
+          T.name,
+          "flex h-[40px] min-w-0 flex-1 items-center justify-center gap-3 rounded-xl bg-bg-surface px-6 outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+        )}
       >
         <span className="truncate">{picked && picked.value !== "all" ? picked.label : label}</span>
         <Icon icon={ArrowDown01Icon} size={16} />
       </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title={label}>
-        <ul role="listbox" aria-label={label} className="-mx-8 flex flex-col">
-          {options.map((o) => (
-            <li key={o.value}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={o.value === value}
-                onClick={() => {
-                  onChange(o.value);
-                  setOpen(false);
-                }}
-                className="flex h-[40px] w-full items-center justify-between gap-4 rounded-md px-8 text-left text-lg leading-lg text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                {o.label}
-                {o.value === value && (
-                  <span className="text-[color:var(--color-icon-brand)]">
-                    <Icon icon={Tick02Icon} size={16} />
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Sheet>
+      <PickSheet open={open} onClose={() => setOpen(false)} title={label} options={options} value={value} onPick={onChange} />
     </>
   );
 }
@@ -290,33 +280,20 @@ export function NetworkChip({ network }: { network: Network }) {
         aria-haspopup="dialog"
         aria-label={`Network: ${networkLabelOf(network)}, change`}
         onClick={() => setOpen(true)}
-        className="inline-flex h-[32px] min-w-0 items-center gap-3 rounded-lg bg-bg-subtle px-5 text-md leading-md text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        className={cn(T.body, "inline-flex h-[32px] min-w-0 items-center gap-3 rounded-lg bg-bg-subtle px-5 text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
       >
-        <span className="truncate font-mono">{networkLabelOf(network).replace(/\s*\(.*\)$/, "")}</span>
+        <span className="truncate font-mono">{shortNetworkOf(network)}</span>
         <Icon icon={ArrowDown01Icon} size={16} />
       </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Network" description="Your demo wallet switches to it.">
-        <ul role="listbox" aria-label="Network" className="-mx-8 flex flex-col">
-          {NETWORKS.map((n) => (
-            <li key={n.value}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={n.value === network}
-                onClick={() => pick(n.value)}
-                className="flex h-[40px] w-full items-center justify-between gap-4 rounded-md px-8 text-left text-lg leading-lg text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                {n.label}
-                {n.value === network && (
-                  <span className="text-[color:var(--color-icon-brand)]">
-                    <Icon icon={Tick02Icon} size={16} />
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Sheet>
+      <PickSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Network"
+        description="Your demo wallet switches to it."
+        options={NETWORKS.map((n) => ({ value: n.value, label: n.label }))}
+        value={network}
+        onPick={pick}
+      />
     </>
   );
 }
@@ -327,7 +304,7 @@ function TokenAddress({ network }: { network: Network }) {
   const contract = idzContractOf(network);
   return (
     <div className="flex h-[32px] w-full items-center justify-between gap-4 rounded-lg border-[length:var(--border-width-1)] border-solid border-border px-5">
-      <span className="min-w-0 truncate text-sm leading-sm text-text-primary">
+      <span className={cn(T.meta, "min-w-0 truncate text-text-primary")}>
         Token Address: <span aria-hidden>{shortAddress(contract)}</span>
         <span className="sr-only">{contract}</span>
       </span>
@@ -352,11 +329,11 @@ function HoldingsLine({ h }: { h: IdzHoldings }) {
     { label: "Pending", value: h.pending },
   ];
   return (
-    <dl className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm leading-sm">
+    <dl className="flex flex-wrap justify-center gap-x-6 gap-y-1">
       {parts.map((p) => (
         <div key={p.label} className="flex items-center gap-2">
-          <dt className="text-text-secondary">{p.label}</dt>
-          <dd className="font-medium tabular-nums text-text-primary">{formatAmount(p.value, "IDZ")}</dd>
+          <dt className={T.meta}>{p.label}</dt>
+          <dd className={cn(T.meta, "tabular-nums text-text-primary")}>{formatAmount(p.value, "IDZ")}</dd>
         </div>
       ))}
     </dl>
@@ -367,23 +344,30 @@ function HoldingsLine({ h }: { h: IdzHoldings }) {
 export function BalanceHeading({ network, connected, title = "Current Balance" }: { network: Network; connected: boolean; title?: string }) {
   return (
     <div className="flex min-h-[28px] items-center justify-between gap-6">
-      <h2 className={cn(SECTION_TITLE, "shrink-0")}>{title}</h2>
+      <h2 className={cn(T.section, "shrink-0")}>{title}</h2>
       {connected && <NetworkChip network={network} />}
     </div>
   );
+}
+
+/** "2,875.8 IDZ": the balance figure to 2 decimals, cut never rounded up, so it fits a phone;
+ *  the exact amount is the Available line under it. */
+function figureOf(amount: string): string {
+  const [whole, fraction = ""] = amount.split(".");
+  return formatAmount(fraction.length > 2 ? `${whole}.${fraction.slice(0, 2)}` : amount, "IDZ");
 }
 
 /** The connected card: the IDZ figure, "= $…", the holdings, the token address, the screen's actions. */
 export function BalanceCard({ network, holdings, children }: { network: Network; holdings: IdzHoldings; children?: React.ReactNode }) {
   return (
     <div className={cn(CARD, "flex flex-col items-center gap-8 px-8 pb-8 pt-14")}>
-      <div className="flex flex-col items-center gap-4">
-        <p className="flex items-center gap-4">
-          <IdzCoin height={44} />
-          <span className="text-7xl font-semibold leading-7xl tabular-nums text-text-brand">{formatAmount(holdings.available, "IDZ")}</span>
+      <div className="flex w-full min-w-0 flex-col items-center gap-4">
+        <p className="flex min-w-0 max-w-full flex-wrap items-center justify-center gap-4">
+          <IdzCoin height={28} />
+          <span className={cn(T.amountHero, "max-w-full break-words text-center text-text-brand")}>{figureOf(holdings.available)}</span>
         </p>
         <p className="flex flex-wrap items-center justify-center gap-4">
-          <span className="text-lg font-semibold leading-lg tabular-nums text-text-primary">= {idzUsdOf(holdings.available)}</span>
+          <span className={cn(T.section, "tabular-nums")}>= {idzUsdOf(holdings.available)}</span>
           <TestnetDemoBadge />
         </p>
         <HoldingsLine h={holdings} />
@@ -401,15 +385,16 @@ export function NoBalanceCard({ children }: { children: React.ReactNode }) {
       <span aria-hidden className="text-[color:var(--color-icon-default)]">
         <Icon icon={Note01Icon} size={24} />
       </span>
-      <p className="text-lg leading-lg text-text-primary">No data found</p>
+      <p className={T.rowTitle}>No data found</p>
       {children}
     </div>
   );
 }
 
-/** Two XL buttons side by side, as the Figma's card actions. */
+/** Two XL buttons side by side, as the Figma's card actions; on a narrow phone (320), where a
+ *  label wouldn't fit half the card, they stack. */
 export function CardActions({ children }: { children: React.ReactNode }) {
-  return <div className="grid w-full grid-cols-2 gap-6">{children}</div>;
+  return <div className="flex w-full flex-wrap gap-6 [&>*]:min-w-[140px] [&>*]:flex-1">{children}</div>;
 }
 
 /** The wallet screen's three tiles (Figma 247010): Buy IDZ · Stake IDZ · Import IDZ. */
@@ -419,7 +404,10 @@ export function ActionTiles({ onImport }: { onImport: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex h-[72px] flex-1 flex-col items-center justify-center gap-3 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-subtle text-md leading-md text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+      className={cn(
+        T.body,
+        "flex h-[72px] min-w-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-subtle text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+      )}
     >
       <span aria-hidden className="text-[color:var(--color-icon-brand)]">
         <Icon icon={icon} size={20} />
@@ -488,7 +476,7 @@ export function ConnectSheet({
       actions={
         <>
           <Button size="xl" className="w-full" loading={busy} onClick={connect}>
-            {busy ? "Connecting…" : "Connect"}
+            {busy ? "Connecting…" : "Connect demo wallet"}
           </Button>
           <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
             Cancel
@@ -496,7 +484,11 @@ export function ConnectSheet({
         </>
       }
     >
-      {error && <p className="text-md leading-md text-text-error">{error}</p>}
+      {error && (
+        <p role="alert" className={cn(T.caption, "text-text-error")}>
+          {error}
+        </p>
+      )}
     </Sheet>
   );
 }
@@ -540,10 +532,10 @@ export function DemoWalletSheet({ open, onClose }: { open: boolean; onClose: () 
     >
       <div className="flex items-center gap-4">
         <TestnetDemoBadge />
-        <span className="text-sm leading-sm text-text-secondary">Test funds only. Nothing is written to a real blockchain.</span>
+        <span className={T.meta}>Test funds only. Nothing is written to a real blockchain.</span>
       </div>
       <fieldset className="flex flex-col gap-2">
-        <legend className="pb-2 text-md font-medium leading-md text-text-primary">Account</legend>
+        <legend className={cn(T.rowTitle, "pb-2")}>Account</legend>
         {DEMO_ACCOUNTS.map((a) => (
           <button
             key={a.index}
@@ -554,8 +546,8 @@ export function DemoWalletSheet({ open, onClose }: { open: boolean; onClose: () 
             className={radio}
           >
             <span className="flex min-w-0 flex-col">
-              <span className="text-lg leading-lg text-text-primary">{a.label}</span>
-              <span className="truncate text-sm leading-sm text-text-secondary">
+              <span className={T.bodyLg}>{a.label}</span>
+              <span className={cn(T.meta, "truncate")}>
                 {shortAddress(a.address)} · {balanceLineOf(makerId(a.index), network, ctx)}
               </span>
             </span>
@@ -568,7 +560,7 @@ export function DemoWalletSheet({ open, onClose }: { open: boolean; onClose: () 
         ))}
       </fieldset>
       <fieldset className="flex flex-col gap-2">
-        <legend className="pb-2 text-md font-medium leading-md text-text-primary">Network</legend>
+        <legend className={cn(T.rowTitle, "pb-2")}>Network</legend>
         {NETWORKS.map((n) => (
           <button
             key={n.value}
@@ -578,7 +570,7 @@ export function DemoWalletSheet({ open, onClose }: { open: boolean; onClose: () 
             onClick={() => n.value !== network && save(walletSwitchNetwork(readWallet(), id, n.value), `Wallet on ${n.label}`)}
             className={radio}
           >
-            <span className="text-lg leading-lg text-text-primary">{n.label}</span>
+            <span className={T.bodyLg}>{n.label}</span>
             {n.value === network && (
               <span className="text-[color:var(--color-icon-brand)]">
                 <Icon icon={Tick02Icon} size={16} />
@@ -611,24 +603,24 @@ export function ImportTokenSheet({ open, onClose, network }: { open: boolean; on
           <Button size="xl" className="w-full" onClick={onClose}>
             Done
           </Button>
-          <p className="text-center text-sm leading-sm text-text-secondary">Adding it to MetaMask in one step opens once real wallets can connect.</p>
+          <p className={cn(T.meta, "text-center")}>Adding it to MetaMask in one step opens once real wallets can connect.</p>
         </>
       }
     >
       <div className="flex items-center gap-6 rounded-xl bg-bg-subtle p-6">
         <IdzCoin height={32} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="text-lg font-semibold leading-lg text-text-primary">{IDZ_TOKEN.name}</span>
-          <span className="text-sm leading-sm text-text-secondary">{networkLabelOf(network)}</span>
+          <span className={T.section}>{IDZ_TOKEN.name}</span>
+          <span className={T.meta}>{networkLabelOf(network)}</span>
         </div>
         <TestnetDemoBadge />
       </div>
       <dl className="flex flex-col gap-6">
         {rows.map((r) => (
           <div key={r.label} className="flex flex-col gap-2">
-            <dt className="text-sm font-medium leading-sm text-text-secondary">{r.label}</dt>
+            <dt className={T.label}>{r.label}</dt>
             <dd className="flex items-center justify-between gap-4 rounded-lg border-[length:var(--border-width-1)] border-solid border-border py-2 pl-6 pr-2">
-              <span className={cn("min-w-0 text-md leading-md text-text-primary", r.mono && "break-all font-mono")}>{r.value}</span>
+              <span className={cn(T.body, "min-w-0 text-text-primary", r.mono && "break-all font-mono")}>{r.value}</span>
               <button
                 type="button"
                 aria-label={`Copy ${r.label.toLowerCase()}`}
@@ -641,7 +633,7 @@ export function ImportTokenSheet({ open, onClose, network }: { open: boolean; on
           </div>
         ))}
       </dl>
-      <p className="text-md leading-md text-text-secondary">
+      <p className={T.body}>
         In your wallet app, choose Import tokens, pick {networkLabelOf(network)}, and paste the contract address. The symbol and decimals fill in from it.
       </p>
     </Sheet>
@@ -650,3 +642,4 @@ export function ImportTokenSheet({ open, onClose, network }: { open: boolean; on
 
 /** The ⋯ menu's two rows every Earn screen has: the wallet balance and the Demo wallet. */
 export const WALLET_ICON = Wallet01Icon;
+

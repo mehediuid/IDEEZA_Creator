@@ -6,20 +6,27 @@
 // every IDZ movement (lib/wallet/idz.ts › idzLedgerOf: rewards, project
 // mints, credits, presale buys and claims, stakes and withdrawals), filtered
 // by Chain Type and Transfer Type, ten at a time. In and Out are written,
-// not only coloured; a presale Buy says where its claim stands.
+// not only coloured; a presale Buy says where its claim stands. From the
+// web's overview too: "N IDZ from the presale is ready to claim" with Go to
+// claim (N2), and what IDZ is next to credits and where sale money lives
+// (N3, N4).
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown02Icon, ArrowUp02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown02Icon, ArrowUp02Icon, Note01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button } from "@/components/ideeza/button";
+import { Button, buttonVariants } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { NETWORKS, type Network } from "@/lib/brief/types";
 import { cn } from "@/lib/utils";
 import { TRANSFER_TYPES, filterIdzLedger, idzLedgerOf, transferTypeLabel, type IdzRow, type TransferType } from "@/lib/wallet/idz";
+import { compareAmounts, formatAmount } from "@/lib/wallet/money";
 import { claimInOf } from "@/lib/wallet/presale";
+import { EmptyState } from "../kit/state";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { useEarnMenu } from "./earn-menu";
 import {
   ActionTiles,
@@ -30,13 +37,11 @@ import {
   ChainTitle,
   ConnectSheet,
   CopyChip,
-  EmptyCard,
   FilterButton,
   IdzFigure,
   ImportTokenSheet,
   InfoRow,
   NoBalanceCard,
-  SECTION_TITLE,
   useEarnState,
   whenOf,
 } from "./parts";
@@ -68,26 +73,46 @@ export function WalletBalance() {
                   Import IDZ Token
                 </Button>
                 <Button size="xl" className="w-full px-4" onClick={() => router.push("/m/earn/presale")}>
-                  Buy IDZ Coin
+                  Buy $IDZ Coin
                 </Button>
               </CardActions>
             </NoBalanceCard>
           )}
         </section>
+        {holdings && compareAmounts(holdings.claimable, "0") > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-brand bg-bg-brand-subtle px-8 py-6">
+            <p className={cn(T.rowTitle, "min-w-0 flex-1")}>{formatAmount(holdings.claimable, "IDZ")} from the presale is ready to claim.</p>
+            <Link href="/m/earn/buy" className={cn(buttonVariants({ hierarchy: "primary", size: "md" }), "border-solid")}>
+              Go to claim
+            </Link>
+          </div>
+        )}
+        <div className={cn(T.body, "flex flex-col gap-2")}>
+          <p>
+            IDZ is IDEEZA’s own coin. It pays an instant mint’s fee and can pay for AI credits; your credits are a separate balance.{" "}
+            <Link href="/m/plans?tab=credits" className="font-medium text-text-brand underline-offset-2 hover:underline">
+              Buy credits with IDZ
+            </Link>
+          </p>
+          <p>
+            Money from selling your projects is on each project’s Earn › Money.{" "}
+            <Link href="/m/projects" className="font-medium text-text-brand underline-offset-2 hover:underline">
+              My projects
+            </Link>
+          </p>
+        </div>
         <section className="flex flex-col gap-8" aria-labelledby="wallet-activity">
-          <h2 id="wallet-activity" className={SECTION_TITLE}>
+          <h2 id="wallet-activity" className={T.section}>
             Transaction Activity
           </h2>
           {!wallet ? null : connected && id ? (
             <Ledger rows={idzLedgerOf(wallet, id)} now={now} />
           ) : (
-            <EmptyCard
-              lines={["No data found.", "Please connect your wallet."]}
-              action={
-                <Button size="lg" onClick={() => setConnecting(true)}>
-                  Connect wallet
-                </Button>
-              }
+            <EmptyState
+              icon={Note01Icon}
+              title="No data found"
+              body="Connect your wallet to see how your IDZ moved."
+              action={{ label: "Connect wallet", onClick: () => setConnecting(true) }}
             />
           )}
         </section>
@@ -136,23 +161,21 @@ function Ledger({ rows, now }: { rows: IdzRow[]; now: number }) {
         />
       </div>
       {shown.length === 0 ? (
-        <EmptyCard
-          lines={rows.length ? ["No transactions match these filters."] : ["No IDZ has moved in this wallet yet."]}
-          action={
-            rows.length ? (
-              <Button
-                hierarchy="secondary"
-                size="lg"
-                onClick={() => {
-                  setChain("all");
-                  setType("all");
-                }}
-              >
-                Clear filters
-              </Button>
-            ) : undefined
-          }
-        />
+        rows.length ? (
+          <EmptyState
+            title="No transactions match"
+            body="No transaction matches these filters."
+            action={{
+              label: "Clear filters",
+              onClick: () => {
+                setChain("all");
+                setType("all");
+              },
+            }}
+          />
+        ) : (
+          <EmptyState icon={Note01Icon} title="No transactions yet" body="No IDZ has moved in this wallet yet." />
+        )
       ) : (
         <ul className="flex flex-col gap-8">
           {shown.slice(0, count).map((r) => {
@@ -165,20 +188,20 @@ function Ledger({ rows, now }: { rows: IdzRow[]; now: number }) {
                   <IdzFigure amount={r.amount} sign={r.held ? "" : into ? "+" : "−"} />
                 </div>
                 <dl className="flex flex-col gap-4">
-                  <InfoRow label="Txn ID">{r.txHash ? <CopyChip value={r.txHash} what="Transaction ID" /> : <span className="text-md leading-md text-text-secondary">Starting balance</span>}</InfoRow>
+                  <InfoRow label="Txn ID">{r.txHash ? <CopyChip value={r.txHash} what="Transaction ID" /> : <span className="text-text-secondary">Starting balance</span>}</InfoRow>
                   <InfoRow label="Wallet Address">
                     <CopyChip value={r.address} what="Wallet address" />
                   </InfoRow>
                   <InfoRow label="Date">{r.at === null ? "—" : whenOf(r.at)}</InfoRow>
                   <InfoRow label="Transfer Type">
                     {transferTypeLabel(r.type)}
-                    <span className={cn("inline-flex items-center gap-1 text-md leading-md", into ? "text-text-success" : "text-text-error")}>
+                    <span className={cn("inline-flex items-center gap-1", into ? "text-text-success" : "text-text-error")}>
                       <Icon icon={into ? ArrowUp02Icon : ArrowDown02Icon} size={16} />
                       {into ? "In" : "Out"}
                     </span>
                   </InfoRow>
                 </dl>
-                <p className="border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-6 text-md leading-md text-text-secondary">
+                <p className={cn(T.body, "border-t-[length:var(--border-width-1)] border-solid border-border pt-6")}>
                   {r.title}
                   {held && <span className="tabular-nums"> · {held}</span>}
                 </p>
@@ -188,7 +211,7 @@ function Ledger({ rows, now }: { rows: IdzRow[]; now: number }) {
         </ul>
       )}
       {shown.length > count && (
-        <Button hierarchy="secondary" size="lg" className="self-center" onClick={() => setCount((n) => n + PER_PAGE)}>
+        <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setCount((n) => n + PER_PAGE)}>
           Show more
         </Button>
       )}
