@@ -3,7 +3,7 @@
 // The welcome offer on the phone (CL-004; lib/account/welcome-offer.ts and the
 // web's components/credits/welcome-offer.tsx): a new account on Free gets half
 // off its first payment on any plan for 12 hours. As on the web it pops up
-// once on Home — after the Welcome map, the Face ID offer and the tour, when
+// once on Home — after the Welcome map and the tour, when
 // no other sheet is up — and that starts the clock. Here it is an M09 sheet:
 // the web's 50% OFF mark, the time left, Monthly · Annual, the three paid
 // plans with the struck-through price, Claim 50% off → the phone's checkout,

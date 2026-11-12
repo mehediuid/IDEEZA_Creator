@@ -2,16 +2,14 @@
 // AU-01…33). The accounts themselves are the web's (auth.ts) — one person, one
 // account, on either — and this keeps only what the phone adds: the six-digit
 // codes for verifying and resetting, the sign-in tries, how each account signs
-// in on the phone (Apple, Google, Facebook, a password) and Face ID, and what
-// this phone remembers (the Face ID offer, who signed in last, the tour to
-// start, the link's campaign tag). The password rules are the web's, so a
+// in on the phone (Apple, Google, Facebook, a password), and what this phone
+// remembers (the tour to start, the link's campaign tag). The password rules are the web's, so a
 // password made on the phone works on the web too. Relative imports only, so
 // node:test can load it.
 
 import * as React from "react";
 import { parseStored, readStoredKey, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
-import { PASSWORD_RULES, normalizeEmail, passwordProblem, readSession, sourceFromUtm, type PasswordRuleId } from "./auth";
-import { handleProblem } from "../people/ids";
+import { PASSWORD_RULES, normalizeEmail, passwordProblem, sourceFromUtm, type PasswordRuleId } from "./auth";
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
@@ -183,13 +181,9 @@ export type PhoneAccount = {
   providers: Provider[];
   /** Made through a provider: no password of its own yet (AU-41h adds one). */
   passwordless: boolean;
-  /** "Use Face ID" was chosen (AU-08). */
-  faceId: boolean;
-  /** Signed in with no handle chosen yet: Name and handle (AU-13) comes before the tabs. */
-  handleOwed: boolean;
 };
 
-const NO_PHONE_ACCOUNT: PhoneAccount = { providers: [], passwordless: false, faceId: false, handleOwed: false };
+const NO_PHONE_ACCOUNT: PhoneAccount = { providers: [], passwordless: false };
 
 export function normalizePhoneAccounts(raw: unknown): Record<string, PhoneAccount> {
   if (!isObj(raw)) return {};
@@ -197,7 +191,7 @@ export function normalizePhoneAccounts(raw: unknown): Record<string, PhoneAccoun
   for (const [email, v] of Object.entries(raw)) {
     if (!isObj(v)) continue;
     const providers = Array.isArray(v.providers) ? PROVIDERS.filter((p) => (v.providers as unknown[]).includes(p)) : [];
-    out[normalizeEmail(email)] = { providers, passwordless: v.passwordless === true, faceId: v.faceId === true, handleOwed: v.handleOwed === true };
+    out[normalizeEmail(email)] = { providers, passwordless: v.passwordless === true };
   }
   return out;
 }
@@ -265,12 +259,6 @@ export type PhoneState = {
   onboarded: boolean;
   /** Logged in without Remember me: the sign-in lasts while this tab does, and the next cold start signs out. */
   forgetSession: boolean;
-  /** The Face ID offer was made on this phone (it is made once). */
-  faceIdOffered: boolean;
-  /** Show the Face ID offer on the next screen (set by the first sign-in here). */
-  faceIdPending: boolean;
-  /** Who signed in here last: Log In offers Face ID for them when they chose it (AU-08). */
-  lastEmail: string;
   /** Look around first was chosen on the Welcome map: the tour starts on the next tab screen. */
   tourPending: boolean;
   /** The kit's pre-prompts (KIT-PM-01 camera, PM-02 photos, PM-03 microphone) come once, at
@@ -287,9 +275,6 @@ export function normalizePhone(raw: unknown): PhoneState {
     explored: r.explored === true,
     onboarded: r.onboarded === true,
     forgetSession: r.forgetSession === true,
-    faceIdOffered: r.faceIdOffered === true,
-    faceIdPending: r.faceIdPending === true,
-    lastEmail: typeof r.lastEmail === "string" ? normalizeEmail(r.lastEmail) : "",
     tourPending: r.tourPending === true,
     cameraAsked: r.cameraAsked === true,
     photosAsked: r.photosAsked === true,
@@ -330,22 +315,12 @@ export function usePhone(): { hydrated: boolean; phone: PhoneState } {
   return React.useMemo(() => ({ hydrated: k.hydrated, phone: normalizePhone(parseStored(k.raw).value) }), [k.hydrated, k.raw]);
 }
 
-/** After any sign-in on the phone: the Face ID offer once, who it was (so Log
- *  In can offer Face ID next time), and Remember me — `remember` false (Log In
- *  with the box unticked) makes this sign-in last only while the tab does;
- *  every other way in is remembered. */
+/** After any sign-in on the phone: Remember me — `remember` false (Log In with
+ *  the box unticked) makes this sign-in last only while the tab does; every
+ *  other way in is remembered. */
 export function afterPhoneSignIn(remember = true): void {
-  const p = readPhone();
-  const email = readSession()?.email ?? p.lastEmail;
-  updatePhone({ ...(!p.faceIdOffered ? { faceIdPending: true } : null), forgetSession: !remember, lastEmail: email });
+  updatePhone({ forgetSession: !remember });
   markAlive();
-}
-
-/** The email Log In may offer Face ID for: the one typed, else whoever signed in
- *  here last — when that account chose "Use Face ID". "" when there is none. */
-export function faceIdEmailFor(typed: string, lastEmail: string, accounts: Record<string, PhoneAccount>): string {
-  const email = typed.trim() ? normalizeEmail(typed) : lastEmail;
-  return email && phoneAccountOf(accounts, email).faceId ? email : "";
 }
 
 // ─────────────────────────── the link's campaign tag ───────────────────────────
@@ -419,40 +394,12 @@ export function relayAddress(random: () => number = Math.random): string {
 
 /** The way-in screens: open to anyone signed out. */
 export const ENTRY_PATH = /^\/m\/(onboarding|welcome|sign-in|sign-up|verify|reset|signing-in|add-email|link)(\/|$)/;
-/** After sign-up: name and handle, the profile steps and the Welcome map. */
-export const SETUP_PATH = /^\/m\/(handle|setup|welcome-map)(\/|$)/;
+/** After sign-up, as on the web: the one question (when the link didn't say) and the Welcome map. */
+export const SETUP_PATH = /^\/m\/(source|welcome-map)(\/|$)/;
 
 /** A mobile path to go back to: only the prototype's own, never a way-in screen (unless `entryOk`). */
 export function mobileNext(raw: string | null | undefined, fallback = "/m", entryOk = false): string {
   if (!raw || !/^\/m(\/|\?|#|$)/.test(raw) || raw.startsWith("//")) return fallback;
   if (!entryOk && ENTRY_PATH.test(raw.split(/[?#]/)[0])) return fallback;
   return raw;
-}
-
-// ─────────────────────────── handle suggestions (AU-13c) ───────────────────────────
-
-/** A name as a handle: Latin letters and numbers, hyphens between words. */
-export function handleBaseOf(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 30)
-    .replace(/-+$/g, "");
-}
-
-/** Three free handles near the name (or what was typed, when the name has no Latin letters). */
-export function handleSuggestions(name: string, typed: string, isFree: (h: string) => boolean = (h) => handleProblem(h) === null): string[] {
-  const base = handleBaseOf(name) || handleBaseOf(typed);
-  if (!base) return [];
-  const first = base.split("-")[0];
-  const candidates = [`${base}-1`, base.replace(/-/g, ""), `${first}-makes`, `${base}-2`, `${first}-builds`, `${base}-3`];
-  const out: string[] = [];
-  for (const c of candidates) {
-    if (c !== typed && !out.includes(c) && isFree(c)) out.push(c);
-    if (out.length === 3) break;
-  }
-  return out;
 }

@@ -5,13 +5,14 @@
 // · offline or refused → back where they started, with the provider's error (AU-04c);
 // · Facebook shared no email → Add your email (AU-04e);
 // · the email has an account that hasn't linked this provider → Link accounts (AU-06);
-// · otherwise signed in — a new account (and one that never chose its handle)
-//   goes on to Name and handle (AU-13). A new account keeps the link's
-//   utm_source, as the web's does.
+// · otherwise signed in — a new account goes on as the web's does after
+//   Sign up (the one question when the link didn't say, then the Welcome
+//   map), and keeps the link's utm_source; an account that was here goes on
+//   to where it was going.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { landingAfterSignIn } from "@/components/mobile/account/parts";
+import { landingAfterSignUp } from "@/components/mobile/account/parts";
 import { SplashScreen } from "@/components/mobile/screen";
 import { accountOf, providerSignIn, readAccounts } from "@/lib/account/auth";
 import {
@@ -45,7 +46,7 @@ async function finish(a: ProviderAnswer): Promise<string> {
   linkProvider(a.email, a.provider, result === "new");
   afterPhoneSignIn();
   saveProviderAnswer(null);
-  return landingAfterSignIn(a.next);
+  return result === "new" ? landingAfterSignUp(a.next) : a.next;
 }
 
 export default function SigningInPage() {

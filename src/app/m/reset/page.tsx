@@ -25,7 +25,6 @@ import {
   AccountHeading,
   PasswordChecklist,
   REFUSED_ALERT,
-  landingAfterSignIn,
 } from "@/components/mobile/account/parts";
 import { CheckRow } from "@/components/mobile/account/ways-in";
 import { BottomBar, SwitchLine } from "@/components/mobile/kit/bottom-bar";
@@ -102,7 +101,7 @@ export default function ResetPage() {
     afterPhoneSignIn();
     toastAfterReload(signOutOthers ? "Password reset. Signed out of other devices." : "Password reset");
     // Signed in with the account's own work: start the page again where they were.
-    window.location.replace(landingAfterSignIn(next));
+    window.location.replace(next);
   };
 
   if (step === "unknown") {

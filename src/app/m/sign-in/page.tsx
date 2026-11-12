@@ -12,28 +12,22 @@
 // `?demo=suspended|expired` shows them (the Shared kit links there).
 // Remember me unticked: the sign-in lasts while this tab does. A provider
 // that failed after starting here says so here (AU-04c), and a browser that
-// won't save the sign-in says that. Face ID (AU-08): once someone chose "Use
-// Face ID", Log In offers it for their email — the one typed, or whoever
-// signed in here last — and a Demo sheet stands in for the phone's check.
+// won't save the sign-in says that.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FaceIdIcon } from "@hugeicons/core-free-icons";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
-import { Icon } from "@/components/dashboard/icon";
-import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { TextInput } from "@/components/ideeza/text-input";
-import { ACCOUNT_CONTENT, AccountAlert, REFUSED_ALERT, landingAfterSignIn, type AlertSpec } from "@/components/mobile/account/parts";
+import { ACCOUNT_CONTENT, AccountAlert, REFUSED_ALERT, type AlertSpec } from "@/components/mobile/account/parts";
 import { WayMark, useProviderSheet } from "@/components/mobile/account/ways-in";
 import { SwitchLine, TEXT_LINK } from "@/components/mobile/kit/bottom-bar";
-import { Sheet } from "@/components/mobile/kit/sheet";
 import { useOnline } from "@/components/mobile/kit/states";
 import { Screen } from "@/components/mobile/screen";
 import { T } from "@/components/mobile/type";
-import { deviceSignIn, isEmail, signIn } from "@/lib/account/auth";
+import { isEmail, signIn } from "@/lib/account/auth";
 import {
   PROVIDERS,
   PROVIDER_WORDS,
@@ -41,14 +35,11 @@ import {
   afterRightSignIn,
   afterWrongSignIn,
   clockOf,
-  faceIdEmailFor,
   issueCode,
   mobileNext,
   readTries,
   saveTries,
   signInLockedFor,
-  usePhone,
-  usePhoneAccounts,
 } from "@/lib/account/phone";
 import { cn } from "@/lib/utils";
 
@@ -72,14 +63,11 @@ export default function SignInPage() {
   const suspended = outcome === "suspended";
   // The provider that failed after starting from this screen, until they try something else.
   const [failed, setFailed] = React.useState(() => PROVIDERS.find((p) => p === params.get("error")) ?? null);
-  const { phone } = usePhone();
-  const faceEmail = faceIdEmailFor(email, phone.lastEmail, usePhoneAccounts());
-  const [faceId, setFaceId] = React.useState(false);
 
   /** Signed in: the account's own work comes back, so the page starts again. */
   const enter = (remembered: boolean) => {
     afterPhoneSignIn(remembered);
-    window.location.replace(landingAfterSignIn(next));
+    window.location.replace(next);
   };
 
   const lockedFor = isEmail(email) ? signInLockedFor(readTries(), email, now) : 0;
@@ -110,15 +98,6 @@ export default function SignInPage() {
       setNow(Date.now());
     }
     setOutcome(result);
-  };
-
-  const withFaceId = async () => {
-    setFaceId(false);
-    setFailed(null);
-    setBusy(true);
-    if ((await deviceSignIn(faceEmail, Date.now())) === "ok") return enter(true);
-    setBusy(false);
-    setOutcome("refused");
   };
 
   const sendCode = () => {
@@ -217,19 +196,6 @@ export default function SignInPage() {
         <Button type="submit" size="xl" className="w-full" loading={busy} disabled={!online || !!lockedFor || suspended}>
           {suspended ? "Account Suspended" : "Log In"}
         </Button>
-        {faceEmail && !suspended && (
-          <Button
-            type="button"
-            hierarchy="secondary"
-            size="xl"
-            className="w-full"
-            iconLeading={<Icon icon={FaceIdIcon} size={20} />}
-            disabled={!online || busy}
-            onClick={() => setFaceId(true)}
-          >
-            Log In with Face ID
-          </Button>
-        )}
         <div className="flex items-center gap-4" role="separator" aria-label="Or login with">
           <span className="h-[1px] flex-1 bg-border" />
           <span className={T.caption}>Or login with</span>
@@ -247,27 +213,6 @@ export default function SignInPage() {
         </div>
       </form>
       {sheet}
-      <Sheet
-        open={faceId}
-        onClose={() => setFaceId(false)}
-        title="Log In with Face ID"
-        description="On a phone, Face ID checks your face here. This demo asks you to confirm."
-        actions={
-          <>
-            <Button size="xl" className="w-full" onClick={() => void withFaceId()}>
-              Continue
-            </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setFaceId(false)}>
-              Cancel
-            </Button>
-          </>
-        }
-      >
-        <Badge tone="warning" className="self-start">
-          Demo
-        </Badge>
-        <p className={cn(T.bodyLg, "[overflow-wrap:anywhere]")}>{faceEmail}</p>
-      </Sheet>
     </Screen>
   );
 }

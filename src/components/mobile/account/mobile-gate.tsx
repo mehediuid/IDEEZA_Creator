@@ -5,42 +5,32 @@
 // Splash shows. Then:
 // · the way-in screens are for the signed out (signed in, they go on); the
 //   first time the app opens signed out, the onboarding comes before Welcome;
-// · Name and handle, the profile steps and the Welcome map need an account;
+// · the one question and the Welcome map (after sign-up) need an account;
 // · the tabs need an account — except Home, which a guest who chose Explore
 //   first may browse; anyone else goes to Welcome, carrying where they were
 //   going. The Shared kit is open to all.
 // Signed in, a sign-in that still owes something goes there first: the 2-step
-// code (AU-07), then Restore for an account set to be deleted (AU-65), then
-// Name and handle for an account that left before choosing its handle
-// (AU-13; the profile steps and the Welcome map stay skippable).
-// Signed in, on a tab screen, one thing at a time and in this order: the Face
-// ID offer (once per phone), the tour when Look around first asked for it,
-// then the welcome offer (on Home, once per account, as on the web).
+// code (AU-07), then Restore for an account set to be deleted (AU-65).
+// Signed in, on a tab screen, one thing at a time and in this order: the tour
+// when Look around first asked for it, then the welcome offer (on Home, once
+// per account, as on the web).
 // A link's utm_source is kept from whatever screen it opens.
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { SESSION_KEY, signOut, useAuth } from "@/lib/account/auth";
-import { FaceIdIcon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import {
   ENTRY_PATH,
   SETUP_PATH,
   isAlive,
   keepUtm,
   mobileNext,
-  phoneAccountOf,
-  updatePhone,
-  updatePhoneAccount,
   usePhone,
-  usePhoneAccounts,
 } from "@/lib/account/phone";
 import { owedOf, readDeviceId, useSecurity } from "@/lib/account/security";
 import { parseStored, useStoredKey } from "@/lib/key-store";
-import { Button } from "@/components/ideeza/button";
-import { ForcedThemeContext, Sheet } from "../kit/sheet";
+import { ForcedThemeContext } from "../kit/sheet";
 import { SplashScreen } from "../screen";
-import { T } from "../type";
 import { PhoneTour } from "./phone-tour";
 import { WelcomeOfferSheet } from "./welcome-offer-sheet";
 
@@ -55,7 +45,6 @@ function redirectFor(
   explored: boolean,
   owes: "two-step" | "restore" | null,
   onboarded = true,
-  handleOwed = false,
 ): string | null {
   if (/^\/m\/kit(\/|$)/.test(pathname)) return null;
   const asked = new URLSearchParams(search).get("next");
@@ -74,7 +63,7 @@ function redirectFor(
     return mobileNext(new URLSearchParams(search).get("next"));
   }
   if (SETUP_PATH.test(pathname)) return signedIn ? null : "/m/welcome";
-  if (signedIn) return handleOwed ? `/m/handle${pathname === "/m" && !search ? "" : `?next=${encodeURIComponent(pathname + search)}`}` : null;
+  if (signedIn) return null;
   if (pathname === "/m" && explored) return null;
   const here = pathname + search;
   // The first time, the onboarding comes before Welcome (and hands on to it).
@@ -101,8 +90,6 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { hydrated, signedIn, account } = useAuth();
   const { hydrated: phoneRead, phone } = usePhone();
-  const phoneAccounts = usePhoneAccounts();
-  const handleOwed = !!account && phoneAccountOf(phoneAccounts, account.email).handleOwed;
   const { hydrated: securityRead, security } = useSecurity(account?.email);
   const session = useStoredKey(SESSION_KEY);
   const sessionAt = (parseStored(session.raw).value as { at?: number } | null)?.at ?? 0;
@@ -110,7 +97,7 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   // All are read from this browser, so `ready` is never true on the server.
   const ready = hydrated && phoneRead && securityRead && session.hydrated;
   const owes = ready && signedIn ? owedOf(security, sessionAt, readDeviceId(), Math.max(openedAt, sessionAt)) : null;
-  const target = ready ? redirectFor(pathname, window.location.search, signedIn, phone.explored, owes, phone.onboarded, handleOwed) : null;
+  const target = ready ? redirectFor(pathname, window.location.search, signedIn, phone.explored, owes, phone.onboarded) : null;
 
   React.useEffect(() => {
     if (target) router.replace(target);
@@ -162,40 +149,7 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
       {signedIn &&
         account &&
         tabScreen &&
-        (phone.faceIdPending && !phone.faceIdOffered ? <FaceIdOffer email={account.email} /> : phone.tourPending ? <PhoneTour /> : <WelcomeOfferSheet />)}
+        (phone.tourPending ? <PhoneTour /> : <WelcomeOfferSheet />)}
     </>
-  );
-}
-
-
-/** AU-08 · Face ID offer: once, after the first sign-in on this phone. */
-function FaceIdOffer({ email }: { email: string }) {
-  const [open, setOpen] = React.useState(true);
-  const done = (use: boolean) => {
-    if (use) updatePhoneAccount(email, (a) => ({ ...a, faceId: true }));
-    updatePhone({ faceIdPending: false, faceIdOffered: true });
-    setOpen(false);
-  };
-  return (
-    <Sheet
-      open={open}
-      onClose={() => done(false)}
-      title="Sign in with Face ID next time"
-      actions={
-        <>
-          <Button size="xl" className="w-full" onClick={() => done(true)}>
-            Use Face ID
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => done(false)}>
-            Not now
-          </Button>
-        </>
-      }
-    >
-      <span aria-hidden className="flex justify-center py-2 text-[color:var(--color-icon-brand)]">
-        <Icon icon={FaceIdIcon} size={48} />
-      </span>
-      <p className={T.body}>Faster, and no password to type. Change it any time in Sign-in &amp; security.</p>
-    </Sheet>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
 // "Where did you hear about IDEEZA?" — the web's one question (Notion Part 1;
-// components/auth/source-picker.tsx), asked once on the phone after Name and
-// handle, and only when the link that brought them didn't say (its utm_source
-// is kept with the account). The web's six choices in its order, as A18 tags
+// components/auth/source-picker.tsx), asked once on the phone right after
+// Sign up (/m/source), and only when the link that brought them didn't say
+// (its utm_source is kept with the account). The web's six choices in its order, as A18 tags
 // with the web's icons: a tap saves and goes on; Other asks for a word first;
 // Skip for now goes on without an answer.
 

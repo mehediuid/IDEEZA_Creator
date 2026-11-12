@@ -10,7 +10,7 @@
 // Find a setting finds ("Page › Row", opening the page at the row), or none.
 // The search reads the web's registry (lib/settings/search.ts) and sends each
 // hit to its phone screen with the phone's words; the settings only the phone
-// has (2-step, Face ID, devices, delete account, sign out…) are PHONE_ROWS.
+// has (2-step, devices, delete account, sign out…) are PHONE_ROWS.
 
 import * as React from "react";
 import {
@@ -118,7 +118,6 @@ type PhoneRow = { label: string; page: string; words: string; href?: string; sig
 /** Settings only the phone has, or that sit somewhere else on it. */
 const PHONE_ROWS: PhoneRow[] = [
   { label: "2-step sign-in", page: "Sign-in & security", words: "two 2fa factor authenticator code backup codes", href: "/m/settings/security#two-step" },
-  { label: "Sign in with Face ID", page: "Sign-in & security", words: "faceid biometric touch fingerprint", href: "/m/settings/security#face-id" },
   { label: "Your devices", page: "Sign-in & security", words: "device phones sessions history signed other", href: "/m/settings/security#devices" },
   { label: "Change email", page: "Sign-in & security", words: "address mail", href: "/m/settings/security/email" },
   { label: "Change password", page: "Sign-in & security", words: "passcode reset", href: "/m/settings/security/password" },
@@ -130,7 +129,7 @@ const PHONE_ROWS: PhoneRow[] = [
 
 const FILLER = new Set("a an and the my of to in on i how do can change turn set with for".split(" "));
 
-/** Every word typed starts a word of the row ("face id", "2-step", "devices"). */
+/** Every word typed starts a word of the row ("2-step", "devices"). */
 function phoneRowsFor(query: string): PhoneRow[] {
   const words = query.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !FILLER.has(w));
   if (!words.length) return [];

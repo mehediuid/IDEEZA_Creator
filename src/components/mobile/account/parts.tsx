@@ -3,16 +3,15 @@
 // Small pieces every Account screen shares (mobile Figma AU-*): the heading
 // (Heading/H4, then Body/SM in text/secondary, 4 apart), the live password
 // checklist, the M01 alert slot (and the one alert for a browser that won't
-// save), where a sign-in lands, and Splash.
+// save), where a new account goes first, and Splash.
 
 import * as React from "react";
 import { AiMagicIcon, CheckmarkCircle02Icon, CircleIcon, CpuIcon, Image01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Banner, type BannerTone } from "@/components/ideeza/banner";
-import { readSession } from "@/lib/account/auth";
-import { phonePasswordChecks, updatePhoneAccount } from "@/lib/account/phone";
-import { readProfileFields } from "@/lib/people/profile-store";
+import { currentAccount, needsSourceQuestion, readAccounts, readSession } from "@/lib/account/auth";
+import { phonePasswordChecks } from "@/lib/account/phone";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 
@@ -89,15 +88,15 @@ export const REFUSED_ALERT: AlertSpec = {
   body: "This browser wouldn’t save that. Check that it allows this site to store data, then try again.",
 };
 
-/** Where a sign-in lands: an account that never chose its handle goes to Name
- *  and handle first (AU-13), then on to where it was going. It stays owed until
- *  the handle is saved, so closing the app there doesn't skip it (the gate
- *  sends them back). */
-export function landingAfterSignIn(next: string): string {
-  if (readProfileFields().handle) return next;
-  const email = readSession()?.email;
-  if (email) updatePhoneAccount(email, (a) => ({ ...a, handleOwed: true }));
-  return `/m/handle${next === "/m" ? "" : `?next=${encodeURIComponent(next)}`}`;
+/** Where a new account goes once it is in, as on the web: the one question
+ *  ("Where did you hear about IDEEZA?") when the link that brought it didn't
+ *  say, then the Welcome map; both carry where it was going. Nothing else is
+ *  asked: the name and birthday came with Sign up, and the handle and the rest
+ *  of the profile wait in Settings and Edit profile, as on the web. */
+export function landingAfterSignUp(next: string): string {
+  const account = currentAccount(readAccounts(), readSession());
+  const tail = next === "/m" ? "" : `?next=${encodeURIComponent(next)}`;
+  return `${account && needsSourceQuestion(account) ? "/m/source" : "/m/welcome-map"}${tail}`;
 }
 
 /** AU-01 · Splash: IDEEZA's brand moment while the app works out where to

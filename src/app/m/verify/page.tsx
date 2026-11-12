@@ -2,7 +2,8 @@
 
 // AU-12 · Verify email: the 6-digit code for the account waiting for its
 // email (Create account, or Sign in → Send code). Email verified (12h), then
-// Name and handle (AU-13) unless the account already has a handle. Back does
+// as on the web: the one question when the link didn't say, and the Welcome
+// map (landingAfterSignUp). Back does
 // what "Wrong email? Change it" does: the waiting account is dropped and
 // Create account opens again with the email filled in, so the same email can
 // be used (it never says "already has an account" for one's own sign-up).
@@ -11,7 +12,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ideeza/button";
 import { CodeStep } from "@/components/mobile/account/code-step";
-import { ACCOUNT_CONTENT, landingAfterSignIn } from "@/components/mobile/account/parts";
+import { ACCOUNT_CONTENT, landingAfterSignUp } from "@/components/mobile/account/parts";
 import { BottomBar } from "@/components/mobile/kit/bottom-bar";
 import { Screen } from "@/components/mobile/screen";
 import { TopBar } from "@/components/mobile/top-bar";
@@ -25,7 +26,7 @@ export default function VerifyPage() {
   const { waiting } = useAuth();
   const [inbox, setInbox] = React.useState(0);
   // Kept once the code is right: verifying ends the wait, and the page must not
-  // take that for "nothing to verify" while it goes on to Name and handle.
+  // take that for "nothing to verify" while it goes on.
   const [email, setEmail] = React.useState<string | null>(null);
   const shown = waiting?.email ?? email;
 
@@ -38,7 +39,7 @@ export default function VerifyPage() {
     setEmail(shown);
     if (!(await verifyEmail(Date.now())).ok) return false;
     afterPhoneSignIn();
-    const after = landingAfterSignIn(next);
+    const after = landingAfterSignUp(next);
     // Verifying signs the account in with its own work: start the page again.
     window.setTimeout(() => window.location.replace(after), 600);
   };

@@ -1,6 +1,6 @@
 "use client";
 
-// AU-18 · Welcome map (after setup; tour first): the web's five stages, the
+// AU-18 · Welcome map (after Sign up and the one question; tour first): the web's five stages, the
 // free credits the account has to start with (its live balance, as the web's
 // Welcome reads it), and what a phone is for. Look around first is the
 // primary and starts the phone's tour (components/mobile/account/phone-tour),

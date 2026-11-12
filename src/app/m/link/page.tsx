@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Button } from "@/components/ideeza/button";
 import { TextInput } from "@/components/ideeza/text-input";
-import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, REFUSED_ALERT, landingAfterSignIn } from "@/components/mobile/account/parts";
+import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, REFUSED_ALERT } from "@/components/mobile/account/parts";
 import { WayButton } from "@/components/mobile/account/ways-in";
 import { BottomBar, TEXT_LINK } from "@/components/mobile/kit/bottom-bar";
 import { useOnline } from "@/components/mobile/kit/states";
@@ -72,7 +72,7 @@ export default function LinkAccountsPage() {
     afterPhoneSignIn();
     saveProviderAnswer(null);
     // Signed in with the account's own work: start the page again.
-    window.location.replace(landingAfterSignIn(answer.next));
+    window.location.replace(answer.next);
   };
 
   const linkWithPassword = async (e: React.FormEvent) => {

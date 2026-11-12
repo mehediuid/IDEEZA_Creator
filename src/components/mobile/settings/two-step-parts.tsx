@@ -6,8 +6,6 @@
 // shows what the app would — the same RFC 6238 code, which changes every 30
 // seconds — with Use this code, as the Demo email does for the email codes.
 // A real authenticator given the setup key shows the very same code.
-// DemoFaceId is the same kind of stand-in for the phone's Face ID sheet: it
-// confirms an action for an account that turned "Sign in with Face ID" on.
 
 import * as React from "react";
 import { Badge } from "@/components/ideeza/badge";
@@ -73,32 +71,6 @@ export function DemoAuthenticator({
         </p>
         <p className={cn(T.meta, "tabular-nums")}>{code ? `Changes in ${left} s` : "Making the code…"}</p>
       </div>
-    </Sheet>
-  );
-}
-
-/** The Demo stand-in for the phone's own Face ID sheet: confirming here passes the check. */
-export function DemoFaceId({ open, onClose, what, onConfirm }: { open: boolean; onClose: () => void; what: string; onConfirm: () => void }) {
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Face ID"
-      description={`On a phone, Face ID checks your face here to ${what}. This demo asks you to confirm.`}
-      actions={
-        <>
-          <Button size="xl" className="w-full" onClick={onConfirm}>
-            Confirm it’s me
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
-        </>
-      }
-    >
-      <Badge tone="warning" className="self-start">
-        Demo
-      </Badge>
     </Sheet>
   );
 }

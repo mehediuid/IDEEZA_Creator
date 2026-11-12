@@ -10,8 +10,7 @@
 // 3 keep a copy (Download your information is the primary button, made at
 //   once on the phone; "Continue without a copy" is the quiet way on);
 // 4 confirm it's you (the password; Apple, Google or Facebook once more for
-//   an account with no password; Face ID when "Sign in with Face ID" is on,
-//   through its Demo sheet) — wrong, deleting, couldn't (offline).
+//   an account with no password) — wrong, deleting, couldn't (offline).
 // The furthest step reached is kept for the tab (sessionStorage), so a
 // reload stays on its step.
 // Then AU-64: deletion scheduled for 30 days; live listings come down now;
@@ -53,7 +52,6 @@ import { TopBar } from "../top-bar";
 import { DownloadStatus, useDownload } from "./data-download";
 import { useSessionAt } from "./security";
 import { signOutToWelcome } from "./sign-out";
-import { DemoFaceId } from "./two-step-parts";
 
 /** The furthest step this tab reached, so a reload stays on its step. */
 const REACHED_KEY = "ideeza:m:delete-reached";
@@ -154,15 +152,10 @@ export function DeleteAccount() {
   const [failed, setFailed] = React.useState(false);
   const [reauth, setReauth] = React.useState(false);
   const [vouched, setVouched] = React.useState(false);
-  const [faceAsk, setFaceAsk] = React.useState(false);
-  const [faceOk, setFaceOk] = React.useState(false);
-  const [usePassword, setUsePassword] = React.useState(false);
   const [now] = React.useState(() => Date.now());
   const scheduled = security.deletion && security.deletion.at >= sessionAt ? security.deletion : null;
   const until = dates.date((scheduled?.until ?? now + DELETE_GRACE_MS), { style: "medium" });
   const provider: Provider | undefined = phone.passwordless ? phone.providers[0] : undefined;
-  // "Sign in with Face ID" on: Face ID confirms it in place of the password.
-  const byFace = phone.faceId && !provider && !usePassword;
 
   if (scheduled) {
     const day = dates.date(scheduled.until, { style: "day" });
@@ -198,14 +191,14 @@ export function DeleteAccount() {
     );
   }
 
-  const confirmable = provider ? vouched : byFace ? faceOk : !!password;
+  const confirmable = provider ? vouched : !!password;
 
   const remove = async () => {
     if (!online) return setFailed(true);
     if (!confirmable || busy) return;
     setBusy(true);
     setFailed(false);
-    if (!provider && !byFace && !(await isCurrentPassword(email, password))) {
+    if (!provider && !(await isCurrentPassword(email, password))) {
       setBusy(false);
       return setWrong(true);
     }
@@ -373,9 +366,7 @@ export function DeleteAccount() {
             <AccountHeading title="Confirm it’s you">
               {provider
                 ? `Sign in with ${PROVIDER_WORDS[provider]} once more to delete your account.`
-                : byFace
-                  ? "Confirm with Face ID to delete your account."
-                  : "Enter your password to delete your account."}
+                : "Enter your password to delete your account."}
             </AccountHeading>
             <AccountAlert
               alert={
@@ -399,19 +390,6 @@ export function DeleteAccount() {
               ) : (
                 <WayButton way={provider} onClick={() => setReauth(true)} />
               )
-            ) : byFace ? (
-              faceOk ? (
-                <p className={cn(T.body, "text-text-success")}>Face ID confirmed it’s you.</p>
-              ) : (
-                <div className="flex flex-col items-start gap-6">
-                  <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setFaceAsk(true)}>
-                    Confirm with Face ID
-                  </Button>
-                  <button type="button" className={TEXT_LINK} onClick={() => setUsePassword(true)}>
-                    Use your password instead
-                  </button>
-                </div>
-              )
             ) : (
               <Field label="Password" htmlFor={ids.password.id} error={wrong ? "That’s not your password." : ""} errorId={ids.password.errorId}>
                 <PasswordInput
@@ -432,15 +410,6 @@ export function DeleteAccount() {
           </>
         )}
       </div>
-      <DemoFaceId
-        open={faceAsk}
-        onClose={() => setFaceAsk(false)}
-        what="confirm Delete account"
-        onConfirm={() => {
-          setFaceAsk(false);
-          setFaceOk(true);
-        }}
-      />
       {provider && (
         <ReauthSheet
           open={reauth}
@@ -477,7 +446,7 @@ function ReauthSheet({
       open={open}
       onClose={onClose}
       title={`Continue with ${words}`}
-      description={`On a phone, ${words} asks you to confirm with Face ID or your ${words} password. This demo asks you to confirm.`}
+      description={`On a phone, ${words} asks you to confirm with your ${words} password. This demo asks you to confirm.`}
       actions={
         <>
           <Button size="xl" className="w-full" onClick={onDone}>

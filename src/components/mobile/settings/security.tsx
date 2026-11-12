@@ -2,8 +2,7 @@
 
 // AU-40 · Sign-in & security (Settings › Account), in the web's words: How
 // you sign in (Email, Password, Apple, Google, Facebook), Protection (2-step
-// sign-in, Sign in with Face ID: on, Delete account is confirmed with Face
-// ID in place of the password, and the helper says only that), Your devices (also the sign-in history,
+// sign-in), Your devices (also the sign-in history,
 // D-17) with Sign out of all other devices, and Delete account. AU-40b
 // loading, AU-40c couldn't load (the record can't be read), AU-40d offline
 // (what was read stays, changes wait). Sheets: AU-43 disconnect (neutral),
@@ -31,7 +30,6 @@ import {
   linkProvider,
   phoneAccountOf,
   unlinkProvider,
-  updatePhoneAccount,
   usePhoneAccounts,
   type Provider,
 } from "@/lib/account/phone";
@@ -285,16 +283,6 @@ export function SecuritySettings() {
           checked={twoStepOn}
           disabled={!online}
           onChange={() => (twoStepOn ? setOpen({ kind: "two-step-off" }) : router.push("/m/settings/security/two-step"))}
-        />
-        <ToggleLine
-          id="face-id"
-          label="Sign in with Face ID"
-          help="Confirms Delete account with Face ID on this phone."
-          checked={phoneAccount.faceId}
-          disabled={!online}
-          onChange={() => {
-            if (!updatePhoneAccount(email, (a) => ({ ...a, faceId: !a.faceId })).ok) failed();
-          }}
         />
       </section>
 

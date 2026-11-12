@@ -398,46 +398,6 @@ export async function createAccount(input: SignUpInput, utmSource: string, now: 
   return writeStoredKey(VERIFY_KEY, { v: 1, email, next: safeNext(next) }).ok ? "ok" : "refused";
 }
 
-/** The phone's Create account (mobile Figma AU-10): only the email and a
- *  password checked by `problem`; the name comes after the email is verified,
- *  and the consent line carries the minimum age. A link's utm_source is kept
- *  as on the web. Like `createAccount`, the account waits for its email and
- *  nobody is signed in. */
-export async function createPhoneAccount(
-  email: string,
-  password: string,
-  problem: (password: string) => string,
-  now: number,
-  next = "",
-  utmSource = "",
-): Promise<CreateResult> {
-  if (!isEmail(email) || problem(password)) return "invalid";
-  const e = normalizeEmail(email);
-  if (accountOf(readAccounts(), e)) return "exists";
-  const salt = newSalt();
-  const source = sourceFromUtm(utmSource);
-  const saved = saveAccount({
-    v: 1,
-    firstName: "",
-    lastName: "",
-    email: e,
-    passwordHash: await hashPassword(password, salt),
-    salt,
-    birthDate: "",
-    consentAt: now,
-    createdAt: now,
-    verifiedAt: null,
-    source,
-    sourceVia: source ? "link" : "",
-    sourceOther: "",
-    sourceSkipped: false,
-    nudgeClosed: false,
-    country: "",
-  });
-  if (!saved.ok) return "refused";
-  return writeStoredKey(VERIFY_KEY, { v: 1, email: e, next: safeNext(next) }).ok ? "ok" : "refused";
-}
-
 /** Apple, Google or Facebook vouched for this email (the mobile prototype's
  *  demo provider sheet stands in for theirs): its account is signed in, and
  *  an account that has none is made, verified — the provider proved the email —
@@ -479,16 +439,6 @@ export async function providerSignIn(
   if (!saved.ok) return "refused";
   await comeIn(e, true);
   return startSession(e, now).ok ? "new" : "refused";
-}
-
-/** Face ID (the phone's "Use Face ID", AU-08): the phone vouches for whoever
- *  chose it there, so their verified account is signed in with no password.
- *  The caller checks that the account chose Face ID on this phone. */
-export async function deviceSignIn(email: string, now: number): Promise<"ok" | "refused"> {
-  const account = accountOf(readAccounts(), email);
-  if (!account || account.verifiedAt === null) return "refused";
-  await comeIn(account.email, false);
-  return startSession(account.email, now).ok ? "ok" : "refused";
 }
 
 /** Whether `password` is the account's password now (Reset: "That's your current password"). */
@@ -542,13 +492,6 @@ export function removeAccount(email: string): WriteResult {
     // Storage blocked: the parked work stays, unreadable without the account.
   }
   return theirs ? writeStoredKey(SESSION_KEY, null) : { ok: true };
-}
-
-/** The signed-in account's name, as the phone's Name and handle step sets it. */
-export function saveAccountName(first: string, last: string): WriteResult {
-  const account = readCurrent();
-  if (!account) return { ok: false };
-  return saveAccount({ ...account, firstName: str(first, NAME_PART_MAX), lastName: str(last, NAME_PART_MAX) });
 }
 
 /** The verify link: marks the waiting account verified, signs it in (a new

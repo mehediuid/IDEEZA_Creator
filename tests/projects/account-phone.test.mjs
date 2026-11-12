@@ -1,8 +1,8 @@
 // The mobile prototype's way in (mobile Figma "Account · 2026 update"): the
 // web's five password rules on the phone, six-digit codes with their resend wait, tries
-// and lock, the sign-in lock, a phone account (email + password, name later),
-// a provider's sign-in, Face ID, the link's campaign tag, and where the phone
-// goes next.
+// and lock, the sign-in lock, the phone's Create account (the web's fields),
+// a provider's sign-in, the link's campaign tag, and where the phone goes
+// next.
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
@@ -25,6 +25,19 @@ const phone = await import("../../.tmp-test/lib/account/phone.js");
 
 const NOW = Date.UTC(2026, 10, 5, 9);
 const signedInAs = () => auth.currentAccount(auth.readAccounts(), auth.readSession())?.email ?? null;
+/** The web's Sign up, as the phone fills it in. */
+const signUp = (over = {}) => ({
+  firstName: "Rafi",
+  lastName: "Ahmed",
+  email: "rafi@mail.com",
+  password: "Abcdefg1!",
+  confirm: "Abcdefg1!",
+  day: "4",
+  month: "3",
+  year: "1998",
+  consent: true,
+  ...over,
+});
 
 beforeEach(() => store.clear());
 
@@ -85,19 +98,21 @@ test("five wrong sign-ins lock that email for 5 minutes; a right one clears it",
   assert.deepEqual(phone.afterRightSignIn(t, "a@b.co"), {});
 });
 
-test("the phone's Create account: email and password only, waiting for the code", async () => {
-  assert.equal(await auth.createPhoneAccount("Rafi@Mail.com", "abcdefgh", phone.phonePasswordProblem, NOW), "invalid");
-  assert.equal(await auth.createPhoneAccount("rafi@mail.com", "Abcdefg1!", phone.phonePasswordProblem, NOW, "/m/ai"), "ok");
-  assert.equal(await auth.createPhoneAccount("RAFI@mail.com", "Abcdefg1!", phone.phonePasswordProblem, NOW), "exists");
+test("the phone's Create account is the web's: name, email, password and birthday, waiting for the code", async () => {
+  assert.equal(await auth.createAccount(signUp({ password: "abcdefgh", confirm: "abcdefgh" }), "", NOW), "invalid");
+  assert.equal(await auth.createAccount(signUp({ firstName: "" }), "", NOW), "invalid");
+  assert.equal(await auth.createAccount(signUp({ day: "31", month: "2" }), "", NOW), "invalid", "no 31 February");
+  assert.equal(await auth.createAccount(signUp({ consent: false }), "", NOW), "invalid");
+  assert.equal(await auth.createAccount(signUp({ email: "Rafi@Mail.com" }), "", NOW, "/m/ai"), "ok");
+  assert.equal(await auth.createAccount(signUp({ email: "RAFI@mail.com" }), "", NOW), "exists");
   const a = auth.accountOf(auth.readAccounts(), "rafi@mail.com");
   assert.equal(a.verifiedAt, null);
-  assert.equal(a.firstName, "");
+  assert.equal(a.firstName, "Rafi");
+  assert.equal(a.birthDate, "1998-03-04");
   assert.equal(signedInAs(), null);
   assert.equal(await auth.signIn("rafi@mail.com", "Abcdefg1!", NOW), "unverified");
   assert.equal((await auth.verifyEmail(NOW)).ok, true);
   assert.equal(signedInAs(), "rafi@mail.com");
-  assert.equal(auth.saveAccountName("Rafi", "Ahmed").ok, true);
-  assert.equal(auth.accountOf(auth.readAccounts(), "rafi@mail.com").firstName, "Rafi");
   assert.equal(await auth.isCurrentPassword("rafi@mail.com", "Abcdefg1!"), true);
   assert.equal(await auth.isCurrentPassword("rafi@mail.com", "Abcdefg2!"), false);
   assert.equal((await auth.resetPassword("rafi@mail.com", "Newpass1!", NOW, phone.phonePasswordProblem)).ok, true);
@@ -111,7 +126,7 @@ test("a provider signs in to its email's account, or makes a verified one", asyn
   assert.equal(a.firstName, "Maya");
   assert.equal(signedInAs(), "maya@gmail.com");
   assert.equal(phone.linkProvider("maya@gmail.com", "google", true).ok, true);
-  assert.deepEqual(phone.phoneAccountOf(phone.readPhoneAccounts(), "MAYA@gmail.com"), { providers: ["google"], passwordless: true, faceId: false, handleOwed: false });
+  assert.deepEqual(phone.phoneAccountOf(phone.readPhoneAccounts(), "MAYA@gmail.com"), { providers: ["google"], passwordless: true });
   await auth.signOut();
   assert.equal(await auth.providerSignIn("maya@gmail.com", { first: "", last: "" }, NOW + 1), "in");
   assert.equal(signedInAs(), "maya@gmail.com");
@@ -119,7 +134,7 @@ test("a provider signs in to its email's account, or makes a verified one", asyn
 });
 
 test("a link's utm_source is kept with the account made from it, so the question isn't asked", async () => {
-  assert.equal(await auth.createPhoneAccount("rafi@mail.com", "Abcdefg1!", phone.phonePasswordProblem, NOW, "", "YouTube Ads!"), "ok");
+  assert.equal(await auth.createAccount(signUp(), "YouTube Ads!", NOW), "ok");
   const byEmail = auth.accountOf(auth.readAccounts(), "rafi@mail.com");
   assert.equal(byEmail.source, "youtubeads");
   assert.equal(byEmail.sourceVia, "link");
@@ -142,43 +157,14 @@ test("a link's utm_source is kept with the account made from it, so the question
   delete globalThis.sessionStorage;
 });
 
-test("Face ID: Log In offers it for the email that chose it, and it signs in without the password", async () => {
-  assert.equal(await auth.providerSignIn("maya@gmail.com", { first: "Maya", last: "Karim" }, NOW), "new");
-  phone.afterPhoneSignIn();
-  assert.equal(phone.readPhone().lastEmail, "maya@gmail.com");
-  assert.equal(phone.readPhone().faceIdPending, true);
-  assert.equal(phone.faceIdEmailFor("", "maya@gmail.com", phone.readPhoneAccounts()), "", "not chosen yet");
-  phone.updatePhoneAccount("maya@gmail.com", (a) => ({ ...a, faceId: true }));
-  await auth.signOut();
-  const accounts = phone.readPhoneAccounts();
-  assert.equal(phone.faceIdEmailFor("", phone.readPhone().lastEmail, accounts), "maya@gmail.com");
-  assert.equal(phone.faceIdEmailFor(" MAYA@gmail.com ", "", accounts), "maya@gmail.com");
-  assert.equal(phone.faceIdEmailFor("someone@else.com", "maya@gmail.com", accounts), "", "the typed email wins");
-  assert.equal(await auth.deviceSignIn("maya@gmail.com", NOW + 5), "ok");
-  assert.equal(signedInAs(), "maya@gmail.com");
-  await auth.signOut();
-  // Never an account that is still waiting for its email, nor an unknown one.
-  assert.equal(await auth.createPhoneAccount("rafi@mail.com", "Abcdefg1!", phone.phonePasswordProblem, NOW), "ok");
-  assert.equal(await auth.deviceSignIn("rafi@mail.com", NOW), "refused");
-  assert.equal(await auth.deviceSignIn("nobody@mail.com", NOW), "refused");
-  assert.equal(signedInAs(), null);
-});
-
-test("an account that left before choosing its handle still owes Name and handle", () => {
-  assert.equal(phone.phoneAccountOf(phone.readPhoneAccounts(), "rafi@mail.com").handleOwed, false);
-  phone.updatePhoneAccount("rafi@mail.com", (a) => ({ ...a, handleOwed: true }));
-  assert.equal(phone.phoneAccountOf(phone.readPhoneAccounts(), "RAFI@mail.com").handleOwed, true);
-  assert.equal(phone.normalizePhoneAccounts({ "a@b.co": { providers: [] } })["a@b.co"].handleOwed, false);
-});
-
-test("this phone remembers the tour it owes and who signed in last", () => {
-  assert.deepEqual(
-    { tour: phone.normalizePhone({}).tourPending, last: phone.normalizePhone({}).lastEmail },
-    { tour: false, last: "" },
-  );
+test("this phone remembers the tour it owes and Remember me", () => {
+  assert.equal(phone.normalizePhone({}).tourPending, false);
   phone.updatePhone({ tourPending: true });
   assert.equal(phone.readPhone().tourPending, true);
-  assert.equal(phone.normalizePhone({ lastEmail: " Maya@Gmail.com " }).lastEmail, "maya@gmail.com");
+  phone.afterPhoneSignIn(false);
+  assert.equal(phone.readPhone().forgetSession, true);
+  phone.afterPhoneSignIn();
+  assert.equal(phone.readPhone().forgetSession, false);
 });
 
 test("where the phone goes next: its own pages only, never back to a way-in screen", () => {
@@ -189,16 +175,6 @@ test("where the phone goes next: its own pages only, never back to a way-in scre
   assert.equal(phone.mobileNext("/m/sign-in?next=/m"), "/m");
   assert.equal(phone.mobileNext("/m/welcome", "/m/welcome", true), "/m/welcome");
   assert.equal(phone.mobileNext("/mobile"), "/m");
-});
-
-test("handle suggestions: three free ones near the name, never a taken one", () => {
-  assert.equal(phone.handleBaseOf("Rafi Ahmed"), "rafi-ahmed");
-  assert.equal(phone.handleBaseOf("Zoë  O'Brien"), "zoe-o-brien");
-  assert.deepEqual(phone.handleSuggestions("Rafi Ahmed", "rafi", () => true), ["rafi-ahmed-1", "rafiahmed", "rafi-makes"]);
-  assert.deepEqual(phone.handleSuggestions("Rafi Ahmed", "rafi", (h) => h !== "rafiahmed"), ["rafi-ahmed-1", "rafi-makes", "rafi-ahmed-2"]);
-  assert.deepEqual(phone.handleSuggestions("রফি", "", () => true), []);
-  // Once they typed a handle of their own, Name and handle passes no name: near what they typed.
-  assert.deepEqual(phone.handleSuggestions("", "naim-rahman", () => true), ["naim-rahman-1", "naimrahman", "naim-makes"]);
 });
 
 test("the phone's way-in keys stay with the browser when accounts swap their work", async () => {
