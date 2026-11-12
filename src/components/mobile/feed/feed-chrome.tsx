@@ -5,7 +5,8 @@
 // Badge LG, the current one on color/glass/fill-sm) and the marketplace
 // activity button on the left; Search and the bell (with the web bell's
 // count) on the right. Under it, while a build of yours waits its turn, the
-// queue pill ("Popup when user is in queue") with the web's words for it.
+// queue pill ("Popup when user is in queue") with the web's words for it; a
+// tap opens that build's chat, as the build pill on every other tab does.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -14,6 +15,8 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Spinner } from "@/components/ideeza/spinner";
 import { queuedAhead, statusOf, useCreateHistory } from "@/lib/create/history";
 import { cn } from "@/lib/utils";
+import { MEDIA_INK } from "../kit/media";
+import { T } from "../type";
 import { usePhoneNotices } from "./use-phone-notices";
 import type { Guard } from "./use-guest";
 
@@ -34,10 +37,11 @@ export function FeedTopNav({ tab, onTab, guard }: { tab: FeedTab; onTab: (t: Fee
               type="button"
               role="tab"
               aria-selected={tab === t}
-              data-theme={tab === t ? "light" : undefined}
               onClick={() => onTab(t)}
               className={cn(
-                "flex h-full items-center rounded-md px-5 py-2 text-md font-semibold leading-md tracking-wide text-[color:var(--color-white)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+                T.name,
+                MEDIA_INK,
+                "flex h-full items-center rounded-md px-5 py-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
                 tab === t ? "bg-[var(--color-glass-fill-sm)]" : "bg-transparent",
               )}
             >
@@ -58,7 +62,11 @@ export function FeedTopNav({ tab, onTab, guard }: { tab: FeedTab; onTab: (t: Fee
           {badge > 0 && (
             <span
               aria-hidden
-              className="pointer-events-none absolute right-[4px] top-[4px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--color-text-error)] px-1 text-xs font-semibold leading-xs text-[color:var(--color-white)]"
+              className={cn(
+                T.micro,
+                MEDIA_INK,
+                "pointer-events-none absolute right-[4px] top-[4px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--color-text-error)] px-1",
+              )}
             >
               {badge > 99 ? "99+" : badge}
             </span>
@@ -75,7 +83,7 @@ function NavIcon({ icon, label, onClick }: { icon: IconValue; label: string; onC
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="inline-flex size-[40px] items-center justify-center rounded-full text-[color:var(--color-white)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+      className={cn(MEDIA_INK, "inline-flex size-[44px] items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
     >
       <Icon icon={icon} size={24} />
     </button>
@@ -87,7 +95,7 @@ export function QueuePill() {
   const router = useRouter();
   const { hydrated, builds } = useCreateHistory();
   const queued = React.useMemo(
-    () => (hydrated ? builds.filter((b) => statusOf(b) === "queued" && !b.blocked).sort((a, b) => a.createdAt - b.createdAt)[0] ?? null : null),
+    () => (hydrated ? (builds.filter((b) => statusOf(b) === "queued" && !b.blocked).sort((a, b) => a.createdAt - b.createdAt)[0] ?? null) : null),
     [hydrated, builds],
   );
   if (!queued) return null;
@@ -98,8 +106,8 @@ export function QueuePill() {
       <button
         type="button"
         data-theme="light"
-        onClick={() => router.push("/m/ai")}
-        className="flex items-center gap-4 rounded-md bg-bg-surface px-5 py-2 text-sm leading-sm text-text-primary shadow-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        onClick={() => router.push(`/m/ai/chat/${encodeURIComponent(queued.chatId)}`)}
+        className={cn(T.meta, "flex items-center gap-4 rounded-md bg-bg-surface px-5 py-2 text-text-primary shadow-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
       >
         <Spinner size={16} />
         {text}

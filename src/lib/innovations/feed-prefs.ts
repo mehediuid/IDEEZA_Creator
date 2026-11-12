@@ -1,9 +1,12 @@
 // What the phone keeps about its Feed, beside the web's reactions (which hold
 // appreciate, save and follow): the clip ⋯ menu's Interested, Not interested
-// and Hide video; when each clip was saved (Saved lists "Saved on"); the clips
-// shared to your Feed with a caption and an audience (D-1: Public or Only me);
-// and the playback choices (Data saver, Video quality). One key,
-// `ideeza:m:feed`. Pure, relative imports only.
+// and Hide video; which clip of a post was saved and when (Saved lists the
+// clip itself with "Saved on"); the product clips you reported; the clips
+// shared to your Feed with a caption and an audience (D-1: Public or Only me),
+// which lead your Feed; and the playback choices (Playback speed, Video
+// quality). Data saver is Settings › Appearance's (`appearance.dataSaver`,
+// one switch for the app), not kept here. One key, `ideeza:m:feed`. Pure,
+// relative imports only.
 
 export const FEED_PREFS_KEY = "ideeza:m:feed";
 
@@ -26,11 +29,17 @@ export type FeedPrefs = {
   interested: string[];
   notInterested: string[];
   hidden: string[];
-  /** Clip id → when it was saved here. */
+  /** Clip id → when it was saved here. (Before clips were saved one by one the key was the
+   *  post's id; `savedRows` reads that as the post's Project clip.) */
   savedAt: Record<string, number>;
+  /** Product clips reported here; a Project clip's report is the post's (the web's reported list). */
+  reported: string[];
   shares: FeedShare[];
+  /** Left from before Data saver moved to Settings › Appearance; nothing reads it. */
   dataSaver: boolean;
   quality: VideoQuality;
+  /** Playback speed, one of SPEEDS. */
+  speed: number;
 };
 
 export const NO_FEED_PREFS: FeedPrefs = {
@@ -39,10 +48,14 @@ export const NO_FEED_PREFS: FeedPrefs = {
   notInterested: [],
   hidden: [],
   savedAt: {},
+  reported: [],
   shares: [],
   dataSaver: false,
   quality: "auto",
+  speed: 1,
 };
+
+const SPEED_VALUES: readonly number[] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
 const ids = (x: unknown): string[] =>
   Array.isArray(x) ? [...new Set(x.filter((s): s is string => typeof s === "string" && s.length > 0 && s.length <= 120))] : [];
@@ -79,9 +92,11 @@ export function feedPrefsIn(value: unknown): FeedPrefs {
     notInterested: ids(r.notInterested),
     hidden: ids(r.hidden),
     savedAt,
+    reported: ids(r.reported),
     shares: sharesIn(r.shares),
     dataSaver: r.dataSaver === true,
     quality: typeof r.quality === "string" && /^(auto|\d{3,4})$/.test(r.quality) ? r.quality : "auto",
+    speed: typeof r.speed === "number" && SPEED_VALUES.includes(r.speed) ? r.speed : 1,
   };
 }
 
@@ -107,6 +122,58 @@ export function withSavedAt(p: FeedPrefs, clipId: string, at: number | null): Fe
   return { ...p, savedAt };
 }
 
+/** A product clip reported here (once). */
+export function withReported(p: FeedPrefs, clipId: string): FeedPrefs {
+  return p.reported.includes(clipId) ? p : { ...p, reported: [...p.reported, clipId] };
+}
+
+// ─────────────────────────── Saved, one clip at a time ───────────────────────────
+
+type ClipRef = { id: string; postId: string; kind: "project" | "product" };
+
+/** The clips Saved lists: for each post on the web's Saved list (newest saved first), the clips
+ *  of it this phone saved; a post saved on the web (or before clips were saved one by one) is its
+ *  Project clip. `at` is null when this phone doesn't know when (kept as 0). */
+export function savedRows<C extends ClipRef>(savedPosts: readonly string[], savedAt: Readonly<Record<string, number>>, clips: readonly C[]): { clip: C; at: number | null }[] {
+  const out: { clip: C; at: number | null; i: number }[] = [];
+  savedPosts.forEach((postId, i) => {
+    const ofPost = clips.filter((c) => c.postId === postId);
+    const marked = ofPost.filter((c) => savedAt[c.id] !== undefined);
+    if (marked.length) for (const c of marked) out.push({ clip: c, at: savedAt[c.id] || null, i });
+    else {
+      const project = ofPost.find((c) => c.kind === "project");
+      if (project) out.push({ clip: project, at: savedAt[postId] ?? null, i });
+    }
+  });
+  return out.sort((a, b) => (b.at ?? 0) - (a.at ?? 0) || b.i - a.i).map(({ clip, at }) => ({ clip, at }));
+}
+
+/** Whether this clip is saved: its post is on the web's list and this clip is one `savedRows` lists. */
+export function isClipSaved<C extends ClipRef>(clip: C, savedPosts: readonly string[], savedAt: Readonly<Record<string, number>>, clips: readonly C[]): boolean {
+  return savedRows(savedPosts, savedAt, clips).some((r) => r.clip.id === clip.id);
+}
+
+/** Saving or unsaving one clip: the phone's note of it, and whether the post itself must go on or
+ *  off the web's Saved list (on with its first clip, off with its last). */
+export function savePlan<C extends ClipRef>(
+  p: FeedPrefs,
+  clip: C,
+  savedPosts: readonly string[],
+  clips: readonly C[],
+  now: number,
+): { prefs: FeedPrefs; togglePost: boolean; saved: boolean } {
+  const rows = savedRows(savedPosts, p.savedAt, clips).filter((r) => r.clip.postId === clip.postId);
+  const was = rows.some((r) => r.clip.id === clip.id);
+  const savedAt = { ...p.savedAt };
+  delete savedAt[clip.postId];
+  // Keep what was listed for this post under its clips' own ids, then change this one.
+  for (const r of rows) savedAt[r.clip.id] = r.at ?? 0;
+  if (was) delete savedAt[clip.id];
+  else savedAt[clip.id] = now;
+  const left = rows.filter((r) => r.clip.id !== clip.id).length + (was ? 0 : 1);
+  return { prefs: { ...p, savedAt }, togglePost: was ? left === 0 : !savedPosts.includes(clip.postId), saved: !was };
+}
+
 /** Why a caption can't be shared; null when it can (a caption is optional). */
 export function captionProblem(caption: string): string | null {
   return caption.trim().length > CAPTION_MAX ? `Keep it under ${CAPTION_MAX} characters.` : null;
@@ -118,6 +185,11 @@ export function withShare(p: FeedPrefs, share: FeedShare): FeedPrefs {
 
 /** How many times this phone shared a clip to its Feed. */
 export const sharesOf = (p: FeedPrefs, clipId: string) => p.shares.filter((s) => s.clipId === clipId).length;
+
+/** Takes a clip off your Feed's shares (every share of it). */
+export function withoutShares(p: FeedPrefs, clipId: string): FeedPrefs {
+  return { ...p, shares: p.shares.filter((s) => s.clipId !== clipId) };
+}
 
 export const SPEEDS: readonly { value: number; label: string }[] = [
   { value: 0.5, label: "0.5" },

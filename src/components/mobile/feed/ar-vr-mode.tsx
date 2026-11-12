@@ -1,24 +1,27 @@
 "use client";
 
-// Feed · AR/VR mode (mobile Figma "Clip ⋯ menu" 04): the top bar (Back,
-// "AR/VR Mode"), the item on the light stage, and the clip's creator, chip,
-// title and description at the foot over a dark scrim (text over it white).
+// Feed · AR/VR mode (mobile Figma "Clip ⋯ menu" 04, 10764:1501): the top bar
+// (Back, "AR/VR Mode"), the item on the light stage, and at the foot over a
+// dark scrim the clip's own text column — the creator (to their profile) with
+// • Follow, the chips, the title and the description (text over it white).
 // What the phone can do is real: it asks the browser whether it can open an
-// AR or a VR session (WebXR). A sample post has no 3D file (the web's words),
-// so there is nothing to place yet and View in AR says so.
+// AR or a VR session (WebXR). A Feed post has no 3D file here (the web's
+// words), so there is nothing to place yet and View in AR says so.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { VirtualRealityVr01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Avatar } from "@/components/ideeza/avatar";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
-import { StateCard } from "@/components/ideeza/state-card";
-import { clipById, clipDetailsHref } from "@/lib/innovations/clips";
+import { Skeleton } from "@/components/ideeza/skeleton";
+import { clipDetailsHref, isMineClipId } from "@/lib/innovations/clips";
+import { follows, useReactions } from "@/lib/innovations/reactions";
+import { profileHrefOf } from "@/lib/people/ids";
+import { NotFoundState } from "../kit/state";
+import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { shortOf } from "./clip-view";
+import { ClipText } from "./clip-view";
+import { useFeedClips } from "./use-clips";
 
 type XrSupport = { ar: boolean; vr: boolean } | null;
 
@@ -46,40 +49,46 @@ function useXrSupport(): XrSupport {
 
 export function ArVrMode({ id }: { id: string }) {
   const router = useRouter();
-  const clip = clipById(id);
+  const toast = useToast();
+  const { hydrated, byId } = useFeedClips();
+  const clip = byId(id);
   const xr = useXrSupport();
+  const { reactions, setFollow } = useReactions();
 
   if (!clip) {
     return (
       <Screen top={<TopBar back title="AR/VR Mode" />}>
         <div className="flex h-full items-center px-8">
-          <StateCard
-            tone="empty"
-            className="w-full"
-            icon={<Icon icon={VirtualRealityVr01Icon} size={32} />}
-            title="This clip isn’t on the Feed"
-            body="It may have been taken down."
-            action={
-              <Button size="xl" className="w-full" onClick={() => router.push("/m")}>
-                Back to the Feed
-              </Button>
-            }
-          />
+          {isMineClipId(id) && !hydrated ? (
+            <div role="status" aria-label="Loading the clip" className="flex w-full flex-col gap-4">
+              <Skeleton shape="block" className="h-[240px] w-full" />
+              <Skeleton shape="text" size="lg" />
+            </div>
+          ) : (
+            <NotFoundState thing="clip" body="It may have been taken down." />
+          )}
         </div>
       </Screen>
     );
   }
 
-  const can = xr === null ? "Checking what this phone can open…" : xr.ar || xr.vr ? `This phone can open ${[xr.ar && "AR", xr.vr && "VR"].filter(Boolean).join(" and ")}.` : "This browser can’t open AR or VR.";
+  const following = follows(reactions, clip.creator.id, false);
+  const creatorHref = clip.source === "mine" ? "/profile" : profileHrefOf(clip.creator.id, "innovations");
+  const can =
+    xr === null
+      ? "Checking what this phone can open…"
+      : xr.ar || xr.vr
+        ? `This phone can open ${[xr.ar && "AR", xr.vr && "VR"].filter(Boolean).join(" and ")}.`
+        : "This browser can’t open AR or VR.";
 
   return (
     <Screen top={<TopBar back title="AR/VR Mode" />} className="relative flex flex-col">
       <div className="relative flex min-h-full flex-1 flex-col bg-gradient-to-b from-[var(--color-white)] to-[var(--color-gray-300)]">
         <div data-theme="light" className="flex flex-col gap-6 px-8 pt-4">
           <Banner tone="info" title="No 3D file to place yet">
-            This sample post has no 3D file; this is its render. {can}
+            {clip.source === "mine" ? "This is the item’s picture; its 3D model opens on the project." : "This sample post has no 3D file; this is its render."} {can}
           </Banner>
-          <Button size="lg" className="w-full" disabled>
+          <Button size="xl" className="w-full" disabled>
             View in AR
           </Button>
         </div>
@@ -89,21 +98,21 @@ export function ArVrMode({ id }: { id: string }) {
             <img src={clip.poster} alt={`${clip.title}, its render`} className="max-h-[320px] w-full object-contain px-12" />
           )}
         </div>
-        <div data-theme="dark" className="bg-gradient-to-b from-transparent via-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] via-[30%] to-[color:color-mix(in_srgb,var(--color-black)_80%,transparent)] px-8 pb-6 pt-16 text-text-primary">
-          <div className="flex flex-col items-start gap-4">
-            <span className="flex items-center gap-6">
-              <Avatar size="md" initials={clip.creator.initials} color={clip.creator.color} />
-              <span className="text-lg font-medium leading-lg">{clip.creator.name}</span>
-            </span>
-            <span className="rounded-full bg-bg-inverse px-4 py-2 text-sm leading-xs text-text-inverse">{clip.kind === "project" ? "Project" : "Product"}</span>
-            <button type="button" onClick={() => router.push(clipDetailsHref(clip))} className="flex flex-col gap-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-              <span className="text-lg font-semibold leading-lg">{clip.title}</span>
-              <span className="text-lg leading-lg">
-                {shortOf(clip.description)}
-                <span className="text-text-tertiary">more</span>
-              </span>
-            </button>
-          </div>
+        <div
+          data-theme="dark"
+          className="bg-gradient-to-b from-transparent via-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] via-[30%] to-[color:color-mix(in_srgb,var(--color-black)_80%,transparent)] px-8 pb-6 pt-16"
+        >
+          <ClipText
+            clip={clip}
+            following={following}
+            onCreator={() => {
+              if (creatorHref) router.push(`/m${creatorHref}`);
+            }}
+            onFollow={() => {
+              if (!setFollow(clip.creator.id, !following)) toast({ title: "This phone couldn’t save that. Nothing changed.", lead: "error" });
+            }}
+            onDetails={() => router.push(clipDetailsHref(clip))}
+          />
         </div>
       </div>
     </Screen>

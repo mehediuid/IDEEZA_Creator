@@ -33,7 +33,7 @@ test("every post is a Project clip; a further product with its own video is a Pr
 test("offers come from the listing rows; a product clip never offers the Main NFT", () => {
   assert.deepEqual(clips.offerOf({ label: "Whole project (Main NFT)", price: "0.30 ETH" }, "Commercial use"), {
     kind: "main",
-    price: "0.30 ETH",
+    price: "0.3 ETH",
     use: null,
     sold: null,
   });
@@ -187,13 +187,40 @@ test("notices: each button says what it does; each leads to the phone's screen",
   assert.equal(phone.actionLabelOf({ id: "coin:plan:x:1", kind: "coin" }), "See plan");
   assert.equal(phone.actionLabelOf({ id: "coin:low", kind: "coin" }), "Buy credits");
   assert.equal(phone.phoneHrefOf({ href: "/projects/m1/products/p2" }), "/m/projects/m1/products/p2");
-  assert.equal(phone.phoneHrefOf({ href: "/projects/m1/earn/sell#x" }), "/m/projects/m1?tab=marketplace");
-  assert.equal(phone.phoneHrefOf({ href: "/innovations/lamp-1#comment-3", projectId: "m9" }), "/m/projects/m9");
-  assert.equal(phone.phoneHrefOf({ href: "/messages/c1" }), "/m/messages");
-  assert.equal(phone.phoneHrefOf({ href: "/chat/abc" }), "/m/ai");
+  // Each button opens its exact phone screen (feed-ux-06, feed-qa-06/07).
+  assert.equal(phone.phoneHrefOf({ href: "/projects/m1/earn/sell#x" }), "/m/projects/m1/earn/sell");
+  assert.equal(phone.phoneHrefOf({ href: "/projects/m1/earn/money?sale=s9#customers" }), "/m/projects/m1/earn/money?sale=s9");
+  assert.equal(phone.phoneHrefOf({ href: "/projects/m1/earn" }), "/m/projects/m1/earn");
+  assert.equal(phone.phoneHrefOf({ href: "/projects/m1" }), "/m/projects/m1");
+  assert.equal(phone.phoneHrefOf({ href: "/innovations/lamp-1#comment-3", projectId: "m9" }), "/m/clip/mine%3Am9?comment=3");
+  assert.equal(phone.phoneHrefOf({ href: "/innovations/lamp-1", projectId: "m9" }), "/m/clip/mine%3Am9");
+  assert.equal(phone.phoneHrefOf({ href: "/messages/c1" }), "/m/messages/c1");
+  assert.equal(phone.phoneHrefOf({ href: "/messages/c1?about=x" }), "/m/messages/c1");
+  assert.equal(phone.phoneHrefOf({ href: "/messages" }), "/m/messages");
+  assert.equal(phone.phoneHrefOf({ href: "/chat/abc" }), "/m/ai/chat/abc");
+  assert.equal(phone.phoneHrefOf({ href: "/build/j1" }), "/m/ai/build/j1");
   assert.equal(phone.phoneHrefOf({ href: "/blog/my-post-1" }), "/m/blog/my-post-1");
-  assert.equal(phone.phoneHrefOf({ href: "/settings/plan?tab=credits" }), "/m/earn");
-  assert.equal(phone.phoneHrefOf({ href: "/settings/get-paid#methods" }), "/m/settings");
+  assert.equal(phone.phoneHrefOf({ href: "/settings/plan?tab=credits#credit-alerts" }), "/m/plans/credits");
+  assert.equal(phone.phoneHrefOf({ href: "/settings/plan" }), "/m/plans");
+  assert.equal(phone.phoneHrefOf({ href: "/settings/get-paid#methods" }), "/m/settings/idz-pay");
+  assert.equal(phone.phoneHrefOf({ href: "/settings/notifications" }), "/m/settings/notifications");
+  assert.equal(phone.phoneHrefOf({ href: "/settings/security" }), "/m/settings/security");
+  assert.equal(phone.phoneHrefOf({ href: "/settings/privacy" }), "/m/settings");
+});
+
+test("account and security notices: a new sign-in has It's me and Log Out", () => {
+  const list = phone.securityNotices({
+    passwordChangedAt: 50,
+    twoStepSince: null,
+    devices: [{ id: "d1", name: "iPad", os: "iPadOS", where: "Dhaka", signedInAt: 40 }],
+  });
+  assert.deepEqual(list.map((n) => n.id), ["sec:device:d1", "sec:password:50"]);
+  assert.equal(phone.actionLabelOf(list[0]), "It’s me");
+  assert.deepEqual(phone.secondActionOf(list[0]), { label: "Log Out", does: "sign-out-device" });
+  assert.equal(phone.deviceIdOf(list[0]), "d1");
+  assert.equal(phone.secondActionOf(list[1]), null);
+  assert.equal(phone.phoneHrefOf(list[1]), "/m/settings/security");
+  assert.equal(phone.securityNotices({ passwordChangedAt: 0, twoStepSince: null, devices: [] }).length, 0);
 });
 
 const DAY = 24 * HOUR;
@@ -227,4 +254,116 @@ test("marketplace activity: the week's average and volume in demo dollars, sales
   assert.deepEqual(rows.map((r) => r.id), ["a", "b", "c"]);
   assert.deepEqual([rows[0].token, rows[0].from, rows[0].price, rows[0].usd], ["#7", "0x1234…cdef", "0.1 ETH", "$375.00"]);
   assert.equal(rows[1].nft, "virtual");
+});
+
+test("a project you shared is a clip: mine:<projectId>, a Product clip per further product video", () => {
+  const creator = { id: "you", name: "Maya Karim", initials: "MK", color: "var(--color-gray-700)", pro: false };
+  const mine = clips.mineClipsOf({
+    projectId: "m7",
+    title: "Smart lamp",
+    description: "A lamp that wakes you.",
+    creator,
+    sharedAt: 100,
+    cover: "/cover.png",
+    stage: "Prototype",
+    minted: true,
+    videos: [
+      { productId: null, name: "Smart lamp", summary: "", takeId: "t-project", poster: null },
+      { productId: "base", name: "Base", summary: "The base.", takeId: "t-base", poster: "/base.png" },
+    ],
+    offers: [{ kind: "main", price: "0.2 ETH", use: null, sold: null, sharePct: 10 }],
+    productOffers: { base: [{ kind: "physical", price: "0.01 ETH", use: "Personal use", sold: { count: 0, of: 5 } }] },
+  });
+  assert.deepEqual(mine.map((c) => [c.id, c.kind, c.takeId]), [
+    ["mine:m7", "project", "t-project"],
+    ["mine:m7~base", "product", "t-base"],
+  ]);
+  assert.equal(mine[0].postId, "mine:m7");
+  assert.equal(mine[0].source, "mine");
+  assert.equal(mine[0].poster, "/cover.png");
+  assert.equal(mine[1].offers[0].kind, "physical");
+  assert.equal(clips.clipBuyHref(mine[0]), "/m/projects/m7/market");
+  assert.equal(clips.clipHref(mine[0].id), "/m/clip/mine%3Am7");
+  assert.ok(clips.isMineClipId("mine:m7"));
+  // Without a video in this browser the post is still a clip (its cover), so it shows on the Feed.
+  const bare = clips.mineClipsOf({ projectId: "m8", title: "Bare", description: "", creator, sharedAt: 1, cover: null, stage: null, minted: false, videos: [], offers: [] });
+  assert.deepEqual(bare.map((c) => [c.id, c.takeId]), [["mine:m8", null]]);
+});
+
+test("the Feed leads with your shares, then your shared projects, then everyone's clips", () => {
+  const creator = { id: "you", name: "You", initials: "YO", color: "var(--color-gray-700)", pro: false };
+  const mine = clips.mineClipsOf({ projectId: "m7", title: "Lamp", description: "", creator, sharedAt: 5, cover: null, stage: null, minted: false, videos: [], offers: [] });
+  const share = { id: "s1", clipId: "p1", caption: "Look", audience: "public", at: 9 };
+  const list = clips.feedClips(clips.FEED_CLIPS, mine, [share]);
+  assert.equal(list[0].id, "p1");
+  assert.equal(list[0].share.caption, "Look");
+  assert.equal(list[1].id, "mine:m7");
+  assert.equal(list.filter((c) => c.id === "p1").length, 1);
+  assert.equal(list.length, clips.FEED_CLIPS.length + 1);
+  // A hidden clip never leads.
+  const hidden = clips.feedClips(clips.FEED_CLIPS, mine, [share], { interested: [], notInterested: [], hidden: ["p1"] });
+  assert.ok(!hidden.some((c) => c.id === "p1"));
+});
+
+test("offers: prices written as the marketplace writes them; an auction says Place bid", () => {
+  assert.equal(clips.tidyPrice("0.80 ETH"), "0.8 ETH");
+  assert.equal(clips.offerOf({ label: "Whole project (Main NFT)", price: "0.80 ETH" }, null).price, "0.8 ETH");
+  assert.equal(
+    clips.offerActionLabel({ kind: "main", price: "0.01 ETH", use: null, sold: null, auction: { bidLabel: "Starting bid", bid: "0.01 ETH", next: "0.01 ETH", endsAt: 5 } }),
+    "Place bid (0.01 ETH)",
+  );
+  assert.equal(clips.stageLabelOf("prototype"), "Prototype");
+  assert.equal(clips.stageLabelOf(null), null);
+  assert.equal(clips.FEED_CLIPS.find((c) => c.id === "p1").stage, clips.stageLabelOf(SAMPLE_POSTS[0].stage));
+});
+
+test("Saved: one clip at a time; a post saved on the web is its Project clip", () => {
+  const all = clips.FEED_CLIPS.filter((c) => c.postId === "sample:p1");
+  let p = prefs.NO_FEED_PREFS;
+  // Saved on the web: listed as the Project clip, date unknown.
+  assert.deepEqual(prefs.savedRows(["sample:p1"], p.savedAt, all).map((r) => [r.clip.id, r.at]), [["p1", null]]);
+  // Saving the product clip first puts the post on the list, the product clip alone in Saved.
+  let plan = prefs.savePlan(p, all[1], [], all, 10);
+  assert.equal(plan.togglePost, true);
+  assert.equal(plan.saved, true);
+  p = plan.prefs;
+  assert.deepEqual(prefs.savedRows(["sample:p1"], p.savedAt, all).map((r) => r.clip.id), ["p1~remote"]);
+  assert.ok(prefs.isClipSaved(all[1], ["sample:p1"], p.savedAt, all));
+  assert.ok(!prefs.isClipSaved(all[0], ["sample:p1"], p.savedAt, all));
+  // Then the project clip: the post stays on the list; both listed.
+  plan = prefs.savePlan(p, all[0], ["sample:p1"], all, 20);
+  assert.equal(plan.togglePost, false);
+  p = plan.prefs;
+  assert.deepEqual(prefs.savedRows(["sample:p1"], p.savedAt, all).map((r) => r.clip.id), ["p1", "p1~remote"]);
+  // Unsaving one keeps the post; unsaving the last takes it off.
+  plan = prefs.savePlan(p, all[0], ["sample:p1"], all, 30);
+  assert.deepEqual([plan.togglePost, plan.saved], [false, false]);
+  plan = prefs.savePlan(plan.prefs, all[1], ["sample:p1"], all, 40);
+  assert.deepEqual([plan.togglePost, plan.saved], [true, false]);
+});
+
+test("feed prefs: playback speed and product reports are kept; shares can be taken back", () => {
+  assert.equal(prefs.feedPrefsIn({ speed: 1.5 }).speed, 1.5);
+  assert.equal(prefs.feedPrefsIn({ speed: 3 }).speed, 1);
+  const r = prefs.withReported(prefs.NO_FEED_PREFS, "p1~remote");
+  assert.deepEqual(prefs.withReported(r, "p1~remote").reported, ["p1~remote"]);
+  const shared = prefs.withShare(prefs.NO_FEED_PREFS, { id: "s1", clipId: "p2", caption: "", audience: "public", at: 1 });
+  assert.equal(prefs.withoutShares(shared, "p2").shares.length, 0);
+});
+
+test("marketplace activity: whole-number grid steps, a smooth line, names stay whole", () => {
+  assert.equal(stats.chartTop([{ count: 6 }]), 8);
+  assert.equal(stats.chartTop([{ count: 0 }]), 4);
+  assert.equal(stats.chartTop([{ count: 4 }]), 4);
+  assert.equal(stats.smoothPath([{ x: 0, y: 10 }, { x: 10, y: 0 }]), "M0,10 C5,10 5,0 10,0");
+  assert.equal(stats.smoothPath([]), "");
+  assert.equal(stats.shortParty("0x1234567890abcdef"), "0x1234…cdef");
+  assert.equal(stats.shortParty("Diego Alvarez"), "Diego Alvarez");
+});
+
+test("the phone's Following: your own choice only, so a new account follows no one", () => {
+  assert.equal(clips.followingClips(clips.FEED_CLIPS, NO_REACTIONS, undefined, false).length, 0);
+  const one = withFollow(NO_REACTIONS, "c2", true);
+  const list = clips.followingClips(clips.FEED_CLIPS, one, undefined, false);
+  assert.ok(list.length > 0 && list.every((c) => c.creator.id === "c2"));
 });
