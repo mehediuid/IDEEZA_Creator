@@ -175,3 +175,17 @@ From the owner's master page (Wallet Balance, Stacking, Refer & Earn, Buy IDEEZA
 - **Permission pre-prompts** (KIT-PM-01…04): camera, photos, microphone and notifications sheets, each once per phone.
 - **States**: list-row bones after 300 ms (KIT-SK-01), empty, error and not-found cards (M48 / M49, ER-04 "This project isn't here" + Go to Feed), the offline banner (M01).
 - **Also in the kit**: M14 tabs, the eyebrow, the list card and rows, the 44 px search, the media chip, code cells, the pick-one sheet (and A06 select over it), the Bottom action bar; links to the account states the demo can't cause.
+
+## Review fixes (2026-11-12)
+
+A 21-reviewer pass (UX, QA, typography, visual) found about 550 issues across `/m`; branch `fix/m-review` fixes them area by area. The per-area logs are kept outside the repo (`IDEEZA_Creator-wt/_review/fix-<area>.md`).
+
+- **One type scale.** Every text style in `/m` comes from the 16 roles in `components/mobile/type.ts` (`T.*`); `tests/projects/mobile-type-scale.test.mjs` is strict and fails on any raw size.
+- **Shared kit:** `TopBar onBack` (forms ask before Back drops work) and `titleAs`, `ImageViewer`, `MobileTabs` + `useTabParam` (tab taps never fetch and work offline), one scrim for stacked sheets, toasts never cover a sheet's rows, list cards and dividers on real border tokens.
+- **Messages:** buyer start links honour `as=`, so "Ask the creator" reaches the creator.
+- **Profile:** the hub's General and Others open real index screens (`/m/profile/settings/{general,others}`); Edit profile asks before any way out loses changes.
+- **Settings:** the Money rows open Get paid, Wallet balance, Payment method, Credit alerts (`/m/settings/credit-alerts`) and Billing details (`/m/settings/billing`).
+- **Plans:** coupon codes at checkout, Pay off while offline, Get paid at the one IDZ price with a by-project split.
+- **Wallet signing sheet:** wallet card, every charge, Total to pay now, Balance after, Reject.
+- **Account:** Reset signs out other devices, Add your email checks a code, Face ID at Log In, Where did you hear about IDEEZA, the welcome offer and the phone tour.
+- **Feed:** your shared projects and Share to your Feed show in the Feed, Search and Saved; every notification opens its own screen.
