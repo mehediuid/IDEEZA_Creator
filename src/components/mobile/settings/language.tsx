@@ -71,6 +71,7 @@ function LanguagePage({ ready, now, zone, voice, dateLocale }: { ready: boolean;
         <SettingsRow
           id="voice"
           label="Voice typing language"
+          helper="The language the mic listens for. Your browser turns your speech into text: Chrome sends the audio to Google to do it."
           value={voice === "auto" ? "Automatic" : languageName(voice)}
           onClick={() => open("voice")}
           disabled={!online}

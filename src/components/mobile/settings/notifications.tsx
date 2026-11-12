@@ -9,9 +9,11 @@
 // The record and its rules are the web's (components/settings/
 // notifications-page.tsx): `ideeza:settings` notifications, and
 // appearance.keepNotices. Toggles save as they change (ST-92 when refused);
-// sheets save on Done.
+// sheets save on Done. Each kind says what it covers, in the web's words;
+// "Credits and plan" links to the low mark once the phone has that page.
 
 import * as React from "react";
+import Link from "next/link";
 import { usePopupPermission } from "@/components/notifications/browser-popups";
 import { useNoticeClock } from "@/components/notifications/use-notices";
 import { popupModeOf, popupModePatch, quietWindowStart, type PopupMode } from "@/lib/notifications/filter";
@@ -19,7 +21,9 @@ import { KIND_LABELS, SHOWN_KINDS, type ShownKind } from "@/lib/notifications/ty
 import { updateSettings, type SettingsV1 } from "@/lib/settings/prefs";
 import { useSettings } from "@/lib/settings/use-settings";
 import { useOnline } from "../kit/states";
-import { ChoiceSheet, SaveFailed, SettingsGroup, SettingsRow, SettingsScreen, useSaver, type ChoiceOption } from "./kit";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
+import { CREDIT_ALERTS_HREF, ChoiceSheet, HELPER_LINK, SaveFailed, SettingsGroup, SettingsRow, SettingsScreen, useSaver, type ChoiceOption } from "./kit";
 import { PhoneSettingsLink, PushBlockedSheet, PushPrompt, PushRow } from "./notifications-push";
 import { BidsSheet, QuietHoursSheet, dollars } from "./notifications-sheets";
 
@@ -45,6 +49,30 @@ const ROW_IDS: Record<ShownKind, string> = {
   comments: "comments",
   teams: "teams",
   blog: "blog",
+};
+
+/** What each kind covers (the web's COVERS, with the phone's places). */
+const COVERS: Record<ShownKind, React.ReactNode> = {
+  marketplace: "A sale of yours, a bid on your auction, and its last hour.",
+  product: "A build ready to review, needing a retry or paused, and a video take that’s ready.",
+  coin: (
+    <>
+      Credits at or under your low mark, bought credits about to expire, your plan renewing, and a withdrawal method added, removed or made your
+      default.
+      {CREDIT_ALERTS_HREF && (
+        <>
+          {" "}
+          <Link href={CREDIT_ALERTS_HREF} className={HELPER_LINK}>
+            Set the low mark
+          </Link>
+        </>
+      )}
+    </>
+  ),
+  message: "A new message or request. These count on the Messages badge, not the bell.",
+  comments: "Comments and replies by others on the projects you shared.",
+  teams: "New messages in your project teams’ conversations. These count on the Messages badge.",
+  blog: "Your blog’s review result, and a blog the IDEEZA team featured or removed.",
 };
 
 /** The web's quiet hours line, live. */
@@ -117,7 +145,7 @@ export function NotificationsSettings() {
       <SettingsGroup label="What you hear about">
         {SHOWN_KINDS.map((k) => (
           <React.Fragment key={k}>
-            <SettingsRow id={ROW_IDS[k]} label={KIND_LABELS[k]} toggle={{ checked: n.channels[k].web, onChange: () => toggleKind(k) }} disabled={off} />
+            <SettingsRow id={ROW_IDS[k]} label={KIND_LABELS[k]} helper={COVERS[k]} toggle={{ checked: n.channels[k].web, onChange: () => toggleKind(k) }} disabled={off} />
             {k === "marketplace" && (
               <SettingsRow
                 id="bid-threshold"
@@ -132,7 +160,7 @@ export function NotificationsSettings() {
         ))}
       </SettingsGroup>
       <SaveFailed saver={saver} group="kinds" />
-      <p id="email" className="scroll-mt-24 rounded-sm text-sm leading-sm text-text-secondary data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus">
+      <p id="email" className={cn(T.meta, "scroll-mt-24 rounded-sm data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus")}>
         Email and text messages aren’t sent yet. Sound and vibration follow your phone’s settings.
       </p>
 

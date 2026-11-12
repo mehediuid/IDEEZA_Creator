@@ -16,6 +16,9 @@ import { TextInput } from "@/components/ideeza/text-input";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { DEMO_USD_RATES } from "@/lib/account/payout";
 import { Sheet } from "../kit/sheet";
+import { cn } from "@/lib/utils";
+import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
+import { T } from "../type";
 import { useToast } from "../kit/toast";
 
 const SAVE_FAILED = "Couldn’t save. Nothing changed.";
@@ -54,14 +57,14 @@ function TimeRow({ label, value, onChange }: { label: string; value: string; onC
       }}
       className="flex min-h-[48px] cursor-pointer items-center gap-6 px-8 py-6 has-[:focus-visible]:bg-bg-subtle"
     >
-      <span className="min-w-0 flex-1 text-md leading-md text-text-primary">{label}</span>
+      <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>{label}</span>
       <input
         ref={input}
         type="time"
         value={value}
         aria-label={label}
         onChange={(e) => CLOCK.test(e.target.value) && onChange(e.target.value)}
-        className="w-[96px] shrink-0 cursor-pointer bg-transparent text-right text-md leading-md text-text-secondary outline-none [&::-webkit-calendar-picker-indicator]:hidden"
+        className={cn(T.body, "w-[96px] shrink-0 cursor-pointer bg-transparent text-right outline-none [&::-webkit-calendar-picker-indicator]:hidden")}
       />
       <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
         <Icon icon={ArrowRight01Icon} size={24} />
@@ -103,14 +106,14 @@ export function QuietHoursSheet({
   };
   return (
     <Sheet open={open} onClose={onClose} title="Quiet hours" actions={<SheetActions onDone={done} onCancel={onClose} />}>
-      <div className="flex flex-col overflow-hidden rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface [&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border">
+      <div className={cn(LIST_CARD, LIST_DIVIDERS, "rounded-lg")}>
         <TimeRow label="Starts" value={draft.from} onChange={(v) => setDraft((d) => ({ ...d, from: v }))} />
         <TimeRow label="Ends" value={draft.to} onChange={(v) => setDraft((d) => ({ ...d, to: v }))} />
       </div>
-      <p className="text-sm leading-sm text-text-secondary">
+      <p className={T.meta}>
         {draft.from === draft.to ? "Start and end are the same time, so quiet hours never start." : "In this phone’s time."}
       </p>
-      {failed && <p className="text-sm leading-sm text-text-error">{SAVE_FAILED}</p>}
+      {failed && <p className={cn(T.meta, "text-text-error")}>{SAVE_FAILED}</p>}
     </Sheet>
   );
 }
@@ -187,8 +190,8 @@ export function BidsSheet({
             <input type="radio" className="sr-only" name={name} checked={picked === o.value} onChange={() => setPicked(o.value)} />
             <Radio checked={picked === o.value} decorative className="mt-1" />
             <span className="flex flex-col gap-1">
-              <span className="text-lg leading-lg text-text-primary">{o.label}</span>
-              <span className="text-sm leading-sm text-text-secondary">{o.hint}</span>
+              <span className={T.bodyLg}>{o.label}</span>
+              <span className={T.meta}>{o.hint}</span>
             </span>
           </label>
         ))}
@@ -208,12 +211,12 @@ export function BidsSheet({
               {...errorProps(error, ids.amount.errorId)}
             />
           </Field>
-          <p className="text-sm leading-sm text-text-secondary">
+          <p className={T.meta}>
             A test ETH counts as {dollars(Number(DEMO_USD_RATES.ETH))}, the demo rate Get paid uses.
           </p>
         </div>
       )}
-      {failed && <p className="text-sm leading-sm text-text-error">{SAVE_FAILED}</p>}
+      {failed && <p className={cn(T.meta, "text-text-error")}>{SAVE_FAILED}</p>}
     </Sheet>
   );
 }

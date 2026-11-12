@@ -16,6 +16,9 @@ import { readBackupZip, restoreBrowserData, type BackupError, type ReadBackup } 
 import { CATEGORIES } from "@/lib/data/export";
 import { useDates } from "@/lib/settings/use-dates";
 import { TEXT_LINK, BottomBar } from "../kit/bottom-bar";
+import { cn } from "@/lib/utils";
+import { LIST_DIVIDERS } from "../kit/list";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 import { useOnline } from "../kit/states";
 import { SettingsScreen } from "./kit";
@@ -113,15 +116,15 @@ export function RestoreSettings() {
           {problem.body}
         </Banner>
       )}
-      <p className="text-md leading-md text-text-primary">
+      <p className={cn(T.body, "text-text-primary")}>
         Choose a .zip that Download your information made, on this phone or another device. It replaces everything IDEEZA keeps on this phone, and
         you’ll see what it holds before anything changes.
       </p>
       <div aria-live="polite" className="flex flex-col gap-4 empty:hidden">
-        {reading && <p className="text-md leading-md text-text-secondary">Reading {reading}…</p>}
+        {reading && <p className={T.body}>Reading {reading}…</p>}
         {restoring && (
           <>
-            <p className="text-md leading-md text-text-primary">Restoring your backup…</p>
+            <p className={cn(T.body, "text-text-primary")}>Restoring your backup…</p>
             <ProgressBar value={100} label="Restoring your backup" className="motion-safe:animate-pulse" />
           </>
         )}
@@ -146,16 +149,16 @@ export function RestoreSettings() {
         {plan && (
           <>
             {plan.empty && <Banner tone="attention">This backup holds nothing. Restoring it leaves IDEEZA empty on this phone.</Banner>}
-            <ul role="list" className="flex flex-col [&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border">
+            <ul role="list" className={cn("flex flex-col", LIST_DIVIDERS)}>
               {CATEGORIES.filter((c) => plan.holds[c.id] !== NOTHING || plan.replaces[c.id] !== NOTHING).map((c) => (
                 <li key={c.id} className="flex flex-col gap-1 py-4">
-                  <span className="text-md font-medium leading-md text-text-primary">{c.label.replace(/ Information$/, "")}</span>
-                  <span className="text-sm leading-sm text-text-secondary">In the backup: {onPhone(plan.holds[c.id])}</span>
-                  <span className="text-sm leading-sm text-text-tertiary">Here now: {onPhone(plan.replaces[c.id])}</span>
+                  <span className={T.rowTitle}>{c.label.replace(/ Information$/, "")}</span>
+                  <span className={T.meta}>In the backup: {onPhone(plan.holds[c.id])}</span>
+                  <span className={cn(T.meta, "text-text-tertiary")}>Here now: {onPhone(plan.replaces[c.id])}</span>
                 </li>
               ))}
             </ul>
-            <p className="text-md leading-md text-text-secondary">
+            <p className={T.body}>
               {plan.files ? `It also holds ${plan.files} ${plan.files === 1 ? "photo, file or video" : "photos, files and videos"}. ` : ""}
               {OTHER_TABS}
             </p>

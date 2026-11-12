@@ -12,6 +12,7 @@
 // (components/settings/blocked-people.tsx).
 
 import * as React from "react";
+import { UserBlock01Icon } from "@hugeicons/core-free-icons";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Button } from "@/components/ideeza/button";
 import { SearchInput } from "@/components/ideeza/search-input";
@@ -23,6 +24,10 @@ import { ME } from "@/lib/messages/types";
 import type { MetWhere } from "@/lib/settings/audience";
 import { useDates } from "@/lib/settings/use-dates";
 import { BottomBar } from "../kit/bottom-bar";
+import { cn } from "@/lib/utils";
+import { EmptyState } from "../kit/state";
+import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
+import { T } from "../type";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { Sheet } from "../kit/sheet";
 import { useOnline } from "../kit/states";
@@ -32,7 +37,6 @@ import { SaveFailed, SettingsGroup, SettingsScreen, useSaver } from "./kit";
 const WHERE: Record<MetWhere, string> = { messages: "Messages", comments: "Comments", marketplace: "Marketplace" };
 /** A search box once the list is longer than this (the web's rule). */
 const SEARCH_FROM = 6;
-const SEARCH = "h-[44px] rounded-xl px-6";
 
 const matches = (text: string, q: string) => text.toLowerCase().includes(q.trim().toLowerCase());
 
@@ -41,8 +45,8 @@ function Person({ p, line }: { p: BlockablePerson; line?: string }) {
     <span className="flex min-w-0 flex-1 items-center gap-6">
       <Avatar initials={p.initials} color={p.color ?? undefined} size="md" />
       <span className="flex min-w-0 flex-col gap-1">
-        <span className="truncate text-md font-medium leading-md text-text-primary">{p.name}</span>
-        {line && <span className="text-sm leading-sm text-text-secondary [overflow-wrap:anywhere]">{line}</span>}
+        <span className={cn(T.rowTitle, "truncate")}>{p.name}</span>
+        {line && <span className={cn(T.meta, "[overflow-wrap:anywhere]")}>{line}</span>}
       </span>
     </span>
   );
@@ -138,16 +142,17 @@ export function BlockedPeopleSettings() {
       }
     >
       {rows.length === 0 ? (
-        <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-6 text-center">
-          <p className="text-lg font-semibold leading-lg text-text-primary">You haven’t blocked anyone</p>
-          <p className="text-md leading-md text-text-secondary">You can block someone from their profile, from a conversation, or with Block someone.</p>
-        </div>
+        <EmptyState
+          icon={UserBlock01Icon}
+          title="You haven’t blocked anyone"
+          body="You can block someone from their profile, from a conversation, or with Block someone."
+        />
       ) : (
         <>
-          <p className="text-md leading-md text-text-secondary">
+          <p className={T.body}>
             People you block can’t message you, and their comments are hidden. You can’t message them or comment on their projects.
           </p>
-          <p role="status" className="text-md font-medium leading-md text-text-primary">
+          <p role="status" className={T.rowTitle}>
             {rows.length === 1 ? "1 person blocked" : `${rows.length} people blocked`}
           </p>
           {rows.length > SEARCH_FROM && (
@@ -156,12 +161,11 @@ export function BlockedPeopleSettings() {
               onValueChange={setQ}
               placeholder="Search blocked people"
               aria-label="Search the people you blocked"
-              containerClassName={SEARCH}
-              className="text-lg leading-lg"
+              size="xl"
             />
           )}
           {shown.length === 0 ? (
-            <p className="text-md leading-md text-text-secondary">No one you blocked matches “{q.trim()}”.</p>
+            <p className={T.body}>No one you blocked matches “{q.trim()}”.</p>
           ) : (
             <SettingsGroup>
               {shown.map((r) => (
@@ -184,18 +188,17 @@ export function BlockedPeopleSettings() {
           onValueChange={setFind}
           placeholder="Search people you’ve met"
           aria-label="Search the people you’ve met"
-          containerClassName={SEARCH}
-          className="text-lg leading-lg"
+          size="xl"
         />
         {results.length === 0 ? (
-          <p role="status" className="text-md leading-md text-text-secondary">
+          <p role="status" className={T.body}>
             {met.length === 0 ? "You haven’t met anyone here yet." : `No one you’ve met matches “${find.trim()}”.`}
           </p>
         ) : (
           <ul
             role="list"
             aria-label="People you’ve met"
-            className="flex flex-col overflow-hidden rounded-lg border-[length:var(--border-width-1)] border-solid border-border [&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border"
+            className={cn(LIST_CARD, LIST_DIVIDERS, "rounded-lg")}
           >
             {results.map((p) => {
               const isBlocked = blockedIds.has(p.id);

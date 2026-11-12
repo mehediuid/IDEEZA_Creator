@@ -2,7 +2,8 @@
 
 // AU-40 · Sign-in & security (Settings › Account), in the web's words: How
 // you sign in (Email, Password, Apple, Google, Facebook), Protection (2-step
-// sign-in, Sign in with Face ID), Your devices (also the sign-in history,
+// sign-in, Sign in with Face ID: on, Delete account is confirmed with Face
+// ID in place of the password, and the helper says only that), Your devices (also the sign-in history,
 // D-17) with Sign out of all other devices, and Delete account. AU-40b
 // loading, AU-40c couldn't load (the record can't be read), AU-40d offline
 // (what was read stays, changes wait). Sheets: AU-43 disconnect (neutral),
@@ -12,14 +13,14 @@
 // the toasts the sub-screens come back with.
 
 import * as React from "react";
-import { ComputerIcon, SmartPhone01Icon, Tablet01Icon, ArrowRight01Icon, Alert02Icon } from "@hugeicons/core-free-icons";
+import { ComputerIcon, SmartPhone01Icon, Tablet01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
-import { StateCard } from "@/components/ideeza/state-card";
+import { TextInput } from "@/components/ideeza/text-input";
 import { Toggle } from "@/components/ideeza/toggle";
 import { countryOfZone, isCurrentPassword, SESSION_KEY, useAuth } from "@/lib/account/auth";
 import { countryNameOf } from "@/lib/account/countries";
@@ -53,10 +54,12 @@ import { notifyStores, parseStored, useStoredKey } from "@/lib/key-store";
 import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
+import { ErrorState } from "../kit/state";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
-import { PageBones, SettingsScreen } from "./kit";
+import { ARRIVED, PageBones, SettingsScreen } from "./kit";
 import { SignOutSheet } from "./sign-out";
 
 /** What this phone is, read from the browser. */
@@ -91,7 +94,7 @@ export function useSessionAt(): number {
 }
 
 function Heading({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-lg font-semibold leading-lg text-text-primary">{children}</h2>;
+  return <h2 className={T.section}>{children}</h2>;
 }
 
 /** "Mobile / Info row": the label, its value on the right, a chevron; 44 tall. */
@@ -102,8 +105,8 @@ function InfoRow({ label, value, onClick, href, disabled }: { label: string; val
   );
   const body = (
     <>
-      <span className={cn("flex-1 text-md leading-md", disabled ? "text-text-disabled" : "text-text-secondary")}>{label}</span>
-      <span className={cn("min-w-0 truncate text-md leading-md", disabled ? "text-text-disabled" : "text-text-primary")}>{value}</span>
+      <span className={cn(T.body, "flex-1", disabled ? "text-text-disabled" : "text-text-secondary")}>{label}</span>
+      <span className={cn(T.body, "min-w-0 truncate", disabled ? "text-text-disabled" : "text-text-primary")}>{value}</span>
       <span className={disabled ? "text-[color:var(--color-icon-disabled)]" : "text-[color:var(--color-icon-default)]"}>
         <Icon icon={ArrowRight01Icon} size={16} />
       </span>
@@ -139,11 +142,11 @@ function ToggleLine({
   disabled?: boolean;
 }) {
   return (
-    <div id={id} className="flex items-start gap-8 py-2">
+    <div id={id} className={"flex items-start gap-8 rounded-md py-2" + ARRIVED}>
       <Toggle checked={checked} onChange={onChange} disabled={disabled} aria-label={label} className="mt-1" />
       <button type="button" disabled={disabled} onClick={onChange} className="flex flex-1 flex-col gap-2 text-left outline-none disabled:cursor-not-allowed">
-        <span className={cn("text-lg leading-lg", disabled ? "text-text-disabled" : "text-[color:var(--color-input-label)]")}>{label}</span>
-        <span className="text-sm leading-sm text-[color:var(--color-input-helper)]">{help}</span>
+        <span className={cn(T.bodyLg, disabled ? "text-text-disabled" : "text-[color:var(--color-input-label)]")}>{label}</span>
+        <span className={cn(T.meta, "text-[color:var(--color-input-helper)]")}>{help}</span>
       </button>
     </div>
   );
@@ -168,14 +171,14 @@ function DeviceRow({ name, line, os, demo, onClick }: { name: string; line: stri
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex items-center gap-4">
-          <span className="truncate text-md font-semibold leading-md text-text-primary">{name}</span>
+          <span className={cn(T.name, "truncate")}>{name}</span>
           {demo && (
             <Badge tone="warning" className="shrink-0">
               Demo
             </Badge>
           )}
         </span>
-        <span className="truncate text-sm leading-sm text-text-secondary">{line}</span>
+        <span className={cn(T.meta, "truncate")}>{line}</span>
       </span>
       <span className="text-[color:var(--color-icon-default)]">
         <Icon icon={ArrowRight01Icon} size={16} />
@@ -223,17 +226,10 @@ export function SecuritySettings() {
   if (unreadable) {
     return (
       <SettingsScreen title="Sign-in & security" back="/m/settings/account" offlineNote={false}>
-        <StateCard
-          tone="error"
-          className="w-full"
-          icon={<Icon icon={Alert02Icon} size={32} />}
+        <ErrorState
           title="Couldn’t load Sign-in & security"
           body="Check your connection, or try again in a moment."
-          action={
-            <Button hierarchy="secondary" size="lg" onClick={notifyStores}>
-              Try again
-            </Button>
-          }
+          action={{ label: "Try again", onClick: notifyStores }}
         />
       </SettingsScreen>
     );
@@ -293,7 +289,7 @@ export function SecuritySettings() {
         <ToggleLine
           id="face-id"
           label="Sign in with Face ID"
-          help="Also confirms withdrawals and Delete account."
+          help="Confirms Delete account with Face ID on this phone."
           checked={phoneAccount.faceId}
           disabled={!online}
           onChange={() => {
@@ -302,7 +298,7 @@ export function SecuritySettings() {
         />
       </section>
 
-      <section className="flex flex-col gap-4" id="devices">
+      <section className={"flex flex-col gap-4 rounded-md" + ARRIVED} id="devices">
         <Heading>Your devices</Heading>
         <div className="flex flex-col">
           <DeviceRow
@@ -325,7 +321,7 @@ export function SecuritySettings() {
         <Button hierarchy="secondary" size="xl" className="w-full" disabled={!online || !others.length} onClick={() => setOpen({ kind: "others" })}>
           Sign out of all other devices
         </Button>
-        {!others.length && <p className="-mt-2 text-sm leading-sm text-text-tertiary">Only this phone is signed in.</p>}
+        {!others.length && <p className={cn(T.meta, "-mt-2 text-text-tertiary")}>Only this phone is signed in.</p>}
       </section>
 
       <Link
@@ -335,8 +331,8 @@ export function SecuritySettings() {
         onClick={(e) => !online && e.preventDefault()}
         className="flex flex-col gap-1 rounded-md py-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        <span className={cn("text-md leading-md", online ? "text-text-error" : "text-text-disabled")}>Delete account</span>
-        <span className="text-sm leading-sm text-text-tertiary">You have 30 days to change your mind.</span>
+        <span className={cn(T.body, online ? "text-text-error" : "text-text-disabled")}>Delete account</span>
+        <span className={cn(T.meta, "text-text-tertiary")}>You have 30 days to change your mind.</span>
       </Link>
 
       <ConnectSheet
@@ -381,7 +377,7 @@ export function SecuritySettings() {
           </>
         }
       >
-        <p className="text-md leading-md text-text-secondary">It’s your only way to sign in. Add a password first so you can still get in.</p>
+        <p className={T.body}>It’s your only way to sign in. Add a password first so you can still get in.</p>
       </Sheet>
       <TwoStepOffSheet
         open={open?.kind === "two-step-off"}
@@ -457,7 +453,7 @@ function ConnectSheet({
       <Badge tone="warning" className="self-start">
         Demo
       </Badge>
-      <p className="text-md leading-md text-text-secondary">
+      <p className={T.body}>
         Then you can sign in with {words} as <span className="text-text-primary">{email}</span>.
       </p>
     </Sheet>
@@ -527,17 +523,17 @@ function TwoStepOffSheet({
       <form id="two-step-off" noValidate onSubmit={submit}>
         <Field label={passwordless ? "Authenticator code" : "Password"} htmlFor={ids.secret.id} error={error} errorId={ids.secret.errorId}>
           {passwordless ? (
-            <input
+            <TextInput
               id={ids.secret.id}
+              size="xl"
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
               value={value}
-              onChange={(e) => {
-                setValue(e.target.value);
+              onValueChange={(v) => {
+                setValue(v);
                 setWrong(false);
               }}
-              className="h-[44px] rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-6 text-lg leading-lg text-[color:var(--color-input-text)] outline-none focus-visible:border-[var(--color-input-border-focus)]"
               {...errorProps(error, ids.secret.errorId)}
             />
           ) : (
@@ -611,8 +607,8 @@ function DeviceSheet({
       <dl className="flex flex-col">
         {rows.map(([term, value]) => (
           <div key={term} className="flex items-start justify-between gap-6 py-4">
-            <dt className="text-md leading-md text-text-secondary">{term}</dt>
-            <dd className="text-right text-md leading-md text-text-primary">{value}</dd>
+            <dt className={T.body}>{term}</dt>
+            <dd className={cn(T.body, "text-right text-text-primary")}>{value}</dd>
           </div>
         ))}
       </dl>

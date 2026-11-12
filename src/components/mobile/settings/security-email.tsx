@@ -17,6 +17,8 @@ import { moveSecurity } from "@/lib/account/security";
 import { CodeStep } from "../account/code-step";
 import { ACCOUNT_CONTENT, AccountAlert, AccountHeading } from "../account/parts";
 import { BottomBar } from "../kit/bottom-bar";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
@@ -138,8 +140,8 @@ export function EmailSettings() {
         />
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <p className="text-md font-medium leading-md text-text-primary">Current email</p>
-            <p className="flex h-[44px] items-center rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border-disabled)] bg-[var(--color-input-bg-disabled)] px-6 text-lg leading-lg text-text-secondary">
+            <p className={T.rowTitle}>Current email</p>
+            <p className={cn(T.bodyLg, "flex h-[44px] items-center rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border-disabled)] bg-[var(--color-input-bg-disabled)] px-6 text-text-secondary")}>
               {current}
             </p>
           </div>

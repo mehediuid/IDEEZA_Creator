@@ -12,8 +12,10 @@ import { Radio } from "@/components/ideeza/checkbox";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { cn } from "@/lib/utils";
 import { useOnline } from "../kit/states";
+import { T } from "../type";
 import { useToast } from "../kit/toast";
-import { SettingsScreen } from "./kit";
+import { LIST_CARD } from "../kit/list";
+import { SettingsScreen, leaveTo } from "./kit";
 
 export type PickOption = { value: string; label: string; hint?: string };
 
@@ -32,7 +34,6 @@ function Choice({
   onPick: () => void;
   pinned?: boolean;
 }) {
-  const label = pinned ? "text-md leading-md" : "text-lg leading-lg";
   return (
     <button
       type="button"
@@ -49,8 +50,8 @@ function Choice({
     >
       {!pinned && <Radio checked={checked} disabled={disabled} decorative className="shrink-0" />}
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={cn(label, disabled ? "text-text-disabled" : "text-text-primary")}>{option.label}</span>
-        {option.hint && <span className="text-sm leading-sm text-text-secondary">{option.hint}</span>}
+        <span className={cn(pinned ? T.body : T.bodyLg, disabled ? "text-text-disabled" : "text-text-primary")}>{option.label}</span>
+        {option.hint && <span className={T.meta}>{option.hint}</span>}
       </span>
       {pinned && <Radio checked={checked} disabled={disabled} decorative className="shrink-0" />}
     </button>
@@ -93,10 +94,7 @@ export function PickerScreen({
   const shown = React.useMemo(() => (q ? options.filter((o) => matches(o, q)) : options), [options, q]);
   const pinnedShown = !q || matches(pinned, q);
 
-  const leave = () => {
-    if (window.history.length > 1) router.back();
-    else router.replace(backTo);
-  };
+  const leave = () => leaveTo(router, backTo);
   const pick = (v: string) => {
     if (v === value) return leave();
     if (!onPick(v)) return setFailed(true);
@@ -105,7 +103,7 @@ export function PickerScreen({
   };
 
   return (
-    <SettingsScreen title={title}>
+    <SettingsScreen title={title} back={backTo}>
       <SearchInput
         value={query}
         onValueChange={setQuery}
@@ -113,17 +111,17 @@ export function PickerScreen({
         aria-label={placeholder}
         autoFocus={autoFocus}
         disabled={!online}
-        containerClassName="mt-2 h-[44px] rounded-xl px-6"
-        className="text-lg leading-lg"
+        size="xl"
+        containerClassName="mt-2"
       />
       {failed && (
-        <p role="alert" className="text-sm leading-sm text-text-error">
+        <p role="alert" className={cn(T.meta, "text-text-error")}>
           Couldn’t save. Nothing changed.
         </p>
       )}
       <div role="radiogroup" aria-label={title} className="flex flex-col gap-6">
         {pinnedShown && (
-          <div className="overflow-hidden rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface">
+          <div className={cn(LIST_CARD, "rounded-lg")}>
             <Choice option={pinned} pinned checked={value === pinned.value} disabled={!online} onPick={() => pick(pinned.value)} />
           </div>
         )}
@@ -136,11 +134,11 @@ export function PickerScreen({
         )}
       </div>
       {!pinnedShown && shown.length === 0 && (
-        <p role="status" className="text-center text-md leading-md text-text-secondary">
+        <p role="status" className={cn(T.body, "text-center")}>
           {noMatch(query.trim())}
         </p>
       )}
-      {note && <p className="text-sm leading-sm text-text-secondary">{note}</p>}
+      {note && <p className={T.meta}>{note}</p>}
     </SettingsScreen>
   );
 }

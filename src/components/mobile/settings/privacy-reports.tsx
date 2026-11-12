@@ -11,7 +11,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Bug01Icon, Comment01Icon, Image01Icon, Message01Icon, UserIcon } from "@hugeicons/core-free-icons";
+import { Bug01Icon, Comment01Icon, Flag01Icon, Image01Icon, Message01Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
@@ -24,6 +24,10 @@ import { directory, personById, profileHrefOf } from "@/lib/people/ids";
 import { REPORTS_KEY, normalizeReports } from "@/lib/people/reports";
 import { useDates } from "@/lib/settings/use-dates";
 import { Sheet } from "../kit/sheet";
+import { cn } from "@/lib/utils";
+import { EmptyState } from "../kit/state";
+import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
+import { T } from "../type";
 import { SettingsGroup, SettingsNote, SettingsRow, SettingsScreen } from "./kit";
 
 const REPORTED_POSTS_KEY = "ideeza:innovations:reported-posts";
@@ -85,7 +89,7 @@ export function useReportsYouMade(): ReportRow[] | null {
 /** The web's safety line: IDEEZA can't act in real time. */
 function Emergency() {
   return (
-    <p className="text-md font-medium leading-md text-text-primary">
+    <p className={T.rowTitle}>
       If you or someone else is in danger, contact your local emergency services now. IDEEZA can’t act in real time.
     </p>
   );
@@ -106,10 +110,11 @@ export function YourReportsSettings() {
     <SettingsScreen title="Your reports" loading={rows === null} offlineNote={false}>
       <Emergency />
       {rows && rows.length === 0 ? (
-        <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-6 text-center">
-          <p className="text-lg font-semibold leading-lg text-text-primary">You haven’t reported anything</p>
-          <p className="text-md leading-md text-text-secondary">To report a profile, a post, a comment or a message, use its ⋯ menu.</p>
-        </div>
+        <EmptyState
+          icon={Flag01Icon}
+          title="You haven’t reported anything"
+          body="To report a profile, a post, a comment or a message, use its ⋯ menu."
+        />
       ) : (
         <>
           <SettingsGroup>
@@ -168,16 +173,16 @@ function ReportSheet({ row, open, onClose }: { row: ReportRow | null; open: bool
         </>
       }
     >
-      {row.quote && <p className="text-md leading-md text-text-primary [overflow-wrap:anywhere]">“{row.quote}”</p>}
-      <dl className="flex flex-col overflow-hidden rounded-lg border-[length:var(--border-width-1)] border-solid border-border [&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border">
+      {row.quote && <p className={cn(T.body, "text-text-primary [overflow-wrap:anywhere]")}>“{row.quote}”</p>}
+      <dl className={cn(LIST_CARD, LIST_DIVIDERS, "rounded-lg bg-transparent")}>
         {lines.map(([term, value]) => (
           <div key={term} className="flex items-start justify-between gap-8 px-8 py-6">
-            <dt className="shrink-0 text-md leading-md text-text-secondary">{term}</dt>
-            <dd className="min-w-0 text-right text-md leading-md text-text-primary [overflow-wrap:anywhere]">{value}</dd>
+            <dt className={cn(T.body, "shrink-0")}>{term}</dt>
+            <dd className={cn(T.body, "min-w-0 text-right text-text-primary [overflow-wrap:anywhere]")}>{value}</dd>
           </div>
         ))}
       </dl>
-      <p className="text-sm leading-sm text-text-secondary">
+      <p className={T.meta}>
         {row.kind === "problem" ? "We can’t reply in the app yet." : "Nobody reviews reports in the app yet."}
       </p>
     </Sheet>

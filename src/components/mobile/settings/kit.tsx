@@ -9,7 +9,11 @@
 //   border/default, radius/lg) of rows.
 // · SettingsRow — "Kit / Settings row" 10689:70: a 24 icon, Body/SM label and
 //   Body/XS helper, a Body/SM value or an A17 badge, then a chevron (Link) or
-//   an A10 toggle; Plain and Danger. 12 / 16 padding, 12 apart.
+//   an A10 toggle. Plain (Sign out) and Danger (Erase) end with nothing: no
+//   chevron. 12 / 16 padding, 12 apart. A value that doesn't fit beside its
+//   label drops under it (320 wide), so the two never run into each other.
+//   The card, its lines, the row's padding and the chevron are the shared
+//   kit's (kit/list.tsx); Settings keeps radius/lg (10690:137).
 // · ChoiceSheet — a pick-one row's M09 radio sheet, a hint per option, Done /
 //   Cancel; Done saves and says "Saved" (ST-93).
 // · SaveFailed — "Couldn't save. Nothing changed." with Try again under the
@@ -17,7 +21,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
@@ -26,14 +29,27 @@ import { Skeleton } from "@/components/ideeza/skeleton";
 import { Toggle } from "@/components/ideeza/toggle";
 import { ARRIVED_ATTR } from "@/components/settings/use-arrival-highlight";
 import { cn } from "@/lib/utils";
+import { TEXT_LINK } from "../kit/bottom-bar";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
 import { OfflineBanner, useOnline } from "../kit/states";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { canGoBack } from "../nav-trail";
 import { Screen } from "../screen";
 import { TopBar, type TopBarAction } from "../top-bar";
 
+/** The Plans area's phone pages for the web's "Credit alerts and limits" and "Billing details".
+ *  The Settings rows, the search hits and the "Set the low mark" link show only with a route (null
+ *  hides them), so nothing points at a page that isn't there. */
+export const CREDIT_ALERTS_HREF: string | null = "/m/settings/credit-alerts";
+export const BILLING_DETAILS_HREF: string | null = "/m/settings/billing";
+
+/** A03 Link SM inside a helper line (the scale's caption role, medium, brand). */
+export const HELPER_LINK = cn(T.caption, "font-medium text-text-brand outline-none hover:underline focus-visible:underline");
+
 /** Kept out of cn() (tailwind-merge drops a bare `outline`): the row a search or link lands on. */
-const ARRIVED =
+export const ARRIVED =
   " scroll-mt-24 data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:-outline-offset-2 data-[arrived]:outline-border-focus";
 
 /** Arriving at a page's #row (search, a link): the row scrolls into view and is outlined once —
@@ -91,7 +107,7 @@ export function SettingsScreen({
             {!online && (
               <div className="flex flex-col gap-6">
                 <OfflineBanner />
-                {offlineNote && <p className="text-sm leading-sm text-text-secondary">Connect to change this.</p>}
+                {offlineNote && <p className={T.meta}>Connect to change this.</p>}
               </div>
             )}
             {children}
@@ -107,7 +123,7 @@ export function PageBones() {
   return (
     <div role="status" aria-label="Loading" className="flex flex-col gap-6">
       {[4, 3, 3].map((rows, i) => (
-        <div key={i} aria-hidden className="flex flex-col rounded-lg border-[length:var(--border-width-1)] border-solid border-border px-4">
+        <div key={i} aria-hidden className={cn(LIST_CARD, "rounded-lg bg-transparent px-4")}>
           {Array.from({ length: rows }, (_, j) => (
             <div key={j} className="flex items-center gap-6 py-4">
               <Skeleton shape="circle" size="lg" />
@@ -128,20 +144,18 @@ export function SettingsGroup({ label, id, children }: { label?: string; id?: st
   return (
     <section id={id} aria-labelledby={label ? labelId : undefined} className={"flex flex-col gap-2 rounded-lg" + ARRIVED}>
       {label && (
-        <h2 id={labelId} className="text-sm font-regular leading-sm text-text-tertiary">
+        <h2 id={labelId} className={cn(T.meta, "text-text-tertiary")}>
           {label}
         </h2>
       )}
-      <div className="flex flex-col overflow-hidden rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface [&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border">
-        {children}
-      </div>
+      <div className={cn(LIST_CARD, LIST_DIVIDERS, "rounded-lg")}>{children}</div>
     </section>
   );
 }
 
 /** A line of Body/XS under a group (what a page's rows mean, "Email and text messages aren't sent yet."). */
 export function SettingsNote({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm leading-sm text-text-secondary">{children}</p>;
+  return <p className={T.meta}>{children}</p>;
 }
 
 export type RowBadge = { tone: BadgeTone; text: string };
@@ -153,11 +167,13 @@ type RowBase = {
   helper?: React.ReactNode;
   value?: React.ReactNode;
   badge?: RowBadge;
-  /** The Danger type: the label in text/error. */
+  /** The Danger type: the label in text/error, no chevron. */
   danger?: boolean;
+  /** The Plain type: an action with no trailing control (Sign out). */
+  plain?: boolean;
   /** Greyed with its reason, which reads as the helper. */
   disabled?: boolean;
-  reason?: string;
+  reason?: React.ReactNode;
   /** Anything else at the end (Copy, Edit). */
   trailing?: React.ReactNode;
 };
@@ -170,13 +186,12 @@ type RowAction =
 
 export type SettingsRowProps = RowBase & RowAction;
 
-const ROW = "flex min-h-[48px] w-full items-center gap-6 px-8 py-6 text-left";
-const PRESSABLE =
-  "outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus";
+/** A row that opens nothing keeps the kit row's padding without its press states. */
+const STILL = "hover:bg-transparent";
 
 export function SettingsRow(props: SettingsRowProps) {
-  const { id, icon, label, helper, value, badge, danger, disabled, reason, trailing } = props;
-  const chevron = !!(props.href || props.onClick);
+  const { id, icon, label, helper, value, badge, danger, plain, disabled, reason, trailing } = props;
+  const chevron = !!(props.href || props.onClick) && !danger && !plain;
   const body = (
     <>
       {icon && (
@@ -184,33 +199,30 @@ export function SettingsRow(props: SettingsRowProps) {
           <Icon icon={icon} size={24} />
         </span>
       )}
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={cn("text-md leading-md", disabled ? "text-text-disabled" : danger ? "text-text-error" : "text-text-primary")}>{label}</span>
-        {(disabled && reason) || helper ? (
-          <span className="text-sm leading-sm text-text-secondary">{disabled && reason ? reason : helper}</span>
-        ) : null}
+      {/* The label keeps its own width; a value that doesn't fit beside it wraps under it. */}
+      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-1">
+        <span className="flex max-w-full flex-[1_0_auto] flex-col gap-1">
+          <span className={cn(T.body, disabled ? "text-text-disabled" : danger ? "text-text-error" : "text-text-primary")}>{label}</span>
+          {(disabled && reason) || helper ? <span className={T.meta}>{disabled && reason ? reason : helper}</span> : null}
+        </span>
+        {value != null && value !== "" && (
+          <span className={cn(T.body, "min-w-0 max-w-full truncate", disabled && "text-text-disabled")}>{value}</span>
+        )}
       </span>
-      {value != null && value !== "" && (
-        <span className={cn("max-w-[55%] shrink-0 truncate text-right text-md leading-md", disabled ? "text-text-disabled" : "text-text-secondary")}>{value}</span>
-      )}
       {badge && (
         <Badge tone={badge.tone} className="shrink-0">
           {badge.text}
         </Badge>
       )}
       {trailing}
-      {chevron && (
-        <span className={cn("shrink-0", disabled ? "text-[color:var(--color-icon-disabled)]" : "text-[color:var(--color-icon-default)]")}>
-          <Icon icon={ArrowRight01Icon} size={24} />
-        </span>
-      )}
+      {chevron && <Chevron disabled={disabled} />}
     </>
   );
 
   if (props.toggle) {
     const t = props.toggle;
     return (
-      <div id={id} className={cn(ROW) + ARRIVED}>
+      <div id={id} className={cn(LIST_ROW, STILL) + ARRIVED}>
         {body}
         <Toggle
           checked={t.checked}
@@ -223,20 +235,20 @@ export function SettingsRow(props: SettingsRowProps) {
   }
   if (props.href && !disabled) {
     return (
-      <Link id={id} href={props.href} className={cn(ROW, PRESSABLE) + ARRIVED}>
+      <Link id={id} href={props.href} className={LIST_ROW + ARRIVED}>
         {body}
       </Link>
     );
   }
   if (props.onClick || (props.href && disabled)) {
     return (
-      <button id={id} type="button" disabled={disabled} onClick={props.onClick} className={cn(ROW, !disabled && PRESSABLE, disabled && "cursor-not-allowed") + ARRIVED}>
+      <button id={id} type="button" disabled={disabled} onClick={props.onClick} className={cn(LIST_ROW, disabled && STILL, disabled && "cursor-not-allowed") + ARRIVED}>
         {body}
       </button>
     );
   }
   return (
-    <div id={id} className={cn(ROW) + ARRIVED}>
+    <div id={id} className={cn(LIST_ROW, STILL) + ARRIVED}>
       {body}
     </div>
   );
@@ -320,22 +332,23 @@ export function ChoiceSheet<T extends string>({
             />
             <Radio checked={picked === o.value} disabled={o.disabled} decorative className="mt-1" />
             <span className="flex flex-col gap-1">
-              <span className={cn("text-lg leading-lg", o.disabled ? "text-text-disabled" : "text-text-primary")}>{o.label}</span>
-              {(o.disabled ? o.reason : o.hint) && <span className="text-sm leading-sm text-text-secondary">{o.disabled ? o.reason : o.hint}</span>}
+              <span className={cn(T.bodyLg, o.disabled ? "text-text-disabled" : "text-text-primary")}>{o.label}</span>
+              {(o.disabled ? o.reason : o.hint) && <span className={T.meta}>{o.disabled ? o.reason : o.hint}</span>}
             </span>
           </label>
         ))}
       </div>
       {children?.(picked)}
-      {failed && <p className="text-sm leading-sm text-text-error">Couldn’t save. Nothing changed.</p>}
+      {failed && <p className={cn(T.meta, "text-text-error")}>Couldn’t save. Nothing changed.</p>}
     </Sheet>
   );
 }
 
 /** Back to where a sub-screen was opened from once its work is done (Back, so the history
- *  doesn't hold the finished screen); opened straight from a link, to `path`. */
+ *  doesn't hold the finished screen); opened straight from a link, `path` takes its place.
+ *  The app's own trail decides (nav-trail), so it never steps out of the app. */
 export function leaveTo(router: { back: () => void; replace: (href: string) => void }, path: string): void {
-  if (window.history.length > 1) router.back();
+  if (canGoBack()) router.back();
   else router.replace(path);
 }
 
@@ -361,11 +374,11 @@ export function SaveFailed({ saver, group }: { saver: ReturnType<typeof useSaver
   if (saver.failed?.group !== group) return null;
   return (
     <div role="alert" className="-mt-2 flex items-center justify-between gap-4">
-      <span className="text-sm leading-sm text-text-error">Couldn’t save. Nothing changed.</span>
+      <span className={cn(T.meta, "text-text-error")}>Couldn’t save. Nothing changed.</span>
       <button
         type="button"
         onClick={saver.failed.retry}
-        className="-my-6 inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline"
+        className={TEXT_LINK}
       >
         Try again
       </button>

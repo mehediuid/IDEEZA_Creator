@@ -5,17 +5,20 @@
 // nothing yet, with Go to Feed; ST-61d the destructive Clear confirm; ST-61e
 // cleared, with its toast. The switch and the list are the web's
 // (`privacy.keepSearchHistory`, lib/data/activity-log.ts): off keeps nothing
-// new and doesn't delete the list; Clear does. The phone has no Search, Feed
-// or Explore marketplace to run a search in yet, so the lines don't open.
+// new and doesn't delete the list; Clear does, and it empties the phone
+// Search's Recent searches too (`ideeza:m:search:recent`).
 
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ideeza/button";
 import { clearSearchHistory, groupByDay, KEEP_DAYS, MAX_ENTRIES, useActivityLog, type SearchSource } from "@/lib/data/activity-log";
+import { RECENT_SEARCHES_KEY } from "@/lib/innovations/search";
+import { writeStoredKey } from "@/lib/key-store";
 import { updateSettings } from "@/lib/settings/prefs";
 import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { TEXT_LINK, BottomBar } from "../kit/bottom-bar";
+import { T } from "../type";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
@@ -36,7 +39,11 @@ export function SearchHistorySettings() {
   const groups = React.useMemo(() => groupByDay(log.searches, now), [log.searches, now]);
 
   const clear = () => {
-    if (clearSearchHistory().ok) toast({ title: "Search history cleared" });
+    if (clearSearchHistory().ok) {
+      // The phone's Search keeps its own Recent list: it goes with the history.
+      writeStoredKey(RECENT_SEARCHES_KEY, []);
+      toast({ title: "Search history cleared" });
+    }
     else toast({ title: "Couldn’t clear your search history. Nothing changed.", lead: "error" });
   };
 
@@ -68,12 +75,12 @@ export function SearchHistorySettings() {
       {unreadable ? (
         <SettingsNote>Your search history can’t be read on this phone. Clear it to start again.</SettingsNote>
       ) : !on ? (
-        <p className="text-md leading-md text-text-secondary">
+        <p className={T.body}>
           Search history is off. Nothing new is kept.{n > 0 ? " The searches below stay until you clear them." : ""}
         </p>
       ) : n === 0 ? (
         <div className="flex flex-col items-start gap-6">
-          <p className="text-md leading-md text-text-secondary">Nothing searched yet.</p>
+          <p className={T.body}>Nothing searched yet.</p>
           <Link href="/m" className={TEXT_LINK}>
             Go to Feed
           </Link>

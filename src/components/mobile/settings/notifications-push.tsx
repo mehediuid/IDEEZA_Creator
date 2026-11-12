@@ -17,6 +17,9 @@ import { Button } from "@/components/ideeza/button";
 import type { PopupMode } from "@/lib/notifications/filter";
 import type { PopupPermission } from "@/lib/notifications/popups";
 import { Sheet } from "../kit/sheet";
+import { cn } from "@/lib/utils";
+import { TEXT_LINK } from "../kit/bottom-bar";
+import { T } from "../type";
 import { useToast } from "../kit/toast";
 import { SettingsRow } from "./kit";
 
@@ -86,7 +89,7 @@ export function PhoneSettingsLink({ onClick, disabled }: { onClick: () => void; 
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className="inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline disabled:cursor-not-allowed disabled:text-text-disabled disabled:no-underline"
+        className={cn(TEXT_LINK, "my-0 disabled:cursor-not-allowed disabled:text-text-disabled disabled:no-underline")}
       >
         Open phone settings
       </button>
@@ -121,7 +124,7 @@ export function PushPrompt({ open, onClose }: { open: boolean; onClose: () => vo
         </>
       }
     >
-      <p className="text-md leading-md text-text-secondary">We’ll also tell you about messages and sales. Change it in Settings › Notifications.</p>
+      <p className={T.body}>We’ll also tell you about messages and sales. Change it in Settings › Notifications.</p>
     </Sheet>
   );
 }
@@ -138,7 +141,7 @@ export function PushBlockedSheet({ open, onClose, permission }: { open: boolean;
   }, [open, permission, onClose, toast]);
   return (
     <Sheet open={open} onClose={onClose} title="Allow notifications" description="Blocked in this browser. To allow them:">
-      <ol className="flex list-decimal flex-col gap-4 pl-8 text-md leading-md text-text-primary">
+      <ol className={cn(T.body, "flex list-decimal flex-col gap-4 pl-8 text-text-primary")}>
         <li>Open the site settings beside the address bar (in an installed app, your phone’s Settings › Apps › IDEEZA).</li>
         <li>Choose Notifications, then Allow.</li>
         <li>Come back to IDEEZA: Push notifications reads On.</li>

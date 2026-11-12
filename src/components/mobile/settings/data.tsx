@@ -23,6 +23,9 @@ import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { Button } from "@/components/ideeza/button";
 import { Sheet } from "../kit/sheet";
+import { cn } from "@/lib/utils";
+import { LIST_DIVIDERS } from "../kit/list";
+import { T } from "../type";
 import { useOnline } from "../kit/states";
 import { SaveFailed, SettingsGroup, SettingsRow, SettingsScreen, useSaver } from "./kit";
 import { EraseSheet } from "./data-erase";
@@ -81,7 +84,7 @@ export function DataSettings({ images, threeD }: { images: ImageService; threeD:
         <SettingsRow label={servicesTitle(threeD)} helper="The prompts you send, to make each result" onClick={() => setOpen("services")} />
       </SettingsGroup>
       <SettingsGroup>
-        <div className="flex flex-col gap-2 px-8 py-6 text-md leading-md text-text-primary">
+        <div className={cn(T.body, "flex flex-col gap-2 px-8 py-6 text-text-primary")}>
           <p id="training" className={ARRIVED}>
             IDEEZA doesn’t train AI on your designs.
           </p>
@@ -237,11 +240,11 @@ function ServicesSheet({
       title={servicesTitle(threeD)}
       description="Your prompts pass through IDEEZA’s server to these services, which don’t see your IP address. Each has its own rules for what it keeps."
     >
-      <ul role="list" className="flex flex-col [&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border">
+      <ul role="list" className={cn("flex flex-col", LIST_DIVIDERS)}>
         {places.map((p) => (
           <li key={p.id} className="flex flex-col gap-1 py-6">
-            <span className="text-md font-medium leading-md text-text-primary">{p.name}</span>
-            <span className="text-sm leading-sm text-text-secondary">{p.what}</span>
+            <span className={T.rowTitle}>{p.name}</span>
+            <span className={T.meta}>{p.what}</span>
           </li>
         ))}
       </ul>

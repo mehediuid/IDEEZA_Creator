@@ -2,20 +2,26 @@
 
 // ST-01 · Settings, in the web registry's order: Find a setting, the account
 // card, Preferences (each page with its state as the row's value), Money
-// (entry rows into Plan & pricing, Get paid, Balance — and Verify your
-// identity, which the master page's Profile settings draws as Creator
+// (Plan & pricing; Get paid → the Get paid page; Wallet balance → the phone's
+// Wallet Balance, where the IDZ lives; Payment method → how you pay; Verify
+// your identity, which the master page's Profile settings draws as Creator
 // Verification), Support (Help), the neutral Sign out (AU-50) and the version.
 // ST-02: the rows wait as bones until the stores are read. ST-03 / 03b: what
 // Find a setting finds ("Page › Row", opening the page at the row), or none.
+// The search reads the web's registry (lib/settings/search.ts) and sends each
+// hit to its phone screen with the phone's words; the settings only the phone
+// has (2-step, Face ID, devices, delete account, sign out…) are PHONE_ROWS.
 
 import * as React from "react";
 import {
   AiBrain01Icon,
-  ArrowRight01Icon,
+  Alert02Icon,
   CheckmarkBadge01Icon,
   Coins01Icon,
   CreditCardIcon,
+  CreditCardPosIcon,
   HelpCircleIcon,
+  Invoice01Icon,
   LanguageSkillIcon,
   Logout01Icon,
   Notification01Icon,
@@ -24,7 +30,6 @@ import {
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
 import Link from "next/link";
-import { Icon } from "@/components/dashboard/icon";
 import { useMakerIdz } from "@/components/balance/use-maker-idz";
 import { Avatar } from "@/components/ideeza/avatar";
 import { SearchInput } from "@/components/ideeza/search-input";
@@ -43,8 +48,11 @@ import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMyProfile } from "@/lib/people/profile-store";
 import { searchSettings, type SettingsHit } from "@/lib/settings/search";
 import { useSettings } from "@/lib/settings/use-settings";
+import { Chevron, LIST_CARD } from "../kit/list";
 import { useDataRowValue } from "./data";
-import { SettingsGroup, SettingsRow, SettingsScreen } from "./kit";
+import { BILLING_DETAILS_HREF, CREDIT_ALERTS_HREF, SettingsGroup, SettingsRow, SettingsScreen } from "./kit";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { SignOutSheet } from "./sign-out";
 
 /** The app's version as the Figma prints it under the list. */
@@ -52,6 +60,8 @@ const VERSION = "1.1.5.451";
 
 const POPUP_WORDS = { now: "Right away", daily: "Once a day", paused: "Paused" } as const;
 const THEME_WORDS = { light: "Light", dark: "Dark", system: "Match system" } as const;
+
+const GET_PAID = "/m/settings/idz-pay";
 
 /** Where a web settings row lives on the phone. */
 export function mobileSettingsHref(hit: SettingsHit): string {
@@ -76,18 +86,65 @@ export function mobileSettingsHref(hit: SettingsHit): string {
     case "appearance":
       return at(`/m/settings/${hit.page}`);
     case "plan":
+      if (row === "credit-alerts") return CREDIT_ALERTS_HREF ?? "/m/plans?tab=credits";
+      if (row === "billing-details") return BILLING_DETAILS_HREF ?? "/m/plans?tab=billing";
+      if (row === "credits") return "/m/plans?tab=credits";
+      if (row === "billing") return "/m/plans?tab=billing";
+      if (row === "payment") return "/m/settings/payments";
       return "/m/plans";
     case "get-paid":
-      return row === "identity" ? "/m/settings/kyc" : "/m/settings/payments";
+      if (row === "identity") return "/m/settings/kyc/1";
+      if (row === "withdraw") return `${GET_PAID}/withdraw`;
+      if (row === "history") return `${GET_PAID}/history`;
+      return GET_PAID;
     default:
       return "/m/settings";
   }
+}
+
+/** The phone's words where the web's row is named for a browser or reads differently here. */
+const PHONE_LABELS: Record<string, string> = {
+  "account:sign-in": "Sign-in & security",
+  "data:storage": "Keep this phone from clearing it",
+  "data:erase": "Erase IDEEZA from this phone",
+  "data:activity": "Search history",
+  "notifications:browser-popups": "Push notifications",
+  "notifications:email": "Email and text messages",
+};
+const phoneLabelOf = (h: SettingsHit) => PHONE_LABELS[`${h.page}:${h.rowId}`] ?? h.label;
+
+type PhoneRow = { label: string; page: string; words: string; href?: string; signOut?: true };
+
+/** Settings only the phone has, or that sit somewhere else on it. */
+const PHONE_ROWS: PhoneRow[] = [
+  { label: "2-step sign-in", page: "Sign-in & security", words: "two 2fa factor authenticator code backup codes", href: "/m/settings/security#two-step" },
+  { label: "Sign in with Face ID", page: "Sign-in & security", words: "faceid biometric touch fingerprint", href: "/m/settings/security#face-id" },
+  { label: "Your devices", page: "Sign-in & security", words: "device phones sessions history signed other", href: "/m/settings/security#devices" },
+  { label: "Change email", page: "Sign-in & security", words: "address mail", href: "/m/settings/security/email" },
+  { label: "Change password", page: "Sign-in & security", words: "passcode reset", href: "/m/settings/security/password" },
+  { label: "Delete account", page: "Sign-in & security", words: "close remove leave deactivate", href: "/m/settings/delete" },
+  { label: "Sign out", page: "Settings", words: "log logout signout", signOut: true },
+  { label: "Wallet balance", page: "Money", words: "idz coins tokens", href: "/m/earn/wallet" },
+  { label: "Payment method", page: "Money", words: "pay card paypal wallet connect", href: "/m/settings/payments" },
+];
+
+const FILLER = new Set("a an and the my of to in on i how do can change turn set with for".split(" "));
+
+/** Every word typed starts a word of the row ("face id", "2-step", "devices"). */
+function phoneRowsFor(query: string): PhoneRow[] {
+  const words = query.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !FILLER.has(w));
+  if (!words.length) return [];
+  return PHONE_ROWS.filter((r) => {
+    const hay = `${r.label} ${r.words}`.toLowerCase().split(/[^a-z0-9]+/);
+    return words.every((w) => hay.some((h) => h.startsWith(w)));
+  });
 }
 
 export function SettingsRoot() {
   const [query, setQuery] = React.useState("");
   const [signOut, setSignOut] = React.useState(false);
   const hits = React.useMemo(() => searchSettings(query), [query]);
+  const phoneHits = React.useMemo(() => phoneRowsFor(query), [query]);
   const searching = query.trim().length > 0;
   const profileRead = useMyProfile().hydrated;
   const planRead = useCreatePlan().hydrated;
@@ -102,10 +159,18 @@ export function SettingsRoot() {
         placeholder="Find a setting"
         aria-label="Find a setting"
         enterKeyHint="search"
-        containerClassName="h-[44px]"
+        size="xl"
       />
       {searching ? (
-        <SearchResults query={query} hits={hits} />
+        <SearchResults
+          query={query}
+          hits={hits}
+          phoneHits={phoneHits}
+          onSignOut={() => {
+            setQuery("");
+            setSignOut(true);
+          }}
+        />
       ) : (
         <>
           <AccountCard />
@@ -115,9 +180,9 @@ export function SettingsRoot() {
             <SettingsRow icon={HelpCircleIcon} label="Help" href="/m/help" />
           </SettingsGroup>
           <SettingsGroup>
-            <SettingsRow id="sign-out" icon={Logout01Icon} label="Sign out" onClick={() => setSignOut(true)} />
+            <SettingsRow id="sign-out" icon={Logout01Icon} label="Sign out" plain onClick={() => setSignOut(true)} />
           </SettingsGroup>
-          <p className="text-center text-sm leading-sm text-text-tertiary">Version {VERSION}</p>
+          <p className={cn(T.meta, "text-center text-text-tertiary")}>Version {VERSION}</p>
         </>
       )}
       <SignOutSheet open={signOut} onClose={() => setSignOut(false)} />
@@ -125,21 +190,42 @@ export function SettingsRoot() {
   );
 }
 
-function SearchResults({ query, hits }: { query: string; hits: SettingsHit[] }) {
-  if (!hits.length) {
-    return <p className="py-8 text-center text-md leading-md text-text-secondary">No setting matches “{query.trim()}”.</p>;
+function SearchResults({
+  query,
+  hits,
+  phoneHits,
+  onSignOut,
+}: {
+  query: string;
+  hits: SettingsHit[];
+  phoneHits: PhoneRow[];
+  onSignOut: () => void;
+}) {
+  // A phone row stands in for the web row that would open the same place.
+  const taken = new Set(phoneHits.map((r) => r.href));
+  const webHits = hits.filter((h) => !taken.has(mobileSettingsHref(h)));
+  const total = phoneHits.length + webHits.length;
+  if (!total) {
+    return <p className={cn(T.body, "py-8 text-center")}>No setting matches “{query.trim()}”.</p>;
   }
   return (
     <div className="flex flex-col gap-2">
-      <p aria-live="polite" className="text-sm leading-sm text-text-tertiary">
-        {hits.length === 1 ? "1 result" : `${hits.length} results`}
+      <p aria-live="polite" className={cn(T.meta, "text-text-tertiary")}>
+        {total === 1 ? "1 result" : `${total} results`}
       </p>
       <SettingsGroup>
-        {hits.map((h) => (
+        {phoneHits.map((r) =>
+          r.href ? (
+            <SettingsRow key={r.label} label={r.label} helper={`${r.page} › ${r.label}`} href={r.href} />
+          ) : (
+            <SettingsRow key={r.label} label={r.label} helper={`${r.page} › ${r.label}`} onClick={onSignOut} />
+          ),
+        )}
+        {webHits.map((h) => (
           <SettingsRow
             key={h.href}
-            label={h.label}
-            helper={h.rowId ? `${h.pageLabel} › ${h.label}` : "Settings page"}
+            label={phoneLabelOf(h)}
+            helper={h.rowId ? `${h.pageLabel} › ${phoneLabelOf(h)}` : "Settings page"}
             href={mobileSettingsHref(h)}
           />
         ))}
@@ -157,16 +243,14 @@ function AccountCard() {
   return (
     <Link
       href="/m/settings/account"
-      className="flex items-center gap-6 rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface px-8 py-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+      className={cn(LIST_CARD, "flex-row items-center gap-6 rounded-lg px-8 py-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
     >
       <Avatar size="lg" initials={initialsOf(name, fields.latinName || null)} src={photo.url ?? undefined} className="shrink-0" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-md font-semibold leading-md text-text-primary">{hydrated ? name : " "}</span>
-        <span className="truncate text-sm leading-sm text-text-secondary">{fields.handle ? `Account · @${handle}` : "Account"}</span>
+        <span className={cn(T.name, "truncate")}>{hydrated ? name : " "}</span>
+        <span className={cn(T.meta, "truncate")}>{fields.handle ? `Account · @${handle}` : "Account"}</span>
       </span>
-      <span className="shrink-0 text-[color:var(--color-icon-default)]">
-        <Icon icon={ArrowRight01Icon} size={24} />
-      </span>
+      <Chevron />
     </Link>
   );
 }
@@ -214,13 +298,17 @@ function Money() {
         value={creditsReady ? `${credits.toLocaleString("en-US")} ${credits === 1 ? "credit" : "credits"}` : ""}
         href="/m/plans"
       />
-      <SettingsRow icon={Wallet01Icon} label="Get paid" value={getPaidValue} href="/m/settings/payments" />
+      {CREDIT_ALERTS_HREF && <SettingsRow id="credit-alerts" icon={Alert02Icon} label="Credit alerts and limits" href={CREDIT_ALERTS_HREF} />}
+      {BILLING_DETAILS_HREF && <SettingsRow id="billing-details" icon={Invoice01Icon} label="Billing details" href={BILLING_DETAILS_HREF} />}
+      <SettingsRow id="get-paid" icon={Wallet01Icon} label="Get paid" value={getPaidValue} href={GET_PAID} />
       <SettingsRow
+        id="wallet-balance"
         icon={Coins01Icon}
-        label="Balance"
-        value={idz.read ? (idz.connected && idz.idz !== null ? `${Number(idz.idz).toLocaleString("en-US")} IDZ` : "Wallet not connected") : ""}
-        href="/m/settings/idz-pay"
+        label="Wallet balance"
+        value={idz.read ? (idz.connected && idz.idz !== null ? `${Number(idz.idz).toLocaleString("en-US")} IDZ` : "Not connected") : ""}
+        href="/m/earn/wallet"
       />
+      <SettingsRow id="payment-method" icon={CreditCardPosIcon} label="Payment method" href="/m/settings/payments" />
       <SettingsRow
         icon={CheckmarkBadge01Icon}
         label="Verify your identity"

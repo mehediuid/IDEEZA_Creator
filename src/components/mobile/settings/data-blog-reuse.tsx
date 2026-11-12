@@ -8,12 +8,15 @@
 // is locked by the blog's own rule; only support can change it.
 
 import * as React from "react";
+import { News01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ideeza/button";
 import { REUSE_SCOPE } from "@/lib/blog/consent";
 import { updateBlog, useBlog } from "@/lib/blog/store";
 import { reuseGrants, revokeReuse, type ReuseGrant } from "@/lib/data/blog-reuse";
 import { useDates } from "@/lib/settings/use-dates";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { EmptyState } from "../kit/state";
+import { T } from "../type";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { SaveFailed, SettingsGroup, SettingsNote, SettingsRow, SettingsScreen, useSaver } from "./kit";
@@ -41,15 +44,14 @@ export function BlogReuseSettings() {
       {unreadable ? (
         <SettingsNote>Your blogs can’t be read on this phone, so nothing here can change.</SettingsNote>
       ) : grants.length === 0 ? (
-        <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 text-center">
-          <p className="text-lg font-semibold leading-lg text-text-primary">No blog gives IDEEZA access</p>
-          <p className="text-md leading-md text-text-secondary">
-            You choose “Give access to IDEEZA to future use” when you publish a blog, and you can take it back here.
-          </p>
-        </div>
+        <EmptyState
+          icon={News01Icon}
+          title="No blog gives IDEEZA access"
+          body="You choose “Give access to IDEEZA to future use” when you publish a blog, and you can take it back here."
+        />
       ) : (
         <>
-          <p className="text-md leading-md text-text-secondary">The blogs where you chose “Give access to IDEEZA to future use”. {REUSE_SCOPE}</p>
+          <p className={T.body}>The blogs where you chose “Give access to IDEEZA to future use”. {REUSE_SCOPE}</p>
           <SettingsGroup>
             {grants.map((g) => (
               <SettingsRow

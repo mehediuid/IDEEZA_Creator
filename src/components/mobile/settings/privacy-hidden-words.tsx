@@ -17,6 +17,8 @@ import { addWords, wordsRemaining } from "@/lib/settings/audience";
 import { HIDDEN_WORDS_MAX, readSettings, updateSettings } from "@/lib/settings/prefs";
 import { useSettings } from "@/lib/settings/use-settings";
 import { useOnline } from "../kit/states";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useToast } from "../kit/toast";
 import { SaveFailed, SettingsScreen, useSaver } from "./kit";
 
@@ -98,7 +100,7 @@ export function HiddenWordsSettings() {
         </Button>
       </form>
       {over > 0 && (
-        <p role="alert" className="text-sm leading-sm text-text-error">
+        <p role="alert" className={cn(T.meta, "text-text-error")}>
           You can hide up to {HIDDEN_WORDS_MAX} words. {over} didn’t fit.
         </p>
       )}
@@ -115,12 +117,12 @@ export function HiddenWordsSettings() {
         </ul>
       )}
       <div className="flex flex-col gap-2">
-        <p className="text-sm leading-sm text-text-secondary">
+        <p className={T.meta}>
           {words.length === 0 && "No hidden words yet. "}
           Someone else’s comment on your shared projects, or a message request, that uses one of these words is hidden. The person who wrote it still
           sees it.
         </p>
-        <p className="text-sm leading-sm text-text-tertiary">
+        <p className={cn(T.meta, "text-text-tertiary")}>
           Remaining {wordsRemaining(words)} of {HIDDEN_WORDS_MAX}. Separate words with a comma. A word matches the whole word in any case and its
           #tag; “#nft” matches only the tag.
         </p>

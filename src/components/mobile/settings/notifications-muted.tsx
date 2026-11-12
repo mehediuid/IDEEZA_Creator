@@ -7,7 +7,7 @@
 // notices still list, but don't pop up or add to the count (filter.ts isHeard).
 
 import * as React from "react";
-import { Folder01Icon } from "@hugeicons/core-free-icons";
+import { Folder01Icon, NotificationOff01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { unmuteProject } from "@/components/notifications/use-notices";
@@ -17,6 +17,9 @@ import { useManualProjects } from "@/lib/manual/projects";
 import { readSettings, updateSettings } from "@/lib/settings/prefs";
 import { useSettings } from "@/lib/settings/use-settings";
 import { useOnline } from "../kit/states";
+import { cn } from "@/lib/utils";
+import { EmptyState } from "../kit/state";
+import { T } from "../type";
 import { useToast } from "../kit/toast";
 import { SaveFailed, SettingsGroup, SettingsNote, SettingsScreen, useSaver } from "./kit";
 
@@ -81,10 +84,7 @@ export function MutedProjectsSettings() {
   return (
     <SettingsScreen title="Muted projects" loading={!running || !hydrated}>
       {list.length === 0 ? (
-        <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-6 text-center">
-          <p className="text-lg font-semibold leading-lg text-text-primary">No muted projects</p>
-          <p className="text-md leading-md text-text-secondary">Mute one from a notice’s ⋯ menu.</p>
-        </div>
+        <EmptyState icon={NotificationOff01Icon} title="No muted projects" body="Mute one from a notice’s ⋯ menu." />
       ) : (
         <>
           <SettingsGroup>
@@ -92,10 +92,10 @@ export function MutedProjectsSettings() {
               <div key={m.id} className="flex items-center gap-6 px-8 py-6">
                 <Tile src={m.cover} />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className={m.name ? "truncate text-md leading-md text-text-primary" : "text-md leading-md text-text-primary"}>
+                  <span className={cn(T.body, "text-text-primary", m.name && "truncate")}>
                     {m.name ?? "A project no longer in this browser"}
                   </span>
-                  {!m.name && <span className="text-sm leading-sm text-text-secondary">Its notices stay quiet until you unmute it.</span>}
+                  {!m.name && <span className={T.meta}>Its notices stay quiet until you unmute it.</span>}
                 </span>
                 <Button hierarchy="secondary" size="sm" disabled={!online} aria-label={`Unmute ${m.name ?? "this project"}`} onClick={() => unmute(m, i)}>
                   Unmute

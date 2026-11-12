@@ -6,12 +6,16 @@
 // shows what the app would — the same RFC 6238 code, which changes every 30
 // seconds — with Use this code, as the Demo email does for the email codes.
 // A real authenticator given the setup key shows the very same code.
+// DemoFaceId is the same kind of stand-in for the phone's Face ID sheet: it
+// confirms an action for an account that turned "Sign in with Face ID" on.
 
 import * as React from "react";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { totpAt, totpSecondsLeft } from "@/lib/account/security";
 import { Sheet } from "../kit/sheet";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 
 /** The code `secret` shows now, and the seconds until it changes. */
 export function useLiveCode(secret: string | null, on: boolean): { code: string; left: number } {
@@ -63,12 +67,38 @@ export function DemoAuthenticator({
         Demo
       </Badge>
       <div className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-surface-raised p-8">
-        <p className="text-sm leading-sm text-text-tertiary">IDEEZA · {email}</p>
-        <p className="text-4xl font-semibold leading-4xl tracking-widest text-text-primary tabular-nums">
+        <p className={cn(T.meta, "text-text-tertiary")}>IDEEZA · {email}</p>
+        <p className={cn(T.display, "tracking-widest tabular-nums")}>
           {code ? `${code.slice(0, 3)} ${code.slice(3)}` : "··· ···"}
         </p>
-        <p className="text-sm leading-sm text-text-secondary tabular-nums">{code ? `Changes in ${left} s` : "Making the code…"}</p>
+        <p className={cn(T.meta, "tabular-nums")}>{code ? `Changes in ${left} s` : "Making the code…"}</p>
       </div>
+    </Sheet>
+  );
+}
+
+/** The Demo stand-in for the phone's own Face ID sheet: confirming here passes the check. */
+export function DemoFaceId({ open, onClose, what, onConfirm }: { open: boolean; onClose: () => void; what: string; onConfirm: () => void }) {
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Face ID"
+      description={`On a phone, Face ID checks your face here to ${what}. This demo asks you to confirm.`}
+      actions={
+        <>
+          <Button size="xl" className="w-full" onClick={onConfirm}>
+            Confirm it’s me
+          </Button>
+          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
+            Cancel
+          </Button>
+        </>
+      }
+    >
+      <Badge tone="warning" className="self-start">
+        Demo
+      </Badge>
     </Sheet>
   );
 }

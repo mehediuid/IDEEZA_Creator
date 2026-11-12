@@ -12,8 +12,14 @@
 // Messages' own store (`ideeza:messages` settings, D13). Toggles save as they
 // change (ST-92 when refused); sheets save on Done. Turning the lock off asks
 // nothing: it only puts back what people saw before.
+// A link can open a sheet straight away: `?open=message|break|comment|lock`
+// (Delete account's "Take a break instead", Messages' "Who can message you").
+// It opens once the page is read and online, and the address drops the param,
+// so Back or a reload doesn't open it again.
 
 import * as React from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { setAllowNewFor } from "@/lib/messages/actions";
 import { allowNewOf } from "@/lib/messages/rules";
@@ -26,7 +32,7 @@ import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
-import { ChoiceSheet, SaveFailed, SettingsGroup, SettingsRow, SettingsScreen, useSaver, type ChoiceOption } from "./kit";
+import { ChoiceSheet, HELPER_LINK, SaveFailed, SettingsGroup, SettingsRow, SettingsScreen, useSaver, type ChoiceOption } from "./kit";
 import { useReportsYouMade } from "./privacy-reports";
 
 const noSubscribe = () => () => {};
@@ -59,7 +65,8 @@ const COMMENT_OPTIONS: ChoiceOption<Reach>[] = [
 
 type BreakPick = QuietChoice | "keep";
 
-type Open = null | "lock" | "message" | "comment" | "break";
+const SHEETS = ["lock", "message", "comment", "break"] as const;
+type Open = null | (typeof SHEETS)[number];
 
 /** A choice short enough for the row's right side; a longer one reads under the label. */
 const fitsRight = (label: string) => label.length <= 20;
@@ -79,6 +86,25 @@ export function PrivacySettings() {
   const [open, setOpen] = React.useState<Open>(null);
   const close = React.useCallback(() => setOpen(null), []);
   const off = !online;
+  const ready = running && messages.hydrated;
+
+  // ?open=…: the sheet a link asked for, once.
+  const asked = useSearchParams().get("open");
+  const [taken, setTaken] = React.useState(false);
+  if (ready && !taken && asked) {
+    setTaken(true);
+    const sheet = (SHEETS as readonly string[]).includes(asked) ? (asked as Exclude<Open, null>) : null;
+    const can = sheet && !off && !(sheet === "lock" && a.locked) && !(sheet === "message" && messages.unreadable);
+    if (can) setOpen(sheet);
+  }
+  React.useEffect(() => {
+    if (!taken) return;
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("open")) return;
+    q.delete("open");
+    const search = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+  }, [taken]);
 
   const until = now && quietModeOn(settings, now) ? a.quietUntil : null;
   const end = (at: number) => dates.dateTime(at, { style: "weekday" });
@@ -97,13 +123,23 @@ export function PrivacySettings() {
   const count = (n: number | undefined) => (n ? String(n) : undefined);
   const noCity = profileRead && !fields.location.trim();
 
+  const cityHint = noCity ? (
+    <>
+      Add your city first in{" "}
+      <Link href="/m/profile/edit" className={HELPER_LINK}>
+        Edit profile
+      </Link>
+      .
+    </>
+  ) : undefined;
+
   const toggleLock = () => {
     if (!a.locked) return setOpen("lock");
     saver.run("profile", () => updateSettings("audience", { locked: false }));
   };
 
   return (
-    <SettingsScreen title="Privacy & safety" loading={!running || !messages.hydrated}>
+    <SettingsScreen title="Privacy & safety" loading={!ready}>
       <SettingsGroup label="Your profile">
         <SettingsRow id="view-public" label="View as public" href="/m/creators/me?view=public" />
         <SettingsRow
@@ -116,9 +152,11 @@ export function PrivacySettings() {
         <SettingsRow
           id="local-time"
           label="Show my location and local time"
-          helper={noCity ? "Add your city first with Edit profile on your profile." : undefined}
           toggle={{ checked: a.showLocalTime, onChange: () => saver.run("profile", () => updateSettings("audience", { showLocalTime: !a.showLocalTime })) }}
-          disabled={off}
+          // With no city there is nothing to show: the switch waits for one (it can still be turned off).
+          disabled={off || (noCity && !a.showLocalTime)}
+          reason={cityHint}
+          helper={cityHint}
         />
         <SettingsRow
           id="search-engines"
@@ -171,14 +209,19 @@ export function PrivacySettings() {
               all of it.
             </p>
             <p>
-              Still public while it’s locked: the projects you shared on Innovations, your marketplace listings and your comments. People can still
+              Still public while it’s locked: your shared projects, your marketplace listings and your comments. People can still
               message you if your message rule lets them.
             </p>
           </div>
         }
         verb="Lock profile"
         onConfirm={() => {
-          if (saver.run("profile", () => updateSettings("audience", { locked: true }))) toast({ title: "Profile locked" });
+          if (!saver.run("profile", () => updateSettings("audience", { locked: true }))) return;
+          // PR-45: the toast can take it back.
+          toast({
+            title: "Profile locked",
+            action: { label: "Undo", onClick: () => void saver.run("profile", () => updateSettings("audience", { locked: false })) },
+          });
         }}
       />
       <ChoiceSheet
@@ -194,7 +237,7 @@ export function PrivacySettings() {
         open={open === "comment"}
         onClose={close}
         title="Who can comment on your shared projects"
-        description="On the projects you share on Innovations. A comment from someone this leaves out is held off your post, and comes back if you change this."
+        description="On the projects you share. A comment from someone this leaves out is held off your post, and comes back if you change this."
         options={COMMENT_OPTIONS}
         value={a.comment}
         onSave={(v) => updateSettings("audience", { comment: v })}
