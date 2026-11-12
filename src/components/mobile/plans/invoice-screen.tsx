@@ -8,13 +8,12 @@
 // which saves a PDF; on paper only the invoice prints.
 
 import * as React from "react";
-import { Download04Icon, Invoice03Icon } from "@hugeicons/core-free-icons";
+import { Download04Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { useMe } from "@/components/dashboard/sidebar-account";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
-import { StateCard } from "@/components/ideeza/state-card";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { billedTo, useBillingDetails } from "@/lib/account/billing-details";
 import { invoiceNameOf, useIdentity } from "@/lib/account/identity";
@@ -25,10 +24,12 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
-import { ListBones } from "../kit/states";
+import { NotFoundState } from "../kit/state";
+import { ListBones, OfflineBanner } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { CARD, Row, dateOf } from "./parts";
+import { T } from "../type";
+import { CARD, HAIRLINE, Row, dateOf } from "./parts";
 
 export function InvoiceScreen({ orderId }: { orderId: string }) {
   const { hydrated: creditsReady, ledger } = useCredits();
@@ -58,19 +59,20 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
       {!ready ? (
         <ListBones rows={4} />
       ) : !invoice ? (
-        <StateCard
-          tone="empty"
-          className="w-full"
-          icon={<Icon icon={Invoice03Icon} size={24} />}
-          title="No invoice here"
+        <NotFoundState
+          thing="invoice"
           body="There’s no payment with this number in this browser. Payments are kept in the browser they were made in."
+          action={{ label: "See your invoices", href: "/m/plans?tab=billing" }}
         />
       ) : (
         <article aria-labelledby="invoice-title" className={cn(CARD, "flex flex-col gap-6 p-8")}>
-          <header className="flex items-start justify-between gap-4 border-b-[length:var(--border-width-1)] border-solid border-border-subtle pb-6">
+          <div className="print:hidden">
+            <OfflineBanner />
+          </div>
+          <header className={cn(HAIRLINE, "flex items-start justify-between gap-4 border-b-[length:var(--border-width-1)] pb-6")}>
             <div className="flex flex-col gap-2">
               <IdeezaLogo height={24} decorative={false} />
-              <h2 id="invoice-title" className="text-sm leading-sm text-text-secondary">
+              <h2 id="invoice-title" className={T.meta}>
                 Invoice · AI platform
               </h2>
             </div>
@@ -79,7 +81,7 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
               <TestnetDemoBadge />
             </div>
           </header>
-          <dl className="flex flex-col border-b-[length:var(--border-width-1)] border-solid border-border-subtle pb-4">
+          <dl className={cn(HAIRLINE, "flex flex-col border-b-[length:var(--border-width-1)] pb-4")}>
             <Row label="Invoice #">
               <span className="font-mono">{invoice.number}</span>
             </Row>
@@ -93,7 +95,7 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
               <span className="flex flex-col items-end">
                 <span>{to.name}</span>
                 {to.lines.map((l, i) => (
-                  <span key={`${i}-${l}`} className="text-sm leading-sm text-text-secondary">
+                  <span key={`${i}-${l}`} className={T.meta}>
                     {l}
                   </span>
                 ))}
@@ -102,7 +104,7 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
           </dl>
           <dl className="flex flex-col rounded-xl bg-bg-subtle px-6 py-2">
             {invoice.lines.map((l) => (
-              <Row key={l.description} label={<span className="flex flex-col"><span className="text-text-primary">{l.description}</span>{l.detail && <span className="text-sm leading-sm">{l.detail}</span>}</span>}>
+              <Row key={l.description} label={<span className="flex flex-col"><span className="text-text-primary">{l.description}</span>{l.detail && <span className={T.meta}>{l.detail}</span>}</span>}>
                 {usd(l.total)}
               </Row>
             ))}
@@ -113,10 +115,10 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
             ))}
             <Row label="Tax">{usd(invoice.tax)}</Row>
           </dl>
-          <p className="flex items-center justify-between text-2xl font-medium leading-2xl text-text-primary">
+          <p className={cn(T.section, "flex items-center justify-between")}>
             {invoice.status === "Paid" ? "Total paid" : "Total"} <span className="tabular-nums">{usd(invoice.status === "Paid" ? invoice.paid : invoice.total)}</span>
           </p>
-          <dl className="flex flex-col border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-4">
+          <dl className={cn(HAIRLINE, "flex flex-col border-t-[length:var(--border-width-1)] pt-4")}>
             <Row label="Paid with">{invoice.paidWith}</Row>
             {invoice.payer && <Row label="From">{shortAddress(invoice.payer)}</Row>}
             {invoice.txHash && (
@@ -125,7 +127,7 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
               </Row>
             )}
           </dl>
-          <p className="text-sm leading-sm text-text-tertiary">Testnet demo: no real money moved. Questions? Contact support@ideeza.com.</p>
+          <p className={cn(T.meta, "text-text-tertiary")}>Testnet demo: no real money moved. Questions? Contact support@ideeza.com.</p>
         </article>
       )}
     </Screen>

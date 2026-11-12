@@ -15,7 +15,8 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { PLANS, planOf, priceOf, relationOf, type Plan } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
-import { BulletList, CARD, SheetMark, checkoutPath, dollars, n, pct } from "./parts";
+import { T } from "../type";
+import { BulletList, CARD, LINK, SheetMark, checkoutPath, dollars, n, pct } from "./parts";
 
 /** The next plan up from the current one, for the "upgrade" offers; null on Disruptor. */
 export function useNextPlan(): Plan | null {
@@ -185,22 +186,22 @@ export function DiscountsSheet({ open, onClose }: { open: boolean; onClose: () =
         {rows.map((r) => (
           <li key={r.name} className="flex items-center justify-between gap-6 rounded-xl bg-bg-subtle px-8 py-6">
             <span className="flex flex-col gap-1">
-              <span className="text-md font-medium leading-md text-text-primary">{r.name}</span>
+              <span className={T.rowTitle}>{r.name}</span>
               {r.off === null ? (
-                <span className="text-sm leading-sm text-text-secondary">No discount</span>
+                <span className={T.meta}>No discount</span>
               ) : (
-                <span className="self-start rounded-md bg-bg-brand-subtle px-3 text-sm leading-sm text-text-brand">{pct(r.off)} off</span>
+                <span className={cn(T.caption, "self-start rounded-md bg-bg-brand-subtle px-3 py-1 text-text-brand")}>{pct(r.off)} off</span>
               )}
             </span>
             <span className="flex flex-col items-end gap-1 text-right">
-              <span className="text-lg font-medium leading-lg tabular-nums text-text-primary">{dollars(r.price)}</span>
-              <span className="text-sm leading-sm tabular-nums text-text-secondary">{total} credits</span>
-              {r.saved > 0 && <span className="text-sm leading-sm tabular-nums text-text-success">Save {usd(r.saved)}</span>}
+              <span className={cn(T.rowTitle, "tabular-nums")}>{usd(r.price)}</span>
+              <span className={cn(T.meta, "tabular-nums")}>{total} credits</span>
+              {r.saved > 0 && <span className={cn(T.meta, "tabular-nums text-text-success")}>Save {usd(r.saved)}</span>}
             </span>
           </li>
         ))}
       </ul>
-      <p className="text-center text-sm leading-sm text-text-tertiary">Discounts apply to the Builder and Disruptor plans. Free and Tinkerer get no AI credit discount.</p>
+      <p className={cn(T.meta, "text-center text-text-tertiary")}>Discounts apply to the Builder and Disruptor plans. Free and Tinkerer get no AI credit discount.</p>
     </Sheet>
   );
 }
@@ -227,7 +228,7 @@ export function ComparePlansSheet({ open, onClose }: { open: boolean; onClose: (
     >
       <table className={cn(CARD, "w-full border-separate border-spacing-0 bg-bg-subtle text-left")}>
         <thead>
-          <tr className="text-md leading-md text-text-secondary">
+          <tr className={T.body}>
             <th scope="col" className="px-8 py-5 font-regular">
               Plan
             </th>
@@ -241,23 +242,23 @@ export function ComparePlansSheet({ open, onClose }: { open: boolean; onClose: (
         </thead>
         <tbody>
           {PLANS.map((p) => (
-            <tr key={p.tier} className="text-md leading-md">
-              <th scope="row" className="border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-8 py-4 font-medium text-text-primary">
+            <tr key={p.tier} className={T.body}>
+              <th scope="row" className="border-t-[length:var(--border-width-1)] border-solid border-border px-8 py-4 font-medium text-text-primary">
                 {p.name}
-                {p.tier === plan.tier && <span className="ml-3 text-sm font-regular text-text-secondary">· yours</span>}
+                {p.tier === plan.tier && <span className={cn(T.meta, "ml-3")}>· yours</span>}
               </th>
-              <td className="border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-4 py-4 text-right tabular-nums text-text-brand">{n(p.credits)}</td>
-              <td className="border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-8 py-4 text-right tabular-nums text-text-primary">
+              <td className="border-t-[length:var(--border-width-1)] border-solid border-border px-4 py-4 text-right tabular-nums text-text-brand">{n(p.credits)}</td>
+              <td className="border-t-[length:var(--border-width-1)] border-solid border-border px-8 py-4 text-right tabular-nums text-text-primary">
                 {dollars(priceOf(p.tier, "monthly").perMonth)}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="rounded-xl bg-bg-success-subtle px-6 py-4 text-sm leading-sm text-text-success">
+      <p className={cn(T.meta, "rounded-xl bg-bg-success-subtle px-6 py-4 text-text-success")}>
         Disruptor adds {n(planOf("disruptor").credits)} AI credits a month and takes {pct(0.25)} off every credit you buy.
       </p>
-      <Link href="/m/plans" onClick={onClose} className="self-center text-md font-medium leading-md text-text-brand hover:underline">
+      <Link href="/m/plans" onClick={onClose} className={cn(LINK, "self-center")}>
         See every plan
       </Link>
     </Sheet>

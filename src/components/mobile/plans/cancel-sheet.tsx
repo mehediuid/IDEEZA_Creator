@@ -1,6 +1,6 @@
 "use client";
 
-// Cancel subscription? (mobile Figma "Billing History › Popup Container",
+// Back to Free? (mobile Figma "Billing History › Popup Container",
 // the web's CancelDialog): you keep the plan until the period ends, then
 // Free; what you lose; that nothing you made is removed. Keep my plan, or
 // Cancel subscription; from a bigger plan the web's smaller-plan way out too.
@@ -13,6 +13,7 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { lossesOf, planOf, type PlanTier } from "@/lib/create/plans";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { T } from "../type";
 import { BulletList, SheetMark, dateOf, n } from "./parts";
 
 const SMALLEST_PAID: PlanTier = "tinkerer";
@@ -31,7 +32,7 @@ export function CancelSheet({ open, onClose }: { open: boolean; onClose: () => v
     <Sheet
       open={open}
       onClose={onClose}
-      title="Cancel subscription?"
+      title="Back to Free?"
       description={`You keep ${current.name} until ${when}, then move to Free.`}
       actions={
         <>
@@ -56,11 +57,11 @@ export function CancelSheet({ open, onClose }: { open: boolean; onClose: () => v
       <SheetMark icon={Alert02Icon} tone="error" />
       {losses.length > 0 && (
         <div className="flex flex-col gap-4">
-          <p className="text-md font-medium leading-md text-text-primary">After that, you’ll lose:</p>
+          <p className={T.rowTitle}>After that, you’ll lose:</p>
           <BulletList items={losses} icon={Cancel01Icon} tone="error" />
         </div>
       )}
-      <p className="text-md leading-md text-text-secondary">
+      <p className={T.body}>
         You have {n(usage.projects)} {usage.projects === 1 ? "project" : "projects"}; Free allows {n(free.projects)}. Nothing is removed: credits you bought stay until they expire, and every project and contributor stays as it is.
       </p>
       {offerSmaller && (

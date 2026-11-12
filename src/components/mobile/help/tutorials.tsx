@@ -9,6 +9,8 @@
 // until its file arrives (owner D1, no reward), then Earn → the % watched
 // (only real playback counts) → Claim 2.0 IDZ (paid into the demo wallet as
 // a wallet line, once per video; no wallet → Connect first) → ✓ Claimed.
+// The editor categories say up front that their steps are done on a
+// computer: a phone has no editors, keyboard or sidebar.
 
 import * as React from "react";
 import Link from "next/link";
@@ -17,9 +19,9 @@ import { ArrowDown01Icon, ArrowLeft01Icon, ArrowRight01Icon, ArrowUp01Icon, Cloc
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
+import { Banner } from "@/components/ideeza/banner";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { SearchInput } from "@/components/ideeza/search-input";
-import { StateCard } from "@/components/ideeza/state-card";
 import { Tag } from "@/components/ideeza/tag";
 import { persistWallet } from "@/components/wallet/wallet-provider";
 import { TUTORIAL_CATEGORIES } from "@/lib/tutorials/content";
@@ -32,14 +34,20 @@ import { readWallet } from "@/lib/wallet/demo-wallet";
 import { TIMING } from "@/lib/wallet/request";
 import { cn } from "@/lib/utils";
 import { ConnectSheet } from "../earn-coin/parts";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
+import { MEDIA_INK } from "../kit/media";
 import { Sheet } from "../kit/sheet";
+import { EmptyState, NotFoundState } from "../kit/state";
 import { ListBones } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 
 const POSTER = "/tutorials/video-poster.jpg";
 export const tutorialHref = (category: string, page: string) => `/m/tutorials/${category}/${page}`;
+/** Categories whose steps happen in the editors or the parts library: on a computer, not the phone. */
+const ON_A_COMPUTER = new Set(["parts-vs-agile-modules", "code-tech"]);
 
 // ── Tutorial Categories ────────────────────────────────────────────────
 
@@ -55,38 +63,28 @@ export function TutorialsScreen() {
       )
     : [];
   return (
-    <Screen top={<TopBar back title="Tutorial categories" />} className="px-8 pb-12 pt-4">
+    <Screen top={<TopBar back="/m/help" title="Tutorial categories" />} className="px-8 pb-12 pt-4">
       <div className="flex flex-col gap-8">
-        <p className="text-md leading-md text-text-secondary">
+        <p className={T.body}>
           Let’s learn about the IDEEZA platform and how it will revolutionise hardware designing. Take a look at all our categories for more tutorials.
         </p>
-        <SearchInput aria-label="Search tutorials" placeholder="Search tutorials" value={query} onValueChange={setQuery} onClear={() => setQuery("")} />
+        <SearchInput size="xl" aria-label="Search tutorials" placeholder="Search tutorials" value={query} onValueChange={setQuery} onClear={() => setQuery("")} />
         {q ? (
           hits.length === 0 ? (
-            <StateCard
-              tone="empty"
-              className="w-full"
-              icon={<Icon icon={Search01Icon} size={24} />}
-              title={`No tutorial about “${query.trim()}”`}
-              action={
-                <Button hierarchy="secondary" size="lg" onClick={() => setQuery("")}>
-                  Clear search
-                </Button>
-              }
-            />
+            <EmptyState icon={Search01Icon} title={`No tutorial about “${query.trim()}”`} body="Try other words, or look through the categories." action={{ label: "Clear search", onClick: () => setQuery("") }} />
           ) : (
-            <ul className="flex flex-col divide-y divide-border-subtle">
+            <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
               {hits.map(({ category, entry }) => (
                 <li key={`${category.slug}/${entry.page.slug}`}>
-                  <Link href={tutorialHref(category.slug, entry.page.slug)} className="flex min-h-[56px] items-center gap-4 py-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+                  <Link href={tutorialHref(category.slug, entry.page.slug)} className={LIST_ROW}>
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="text-md font-medium leading-md text-text-primary">{entry.page.title}</span>
-                      <span className="truncate text-sm leading-sm text-text-secondary">
+                      <span className={T.rowTitle}>{entry.page.title}</span>
+                      <span className={cn(T.meta, "truncate")}>
                         {category.title}
                         {entry.group ? ` › ${entry.group.title}` : ""}
                       </span>
                     </span>
-                    <Icon icon={ArrowRight01Icon} size={16} />
+                    <Chevron />
                   </Link>
                 </li>
               ))}
@@ -113,11 +111,11 @@ function CategoryCard({ category, progress }: { category: TutorialCategory; prog
   const earned = progress ? earnedIn(progress, category) : "0";
   const line = [done ? `${done} of ${countLabel(stats.topics, "topic", "topics")} done` : null, isZero(earned) ? null : `${formatIdz(earned)} IDZ earned`].filter(Boolean);
   return (
-    <article className="relative flex flex-col gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-surface p-6">
+    <article className="relative flex flex-col gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-6">
       {/* eslint-disable-next-line @next/next/no-img-element -- a static cover from public/ */}
       <img src={category.cover.src} alt={category.cover.alt} decoding="async" className="aspect-[8/5] w-full rounded-lg bg-bg-subtle object-cover" />
       <div className="flex items-start gap-4">
-        <h2 className="min-w-0 flex-1 text-xl font-medium leading-xl text-text-primary">
+        <h2 className={cn(T.section, "min-w-0 flex-1")}>
           <Link
             href={slug ? tutorialHref(category.slug, slug) : "/m/tutorials"}
             className="outline-none before:absolute before:inset-0 before:rounded-xl before:content-[''] focus-visible:before:ring-2 focus-visible:before:ring-border-focus"
@@ -126,13 +124,13 @@ function CategoryCard({ category, progress }: { category: TutorialCategory; prog
           </Link>
         </h2>
         {!isZero(stats.idz) && (
-          <p className="shrink-0 text-md font-medium leading-md text-text-brand">
+          <p className={cn(T.rowTitle, "shrink-0 text-text-brand")}>
             <span className="sr-only">Earn up to </span>
             {formatIdz(stats.idz)} IDZ
           </p>
         )}
       </div>
-      <p className="line-clamp-3 text-md leading-md text-text-secondary">{category.description}</p>
+      <p className={cn(T.body, "line-clamp-3")}>{category.description}</p>
       <div className="flex flex-wrap items-center gap-4">
         <Tag size="sm">{countLabel(stats.topics, "Topic", "Topics")}</Tag>
         {stats.videos > 0 ? (
@@ -145,7 +143,7 @@ function CategoryCard({ category, progress }: { category: TutorialCategory; prog
           </Tag>
         ) : null}
       </div>
-      {line.length > 0 && <p className="text-sm leading-sm text-text-success">{line.join(" · ")}</p>}
+      {line.length > 0 && <p className={cn(T.meta, "text-text-success")}>{line.join(" · ")}</p>}
     </article>
   );
 }
@@ -164,7 +162,7 @@ export function TutorialCategoryRedirect() {
   }, [c, progress, router]);
   if (!c) return <NotFound />;
   return (
-    <Screen top={<TopBar back title="Tutorial details" />} className="px-8 pt-4">
+    <Screen top={<TopBar back="/m/tutorials" title="Tutorial details" />} className="px-8 pt-4">
       <ListBones rows={3} />
     </Screen>
   );
@@ -173,18 +171,7 @@ export function TutorialCategoryRedirect() {
 function NotFound() {
   return (
     <Screen top={<TopBar back="/m/tutorials" title="Tutorial details" />} className="px-8 pt-8">
-      <StateCard
-        tone="empty"
-        className="w-full"
-        icon={<Icon icon={Search01Icon} size={24} />}
-        title="Tutorial not found"
-        body="This address doesn’t name a tutorial."
-        action={
-          <Link href="/m/tutorials" className="text-md font-medium leading-md text-text-brand hover:underline">
-            See every tutorial
-          </Link>
-        }
-      />
+      <NotFoundState thing="tutorial" body="This address doesn’t name a tutorial." action={{ label: "See every tutorial", href: "/m/tutorials" }} />
     </Screen>
   );
 }
@@ -227,41 +214,46 @@ function TopicPage({ match }: { match: PageMatch }) {
   return (
     <Screen top={<TopBar back="/m/tutorials" title="Tutorial details" actions={[{ icon: Menu01Icon, label: "Tutorial topics", onClick: () => setMenu(true) }]} />} className="px-8 pb-12 pt-4">
       <article className="flex flex-col gap-6">
-        <p className="text-sm leading-sm text-text-secondary">
+        <p className={T.meta}>
           {category.title}
           {match.group ? ` › ${match.group.title}` : ""}
         </p>
-        <h1 className="text-4xl font-semibold leading-4xl text-text-primary">{page.title}</h1>
-        {page.summary && <p className="text-lg leading-lg text-text-secondary">{page.summary}</p>}
+        <h2 className={T.display}>{page.title}</h2>
+        {page.summary && <p className={cn(T.bodyLg, "text-text-secondary")}>{page.summary}</p>}
+        {ON_A_COMPUTER.has(category.slug) && (
+          <Banner tone="info" title="These steps are done on a computer">
+            The editors and the parts library open on a computer. On the phone you can look at every piece and ask for changes in words.
+          </Banner>
+        )}
         {blocks.map((b, i) => (
           <Block key={i} block={b} anchor={anchors.get(i)} progress={progress} />
         ))}
         <div ref={endRef} />
         {progress?.read[key] && (
-          <p className="flex items-center gap-2 text-sm leading-sm text-text-success">
+          <p className={cn(T.caption, "flex items-center gap-2 text-text-success")}>
             <Icon icon={Tick02Icon} size={14} />
             Read
           </p>
         )}
-        <nav aria-label="More in this category" className="flex gap-4 border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-6">
+        <nav aria-label="More in this category" className="flex gap-4 border-t-[length:var(--border-width-1)] border-solid border-border pt-6">
           {prev ? (
             <Link href={tutorialHref(category.slug, prev.page.slug)} className="flex min-h-[56px] min-w-0 flex-1 flex-col justify-center gap-1 rounded-xl bg-bg-subtle px-6 py-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-              <span className="flex items-center gap-1 text-sm leading-sm text-text-secondary">
+              <span className={cn(T.meta, "flex items-center gap-1")}>
                 <Icon icon={ArrowLeft01Icon} size={14} />
                 Previous
               </span>
-              <span className="truncate text-md font-medium leading-md text-text-primary">{prev.page.title}</span>
+              <span className={cn(T.rowTitle, "truncate")}>{prev.page.title}</span>
             </Link>
           ) : (
             <span className="flex-1" />
           )}
           {next ? (
             <Link href={tutorialHref(category.slug, next.page.slug)} className="flex min-h-[56px] min-w-0 flex-1 flex-col items-end justify-center gap-1 rounded-xl bg-bg-subtle px-6 py-4 text-right outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-              <span className="flex items-center gap-1 text-sm leading-sm text-text-secondary">
+              <span className={cn(T.meta, "flex items-center gap-1")}>
                 Next
                 <Icon icon={ArrowRight01Icon} size={14} />
               </span>
-              <span className="w-full truncate text-md font-medium leading-md text-text-primary">{next.page.title}</span>
+              <span className={cn(T.rowTitle, "w-full truncate")}>{next.page.title}</span>
             </Link>
           ) : (
             <span className="flex-1" />
@@ -276,20 +268,20 @@ function TopicPage({ match }: { match: PageMatch }) {
 function Block({ block: b, anchor, progress }: { block: TutorialBlock; anchor?: string; progress: TutorialProgress | undefined }) {
   switch (b.kind) {
     case "paragraph":
-      return <p className="text-lg leading-lg text-text-primary">{b.text}</p>;
+      return <p className={T.bodyLg}>{b.text}</p>;
     case "heading":
       return b.level === 2 ? (
-        <h2 id={anchor} className="pt-4 text-2xl font-medium leading-2xl text-text-primary">
-          {b.text}
-        </h2>
-      ) : (
-        <h3 id={anchor} className="text-xl font-medium leading-xl text-text-primary">
+        <h3 id={anchor} className={cn(T.title, "pt-4")}>
           {b.text}
         </h3>
+      ) : (
+        <h4 id={anchor} className={T.section}>
+          {b.text}
+        </h4>
       );
     case "list":
       return (
-        <ul className="flex list-disc flex-col gap-2 pl-10 text-lg leading-lg text-text-primary">
+        <ul className={cn(T.bodyLg, "flex list-disc flex-col gap-2 pl-10")}>
           {b.items.map((it) => (
             <li key={it}>{it}</li>
           ))}
@@ -351,7 +343,7 @@ function VideoCard({ video, progress }: { video: TutorialVideo; progress: Tutori
   };
 
   return (
-    <figure className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-surface p-4">
+    <figure className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-4">
       {isAvailable(video) ? (
         <video
           src={video.src}
@@ -382,17 +374,17 @@ function VideoCard({ video, progress }: { video: TutorialVideo; progress: Tutori
           onEnded={flush}
         />
       ) : (
-        <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-bg-subtle">
+        <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-bg-overlay">
           {/* eslint-disable-next-line @next/next/no-img-element -- the shared poster from public/ */}
-          <img src={POSTER} alt="" className="absolute inset-0 size-full object-cover opacity-40" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-text-primary">
+          <img src={POSTER} alt="" className="absolute inset-0 size-full object-cover" />
+          <div className={cn(MEDIA_INK, "absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--color-modal-scrim)]")}>
             <Icon icon={Clock01Icon} size={22} />
-            <p className="text-md font-medium leading-md">Video coming soon</p>
+            <p className={cn(T.rowTitle, MEDIA_INK)}>Video coming soon</p>
           </div>
         </div>
       )}
       <figcaption className="flex items-center justify-between gap-4 px-2 pb-2">
-        <span className="text-md leading-md text-text-primary">{state === "soon" ? video.title : "See this video and earn IDZ Token"}</span>
+        <span className={cn(T.body, "text-text-primary")}>{state === "soon" ? video.title : "See this video and earn IDZ Token"}</span>
         {state === "claimed" ? (
           <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
             Claimed
@@ -402,15 +394,15 @@ function VideoCard({ video, progress }: { video: TutorialVideo; progress: Tutori
             Claim {reward}
           </Button>
         ) : state === "soon" ? (
-          <span className="shrink-0 text-sm leading-sm text-text-tertiary">No reward yet</span>
+          <span className={cn(T.caption, "shrink-0 text-text-tertiary")}>No reward yet</span>
         ) : (
-          <span className="shrink-0 text-sm leading-sm text-text-brand">Earn: {reward}</span>
+          <span className={cn(T.caption, "shrink-0 text-text-brand")}>Earn: {reward}</span>
         )}
       </figcaption>
       {state === "watching" && (
         <div className="flex flex-col gap-2 px-2 pb-2">
           <ProgressBar value={share * 100} label={`${Math.round(share * 100)}% watched`} />
-          <span className="text-sm leading-sm text-text-secondary">{Math.round(share * 100)}% watched · watch to the end to earn</span>
+          <span className={T.meta}>{Math.round(share * 100)}% watched · watch to the end to earn</span>
         </div>
       )}
       <ConnectSheet
@@ -446,7 +438,7 @@ function TopicsSheet({ open, onClose, current, progress }: { open: boolean; onCl
           const on = openCats.has(c.slug);
           return (
             <li key={c.slug}>
-              <button type="button" aria-expanded={on} onClick={() => toggle(c.slug)} className={cn(row, "text-md font-medium leading-md text-text-primary")}>
+              <button type="button" aria-expanded={on} onClick={() => toggle(c.slug)} className={cn(row, T.rowTitle)}>
                 {c.title}
                 <Icon icon={on ? ArrowUp01Icon : ArrowDown01Icon} size={16} />
               </button>
@@ -455,7 +447,7 @@ function TopicsSheet({ open, onClose, current, progress }: { open: boolean; onCl
                   {c.topics.map((t) =>
                     isGroup(t) ? (
                       <li key={t.slug}>
-                        <p className="px-4 pb-1 pt-3 text-sm font-medium leading-sm text-text-secondary">{t.title}</p>
+                        <p className={cn(T.meta, "px-4 pb-1 pt-3")}>{t.title}</p>
                         <ul className="flex flex-col pl-6">
                           {t.children!.map((p) => (
                             <PageRow key={p.slug} title={p.title} current={current.category.slug === c.slug && current.page.slug === p.slug} done={!!progress && isPageDone(progress, c.slug, p)} onPick={() => go(c.slug, p.slug)} className={row} />
@@ -479,7 +471,7 @@ function TopicsSheet({ open, onClose, current, progress }: { open: boolean; onCl
 function PageRow({ title, current, done, onPick, className }: { title: string; current: boolean; done: boolean; onPick: () => void; className: string }) {
   return (
     <li>
-      <button type="button" aria-current={current ? "page" : undefined} onClick={onPick} className={cn(className, "text-md leading-md", current ? "bg-bg-brand-subtle font-medium text-text-brand" : "text-text-primary")}>
+      <button type="button" aria-current={current ? "page" : undefined} onClick={onPick} className={cn(className, current ? cn(T.rowTitle, "bg-bg-brand-subtle text-text-brand") : cn(T.body, "text-text-primary"))}>
         {title}
         {done && (
           <span className="text-text-success">

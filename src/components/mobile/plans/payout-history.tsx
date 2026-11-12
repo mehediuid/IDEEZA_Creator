@@ -13,29 +13,30 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Download04Icon, Invoice03Icon, Share08Icon, Tick02Icon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { Download04Icon, Invoice03Icon, Tick02Icon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { StateCard } from "@/components/ideeza/state-card";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { networkName } from "@/components/settings/get-paid/parts";
 import { DATE_RANGES, filterWithdrawals, periodLabel, withdrawalTotalsOf, type DateRange } from "@/lib/account/money-phone";
 import { STATUS_WORD, WITHDRAWAL_STATUSES, formatUsd, statementCsv, statementFileName, statementYears, type StatementPeriod, type Withdrawal, type WithdrawalStatus } from "@/lib/account/payout";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
-import { formatAmount } from "@/lib/wallet/money";
 import { cn } from "@/lib/utils";
 import { FilterButton, useCopy, whenOf } from "../earn-coin/parts";
 import { Sheet } from "../kit/sheet";
+import { EmptyState } from "../kit/state";
+import { OfflineBanner } from "../kit/states";
 import { SheetSelect } from "../kit/sheet-select";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { useGetPaid } from "./get-paid-screen";
-import { CARD, Row, RowsCard, n } from "./parts";
+import { CARD, LINK, Row, RowsCard, n, payoutLine } from "./parts";
 
 const PER_PAGE = 10;
 const STATUS_TONE: Record<WithdrawalStatus, "success" | "brand-outline" | "warning"> = { complete: "success", "in-progress": "brand-outline", pending: "warning" };
@@ -72,26 +73,28 @@ export function WithdrawalHistoryScreen() {
 
   return (
     <Screen
-      top={<TopBar back title="Withdrawal history" actions={[{ icon: Download04Icon, label: "Download statement", onClick: () => setStatement(true) }]} />}
+      top={<TopBar back="/m/settings/idz-pay" title="Withdrawal history" actions={[{ icon: Download04Icon, label: "Download statement", onClick: () => setStatement(true) }]} />}
       className="px-8 pb-12 pt-4"
     >
       {!loaded || !store ? (
         <Skeleton shape="block" className="h-[240px] w-full" />
       ) : (
         <div className="flex flex-col gap-8">
+          <OfflineBanner />
           <div className="grid grid-cols-3 gap-4">
             {WITHDRAWAL_STATUSES.map((s, i) => (
-              <div key={s} className="flex flex-col gap-1 rounded-xl bg-bg-brand-subtle px-5 py-5">
-                <span className="text-xl font-medium leading-xl tabular-nums text-text-primary">{formatUsd(totals[s])}</span>
-                <span className="flex items-center gap-2 text-sm leading-sm text-text-secondary">
+              <div key={s} className="flex min-w-0 flex-col gap-1 rounded-xl bg-bg-brand-subtle px-5 py-5">
+                <span className={cn(T.section, "truncate tabular-nums")}>{formatUsd(totals[s])}</span>
+                <span className={cn(T.meta, "flex items-center gap-2")}>
                   {STATUS_WORD[s]}
                   {i === 0 && <span className="sr-only">(testnet demo)</span>}
                 </span>
               </div>
             ))}
           </div>
-          <TestnetDemoBadge />
+          <TestnetDemoBadge className="self-start" />
           <SearchInput
+            size="xl"
             aria-label="Search transactions"
             placeholder="Search transactions"
             value={query}
@@ -122,26 +125,20 @@ export function WithdrawalHistoryScreen() {
             />
           </div>
           {list.length === 0 ? (
-            <StateCard tone="empty" className="w-full" icon={<Icon icon={Invoice03Icon} size={24} />} title="No withdrawals yet" body="Each withdrawal you sign shows up here, with its reference." />
+            <EmptyState icon={Invoice03Icon} title="No withdrawals yet" body="Each withdrawal you sign shows up here, with its reference." />
           ) : shown.length === 0 ? (
-            <StateCard
-              tone="empty"
-              className="w-full"
-              icon={<Icon icon={Invoice03Icon} size={24} />}
+            <EmptyState
+              icon={Invoice03Icon}
               title="Nothing matches"
-              action={
-                <Button
-                  hierarchy="secondary"
-                  size="lg"
-                  onClick={() => {
-                    setQuery("");
-                    setStatus("all");
-                    setRange("all");
-                  }}
-                >
-                  Clear filters
-                </Button>
-              }
+              body="No withdrawal matches this search and these filters."
+              action={{
+                label: "Clear filters",
+                onClick: () => {
+                  setQuery("");
+                  setStatus("all");
+                  setRange("all");
+                },
+              }}
             />
           ) : (
             <>
@@ -154,17 +151,17 @@ export function WithdrawalHistoryScreen() {
                       className={cn(CARD, "flex w-full flex-col gap-2 px-7 py-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
                     >
                       <span className="flex items-center justify-between gap-4">
-                        <span className="text-xl font-medium leading-xl tabular-nums text-text-primary">{formatUsd(w.amount)}</span>
+                        <span className={cn(T.section, "tabular-nums")}>{formatUsd(w.amount)}</span>
                         <Badge tone={STATUS_TONE[w.status]}>{STATUS_WORD[w.status]}</Badge>
                       </span>
-                      <span className="flex items-center justify-between gap-4 text-sm leading-sm text-text-secondary">
+                      <span className={cn(T.meta, "flex items-center justify-between gap-4")}>
                         <span className="min-w-0 truncate">
                           {w.to.label}
                           {w.to.address ? ` (${shortAddress(w.to.address)})` : ""}
                         </span>
                         <span className="shrink-0">{whenOf(w.at)}</span>
                       </span>
-                      <span className="font-mono text-sm leading-sm text-text-tertiary">{w.id}</span>
+                      <span className={cn(T.meta, "font-mono text-text-tertiary")}>{w.id}</span>
                     </button>
                   </li>
                 ))}
@@ -195,7 +192,7 @@ function TransactionSheet({ withdrawal: w, onClose }: { withdrawal: Withdrawal |
   const lines = [
     `IDEEZA withdrawal receipt (testnet demo)`,
     `Reference: ${w.id}`,
-    `Amount: ${formatUsd(w.amount)} as ${formatAmount(w.amount, w.token)}`,
+    `Amount: ${formatUsd(w.amount)} as ${payoutLine(w.amount, w.token)}`,
     `To: ${w.to.label}${w.to.address ? ` · ${w.to.address}` : ""}${w.to.network ? ` · ${networkName(w.to.network)}` : ""}`,
     `Date: ${whenOf(w.at)}`,
     `Status: ${STATUS_WORD[w.status]}`,
@@ -217,14 +214,10 @@ function TransactionSheet({ withdrawal: w, onClose }: { withdrawal: Withdrawal |
       onClose={onClose}
       title="Transaction details"
       actions={
-        <div className="flex gap-4">
-          <Button hierarchy="secondary" size="xl" className="flex-1" onClick={share}>
-            <Icon icon={Share08Icon} size={18} />
-            Share
-          </Button>
+        <>
           <Button
             size="xl"
-            className="flex-1"
+            className="w-full"
             onClick={() => {
               download(`${lines.join("\r\n")}\r\n`, `ideeza-withdrawal-${w.id}.txt`, "text/plain;charset=utf-8");
               toast({ title: "Receipt downloaded" });
@@ -232,11 +225,15 @@ function TransactionSheet({ withdrawal: w, onClose }: { withdrawal: Withdrawal |
           >
             Download receipt
           </Button>
-        </div>
+          <Button hierarchy="secondary" size="xl" className="w-full" onClick={share}>
+            Share
+          </Button>
+        </>
       }
     >
       <div className="flex flex-col items-center gap-2">
-        <span className="text-6xl font-semibold leading-6xl tabular-nums text-text-primary">{formatUsd(w.amount)}</span>
+        <span className={T.amountHero}>{formatUsd(w.amount)}</span>
+        <span className={T.meta}>as {payoutLine(w.amount, w.token)}</span>
         <Badge tone={STATUS_TONE[w.status]}>{STATUS_WORD[w.status]}</Badge>
       </div>
       <ol className="flex flex-col">
@@ -254,11 +251,11 @@ function TransactionSheet({ withdrawal: w, onClose }: { withdrawal: Withdrawal |
                 {i < STEPS.length - 1 && <span aria-hidden className={cn("w-[2px] flex-1", reached && i + 1 < done ? "bg-bg-brand" : "bg-bg-subtle")} />}
               </span>
               <span className="flex flex-col pb-6">
-                <span className={cn("text-md leading-md", reached ? "text-text-primary" : "text-text-secondary")}>
+                <span className={cn(T.body, reached && "text-text-primary")}>
                   {s}
                   <span className="sr-only">{reached ? " — done" : " — not yet"}</span>
                 </span>
-                <span className="text-sm leading-sm text-text-secondary">{reached ? whenOf(w.at) : w.legacy ? "Requested in Earn before Get paid" : "Waiting"}</span>
+                <span className={T.meta}>{reached ? whenOf(w.at) : w.legacy ? "Requested in Earn before Get paid" : "Waiting"}</span>
               </span>
             </li>
           );
@@ -272,7 +269,7 @@ function TransactionSheet({ withdrawal: w, onClose }: { withdrawal: Withdrawal |
         {w.to.network && <Row label="Network">{networkName(w.to.network)}</Row>}
         <Row label="Date & time">{whenOf(w.at)}</Row>
         <Row label="Transaction ID">
-          <button type="button" onClick={() => copy(w.id, "Transaction ID copied")} className="inline-flex items-center gap-2 font-mono text-text-brand outline-none focus-visible:underline">
+          <button type="button" onClick={() => copy(w.id, "Transaction ID copied")} className="inline-flex min-h-[32px] items-center gap-2 font-mono text-text-brand outline-none focus-visible:underline">
             {w.id}
             <Icon icon={Copy01Icon} size={14} />
           </button>
@@ -332,8 +329,8 @@ function StatementSheet({ open, onClose, years }: { open: boolean; onClose: () =
             <Icon icon={Invoice03Icon} size={22} />
           </span>
           <span className="flex min-w-0 flex-col">
-            <span className="truncate text-md leading-md text-text-primary">{ready.name}</span>
-            <span className="text-sm leading-sm text-text-secondary">
+            <span className={cn(T.body, "truncate text-text-primary")}>{ready.name}</span>
+            <span className={T.meta}>
               CSV · {n(ready.rows)} {ready.rows === 1 ? "line" : "lines"}
             </span>
           </span>
@@ -407,17 +404,17 @@ export function StatementScreen() {
           <header className="flex items-start justify-between gap-4">
             <IdeezaLogo height={20} decorative={false} />
             <span className="flex flex-col items-end text-right">
-              <span className="text-md font-medium leading-md text-text-primary">Withdrawal statement</span>
-              <span className="text-xs leading-xs text-text-secondary">Summary for {periodLabel(period.year, period.month)}</span>
+              <span className={T.rowTitle}>Withdrawal statement</span>
+              <span className={T.micro}>Summary for {periodLabel(period.year, period.month)}</span>
               <TestnetDemoBadge />
             </span>
           </header>
           {rows.length === 0 ? (
-            <p className="py-8 text-center text-md leading-md text-text-secondary">No sales or withdrawals in {periodLabel(period.year, period.month)}.</p>
+            <p className={cn(T.body, "py-8 text-center")}>No sales or withdrawals in {periodLabel(period.year, period.month)}.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-border-subtle">
+            <ul className="flex flex-col divide-y divide-border">
               {rows.map((r, i) => (
-                <li key={`${r[8]}-${i}`} className="flex items-start justify-between gap-4 py-4 text-sm leading-sm">
+                <li key={`${r[8]}-${i}`} className={cn(T.meta, "flex items-start justify-between gap-4 py-4")}>
                   <span className="flex min-w-0 flex-col gap-1">
                     <span className="font-medium text-text-primary">
                       {r[1]}
@@ -430,20 +427,18 @@ export function StatementScreen() {
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-end tabular-nums">
-                    <span className="text-text-primary">
-                      {r[4]} {r[5]}
-                    </span>
+                    <span className="text-text-primary">{r[1] === "Withdrawal" && r[5] === "IDZ" ? payoutLine((r[4] || "0").replace(/^-/, ""), "IDZ").replace("≈ ", "≈ −") : `${r[4]} ${r[5]}`}</span>
                     <span className="text-text-secondary">{formatUsd(r[6] || "0")}</span>
                   </span>
                 </li>
               ))}
             </ul>
           )}
-          <p className="text-center text-xs leading-xs text-text-tertiary">Made by IDEEZA from this browser’s records. Dollars at demo rates.</p>
+          <p className={cn(T.micro, "text-center text-text-tertiary")}>Made by IDEEZA from this browser’s records. Dollars at demo rates.</p>
         </article>
       )}
-      <Link href="/m/settings/idz-pay" className="mt-8 block text-center text-md font-medium leading-md text-text-brand hover:underline">
-        Back to Get Paid
+      <Link href="/m/settings/idz-pay" className={cn(LINK, "mt-8 flex min-h-[44px] items-center justify-center")}>
+        Back to Get paid
       </Link>
     </Screen>
   );

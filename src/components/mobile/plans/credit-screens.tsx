@@ -11,26 +11,36 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Alert02Icon, ArrowRight01Icon, Invoice03Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, Invoice03Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
-import { Button } from "@/components/ideeza/button";
-import { StateCard } from "@/components/ideeza/state-card";
+import { Button, buttonVariants } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { allowanceOf, lotStateOf, type LotState } from "@/lib/account/money-phone";
-import { nextExpiring, runningLow } from "@/lib/create/credit-limits";
-import { lotsOf } from "@/lib/create/credit-lots";
+import { runningLow } from "@/lib/create/credit-limits";
+import { lotsOf, type Lot } from "@/lib/create/credit-lots";
 import { usd } from "@/lib/create/credit-pricing";
 import { BUILD_COST, describeEntry, useCredits, type CreditEntry } from "@/lib/create/credits";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { BuyCreditsSheet } from "../ai/buy-credits-sheet";
-import { ListBones } from "../kit/states";
+import { EmptyState } from "../kit/state";
+import { ListBones, OfflineBanner } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { ComparePlansSheet, ReachedLimitSheet, UpgradeUnlockSheet, useNextPlan } from "./credit-sheets";
-import { CARD, LINK, Row, dateOf, n, pct } from "./parts";
+import { CARD, HAIRLINE, LINK, Row, dateOf, n, pct } from "./parts";
+
+/** The credits that end first: every lot ending on the earliest day counts, not only one of them. */
+function expiringFirst(lots: readonly Lot[], now: number): { credits: number; expiresAt: number } | null {
+  const live = lots.filter((l) => l.remaining > 0 && l.expiresAt !== null && l.expiresAt > now);
+  if (!live.length) return null;
+  const first = Math.min(...live.map((l) => l.expiresAt as number));
+  const day = dateOf(first);
+  return { credits: live.filter((l) => dateOf(l.expiresAt as number) === day).reduce((sum, l) => sum + l.remaining, 0), expiresAt: first };
+}
 
 export function CurrentCreditScreen() {
   const { hydrated, balance, ledger } = useCredits();
@@ -46,7 +56,8 @@ export function CurrentCreditScreen() {
 
   const lots = React.useMemo(() => lotsOf(ledger), [ledger]);
   const month = planReady ? allowanceOf(ledger, lots, sub, now) : null;
-  const expiring = nextExpiring(ledger, now);
+  const expiring = expiringFirst(lots, now);
+  const out = hydrated && balance === 0;
   const low = hydrated && runningLow(balance, lowAt);
   const recent = ledger.slice(-3).reverse();
 
@@ -61,10 +72,11 @@ export function CurrentCreditScreen() {
         <ListBones rows={4} />
       ) : (
         <div className="flex flex-col gap-8">
+          <OfflineBanner />
           <section aria-label="Current balance" className="flex flex-col items-center gap-2 rounded-xl border-[length:var(--border-width-1-5)] border-solid border-border-brand bg-bg-surface px-8 py-8 text-center">
-            <span className="text-md leading-md text-text-secondary">Current balance</span>
-            <span className="text-5xl font-semibold leading-5xl tabular-nums text-text-primary">{n(balance)} credits</span>
-            <span className="text-sm leading-sm text-text-secondary">
+            <span className={T.body}>Current balance</span>
+            <span className={T.amountHero}>{n(balance)} credits</span>
+            <span className={T.meta}>
               ≈ {n(balance)} concept drawings or {n(Math.floor(balance / BUILD_COST))} one-product builds
               {expiring ? ` · ${n(expiring.credits)} expire ${dateOf(expiring.expiresAt)}` : ""}
             </span>
@@ -75,8 +87,8 @@ export function CurrentCreditScreen() {
                 <Icon icon={Alert02Icon} size={20} />
               </span>
               <span className="flex flex-col gap-1">
-                <span className="text-md font-medium leading-md text-text-primary">Running low on credits</span>
-                <span className="text-sm leading-sm text-text-secondary">You may run out soon. Top up to keep creating.</span>
+                <span className={T.rowTitle}>{out ? "You’re out of credits" : "Running low on credits"}</span>
+                <span className={T.meta}>{out ? "Buy credits or upgrade to keep creating." : "You may run out soon. Top up to keep creating."}</span>
               </span>
             </div>
           )}
@@ -85,7 +97,7 @@ export function CurrentCreditScreen() {
           </Button>
 
           <section aria-labelledby="this-month" className={cn(CARD, "flex flex-col px-8 py-6")}>
-            <h2 id="this-month" className="pb-2 text-xl font-medium leading-xl text-text-primary">
+            <h2 id="this-month" className={cn(T.section, "pb-2")}>
               This month
             </h2>
             <dl className="flex flex-col">
@@ -113,11 +125,11 @@ export function CurrentCreditScreen() {
           </section>
 
           <section aria-labelledby="recent" className={cn(CARD, "flex flex-col px-8 py-6")}>
-            <h2 id="recent" className="pb-2 text-xl font-medium leading-xl text-text-primary">
+            <h2 id="recent" className={cn(T.section, "pb-2")}>
               Recent activity
             </h2>
             {recent.length === 0 ? (
-              <p className="py-4 text-md leading-md text-text-secondary">No credit has moved yet.</p>
+              <p className={cn(T.body, "py-4")}>No credit has moved yet.</p>
             ) : (
               <ul className="flex flex-col">
                 {recent.map((e) => (
@@ -126,12 +138,8 @@ export function CurrentCreditScreen() {
               </ul>
             )}
           </section>
-          <Link
-            href="/m/plans/credits/history"
-            className="inline-flex h-[44px] items-center justify-center gap-3 rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-button-secondary-border)] bg-[var(--color-button-secondary-bg)] text-lg leading-lg text-[color:var(--color-button-secondary-text)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
+          <Link href="/m/plans/credits/history" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
             View full credit history
-            <Icon icon={ArrowRight01Icon} size={16} />
           </Link>
         </div>
       )}
@@ -150,10 +158,10 @@ function ActivityRow({ entry: e }: { entry: CreditEntry }) {
   return (
     <li className="flex items-center justify-between gap-6 py-3">
       <span className="flex min-w-0 flex-col">
-        <span className="truncate text-md leading-md text-text-primary">{what}</span>
-        <span className="text-sm leading-sm text-text-secondary">{dateOf(e.ts)}</span>
+        <span className={cn(T.body, "truncate text-text-primary")}>{what}</span>
+        <span className={T.meta}>{dateOf(e.ts)}</span>
       </span>
-      <span className={cn("shrink-0 text-md font-medium leading-md tabular-nums", e.delta >= 0 ? "text-text-success" : "text-text-primary")}>{amount}</span>
+      <span className={cn(T.rowTitle, "shrink-0 tabular-nums", e.delta >= 0 && "text-text-success")}>{amount}</span>
     </li>
   );
 }
@@ -185,38 +193,36 @@ export function CreditHistoryScreen() {
         <ListBones rows={4} />
       ) : (
         <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-medium leading-2xl text-text-primary">Credit history</h2>
-            <p className="text-md leading-md text-text-secondary">Track your purchases and credit usage.</p>
-          </div>
-          <div className="flex items-center justify-between gap-6 rounded-xl bg-bg-brand-subtle px-8 py-6">
-            <span className="flex flex-col gap-1">
-              <span className="text-sm leading-sm text-text-secondary">Total remaining credits</span>
-              <span className="text-3xl font-semibold leading-3xl tabular-nums text-text-brand">{n(balance)} credits</span>
-            </span>
-            <Badge tone="brand-outline">
-              {active} active {active === 1 ? "pack" : "packs"}
-            </Badge>
+          <OfflineBanner />
+          <p className={T.body}>Track your purchases and credit usage.</p>
+          <div className="flex flex-col gap-4 rounded-xl bg-bg-brand-subtle px-8 py-6">
+            <div className="flex items-center justify-between gap-6">
+              <span className="flex flex-col gap-1">
+                <span className={T.meta}>Total remaining credits</span>
+                <span className={cn(T.amountHero, "text-text-brand")}>{n(balance)} credits</span>
+              </span>
+              <Badge tone="brand-outline">
+                {active} active {active === 1 ? "pack" : "packs"}
+              </Badge>
+            </div>
+            <TestnetDemoBadge className="self-start" />
           </div>
           {lots.length === 0 ? (
-            <StateCard tone="empty" className="w-full" icon={<Icon icon={Invoice03Icon} size={24} />} title="No credits yet" body="Credits your plan adds and credits you buy show up here." />
+            <EmptyState icon={Invoice03Icon} title="No credits yet" body="Credits your plan adds and credits you buy show up here." />
           ) : (
             <ul className="flex flex-col gap-6">
-              {lots.map((l, i) => {
+              {lots.map((l) => {
                 const e = byId.get(l.id);
                 const state = STATE_BADGE[lotStateOf(l, now)];
                 return (
                   <li key={l.id} className={cn(CARD, "flex flex-col p-8")}>
                     <div className="flex items-center justify-between gap-4">
-                      <h3 className="text-xl font-medium leading-xl text-text-primary">{lotName(e)}</h3>
+                      <h3 className={T.section}>{lotName(e)}</h3>
                       <Badge tone={state.tone}>{state.label}</Badge>
                     </div>
-                    <p className="flex items-center justify-between gap-4 border-b-[length:var(--border-width-1)] border-solid border-border-subtle pb-4 pt-2 text-md leading-md">
-                      <span className="inline-flex items-center gap-3 font-medium text-text-primary">
-                        {e?.price !== undefined ? `Paid ${usd(e.price)}` : e?.reason === "grant" ? "With your plan" : "Free"}
-                        {i === 0 && e?.price !== undefined && <TestnetDemoBadge />}
-                      </span>
-                      <span className="text-text-secondary">{dateOf(l.ts)}</span>
+                    <p className={cn(HAIRLINE, "flex items-center justify-between gap-4 border-b-[length:var(--border-width-1)] pb-4 pt-2")}>
+                      <span className={T.rowTitle}>{e?.price !== undefined ? `Paid ${usd(e.price)}` : e?.reason === "grant" ? "With your plan" : "Free"}</span>
+                      <span className={T.body}>{dateOf(l.ts)}</span>
                     </p>
                     <dl className="flex flex-col pt-2">
                       <Row label="Credits">
