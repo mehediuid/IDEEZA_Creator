@@ -66,7 +66,7 @@ test("every post's copy, stage, licence and listing follow the rules", () => {
     assert.ok(REAL_STAGES.includes(post.stage), `${at} stage ${post.stage}`);
     if (post.minted) {
       assert.ok(["Commercial use", "Personal use"].includes(post.license), `${at} license`);
-      assert.equal(post.chain, "Polygon");
+      assert.equal(post.chain, "Base Sepolia (Testnet)");
     } else {
       assert.equal(post.license, null);
       assert.equal(post.chain, null);
@@ -168,7 +168,7 @@ test("smart-plant-watering-hub matches the approved mockup", () => {
   assert.equal(post.stage, "testing");
   assert.equal(post.network, "Mesh · 1 hub, 4 probes");
   assert.equal(post.license, "Commercial use");
-  assert.equal(post.chain, "Polygon");
+  assert.equal(post.chain, "Base Sepolia (Testnet)");
   assert.deepEqual(post.listing, {
     rows: [
       { label: "Whole project (Main NFT)", price: "0.40 ETH" },
