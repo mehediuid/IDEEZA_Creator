@@ -7,15 +7,9 @@
 // Save photo; a PDF opens the phone's own preview instead).
 
 import * as React from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
-import { ArrowLeft02Icon, ArrowRight01Icon, ArrowRight02Icon, Cancel01Icon, Download04Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { useDialogFocus } from "@/components/create/use-dialog-focus";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
-import { Button, buttonVariants } from "@/components/ideeza/button";
-import { IconButton } from "@/components/ideeza/icon-button";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf, coverOf } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -24,9 +18,10 @@ import { initialsOfName } from "@/lib/messages/people";
 import type { PhotoRef } from "@/lib/messages/phone";
 import type { CardRef } from "@/lib/messages/types";
 import { cn } from "@/lib/utils";
-import { HomeIndicator } from "../home-indicator";
+import { Chevron } from "../kit/list";
+import { ImageViewer } from "../kit/image-viewer";
 import { Sheet } from "../kit/sheet";
-import { StatusBar } from "../status-bar";
+import { T } from "../type";
 import { CoverTile, TEXT_ACTION } from "./kit";
 
 // ── Members ─────────────────────────────────────────────────────────────
@@ -55,8 +50,8 @@ export function MembersSheet({
             <>
               <Avatar size="md" initials={initialsOfName(m.name)} />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-lg leading-lg text-text-primary">{m.name}</span>
-                <span className="truncate text-md leading-md text-text-secondary">{m.role}</span>
+                <span className={cn(T.bodyLg, "truncate")}>{m.name}</span>
+                <span className={cn(T.body, "truncate")}>{m.role}</span>
               </span>
               {m.you && <Badge tone="neutral">You</Badge>}
             </>
@@ -80,7 +75,7 @@ export function MembersSheet({
         })}
       </ul>
       <div className="flex flex-col gap-2 pb-4">
-        <p className="text-sm leading-sm text-text-secondary">The team is managed in the project’s Team tab.</p>
+        <p className={T.meta}>The team is managed in the project’s Team tab.</p>
         {teamHref && (
           <Link href={teamHref} onClick={onClose} className={cn(TEXT_ACTION, "self-start")}>
             Open Team
@@ -110,7 +105,7 @@ export function ShareProjectSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Share a project">
       {projects.length === 0 ? (
-        <p className="pb-4 text-md leading-md text-text-secondary">You have no projects yet.</p>
+        <p className={cn(T.body, "pb-4")}>You have no projects yet.</p>
       ) : (
         <ul role="list" className="-mx-8 flex flex-col">
           {projects.map((p) => {
@@ -129,14 +124,10 @@ export function ShareProjectSheet({
                 >
                   <CoverTile access={{ name, cover: coverOf(p, buildsOf(p, builds)), gradient: null }} size={56} />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="truncate text-lg font-medium leading-lg text-text-primary">{name}</span>
-                    <span className="truncate text-md leading-md text-text-secondary">{line}</span>
+                    <span className={cn(T.bodyStrong, "truncate")}>{name}</span>
+                    <span className={cn(T.body, "truncate")}>{line}</span>
                   </span>
-                  {!added && (
-                    <span className="text-[color:var(--color-icon-default)]">
-                      <Icon icon={ArrowRight01Icon} size={20} />
-                    </span>
-                  )}
+                  {!added && <Chevron />}
                 </button>
               </li>
             );
@@ -149,102 +140,24 @@ export function ShareProjectSheet({
 
 // ── Photo viewer ────────────────────────────────────────────────────────
 
-const APP_ID = "m-app";
-
+/** MS-22 on the kit's one viewer: n of N, the photo and its name, ← → and Save photo. */
 export function PhotoViewer({ photos, start, onClose }: { photos: PhotoRef[]; start: number; onClose: () => void }) {
   const [at, setAt] = React.useState(start);
-  const panel = React.useRef<HTMLDivElement>(null);
-  const swipe = React.useRef<number | null>(null);
   const photo = photos[Math.min(at, photos.length - 1)];
   const { url, missing } = useMessageFileUrl(photo?.file.key ?? null);
-  useDialogFocus(true, panel);
-
-  const go = React.useCallback((d: number) => setAt((i) => Math.min(photos.length - 1, Math.max(0, i + d))), [photos.length]);
-
-  React.useEffect(() => {
-    const app = document.getElementById(APP_ID);
-    app?.setAttribute("inert", "");
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") go(-1);
-      else if (e.key === "ArrowRight") go(1);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      app?.removeAttribute("inert");
-    };
-  }, [onClose, go]);
-
   if (!photo) return null;
-  return createPortal(
-    <div
-      ref={panel}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Photo ${at + 1} of ${photos.length}`}
-      data-theme="dark"
-      className="fixed inset-0 z-sheet flex flex-col bg-bg-page font-sans text-text-primary motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal"
-    >
-      <StatusBar tone="media" />
-      <header className="flex h-[56px] shrink-0 items-center justify-between gap-4 px-8">
-        {/* The viewer's buttons stay light on the dark ground, as the Figma draws them. */}
-        <span data-theme="light">
-          <IconButton hierarchy="secondary" size="xl" aria-label="Close" icon={<Icon icon={Cancel01Icon} size={22} />} onClick={onClose} />
-        </span>
-        <p className="text-lg font-medium leading-lg" aria-live="polite">
-          {at + 1} of {photos.length}
-        </p>
-        <span className="w-[44px]" aria-hidden />
-      </header>
-      <div
-        className="flex min-h-0 flex-1 touch-pan-y flex-col items-center justify-center gap-6"
-        onPointerDown={(e) => {
-          swipe.current = e.clientX;
-        }}
-        onPointerUp={(e) => {
-          if (swipe.current === null) return;
-          const dx = e.clientX - swipe.current;
-          swipe.current = null;
-          if (Math.abs(dx) > 48) go(dx < 0 ? 1 : -1);
-        }}
-      >
-        {missing ? (
-          <p className="px-8 text-center text-md leading-md text-text-secondary">{photo.file.name} isn’t on this phone any more.</p>
-        ) : url ? (
-          // A blob URL from IndexedDB: next/image can't optimise it.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt={photo.file.name} draggable={false} className="max-h-full w-full select-none object-contain" />
-        ) : null}
-        <p className="max-w-full truncate px-8 text-md leading-md text-text-primary">{photo.file.name}</p>
-      </div>
-      <footer data-theme="light" className="flex shrink-0 items-center gap-6 px-8 pb-4 pt-8">
-        <IconButton hierarchy="secondary" size="xl" aria-label="Previous photo" disabled={at === 0} icon={<Icon icon={ArrowLeft02Icon} size={22} />} onClick={() => go(-1)} />
-        {url ? (
-          <a
-            href={url}
-            download={photo.file.name}
-            className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "flex-1")}
-          >
-            <Icon icon={Download04Icon} size={20} />
-            Save photo
-          </a>
-        ) : (
-          <Button hierarchy="secondary" size="xl" className="flex-1" disabled>
-            Save photo
-          </Button>
-        )}
-        <IconButton
-          hierarchy="secondary"
-          size="xl"
-          aria-label="Next photo"
-          disabled={at >= photos.length - 1}
-          icon={<Icon icon={ArrowRight02Icon} size={22} />}
-          onClick={() => go(1)}
-        />
-      </footer>
-      <HomeIndicator tone="media" />
-    </div>,
-    document.body,
+  return (
+    <ImageViewer
+      open
+      onClose={onClose}
+      index={Math.min(at, photos.length - 1)}
+      count={photos.length}
+      onIndex={setAt}
+      src={missing ? null : url}
+      alt={photo.file.name}
+      caption={photo.file.name}
+      note={missing ? `${photo.file.name} isn’t on this phone any more.` : undefined}
+      save={url && !missing ? { href: url, name: photo.file.name } : null}
+    />
   );
 }

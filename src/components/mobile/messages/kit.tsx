@@ -11,8 +11,8 @@
 //   unread count (A17 Solid Brand SM).
 // · Context card — Expanded (cover, label, title, caption, Open), Collapsed
 //   (title + Open) and Ended (label + what's gone).
-// · Request bar, Composer notice, Composer context bar, the thread's bones,
-//   and the one card a screen shows when there is nothing to show.
+// · Request bar, Composer notice, Composer context bar and the thread's bones.
+// A screen with nothing to show uses the shared kit's states (kit/state.tsx).
 
 import * as React from "react";
 import Link from "next/link";
@@ -22,25 +22,28 @@ import { Button } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { initialsOfName } from "@/lib/messages/people";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import type { SubjectAccess } from "./view";
 
 // ── Chat bubble ─────────────────────────────────────────────────────────
 
 export type Side = "theirs" | "yours";
 
-export const BUBBLE = "whitespace-pre-wrap break-words rounded-lg px-6 py-4 text-md leading-md text-text-primary [overflow-wrap:anywhere]";
+export const BUBBLE = cn(T.body, "whitespace-pre-wrap break-words rounded-lg px-6 py-4 text-text-primary [overflow-wrap:anywhere]");
 
 export function bubbleTone(side: Side): string {
   return side === "yours" ? "bg-bg-brand-subtle" : "bg-bg-subtle";
 }
 
 export function BubbleMeta({ tone = "default", children }: { tone?: "default" | "error"; children: React.ReactNode }) {
-  return <p className={cn("text-sm leading-sm", tone === "error" ? "text-text-error" : "text-text-tertiary")}>{children}</p>;
+  return <p className={cn(T.meta, tone === "error" ? "text-text-error" : "text-text-tertiary")}>{children}</p>;
 }
 
 /** A03 Link MD in brand, with a 44 px tall tap area (Retry, Open). */
-export const TEXT_ACTION =
-  "relative inline-flex items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus after:absolute after:inset-x-0 after:top-1/2 after:h-[44px] after:-translate-y-1/2 after:content-['']";
+export const TEXT_ACTION = cn(
+  T.rowTitle,
+  "relative inline-flex items-center text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus after:absolute after:inset-x-0 after:top-1/2 after:h-[44px] after:-translate-y-1/2 after:content-['']",
+);
 
 // ── Avatar tile for a subject (a project or a post) ─────────────────────
 
@@ -60,7 +63,8 @@ export function CoverTile({ access, size = 48 }: { access: Pick<SubjectAccess, "
       style={access.gradient ? { background: access.gradient } : undefined}
       className={cn(
         box,
-        "inline-flex items-center justify-center bg-bg-brand-subtle text-md font-semibold leading-md",
+        T.name,
+        "inline-flex items-center justify-center bg-bg-brand-subtle",
         access.gradient ? "text-text-on-brand" : "text-text-brand",
       )}
     >
@@ -84,13 +88,13 @@ export function ContextCard({
   collapsed?: boolean;
 }) {
   const box =
-    "flex items-center gap-6 rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface px-6 py-4 transition-[padding] duration-fast";
+    "flex items-center gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface px-6 py-4 transition-[padding] duration-fast";
   if (access.ended) {
     return (
       <section aria-label="About this conversation" className={box}>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="text-sm leading-sm text-text-tertiary">{label}</p>
-          <p className="truncate text-md leading-md text-text-primary">{access.ended}</p>
+          <p className={cn(T.meta, "text-text-tertiary")}>{label}</p>
+          <p className={cn(T.body, "truncate text-text-primary")}>{access.ended}</p>
         </div>
       </section>
     );
@@ -103,7 +107,7 @@ export function ContextCard({
   if (collapsed) {
     return (
       <section aria-label="About this conversation" className={box}>
-        <p className="min-w-0 flex-1 truncate text-md leading-md text-text-primary">{access.name}</p>
+        <p className={cn(T.body, "min-w-0 flex-1 truncate text-text-primary")}>{access.name}</p>
         {open}
       </section>
     );
@@ -112,9 +116,10 @@ export function ContextCard({
     <section aria-label="About this conversation" className={box}>
       <CoverTile access={access} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="text-sm leading-sm text-text-tertiary">{label}</p>
-        <p className="truncate text-md leading-md text-text-primary">{access.name}</p>
-        {caption && <p className="truncate text-sm leading-sm text-text-secondary">{caption}</p>}
+        <p className={cn(T.meta, "text-text-tertiary")}>{label}</p>
+        <p className={cn(T.body, "truncate text-text-primary")}>{access.name}</p>
+        {caption && <p className={cn(T.meta, "truncate")}>{caption}</p>}
+        {access.note && <p className={cn(T.meta, "text-text-tertiary")}>{access.note}</p>}
       </div>
       {open}
     </section>
@@ -126,10 +131,15 @@ export function ContextCard({
 const DOCK = "border-t-[length:var(--border-width-1)] border-solid border-border bg-bg-surface";
 
 export function RequestBar({
+  name,
+  subjectName,
   onAccept,
   onDelete,
   onBlock,
 }: {
+  /** Who asks and what about: the web's sentence, so the request says it even when the top bar is cut. */
+  name: string;
+  subjectName: string;
   onAccept: () => void;
   onDelete: () => void;
   /** Left out once you've blocked them. */
@@ -138,8 +148,11 @@ export function RequestBar({
   return (
     <section aria-label="Message request" className={cn(DOCK, "flex flex-col gap-4 px-8 py-6")}>
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-semibold leading-xs tracking-wide text-text-primary">Message request</p>
-        <p className="text-sm leading-sm text-text-secondary">Replying keeps it here. Accept moves it to your Inbox.</p>
+        <p className={cn(T.label, "text-text-primary")}>Message request</p>
+        <p className={cn(T.meta, "text-text-primary")}>
+          {name} wants to message you about {subjectName}.
+        </p>
+        <p className={T.meta}>Replying keeps it here. Accept moves it to your Inbox.</p>
       </div>
       <div className="grid grid-cols-3 gap-4">
         <Button size="md" onClick={onAccept}>
@@ -162,7 +175,7 @@ export function RequestBar({
 export function ComposerNotice({ children, action }: { children: React.ReactNode; action?: { label: string; onClick: () => void } }) {
   return (
     <div data-notice className={cn(DOCK, "flex flex-col gap-4 px-8 pb-4 pt-6")}>
-      <p className="text-center text-md leading-md text-text-secondary">{children}</p>
+      <p className={cn(T.body, "text-center")}>{children}</p>
       {action && (
         <Button hierarchy="secondary" size="xl" className="w-full" onClick={action.onClick}>
           {action.label}
@@ -176,7 +189,7 @@ export function ComposerNotice({ children, action }: { children: React.ReactNode
 export function ComposerContextBar({ children, onClose, closeLabel }: { children: React.ReactNode; onClose?: () => void; closeLabel?: string }) {
   return (
     <div className="flex min-h-[40px] items-center gap-4 bg-bg-surface py-2 pl-8 pr-4">
-      <p className="min-w-0 flex-1 truncate text-sm leading-sm text-text-secondary">{children}</p>
+      <p className={cn(T.meta, "min-w-0 flex-1 truncate")}>{children}</p>
       {onClose && (
         <IconButton hierarchy="ghost" size="sm" aria-label={closeLabel ?? "Close"} icon={<Icon icon={Cancel01Icon} size={20} />} onClick={onClose} />
       )}
@@ -188,7 +201,7 @@ export function ComposerContextBar({ children, onClose, closeLabel }: { children
 
 export function InlineNote({ tone, children }: { tone: "helper" | "error"; children: React.ReactNode }) {
   return (
-    <p className={cn("flex items-start gap-2 text-sm leading-sm", tone === "error" ? "text-text-error" : "text-text-secondary")}>
+    <p className={cn(T.meta, "flex items-start gap-2", tone === "error" && "text-text-error")}>
       <span className={cn("pt-[1px]", tone === "error" ? "text-[color:var(--color-icon-error)]" : "text-[color:var(--color-icon-secondary)]")}>
         <Icon icon={tone === "error" ? CancelCircleIcon : HelpCircleIcon} size={16} />
       </span>
@@ -207,49 +220,6 @@ export function ThreadBones() {
       {BONE_WIDTHS.map((w, i) => (
         <span key={w} aria-hidden className={cn("h-[40px] rounded-lg bg-bg-subtle", w, i % 2 ? "self-end" : "self-start")} />
       ))}
-    </div>
-  );
-}
-
-// ── The one card (M48 · M57 · M54 as the Figma draws them) ──────────────
-
-export type NoteTone = "empty" | "missing" | "locked";
-
-const NOTE_GROUND: Record<NoteTone, string> = {
-  empty: "bg-bg-subtle text-[color:var(--color-icon-default)]",
-  missing: "bg-bg-brand-subtle text-[color:var(--color-icon-secondary)]",
-  locked: "bg-bg-warning-subtle text-[color:var(--color-icon-warning)]",
-};
-
-export function NoteCard({
-  tone,
-  icon,
-  title,
-  body,
-  action,
-  titleAs = "p",
-}: {
-  tone: NoteTone;
-  icon: React.ReactNode;
-  title: string;
-  body?: string;
-  action?: React.ReactNode;
-  titleAs?: "p" | "h2";
-}) {
-  const Title = titleAs;
-  return (
-    <div
-      role="status"
-      className="flex w-full flex-col items-center gap-5 rounded-md border border-solid border-border-subtle bg-bg-surface p-[calc(var(--spacing-6)_-_var(--border-width-1))] text-center"
-    >
-      <span aria-hidden className={cn("inline-flex size-[80px] items-center justify-center rounded-full", NOTE_GROUND[tone])}>
-        {icon}
-      </span>
-      <div className="flex flex-col gap-1">
-        <Title className="text-3xl font-semibold leading-3xl tracking-slight text-text-primary">{title}</Title>
-        {body && <p className="text-md leading-md text-text-secondary">{body}</p>}
-      </div>
-      {action}
     </div>
   );
 }

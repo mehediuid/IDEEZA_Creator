@@ -30,6 +30,7 @@ import { clockOf, dayLabelOf, reportEvidenceOf } from "@/lib/messages/rules";
 import type { CardRef, Entry, FileRef, MessageEntry, Participant, Subject } from "@/lib/messages/types";
 import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useBubbleGestures } from "./gestures";
 import { BUBBLE, BubbleMeta, bubbleTone, ContextCard, InlineNote, TEXT_ACTION, type Side } from "./kit";
 import { useSubjectAccess } from "./view";
@@ -49,7 +50,7 @@ export type TimelineHandlers = {
 
 function Photo({ file, onOpen }: { file: FileRef; onOpen: () => void }) {
   const { url, missing } = useMessageFileUrl(file.key);
-  if (missing) return <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm leading-sm text-text-tertiary">{file.name} isn’t on this phone any more.</p>;
+  if (missing) return <p className={cn(T.meta, "rounded-lg border border-dashed border-border px-4 py-3 text-text-tertiary")}>{file.name} isn’t on this phone any more.</p>;
   return (
     <button
       type="button"
@@ -67,7 +68,7 @@ function Photo({ file, onOpen }: { file: FileRef; onOpen: () => void }) {
 
 function Pdf({ file }: { file: FileRef }) {
   const { url, missing } = useMessageFileUrl(file.key);
-  if (missing) return <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm leading-sm text-text-tertiary">{file.name} isn’t on this phone any more.</p>;
+  if (missing) return <p className={cn(T.meta, "rounded-lg border border-dashed border-border px-4 py-3 text-text-tertiary")}>{file.name} isn’t on this phone any more.</p>;
   return (
     <a
       href={url ?? undefined}
@@ -80,8 +81,8 @@ function Pdf({ file }: { file: FileRef }) {
         <Icon icon={Pdf01Icon} size={20} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-md font-medium leading-md text-text-primary">{file.name}</span>
-        <span className="block text-sm leading-sm text-text-secondary">PDF · {sizeOf(file.size)}</span>
+        <span className={cn(T.rowTitle, "block truncate")}>{file.name}</span>
+        <span className={cn(T.meta, "block")}>PDF · {sizeOf(file.size)}</span>
       </span>
     </a>
   );
@@ -115,8 +116,8 @@ function Quote({ entries, entryId, snapshots }: { entries: readonly Entry[]; ent
   const who = q.from === me ? "You" : firstNameOf(people.personOf(q.from, snapshots).name);
   return (
     <span className="mb-2 flex flex-col border-l-[length:var(--border-width-2)] border-solid border-border-strong pl-4">
-      <span className="text-sm font-medium leading-sm text-text-secondary">{who}</span>
-      <span className="line-clamp-2 text-sm leading-sm text-text-secondary">{q.line}</span>
+      <span className={cn(T.meta, "text-text-primary")}>{who}</span>
+      <span className={cn(T.meta, "line-clamp-2")}>{q.line}</span>
     </span>
   );
 }
@@ -169,7 +170,7 @@ function Message({
           </span>
         )}
         {deleted && !evidence ? (
-          <p className="rounded-lg border-[length:var(--border-width-1)] border-dashed border-border px-6 py-4 text-md leading-md text-text-tertiary">Message deleted</p>
+          <p className={cn(T.body, "rounded-lg border-[length:var(--border-width-1)] border-dashed border-border px-6 py-4 text-text-tertiary")}>Message deleted</p>
         ) : (
           (shownText || entry.replyTo) && (
             <p className={cn(BUBBLE, bubbleTone(side))}>
@@ -183,7 +184,7 @@ function Message({
       </div>
       {!deleted && entry.editedAt !== undefined && <BubbleMeta>Edited</BubbleMeta>}
       {evidence && (
-        <div className="flex flex-col gap-1 text-sm leading-sm text-text-secondary">
+        <div className={cn(T.meta, "flex flex-col gap-1")}>
           <p>
             {deleted
               ? `${people.nameOf(entry.from)} deleted this message. You still see it because you reported it; it's kept with your report.`
@@ -325,14 +326,14 @@ export function Timeline({
             return (
               <div key={row.key} className="flex items-center gap-8">
                 <Divider className="flex-1" />
-                <p className="shrink-0 text-sm font-medium leading-sm text-text-primary">{dayLabelOf(row.at, now, locale)}</p>
+                <p className={cn(T.overline, "shrink-0 text-text-primary")}>{dayLabelOf(row.at, now, locale)}</p>
                 <Divider className="flex-1" />
               </div>
             );
           }
           if (row.kind === "context") {
             return (
-              <p key={row.key} className="text-center text-sm leading-sm text-text-secondary">
+              <p key={row.key} className={cn(T.meta, "text-center")}>
                 {phoneContextSentenceOf(row.entry.context, infoOf(row.entry.context))}
               </p>
             );
@@ -356,7 +357,7 @@ export function Timeline({
                   <Avatar size="sm" initials={initialsOfName(name)} />
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
-                  <p className="text-sm leading-sm text-text-tertiary">{role ? `${firstNameOf(name)} · ${role}` : name}</p>
+                  <p className={cn(T.meta, "text-text-tertiary")}>{role ? `${firstNameOf(name)} · ${role}` : name}</p>
                   {messages}
                   {time}
                 </div>

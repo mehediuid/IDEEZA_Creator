@@ -44,14 +44,27 @@ export const ForcedThemeContext = React.createContext<"dark" | null>(null);
 
 const APP_ID = "m-app";
 
-/** Open layers, oldest first: only the top one answers Escape, only the bottom one draws the scrim. */
-const layers: number[] = [];
+/** Open layers, oldest first: only the top one answers Escape. One scrim, drawn by the lowest
+ *  sheet — or, over a full-screen layer (the image viewer covers what is under it), by the
+ *  lowest sheet above that. */
+const layers: { id: number; opaque: boolean }[] = [];
 let nextLayer = 0;
 const watchers = new Set<() => void>();
 const changed = () => watchers.forEach((w) => w());
 
-/** Registers an open layer; true while it is the bottom one (the one with the scrim). */
-function useLayer(open: boolean, onClose: () => void): boolean {
+function scrimOwner(): number | undefined {
+  let owner: number | undefined;
+  for (const l of layers) {
+    if (l.opaque) owner = undefined;
+    else if (owner === undefined) owner = l.id;
+  }
+  return owner;
+}
+
+/** Registers an open layer: the app behind goes inert, Escape closes the top layer only.
+ *  True while it is the layer that draws the scrim. `opaque`: a full-screen layer with a
+ *  ground of its own (kit/image-viewer.tsx). */
+export function useLayer(open: boolean, onClose: () => void, opaque = false): boolean {
   const close = React.useRef(onClose);
   const [base, setBase] = React.useState(true);
   React.useEffect(() => {
@@ -61,14 +74,14 @@ function useLayer(open: boolean, onClose: () => void): boolean {
   React.useLayoutEffect(() => {
     if (!open) return;
     const id = ++nextLayer;
-    layers.push(id);
-    const watch = () => setBase(layers[0] === id);
+    layers.push({ id, opaque });
+    const watch = () => setBase(scrimOwner() === id);
     watchers.add(watch);
     changed();
     const app = document.getElementById(APP_ID);
     if (layers.length === 1) app?.setAttribute("inert", "");
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && layers[layers.length - 1] === id) {
+      if (e.key === "Escape" && layers[layers.length - 1]?.id === id) {
         e.stopPropagation();
         close.current();
       }
@@ -77,11 +90,14 @@ function useLayer(open: boolean, onClose: () => void): boolean {
     return () => {
       document.removeEventListener("keydown", onKey);
       watchers.delete(watch);
-      layers.splice(layers.indexOf(id), 1);
+      layers.splice(
+        layers.findIndex((l) => l.id === id),
+        1,
+      );
       changed();
       if (layers.length === 0) app?.removeAttribute("inert");
     };
-  }, [open]);
+  }, [open, opaque]);
   return base;
 }
 
@@ -222,8 +238,11 @@ function SheetPanel({
 }) {
   const framed = useFramed();
   const drag = useDragToClose(panel, onClose);
+  // Only rows (a pick-one sheet, a list): the whole sheet is its foot, so a toast stands above it.
+  const rowsOnly = !actions && !footer;
   return (
     <div
+      {...(rowsOnly ? { [FOOT_ATTR]: "" } : {})}
       className={cn(
         "flex min-h-0 flex-col rounded-t-xl border-b-0 pt-6",
         SURFACE,

@@ -29,11 +29,11 @@ import { T } from "../type";
 
 /** The card: surface, border/default, radius/xl, clipping its rows. */
 export const LIST_CARD =
-  "flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default bg-bg-surface";
+  "flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface";
 
 /** Between the rows of a card: one border/default line over every row but the first. */
 export const LIST_DIVIDERS =
-  "[&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border-default";
+  "[&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border";
 
 /** A content row inside a ListCard: its padding (12 / 16) and its press states. */
 export const LIST_ROW =

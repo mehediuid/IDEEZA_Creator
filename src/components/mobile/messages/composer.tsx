@@ -6,27 +6,45 @@
 // Primary 44, off while there's nothing to send). Above it, the context bar
 // says what Send will do: "Replying to Mira · …", "Editing message", or the
 // entry point's "About: …". Photos ask the phone's photo permission once
-// (KIT-PM-02). Attached photos and PDFs show above the field, each with ✕, and
-// the web's file rules (type, 10 MB, 5 files) as inline errors. A refused
-// send keeps the draft and says why under the field. Enter sends.
+// (KIT-PM-02, the kit's pre-prompt). Attached photos and PDFs show above the
+// field, each with ✕, and the web's file rules (type, 10 MB, 5 files) as
+// inline errors. A refused send keeps the draft and says why under the field.
+// On a touch keyboard Return starts a new line (the field grows to five) and
+// the Send button sends; with a hardware keyboard Enter sends, Shift+Enter
+// starts a line.
 
 import * as React from "react";
 import { Add01Icon, Cancel01Icon, Folder01Icon, Image01Icon, Pdf01Icon, SentIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { Textarea } from "@/components/ideeza/text-input";
 import { sizeOf } from "@/components/messages/message-files";
-import { readPhone, updatePhone } from "@/lib/account/phone";
 import { fileError } from "@/lib/messages/rules";
 import { COUNT_FROM, FILE_TYPES, FILES_MAX, TEXT_MAX, type CardRef } from "@/lib/messages/types";
 import { cn } from "@/lib/utils";
-import { ActionSheet, Sheet } from "../kit/sheet";
+import { usePrePrompt } from "../kit/permission-sheet";
+import { ActionSheet } from "../kit/sheet";
+import { T } from "../type";
 import { ComposerContextBar, InlineNote } from "./kit";
 import { ShareProjectSheet } from "./sheets";
 
 const PHOTO_TYPES = FILE_TYPES.filter((t) => t.startsWith("image/"));
 const MAX_FIELD_PX = 136;
+
+const COARSE = "(pointer: coarse)";
+function watchPointer(onChange: () => void) {
+  const mq = window.matchMedia(COARSE);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+/** A touch keyboard (no Shift to hold): Return writes a new line there. */
+function useTouchKeyboard(): boolean {
+  return React.useSyncExternalStore(
+    watchPointer,
+    () => window.matchMedia(COARSE).matches,
+    () => false,
+  );
+}
 
 export type Draft = { text: string; files: File[]; cards: CardRef[] };
 
@@ -63,7 +81,7 @@ function Chip({ icon, label, onRemove, removeLabel }: { icon: typeof Add01Icon; 
       <span className="text-[color:var(--color-icon-secondary)]">
         <Icon icon={icon} size={16} />
       </span>
-      <span className="min-w-0 truncate text-md leading-md text-text-primary">{label}</span>
+      <span className={cn(T.body, "min-w-0 truncate text-text-primary")}>{label}</span>
       <IconButton hierarchy="ghost" size="lg" aria-label={removeLabel} icon={<Icon icon={Cancel01Icon} size={16} />} onClick={onRemove} />
     </li>
   );
@@ -103,7 +121,8 @@ export function Composer({
   const [busy, setBusy] = React.useState(false);
   const [adding, setAdding] = React.useState(false);
   const [sharing, setSharing] = React.useState(false);
-  const [asking, setAsking] = React.useState(false);
+  const photosAsk = usePrePrompt("photos");
+  const touch = useTouchKeyboard();
   const fieldRef = React.useRef<HTMLTextAreaElement>(null);
   const photoRef = React.useRef<HTMLInputElement>(null);
   const pdfRef = React.useRef<HTMLInputElement>(null);
@@ -167,10 +186,7 @@ export function Composer({
     setFileErrors(errs);
   };
 
-  const pickPhotos = () => {
-    if (!readPhone().photosAsked) setAsking(true);
-    else photoRef.current?.click();
-  };
+  const pickPhotos = () => photosAsk.ask(() => photoRef.current?.click());
 
   const send = async () => {
     if (!canSend) return;
@@ -263,13 +279,13 @@ export function Composer({
           value={text}
           maxLength={TEXT_MAX}
           disabled={disabled}
-          enterKeyHint="send"
+          enterKeyHint={touch ? "enter" : "send"}
           onValueChange={(v) => {
             setText(v);
             if (error) setError(null);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            if (e.key === "Enter" && !touch && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               void send();
             } else if (e.key === "Escape" && mode) {
@@ -281,7 +297,7 @@ export function Composer({
           aria-describedby={error ? errorId : undefined}
           placeholder={attached ? "Add a message (optional)" : "Write a message…"}
           containerClassName="min-h-[44px] min-w-0 flex-1"
-          className="resize-none overflow-y-auto py-4 text-lg leading-lg"
+          className={cn(T.bodyLg, "resize-none overflow-y-auto py-4")}
         />
         <IconButton
           hierarchy="primary"
@@ -302,7 +318,7 @@ export function Composer({
             <span />
           )}
           {text.length >= COUNT_FROM && (
-            <p className={cn("shrink-0 text-sm tabular-nums leading-sm", text.length >= TEXT_MAX ? "text-text-error" : "text-text-secondary")}>
+            <p className={cn(T.meta, "shrink-0 tabular-nums", text.length >= TEXT_MAX && "text-text-error")}>
               {text.length.toLocaleString("en-US")} / {TEXT_MAX.toLocaleString("en-US")}
             </p>
           )}
@@ -351,31 +367,7 @@ export function Composer({
           setSharing(false);
         }}
       />
-      <Sheet
-        open={asking}
-        onClose={() => setAsking(false)}
-        title="Choose photos"
-        actions={
-          <>
-            <Button
-              size="xl"
-              className="w-full"
-              onClick={() => {
-                updatePhone({ photosAsked: true });
-                setAsking(false);
-                photoRef.current?.click();
-              }}
-            >
-              Continue
-            </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setAsking(false)}>
-              Not now
-            </Button>
-          </>
-        }
-      >
-        <p className="text-md leading-md text-text-secondary">To add photos to your project, profile or messages. You pick which ones.</p>
-      </Sheet>
+      {photosAsk.sheet}
     </div>
   );
 }

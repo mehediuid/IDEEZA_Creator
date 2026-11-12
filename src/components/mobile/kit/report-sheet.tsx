@@ -139,6 +139,8 @@ export function ReportSheet({
         }
       >
         <p className={T.body}>Thanks for telling us. You can find it in Settings › Privacy &amp; safety › Your reports.</p>
+        {/* The web's honest line (report dialog, done state). */}
+        <p className={T.body}>In this demo nobody reviews reports yet.</p>
         {blocked && <p className={T.body}>You blocked {blockName} too.</p>}
       </Sheet>
     );

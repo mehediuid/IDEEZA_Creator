@@ -98,8 +98,13 @@ export const FLOAT_ATTR = "data-m-float";
 /** On each open sheet layer (kit/sheet.tsx); the last one is on top. */
 export const LAYER_ATTR = "data-m-layer";
 
+/** The least room a toast needs above an edge (its card with an action, clear of the status bar). */
+const ROOM = 160;
+
 /** The toast's `bottom` in the viewport: 8 px (spacing/4) above the highest foot. Over an open
- *  sheet that is the top sheet's own foot; on a screen, the screen's foot and what floats on it. */
+ *  sheet that is the top sheet's own foot (its actions or composer; the whole sheet when it has
+ *  only rows, so no row is covered — unless the sheet is too tall to stand above); on a screen,
+ *  the screen's foot and what floats on it. */
 function bottomOffset(root: HTMLElement): number {
   const layers = document.querySelectorAll<HTMLElement>(`[${LAYER_ATTR}]`);
   const top = layers[layers.length - 1];
@@ -107,7 +112,7 @@ function bottomOffset(root: HTMLElement): number {
   let edge = floor;
   (top ?? root).querySelectorAll<HTMLElement>(top ? `[${FOOT_ATTR}]` : `[${FOOT_ATTR}], [${FLOAT_ATTR}]`).forEach((el) => {
     const r = el.getBoundingClientRect();
-    if (r.height > 0 && r.top < edge) edge = r.top;
+    if (r.height > 0 && r.top < edge && r.top >= ROOM) edge = r.top;
   });
   const gap = parseFloat(getComputedStyle(root).getPropertyValue("--spacing-4")) || 0;
   return Math.round(window.innerHeight - edge + gap);

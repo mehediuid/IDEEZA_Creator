@@ -17,6 +17,7 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DS_DEFAULT_BUTTON_PAD, FramedProvider, PATH_MESSAGE, useDeviceMode, useVisibleViewport } from "./device";
 import { MobileGate } from "./account/mobile-gate";
+import { BuildWatcher } from "./ai/build-watcher";
 import { BackOnlineToast } from "./kit/states";
 import { PendingToast, ToastProvider } from "./kit/toast";
 import { useNavTrail } from "./nav-trail";
@@ -103,6 +104,7 @@ function MobileApp({ framed, children }: { framed: boolean; children: React.Reac
           </React.Suspense>
           <BackOnlineToast />
           <PendingToast />
+          <BuildWatcher />
         </ToastProvider>
       </div>
     </FramedProvider>

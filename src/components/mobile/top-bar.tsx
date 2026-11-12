@@ -24,12 +24,16 @@ export type TopBarAction = { icon: IconValue; label: string; onClick: () => void
 export function TopBar({
   title,
   back,
+  onBack,
   actions = [],
   className,
 }: {
   title?: React.ReactNode;
   /** Draws Back: the previous screen; when there is none in the app, this parent path (`true`: Home). */
   back?: string | true;
+  /** Called in place of Back, with the Back to run once it is safe: a form with unsaved
+   *  changes asks first (`onBack={(goBack) => (dirty ? setLeaving(() => goBack) : goBack())}`). */
+  onBack?: (goBack: () => void) => void;
   actions?: TopBarAction[];
   className?: string;
 }) {
@@ -44,7 +48,7 @@ export function TopBar({
             size="xl"
             aria-label="Back"
             icon={<Icon icon={ArrowLeft02Icon} size={22} />}
-            onClick={goBack}
+            onClick={onBack ? () => onBack(goBack) : goBack}
           />
         )}
       </div>
