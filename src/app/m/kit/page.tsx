@@ -23,6 +23,7 @@ import { Button } from "@/components/ideeza/button";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { ConfirmSheet } from "@/components/mobile/kit/confirm-sheet";
 import { Eyebrow } from "@/components/mobile/kit/eyebrow";
+import { ImageViewer } from "@/components/mobile/kit/image-viewer";
 import { LIST_CARD, ListCard, ListRow } from "@/components/mobile/kit/list";
 import { MEDIA_CHIP, MEDIA_GROUND } from "@/components/mobile/kit/media";
 import { usePrePrompt, PermissionSheet, type PermissionKind } from "@/components/mobile/kit/permission-sheet";
@@ -72,7 +73,14 @@ type Open =
   | "delete"
   | "cant-yet"
   | "pick"
+  | "layers"
   | `pm-${PermissionKind}`;
+
+/** The viewer's sample pictures (the app's own art). */
+const PHOTOS = [
+  { src: "/m/welcome-plant.png", name: "welcome-plant.png" },
+  { src: "/m/ai-orb.svg", name: "ai-orb.svg" },
+];
 
 const SORTS = [
   { value: "new", label: "Newest first" },
@@ -99,6 +107,10 @@ export default function SharedKitPage() {
   const [tab, setTab] = useTabParam("tab", TAB_VALUES, "inbox");
   const [query, setQuery] = React.useState("");
   const mic = usePrePrompt("microphone");
+  // TopBar onBack: with words in the search field below, Back asks first (KIT-CF-01).
+  const [leaving, setLeaving] = React.useState<(() => void) | null>(null);
+  const [menuOverSheet, setMenuOverSheet] = React.useState(false);
+  const [photo, setPhoto] = React.useState<number | null>(null);
 
   const copyLink = async () => {
     try {
@@ -129,7 +141,10 @@ export default function SharedKitPage() {
   };
 
   return (
-    <Screen top={<TopBar back title="Shared kit" />} className="px-8 pb-16">
+    <Screen
+      top={<TopBar back title="Shared kit" onBack={(goBack) => (query ? setLeaving(() => goBack) : goBack())} />}
+      className="px-8 pb-16"
+    >
       <div className="flex flex-col gap-12">
         <Group title="Menus (M12)">
           <Row label="Post ⋯" note="KIT-RB-02" onClick={() => setOpen("post-menu")} />
@@ -182,6 +197,14 @@ export default function SharedKitPage() {
 
         <Group title="Pick one (_Select item)">
           <Row label="Sort by" note={`PickSheet · ${SORTS.find((s) => s.value === sort)?.label}`} onClick={() => setOpen("pick")} />
+        </Group>
+
+        <Group title="Layers">
+          <Row label="A sheet with a toast and a menu" note="One scrim · the toast above the sheet’s actions" onClick={() => setOpen("layers")} />
+        </Group>
+
+        <Group title="Image viewer">
+          <Row label="Photos" note="MS-22 · n of N, ← Save photo →" onClick={() => setPhoto(0)} />
         </Group>
 
         <Group title="Toasts (M02)">
@@ -331,6 +354,53 @@ export default function SharedKitPage() {
           Remove the listing first, then delete.
         </Banner>
       </Sheet>
+
+      <Sheet
+        open={open === "layers"}
+        onClose={close}
+        title="A sheet under a toast"
+        description="The toast stands 8 px above these actions and can be tapped; a menu opened from here shares this sheet’s scrim."
+        actions={
+          <>
+            <Button
+              size="xl"
+              className="w-full"
+              onClick={() => toast({ title: "Link copied", action: { label: "Undo", onClick: () => toast({ title: "Undone" }) } })}
+            >
+              Show a toast
+            </Button>
+            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setMenuOverSheet(true)}>
+              Open a menu
+            </Button>
+          </>
+        }
+      />
+      <ActionSheet
+        open={menuOverSheet}
+        onClose={() => setMenuOverSheet(false)}
+        title="A menu over a sheet"
+        items={[{ label: "Copy link", icon: CopyLinkIcon, onSelect: () => void copyLink() }]}
+      />
+      <ImageViewer
+        open={photo !== null}
+        onClose={() => setPhoto(null)}
+        index={photo ?? 0}
+        count={PHOTOS.length}
+        onIndex={setPhoto}
+        src={PHOTOS[photo ?? 0].src}
+        alt={PHOTOS[photo ?? 0].name}
+        caption={PHOTOS[photo ?? 0].name}
+        save={{ href: PHOTOS[photo ?? 0].src, name: PHOTOS[photo ?? 0].name }}
+      />
+      <ConfirmSheet
+        open={leaving !== null}
+        onClose={() => setLeaving(null)}
+        title="Discard changes?"
+        body="What you typed in the search field won’t be kept."
+        verb="Discard"
+        cancelLabel="Keep editing"
+        onConfirm={() => leaving?.()}
+      />
 
       <PickSheet open={open === "pick"} onClose={close} title="Sort by" value={sort} options={SORTS} onPick={setSort} />
       {(["camera", "photos", "notifications"] as const).map((k) => (
