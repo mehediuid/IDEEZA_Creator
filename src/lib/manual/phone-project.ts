@@ -14,6 +14,7 @@ import type { InnovationPost } from "../innovations/types";
 import type { DeleteBlock } from "./permissions";
 import type { PublishIntent } from "./earn-route";
 import type { EarnButton } from "./earn-view";
+import type { Role } from "../network/types";
 
 // ─────────────────────────── the tabs (M1) ───────────────────────────
 
@@ -31,6 +32,17 @@ export const PHONE_TABS: readonly { id: PhoneTab; label: string }[] = [
  *  `team` tabs are a screen of their own on the phone (06), so they read as the Overview too. */
 export function parsePhoneTab(raw: string | null | undefined): PhoneTab {
   return PHONE_TABS.some((t) => t.id === raw) ? (raw as PhoneTab) : "overview";
+}
+
+/**
+ * The web's `?tab=` values that are a screen of their own on the phone (06 Team, 06b Network,
+ * 05 Versions): the page replaces itself with that screen, so a web link or a notification that
+ * names the tab lands in the right place. `contributors` is the web's older name for Team.
+ */
+export function phoneSubScreenOf(raw: string | null | undefined): "team" | "network" | "versions" | null {
+  if (raw === "team" || raw === "contributors") return "team";
+  if (raw === "network" || raw === "versions") return raw;
+  return null;
 }
 
 // ─────────────────────────── addresses ───────────────────────────
@@ -188,6 +200,23 @@ export const BUY_LATER = "Buying from the phone opens with Explore marketplace. 
 
 // ─────────────────────────── small words ───────────────────────────
 
+/** The phone has no Innovations: its Home is the Feed (owner, 2026-10-31). A line the shared
+ *  logic words for the web ("Shared to Innovations") reads "Shared to Feed" on the phone. */
+export function phoneWords(text: string): string {
+  return text.replace(/\bthe Innovations page\b/g, "Feed").replace(/\bInnovations\b/g, "Feed");
+}
+
+/** A product's role in a network, in the Figma note's plain words (06d–06h 10422:10253:
+ *  "leads / follows / works as an equal"), never Master / Slave. */
+export const PHONE_ROLE_LABEL: Record<Role, string> = {
+  Master: "Leads",
+  Slave: "Follows",
+  Peer: "Works as an equal",
+  Independent: "Works on its own",
+  Gateway: "Gateway",
+  Standby: "Follows (standby)",
+};
+
 /** "3 of 3 ready" — the readiness sheet's group count. */
 export function readyOfLine(ready: number, total: number): string {
   return `${ready} of ${total} ready`;
@@ -203,6 +232,11 @@ export const PRODUCT_SORTS: readonly { value: ProductSort; label: string }[] = [
   { value: "project", label: "Project order" },
   { value: "name", label: "Name A–Z" },
 ];
+
+/** `?psort=` as the Products tab reads it. */
+export function parseProductSort(raw: string | null | undefined): ProductSort {
+  return raw === "name" ? "name" : "project";
+}
 
 /** The Products tab's search and sort over its rows: a case-blind match on the name or the
  *  description, then the order picked. */

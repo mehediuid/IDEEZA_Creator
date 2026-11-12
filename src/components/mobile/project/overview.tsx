@@ -22,13 +22,14 @@ import { formatDate } from "@/lib/manual/project-summary";
 import { shortOf } from "@/lib/manual/journey";
 import { aboutRowsOf } from "@/lib/manual/rail-copy";
 import { LOG_SHOWN, logLinesOf, versionGroupsOf } from "@/lib/manual/rail-rows";
-import { phoneProjectHref, phoneProjectPath } from "@/lib/manual/phone-project";
+import { phoneProjectHref, phoneProjectPath, phoneWords } from "@/lib/manual/phone-project";
 import { PROTOCOLS } from "@/lib/network/catalog";
 import { useProjectNetwork } from "@/lib/network/store";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useProject } from "./context";
 import { BuildCheckLine, useProductRows } from "./product-rows";
-import { Chevron, InfoRow, LIST_CARD, ListCard, ProductRow, SectionHeading, SubLine } from "./parts";
+import { Chevron, InfoRow, LINK_MD, LIST_CARD, ListCard, ProductRow, SectionHeading, SubLine } from "./parts";
 
 export function OverviewTab() {
   const { project, view, viewer } = useProject();
@@ -72,9 +73,9 @@ function ActivitySection() {
       >
         <span className="flex items-center gap-4">
           <Badge tone="brand-outline">{shortOf(now)}</Badge>
-          <span className="text-md leading-md text-text-secondary">{formatDate(now.createdAt)}</span>
+          <span className={T.body}>{formatDate(now.createdAt)}</span>
         </span>
-        <span className="line-clamp-2 text-md leading-md text-text-primary">{now.description || "Project created."}</span>
+        <span className={cn(T.body, "line-clamp-2 text-text-primary")}>{now.description || "Project created."}</span>
       </Link>
     </section>
   );
@@ -121,9 +122,9 @@ function VersionsSection() {
         className={cn(LIST_CARD, "flex-row items-center gap-6 p-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle")}
       >
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-md font-semibold leading-md text-text-primary">{row.title}</span>
-          <span className="text-sm leading-sm text-text-secondary">{[saved, row.pieces].filter(Boolean).join(" · ")}</span>
-          <span className="truncate text-sm leading-sm text-text-secondary">{group.heading}</span>
+          <span className={T.name}>{row.title}</span>
+          <span className={T.meta}>{[saved, row.pieces].filter(Boolean).join(" · ")}</span>
+          <span className={cn(T.meta, "truncate")}>{group.heading}</span>
         </span>
         <Chevron />
       </Link>
@@ -181,9 +182,10 @@ function RecentSection() {
       <ul className="flex flex-col gap-6">
         {shown.map((l) => (
           <li key={l.key} className="flex flex-col gap-1">
-            <span className="text-md font-medium leading-md text-text-primary">{l.title}</span>
-            {l.note && <span className="text-sm leading-sm text-text-secondary">{l.note}</span>}
-            <span className="text-sm leading-sm text-text-tertiary">{l.when.map((m) => (m.kind === "time" ? m.time.text : m.text)).join("")}</span>
+            {/* The phone has no Innovations: the web's "Shared to Innovations" reads "Shared to Feed". */}
+            <span className={T.rowTitle}>{phoneWords(l.title)}</span>
+            {l.note && <span className={T.meta}>{phoneWords(l.note)}</span>}
+            <span className={cn(T.meta, "text-text-tertiary")}>{l.when.map((m) => (m.kind === "time" ? m.time.text : m.text)).join("")}</span>
           </li>
         ))}
       </ul>
@@ -192,7 +194,7 @@ function RecentSection() {
           <button
             type="button"
             onClick={() => setAll((v) => !v)}
-            className="-my-6 inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline"
+            className={cn(LINK_MD, "-my-6 inline-flex min-h-[44px] items-center")}
           >
             {all ? "Show less" : `Show all (${lines.length})`}
           </button>

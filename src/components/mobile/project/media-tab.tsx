@@ -10,19 +10,20 @@
 // · Product videos: one compact row per current product (the web shows a
 //   tile): a ready one plays in a sheet, the others say their state with the
 //   web's action, which opens the product page where its video is made;
+// · Assembly snapshots (owner): the pictures Product Preview's Snapshot kept,
+//   as the web's Media tab lists them; a tap opens the viewer, where Remove
+//   asks first;
 // · From your builds: the concept images in a 3-column grid, the Cover chip
 //   on the cover; a tap opens the image viewer (03b), where "Use as cover"
 //   lives (03g "This image is the cover", 03h the toast).
+// Every picture opens in the kit's one full-screen viewer (kit/image-viewer:
+// dark in both themes, white text, ✕, "n of N", the caption, ← action →).
 
 import * as React from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Alert02Icon,
-  ArrowLeft02Icon,
-  ArrowRight02Icon,
   Bookmark02Icon,
-  Cancel01Icon,
   CheckmarkCircle02Icon,
   Delete02Icon,
   LockIcon,
@@ -46,6 +47,7 @@ import { currentProductsOf } from "@/lib/manual/readiness";
 import { phoneHrefOf, phoneProjectPath } from "@/lib/manual/phone-project";
 import { describeJoin, projectVideoStatusOf } from "@/lib/video/project-video";
 import { productVideoStatus } from "@/lib/video/product-video";
+import { readSnapshots, removeSnapshot, type Snapshot } from "@/lib/manual/snapshots";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY, type VideoTake } from "@/lib/video/types";
 import {
@@ -60,8 +62,11 @@ import {
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { ImageViewer } from "../kit/image-viewer";
+import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { T } from "../type";
 import { useProject } from "./context";
 import { LIST_CARD, LIST_ROW, ListCard, SectionHeading, Thumb } from "./parts";
 import { PhoneVideo } from "./video";
@@ -71,6 +76,7 @@ export function MediaTab() {
     <div className="flex flex-col gap-12">
       <ProjectVideoSection />
       <ProductVideosSection />
+      <SnapshotsSection />
       <BuildImagesSection />
     </div>
   );
@@ -97,8 +103,8 @@ const TONE_INK: Record<string, string> = {
 function SectionMeta({ title, meta }: { title: string; meta: string | null }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <h2 className="text-lg font-semibold leading-lg text-text-primary">{title}</h2>
-      {meta && <span className="text-sm leading-sm text-text-secondary">{meta}</span>}
+      <h2 className={T.section}>{title}</h2>
+      {meta && <span className={T.meta}>{meta}</span>}
     </div>
   );
 }
@@ -142,14 +148,14 @@ function ProjectVideoSection() {
             ))}
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-2">
-            <span className="truncate text-md font-semibold leading-md text-text-primary">{project.name}</span>
-            <span className={cn("flex items-start gap-2 text-sm leading-sm", TONE_INK[copy.tone])}>
+            <span className={cn(T.name, "truncate")}>{project.name}</span>
+            <span className={cn(T.meta, "flex items-start gap-2", TONE_INK[copy.tone])}>
               <span aria-hidden className="mt-[2px]">
                 <Icon icon={TONE_ICON[copy.icon] ?? LockIcon} size={14} />
               </span>
               <span className="text-text-secondary">{copy.text}</span>
             </span>
-            {copy.sub && <span className="text-sm leading-sm text-text-secondary">{copy.sub}</span>}
+            {copy.sub && <span className={T.meta}>{copy.sub}</span>}
             {copy.progress !== null && <ProgressBar value={copy.progress} label="Project video render" />}
             {actionText && (
               <Link href={actionHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "self-start")}>
@@ -162,7 +168,7 @@ function ProjectVideoSection() {
       {playing && (
         <div className="flex flex-col gap-4">
           <PhoneVideo takeId={playing.id} label={`${project.name} project video`} />
-          <p className="text-sm leading-sm text-text-secondary">
+          <p className={T.meta}>
             {[
               `Take ${playing.n}`,
               resolutionOf(playing.quality),
@@ -174,10 +180,10 @@ function ProjectVideoSection() {
           </p>
           {playing.join && (
             <details className="group">
-              <summary className="-my-6 flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-md font-medium leading-md text-text-primary">
+              <summary className={cn(T.rowTitle, "-my-6 flex min-h-[44px] cursor-pointer list-none items-center gap-2")}>
                 What&apos;s in this video
               </summary>
-              <ul className="mt-4 flex flex-col gap-2 text-sm leading-sm text-text-secondary">
+              <ul className={cn(T.meta, "mt-4 flex flex-col gap-2")}>
                 {describeJoin(playing.join).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
@@ -213,8 +219,8 @@ function ProjectVideoSection() {
                       <Icon icon={PlayCircleIcon} size={20} />
                     </button>
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="text-md font-medium leading-md text-text-primary">Take {t.n}</span>
-                      <span className="text-sm leading-sm text-text-secondary">
+                      <span className={T.rowTitle}>Take {t.n}</span>
+                      <span className={T.meta}>
                         {[resolutionOf(t.quality), t.clip ? `${Math.round(t.clip.durationMs / 1000)} s` : null, formatDate(t.createdAt), t.failure ? "Failed" : !t.readyAt ? "Rendering" : null]
                           .filter(Boolean)
                           .join(" · ")}
@@ -303,7 +309,7 @@ function ProductVideosSection() {
           const thumb = (
             <Thumb url={product.built?.product.conceptImageUrl}>
               {take && (
-                <span aria-hidden className="absolute inline-flex size-[28px] items-center justify-center rounded-full bg-bg-inverse text-text-inverse">
+                <span aria-hidden className={cn(MEDIA_GROUND, MEDIA_INK, "absolute inline-flex size-[28px] items-center justify-center rounded-full")}>
                   <Icon icon={PlayIcon} size={16} />
                 </span>
               )}
@@ -311,8 +317,8 @@ function ProductVideosSection() {
           );
           const text = (
             <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className="truncate text-md font-semibold leading-md text-text-primary">{name}</span>
-              <span className={cn("flex items-center gap-2 text-sm leading-sm", TONE_INK[copy.tone])}>
+              <span className={cn(T.name, "truncate")}>{name}</span>
+              <span className={cn(T.meta, "flex items-center gap-2", TONE_INK[copy.tone])}>
                 <Icon icon={TONE_ICON[copy.icon] ?? VideoOffIcon} size={14} />
                 <span className="text-text-secondary">
                   {take ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ") : copy.text}
@@ -370,7 +376,7 @@ function BuildImagesSection() {
     return (
       <section aria-label="From your builds" className="flex flex-col gap-4">
         <SectionHeading title="From your builds" />
-        <p className="text-md leading-md text-text-secondary">No images yet. A build&apos;s concept images show here once it is saved to this project.</p>
+        <p className={T.body}>No images yet. A build&apos;s concept images show here once it is saved to this project.</p>
       </section>
     );
   }
@@ -398,16 +404,16 @@ function BuildImagesSection() {
                   </span>
                 )}
               </span>
-              <span className="line-clamp-2 text-sm leading-sm text-text-secondary">
+              <span className={cn(T.meta, "line-clamp-2")}>
                 {t.name} · v{t.version}
               </span>
             </button>
           </li>
         ))}
       </ul>
-      {ownerFacts && <p className="text-sm leading-sm text-text-secondary">Tap an image to see it full size or make it the cover.</p>}
-      {at !== null && (
-        <ImageViewer
+      {ownerFacts && <p className={T.meta}>Tap an image to see it full size or make it the cover.</p>}
+      {at !== null && at < tiles.length && (
+        <BuildImageViewer
           tiles={tiles}
           index={at}
           coverUrl={coverUrl}
@@ -424,8 +430,100 @@ function BuildImagesSection() {
 
 type Tile = ReturnType<typeof mediaTilesOf>[number];
 
-/** 03b · the image viewer, full screen on the DS inverse surface. */
-export function ImageViewer({
+// ─────────────────────────── Assembly snapshots (the web's SnapshotsGroup) ───────────────────────────
+
+const snapshotWhen = (at: number) => new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+function SnapshotsSection() {
+  const { project, view, viewer } = useProject();
+  const owner = can(viewer, "facts.seeOwnerOnly", view.canCtx);
+  const canRemove = can(viewer, "product.edit", view.canCtx);
+  const toast = useToast();
+  const [list, setList] = React.useState<Snapshot[]>([]);
+  const [at, setAt] = React.useState<number | null>(null);
+  const [removing, setRemoving] = React.useState<Snapshot | null>(null);
+  React.useEffect(() => {
+    const read = () => {
+      try {
+        setList(readSnapshots(project.id, window.localStorage));
+      } catch {
+        setList([]);
+      }
+    };
+    read();
+    window.addEventListener("storage", read);
+    return () => window.removeEventListener("storage", read);
+  }, [project.id]);
+  if (!owner || list.length === 0) return null;
+  const open = at !== null && at < list.length ? list[at] : null;
+  return (
+    <section aria-label="Assembly snapshots" className="flex flex-col gap-4">
+      <SectionHeading title="Assembly snapshots" />
+      <ul className="grid grid-cols-3 gap-4">
+        {list.map((snap, i) => (
+          <li key={snap.id}>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-label={`${snap.productName}, assembled, ${snapshotWhen(snap.at)}`}
+              onClick={() => setAt(i)}
+              className="flex w-full flex-col gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-bg-surface-raised">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL */}
+                <img src={snap.dataUrl} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
+              </span>
+              <span className={cn(T.meta, "line-clamp-2")}>{snap.productName}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <ImageViewer
+        open={open !== null}
+        onClose={() => setAt(null)}
+        index={at ?? 0}
+        count={list.length}
+        onIndex={setAt}
+        noun="Snapshot"
+        src={open?.dataUrl ?? null}
+        alt={open ? `${open.productName}, assembled` : ""}
+        caption={open ? `${open.productName} · ${snapshotWhen(open.at)}` : undefined}
+        action={
+          canRemove && open ? (
+            <Button hierarchy="secondary" size="xl" className="flex-1" onClick={() => setRemoving(open)}>
+              Remove
+            </Button>
+          ) : undefined
+        }
+      />
+      <ConfirmSheet
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title="Remove this snapshot?"
+        body="The picture is removed from this browser. It can’t be undone."
+        verb="Remove snapshot"
+        destructive
+        onConfirm={() => {
+          const snap = removing;
+          if (!snap) return;
+          try {
+            const next = removeSnapshot(project.id, snap.id, window.localStorage);
+            setList(next);
+            setAt(null);
+            toast({ title: "Snapshot removed" });
+          } catch {
+            toast({ title: "It couldn’t be removed. This browser’s storage refused.", lead: "error" });
+          }
+        }}
+      />
+    </section>
+  );
+}
+
+// ─────────────────────────── 03b · the image viewer ───────────────────────────
+
+/** 03b · a build's concept images full size, with Use as cover (03g, 03h). */
+function BuildImageViewer({
   tiles,
   index,
   coverUrl,
@@ -449,22 +547,6 @@ export function ImageViewer({
   const [refused, setRefused] = React.useState<string | null>(null);
   const tile = tiles[index];
   const isCover = tile.url === coverUrl;
-  const step = (d: 1 | -1) => onIndex((index + d + tiles.length) % tiles.length);
-
-  React.useEffect(() => {
-    const app = document.getElementById("m-app");
-    app?.setAttribute("inert", "");
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight") onIndex((index + 1) % tiles.length);
-      else if (e.key === "ArrowLeft") onIndex((index - 1 + tiles.length) % tiles.length);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      app?.removeAttribute("inert");
-    };
-  }, [index, tiles.length, onClose, onIndex]);
 
   const useAsCover = () => {
     setRefused(null);
@@ -475,46 +557,33 @@ export function ImageViewer({
     if (out.kind === "refused") setRefused(out.reason);
   };
 
-  return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={`${tile.name} image`} className="fixed inset-0 z-sheet flex flex-col bg-bg-inverse font-sans text-text-inverse">
-      <div className="flex h-[56px] shrink-0 items-center gap-4 px-8 pt-[env(safe-area-inset-top)]">
-        <Button hierarchy="inverse" size="xl" iconOnly aria-label="Close" onClick={onClose} autoFocus>
-          <Icon icon={Cancel01Icon} size={22} />
-        </Button>
-        <p className="flex-1 text-center text-lg font-semibold leading-lg" aria-live="polite">
-          {index + 1} of {tiles.length}
-        </p>
-        <span className="w-[44px]" />
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a concept image from the build store */}
-        <img src={tile.url} alt={`${tile.name}, version ${tile.version}`} className="max-h-full w-full object-contain" />
-        <p className="text-md leading-md">
-          {tile.name} · v{tile.version}
-        </p>
-        {refused && <p className="px-8 text-center text-md leading-md">{refused}</p>}
-      </div>
-      <div className="flex shrink-0 items-center gap-4 px-8 pb-[calc(var(--spacing-8)_+_env(safe-area-inset-bottom))] pt-4">
-        <Button hierarchy="inverse" size="xl" iconOnly aria-label="Previous image" disabled={tiles.length < 2} onClick={() => step(-1)}>
-          <Icon icon={ArrowLeft02Icon} size={22} />
-        </Button>
-        {canCover &&
-          (isCover ? (
-            <p className="flex h-[44px] flex-1 items-center justify-center gap-2 text-lg font-semibold leading-lg">
-              <Icon icon={Tick02Icon} size={20} />
-              This image is the cover
-            </p>
-          ) : (
-            <Button hierarchy="inverse" size="xl" className="flex-1" iconLeading={<Icon icon={Tick02Icon} size={20} />} onClick={useAsCover}>
-              Use as cover
-            </Button>
-          ))}
-        {!canCover && <span className="flex-1" />}
-        <Button hierarchy="inverse" size="xl" iconOnly aria-label="Next image" disabled={tiles.length < 2} onClick={() => step(1)}>
-          <Icon icon={ArrowRight02Icon} size={22} />
-        </Button>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <ImageViewer
+      open
+      onClose={onClose}
+      index={index}
+      count={tiles.length}
+      onIndex={(i) => {
+        setRefused(null);
+        onIndex(i);
+      }}
+      noun="Image"
+      src={tile.url}
+      alt={`${tile.name}, version ${tile.version}`}
+      caption={`${tile.name} · v${tile.version}`}
+      note={refused}
+      action={
+        !canCover ? undefined : isCover ? (
+          <p className={cn(T.bodyStrong, MEDIA_INK, "flex h-[44px] flex-1 items-center justify-center gap-2")}>
+            <Icon icon={Tick02Icon} size={20} />
+            This image is the cover
+          </p>
+        ) : (
+          <Button hierarchy="secondary" size="xl" className="flex-1" iconLeading={<Icon icon={Tick02Icon} size={20} />} onClick={useAsCover}>
+            Use as cover
+          </Button>
+        )
+      }
+    />
   );
 }

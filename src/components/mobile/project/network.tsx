@@ -11,30 +11,31 @@
 // Connect (the AI's proposal — the same automap call with the web's honest
 // fallback to the rule planner when the AI can't be reached — and the roles
 // it makes), Review (the network's name, cloud, type and frequency, each
-// product's role and its sensor type when a link needs one), Done.
+// product's role and its sensor type when a link needs one), Done. Roles read
+// in the Figma note's plain words (leads / follows / works as an equal). Back
+// on Setup asks "Discard this network?" just as ✕ does; a project has one
+// network, so the wizard opens the network when there is one already.
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Cancel01Icon, CheckmarkCircle02Icon, ShareKnowledgeIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Field, useFieldIds } from "@/components/auth/auth-parts";
+import { FIELD_LABEL, Field, useFieldIds } from "@/components/auth/auth-parts";
 import { PasswordInput } from "@/components/auth/auth-parts";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
-import { Button, buttonVariants } from "@/components/ideeza/button";
+import { Button } from "@/components/ideeza/button";
 import { Checkbox, Radio } from "@/components/ideeza/checkbox";
 import { Spinner } from "@/components/ideeza/spinner";
-import { StateCard } from "@/components/ideeza/state-card";
 import { TextInput } from "@/components/ideeza/text-input";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { frequencyOptions } from "@/components/network/product-form";
 import { PROTOCOL_OPTIONS } from "@/components/network/link-panel";
 import { networkMeta, networkSummaryRows } from "@/components/network/summary";
 import { can } from "@/lib/manual/permissions";
-import { phoneProjectHref, phoneProjectPath } from "@/lib/manual/phone-project";
+import { PHONE_ROLE_LABEL, phoneProjectHref, phoneProjectPath } from "@/lib/manual/phone-project";
 import { CARRIES, CLOUD_TYPES, INTENTS, SENSORS, intentInfo, labelOf, protocolInfo } from "@/lib/network/catalog";
-import { ROLE_LABEL, createBlocker, linkTitle, nodeName, pickMaster, productChip, productStatus, protocolsUsed, rolesOf, settingsFor } from "@/lib/network/derive";
+import { createBlocker, linkTitle, nodeName, pickMaster, productChip, productStatus, protocolsUsed, rolesOf, settingsFor } from "@/lib/network/derive";
 import { arrangeFor, layoutNodes, planLinks, validateAiLinks } from "@/lib/network/planner";
 import { networkProducts } from "@/lib/network/products";
 import { saveNetwork, useProjectNetwork } from "@/lib/network/store";
@@ -43,18 +44,14 @@ import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { SheetSelect } from "../kit/sheet-select";
+import { EmptyState } from "../kit/state";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { LIST_ROW, ListCard } from "./parts";
-import { ProjectLoading } from "./project-screen";
+import { ProjectLoading, ProjectMissing } from "./project-screen";
 
-function Missing() {
-  return (
-    <Screen top={<TopBar back="/m/projects" />} className="px-8">
-      <p className="pt-8 text-lg font-semibold leading-lg text-text-primary">We couldn&apos;t find this project</p>
-    </Screen>
-  );
-}
+const ROLE_LABEL = PHONE_ROLE_LABEL;
 
 // ─────────────────────────── 06b / 06h · the network ───────────────────────────
 
@@ -62,26 +59,18 @@ export function NetworkScreen({ projectId }: { projectId: string }) {
   const data = useProjectPageData(projectId, "project");
   const { hydrated, network } = useProjectNetwork(data.state === "ready" ? data.project.id : null);
   if (data.state === "loading" || (data.state === "ready" && !hydrated)) return <ProjectLoading />;
-  if (data.state === "missing") return <Missing />;
+  if (data.state === "missing") return <ProjectMissing />;
   const { project, view, viewer } = data;
   const products = networkProducts(project, view.refs);
   const canManage = can(viewer, "network.manage", view.canCtx);
   return (
     <Screen top={<TopBar back={phoneProjectHref(project.id)} title="Network" />} className="px-8 pb-12">
       {!network ? (
-        <StateCard
-          tone="empty"
-          className="w-full"
-          icon={<Icon icon={ShareKnowledgeIcon} size={32} />}
+        <EmptyState
+          icon={ShareKnowledgeIcon}
           title="No network yet"
           body="A network records which products in this project talk to each other, over which protocol, and what each one does."
-          action={
-            canManage ? (
-              <Link href={phoneProjectPath(project.id, "network/new")} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-                Create Network
-              </Link>
-            ) : undefined
-          }
+          action={canManage ? { label: "Create Network", href: phoneProjectPath(project.id, "network/new") } : undefined}
         />
       ) : (
         <NetworkView network={network} products={products} />
@@ -97,25 +86,25 @@ function NetworkView({ network, products }: { network: Network; products: NetPro
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold leading-lg text-text-primary">{network.name || "Unnamed Network"}</h2>
-        <p className="text-sm leading-sm text-text-secondary">{networkMeta(network)}</p>
+        <h2 className={T.section}>{network.name || "Unnamed Network"}</h2>
+        <p className={T.meta}>{networkMeta(network)}</p>
       </div>
       <ListCard label="Summary">
         {networkSummaryRows(network, products).map((r) => (
           <li key={r.label} className={cn(LIST_ROW, "flex min-h-[44px] items-center gap-4 p-6")}>
-            <span className="shrink-0 text-md leading-md text-text-secondary">{r.label}</span>
-            <span className="min-w-0 flex-1 truncate text-right text-md leading-md text-text-primary">{r.value}</span>
+            <span className={cn(T.body, "shrink-0")}>{r.label}</span>
+            <span className={cn(T.body, "min-w-0 flex-1 truncate text-right text-text-primary")}>{r.value}</span>
           </li>
         ))}
       </ListCard>
       <section aria-label="Connections" className="flex flex-col gap-4">
-        <h3 className="text-md font-semibold leading-md text-text-primary">Connections</h3>
+        <h3 className={T.section}>Connections</h3>
         <ListCard label="Connections">
           {network.links.map((l) => (
             <li key={l.id} className={cn(LIST_ROW, "flex items-center gap-6 p-6")}>
               <span className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="truncate text-md font-medium leading-md text-text-primary">{linkTitle(l, name)}</span>
-                <span className="truncate text-sm leading-sm text-text-secondary">{l.label}</span>
+                <span className={cn(T.rowTitle, "truncate")}>{linkTitle(l, name)}</span>
+                <span className={cn(T.meta, "truncate")}>{l.label}</span>
               </span>
               <Badge tone="neutral">{l.from === "app" || l.to === "app" ? "Cloud" : protocolInfo(l.protocol).name}</Badge>
             </li>
@@ -123,11 +112,11 @@ function NetworkView({ network, products }: { network: Network; products: NetPro
         </ListCard>
       </section>
       <section aria-label="Products" className="flex flex-col gap-4">
-        <h3 className="text-md font-semibold leading-md text-text-primary">Products</h3>
+        <h3 className={T.section}>Products</h3>
         <ListCard label="Products">
           {members.map((p) => (
             <li key={p.id} className={cn(LIST_ROW, "flex items-center gap-6 p-6")}>
-              <span className="min-w-0 flex-1 truncate text-md font-medium leading-md text-text-primary">{p.name}</span>
+              <span className={cn(T.rowTitle, "min-w-0 flex-1 truncate")}>{p.name}</span>
               <Badge tone="brand">{ROLE_LABEL[roles[p.id] ?? "Standby"]}</Badge>
             </li>
           ))}
@@ -153,12 +142,37 @@ const stamp = () => Date.now();
 
 export function AddNetworkScreen({ projectId }: { projectId: string }) {
   const data = useProjectPageData(projectId, "project");
-  if (data.state === "loading") return <ProjectLoading />;
-  if (data.state === "missing") return <Missing />;
-  return <AddNetwork projectId={data.project.id} projectName={data.project.name} products={networkProducts(data.project, data.view.refs)} />;
+  const router = useRouter();
+  const { hydrated, network } = useProjectNetwork(data.state === "ready" ? data.project.id : null);
+  const [created, setCreated] = React.useState(false);
+  // One network per project: a deep link or Back into the wizard opens the one there is.
+  const exists = hydrated && network !== null && !created;
+  React.useEffect(() => {
+    if (exists) router.replace(phoneProjectPath(projectId, "network"));
+  }, [exists, projectId, router]);
+  if (data.state === "loading" || (data.state === "ready" && !hydrated) || exists) return <ProjectLoading />;
+  if (data.state === "missing") return <ProjectMissing />;
+  return (
+    <AddNetwork
+      projectId={data.project.id}
+      projectName={data.project.name}
+      products={networkProducts(data.project, data.view.refs)}
+      onCreated={() => setCreated(true)}
+    />
+  );
 }
 
-function AddNetwork({ projectId, projectName, products }: { projectId: string; projectName: string; products: NetProduct[] }) {
+function AddNetwork({
+  projectId,
+  projectName,
+  products,
+  onCreated,
+}: {
+  projectId: string;
+  projectName: string;
+  products: NetProduct[];
+  onCreated: () => void;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const asked = (params.get("step") as Step | null) ?? "setup";
@@ -184,7 +198,7 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
   // A step the wizard hasn't reached (a reload, a typed address) starts again at Setup.
   const step: Step = saved ? "done" : asked === "setup" || asked === "method" ? asked : doc ? asked : "setup";
   const go = (s: Step) => router.push(`${phoneProjectPath(projectId, "network/new")}${s === "setup" ? "" : `?step=${s}`}`);
-  const exit = () => router.push(phoneProjectPath(projectId, "network"));
+  const exit = () => router.replace(phoneProjectPath(projectId, "network"));
 
   const chosen = products.filter((p) => chosenIds.includes(p.id));
   const minProducts = intent === "p2p" || intent === "both" ? 2 : 1;
@@ -264,6 +278,7 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
       createdAt: now,
       updatedAt: now,
     };
+    onCreated();
     saveNetwork(network);
     setSaved(network);
   };
@@ -278,24 +293,24 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
       <div className="flex flex-col gap-8">
         <section role="radiogroup" aria-labelledby="net-goal" className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <h2 id="net-goal" className="text-md font-semibold leading-md text-text-primary">What should this network do?</h2>
-            <p className="text-sm leading-sm text-text-secondary">This sets the network template. You can change it later.</p>
+            <h2 id="net-goal" className={T.section}>What should this network do?</h2>
+            <p className={T.meta}>This sets the network template. You can change it later.</p>
           </div>
           {INTENTS.map((i) => (
             <label key={i.key} className="relative flex cursor-pointer items-start gap-6 py-2">
               <input type="radio" name="net-goal" className="sr-only" checked={intent === i.key} onChange={() => setIntent(i.key)} />
               <Radio checked={intent === i.key} decorative className="mt-1" />
               <span className="flex flex-col gap-1">
-                <span className="text-md leading-md text-text-primary">{i.title}</span>
-                <span className="text-sm leading-sm text-text-secondary">{i.body}</span>
+                <span className={cn(T.body, "text-text-primary")}>{i.title}</span>
+                <span className={T.meta}>{i.body}</span>
               </span>
             </label>
           ))}
         </section>
         <section aria-labelledby="net-join" className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <h2 id="net-join" className="text-md font-semibold leading-md text-text-primary">Which products join this network?</h2>
-            <p className="text-sm leading-sm text-text-secondary">
+            <h2 id="net-join" className={T.section}>Which products join this network?</h2>
+            <p className={T.meta}>
               You have {chosenIds.length} {chosenIds.length === 1 ? "product" : "products"} selected in this network
               {products.length - chosenIds.length > 0 ? ` · ${products.length - chosenIds.length} not included` : ""}
             </p>
@@ -312,8 +327,8 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
                 />
                 <Checkbox checked={on} decorative className="mt-1" />
                 <span className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate text-md leading-md text-text-primary">{p.name}</span>
-                  <span className="text-sm leading-sm text-text-secondary">{productChip(p) || "No parts listed"}</span>
+                  <span className={cn(T.body, "truncate text-text-primary")}>{p.name}</span>
+                  <span className={T.meta}>{productChip(p) || "No parts listed"}</span>
                 </span>
               </label>
             );
@@ -326,21 +341,21 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
         <Button size="xl" className="w-full" disabled={setupBlocker !== null} onClick={() => go("method")}>
           Continue
         </Button>
-        {setupBlocker && <p className="text-sm leading-sm text-text-secondary">{setupBlocker}</p>}
+        {setupBlocker && <p className={T.meta}>{setupBlocker}</p>}
       </>
     );
   } else if (step === "method") {
     body = (
       <div className="flex flex-col gap-6">
-        <h2 id="net-method" className="text-md font-semibold leading-md text-text-primary">How do you want to map the connections?</h2>
+        <h2 id="net-method" className={T.section}>How do you want to map the connections?</h2>
         <div role="radiogroup" aria-labelledby="net-method" className="flex flex-col gap-4">
           <div className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-brand bg-bg-brand-subtle p-6">
             <Radio checked decorative className="mt-1" />
             <span className="flex flex-col gap-2">
-              <span className="flex items-center gap-4 text-md font-medium leading-md text-text-primary">
+              <span className={cn(T.rowTitle, "flex items-center gap-4")}>
                 AI Auto-Map <Badge tone="brand">Recommended</Badge>
               </span>
-              <span className="text-sm leading-sm text-text-secondary">
+              <span className={T.meta}>
                 AI reads your {chosen.length} {chosen.length === 1 ? "product" : "products"} and your goal, then proposes the whole connection map. Nothing is saved until you review it.
               </span>
             </span>
@@ -348,15 +363,15 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
           <div aria-disabled className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-6">
             <Radio checked={false} disabled decorative className="mt-1" />
             <span className="flex flex-col gap-2">
-              <span className="flex items-center gap-4 text-md font-medium leading-md text-text-disabled">
+              <span className={cn(T.rowTitle, "flex items-center gap-4 text-text-disabled")}>
                 Manual Canvas <Badge tone="neutral">Advanced</Badge>
               </span>
-              <span className="text-sm leading-sm text-text-secondary">The canvas opens on a computer: draw every link yourself there.</span>
+              <span className={T.meta}>The canvas opens on a computer: draw every link yourself there.</span>
             </span>
           </div>
         </div>
-        <div className="flex flex-col gap-2 rounded-xl bg-bg-subtle p-6 text-sm leading-sm text-text-secondary">
-          <p className="font-medium text-text-primary">Either way, every link answers the same 3 questions</p>
+        <div className={cn(T.meta, "flex flex-col gap-2 rounded-xl bg-bg-subtle p-6")}>
+          <p className="text-text-primary">Either way, every link answers the same 3 questions</p>
           <p>Q1 Who starts the conversation? → sets who leads and who follows</p>
           <p>Q2 Is anything in the middle? → sets the message hub and the cloud space</p>
           <p>Q3 What travels on this link? → sets the sensor field</p>
@@ -373,8 +388,8 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
     body = mapping ? (
       <div role="status" className="flex flex-col items-center gap-6 py-24 text-center">
         <Spinner />
-        <p className="text-md font-medium leading-md text-text-primary">AI is mapping your products…</p>
-        <p className="text-sm leading-sm text-text-secondary">It reads each product&apos;s parts and your goal. This takes about 15 seconds.</p>
+        <p className={T.rowTitle}>AI is mapping your products…</p>
+        <p className={T.meta}>It reads each product&apos;s parts and your goal. This takes about 15 seconds.</p>
       </div>
     ) : mapFailed || !doc ? (
       <Banner tone="error" title="We couldn't map these products">
@@ -383,15 +398,15 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
     ) : (
       <div className="flex flex-col gap-6">
         {source === "ai" ? (
-          <p className="rounded-xl bg-bg-subtle p-6 text-sm leading-sm text-text-secondary">
+          <p className={cn(T.meta, "rounded-xl bg-bg-subtle p-6")}>
             From your {chosen.length} products and the goal “{intentInfo(intent).title}”, AI proposes these {doc.links.length} links. Nothing is saved yet.
           </p>
         ) : (
           <Banner tone="info">{`The AI couldn't be reached, so IDEEZA's connection rules drew these ${doc.links.length} links from your ${chosen.length} products and the goal "${intentInfo(intent).title}". Nothing is saved yet — check each one.`}</Banner>
         )}
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-md font-semibold leading-md text-text-primary">Suggested connections</h2>
-          <span className="text-sm leading-sm text-text-secondary">
+          <h2 className={T.section}>Suggested connections</h2>
+          <span className={T.meta}>
             {chosen.length} products · {doc.links.length} links{apps ? ` · ${apps} app` : ""}
           </span>
         </div>
@@ -399,8 +414,8 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
           {doc.links.map((l) => (
             <li key={l.id} className={cn(LIST_ROW, "flex items-center gap-6 p-6")}>
               <span className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="truncate text-md font-medium leading-md text-text-primary">{linkTitle(l, nm)}</span>
-                <span className="truncate text-sm leading-sm text-text-secondary">
+                <span className={cn(T.rowTitle, "truncate")}>{linkTitle(l, nm)}</span>
+                <span className={cn(T.meta, "truncate")}>
                   {labelOf(CARRIES, l.carries)} · {l.label}
                 </span>
               </span>
@@ -409,9 +424,9 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
           ))}
         </ListCard>
         <div className="flex flex-col gap-2 rounded-xl bg-bg-success-subtle p-6">
-          <p className="text-sm font-medium leading-sm text-text-success">Roles these links produce</p>
+          <p className={cn(T.meta, "text-text-success")}>Roles these links produce</p>
           {chosen.map((p) => (
-            <p key={p.id} className="text-sm leading-sm text-text-primary">
+            <p key={p.id} className={cn(T.meta, "text-text-primary")}>
               {p.name} = {ROLE_LABEL[roles[p.id] ?? "Standby"]}
             </p>
           ))}
@@ -438,7 +453,7 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
           <TextInput id={ids.name.id} size="xl" value={name} onValueChange={setName} autoComplete="off" />
         </Field>
         <div className="flex flex-col gap-2">
-          <span className="text-md font-medium leading-md text-text-primary">Cloud type</span>
+          <span className={FIELD_LABEL}>Cloud type</span>
           <SheetSelect title="Cloud type" value={cloudType} options={CLOUD_TYPES} onChange={(v) => setCloudType(v as CloudType)} />
         </div>
         {cloudType !== "none" && (
@@ -452,7 +467,7 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
           </>
         )}
         <div className="flex flex-col gap-2">
-          <span className="text-md font-medium leading-md text-text-primary">Network type</span>
+          <span className={FIELD_LABEL}>Network type</span>
           <SheetSelect
             title="Network type"
             value={protocol}
@@ -466,17 +481,17 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
           />
         </div>
         <div className="flex flex-col gap-2">
-          <span className="text-md font-medium leading-md text-text-primary">Frequency</span>
+          <span className={FIELD_LABEL}>Frequency</span>
           <SheetSelect title="Frequency" value={frequency} options={frequencyOptions(protocol)} onChange={(v) => setFrequency(v as Frequency)} />
         </div>
-        <h2 className="pt-4 text-md font-semibold leading-md text-text-primary">Products</h2>
+        <h2 className={cn(T.section, "pt-4")}>Products</h2>
         <ListCard label="Products">
           {chosen.map((p) => {
             const status = productStatus(p, settings[p.id], doc.links, isProduct);
             return (
               <li key={p.id} className={cn(LIST_ROW, "flex flex-col gap-4 p-6")}>
                 <span className="flex items-center gap-4">
-                  <span className="min-w-0 flex-1 truncate text-md font-medium leading-md text-text-primary">{p.name}</span>
+                  <span className={cn(T.rowTitle, "min-w-0 flex-1 truncate")}>{p.name}</span>
                   <Badge tone="brand">{ROLE_LABEL[roles[p.id] ?? "Standby"]}</Badge>
                   <Badge tone={status.ready ? "success" : "warning"}>{status.text}</Badge>
                 </span>
@@ -504,7 +519,7 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
         <Button size="xl" className="w-full" disabled={blocker !== null} onClick={create}>
           Create network
         </Button>
-        {blocker && <p className="text-sm leading-sm text-text-secondary">{blocker}</p>}
+        {blocker && <p className={T.meta}>{blocker}</p>}
       </>
     );
   } else if (step === "done" && saved) {
@@ -515,8 +530,8 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
         <span className="inline-flex size-[56px] items-center justify-center rounded-full bg-bg-success-subtle text-text-success">
           <Icon icon={CheckmarkCircle02Icon} size={26} />
         </span>
-        <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Network created</h2>
-        <p className="text-md leading-md text-text-secondary">
+        <h2 className={T.title}>Network created</h2>
+        <p className={T.body}>
           {saved.cloudType === "none"
             ? `${title} is saved to ${projectName}. Its ${n} products talk to each other directly.`
             : saved.cloudName
@@ -526,7 +541,7 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
         <ListCard label="Roles" className="w-full text-left">
           {chosen.map((p) => (
             <li key={p.id} className={cn(LIST_ROW, "flex items-center gap-6 p-6")}>
-              <span className="min-w-0 flex-1 truncate text-md leading-md text-text-primary">{p.name}</span>
+              <span className={cn(T.body, "min-w-0 flex-1 truncate text-text-primary")}>{p.name}</span>
               <Badge tone="brand">{ROLE_LABEL[roles[p.id] ?? "Standby"]}</Badge>
             </li>
           ))}
@@ -550,6 +565,7 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
       top={
         <TopBar
           back={step === "setup" || step === "done" ? phoneProjectPath(projectId, "network") : true}
+          onBack={step === "setup" ? (goBack) => (progress ? setDiscarding(true) : goBack()) : undefined}
           title="Add network"
           actions={step === "done" ? [] : [{ icon: Cancel01Icon, label: "Discard network", onClick: () => (progress ? setDiscarding(true) : exit()) }]}
         />
@@ -563,13 +579,14 @@ function AddNetwork({ projectId, projectName, products }: { projectId: string; p
             <li key={s.id} aria-current={i === index ? "step" : undefined} className="flex flex-1 flex-col items-center gap-2">
               <span
                 className={cn(
-                  "inline-flex size-[32px] items-center justify-center rounded-full border-[length:var(--border-width-1)] border-solid text-md font-medium leading-md",
+                  T.rowTitle,
+                  "inline-flex size-[32px] items-center justify-center rounded-full border-[length:var(--border-width-1)] border-solid",
                   i === index ? "border-transparent bg-bg-brand text-text-on-brand" : i < index ? "border-border-brand text-text-brand" : "border-border text-text-secondary",
                 )}
               >
                 {i + 1}
               </span>
-              <span className={cn("text-sm leading-sm", i === index ? "font-medium text-text-primary" : "text-text-secondary")}>{s.label}</span>
+              <span className={cn(T.meta, i === index && "text-text-primary")}>{s.label}</span>
             </li>
           ))}
         </ol>

@@ -2,7 +2,9 @@
 
 // The project page's sheets, every one rising from the bottom:
 // · 07 ⋯ Project actions (M12): Edit name and description · Share to Feed (a
-//   Draft can't yet: "Mint it first", which goes to the mint) or View post ·
+//   Draft's row says "Mint it first" and goes to the mint) — or, once shared,
+//   View post (its clip on the Feed), Edit post (the story) and Stop sharing
+//   (asks first, the toast offers Undo), which the web keeps on the post ·
 //   Delete project…, the red row last;
 // · 07b Edit name and description (07g–07n): the web's editor — the name
 //   (1–80, a name another project has is a note), the description (counter
@@ -22,10 +24,12 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Delete02Icon,
+  Edit02Icon,
   LockIcon,
   News01Icon,
   PencilEdit01Icon,
   PlayIcon,
+  ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
@@ -39,6 +43,7 @@ import { useStoreWrite } from "@/components/projects/details/use-store-write";
 import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useCreateHistory } from "@/lib/create/history";
+import { postIdOfProject } from "@/lib/innovations/slug";
 import { deletePlanOf, matchesTypedName } from "@/lib/manual/delete-plan";
 import { earnHref, earnMintHref, publishHrefOf, publishOptionsOf, type PublishIntent } from "@/lib/manual/earn-route";
 import { editorWorkOfProject } from "@/lib/manual/editor-work";
@@ -58,9 +63,11 @@ import { useProjectVideos } from "@/lib/video/store";
 import { actionLabel, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
 import { ActionSheet, Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
-import { useProject, type ProjectSheet } from "./context";
+import { T } from "../type";
+import { useProject, type ProjectSheet, type Ready } from "./context";
 import { LIST_ROW, ListCard, Thumb } from "./parts";
 import { AddProductSheet } from "./products-tab";
 
@@ -75,6 +82,8 @@ export function ProjectSheets({ sheet, onSheet }: { sheet: ProjectSheet | null; 
       {sheet?.kind === "edit" && <EditSheet ai={sheet.ai === true} onClose={close} />}
       {sheet?.kind === "delete" && <DeleteSheet onClose={close} />}
       {sheet?.kind === "share" && <ShareSheet onClose={close} />}
+      {sheet?.kind === "edit-post" && <EditPostSheet onClose={close} />}
+      <StopSharingSheet open={sheet?.kind === "stop-sharing"} onClose={close} />
       <PublishSheet open={sheet?.kind === "publish"} onClose={close} onSheet={onSheet} />
       {sheet?.kind === "readiness" && <ReadinessSheet purpose={sheet.purpose} then={sheet.then} onClose={close} />}
       <AddProductSheet open={sheet?.kind === "add-product"} onClose={close} />
@@ -96,13 +105,24 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
     ...(canEdit ? [{ label: "Edit name and description", icon: PencilEdit01Icon, onSelect: () => onSheet({ kind: "edit" }) }] : []),
     ...(shareShown
       ? [
-          shared
-            ? { label: "View post", icon: News01Icon, onSelect: () => router.push("/m") }
-            : {
-                label: "Share to Feed",
-                icon: News01Icon,
-                onSelect: () => (canShare ? onSheet({ kind: "share" }) : setMintFirst(true)),
-              },
+          ...(shared
+            ? [
+                { label: "View post", icon: News01Icon, onSelect: () => router.push(`/m/clip/${encodeURIComponent(postIdOfProject(project.id))}`) },
+                ...(canShare
+                  ? [
+                      { label: "Edit post", icon: Edit02Icon, onSelect: () => onSheet({ kind: "edit-post" }) },
+                      { label: "Stop sharing", icon: ViewOffSlashIcon, onSelect: () => onSheet({ kind: "stop-sharing" }) },
+                    ]
+                  : []),
+              ]
+            : [
+                {
+                  // A Draft can't share yet: the row says why before the tap (Figma 07 10371:2201).
+                  label: canShare ? "Share to Feed" : "Share to Feed · Mint it first",
+                  icon: News01Icon,
+                  onSelect: () => (canShare ? onSheet({ kind: "share" }) : setMintFirst(true)),
+                },
+              ]),
         ]
       : []),
     ...(can(viewer, "project.delete") ? [{ label: "Delete project…", icon: Delete02Icon, destructive: true, onSelect: () => onSheet({ kind: "delete" }) }] : []),
@@ -152,7 +172,7 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
   const dirty = name !== initial.name || description !== initial.description;
   const change = nameChanged ? "rename" : "description";
   const rows = React.useMemo(() => productRowsOf(project).map((r) => ({ name: r.name, description: r.description })), [project]);
-  const ai = useDescriptionAiAssist({ products: rows, value: description, onReplace: setDescription, pillClassName: "min-h-[44px]" });
+  const ai = useDescriptionAiAssist({ products: rows, value: description, onReplace: setDescription, pillClassName: "min-h-[44px] rounded-xl leading-md tracking-wide" });
   const started = React.useRef(false);
   React.useEffect(() => {
     if (!startAi || started.current) return;
@@ -233,10 +253,10 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
             autoComplete="off"
             {...errorProps(nameError, ids.name.errorId)}
           />
-          <span className={cn("text-sm leading-sm", nameCheck.counter ? "text-text-error" : "text-text-secondary")}>
+          <span className={cn(T.caption, nameCheck.counter && "text-text-error")}>
             {nameCheck.counter ?? `${Array.from(name.trim()).length}/${PROJECT_NAME_MAX}`}
           </span>
-          {nameCheck.note && <span className="text-sm leading-sm text-text-secondary">{nameCheck.note}</span>}
+          {nameCheck.note && <span className={T.caption}>{nameCheck.note}</span>}
         </Field>
         <Field label="Description" htmlFor={ids.description.id} error={descCheck.tooLong ? descCheck.error : null} errorId={ids.description.errorId}>
           <Textarea
@@ -247,7 +267,7 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
             readOnly={ai.running}
             {...errorProps(descCheck.tooLong ? descCheck.error : null, ids.description.errorId)}
           />
-          <span className="flex justify-between gap-4 text-sm leading-sm text-text-secondary">
+          <span className={cn(T.caption, "flex justify-between gap-4")}>
             <span>What it is, and who it is for.</span>
             {descCheck.counter && <span>{descCheck.counter}</span>}
           </span>
@@ -291,6 +311,9 @@ function deleteBlockNow(project: ReturnType<typeof useProject>["project"], view:
     }),
   );
 }
+
+/** The most of a project's name a sheet title shows before it is cut. */
+const TITLE_NAME_MAX = 32;
 
 function DeleteSheet({ onClose }: { onClose: () => void }) {
   const { project, view, brief } = useProject();
@@ -357,6 +380,8 @@ function DeleteSheet({ onClose }: { onClose: () => void }) {
     );
   }
 
+  // A long name is cut in the title (two lines at 320 px) and said in full in the sheet.
+  const longName = Array.from(name).length > TITLE_NAME_MAX;
   const matched = !plan.typed || matchesTypedName(entry, name);
   const mismatch = plan.typed && checked && entry.trim() !== "" && !matched;
   const confirm = () => {
@@ -377,7 +402,7 @@ function DeleteSheet({ onClose }: { onClose: () => void }) {
     <Sheet
       open
       onClose={() => !pending && onClose()}
-      title={`Delete “${name}”?`}
+      title={`Delete “${longName ? `${Array.from(name).slice(0, TITLE_NAME_MAX).join("")}…` : name}”?`}
       actions={
         <>
           <Button hierarchy="danger" size="xl" className="w-full" disabled={!matched} loading={pending} onClick={confirm}>
@@ -389,8 +414,9 @@ function DeleteSheet({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <div className="flex flex-col gap-2 text-md leading-md text-text-secondary">
-        <h3 className="font-medium text-text-primary">What goes</h3>
+      {longName && <p className={cn(T.body, "break-words text-text-primary")}>“{name}”</p>}
+      <div className={cn(T.body, "flex flex-col gap-2")}>
+        <h3 className={T.rowTitle}>What goes</h3>
         <ul className="flex list-disc flex-col gap-1 pl-8">
           {plan.goes.map((l) => (
             <li key={l}>{l}</li>
@@ -399,7 +425,7 @@ function DeleteSheet({ onClose }: { onClose: () => void }) {
         {plan.minted && <p>{plan.minted}</p>}
         {plan.stays.length > 0 && (
           <>
-            <h3 className="pt-4 font-medium text-text-primary">What stays</h3>
+            <h3 className={cn(T.rowTitle, "pt-4")}>What stays</h3>
             <ul className="flex flex-col gap-1">
               {plan.stays.map((l) => (
                 <li key={l}>{l}</li>
@@ -437,8 +463,8 @@ function DeleteSheet({ onClose }: { onClose: () => void }) {
 
 // ─────────────────────────── readiness rows (07d, 08b) ───────────────────────────
 
-function useLiveReadiness(purpose: ReadinessPurpose) {
-  const { project: given, view, brief } = useProject();
+/** The readiness of a project's videos for `purpose`, live (the web's dialog reads the same). */
+export function useReadinessOf(given: Ready["project"], view: Ready["view"], brief: Ready["brief"], purpose: ReadinessPurpose) {
   const { projects } = useManualProjects();
   const project = projects.find((p) => p.id === given.id) ?? given;
   const { record } = useProjectVideos(project.id);
@@ -446,18 +472,33 @@ function useLiveReadiness(purpose: ReadinessPurpose) {
   return React.useMemo(() => readinessOf(readinessFactsOf(project, view, brief, record, jobs, now), purpose), [project, view, brief, record, jobs, now, purpose]);
 }
 
-function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveReadiness> }) {
-  const { project } = useProject();
+function useLiveReadiness(purpose: ReadinessPurpose) {
+  const { project, view, brief } = useProject();
+  return useReadinessOf(project, view, brief, purpose);
+}
+
+/** Each product with its video's state and the web's action (Generate AI video…), then the
+ *  project video's row. `projectVideo={false}` leaves that row out (the Project video screen). */
+export function ReadinessRows({
+  readiness,
+  projectId,
+  projectVideo = true,
+}: {
+  readiness: ReturnType<typeof useReadinessOf>;
+  projectId: string;
+  projectVideo?: boolean;
+}) {
+  const project = { id: projectId };
   const productHref = (pid: string) => phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(pid)}`) ?? "#";
   const router = useRouter();
-  const pv = readiness.project;
+  const pv = projectVideo ? readiness.project : null;
   const pvCopy = pv ? projectRowCopy(pv) : null;
   const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
   return (
     <>
       <div className="flex items-baseline justify-between">
-        <h3 className="text-md font-medium leading-md text-text-primary">Products</h3>
-        <span className="text-sm leading-sm text-text-secondary">{readyOfLine(readiness.counts.ready, readiness.counts.total)}</span>
+        <h3 className={T.section}>Products</h3>
+        <span className={T.meta}>{readyOfLine(readiness.counts.ready, readiness.counts.total)}</span>
       </div>
       <ListCard label="Products">
         {readiness.products.map((p) => {
@@ -468,14 +509,14 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
             <li key={p.productId} className={cn(LIST_ROW, "flex items-start gap-6 p-6")}>
               <Thumb url={p.thumb}>
                 {ready && (
-                  <span aria-hidden className="absolute inline-flex size-[28px] items-center justify-center rounded-full bg-bg-inverse text-text-inverse">
+                  <span aria-hidden className={cn(MEDIA_GROUND, MEDIA_INK, "absolute inline-flex size-[28px] items-center justify-center rounded-full")}>
                     <Icon icon={PlayIcon} size={16} />
                   </span>
                 )}
               </Thumb>
               <span className="flex min-w-0 flex-1 flex-col gap-2">
-                <span className="truncate text-md font-medium leading-md text-text-primary">{p.name}</span>
-                <span className={cn("text-sm leading-sm", ready ? "text-text-success" : "text-text-secondary")}>{copy.text}</span>
+                <span className={cn(T.rowTitle, "truncate")}>{p.name}</span>
+                <span className={cn(T.meta, ready && "text-text-success")}>{copy.text}</span>
                 {label && (
                   <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(productHref(p.productId))}>
                     {label}
@@ -488,13 +529,13 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
       </ListCard>
       {pv && pvCopy && (
         <>
-          <h3 className="text-md font-medium leading-md text-text-primary">Project video</h3>
+          <h3 className={T.section}>Project video</h3>
           <div className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-dashed border-border p-6">
             <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
               <Icon icon={LockIcon} size={16} />
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className="text-sm leading-sm text-text-secondary">{pvCopy.text}</span>
+              <span className={T.meta}>{pvCopy.text}</span>
               {pvAction && (
                 <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(phoneProjectPath(project.id, "video"))}>
                   {pvAction}
@@ -540,15 +581,15 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
           <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
             Cancel
           </Button>
-          {reason && <p className="text-sm leading-sm text-text-secondary">{reason}</p>}
+          {reason && <p className={T.meta}>{reason}</p>}
         </>
       }
     >
       <Banner tone="info">Every product needs an AI video, and the post needs your story.</Banner>
-      <ReadinessRows readiness={readiness} />
+      <ReadinessRows readiness={readiness} projectId={project.id} />
       <div className="flex flex-col gap-2">
-        <h3 className="text-md font-medium leading-md text-text-primary">Write your story</h3>
-        <label htmlFor={storyId} className="text-sm font-medium leading-sm text-text-primary">
+        <h3 className={T.section}>Write your story</h3>
+        <label htmlFor={storyId} className={T.label}>
           The post
         </label>
         <Textarea
@@ -559,7 +600,7 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
           onValueChange={(v) => setStory(v.slice(0, STORY_MAX))}
           placeholder="Why did you build this? What should others do with it?"
         />
-        <span className="flex justify-between gap-4 text-sm leading-sm text-text-secondary">
+        <span className={cn(T.caption, "flex justify-between gap-4")}>
           <span>Shown with your post in Feed, with the project&apos;s current activity as its status.</span>
           <span>
             {story.length}/{STORY_MAX}
@@ -567,7 +608,7 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
         </span>
       </div>
       {askOwnership && (
-        <label className="relative flex min-h-[44px] cursor-pointer items-center gap-4 text-md font-medium leading-md text-text-primary">
+        <label className={cn(T.rowTitle, "relative flex min-h-[44px] cursor-pointer items-center gap-4")}>
           <input
             type="checkbox"
             className="sr-only"
@@ -579,6 +620,89 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
         </label>
       )}
     </Sheet>
+  );
+}
+
+// ─────────────────────────── Edit post · Stop sharing (the web's post bar) ───────────────────────────
+
+/** Edit post: the share's own story. Its status is the project's current Activity, set on the
+ *  project, so it isn't edited here; the shared time stays (web: post-owner-bar.tsx). */
+function EditPostSheet({ onClose }: { onClose: () => void }) {
+  const { project, view } = useProject();
+  const { setShowcase } = useManualProjects();
+  const toast = useToast();
+  const [story, setStory] = React.useState(project.post?.story ?? "");
+  const [tried, setTried] = React.useState(false);
+  const storyId = React.useId();
+  const blocker = sharePostBlocker({ story });
+  const save = () => {
+    if (blocker) return setTried(true);
+    setShowcase(project.id, true, view.summary.showcase?.at, { story: story.trim() });
+    toast({ title: "Post updated" });
+    onClose();
+  };
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title="Edit post"
+      description="What people read with your post on Feed."
+      actions={
+        <>
+          <Button size="xl" className="w-full" onClick={save}>
+            Save
+          </Button>
+          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
+            Cancel
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <label htmlFor={storyId} className={T.label}>
+          The post
+        </label>
+        <Textarea
+          id={storyId}
+          rows={4}
+          value={story}
+          maxLength={STORY_MAX}
+          invalid={tried && blocker !== null}
+          onValueChange={(v) => setStory(v.slice(0, STORY_MAX))}
+          placeholder="Why did you build this? What should others do with it?"
+        />
+        <span className={cn(T.caption, "flex justify-between gap-4", tried && blocker && "text-text-error")}>
+          <span role={tried && blocker ? "alert" : undefined}>{tried && blocker ? blocker : "Its status is the project’s current activity."}</span>
+          <span className="text-text-secondary">
+            {story.length}/{STORY_MAX}
+          </span>
+        </span>
+      </div>
+    </Sheet>
+  );
+}
+
+function StopSharingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { project, view } = useProject();
+  const { setShowcase } = useManualProjects();
+  const toast = useToast();
+  return (
+    <ConfirmSheet
+      open={open}
+      onClose={onClose}
+      title="Stop sharing to Feed?"
+      body="The post leaves Feed, and only you can open it. Its comments are kept and come back if you share again."
+      verb="Stop sharing"
+      onConfirm={() => {
+        const at = view.summary.showcase?.at;
+        const post = project.post;
+        setShowcase(project.id, false);
+        toast({
+          title: "Stopped sharing. The post left Feed.",
+          action: { label: "Undo", onClick: () => setShowcase(project.id, true, at, post) },
+        });
+      }}
+    />
   );
 }
 
@@ -618,11 +742,11 @@ function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () =
           <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
             Cancel
           </Button>
-          {!pick && <p className="text-sm leading-sm text-text-secondary">Pick how it goes out.</p>}
+          {!pick && <p className={T.meta}>Pick how it goes out.</p>}
         </>
       }
     >
-      <p id="m-publish-label" className="text-md font-medium leading-md text-text-primary">
+      <p id="m-publish-label" className={T.section}>
         How it goes out
       </p>
       <div role="radiogroup" aria-labelledby="m-publish-label" className="flex flex-col gap-4 pb-4">
@@ -639,9 +763,9 @@ function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () =
               <input type="radio" name="m-publish" className="sr-only" checked={on} onChange={() => setPick(it.id as PublishIntent)} />
               <Radio checked={on} decorative className="mt-1" />
               <span className="flex flex-col gap-1">
-                <span className="text-md font-medium leading-md text-text-primary">{it.label}</span>
-                <span className="text-sm leading-sm text-text-secondary">{status === "private" && it.id === "sell" ? "List it on Explore marketplace." : it.sub}</span>
-                <span className="text-sm leading-sm text-text-secondary">{it.requirement}</span>
+                <span className={T.rowTitle}>{it.label}</span>
+                <span className={T.meta}>{status === "private" && it.id === "sell" ? "List it on Explore marketplace." : it.sub}</span>
+                <span className={T.meta}>{it.requirement}</span>
               </span>
             </label>
           );
@@ -654,6 +778,7 @@ function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () =
 // ─────────────────────────── 08b · readiness ───────────────────────────
 
 function ReadinessSheet({ purpose, then, onClose }: { purpose: ReadinessPurpose; then: string | null; onClose: () => void }) {
+  const { project } = useProject();
   const router = useRouter();
   const readiness = useLiveReadiness(purpose);
   const copy = readinessCopy(purpose);
@@ -679,12 +804,12 @@ function ReadinessSheet({ purpose, then, onClose }: { purpose: ReadinessPurpose;
           <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
             Cancel
           </Button>
-          {blocker && <p className="text-sm leading-sm text-text-secondary">{blocker}</p>}
+          {blocker && <p className={T.meta}>{blocker}</p>}
         </>
       }
     >
       <Banner tone="info">{copy.info}</Banner>
-      <ReadinessRows readiness={readiness} />
+      <ReadinessRows readiness={readiness} projectId={project.id} />
     </Sheet>
   );
 }

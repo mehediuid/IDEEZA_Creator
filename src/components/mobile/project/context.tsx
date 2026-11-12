@@ -16,6 +16,8 @@ export type ProjectSheet =
   | { kind: "edit"; ai?: boolean }
   | { kind: "delete" }
   | { kind: "share" }
+  | { kind: "edit-post" }
+  | { kind: "stop-sharing" }
   | { kind: "publish" }
   | { kind: "readiness"; purpose: ReadinessPurpose; then: string | null }
   | { kind: "add-product" };

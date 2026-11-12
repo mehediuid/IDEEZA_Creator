@@ -90,3 +90,29 @@ test("someone else's project: the Feed's sample ids open read-only, anything els
   assert.equal(p.parseViewerTab("activity"), "overview");
   assert.equal(p.parseViewerTab("media"), "media");
 });
+
+test("the web's Team, Network and Versions tabs open their phone screens", () => {
+  assert.equal(p.phoneSubScreenOf("team"), "team");
+  assert.equal(p.phoneSubScreenOf("contributors"), "team");
+  assert.equal(p.phoneSubScreenOf("network"), "network");
+  assert.equal(p.phoneSubScreenOf("versions"), "versions");
+  assert.equal(p.phoneSubScreenOf("media"), null);
+  assert.equal(p.phoneSubScreenOf(null), null);
+});
+
+test("the phone says Feed where the web says Innovations; roles in plain words", () => {
+  assert.equal(p.phoneWords("Shared to Innovations"), "Shared to Feed");
+  assert.equal(p.phoneWords("Show it on the Innovations page"), "Show it on Feed");
+  assert.equal(p.phoneWords("Listed · Buy now"), "Listed · Buy now");
+  assert.equal(p.PHONE_ROLE_LABEL.Master, "Leads");
+  assert.equal(p.PHONE_ROLE_LABEL.Slave, "Follows");
+  assert.equal(p.PHONE_ROLE_LABEL.Peer, "Works as an equal");
+  for (const label of Object.values(p.PHONE_ROLE_LABEL)) assert.doesNotMatch(label, /master|slave/i);
+});
+
+test("the Products tab's sort from the address", () => {
+  assert.equal(p.parseProductSort("name"), "name");
+  assert.equal(p.parseProductSort("project"), "project");
+  assert.equal(p.parseProductSort("zzz"), "project");
+  assert.equal(p.parseProductSort(null), "project");
+});
