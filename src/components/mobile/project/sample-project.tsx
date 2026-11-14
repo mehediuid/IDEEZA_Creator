@@ -121,8 +121,9 @@ type VideoMedia = Extract<PostMedia, { kind: "video" }>;
 
 /** A page's video on top, as the Feed played it: muted and looping, still under Data saver or
  *  reduced motion; the chip pauses or plays it. With no video, the picture. */
-export function MediaHero({ video, picture, name }: { video: VideoMedia | null; picture: string | null; name: string }) {
+export function MediaHero({ video, picture, name }: { video: { src: string; alt: string } | null; picture: string | null; name: string }) {
   const first = video;
+  const src = video?.src;
   const dataSaver = useSettings().appearance.dataSaver;
   const player = React.useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = React.useState(false);
@@ -130,7 +131,7 @@ export function MediaHero({ video, picture, name }: { video: VideoMedia | null; 
     const v = player.current;
     if (!v || dataSaver || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     v.play().catch(() => setPlaying(false));
-  }, [dataSaver]);
+  }, [dataSaver, src]);
   if (!first && !picture) return null;
   const toggle = () => {
     const v = player.current;

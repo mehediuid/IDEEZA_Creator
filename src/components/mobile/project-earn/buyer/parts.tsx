@@ -9,8 +9,12 @@
 // · PreviewBanner — M01 Info with Exit preview (18, 19);
 // · ProjectTop — the name and its chips, the meta line, the description
 //   clamped to 3 lines (Show more); ViewerTabs (M14 Line Full);
-// · OfferCard / OfferRows — a listing's card: its price line, Info rows and a
-//   foot (the wallet line, the share-sale note);
+// · BuyBox — a listing as a product page sells it (owner 2026-11-12): what
+//   is sold as an overline, the price large, short facts in a grid, a ruled
+//   foot (the wallet line, the last activity, the Testnet demo line);
+//   IconLine puts a small mark before a foot line;
+// · OfferCard / OfferRows — a seller's card: its price line, Info rows and a
+//   foot;
 // · WalletLine — "Paying from Mira's demo wallet · 0x… · 0.5 test ETH";
 // · NftActivityLine, ProjectActivity (Now + Earlier, or "No journey shared
 //   yet."), LegalSection, HolderBenefits, AboutRows;
@@ -18,7 +22,7 @@
 
 import * as React from "react";
 import { ArrowDown01Icon, CheckmarkCircle01Icon, TestTube01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
+import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
@@ -218,7 +222,126 @@ export function useScrolledPast(target: React.RefObject<HTMLElement | null>): bo
   return gone;
 }
 
-// ─────────────────────────── a listing's card ───────────────────────────
+// ─────────────────────────── a listing's buy box ───────────────────────────
+
+export type BoxFact = { label: string; value: string };
+
+/** A fact in a buy box: a small label over its value. */
+function Fact({ label, value }: BoxFact) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <dt className={T.micro}>{label}</dt>
+      <dd className={cn(T.rowTitle, "break-words")}>{value}</dd>
+    </div>
+  );
+}
+
+/** A line in a buy box's foot with its small mark (the wallet, the testnet). */
+export function IconLine({ icon, children }: { icon: IconValue; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span aria-hidden className="mt-[2px] shrink-0 text-[color:var(--color-icon-secondary)]">
+        <Icon icon={icon} size={16} />
+      </span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+/** A listing as a product page sells it: the overline, the price large (`sub` under it, `aside`
+ *  beside it), the facts three to a row, `notes` under them, then `children` (the bids, the
+ *  field) and the ruled `foot`. The buy button is the bottom bar's. */
+export function BuyBox({
+  label,
+  overline,
+  price,
+  sub,
+  aside,
+  facts,
+  notes,
+  foot,
+  children,
+}: {
+  label: string;
+  overline: string;
+  price: string;
+  sub?: string;
+  aside?: React.ReactNode;
+  facts: readonly BoxFact[];
+  notes?: string | null;
+  foot?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <section aria-label={label} className={cn(LIST_CARD, "gap-6 p-8")}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className={T.overline}>{overline}</p>
+          <p className={cn(T.display, "break-words tabular-nums")}>{price}</p>
+          {sub && <p className={cn(T.meta, "tabular-nums")}>{sub}</p>}
+        </div>
+        {aside}
+      </div>
+      <dl className="grid grid-cols-3 gap-x-8 gap-y-6">
+        {facts.map((f) => (
+          <Fact key={f.label} label={f.label} value={f.value} />
+        ))}
+      </dl>
+      {notes && <p className={T.caption}>{notes}</p>}
+      {children}
+      {foot && <div className="flex flex-col gap-3 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">{foot}</div>}
+    </section>
+  );
+}
+
+/** What the buyer holds, as a receipt (owner 2026-11-12: no tables under the title): the overline,
+ *  what they own in large type, three facts, then every detail behind "All details" (closed), and
+ *  the testnet note. `toggleRef` is that button, which the bar's View your share brings into view. */
+export function ReceiptCard({
+  label,
+  overline,
+  headline,
+  facts,
+  details,
+  toggleRef,
+}: {
+  label: string;
+  overline: string;
+  headline: string;
+  facts: readonly BoxFact[];
+  details: readonly OfferRow[];
+  toggleRef?: React.Ref<HTMLButtonElement>;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const id = React.useId();
+  return (
+    <section aria-label={label} className={cn(LIST_CARD, "gap-6 p-8")}>
+      <div className="flex items-start gap-4">
+        <span aria-hidden className="mt-1 shrink-0 text-[color:var(--color-icon-success)]">
+          <Icon icon={CheckmarkCircle01Icon} size={24} />
+        </span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className={T.overline}>{overline}</p>
+          <p className={cn(T.section, "break-words")}>{headline}</p>
+        </div>
+      </div>
+      <dl className="grid grid-cols-3 gap-x-8 gap-y-6">
+        {facts.map((f) => (
+          <Fact key={f.label} label={f.label} value={f.value} />
+        ))}
+      </dl>
+      <div className="flex flex-col gap-4 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
+        <Disclosure title="All details" open={open} onToggle={() => setOpen((v) => !v)} controls={id} toggleRef={toggleRef} className="w-full justify-between" />
+        <div id={id} hidden={!open} className="-mx-6">
+          <OfferRows rows={details} />
+        </div>
+        <p className={T.meta}>Not on a blockchain — this is a testnet demo.</p>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────── a seller's card ───────────────────────────
 
 export type OfferRow = { label: string; value: React.ReactNode };
 
@@ -291,7 +414,7 @@ export function CardNote({ children }: { children: React.ReactNode }) {
   return <p className={NOTE}>{children}</p>;
 }
 
-/** "Main NFT activity" and its one line. */
+/** "Main NFT activity" and its one line, as a section (a seller's). */
 export function NftActivityLine({ heading, line }: { heading: string; line: string }) {
   return (
     <section aria-label={heading} className="flex flex-col gap-1">

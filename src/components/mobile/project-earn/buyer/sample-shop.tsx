@@ -24,7 +24,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { BubbleChatIcon, Coins01Icon, CubeIcon, PackageIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { Activity01Icon, BubbleChatIcon, Coins01Icon, CubeIcon, PackageIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { scrollWithin } from "@/components/create/anchors";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
@@ -61,7 +61,7 @@ import { BottomBar } from "../../kit/bottom-bar";
 import { LIST_CARD, LIST_DIVIDERS } from "../../kit/list";
 import { PhoneWalletScope } from "../phone-wallet";
 import { readSampleSales, useSampleSales, writeSampleSales } from "./sample-sales-store";
-import { ClosedCard, DemoShopBanner, Disclosure, OfferRowsCard, PurchaseDoneSheet, WalletLine, type DoneFacts } from "./parts";
+import { BuyBox, ClosedCard, DemoShopBanner, IconLine, PurchaseDoneSheet, ReceiptCard, WalletLine, type DoneFacts } from "./parts";
 import { T } from "../../type";
 
 /** The web's words for a project sold in full (lib/market/purchase.ts). */
@@ -164,16 +164,6 @@ function ShopProvider({ post, id, children }: { post: InnovationPost; id: string
   );
 }
 
-/** A fact in the buy box: a small label over its value. */
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <dt className={T.micro}>{label}</dt>
-      <dd className={cn(T.rowTitle, "break-words")}>{value}</dd>
-    </div>
-  );
-}
-
 /** Right under the title: what the active buyer holds, the Main NFT's buy box, then the copies. */
 export function SampleMarketSection() {
   const shop = useShop();
@@ -199,30 +189,30 @@ export function SampleMarketSection() {
           )
         ) : (
           <div className="flex flex-col gap-3">
-            <section aria-label="Main NFT, the whole project" className={cn(LIST_CARD, "gap-6 p-8")}>
-              <div className="flex flex-col gap-1">
-                <p className={T.overline}>Whole project · Main NFT</p>
-                <p className={cn(T.display, "tabular-nums")}>{formatAmount(main.price, main.token)}</p>
-              </div>
-              <dl className="grid grid-cols-[auto_auto_1fr] gap-x-8 gap-y-2">
-                <Fact label="Listing" value="Buy now" />
-                <Fact label="Share" value="100%" />
-                <Fact label="Chain" value={networkLabelOf(SAMPLE_NETWORK)} />
-              </dl>
-              <div className="flex flex-col gap-3 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
-                <div className="flex items-start gap-3">
-                  <span aria-hidden className="mt-[2px] shrink-0 text-[color:var(--color-icon-secondary)]">
-                    <Icon icon={Wallet01Icon} size={16} />
-                  </span>
-                  <WalletLine buyerId={buyerId} token={main.token} network={SAMPLE_NETWORK} verb="buy" />
-                </div>
-                <p className={T.meta}>
-                  <span className="sr-only">Main NFT activity: </span>
-                  {lastMain}
-                </p>
-                <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
-              </div>
-            </section>
+            <BuyBox
+              label="Main NFT, the whole project"
+              overline="Whole project · Main NFT"
+              price={formatAmount(main.price, main.token)}
+              facts={[
+                { label: "Listing", value: "Buy now" },
+                { label: "Share", value: "100%" },
+                { label: "Chain", value: networkLabelOf(SAMPLE_NETWORK) },
+              ]}
+              foot={
+                <>
+                  <IconLine icon={Wallet01Icon}>
+                    <WalletLine buyerId={buyerId} token={main.token} network={SAMPLE_NETWORK} verb="buy" />
+                  </IconLine>
+                  <IconLine icon={Activity01Icon}>
+                    <p className={T.meta}>
+                      <span className="sr-only">Main NFT activity: </span>
+                      {lastMain}
+                    </p>
+                  </IconLine>
+                  <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
+                </>
+              }
+            />
             <p className={cn(T.caption, "text-text-tertiary")}>{SHARE_SALE_NOTE}</p>
           </div>
         ))}
@@ -344,33 +334,33 @@ export function SampleCopyBar() {
   );
 }
 
-/** What the active buyer holds of this sample, newest first. */
+/** What the active buyer holds of this sample, newest first: a receipt card per purchase. */
 function SamplePurchaseSummary({ holding, creator, copies }: { holding: SampleSale[]; creator: string; copies: SampleOffer[] }) {
-  const [open, setOpen] = React.useState(true);
-  const id = React.useId();
   return (
     <section aria-label="Purchase summary" className="flex flex-col gap-4">
-      <Disclosure title="Purchase summary" open={open} onToggle={() => setOpen((v) => !v)} controls={id} className="w-full justify-between" />
-      <div id={id} hidden={!open} className="flex flex-col gap-4">
-        {holding.map((s) => (
-          <OfferRowsCard
+      {holding.map((s) => {
+        const serial = s.serial !== null ? serialText(s.serial, copies.find((o) => o.kind === s.kind)?.sold?.of ?? null) : null;
+        return (
+          <ReceiptCard
             key={s.id}
             label={s.name}
-            rows={[
+            overline={`Your purchase · ${s.name}`}
+            headline={s.kind === "main" ? "You own the whole project" : serial ? `You own copy ${serial}` : "You own a copy"}
+            facts={[
+              { label: "Paid", value: formatAmount(s.price, s.token) },
+              { label: "Chain", value: networkLabelOf(s.network) },
+              { label: "Purchased", value: formatDate(s.at) },
+            ]}
+            details={[
               { label: "NFT type", value: s.name },
-              s.kind === "main"
-                ? { label: "Your share", value: "100% of the project" }
-                : { label: "Copy", value: s.serial !== null ? serialText(s.serial, copies.find((o) => o.kind === s.kind)?.sold?.of ?? null) : "—" },
-              { label: "Blockchain", value: networkLabelOf(s.network) },
               { label: "Price paid", value: `${formatAmount(s.price, s.token)} (+ ${formatAmount(s.networkFee, s.token)} network fee)` },
               { label: "Purchased from", value: creator },
               { label: "Transaction", value: `${shortAddress(s.txHash)} · Demo` },
               { label: "Purchased", value: formatDateTime(s.at) },
             ]}
           />
-        ))}
-        <p className={T.meta}>Not on a blockchain — this is a testnet demo.</p>
-      </div>
+        );
+      })}
     </section>
   );
 }

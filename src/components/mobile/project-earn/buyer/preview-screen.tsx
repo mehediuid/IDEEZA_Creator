@@ -216,11 +216,12 @@ function PreviewMarket({ data }: { data: Ready }) {
             onBuyNow={NO_SHEET}
             onPlaced={NO_SHEET}
             focusBid={0}
+            foot={<MainActivity projectId={project.id} sales={view.sales} listedAt={listing.listedAt} />}
           />
         ) : (
-          <BuyNowCard listing={listing} view={view} buyerId={null} />
+          <BuyNowCard listing={listing} view={view} buyerId={null} foot={<MainActivity projectId={project.id} sales={view.sales} listedAt={listing.listedAt} />} />
         ))}
-      {listing && <MainActivity projectId={project.id} sales={view.sales} listedAt={listing.listedAt} />}
+      {listing && closed && <MainActivity projectId={project.id} sales={view.sales} listedAt={listing.listedAt} />}
       <PhoneCopies project={project} view={view} viewer={viewer} buyerId={null} onBought={NO_SHEET} />
       <Link href={phoneMarketHref(project.id)} className={`-my-6 inline-flex min-h-[44px] items-center gap-2 self-start ${LINK_MD}`}>
         Open in Explore marketplace

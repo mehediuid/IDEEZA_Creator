@@ -6,15 +6,20 @@
 // is the person's own, so a demo creator — Mira, Leo or Sam — does the buying
 // with test tokens in a test wallet. The whole screen signs through the
 // phone's wallet sheet (PhoneWalletScope).
+// Laid out as a product page (owner 2026-11-12, as the Feed sample's page):
 // · Top bar: Back; the name comes into it once the header scrolls away.
-// · The Testnet demo banner and its "Shop as someone else".
+// · The clip the Feed plays on top (the project video in use, else a
+//   product's; the cover while it loads or when it isn't in this browser).
 // · The header: name and status chip, "Created by {the creator's name} ·
 //   Listed {date}" — the page speaks to the buyer, never "you" for the
-//   creator — (and "You own n%" for a holder), the description.
+//   creator — (and "You own n%" for a holder).
+// · Right under it, the marketplace: an auction's standing banner, Purchase
+//   summary for a holder, the Main NFT's buy box (main-offer.tsx) with the
+//   wallet, activity and Testnet demo lines in its foot, then the copies as
+//   rows (copies.tsx). Then the description.
 // · Tabs Overview · Products · Media (`?tab=`, the kit's client-state tabs);
-//   the Overview holds the
-//   Marketplace block (main-offer.tsx, copies.tsx), Project activity, the
-//   products, Legal information, Holder benefits and About.
+//   the Overview holds Project activity, the products, Legal information,
+//   Holder benefits and About.
 // · The bottom bar: the one primary for where the buyer stands — Buy now (Buy
 //   another share), Place bid (Bid again), View your share, Browse other
 //   projects — beside Ask the creator, or Get creator support for a holder.
@@ -27,19 +32,23 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BubbleChatIcon, Coins01Icon, Store01Icon } from "@hugeicons/core-free-icons";
+import { scrollWithin } from "@/components/create/anchors";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { useAuctionClock } from "@/components/marketplace/bid-card";
 import { usePurchase } from "@/components/marketplace/purchase-dialog";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
+import { useClipUrl } from "@/components/video-jobs/video-player";
 import { StatusChip } from "@/components/projects/status-chip";
 import { useAuth } from "@/lib/account/auth";
 import { can } from "@/lib/manual/permissions";
 import { phoneMarketHref } from "@/lib/manual/phone-earn";
 import { sampleProjectOf, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
 import { detailsRows } from "@/lib/manual/rail-copy";
+import { coverOf } from "@/lib/manual/project-read";
 import { headerText } from "@/lib/manual/project-summary";
+import type { ManualProject } from "@/lib/manual/projects";
 import { auctionStateOf } from "@/lib/market/auction";
 import { readMarketNow } from "@/lib/market/market-store";
 import { holdingOf } from "@/lib/market/sales";
@@ -49,6 +58,8 @@ import { ME } from "@/lib/messages/types";
 import { displayNameOf } from "@/lib/people/ids";
 import { useMyProfile } from "@/lib/people/profile-store";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
+import { useProjectVideos } from "@/lib/video/store";
+import { PROJECT_VIDEO_KEY } from "@/lib/video/types";
 import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
@@ -64,6 +75,8 @@ import { MediaTab } from "../../project/media-tab";
 import { BuildCheckLine, useProductRows } from "../../project/product-rows";
 import { ListCard } from "../../kit/list";
 import { ProductRow, SectionHeading, SubLine } from "../../project/parts";
+import { Description } from "../../project/project-screen";
+import { MediaHero } from "../../project/sample-project";
 import { ProductsTab } from "../../project/products-tab";
 import { usePhoneWriteGate } from "../../project/write-gate";
 import { PhoneWalletScope } from "../phone-wallet";
@@ -202,10 +215,11 @@ function MarketReady({ data }: { data: Ready }) {
   const createdBy = (text.createdBy ?? "Created by you").replace(/^Created by you/, `Created by ${creator}`);
   const meta = [createdBy, holding ? `You own ${holding.sharePct}%` : null].filter(Boolean).join(" · ");
 
-  // Bring the Overview's block into view (the bar's controls live there).
-  const onOverview = (then: () => void) => {
-    if (tab !== "overview") goTab("overview");
-    requestAnimationFrame(() => requestAnimationFrame(then));
+  // Bring a control of the marketplace block into view, inside the screen's own scroller.
+  const reveal = (el: HTMLElement | null | undefined) => {
+    if (!el) return;
+    scrollWithin(el, "nearest", "smooth");
+    el.focus({ preventScroll: true });
   };
   const bar = (
     <MarketBar
@@ -221,8 +235,8 @@ function MarketReady({ data }: { data: Ready }) {
                 label: standing === "outbid" ? "Bid again" : "Place bid",
                 run: () => {
                   const form = document.getElementById(BID_FORM_ID) as HTMLFormElement | null;
-                  if (form && tab === "overview") form.requestSubmit();
-                  else onOverview(() => setFocusBid((n) => n + 1));
+                  if (form) form.requestSubmit();
+                  else setFocusBid((n) => n + 1);
                 },
               }
             : standing === "won"
@@ -230,11 +244,7 @@ function MarketReady({ data }: { data: Ready }) {
                   kind: "share",
                   label: "View your share",
                   reason: holding ? null : "It's yours once the creator closes the auction.",
-                  run: () =>
-                    onOverview(() => {
-                      summaryRef.current?.scrollIntoView({ block: "start" });
-                      summaryRef.current?.focus();
-                    }),
+                  run: () => reveal(summaryRef.current),
                 }
               : standing === "lost"
                 ? { kind: "browse", label: "Browse other projects" }
@@ -242,58 +252,70 @@ function MarketReady({ data }: { data: Ready }) {
                   ? {
                       kind: "copies",
                       label: "Buy now",
-                      run: () =>
-                        onOverview(() => {
-                          const el = copiesRef.current;
-                          el?.scrollIntoView({ block: "start" });
-                          el?.querySelector<HTMLButtonElement>("[data-copy-buy]")?.focus();
-                        }),
+                      run: () => reveal(copiesRef.current?.querySelector<HTMLButtonElement>("[data-copy-buy]")),
                     }
                   : null
       }
     />
   );
 
+  // The box's foot after the wallet line: the newest activity, and who is shopping (Change).
+  const boxFoot = listing && (
+    <>
+      <MainActivity projectId={project.id} sales={view.sales} listedAt={listing.listedAt} />
+      <DemoShopBanner body={MARKET_BANNER_BODY} line />
+    </>
+  );
+  const boxShown = !!listing && (live && listing.type === "buyNow" ? true : auction !== null);
+
   return (
     <ProjectProvider value={ctx}>
       <Screen top={<TopBar back title={titleGone ? project.name : undefined} />} footer={bar}>
         <OfflineBanner />
-        <DemoShopBanner body={MARKET_BANNER_BODY} />
-        <ProjectTop name={project.name} chips={<StatusChip status={view.summary.status} word={text.chip.word} />} meta={meta} description={project.description} titleRef={titleRef} />
+        <ListingHero project={project} view={view} />
+        <ProjectTop name={project.name} chips={<StatusChip status={view.summary.status} word={text.chip.word} />} meta={meta} description="" titleRef={titleRef} />
+        <section aria-labelledby="bv-market" className="flex flex-col gap-6 px-8 pb-8">
+          <h2 id="bv-market" className="sr-only">
+            Marketplace
+          </h2>
+          {listing && auction && <StandingBanner standing={standing} listing={listing} state={auction} bids={view.bids} buyerId={buyerId} />}
+          {holding && can(viewer, "purchase.seeSummary", view.canCtx) && <PurchaseSummary holding={holding} toggleRef={summaryRef} />}
+          {listing && live && listing.type === "buyNow" ? (
+            <div className="flex flex-col gap-4">
+              {holding && <h3 className={T.section}>Buy another share</h3>}
+              <BuyNowCard listing={listing} view={view} buyerId={buyerId} foot={boxFoot} />
+            </div>
+          ) : listing && auction ? (
+            <AuctionCard
+              project={project}
+              listing={listing}
+              view={view}
+              state={auction}
+              clock={clock}
+              buyerId={buyerId}
+              canBid={canBid}
+              canBuy={canBuy}
+              buyBusy={busy}
+              onBuyNow={() => void purchase("auctionBuyNow")}
+              onPlaced={(sentence) => toast({ title: sentence })}
+              focusBid={focusBid}
+              foot={boxFoot}
+            />
+          ) : (
+            <ClosedOrNothing view={view} holdsSale={holding !== null && view.listing.kind === "sold" && view.listing.sale.buyerId === buyerId} />
+          )}
+          {!boxShown && <DemoShopBanner body={MARKET_BANNER_BODY} line />}
+          <PhoneCopies project={project} view={view} viewer={viewer} buyerId={buyerId} onBought={boughtCopy} anchorRef={copiesRef} />
+        </section>
+        {project.description.trim() && (
+          <div className="px-8 pb-8">
+            <Description text={project.description} />
+          </div>
+        )}
         <ViewerTabs tabs={VIEWER_TABS} tab={tab} onChange={goTab} />
         <div {...tabPanelProps(VIEWER_TABS_ID, tab)} className="px-8 pb-12 pt-8 outline-none">
           {tab === "overview" && (
             <div className="flex flex-col gap-12">
-              <section aria-labelledby="bv-market" className="flex flex-col gap-4">
-                <SectionHeading id="bv-market" title="Marketplace" />
-                {listing && auction && <StandingBanner standing={standing} listing={listing} state={auction} bids={view.bids} buyerId={buyerId} />}
-                {holding && can(viewer, "purchase.seeSummary", view.canCtx) && <PurchaseSummary holding={holding} toggleRef={summaryRef} />}
-                {listing && live && listing.type === "buyNow" ? (
-                  <div className="flex flex-col gap-4">
-                    {holding && <h3 className={T.section}>Buy another share</h3>}
-                    <BuyNowCard listing={listing} view={view} buyerId={buyerId} />
-                  </div>
-                ) : listing && auction ? (
-                  <AuctionCard
-                    project={project}
-                    listing={listing}
-                    view={view}
-                    state={auction}
-                    clock={clock}
-                    buyerId={buyerId}
-                    canBid={canBid}
-                    canBuy={canBuy}
-                    buyBusy={busy}
-                    onBuyNow={() => void purchase("auctionBuyNow")}
-                    onPlaced={(sentence) => toast({ title: sentence })}
-                    focusBid={focusBid}
-                  />
-                ) : (
-                  <ClosedOrNothing view={view} holdsSale={holding !== null && view.listing.kind === "sold" && view.listing.sale.buyerId === buyerId} />
-                )}
-                {listing && <MainActivity projectId={project.id} sales={view.sales} listedAt={listing.listedAt} />}
-                <PhoneCopies project={project} view={view} viewer={viewer} buyerId={buyerId} onBought={boughtCopy} anchorRef={copiesRef} />
-              </section>
               <ProjectActivity projectId={project.id} createdAt={project.createdAt} />
               <ProductsSection seeAll={`${phoneMarketHref(project.id)}?tab=products`} />
               <LegalSection legal={project.legal} />
@@ -312,6 +334,26 @@ function MarketReady({ data }: { data: Ready }) {
       </Screen>
       <PurchaseDoneSheet done={done} onClose={() => setDone(null)} />
     </ProjectProvider>
+  );
+}
+
+/** The clip the Feed plays for this project (feed/use-clips.ts): the project video in use, else the
+ *  first product's; the cover while it loads, or when its file isn't in this browser. */
+function ListingHero({ project, view }: { project: ManualProject; view: Ready["view"] }) {
+  const { record } = useProjectVideos(project.id);
+  const takeOf = (key: string) => {
+    const pv = record?.products[key];
+    return pv?.inUseId && pv.takes.some((t) => t.id === pv.inUseId) ? pv.inUseId : null;
+  };
+  const take = takeOf(PROJECT_VIDEO_KEY) ?? view.products.filter((p) => p.dropped === null).map((p) => takeOf(p.id)).find((t) => t !== null) ?? null;
+  const clip = useClipUrl(take);
+  const src = take && clip.state === "ready" ? clip.url : null;
+  return (
+    <MediaHero
+      video={src ? { src, alt: `${project.name} video` } : null}
+      picture={(src ? clip.posterUrl : null) ?? coverOf(project, view.refs)}
+      name={project.name}
+    />
   );
 }
 
