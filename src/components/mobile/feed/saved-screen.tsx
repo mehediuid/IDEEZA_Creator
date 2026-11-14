@@ -8,11 +8,12 @@
 // store), so a post saved on either shows on both, and your own shared
 // projects are listed like anyone's. Newest first.
 //
-// `?list=appreciated` is the same list over what you appreciated (the web's
-// Innovations "Appreciated" mode), with Remove and Undo.
+// Two tabs under the top bar, Saved · Appreciated (`?list=appreciated`, the
+// web's Innovations "Appreciated" mode): the same list over what you
+// appreciated, with Remove and Undo. The hub's Saved Items opens it on Saved.
 
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Bookmark01Icon, BookmarkRemove01Icon, Copy01Icon, FavouriteIcon, HeartRemoveIcon, MoreHorizontalIcon, ViewIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { clipHref, type FeedClip } from "@/lib/innovations/clips";
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { ActionSheet } from "../kit/sheet";
 import { EmptyState } from "../kit/state";
 import { ListBones } from "../kit/states";
+import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
@@ -33,12 +35,18 @@ import { useFeedClips } from "./use-clips";
 import { useFeedPrefs } from "./use-feed";
 
 type Row = { clip: FeedClip; at: number | null };
+type List = "saved" | "appreciated";
+const LISTS: readonly { value: List; label: string }[] = [
+  { value: "saved", label: "Saved" },
+  { value: "appreciated", label: "Appreciated" },
+];
 
 const FAILED = "This phone couldn’t save that. Nothing changed.";
 
 export function SavedScreen() {
   const router = useRouter();
-  const appreciated = useSearchParams().get("list") === "appreciated";
+  const [list, setList] = useTabParam<List>("list", ["saved", "appreciated"], "saved");
+  const appreciated = list === "appreciated";
   const toast = useToast();
   const settings = useSettings();
   const copy = useCopyClipLink();
@@ -79,11 +87,12 @@ export function SavedScreen() {
     });
   };
 
-  const title = appreciated ? "Appreciated" : "Saved";
-
   return (
-    <Screen top={<TopBar back="/m/profile" title={title} />}>
-      <div className="flex flex-col gap-4 px-8 pb-8">
+    <Screen top={<TopBar back="/m/profile" title="Saved" />}>
+      <div className="sticky top-0 z-10 bg-bg-page">
+        <MobileTabs label="Your lists" idBase="saved-lists" tabs={LISTS} value={list} onChange={setList} />
+      </div>
+      <div {...tabPanelProps("saved-lists", list)} className="flex flex-col gap-4 px-8 pb-8 pt-6 outline-none">
         <h2 className={cn(T.section, "pt-2")}>{appreciated ? "What you appreciated" : "Saved Items"}</h2>
         {!hydrated || !prefsRead || !clipsRead ? (
           <ListBones rows={6} />
