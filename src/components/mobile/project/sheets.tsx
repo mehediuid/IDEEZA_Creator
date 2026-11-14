@@ -2,10 +2,12 @@
 
 // The project page's sheets, every one rising from the bottom:
 // · 07 ⋯ Project actions (M12): Edit name and description · Share to Feed (a
-//   Draft's row says "Mint it first" and goes to the mint) — or, once shared,
-//   View post (its clip on the Feed), Edit post (the story) and Stop sharing
-//   (asks first, the toast offers Undo), which the web keeps on the post ·
-//   Delete project…, the red row last;
+//   Draft's row says "Mint it first" and goes to the mint; the Feed shows only
+//   what is for sale (owner 2026-11-12), so a project with nothing on the
+//   marketplace says "List it first" and goes to Sell) — or, once shared,
+//   View post (its clip on the Feed, while something of it is for sale), Edit
+//   post (the story) and Stop sharing (asks first, the toast offers Undo),
+//   which the web keeps on the post · Delete project…, the red row last;
 // · 07b Edit name and description (07g–07n): the web's editor — the name
 //   (1–80, a name another project has is a note), the description (counter
 //   from 800, "What it is, and who it is for."), Update with AI with Undo,
@@ -97,17 +99,27 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
   const { project, view, viewer } = useProject();
   const router = useRouter();
   const [mintFirst, setMintFirst] = React.useState(false);
+  const [listFirst, setListFirst] = React.useState(false);
   const canEdit = can(viewer, "project.rename", view.canCtx) || can(viewer, "project.editDescription", view.canCtx);
   const canShare = can(viewer, "project.showcase", view.canCtx);
   const shared = view.summary.showcase;
-  const shareShown = canShare || (view.lock === null && view.summary.status === "draft" && can(viewer, "facts.seeOwnerOnly"));
+  const onFeed = forSaleNow(view);
+  // Minted with nothing for sale: sharing waits for a listing — unless it can never be listed again.
+  const needsListing = canShare && !onFeed;
+  const canList = can(viewer, "listing.create", view.canCtx);
+  const shareShown =
+    (canShare && (onFeed || canList || shared !== null)) || (view.lock === null && view.summary.status === "draft" && can(viewer, "facts.seeOwnerOnly"));
+  const sellHref =
+    phoneHrefOf(view.summary.status === "draft" ? earnMintHref(project.id, "sell") : earnHref(project.id, "sell", { list: "1" }), project.id) ?? "/m/projects";
   const items = [
     ...(canEdit ? [{ label: "Edit name and description", icon: PencilEdit01Icon, onSelect: () => onSheet({ kind: "edit" }) }] : []),
     ...(shareShown
       ? [
           ...(shared
             ? [
-                { label: "View post", icon: News01Icon, onSelect: () => router.push(`/m/clip/${encodeURIComponent(postIdOfProject(project.id))}`) },
+                ...(onFeed
+                  ? [{ label: "View post", icon: News01Icon, onSelect: () => router.push(`/m/clip/${encodeURIComponent(postIdOfProject(project.id))}`) }]
+                  : []),
                 ...(canShare
                   ? [
                       { label: "Edit post", icon: Edit02Icon, onSelect: () => onSheet({ kind: "edit-post" }) },
@@ -117,10 +129,11 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
               ]
             : [
                 {
-                  // A Draft can't share yet: the row says why before the tap (Figma 07 10371:2201).
-                  label: canShare ? "Share to Feed" : "Share to Feed · Mint it first",
+                  // A Draft can't share yet, nor a project with nothing for sale: the row says why
+                  // before the tap (Figma 07 10371:2201).
+                  label: !canShare ? "Share to Feed · Mint it first" : needsListing ? "Share to Feed · List it first" : "Share to Feed",
                   icon: News01Icon,
-                  onSelect: () => (canShare ? onSheet({ kind: "share" }) : setMintFirst(true)),
+                  onSelect: () => (!canShare ? setMintFirst(true) : needsListing ? setListFirst(true) : onSheet({ kind: "share" })),
                 },
               ]),
         ]
@@ -129,7 +142,28 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
   ];
   return (
     <>
-      <ActionSheet open={open} onClose={onClose} title={shared ? `${project.name} · on Feed since ${formatDate(shared.at)}` : project.name} items={items} />
+      <ActionSheet
+        open={open}
+        onClose={onClose}
+        title={shared ? (onFeed ? `${project.name} · on Feed since ${formatDate(shared.at)}` : `${project.name} · off the Feed until it’s for sale`) : project.name}
+        items={items}
+      />
+      <Sheet
+        open={listFirst}
+        onClose={() => setListFirst(false)}
+        title="List it first"
+        description="The Feed shows only what is for sale. Put the project or a copy of it on the marketplace, then share it to the Feed."
+        actions={
+          <>
+            <Button size="xl" className="w-full" onClick={() => router.push(sellHref)}>
+              Go to Sell
+            </Button>
+            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setListFirst(false)}>
+              Cancel
+            </Button>
+          </>
+        }
+      />
       <Sheet
         open={mintFirst}
         onClose={() => setMintFirst(false)}
@@ -148,6 +182,12 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
       />
     </>
   );
+}
+
+/** Something of it is for sale — a live Main listing or a listed copy — so its clip is on the Feed
+ *  (the Feed's own rule, feed/use-clips.ts). */
+function forSaleNow(view: Ready["view"]): boolean {
+  return view.listing.kind === "live" || (view.lock === null && view.editions.some((t) => t.listing !== null));
 }
 
 // ─────────────────────────── 07b · Edit name and description ───────────────────────────

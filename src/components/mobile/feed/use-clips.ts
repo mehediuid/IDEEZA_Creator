@@ -7,7 +7,9 @@
 // the cover, the current Activity, the mint, the live Main listing (Buy now or
 // auction, with its bids) and the listed copies — so its clip never disagrees
 // with the project. Its id is `mine:<projectId>`, the id of its post, which is
-// what its comments, its saves and its notices are keyed by.
+// what its comments, its saves and its notices are keyed by. As the samples,
+// a clip of yours plays only while it is on the marketplace (owner
+// 2026-11-12: every Feed video is a marketplace item).
 
 import * as React from "react";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
@@ -16,6 +18,7 @@ import {
   FEED_CLIPS,
   licenseWordOf,
   mineClipsOf,
+  onMarketplace,
   type ClipOffer,
   type FeedClip,
   type MineVideo,
@@ -150,7 +153,7 @@ export function useMineClips(): { hydrated: boolean; clips: FeedClip[] } {
         videos: list,
         offers: [...(main ? [main] : []), ...copies],
         productOffers,
-      });
+      }).filter(onMarketplace);
     });
   }, [hydrated, journeys, videos, shared, builds, editions.record, market, me.name, me.initials, now]);
 

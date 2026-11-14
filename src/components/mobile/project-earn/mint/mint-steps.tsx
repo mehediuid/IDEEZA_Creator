@@ -8,7 +8,8 @@
 // · MintDetails — Sell: the shared listing terms, the license, Share to Feed
 //   and its story; Give: the chain, the collection, Minting type, the license
 //   and the two confirms; Keep private: the chain, the collection and the
-//   confirms. Messages show once a field is left, at once for a typed amount,
+//   confirms. Only Sell offers Share to Feed: the Feed shows only what is for
+//   sale (owner 2026-11-12), and a gift or a private mint lists nothing. Messages show once a field is left, at once for a typed amount,
 //   all of them once Continue was pressed (13h). An instant mint the wallet
 //   can't pay says so under Minting type (13g);
 // · MintReview — What is minted, Product videos (the gate's), Shared as, the
@@ -16,7 +17,7 @@
 //   reject or a failure leads the screen (13l);
 // · MintDone — Mint complete (13d) / Given to the community (08d): the
 //   ownership proof, the listing or what others can do, the videos;
-// · MintShare — Share to Feed from Done.
+// · MintShare — Share to Feed from Done, after a Sell (the flow mounts it then).
 
 import * as React from "react";
 import Link from "next/link";
@@ -161,7 +162,6 @@ const NETWORK_OPTIONS = NETWORKS.map((n) => ({ value: n.value, label: n.label })
 const LICENSE_OPTIONS = LICENSES.map((l) => ({ value: l.value, label: l.label }));
 const NEW_COLLECTION = "__new__";
 const SAVE_SIGNATURE_LINE = "Saved with a free signature — nothing is charged. You can mint it on chain when you list it.";
-const SHOWCASE_NOTE = "It's shared once every product has a video — the mint doesn't wait for them, and you can make them after.";
 /** Amount fields show a wrong typed value at once; the rest after they're left. */
 const AT_ONCE: ReadonlySet<ListingField> = new Set<ListingField>(["price", "minBid", "auctionBuyNow"]);
 
@@ -190,7 +190,6 @@ export function MintDetails({
   creatorPct,
   mintStatus,
   mintAddress,
-  videosReady,
   shortfall,
   tried,
 }: {
@@ -200,7 +199,6 @@ export function MintDetails({
   creatorPct: number;
   mintStatus: MintStatus;
   mintAddress?: string;
-  videosReady: boolean;
   /** An instant mint the wallet can't pay: why (13g). */
   shortfall: string | null;
   tried: boolean;
@@ -266,7 +264,7 @@ export function MintDetails({
   );
   const share = <ShareToggle checked={state.shareToNewsfeed} onChange={(v) => onChange({ shareToNewsfeed: v })} />;
   const story = state.shareToNewsfeed && (
-    <StoryPanel id={ids.story.id} value={state.story} onChange={(story) => onChange({ story })} note={intent === "save" && !videosReady ? SHOWCASE_NOTE : undefined} />
+    <StoryPanel id={ids.story.id} value={state.story} onChange={(story) => onChange({ story })} />
   );
   const lowFunds = shortfall && <Banner tone="attention">{shortfall}</Banner>;
 
@@ -307,8 +305,6 @@ export function MintDetails({
       {intent === "give" && lowFunds}
       {intent === "give" && license}
       <OwnerCheck checked={state.confirmOwnership} onChange={(v) => onChange({ confirmOwnership: v })} error={tried && !state.confirmOwnership ? "Confirm you are the rightful owner of this idea." : undefined} />
-      {share}
-      {story}
     </div>
   );
 }

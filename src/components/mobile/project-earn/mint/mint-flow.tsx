@@ -265,7 +265,8 @@ export function MintFlow({ projectId }: { projectId: string }) {
         setStatus(cur.id, "completed");
         if (typeof cur.ownerConfirmedAt !== "number") setOwnerConfirmed(cur.id, at);
         const shareReady = readinessOf(factsOf(s, { videos: videosRef.current, jobs: jobsRef.current, now: at }), "showcase").rules.every((r) => r.ok);
-        if (s.shareToNewsfeed && shareReady && cur.showcasedAt == null) setShowcase(cur.id, true, at, { story: s.story.trim() });
+        // The Feed shows only what is for sale: only a Sell shares on the phone.
+        if (s.intent === "sell" && s.shareToNewsfeed && shareReady && cur.showcasedAt == null) setShowcase(cur.id, true, at, { story: s.story.trim() });
         mintedAt = at;
         return { ok: true };
       };
@@ -356,7 +357,6 @@ export function MintFlow({ projectId }: { projectId: string }) {
             creatorPct={creatorPct}
             mintStatus={mintStatus}
             mintAddress={project.mint?.wallet.address}
-            videosReady={gate.readiness.rules.find((r) => r.id === "videos")?.ok === true}
             shortfall={type === "instant" ? (shortfall?.missing ?? null) : null}
             tried={tried}
           />
@@ -417,7 +417,7 @@ function MintFooter({
   if (step === "success") {
     return (
       <BottomBar className="flex-row gap-6 pt-8">
-        <MintShare />
+        {state.intent === "sell" && <MintShare />}
         <Button size="xl" className="min-w-0 flex-1" onClick={onDone}>
           Done
         </Button>
@@ -472,6 +472,5 @@ function MintFooter({
 function ctaOf(state: MintState, type: MintType): string {
   const intent = state.intent ?? "sell";
   if (intent === "save") return "Sign and save";
-  const base = `${type === "instant" ? "Pay" : "Sign"} and ${intent === "sell" ? "list" : "give"}`;
-  return intent === "give" && state.shareToNewsfeed ? `${base} · post to Feed` : base;
+  return `${type === "instant" ? "Pay" : "Sign"} and ${intent === "sell" ? "list" : "give"}`;
 }
