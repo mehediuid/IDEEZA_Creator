@@ -398,7 +398,7 @@ export async function createAccount(input: SignUpInput, utmSource: string, now: 
   return writeStoredKey(VERIFY_KEY, { v: 1, email, next: safeNext(next) }).ok ? "ok" : "refused";
 }
 
-/** Apple, Google or Facebook vouched for this email (the mobile prototype's
+/** Google or Facebook vouched for this email (the mobile prototype's
  *  demo provider sheet stands in for theirs): its account is signed in, and
  *  an account that has none is made, verified — the provider proved the email —
  *  with a password nobody knows, until one is added in Sign-in & security. */

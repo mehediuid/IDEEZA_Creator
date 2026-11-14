@@ -20,7 +20,7 @@ The `/m` prototype's own screens and parts, from the mobile Figma (`fKXxJ25dXvxW
 | `kit/pick-list.tsx`, `kit/permission-sheet.tsx` | `PickSheet` / `PickList` (every pick-one list); the camera, photos, microphone and notifications pre-prompts |
 | `kit/bottom-bar.tsx`, `kit/code-cells.tsx`, `kit/sheet-select.tsx` | The Bottom action bar and its text link, six code cells, A06 Select as a pick-one sheet |
 | `account/mobile-gate.tsx` | Where the phone may go (way-in, setup, tabs, guest Home), Splash |
-| `account/ways-in.tsx`, `account/guest-gate.tsx` | Continue with Apple · Google · Facebook · email, the Demo provider sheet, the guest gate |
+| `account/ways-in.tsx`, `account/guest-gate.tsx` | Continue with Google · Facebook · email, the Demo provider sheet, the guest gate |
 | `account/code-step.tsx`, `account/parts.tsx`, `account/terms-sheet.tsx` | The six-digit code step and Demo email; heading, checklist, alert, Splash; the Terms viewer |
 | `ai/` | The AI tab: start, the concept chat (`use-concept-flow.ts`), build, pieces, history, the build pill (logic: `lib/mobile-ai/flow.ts`) |
 | `feed/` | Home: the Feed's clips, comments, ⋯ menu, share, Saved, Marketplace activity, Global Search, Notifications |

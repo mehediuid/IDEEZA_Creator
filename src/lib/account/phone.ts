@@ -2,7 +2,7 @@
 // AU-01…33). The accounts themselves are the web's (auth.ts) — one person, one
 // account, on either — and this keeps only what the phone adds: the six-digit
 // codes for verifying and resetting, the sign-in tries, how each account signs
-// in on the phone (Apple, Google, Facebook, a password), and what this phone
+// in on the phone (Google, Facebook, a password), and what this phone
 // remembers (the tour to start, the link's campaign tag). The password rules are the web's, so a
 // password made on the phone works on the web too. Relative imports only, so
 // node:test can load it.
@@ -170,9 +170,10 @@ export function saveTries(tries: SignInTries): WriteResult {
 
 // ─────────────────────────── how each account signs in on the phone ───────────────────────────
 
-export type Provider = "apple" | "google" | "facebook";
-export const PROVIDERS: readonly Provider[] = ["apple", "google", "facebook"];
-export const PROVIDER_WORDS: Record<Provider, string> = { apple: "Apple", google: "Google", facebook: "Facebook" };
+/** The web's two providers; the phone has no Apple (owner 2026-11-09 and 11-12). */
+export type Provider = "google" | "facebook";
+export const PROVIDERS: readonly Provider[] = ["google", "facebook"];
+export const PROVIDER_WORDS: Record<Provider, string> = { google: "Google", facebook: "Facebook" };
 
 export const PHONE_ACCOUNTS_KEY = "ideeza:m:accounts";
 
@@ -383,11 +384,6 @@ export function readProviderAnswer(): ProviderAnswer | null {
 
 export function saveProviderAnswer(a: ProviderAnswer | null): WriteResult {
   return writeStoredKey(PROVIDER_KEY, a);
-}
-
-/** Apple's "Hide my email": a relay address stands in for theirs (AU-04d). */
-export function relayAddress(random: () => number = Math.random): string {
-  return `${Math.floor(random() * 36 ** 8).toString(36).padStart(8, "0")}@privaterelay.appleid.com`;
 }
 
 // ─────────────────────────── where to go ───────────────────────────

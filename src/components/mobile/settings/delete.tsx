@@ -9,7 +9,7 @@
 //   bid on a live auction);
 // 3 keep a copy (Download your information is the primary button, made at
 //   once on the phone; "Continue without a copy" is the quiet way on);
-// 4 confirm it's you (the password; Apple, Google or Facebook once more for
+// 4 confirm it's you (the password; Google or Facebook once more for
 //   an account with no password) — wrong, deleting, couldn't (offline).
 // The furthest step reached is kept for the tab (sessionStorage), so a
 // reload stays on its step.

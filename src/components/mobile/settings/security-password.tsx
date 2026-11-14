@@ -6,7 +6,7 @@
 // current password, 41c don't match (on leaving the field), 41d same as now,
 // 41e saving, 41g offline (what was typed stays). Back on Sign-in & security
 // with "Password changed" (AU-33b).
-// AU-41h · Add a password, for an account made through Apple, Google or
+// AU-41h · Add a password, for an account made through Google or
 // Facebook: a 6-digit code to its email first, then the new password.
 
 import * as React from "react";

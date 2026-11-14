@@ -177,12 +177,12 @@ test("removing an account drops it, its parked work and its session", async () =
 });
 
 test("a provider can't be disconnected while it is the only way in", () => {
-  phone.linkProvider("rafi@mail.com", "apple", true);
+  phone.linkProvider("rafi@mail.com", "facebook", true);
   const a = phone.phoneAccountOf(phone.readPhoneAccounts(), "rafi@mail.com");
-  assert.equal(phone.isLastWayIn(a, "apple"), true);
-  assert.equal(phone.unlinkProvider("rafi@mail.com", "apple").ok, false);
+  assert.equal(phone.isLastWayIn(a, "facebook"), true);
+  assert.equal(phone.unlinkProvider("rafi@mail.com", "facebook").ok, false);
   phone.linkProvider("rafi@mail.com", "google");
-  assert.ok(phone.unlinkProvider("rafi@mail.com", "apple").ok);
+  assert.ok(phone.unlinkProvider("rafi@mail.com", "facebook").ok);
   assert.deepEqual(phone.phoneAccountOf(phone.readPhoneAccounts(), "rafi@mail.com").providers, ["google"]);
   assert.ok(phone.movePhoneAccount("rafi@mail.com", "rafi.ahmed@mail.com").ok);
   assert.deepEqual(phone.phoneAccountOf(phone.readPhoneAccounts(), "rafi.ahmed@mail.com").providers, ["google"]);

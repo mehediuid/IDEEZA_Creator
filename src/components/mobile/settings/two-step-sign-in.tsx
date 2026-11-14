@@ -1,6 +1,6 @@
 "use client";
 
-// AU-07 · 2-step sign-in: after the password (or Apple, Google, Facebook, or
+// AU-07 · 2-step sign-in: after the password (or Google, Facebook, or
 // a reset) an account with 2-step on, on a phone it doesn't trust yet, owes
 // the authenticator's code before anything opens (the gate sends it here).
 // The 6th digit checks it (07); wrong (07b); five wrong lock the app code for
