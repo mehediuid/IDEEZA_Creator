@@ -55,7 +55,12 @@ import { MEDIA_INK } from "../kit/media";
 import { T } from "../type";
 import { ClipOffers } from "./clip-offers";
 
-/** The clip's creator, its chips, its title and two lines of its description: the text column the
+/** A clip's own note (can't play, not in this browser): a small dark glass card, centred between
+ *  the screen's left edge and the side buttons. */
+const CLIP_NOTE =
+  "absolute inset-x-[64px] top-[40%] flex -translate-y-1/2 flex-col items-center gap-2 rounded-xl bg-[var(--color-modal-scrim)] px-8 py-6 text-center backdrop-blur-sm";
+
+/** The clip's creator, its type icon, its title and a line of its description: the text column the
  *  Feed and AR/VR mode share. The title and the description open the item's details. */
 export function ClipText({
   clip,
@@ -284,6 +289,8 @@ export function ClipView({
       {model && <ModelView clip={clip} poster={poster} />}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[140px] bg-gradient-to-b from-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)] to-transparent" />
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%] bg-gradient-to-b from-transparent from-[10%] to-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)]" />
+      {/* Behind the side buttons: a light picture (a product shot on white) keeps their white marks readable. */}
+      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-[96px] bg-gradient-to-l from-[color:color-mix(in_srgb,var(--color-black)_45%,transparent)] to-transparent" />
 
       <button
         type="button"
@@ -307,24 +314,26 @@ export function ClipView({
             <Spinner size={32} />
           </span>
         )}
+        {/* A clip that can't play says so in a small glass card, clear of the side buttons and
+            readable on any picture (owner 2026-11-12: nothing big laid over the video). */}
         {failed && !model && (
-          <div className="pointer-events-auto absolute inset-x-8 top-1/2 flex -translate-y-1/2 flex-col items-center gap-6 text-center">
+          <div className={cn(CLIP_NOTE, "pointer-events-auto")}>
             <span className="text-[color:var(--color-icon-error)]">
-              <Icon icon={Alert02Icon} size={32} />
+              <Icon icon={Alert02Icon} size={24} />
             </span>
-            <p className={cn(T.display, MEDIA_INK)}>Couldn’t play this clip</p>
-            <Button hierarchy="secondary" size="xl" onClick={retry}>
+            <p className={cn(T.rowTitle, MEDIA_INK)}>Couldn’t play this clip</p>
+            <Button hierarchy="secondary" size="md" className="mt-2" onClick={retry}>
               Try again
             </Button>
           </div>
         )}
         {lost && !model && (
-          <div role="status" className="absolute inset-x-8 top-1/2 flex -translate-y-1/2 flex-col items-center gap-4 text-center">
+          <div role="status" className={CLIP_NOTE}>
             <span className={MEDIA_INK}>
-              <Icon icon={Alert02Icon} size={32} />
+              <Icon icon={Alert02Icon} size={24} />
             </span>
-            <p className={cn(T.display, MEDIA_INK)}>This video isn’t in this browser</p>
-            <p className={cn(T.body, MEDIA_INK)}>It plays where it was made. Your post is still on the Feed.</p>
+            <p className={cn(T.rowTitle, MEDIA_INK)}>This video isn’t in this browser</p>
+            <p className={cn(T.meta, MEDIA_INK)}>It plays where it was made. Your post is still on the Feed.</p>
           </div>
         )}
 
