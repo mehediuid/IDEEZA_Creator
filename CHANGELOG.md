@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere) | Mobile app: native mobile UX everywhere | 15 Nov 2026 | None (owner: no ticket) | Not started |
 | [CL-009](#cl-009-mobile-app-splash-onboarding-welcome-and-log-in) | Mobile app: splash, onboarding, Welcome and Log In | 9 Nov 2026 | Not created yet | Not started |
 | [CL-008](#cl-008-mobile-app-create-flow-the-image-first-the-3d-as-the-result) | Mobile app create flow: the image first, the 3D as the result | 9 Nov 2026 | Not created yet | Not started |
 | [CL-007](#cl-007-landing-page-events-section-moments-from-ideeza) | Landing page: Events section, Moments From IDEEZA | 8 Nov 2026 | [PR-9089](https://ideeza.atlassian.net/browse/PR-9089) | Ready for development |
@@ -37,6 +38,100 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-010 Mobile app: native mobile UX everywhere
+
+**In the prototype:** 15 November 2026 · **Jira:** none (the owner asked for no ticket) · **Production:** Not started
+
+**Screen:** the whole mobile app at `/m`. The owner reviewed it and asked that it work the way a phone app works, not like the website made smaller. Every screen was reworked by area. Nothing was removed: things moved, were grouped, or went one tap deeper.
+
+### What to build
+
+**Rules for every screen**
+- [ ] One header: the top bar holds the context and takes the name once the large title scrolls away. No second title, link or chip stacked under it.
+- [ ] Summary first. The 1–3 facts that matter come first (a large figure or a three-up fact grid); the full list sits behind **All details** or a row that opens it.
+- [ ] Explanations take one line at most. Longer text opens from an **ⓘ** button beside the heading, in a sheet with the full words.
+- [ ] No more than three tabs. A tab that held a whole workflow becomes a **row** (icon, title, live value, ›) that opens its own screen; Back returns.
+- [ ] No text links outside sentences: a row with ›, or an action in the top bar's **⋯**.
+- [ ] One primary action per screen, in the bottom bar (thumb zone). Secondary actions are rows or sit in **⋯**.
+- [ ] An object's own page (project, product) leads with its picture or video.
+- [ ] A running build shows as a slim bar under the header, and the video render tray sits above the bottom bar. Neither ever covers a title, a field or a button.
+- [ ] Rows and buttons show a pressed state; every tap target is at least 44 px.
+
+**Sheets and confirms**
+- [ ] A sheet's foot holds **one** primary button. The ✕, a swipe down and a tap outside close it, so there is no Cancel / Close / Done / Not now button that only closes. A sheet whose only button was one of those has no foot.
+- [ ] A reason the button is off (*2 products still need an AI video…*) sits above the button.
+- [ ] A confirm (*Stop sharing to Feed?*, *Delete…?*) puts **Cancel** and the action side by side, the action on the right; labels too long for half the width stack.
+- [ ] A sheet never squeezes its content: it scrolls.
+- [ ] Coming back with Back or Close reopens what was open: the screen and sheet the maker left from (e.g. Sell › Main NFT › *Add to marketplace* → a product's video → Close lands on that sheet again). Arriving any other way opens the screen clean.
+
+**Way in (follows the website's sign-up)**
+- [ ] Onboarding: **Next** on screens 1–3, **Continue** on the last.
+- [ ] Create account has the website's fields: first and last name, email, password with its checklist, re-type, date of birth (day, month, year), and the consent line in label size.
+- [ ] After the code: *Where did you hear about IDEEZA?* (once, unless the link said), then the Welcome map. No handle step, no profile steps, no Face ID, no Apple anywhere (Google and Facebook only).
+- [ ] The tour points at each tab: the screen dims around the tab, a small card with an arrow says what it does, with Back / Next and Skip. Tapping the lit tab is Next.
+
+**Home · Feed**
+- [ ] Only items on the marketplace appear, the maker's own shared projects too (they leave the Feed when nothing is for sale).
+- [ ] A clip's text keeps to about a fifth of the screen: a type icon before the title (project or product), two lines of title, one line of description with *more*, and offers as one slim pill (*Main NFT · 0.8 ETH*, *+3*, ›) that opens the buy page.
+- [ ] A clip that can't play says so in a small dark card that doesn't cover the side buttons.
+- [ ] Share to Feed on a project with nothing for sale says *Share to Feed · List it first* and opens a sheet that goes to Sell. The mint flow offers Share to Feed after a sale listing only.
+- [ ] Search: browse by kind and search history; *See all results* first; people as rows with Follow, posts as a cover grid. Notifications: the whole row opens it, an icon and an unread dot, one meta line. Saved: two tabs, **Saved · Appreciated**.
+
+**Buying (someone else's item, or the demo buyer on your own listing)**
+- [ ] The page leads with the clip's video, then the name, then a **buy box**: what is sold (*Whole project · Main NFT*), the price large, the facts three to a row, the wallet line, the last activity, *Testnet demo · shopping as Mira · Change*. Copies are rows with a small **Buy** (two prices ask which in a sheet). The bottom bar's **Buy now** buys the Main NFT.
+- [ ] After buying: a receipt card (*You own 40% of the project*, Token · Paid · Purchased, **All details** closed).
+
+**Project page (yours)**
+- [ ] Media first (project video in use, else the cover), the name, the status chip and *Built · n products*, the description.
+- [ ] Products are the main content; the description tip comes after them.
+- [ ] Rows instead of tabs: Activity, Media, Versions, Team, Network, each with its live value.
+- [ ] Bottom bar: Publish + Earn while it can be published, else the live fact (*Listed*, *Sold 40%*) beside **Earn**.
+
+**Earn**
+- [ ] One header with **⋯** (Preview as others see it, Sell copies of a product). The summary first: *Earned* large, Price · Copies sold · Bought by. Then rows **Sell · Business plan · Money**, each opening its own screen. A finished checklist folds to one row.
+- [ ] Sell: Main NFT, Physical and Virtual as rows with their live state; each opens its screen (summary, *Before you can list* as one card, activity, edit and remove as rows, one bottom-bar action). The listing form has one bottom-bar button and puts advanced fields under **More options**. The mint keeps the website's four steps.
+- [ ] Money: earnings first, then Splits, Sales and Rights as lists; adding is each list's last row.
+- [ ] *Add to marketplace*: each product is one row (state, then *Generate AI video* ›) and both fit.
+
+**Product page (yours)**
+- [ ] One scroll, no tabs: the concept image (or video) first, one header, then Build (piece rows with their state), a Media row, Activity rows and Specs.
+
+**Money screens**
+- [ ] Get paid: the balance first, **Withdraw money** in the bottom bar, one *Verify your identity* row, demo rates and tax notes behind ⓘ.
+- [ ] Plans, credits, checkout, withdraw: pick, then pay with the bottom-bar button.
+- [ ] Earn Coin: your IDZ balance first, then *Ways to earn* as rows.
+
+**Everything else**
+- [ ] Settings and Profile: grouped rows with values and ›; long help behind ⓘ; Delete account red and last. Edit profile: the cover with the photo, then each field as a row that opens its own sheet.
+- [ ] Messages: chat-app inbox rows (name, relation, time; subject; last line and unread count); the thread's header shows avatar and relation; a request is one sentence with ⓘ and Block · Delete · Accept.
+- [ ] AI tab: the prompt box pinned at the foot, ideas as chips above it; the project question is one list with **Continue** pinned at the foot, and the prompt box steps aside while it's open.
+
+Demo stand-ins (prototype only): testnet money, demo buyers (Mira, Leo, Sam), sample Feed items.
+
+### Design
+
+- Mobile design system only: the mobile type scale (no raw sizes anywhere), list cards and rows, bottom sheets (handle, title, ✕), the bottom bar, Primary / Secondary / Danger XL buttons, badges, the media chip and scrim for text on video.
+- No new colours or tokens; DS default radius; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: project page with no picture, two meta lines, a tip card and four tabs](docs/changelog/2026-11-15-m-project-before.png) | ![After: project page with the cover first and products as content](docs/changelog/2026-11-15-m-project-after.png) |
+| ![Before: Earn with a stacked header and four tabs](docs/changelog/2026-11-15-m-earn-before.png) | ![After: Earn hub, summary first and rows](docs/changelog/2026-11-15-m-earn-after.png) |
+| ![Before: Money with paragraphs and tables](docs/changelog/2026-11-15-m-money-before.png) | ![After: Money, earnings first and lists](docs/changelog/2026-11-15-m-money-after.png) |
+| ![Before: product page with no picture and a banner](docs/changelog/2026-11-15-m-product-before.png) | ![After: product page, image first and piece rows](docs/changelog/2026-11-15-m-product-after.png) |
+| ![Before: Earn Coin as four paragraph cards](docs/changelog/2026-11-15-m-earncoin-before.png) | ![After: Earn Coin, balance first and rows](docs/changelog/2026-11-15-m-earncoin-after.png) |
+| ![Before: Get paid with Withdraw inside a card and greyed rows](docs/changelog/2026-11-15-m-getpaid-before.png) | ![After: Get paid, balance first and Withdraw in the bar](docs/changelog/2026-11-15-m-getpaid-after.png) |
+| — | ![After: the buy page with the buy box](docs/changelog/2026-11-15-m-market-after.png) |
+| — | ![After: the receipt after buying](docs/changelog/2026-11-15-m-receipt-after.png) |
+| — | ![After: a Feed clip, slim text and one offer pill](docs/changelog/2026-11-15-m-feed-after.png) |
+| — | ![After: Share to Feed, List it first](docs/changelog/2026-11-15-m-listfirst-after.png) |
+| — | ![After: a confirm with Cancel and the action side by side](docs/changelog/2026-11-15-m-confirm-after.png) |
+| — | ![After: Sign-in & security as grouped rows](docs/changelog/2026-11-15-m-security-after.png) |
 
 ---
 
