@@ -1,25 +1,31 @@
 "use client";
 
 // Feed · AR/VR mode (mobile Figma "Clip ⋯ menu" 04, 10764:1501): the top bar
-// (Back, "AR/VR Mode"), the item on the light stage, and at the foot over a
-// dark scrim the clip's own text column — the creator (to their profile) with
-// • Follow, the chips, the title and the description (text over it white).
-// What the phone can do is real: it asks the browser whether it can open an
-// AR or a VR session (WebXR). A Feed post has no 3D file here (the web's
-// words), so there is nothing to place yet and View in AR says so.
+// (Back, "AR/VR Mode"), the item on the light stage with one slim ⓘ line over
+// it ("No 3D file to place yet", tap for why), and at the foot over a dark
+// scrim the clip's own text column — the creator (to their profile) with •
+// Follow, the title and the description (text over it white) — then View in
+// AR in the thumb zone. What the phone can do is real: it asks the browser
+// whether it can open an AR or a VR session (WebXR); the line's sheet says
+// what it found. A Feed post has no 3D file here (the web's words), so there is
+// nothing to place yet and View in AR stays off.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Banner } from "@/components/ideeza/banner";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { clipDetailsHref, isMineClipId } from "@/lib/innovations/clips";
 import { follows, useReactions } from "@/lib/innovations/reactions";
 import { profileHrefOf } from "@/lib/people/ids";
+import { cn } from "@/lib/utils";
+import { Sheet } from "../kit/sheet";
 import { NotFoundState } from "../kit/state";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { ClipText } from "./clip-view";
 import { useFeedClips } from "./use-clips";
 
@@ -54,6 +60,7 @@ export function ArVrMode({ id }: { id: string }) {
   const clip = byId(id);
   const xr = useXrSupport();
   const { reactions, setFollow } = useReactions();
+  const [info, setInfo] = React.useState(false);
 
   if (!clip) {
     return (
@@ -81,16 +88,24 @@ export function ArVrMode({ id }: { id: string }) {
         ? `This phone can open ${[xr.ar && "AR", xr.vr && "VR"].filter(Boolean).join(" and ")}.`
         : "This browser can’t open AR or VR.";
 
+  const why = clip.source === "mine" ? "This is the item’s picture; its 3D model opens on the project." : "This sample post has no 3D file; this is its render.";
+
   return (
-    <Screen top={<TopBar back title="AR/VR Mode" />} className="relative flex flex-col">
+    <Screen
+      top={<TopBar back title="AR/VR Mode" />}
+      className="relative flex flex-col"
+    >
       <div className="relative flex min-h-full flex-1 flex-col bg-gradient-to-b from-[var(--color-white)] to-[var(--color-gray-300)]">
-        <div data-theme="light" className="flex flex-col gap-6 px-8 pt-4">
-          <Banner tone="info" title="No 3D file to place yet">
-            {clip.source === "mine" ? "This is the item’s picture; its 3D model opens on the project." : "This sample post has no 3D file; this is its render."} {can}
-          </Banner>
-          <Button size="xl" className="w-full" disabled>
-            View in AR
-          </Button>
+        <div data-theme="light" className="flex justify-center px-8 pt-4">
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => setInfo(true)}
+            className={cn(T.meta, "inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[var(--color-glass-fill-lg)] px-6 text-text-primary outline-none active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
+          >
+            <Icon icon={InformationCircleIcon} size={16} />
+            No 3D file to place yet
+          </button>
         </div>
         <div className="flex flex-1 items-center justify-center py-8">
           {clip.poster && (
@@ -100,7 +115,7 @@ export function ArVrMode({ id }: { id: string }) {
         </div>
         <div
           data-theme="dark"
-          className="bg-gradient-to-b from-transparent via-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] via-[30%] to-[color:color-mix(in_srgb,var(--color-black)_80%,transparent)] px-8 pb-6 pt-16"
+          className="flex flex-col gap-6 bg-gradient-to-b from-transparent via-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] via-[30%] to-[color:color-mix(in_srgb,var(--color-black)_80%,transparent)] px-8 pb-6 pt-16"
         >
           <ClipText
             clip={clip}
@@ -113,8 +128,14 @@ export function ArVrMode({ id }: { id: string }) {
             }}
             onDetails={() => router.push(clipDetailsHref(clip))}
           />
+          <Button size="xl" className="w-full" disabled>
+            View in AR
+          </Button>
         </div>
       </div>
+      <Sheet open={info} onClose={() => setInfo(false)} title="No 3D file to place yet" description={why}>
+        <p className={cn(T.body, "pb-4")}>{can}</p>
+      </Sheet>
     </Screen>
   );
 }

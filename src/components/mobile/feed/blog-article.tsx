@@ -1,8 +1,9 @@
 "use client";
 
 // A blog, as Global Search opens it (mobile Figma "Blog" reader): Back,
-// "Blog"; the title (H3), the writer and the date, the cover, then the body
-// drawn by the web's reader (ArticleBody: the same type ladder and the same
+// "Blog"; the cover first, full width (a phone's reader leads with the
+// picture), then the title (H3), the writer and the date, then the body drawn
+// by the web's reader (ArticleBody: the same type ladder and the same
 // images). Only a blog readers can open is shown: one not on the IDEEZA Blog
 // says so in the web's words; one that isn't there is the kit's not-found page.
 
@@ -62,6 +63,7 @@ function Reader({ id, title, at, cover }: { id: string; title: string; at: numbe
   const photo = useMyPhoto();
   return (
     <article className="flex flex-col gap-8 px-8 pb-10">
+      {cover && <CoverImage cover={cover} className="w-full rounded-lg" />}
       <header className="flex flex-col gap-4">
         <h2 className={T.display}>{title}</h2>
         <p className={cn(T.meta, "flex items-center gap-4")}>
@@ -71,7 +73,6 @@ function Reader({ id, title, at, cover }: { id: string; title: string; at: numbe
           {dayDate(at)}
         </p>
       </header>
-      {cover && <CoverImage cover={cover} className="w-full rounded-lg" />}
       {!body.hydrated ? (
         <ArticleBodySkeleton />
       ) : body.unreadable ? (

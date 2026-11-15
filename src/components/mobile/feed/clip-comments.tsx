@@ -5,9 +5,11 @@
 // comments"). The sort (Top ⌄, a pick-one sheet), then the threads: a comment
 // (A16 MD avatar), its replies under it (SM), "View n more replies" and, once
 // open, "Hide replies"; Reply · ♥ n · ⋯ on each. The composer (_Comment input)
-// is pinned at the foot: "Add a comment…" with Link · Image · @ and Post;
-// Reply mode says "Replying to @Name" with Cancel and Reply (the @Name is
-// drawn, never typed into the words); Edit mode Cancel and Save.
+// is pinned at the foot and kept small, as a phone's is (2026 mobile UX pass):
+// your avatar and one growing line "Add a comment…" (up to five lines), with
+// Link · Image · @ and Post inside the box under the words; Reply mode says
+// "Replying to @Name" with Cancel above it and Reply (the @Name is drawn,
+// never typed into the words); Edit mode "Editing your comment", Cancel, Save.
 //
 // Every rule is the web's (lib/innovations/comments.ts) and every write goes to
 // the post's comment store, so the count on the clip, the web's post and the
@@ -25,6 +27,7 @@ import {
   ArrowDown01Icon,
   AtIcon,
   Cancel01Icon,
+  Comment01Icon,
   Copy01Icon,
   Delete02Icon,
   FavouriteIcon,
@@ -97,6 +100,8 @@ type Photo = { src: string; name: string };
 
 const FAILED = "This phone couldn’t save that. Nothing changed.";
 const FLASH_MS = 1600;
+/** The composer's line grows with the words up to this height (five lines), then scrolls. */
+const FIELD_MAX = 120;
 const rowId = (id: string) => `m-comment-${id}`;
 /** The time of a write, read when the write happens (never during render). */
 const writeTime = () => Date.now();
@@ -150,6 +155,13 @@ export function ClipComments({
   React.useEffect(() => {
     if (focusAsk) field.current?.focus();
   }, [focusAsk]);
+  // One line until the words need more, then up to five.
+  React.useLayoutEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, FIELD_MAX)}px`;
+  }, [text, open]);
 
   const count = commentCount(comments, rules);
   const tops = topLevelOf(comments, sort, pinned);
@@ -337,38 +349,49 @@ export function ClipComments({
   const composer = refusal ? (
     <p className={cn(T.body, "px-2 py-4")}>{refusal}</p>
   ) : (
-    <div className="flex items-start gap-6 rounded-lg p-4">
-      <Avatar size={mode.kind === "comment" ? "md" : "sm"} initials={me.initials} src={myPhoto.url ?? undefined} />
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
-        {mode.kind === "reply" && (
-          <p className={cn(T.body, "text-text-tertiary")}>
-            Replying to <span className="text-text-brand">@{nameOf(mode.target.authorId)}</span>
-          </p>
-        )}
-        {mode.kind === "edit" && <p className={cn(T.body, "text-text-tertiary")}>Editing your comment</p>}
-        {matches.length > 0 && (
-          <ul aria-label="People in this conversation" className="flex flex-col rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface py-2">
-            {matches.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => pickMention(p.name)}
-                  className={cn(T.body, "flex min-h-[44px] w-full items-center gap-4 px-6 text-left text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
-                >
-                  <Avatar size="xs" initials={personOf(p.id).initials} color={personOf(p.id).color} />
-                  {p.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border)] bg-[var(--color-input-bg)] focus-within:border-[var(--color-input-border-focus)] focus-within:shadow-focus-brand">
+    <div className="flex flex-col gap-2">
+      {mode.kind !== "comment" && (
+        <div className="flex min-h-[44px] items-center justify-between gap-4 pl-[44px]">
+          {mode.kind === "reply" ? (
+            <p className={cn(T.body, "min-w-0 truncate text-text-tertiary")}>
+              Replying to <span className="text-text-brand">@{nameOf(mode.target.authorId)}</span>
+            </p>
+          ) : (
+            <p className={cn(T.body, "min-w-0 truncate text-text-tertiary")}>Editing your comment</p>
+          )}
+          <Button hierarchy="ghost" size="sm" className="relative shrink-0 after:absolute after:-inset-[6px] after:content-['']" onClick={resetComposer}>
+            Cancel
+          </Button>
+        </div>
+      )}
+      {matches.length > 0 && (
+        <ul aria-label="People in this conversation" className="ml-[44px] flex flex-col rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface py-2">
+          {matches.map((p) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                onClick={() => pickMention(p.name)}
+                className={cn(T.body, "flex min-h-[44px] w-full items-center gap-4 px-6 text-left text-text-primary outline-none hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
+              >
+                <Avatar size="xs" initials={personOf(p.id).initials} color={personOf(p.id).color} />
+                {p.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-end gap-4">
+        <span className="shrink-0 pb-2">
+          <Avatar size="sm" initials={me.initials} src={myPhoto.url ?? undefined} />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border)] bg-[var(--color-input-bg)] focus-within:border-[var(--color-input-border-focus)] focus-within:shadow-focus-brand">
           <label className="sr-only" htmlFor={`compose-${clip.id}`}>
             {mode.kind === "reply" ? "Your reply" : mode.kind === "edit" ? "Your comment" : "Add a comment"}
           </label>
           <textarea
             id={`compose-${clip.id}`}
             ref={field}
+            rows={1}
             value={text}
             maxLength={COMMENT_MAX}
             placeholder="Add a comment…"
@@ -384,45 +407,40 @@ export function ClipComments({
                 resetComposer();
               }
             }}
-            className={cn(T.body, "h-[80px] resize-none bg-transparent px-6 pb-4 pt-5 text-[color:var(--color-input-text)] outline-none placeholder:text-[color:var(--color-input-placeholder)]")}
+            className={cn(T.body, "max-h-[120px] min-h-[44px] resize-none bg-transparent px-6 pb-1 pt-[12px] text-[color:var(--color-input-text)] outline-none placeholder:text-[color:var(--color-input-placeholder)]")}
           />
           {photo && (
-            <div className="flex items-center gap-4 px-6 pb-4">
+            <div className="flex items-center gap-4 px-6 pb-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- the photo going with the comment */}
               <img src={photo.src} alt={`Photo: ${photo.name}`} className="size-[48px] rounded-md object-cover" />
               <button
                 type="button"
                 aria-label="Remove the photo"
                 onClick={() => setPhoto(null)}
-                className="inline-flex size-[44px] items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                className="inline-flex size-[44px] items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
               >
                 <Icon icon={Cancel01Icon} size={16} />
               </button>
             </div>
           )}
-        </div>
-        {failed && <p className={cn(T.meta, "text-text-error")}>This phone couldn’t save it. Your words are kept; try again.</p>}
-        <div className="flex items-center gap-1">
-          <ToolButton label="Add a link" icon={Link01Icon} onClick={() => insert("https://")} />
-          <ToolButton
-            label={photo ? "Replace the photo" : "Add a photo"}
-            icon={Image01Icon}
-            disabledReason={mode.kind !== "comment" ? "Photos go with a comment, not a reply" : null}
-            onClick={() => file.current?.click()}
-          />
-          <ToolButton label="Mention someone" icon={AtIcon} onClick={() => insert("@")} />
-          <input ref={file} type="file" accept="image/*" tabIndex={-1} aria-hidden className="sr-only" onChange={pickPhoto} />
-          <span className="flex-1" />
-          {mode.kind !== "comment" && (
-            <Button hierarchy="ghost" size="sm" onClick={resetComposer}>
-              Cancel
+          <div className="flex items-center pl-2 pr-3">
+            <ToolButton label="Add a link" icon={Link01Icon} onClick={() => insert("https://")} />
+            <ToolButton
+              label={photo ? "Replace the photo" : "Add a photo"}
+              icon={Image01Icon}
+              disabledReason={mode.kind !== "comment" ? "Photos go with a comment, not a reply" : null}
+              onClick={() => file.current?.click()}
+            />
+            <ToolButton label="Mention someone" icon={AtIcon} onClick={() => insert("@")} />
+            <input ref={file} type="file" accept="image/*" tabIndex={-1} aria-hidden className="sr-only" onChange={pickPhoto} />
+            <span className="flex-1" />
+            <Button size="sm" className="relative after:absolute after:-inset-[6px] after:content-['']" disabled={!!problem} onClick={send}>
+              {failed ? "Try again" : verb}
             </Button>
-          )}
-          <Button size="sm" disabled={!!problem} onClick={send}>
-            {failed ? "Try again" : verb}
-          </Button>
+          </div>
         </div>
       </div>
+      {failed && <p className={cn(T.meta, "pl-[44px] text-text-error")}>This phone couldn’t save it. Your words are kept; try again.</p>}
     </div>
   );
 
@@ -442,7 +460,12 @@ export function ClipComments({
             ))}
           </div>
         ) : tops.length === 0 ? (
-          <p className={cn(T.body, "py-8 text-center")}>Be the first to comment.</p>
+          <div className="flex flex-col items-center gap-4 py-12 text-center">
+            <span aria-hidden className="inline-flex size-[56px] items-center justify-center rounded-full bg-bg-subtle text-[color:var(--color-icon-secondary)]">
+              <Icon icon={Comment01Icon} size={24} />
+            </span>
+            <p className={T.body}>Be the first to comment.</p>
+          </div>
         ) : (
           <div className="flex flex-col gap-8">
             <div className="flex justify-end">

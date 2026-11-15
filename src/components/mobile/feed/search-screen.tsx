@@ -1,17 +1,23 @@
 "use client";
 
-// Global Search (mobile Figma, Design - Light Mode › Global Search):
+// Global Search (mobile Figma, Design - Light Mode › Global Search), laid out
+// as a phone's search (2026 mobile UX pass):
 // - the field focused with nothing typed: Recent searches (Clear all; ✕ on a
-//   row), a query or a person you opened;
-// - typing: People, Projects and Blogs that match, the match in the brand ink
-//   (a project also says who made it, so a match on the maker reads why);
-//   a pick opens it;
-// - Search (Enter): the chips People · Post · Projects · Parts & Agile Module
-//   · Marketplace · Blog · Settings · Help & tutorials over every kind's
-//   results (each with View all), or one kind's under its chip; a chip with
-//   nothing typed lists all of it ("Search People" from the Feed). The query
-//   and the chip live in the address (a chip changes at once, with no trip to
-//   the server), so Back returns to them.
+//   row), a query or a person you opened; then Browse, a row per kind that
+//   lists all of it (what a chip with nothing typed does), and the Search
+//   history row (On / Off → Settings › Data › Search history);
+// - typing: "See all results for …" first (= Enter), then People, Projects and
+//   Blogs that match, the match in the brand ink (a project also says who made
+//   it, so a match on the maker reads why); a pick opens it;
+// - Search (Enter): the chips All · People · Post · Projects · Parts & Agile
+//   Module · Marketplace · Blog · Settings · Help & tutorials over every
+//   kind's results (each heading with View all), or one kind's under its chip.
+//   People are rows with Follow at the end; posts a two-column grid of covers
+//   (counts on the picture, ⋯ the clip's menu; the description is on the clip);
+//   projects, parts, blogs, settings and help rows; marketplace items product
+//   rows with the price and Buy now / View Auction. The query and the chip live
+//   in the address (a chip changes at once, with no trip to the server), so
+//   Back returns to them.
 // Recent searches and Settings › Search history keep a search only while
 // "Keep my search history" is on (the web's rule, recordSearch). People are
 // followed as on the web (Follow / Following; no Friends, D-1). A result opens
@@ -21,6 +27,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft02Icon,
+  ArrowRight01Icon,
   Cancel01Icon,
   Clock01Icon,
   Comment01Icon,
@@ -28,12 +35,17 @@ import {
   FavouriteIcon,
   Globe02Icon,
   HelpCircleIcon,
+  Layers01Icon,
   MoreHorizontalIcon,
+  News01Icon,
   Search01Icon,
   Settings02Icon,
+  Store01Icon,
+  UserIcon,
+  Video01Icon,
   ViewIcon,
 } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
+import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
@@ -64,7 +76,8 @@ import {
 import { formatDate, formatDateTime } from "@/lib/settings/dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
-import { ListCard, ListRow } from "../kit/list";
+import { LIST_CARD, ListCard, ListRow } from "../kit/list";
+import { MEDIA_INK } from "../kit/media";
 import { Sheet } from "../kit/sheet";
 import { EmptyState } from "../kit/state";
 import { ListBones } from "../kit/states";
@@ -81,14 +94,32 @@ type Entry = SearchEntry<SearchItem>;
 
 const kindOf = (raw: string | null): SearchKind | null => SEARCH_KINDS.find((k) => k.id === raw)?.id ?? null;
 
-/** How many of a kind the all-kinds results show before "View all". */
-const PREVIEW = 3;
+/** Each kind's picture, in Browse and nowhere else. */
+const KIND_ICON: Record<SearchKind, IconValue> = {
+  people: UserIcon,
+  post: Video01Icon,
+  projects: Layers01Icon,
+  parts: CpuIcon,
+  marketplace: Store01Icon,
+  blog: News01Icon,
+  settings: Settings02Icon,
+  help: HelpCircleIcon,
+};
 
-/** A result card: surface, border/default, radius/xl (the kit's card). */
-const CARD = "flex w-full flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface text-left";
+/** How many of a kind the all-kinds results show before "View all" (posts: two rows of two). */
+const previewOf = (kind: SearchKind) => (kind === "post" ? 4 : 3);
+
+/** A row's pressed state (touch has no hover). */
+const PRESS = "transition-colors duration-fast active:bg-bg-subtle";
+
+/** A 36 px button's tap area grown to 44 (the kit's touch rule). */
+const HIT44 = "relative after:absolute after:inset-x-0 after:-inset-y-[4px] after:content-['']";
 
 /** Search is signed in (the gate sends everyone else to Welcome), so a clip's ⋯ runs at once. */
 const SIGNED_IN: Guard = (_title, run) => run();
+
+/** The address Settings › Data › Search history lives at. */
+const HISTORY_HREF = "/m/settings/data/search-history";
 
 export function SearchScreen() {
   const router = useRouter();
@@ -196,7 +227,7 @@ export function SearchScreen() {
           <ListBones rows={5} />
         </div>
       ) : typing && !text.trim() ? (
-        <Recent
+        <Start
           keep={keep}
           recent={recent}
           onQuery={(t) => {
@@ -208,6 +239,7 @@ export function SearchScreen() {
           onClear={() => {
             if (update(() => [])) toast({ title: "Recent searches cleared" });
           }}
+          onBrowse={(k) => go("", k)}
         />
       ) : typing ? (
         <Suggestions entries={entries} q={text} onOpen={open} onSearch={() => submit()} />
@@ -218,13 +250,15 @@ export function SearchScreen() {
   );
 }
 
-function Recent({
+/** Nothing typed: what you searched lately, then every kind to browse, then the history switch's row. */
+function Start({
   keep,
   recent,
   onQuery,
   onPerson,
   onRemove,
   onClear,
+  onBrowse,
 }: {
   keep: boolean;
   recent: RecentSearch[];
@@ -232,69 +266,75 @@ function Recent({
   onPerson: (href: string) => void;
   onRemove: (key: string) => void;
   onClear: () => void;
+  onBrowse: (k: SearchKind) => void;
 }) {
-  const off = keep ? null : (
-    <p className={cn(T.meta, "text-text-tertiary")}>
-      Search history is off in Settings, so new searches aren’t kept.
-    </p>
-  );
-  if (!recent.length) {
-    return (
-      <div className="flex flex-col gap-2 px-8 py-4">
-        <p className={T.body}>Search people, posts, projects, parts, the marketplace, blogs, settings and help.</p>
-        {off}
-      </div>
-    );
-  }
   return (
-    <section className="flex flex-col gap-2 px-8 pb-8">
-      <div className="flex items-center justify-between">
-        <h2 className={T.section}>Recent searches</h2>
-        <button type="button" onClick={onClear} className={cn(T.body, "-mr-2 min-h-[44px] rounded-md px-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus")}>
-          Clear all
-        </button>
-      </div>
-      {off}
-      <ul className="flex flex-col">
-        {recent.map((r) => {
-          const key = recentKeyOf(r);
-          return (
-            <li key={key} className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => (r.kind === "query" ? onQuery(r.text) : onPerson(r.href))}
-                className="flex min-h-[52px] min-w-0 flex-1 items-center gap-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                {r.kind === "query" ? (
-                  <>
-                    <span aria-hidden className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-full bg-bg-surface text-[color:var(--color-icon-default)]">
-                      <Icon icon={Clock01Icon} size={20} />
-                    </span>
-                    <span className={cn(T.body, "truncate text-text-primary")}>{r.text}</span>
-                  </>
-                ) : (
-                  <>
-                    <PersonAvatar id={r.id} name={r.name} />
-                    <span className="flex min-w-0 flex-col">
-                      <span className={cn(T.bodyLg, "truncate")}>{r.name}</span>
-                      <span className={cn(T.meta, "truncate")}>{r.subtitle}</span>
-                    </span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                aria-label={`Remove ${r.kind === "query" ? r.text : r.name} from recent searches`}
-                onClick={() => onRemove(key)}
-                className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <Icon icon={Cancel01Icon} size={20} />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <div className="flex flex-col gap-8 px-8 pb-10 pt-2">
+      {recent.length > 0 && (
+        <section aria-labelledby="search-recent" className="flex flex-col">
+          <div className="flex items-center justify-between">
+            <h2 id="search-recent" className={T.section}>
+              Recent searches
+            </h2>
+            <Button hierarchy="ghost" size="md" className={cn(HIT44, "-mr-4")} onClick={onClear}>
+              Clear all
+            </Button>
+          </div>
+          <ul className="flex flex-col">
+            {recent.map((r) => {
+              const key = recentKeyOf(r);
+              return (
+                <li key={key} className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => (r.kind === "query" ? onQuery(r.text) : onPerson(r.href))}
+                    className={cn(PRESS, "-ml-2 flex min-h-[52px] min-w-0 flex-1 items-center gap-6 rounded-md pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+                  >
+                    {r.kind === "query" ? (
+                      <>
+                        <span aria-hidden className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-full bg-bg-surface text-[color:var(--color-icon-default)]">
+                          <Icon icon={Clock01Icon} size={20} />
+                        </span>
+                        <span className={cn(T.body, "truncate text-text-primary")}>{r.text}</span>
+                      </>
+                    ) : (
+                      <>
+                        <PersonAvatar id={r.id} name={r.name} />
+                        <span className="flex min-w-0 flex-col">
+                          <span className={cn(T.rowTitle, "truncate")}>{r.name}</span>
+                          <span className={cn(T.meta, "truncate")}>{r.subtitle}</span>
+                        </span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${r.kind === "query" ? r.text : r.name} from recent searches`}
+                    onClick={() => onRemove(key)}
+                    className="-mr-4 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                  >
+                    <Icon icon={Cancel01Icon} size={20} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      <section aria-labelledby="search-browse" className="flex flex-col gap-4">
+        <h2 id="search-browse" className={T.section}>
+          Browse
+        </h2>
+        <ListCard>
+          {SEARCH_KINDS.map((k) => (
+            <ListRow key={k.id} icon={KIND_ICON[k.id]} title={k.label} onClick={() => onBrowse(k.id)} />
+          ))}
+        </ListCard>
+      </section>
+      <ListCard label="Search history">
+        <ListRow icon={Clock01Icon} title="Search history" meta={keep ? undefined : "New searches aren’t kept."} value={keep ? "On" : "Off"} href={HISTORY_HREF} />
+      </ListCard>
+    </div>
   );
 }
 
@@ -329,6 +369,20 @@ function Suggestions({ entries, q, onOpen, onSearch }: { entries: readonly Entry
   const groups = suggestionsOf(entries, q);
   return (
     <div className="flex flex-col gap-6 px-8 pb-8">
+      {/* Enter, as a row: the first thing under the field. */}
+      <button
+        type="button"
+        onClick={onSearch}
+        className={cn(PRESS, "-mx-2 flex min-h-[48px] items-center gap-6 rounded-md px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+      >
+        <span aria-hidden className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-full bg-bg-surface text-[color:var(--color-icon-default)]">
+          <Icon icon={Search01Icon} size={16} />
+        </span>
+        <span className={cn(T.rowTitle, "min-w-0 flex-1 truncate")}>See all results for “{q.trim()}”</span>
+        <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+          <Icon icon={ArrowRight01Icon} size={20} />
+        </span>
+      </button>
       {groups.map((g) => (
         <section key={g.kind} className="flex flex-col gap-2">
           <h2 className={T.section}>{SUGGEST_LABEL[g.kind]}</h2>
@@ -337,7 +391,11 @@ function Suggestions({ entries, q, onOpen, onSearch }: { entries: readonly Entry
               const sub = e.ref.type === "person" ? e.ref.subtitle : e.ref.type === "project" || e.ref.type === "blog" ? `by ${e.ref.by}` : null;
               return (
                 <li key={`${e.kind}:${e.id}`}>
-                  <button type="button" onClick={() => onOpen(e)} className="flex min-h-[48px] w-full items-center gap-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+                  <button
+                    type="button"
+                    onClick={() => onOpen(e)}
+                    className={cn(PRESS, "-mx-2 flex min-h-[48px] w-[calc(100%_+_var(--spacing-4))] items-center gap-6 rounded-md px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+                  >
                     <Thumb item={e.ref} />
                     <span className="flex min-w-0 flex-col">
                       <span className={cn(e.ref.type === "person" ? T.bodyLg : T.body, "truncate text-text-primary")}>
@@ -356,9 +414,6 @@ function Suggestions({ entries, q, onOpen, onSearch }: { entries: readonly Entry
           </ul>
         </section>
       ))}
-      <Button hierarchy="secondary" size="xl" className="w-full" onClick={onSearch}>
-        See all results for “{q.trim()}”
-      </Button>
     </div>
   );
 }
@@ -372,7 +427,7 @@ function Thumb({ item }: { item: SearchItem }) {
   }
   return (
     <span aria-hidden className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-full bg-bg-surface text-[color:var(--color-icon-default)]">
-      <Icon icon={CpuIcon} size={16} />
+      <Icon icon={item.type === "blog" ? News01Icon : CpuIcon} size={16} />
     </span>
   );
 }
@@ -398,8 +453,12 @@ function Results({
   const all = kind ? [] : groupResults(entries, q);
   const nothing = kind ? one.length === 0 : all.length === 0;
   return (
-    <div className="flex flex-col gap-8 pb-8">
+    <div className="flex flex-col gap-8 pb-10">
       <div role="group" aria-label="What to search" className="flex gap-4 overflow-x-auto px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* All: every kind's results (tapping the chosen chip again does the same). */}
+        <Tag size="md" selected={kind === null} onClick={() => onKind(null)}>
+          All
+        </Tag>
         {SEARCH_KINDS.map((k) => (
           <Tag key={k.id} size="md" selected={kind === k.id} onClick={() => onKind(kind === k.id ? null : k.id)}>
             {k.label}
@@ -421,139 +480,197 @@ function Results({
             icon={Search01Icon}
             title={q ? `No results for “${q}”` : "Nothing here yet"}
             body={q ? "Check the spelling, or try another word or another chip." : "There is nothing of this kind to show yet."}
+            action={q && kind ? { label: "Search all kinds", onClick: () => onKind(null) } : undefined}
           />
         </div>
       ) : kind ? (
         <ResultList kind={kind} entries={one} q={q} onOpen={onOpen} />
       ) : (
-        all.map((g) => (
-          <section key={g.kind} className="flex flex-col gap-4">
-            <h2 className={cn(T.section, "px-8")}>{SEARCH_KINDS.find((k) => k.id === g.kind)?.label}</h2>
-            <ResultList kind={g.kind} entries={g.entries.slice(0, PREVIEW)} q={q} onOpen={onOpen} />
-            {g.entries.length > PREVIEW && (
-              <div className="px-8">
-                <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => onKind(g.kind)}>
-                  View all
-                </Button>
+        all.map((g) => {
+          const label = SEARCH_KINDS.find((k) => k.id === g.kind)?.label ?? "";
+          const preview = previewOf(g.kind);
+          return (
+            <section key={g.kind} aria-label={label} className="flex flex-col gap-2">
+              <div className="flex min-h-[44px] items-center justify-between gap-4 px-8">
+                <h2 className={T.section}>{label}</h2>
+                {g.entries.length > preview && (
+                  <button
+                    type="button"
+                    onClick={() => onKind(g.kind)}
+                    aria-label={`View all ${g.entries.length} in ${label}`}
+                    className={cn(T.rowTitle, "-mr-2 inline-flex min-h-[44px] items-center gap-1 rounded-md pl-4 pr-2 text-text-brand outline-none active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
+                  >
+                    View all
+                    <Icon icon={ArrowRight01Icon} size={16} />
+                  </button>
+                )}
               </div>
-            )}
-          </section>
-        ))
+              <ResultList kind={g.kind} entries={g.entries.slice(0, preview)} q={q} onOpen={onOpen} />
+            </section>
+          );
+        })
       )}
     </div>
   );
 }
 
 function ResultList({ kind, entries, q, onOpen }: { kind: SearchKind; entries: readonly Entry[]; q: string; onOpen: (e: Entry) => void }) {
-  if (kind === "settings" || kind === "help") {
-    return (
-      <div className="px-8">
-        <ListCard label={kind === "settings" ? "Settings" : "Help & tutorials"}>
-          {entries.map((e) =>
-            e.ref.type === "settings" || e.ref.type === "help" ? (
-              <ListRow
-                key={e.id}
-                icon={kind === "settings" ? Settings02Icon : HelpCircleIcon}
-                title={<Marked text={e.title} q={q} />}
-                meta={e.ref.where}
-                onClick={() => onOpen(e)}
-              />
-            ) : null,
-          )}
-        </ListCard>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-4 px-8">
-      {/* Money is a Testnet demo: said once over the Marketplace cards. */}
-      {kind === "marketplace" && <TestnetDemoBadge className="self-start" />}
-      <ul className={cn("flex flex-col", kind !== "people" && "gap-6")}>
-        {entries.map((e) => (
-          <li key={`${e.kind}:${e.id}`}>
-            <ResultCard entry={e} q={q} onOpen={() => onOpen(e)} />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function ResultCard({ entry, q, onOpen }: { entry: Entry; q: string; onOpen: () => void }) {
   const settings = useSettings();
-  const it = entry.ref;
-  switch (it.type) {
-    case "person":
-      return <PersonResult item={it} q={q} onOpen={onOpen} />;
-    case "post":
-      return <PostResult item={it} q={q} onOpen={onOpen} />;
-    case "project":
+  const locale = settings.language.dateLocale;
+  switch (kind) {
+    case "settings":
+    case "help":
       return (
-        <button type="button" onClick={onOpen} className={cn(CARD, "outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
-          {it.image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- the project's picture
-            <img src={it.image} alt="" className="aspect-[16/9] w-full object-cover" />
-          ) : (
-            <span aria-hidden className="flex aspect-[16/9] w-full items-center justify-center bg-bg-subtle text-[color:var(--color-icon-secondary)]">
-              <Icon icon={CpuIcon} size={32} />
-            </span>
-          )}
-          <span className="flex flex-col gap-1 p-6">
-            <span className={T.section}>
-              <Marked text={it.name} q={q} />
-            </span>
-            <span className={T.body}>{it.by}</span>
-          </span>
-        </button>
+        <div className="px-8">
+          <ListCard label={kind === "settings" ? "Settings" : "Help & tutorials"}>
+            {entries.map((e) =>
+              e.ref.type === "settings" || e.ref.type === "help" ? (
+                <ListRow
+                  key={e.id}
+                  icon={kind === "settings" ? Settings02Icon : HelpCircleIcon}
+                  title={<Marked text={e.title} q={q} />}
+                  meta={e.ref.where}
+                  onClick={() => onOpen(e)}
+                />
+              ) : null,
+            )}
+          </ListCard>
+        </div>
       );
-    case "part":
-      return <PartResult item={it} q={q} />;
-    case "market":
-      return <MarketResult item={it} q={q} onOpen={onOpen} />;
+    case "projects":
+      return (
+        <div className="px-8">
+          <ListCard label="Projects">
+            {entries.map((e) =>
+              e.ref.type === "project" ? (
+                <ListRow
+                  key={e.id}
+                  leading={<RowPicture src={e.ref.image} icon={Layers01Icon} />}
+                  title={<Marked text={e.ref.name} q={q} />}
+                  meta={`by ${e.ref.by}`}
+                  onClick={() => onOpen(e)}
+                />
+              ) : null,
+            )}
+          </ListCard>
+        </div>
+      );
+    case "parts":
+      return (
+        <div className="px-8">
+          <ListCard label="Parts & Agile Module">
+            {entries.map((e) => (e.ref.type === "part" ? <PartRow key={e.id} item={e.ref} q={q} /> : null))}
+          </ListCard>
+        </div>
+      );
     case "blog":
       return (
-        <button type="button" onClick={onOpen} className={cn(CARD, "flex-row items-center gap-6 p-6 outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
-          <span className="flex min-w-0 flex-1 flex-col gap-2">
-            <span className={T.meta}>{it.by}</span>
-            <span className={T.section}>
-              <Marked text={it.title} q={q} />
-            </span>
-            <span className={cn(T.meta, "text-text-tertiary")}>{formatDate(it.at, settings.language.dateLocale, { style: "medium" })}</span>
-          </span>
-          {it.cover && <CoverImage cover={it.cover} decorative className="size-[72px] shrink-0 rounded-md" />}
-        </button>
+        <div className="px-8">
+          <ListCard label="Blog">
+            {entries.map((e) =>
+              e.ref.type === "blog" ? (
+                <ListRow
+                  key={e.id}
+                  leading={
+                    e.ref.cover ? (
+                      <CoverImage cover={e.ref.cover} decorative className="size-[48px] shrink-0 rounded-md" />
+                    ) : (
+                      <RowPicture src={null} icon={News01Icon} />
+                    )
+                  }
+                  title={<Marked text={e.ref.title} q={q} />}
+                  meta={`${e.ref.by} · ${formatDate(e.ref.at, locale, { style: "medium" })}`}
+                  onClick={() => onOpen(e)}
+                />
+              ) : null,
+            )}
+          </ListCard>
+        </div>
+      );
+    case "people":
+      return (
+        <ul aria-label="People" className="flex flex-col px-8">
+          {entries.map((e) => (e.ref.type === "person" ? <PersonRow key={e.id} item={e.ref} q={q} onOpen={() => onOpen(e)} /> : null))}
+        </ul>
+      );
+    case "post":
+      return (
+        <ul aria-label="Post" className="grid grid-cols-2 gap-x-4 gap-y-8 px-8">
+          {entries.map((e) => (e.ref.type === "post" ? <PostTile key={`${e.kind}:${e.id}`} item={e.ref} q={q} onOpen={() => onOpen(e)} /> : null))}
+        </ul>
+      );
+    case "marketplace":
+      return (
+        <div className="flex flex-col gap-4 px-8">
+          {/* Money is a Testnet demo: said once over the Marketplace items. */}
+          <TestnetDemoBadge className="self-start" />
+          <ul aria-label="Marketplace" className="flex flex-col gap-4">
+            {entries.map((e) => (e.ref.type === "market" ? <MarketRow key={`${e.kind}:${e.id}`} item={e.ref} q={q} onOpen={() => onOpen(e)} /> : null))}
+          </ul>
+        </div>
       );
     default:
       return null;
   }
 }
 
-/** Figma 03 / 04: the post with its ⋯ (the clip's menu), "see more / see less", and its
- *  appreciations, comments and views as everyone sees them now. */
-function PostResult({ item, q, onOpen }: { item: Extract<SearchItem, { type: "post" }>; q: string; onOpen: () => void }) {
+/** A row's 48 px picture, or the kind's icon on a tile when there is none. */
+function RowPicture({ src, icon }: { src: string | null; icon: IconValue }) {
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element -- the result's picture
+    return <img src={src} alt="" className="size-[48px] shrink-0 rounded-md object-cover" />;
+  }
+  return (
+    <span aria-hidden className="inline-flex size-[48px] shrink-0 items-center justify-center rounded-md bg-bg-subtle text-[color:var(--color-icon-secondary)]">
+      <Icon icon={icon} size={24} />
+    </span>
+  );
+}
+
+/** Figma 03 / 04, as a phone's search shows videos: the cover with its appreciations, comments and
+ *  views as everyone sees them now, the clip's ⋯, the title, the creator and the date (Public). */
+function PostTile({ item, q, onOpen }: { item: Extract<SearchItem, { type: "post" }>; q: string; onOpen: () => void }) {
   const settings = useSettings();
   const { reactions } = useReactions();
   const comments = useCommentCount(item.clip.postId, sampleSeedOf(item.clip.postId));
   const counts = countsOf(reactions, item.clip.postId, item.clip.base);
-  const [more, setMore] = React.useState(false);
   const [menu, setMenu] = React.useState(false);
   const [used, setUsed] = React.useState(false);
   const clip = item.clip;
-  const long = clip.description.length > 140;
   return (
-    <div className={CARD}>
-      <div className="flex items-center gap-6 p-6">
-        <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-          <Avatar size="md" initials={clip.creator.initials} color={clip.creator.color} />
-          <span className="flex min-w-0 flex-col">
-            <span className={cn(T.bodyLg, "truncate")}>{clip.creator.name}</span>
-            <span className={cn(T.meta, "flex items-center gap-2")}>
-              {formatDate(clip.sharedAt, settings.language.dateLocale, { style: "medium" })}
-              <span aria-hidden>•</span>
-              <Icon icon={Globe02Icon} size={12} aria-label="Public" aria-hidden={false} />
+    <li className="flex min-w-0 flex-col gap-3">
+      <div className="relative overflow-hidden rounded-lg bg-bg-subtle">
+        <button type="button" onClick={onOpen} aria-label={`Open ${clip.title}`} className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus">
+          {clip.poster ? (
+            // eslint-disable-next-line @next/next/no-img-element -- the clip's cover
+            <img src={clip.poster} alt="" className="aspect-[3/4] w-full object-cover" />
+          ) : (
+            <span aria-hidden className="flex aspect-[3/4] w-full items-center justify-center text-[color:var(--color-icon-secondary)]">
+              <Icon icon={Video01Icon} size={32} />
             </span>
-          </span>
+          )}
         </button>
+        {/* White on a dark scrim (text on media). */}
+        <span
+          className={cn(
+            T.meta,
+            MEDIA_INK,
+            "pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-x-4 gap-y-1 bg-gradient-to-b from-transparent to-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)] px-4 pb-3 pt-10",
+          )}
+        >
+          <span className="flex items-center gap-1" aria-label={`${counts.appreciations} appreciations`}>
+            <Icon icon={FavouriteIcon} size={14} />
+            {formatCount(counts.appreciations)}
+          </span>
+          <span className="flex items-center gap-1" aria-label={`${comments ?? 0} comments`}>
+            <Icon icon={Comment01Icon} size={14} />
+            {formatCount(comments ?? 0)}
+          </span>
+          <span className="flex items-center gap-1" aria-label={`${counts.views} views`}>
+            <Icon icon={ViewIcon} size={14} />
+            {formatCount(counts.views)}
+          </span>
+        </span>
         <button
           type="button"
           aria-label={`More for ${clip.title}`}
@@ -561,53 +678,35 @@ function PostResult({ item, q, onOpen }: { item: Extract<SearchItem, { type: "po
             setUsed(true);
             setMenu(true);
           }}
-          className="-mr-4 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+          className={cn(MEDIA_INK, "absolute right-0 top-0 inline-flex size-[44px] items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus")}
         >
-          <Icon icon={MoreHorizontalIcon} size={20} />
+          <span className="inline-flex size-[32px] items-center justify-center rounded-full bg-[var(--color-modal-scrim)]">
+            <Icon icon={MoreHorizontalIcon} size={18} />
+          </span>
         </button>
       </div>
-      <button type="button" onClick={onOpen} className={cn(T.section, "px-6 pb-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
-        <Marked text={clip.title} q={q} />
+      <button type="button" onClick={onOpen} className="flex min-w-0 flex-col gap-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+        <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>
+          <Marked text={clip.title} q={q} />
+        </span>
+        <span className={cn(T.meta, "flex min-w-0 items-center gap-2")}>
+          <Avatar size="2xs" initials={clip.creator.initials} color={clip.creator.color} />
+          <span className="truncate">{clip.creator.name}</span>
+        </span>
+        <span className={cn(T.meta, "flex items-center gap-2 text-text-tertiary")}>
+          {formatDate(clip.sharedAt, settings.language.dateLocale, { style: "medium" })}
+          <Icon icon={Globe02Icon} size={12} aria-label="Public" aria-hidden={false} />
+        </span>
       </button>
-      {clip.description && (
-        <p className="px-6 pb-6">
-          <span className={cn(T.body, !more && "line-clamp-3")}>{clip.description}</span>
-          {long && (
-            <button type="button" onClick={() => setMore((m) => !m)} className={cn(T.rowTitle, "min-h-[44px] text-text-brand outline-none hover:underline focus-visible:underline")}>
-              {more ? "See less" : "See more"}
-            </button>
-          )}
-        </p>
-      )}
-      {clip.poster && (
-        <button type="button" onClick={onOpen} aria-label={`Open ${clip.title}`} className="block outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus">
-          {/* eslint-disable-next-line @next/next/no-img-element -- the clip's picture */}
-          <img src={clip.poster} alt="" className="aspect-[4/3] w-full object-cover" />
-        </button>
-      )}
-      <span className={cn(T.body, "flex items-center gap-8 px-6 py-4")}>
-        <span className="flex items-center gap-2" aria-label={`${counts.appreciations} appreciations`}>
-          <Icon icon={FavouriteIcon} size={16} />
-          {formatCount(counts.appreciations)}
-        </span>
-        <span className="flex items-center gap-2" aria-label={`${comments ?? 0} comments`}>
-          <Icon icon={Comment01Icon} size={16} />
-          {formatCount(comments ?? 0)}
-        </span>
-        <span className="flex items-center gap-2" aria-label={`${counts.views} views`}>
-          <Icon icon={ViewIcon} size={16} />
-          {formatCount(counts.views)}
-        </span>
-      </span>
-      {/* Mounted once asked for (and kept, for the sheets it opens): not one menu per card. */}
+      {/* Mounted once asked for (and kept, for the sheets it opens): not one menu per tile. */}
       {used && <ClipMenu clip={clip} open={menu} onClose={() => setMenu(false)} height={null} guard={SIGNED_IN} />}
-    </div>
+    </li>
   );
 }
 
-/** Figma 06: an item on sale. Buy now: the current price and Buy now; an auction: the bid, when it
- *  ends and View Auction. Both open the item's marketplace. */
-function MarketResult({ item, q, onOpen }: { item: Extract<SearchItem, { type: "market" }>; q: string; onOpen: () => void }) {
+/** Figma 06, as a product row: an item on sale. Buy now: the current price and Buy now; an auction:
+ *  the bid, when it ends and View Auction. Both open the item's marketplace; the row opens the clip. */
+function MarketRow({ item, q, onOpen }: { item: Extract<SearchItem, { type: "market" }>; q: string; onOpen: () => void }) {
   const router = useRouter();
   const settings = useSettings();
   const { reactions } = useReactions();
@@ -615,74 +714,69 @@ function MarketResult({ item, q, onOpen }: { item: Extract<SearchItem, { type: "
   const { clip, offer } = item;
   const auction = offer.kind === "main" ? offer.auction : undefined;
   return (
-    <div className={CARD}>
-      <button type="button" onClick={onOpen} className="relative block text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+    <li className={cn(LIST_CARD, "flex-row gap-6 p-6")}>
+      <button type="button" onClick={onOpen} aria-label={`Open ${clip.title}`} className="shrink-0 self-start overflow-hidden rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
         {clip.poster ? (
           // eslint-disable-next-line @next/next/no-img-element -- the item's picture
-          <img src={clip.poster} alt="" className="aspect-[16/10] w-full object-cover" />
+          <img src={clip.poster} alt="" className="size-[88px] object-cover" />
         ) : (
-          <span aria-hidden className="flex aspect-[16/10] w-full items-center justify-center bg-bg-subtle text-[color:var(--color-icon-secondary)]">
+          <span aria-hidden className="flex size-[88px] items-center justify-center bg-bg-subtle text-[color:var(--color-icon-secondary)]">
             <Icon icon={CpuIcon} size={32} />
           </span>
         )}
-        {clip.stage && <Tag size="md" className="absolute right-6 top-6">{clip.stage}</Tag>}
       </button>
-      <div className="flex flex-col gap-4 p-6">
-        <span className={T.section}>
-          <Marked text={clip.title} q={q} />
-        </span>
-        <span className={cn(T.body, "flex items-center justify-between gap-4")}>
-          <span className="truncate">{clip.creator.name}</span>
-          <span className="flex shrink-0 items-center gap-4">
-            <span className="flex items-center gap-2">
-              <Icon icon={ViewIcon} size={16} />
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <button type="button" onClick={onOpen} className="flex min-w-0 flex-col gap-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+          <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>
+            <Marked text={clip.title} q={q} />
+          </span>
+          <span className={cn(T.meta, "flex min-w-0 items-center gap-3")}>
+            <span className="truncate">{clip.creator.name}</span>
+            <span className="flex shrink-0 items-center gap-1" aria-label={`${counts.views} views`}>
+              <Icon icon={ViewIcon} size={14} />
               {formatCount(counts.views)}
             </span>
-            <span className="flex items-center gap-2">
-              <Icon icon={FavouriteIcon} size={16} />
+            <span className="flex shrink-0 items-center gap-1" aria-label={`${counts.appreciations} appreciations`}>
+              <Icon icon={FavouriteIcon} size={14} />
               {formatCount(counts.appreciations)}
             </span>
           </span>
-        </span>
+        </button>
         <span className="flex flex-wrap gap-2">
+          {clip.stage && <Badge tone="neutral">{clip.stage}</Badge>}
           {[...new Set(clip.offers.map((o) => o.kind))].map((k) => (
             <Badge key={k} tone="blue">
               {OFFER_NAME[k]}
             </Badge>
           ))}
         </span>
-        <span className="flex flex-col gap-1 border-t-[length:var(--border-width-1)] border-solid border-border pt-4">
-          <span className={T.body}>{auction ? auction.bidLabel : offer.kind === "main" ? "Current Price" : `${OFFER_NAME[offer.kind]} from`}</span>
-          <span className={T.section}>{auction ? auction.bid : offer.price}</span>
-          {auction?.endsAt && <span className={cn(T.meta, "text-text-warning")}>Ends {formatDateTime(auction.endsAt, settings.language.dateLocale, { style: "medium" })}</span>}
-        </span>
-        <Button size="xl" className="w-full" onClick={() => router.push(clipBuyHref(clip))}>
-          {auction ? "View Auction" : "Buy now"}
-        </Button>
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <span className="flex min-w-0 flex-col">
+            <span className={T.meta}>{auction ? auction.bidLabel : offer.kind === "main" ? "Current Price" : `${OFFER_NAME[offer.kind]} from`}</span>
+            <span className={cn(T.section, "tabular-nums")}>{auction ? auction.bid : offer.price}</span>
+            {auction?.endsAt && <span className={cn(T.meta, "text-text-warning")}>Ends {formatDateTime(auction.endsAt, settings.language.dateLocale, { style: "medium" })}</span>}
+          </span>
+          <Button hierarchy="secondary" size="md" className={HIT44} onClick={() => router.push(clipBuyHref(clip))}>
+            {auction ? "View Auction" : "Buy now"}
+          </Button>
+        </div>
       </div>
-    </div>
+    </li>
   );
 }
 
-/** Figma 05: a part or an Agile Module. It has no phone page, so it opens its facts in a sheet. */
-function PartResult({ item, q }: { item: Extract<SearchItem, { type: "part" }>; q: string }) {
+/** Figma 05: a part or an Agile Module. It has no phone page, so its row opens its facts in a sheet. */
+function PartRow({ item, q }: { item: Extract<SearchItem, { type: "part" }>; q: string }) {
   const [open, setOpen] = React.useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className={cn(CARD, "outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
-        <span aria-hidden className="flex aspect-[16/9] w-full items-center justify-center bg-bg-subtle text-[color:var(--color-icon-secondary)]">
-          <Icon icon={CpuIcon} size={40} />
-        </span>
-        <span className="flex flex-col gap-2 p-6">
-          <span className="flex items-start justify-between gap-4">
-            <span className={T.section}>
-              <Marked text={item.title} q={q} />
-            </span>
-            <Badge tone="neutral">{item.tag}</Badge>
-          </span>
-          <span className={T.body}>{item.meta}</span>
-        </span>
-      </button>
+      <ListRow
+        leading={<RowPicture src={null} icon={CpuIcon} />}
+        title={<Marked text={item.title} q={q} />}
+        meta={item.meta}
+        trailing={<Badge tone="neutral">{item.tag}</Badge>}
+        onClick={() => setOpen(true)}
+      />
       <Sheet open={open} onClose={() => setOpen(false)} title={item.title} description={item.tag}>
         <dl className="flex flex-col gap-4">
           {item.facts.map((f) => (
@@ -712,28 +806,34 @@ function PartResult({ item, q }: { item: Extract<SearchItem, { type: "part" }>; 
   );
 }
 
-function PersonResult({ item, q, onOpen }: { item: Extract<SearchItem, { type: "person" }>; q: string; onOpen: () => void }) {
+/** A person: the row opens their profile; Follow / Following at its end (the web's follow). */
+function PersonRow({ item, q, onOpen }: { item: Extract<SearchItem, { type: "person" }>; q: string; onOpen: () => void }) {
   const { reactions, setFollow, hydrated } = useReactions();
   const toast = useToast();
   // Your own choice only: a new account starts following no one.
   const on = item.followKey ? follows(reactions, item.followKey, false) : false;
   return (
-    <div className="flex flex-col gap-4 border-b-[length:var(--border-width-1)] border-solid border-border py-6">
-      <button type="button" onClick={onOpen} className="flex items-center gap-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+    <li className="flex items-center gap-4 border-b-[length:var(--border-width-1)] border-solid border-border py-2 last:border-b-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        className={cn(PRESS, "-ml-2 flex min-h-[60px] min-w-0 flex-1 items-center gap-6 rounded-md pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+      >
         <PersonAvatar id={item.person.id} name={item.person.name} />
         <span className="flex min-w-0 flex-col">
-          <span className={cn(T.bodyLg, "truncate")}>
+          <span className={cn(T.rowTitle, "truncate")}>
             <Marked text={item.person.name} q={q} />
           </span>
-          <span className={cn(T.meta, "line-clamp-2")}>{item.subtitle}</span>
+          <span className={cn(T.meta, "truncate")}>{item.subtitle}</span>
         </span>
       </button>
       {item.followKey && (
         <Button
-          hierarchy={on ? "secondary" : "primary"}
-          size="lg"
-          className="ml-[52px]"
+          hierarchy={on ? "secondary" : "tonal"}
+          size="md"
+          className={cn(HIT44, "shrink-0")}
           aria-pressed={on}
+          aria-label={`${on ? "Following" : "Follow"} ${item.person.name}`}
           disabled={!hydrated}
           onClick={() => {
             if (!setFollow(item.followKey as string, !on)) toast({ title: "This phone couldn’t save that. Nothing changed.", lead: "error" });
@@ -742,6 +842,6 @@ function PersonResult({ item, q, onOpen }: { item: Extract<SearchItem, { type: "
           {on ? "Following" : "Follow"}
         </Button>
       )}
-    </div>
+    </li>
   );
 }

@@ -1,16 +1,18 @@
 "use client";
 
-// Feed · Saved clips (mobile Figma 01–02): Back, "Saved"; "Saved Items", then a
-// row per saved clip — its picture, its name and "Saved on: <date>" (when this
-// phone saved it; one saved on the web says Saved), and ⋯: the M12 menu with
-// View original post, Copy link and Unsave. A product clip is listed as itself
-// (its own picture, its own page); the list is the web's Saved (the reactions
-// store), so a post saved on either shows on both, and your own shared
-// projects are listed like anyone's. Newest first.
+// Feed · Saved clips (mobile Figma 01–02): Back, "Saved"; then a row per saved
+// clip — its picture, its name and "Saved on: <date>" (when this phone saved
+// it; one saved on the web says Saved), and ⋯: the M12 menu with View original
+// post, Copy link and Unsave. A product clip is listed as itself (its own
+// picture, its own page); the list is the web's Saved (the reactions store),
+// so a post saved on either shows on both, and your own shared projects are
+// listed like anyone's. Newest first.
 //
 // Two tabs under the top bar, Saved · Appreciated (`?list=appreciated`, the
-// web's Innovations "Appreciated" mode): the same list over what you
-// appreciated, with Remove and Undo. The hub's Saved Items opens it on Saved.
+// web's Innovations "Appreciated" mode), each with its count: the same list
+// over what you appreciated, with Remove and Undo. The tabs name the lists, so
+// there is no heading over them (the Figma's "Saved Items" is the tab). The
+// hub's Saved Items opens it on Saved.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -36,10 +38,6 @@ import { useFeedPrefs } from "./use-feed";
 
 type Row = { clip: FeedClip; at: number | null };
 type List = "saved" | "appreciated";
-const LISTS: readonly { value: List; label: string }[] = [
-  { value: "saved", label: "Saved" },
-  { value: "appreciated", label: "Appreciated" },
-];
 
 const FAILED = "This phone couldn’t save that. Nothing changed.";
 
@@ -56,14 +54,18 @@ export function SavedScreen() {
   const { toggleSave } = useSaveClip();
   const [menu, setMenu] = React.useState<Row | null>(null);
 
-  const rows = React.useMemo<Row[]>(() => {
-    if (!appreciated) return savedRows(reactions.saved, prefs.savedAt, all);
-    return reactions.appreciated
-      .map((postId) => all.find((c) => c.postId === postId && c.kind === "project"))
-      .filter((c): c is FeedClip => !!c)
-      .reverse()
-      .map((clip) => ({ clip, at: null }));
-  }, [appreciated, reactions.saved, reactions.appreciated, prefs.savedAt, all]);
+  const savedList = React.useMemo<Row[]>(() => savedRows(reactions.saved, prefs.savedAt, all), [reactions.saved, prefs.savedAt, all]);
+  const appreciatedList = React.useMemo<Row[]>(
+    () =>
+      reactions.appreciated
+        .map((postId) => all.find((c) => c.postId === postId && c.kind === "project"))
+        .filter((c): c is FeedClip => !!c)
+        .reverse()
+        .map((clip) => ({ clip, at: null })),
+    [reactions.appreciated, all],
+  );
+  const rows = appreciated ? appreciatedList : savedList;
+  const ready = hydrated && prefsRead && clipsRead;
 
   const unsave = (r: Row) => {
     if (appreciated) {
@@ -90,14 +92,25 @@ export function SavedScreen() {
   return (
     <Screen top={<TopBar back="/m/profile" title="Saved" />}>
       <div className="sticky top-0 z-10 bg-bg-page">
-        <MobileTabs label="Your lists" idBase="saved-lists" tabs={LISTS} value={list} onChange={setList} />
+        <MobileTabs
+          label="Your lists"
+          idBase="saved-lists"
+          tabs={[
+            { value: "saved", label: "Saved", count: ready ? savedList.length : 0, countLabel: `${savedList.length} saved` },
+            { value: "appreciated", label: "Appreciated", count: ready ? appreciatedList.length : 0, countLabel: `${appreciatedList.length} appreciated` },
+          ]}
+          value={list}
+          onChange={setList}
+        />
       </div>
-      <div {...tabPanelProps("saved-lists", list)} className="flex flex-col gap-4 px-8 pb-8 pt-6 outline-none">
-        <h2 className={cn(T.section, "pt-2")}>{appreciated ? "What you appreciated" : "Saved Items"}</h2>
-        {!hydrated || !prefsRead || !clipsRead ? (
-          <ListBones rows={6} />
+      <div {...tabPanelProps("saved-lists", list)} className="flex flex-col px-8 pb-8 pt-2 outline-none">
+        {!ready ? (
+          <div className="pt-4">
+            <ListBones rows={6} />
+          </div>
         ) : rows.length === 0 ? (
           <EmptyState
+            className="mt-6"
             icon={appreciated ? FavouriteIcon : Bookmark01Icon}
             title={appreciated ? "Nothing appreciated yet" : "Nothing saved yet"}
             body={appreciated ? "Tap the heart on a clip on the Feed and it shows here." : "Save a video from its ⋯ menu on the Feed and it waits for you here."}
@@ -106,20 +119,20 @@ export function SavedScreen() {
         ) : (
           <ul className="flex flex-col">
             {rows.map((r) => (
-              <li key={r.clip.id} className="flex items-center gap-6 border-b-[length:var(--border-width-1)] border-solid border-border py-6">
+              <li key={r.clip.id} className="flex items-center gap-4 border-b-[length:var(--border-width-1)] border-solid border-border py-3 last:border-b-0">
                 <button
                   type="button"
                   onClick={() => router.push(clipHref(r.clip.id))}
-                  className="flex min-w-0 flex-1 items-center gap-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                  className="-ml-2 flex min-h-[72px] min-w-0 flex-1 items-center gap-6 rounded-md pl-2 text-left outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
                 >
                   {r.clip.poster ? (
                     // eslint-disable-next-line @next/next/no-img-element -- the clip's picture
-                    <img src={r.clip.poster} alt="" className="size-[40px] shrink-0 rounded-md object-cover" />
+                    <img src={r.clip.poster} alt="" className="size-[56px] shrink-0 rounded-md object-cover" />
                   ) : (
-                    <span aria-hidden className="size-[40px] shrink-0 rounded-md bg-bg-subtle" />
+                    <span aria-hidden className="size-[56px] shrink-0 rounded-md bg-bg-subtle" />
                   )}
-                  <span className="flex min-w-0 flex-col">
-                    <span className={cn(T.rowTitle, "truncate")}>{r.clip.title}</span>
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>{r.clip.title}</span>
                     <span className={T.meta}>
                       {appreciated
                         ? `by ${r.clip.creator.name}`
@@ -133,7 +146,7 @@ export function SavedScreen() {
                   type="button"
                   aria-label={`More for ${r.clip.title}`}
                   onClick={() => setMenu(r)}
-                  className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                  className="-mr-4 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
                 >
                   <Icon icon={MoreHorizontalIcon} size={20} />
                 </button>

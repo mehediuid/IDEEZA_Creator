@@ -41,7 +41,7 @@ export function FeedTopNav({ tab, onTab, guard }: { tab: FeedTab; onTab: (t: Fee
               className={cn(
                 T.name,
                 MEDIA_INK,
-                "flex h-full items-center rounded-md px-5 py-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+                "flex h-full items-center rounded-md px-5 py-2 outline-none after:absolute after:inset-x-0 after:-inset-y-[8px] after:content-[''] focus-visible:ring-2 focus-visible:ring-border-focus relative",
                 tab === t ? "bg-[var(--color-glass-fill-sm)]" : "bg-transparent",
               )}
             >
@@ -83,7 +83,7 @@ function NavIcon({ icon, label, onClick }: { icon: IconValue; label: string; onC
       type="button"
       aria-label={label}
       onClick={onClick}
-      className={cn(MEDIA_INK, "inline-flex size-[44px] items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+      className={cn(MEDIA_INK, "inline-flex size-[44px] items-center justify-center rounded-full outline-none transition-colors duration-fast active:bg-[var(--color-glass-fill-sm)] focus-visible:ring-2 focus-visible:ring-border-focus")}
     >
       <Icon icon={icon} size={24} />
     </button>

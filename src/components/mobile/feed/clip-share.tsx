@@ -4,8 +4,9 @@
 // "Share to your Feed" — you (A16 Avatar SM and your name) with the audience
 // under your name (Public ⌄, a pick-one sheet "Post audience": Public or Only
 // me; no Friends, D-1), then the caption as the Figma draws it, borderless
-// right under you ("Say something about this post..."), then Share now and
-// Cancel. A share is real: the clip leads your Feed with "You shared", your
+// right under you ("Say something about this post..."), then the clip being
+// shared as a small card (its picture, title and creator: what the share will
+// show), then Share now and Cancel. A share is real: the clip leads your Feed with "You shared", your
 // audience and your caption (lib/innovations/clips.ts `feedClips`), and its ⋯
 // takes it off again. A write the phone refuses keeps the caption and says so.
 
@@ -20,6 +21,7 @@ import type { FeedClip } from "@/lib/innovations/clips";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMe } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
+import { LIST_CARD } from "../kit/list";
 import { PickSheet } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
@@ -142,6 +144,19 @@ export function ClipShare({
               {problem ?? `${caption.length}/${CAPTION_MAX}`}
             </span>
           )}
+        </div>
+        {/* What the share shows: the clip itself. */}
+        <div className={cn(LIST_CARD, "flex-row items-center gap-6 p-4")}>
+          {clip.poster ? (
+            // eslint-disable-next-line @next/next/no-img-element -- the clip's picture
+            <img src={clip.poster} alt="" className="size-[56px] shrink-0 rounded-md object-cover" />
+          ) : (
+            <span aria-hidden className="size-[56px] shrink-0 rounded-md bg-bg-subtle" />
+          )}
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>{clip.title}</span>
+            <span className={cn(T.meta, "truncate")}>{clip.creator.name}</span>
+          </span>
         </div>
       </Sheet>
       <PickSheet

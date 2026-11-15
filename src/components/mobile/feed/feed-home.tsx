@@ -17,13 +17,16 @@
 // People), everything hidden (show them again), offline. A new account follows
 // no one until it chooses to (the sample dataset's follows are the web's
 // demo, not the phone account's). After a skipped "Where did you hear about
-// IDEEZA?", the web's "Finish your profile" card shows under the top nav.
+// IDEEZA?", the web's "Finish your profile" card shows under the top nav. The
+// build's live bar and the render tray dock under the top nav (kit/dock.tsx),
+// so they push the banner and the card down instead of covering them.
 
 import * as React from "react";
 import { Search01Icon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { FEED_CLIPS, feedClips, followingClips, type FeedClip } from "@/lib/innovations/clips";
 import { useReactions } from "@/lib/innovations/reactions";
+import { DockSlot } from "../kit/dock";
 import { EmptyState } from "../kit/state";
 import { OfflineBanner } from "../kit/states";
 import { useTabParam } from "../kit/tabs";
@@ -106,6 +109,10 @@ export function FeedHome() {
         </div>
         <div className="pointer-events-auto">
           <QueuePill />
+        </div>
+        {/* The build's bar and the render tray dock here, under the top nav, in flow (lens 13). */}
+        <div className="pointer-events-auto pt-2 empty:hidden">
+          <DockSlot edge="top" />
         </div>
         <div className="pointer-events-auto px-8 pt-4">
           <OfflineBanner />

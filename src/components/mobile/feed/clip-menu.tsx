@@ -11,7 +11,8 @@
 // - Copy link copies the clip's own address ("Link to post copied to clipboard");
 // - Playback speed (kept) and Video quality are pick-one sheets (quality offers
 //   what the clip really has, and Data saver — Settings › Appearance's switch,
-//   one for the app — which waits for a tap before playing);
+//   one for the app — which waits for a tap before playing); their rows say
+//   the current choice ("Playback speed · Normal", "Video quality · Auto");
 // - Report is the kit's Report sheet with "Also block {creator}" (Figma 07):
 //   "Tell us more" opens under Something else; a reported clip reads Reported.
 // A clip you shared to your Feed adds "Remove from your Feed". On a project you
@@ -178,9 +179,11 @@ export function ClipMenu({
   };
 
   const shared: ActionSheetItem[] = clip.share ? [{ label: "Remove from your Feed", icon: Delete02Icon, destructive: true, onSelect: removeShare }] : [];
+  const speedNow = prefs.speed === 1 ? "Normal" : `${SPEEDS.find((x) => x.value === prefs.speed)?.label ?? prefs.speed}×`;
+  const qualityNow = prefs.quality === "auto" ? "Auto" : `${prefs.quality}p`;
   const playback: ActionSheetItem[] = [
-    { label: "Playback speed", icon: DashboardSpeed01Icon, onSelect: () => setSheet("speed") },
-    { label: "Video quality", icon: Video01Icon, onSelect: () => setSheet("quality") },
+    { label: `Playback speed · ${speedNow}`, icon: DashboardSpeed01Icon, onSelect: () => setSheet("speed") },
+    { label: `Video quality · ${qualityNow}`, icon: Video01Icon, onSelect: () => setSheet("quality") },
   ];
   const saveRow: ActionSheetItem = { label: saved ? "Unsave video" : "Save video", icon: saved ? BookmarkRemove01Icon : Bookmark01Icon, onSelect: save };
   const copyRow: ActionSheetItem = { label: "Copy link", icon: Link01Icon, onSelect: () => copy(clip.id) };
@@ -250,7 +253,7 @@ export function ClipMenu({
         <div className="flex min-h-[48px] items-center justify-between gap-6">
           <span className="flex flex-col">
             <span className={T.bodyLg}>Data saver</span>
-            <span className={cn(T.meta, "text-text-tertiary")}>Clips wait for a tap before they play. The same switch as Settings › Appearance.</span>
+            <span className={cn(T.meta, "text-text-tertiary")}>Clips wait for a tap. Also in Settings › Appearance.</span>
           </span>
           <Toggle
             aria-label="Data saver"

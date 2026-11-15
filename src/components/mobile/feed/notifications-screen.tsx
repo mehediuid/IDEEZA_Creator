@@ -1,36 +1,46 @@
 "use client";
 
-// Notification (mobile Figma, Design - Light Mode › Notification): Back,
-// "Notification" and ⋮ (Mark all as read · Notification settings · Clear all
-// notifications); the All and Unread tabs (M14, Unread with its count; the tab
-// is kept in the address, `?tab=unread`); the list under New, Today, Yesterday
-// and the date; each notice with its button — two where the Figma draws two
-// (a new sign-in: It's me · Log Out) — and its own ⋮ (Turn off notifications
-// like this · Mute this project · Delete this notification). Popups are the
-// kit's bottom sheets, so the Figma's dropdowns rise from the bottom (owner
-// rule), and the two deletes ask first.
+// Notification (mobile Figma, Design - Light Mode › Notification), row-first
+// (2026 mobile UX pass): Back, "Notification" and ⋮ (Mark all as read ·
+// Notification settings · Clear all notifications); the All and Unread tabs
+// (M14, Unread with its count; the tab is kept in the address, `?tab=unread`);
+// the list under New, Today, Yesterday and the date. Each notice is one row,
+// tappable as a whole: the kind's picture (a dot while unread), one meta line
+// (its tag and a compact time), the title, the body in two lines; under them
+// its button, small — two where the Figma draws two (a new sign-in: It's me ·
+// Log Out) — and its own ⋮ (Turn off notifications like this · Mute this
+// project · Delete this notification). Popups are the kit's bottom sheets, so
+// the Figma's dropdowns rise from the bottom (owner rule), and the two deletes
+// ask first.
 //
 // The notices are the web bell's (use-notices.ts): builds, sales and bids,
 // messages, comments, coin and plan, videos, blog reviews — and the phone's
-// account and security notices. Each button opens the exact phone screen: the
-// thread, the build's chat, Plans, the project's Earn tab, the comment on your
-// post. Opening one marks it read where the bell keeps it; turning a kind off
-// and muting a project are the web's Notification settings; Delete and Clear
-// all take notices off this phone's list only (the web bell keeps every record).
+// account and security notices. The row and its button open the exact phone
+// screen: the thread, the build's chat, Plans, the project's Earn tab, the
+// comment on your post. Opening one marks it read where the bell keeps it;
+// turning a kind off and muting a project are the web's Notification settings;
+// Delete and Clear all take notices off this phone's list only (the web bell
+// keeps every record).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Coins01Icon,
   Comment01Icon,
+  CpuIcon,
   Delete02Icon,
+  LicenseIcon,
   Message01Icon,
   MoreVerticalIcon,
+  News01Icon,
   Notification01Icon,
   NotificationOff01Icon,
   Settings02Icon,
   Shield01Icon,
   Store01Icon,
   TickDouble02Icon,
+  UserAdd01Icon,
+  UserGroupIcon,
   VolumeOffIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
@@ -49,7 +59,7 @@ import {
 } from "@/lib/notifications/phone";
 import { KIND_LABELS } from "@/lib/notifications/types";
 import type { Notice, NoticeKind } from "@/lib/notifications/types";
-import { formatDate, formatDateTime } from "@/lib/settings/dates";
+import { formatDate, formatStamp, formatTime } from "@/lib/settings/dates";
 import { readSettings, updateSettings } from "@/lib/settings/prefs";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
@@ -64,14 +74,22 @@ import { T } from "../type";
 import { useMinuteNow } from "./use-feed";
 import { usePhoneNotices } from "./use-phone-notices";
 
-/** Notices about something a person did carry a picture of it, as the Figma's avatar rows do. */
-const KIND_ICON: Partial<Record<NoticeKind, IconValue>> = {
-  message: Message01Icon,
-  teams: Message01Icon,
-  comments: Comment01Icon,
+/** Every notice leads with its kind's picture, so the rows line up and scan by kind. */
+const KIND_ICON: Record<NoticeKind, IconValue> = {
   marketplace: Store01Icon,
+  product: CpuIcon,
+  coin: Coins01Icon,
+  comments: Comment01Icon,
+  message: Message01Icon,
+  following: UserAdd01Icon,
+  teams: UserGroupIcon,
+  blog: News01Icon,
+  policy: LicenseIcon,
   other: Shield01Icon,
 };
+
+/** A 36 px button's tap area grown to 44 (the kit's touch rule). */
+const HIT44 = "after:absolute after:inset-x-0 after:-inset-y-[4px] after:content-['']";
 
 const TABS = ["all", "unread"] as const;
 
@@ -196,17 +214,14 @@ export function NotificationsScreen() {
           <div className="flex flex-col pb-8">
             {groups.map((g) => (
               <section key={g.key} aria-label={g.label} className="flex flex-col">
-                <h2 className={cn(T.meta, "flex items-center gap-6 px-8 pb-2 pt-8 text-text-tertiary")}>
-                  {g.label}
-                  <span aria-hidden className="h-px flex-1 bg-[var(--color-border-default)]" />
-                </h2>
-                <ul className="flex flex-col px-8">
+                <h2 className={cn(T.rowTitle, "px-8 pb-1 pt-8")}>{g.label}</h2>
+                <ul className="flex flex-col">
                   {g.notices.map((n) => (
                     <NoticeRow
                       key={n.id}
                       n={n}
                       read={feed.isRead(n)}
-                      when={formatDateTime(n.at, locale, { style: "long" })}
+                      when={g.key === "new" ? formatStamp(n.at, locale, now) : (formatTime(n.at, locale) ?? formatStamp(n.at, locale, now))}
                       onOpen={() => openNotice(n)}
                       onSecond={() => second(n)}
                       onMenu={() => setRowMenu(n)}
@@ -258,30 +273,35 @@ function NoticeRow({
   onSecond: () => void;
   onMenu: () => void;
 }) {
-  const icon = KIND_ICON[n.kind];
   const error = n.id.startsWith("build:") && n.id.endsWith(":retry");
   const two = secondActionOf(n);
   return (
-    <li className="flex items-start gap-4 border-b-[length:var(--border-width-1)] border-solid border-border py-8">
-      {icon && (
-        <span aria-hidden className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-full bg-bg-surface text-[color:var(--color-icon-default)]">
-          <Icon icon={icon} size={20} />
-        </span>
-      )}
+    // The whole row opens the notice (its main button's tap area covers the row); the small
+    // buttons and ⋮ sit above that area. Pressed: the row tints.
+    <li className="relative flex items-start gap-6 px-8 py-6 transition-colors duration-fast active:bg-bg-subtle">
+      <span aria-hidden className="relative mt-1 inline-flex size-[40px] shrink-0 items-center justify-center rounded-full bg-bg-surface text-[color:var(--color-icon-default)]">
+        <Icon icon={KIND_ICON[n.kind] ?? Notification01Icon} size={20} />
+        {!read && <span className="absolute right-0 top-0 size-[10px] rounded-full bg-[var(--color-icon-brand)] ring-2 ring-[var(--color-bg-page)]" />}
+      </span>
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <button type="button" onClick={onOpen} className="flex flex-col gap-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex flex-col gap-1 rounded-sm text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-2 focus-visible:ring-border-focus"
+        >
           {!read && <span className="sr-only">Unread: </span>}
-          <span className={cn(T.meta, "text-text-tertiary")}>{n.tag}</span>
+          <span className={cn(T.meta, "text-text-tertiary")}>
+            {n.tag} · {when}
+          </span>
           <span className={cn(read ? T.body : T.rowTitle, error ? "text-text-error" : "text-text-primary")}>{n.title}</span>
-          {n.body && <span className={T.body}>{n.body}</span>}
-          <span className={cn(T.meta, "text-text-tertiary")}>{when}</span>
+          {n.body && <span className={cn(T.body, "line-clamp-2")}>{n.body}</span>}
         </button>
-        <div className="flex flex-wrap gap-4">
-          <Button size="sm" onClick={onOpen}>
+        <div className="relative z-[1] flex flex-wrap gap-4">
+          <Button size="md" hierarchy="secondary" className={cn("relative", HIT44)} onClick={onOpen}>
             {actionLabelOf(n)}
           </Button>
           {two && (
-            <Button size="sm" hierarchy="secondary" onClick={onSecond}>
+            <Button size="md" hierarchy="secondary" className={cn("relative", HIT44)} onClick={onSecond}>
               {two.label}
             </Button>
           )}
@@ -291,7 +311,7 @@ function NoticeRow({
         type="button"
         aria-label={`More for: ${n.title}`}
         onClick={onMenu}
-        className="-mr-4 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="relative z-[1] -mr-4 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         <Icon icon={MoreVerticalIcon} size={20} />
       </button>
