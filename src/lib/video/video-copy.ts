@@ -130,6 +130,10 @@ export function actionLabel(action: StatusCopy["action"]): string | null {
   return action === "generate" ? "Generate AI video" : action === "retry" ? "Try again" : action === "review" ? "Review" : null;
 }
 
+/** The readiness row's quiet action on a settled "Video ready": a new take, made as Regenerate
+ *  makes one, while the take in use stays until the maker chooses the new one. */
+export const REPLACE_LABEL = "Replace";
+
 export type ReadinessCopy = { title: string; info: string; cta: string };
 
 /** P2-VIDEO-14's table, with §4.3's two added purposes. */

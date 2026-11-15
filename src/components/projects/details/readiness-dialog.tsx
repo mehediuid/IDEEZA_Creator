@@ -10,7 +10,10 @@
 //   poster, else the concept image, else a neutral icon; the name; the
 //   P2-VIDEO-4 status; and the owner's action — Generate AI video / Try
 //   again / Review opens the Generate dialog on top (Review on the waiting
-//   take's Review), with ← Back to this one.
+//   take's Review), with ← Back to this one. A settled "Video ready" row
+//   carries a quiet Replace instead: the Generate form from the take in use,
+//   as Regenerate opens it, and that take stays in use until the maker
+//   chooses the new one.
 // - Every whole-project purpose (not an edition) adds the "Project video"
 //   group under the products (owner, 2026-10-21): one row, made from the
 //   product videos. It waits, with its reason, until every product has its
@@ -47,6 +50,7 @@ import { useProjectVideos } from "@/lib/video/store";
 import {
   PROJECT_GROUP_META,
   PROJECT_VIDEO_TITLE,
+  REPLACE_LABEL,
   actionLabel,
   projectStateLine,
   readinessCopy,
@@ -115,7 +119,11 @@ export function ReadinessDialog({
   const [askedOwnership] = React.useState(() => purpose === "showcase" && ownershipRule?.ok === false);
   const owned = ownershipRule?.ok === true;
 
-  const [generating, setGenerating] = React.useState<{ target: VideoTarget; reviewTakeId: string | null } | null>(null);
+  const [generating, setGenerating] = React.useState<{
+    target: VideoTarget;
+    reviewTakeId: string | null;
+    fromTakeId: string | null;
+  } | null>(null);
   const [projecting, setProjecting] = React.useState(false);
   const actionRefs = React.useRef(new Map<string, HTMLButtonElement>());
   const projectActionRef = React.useRef<HTMLButtonElement | null>(null);
@@ -152,11 +160,13 @@ export function ReadinessDialog({
   }
 
   const productById = React.useMemo(() => new Map(view.products.map((p) => [p.id, p])), [view.products]);
-  const openGenerate = (row: ProductReadiness) => {
+  const openGenerate = (row: ProductReadiness, replace = false) => {
     const p = productById.get(row.productId) ?? (product?.id === row.productId ? product : undefined);
     const v = row.video;
     const waiting = v.state === "review" ? v.take : v.state === "ready" ? v.review : undefined;
-    if (p) setGenerating({ target: videoTargetOf(project, p), reviewTakeId: waiting?.id ?? null });
+    // Replace opens the form from the take in use, as Regenerate does; it stays in use meanwhile.
+    const from = replace && v.state === "ready" ? v.take.id : null;
+    if (p) setGenerating({ target: videoTargetOf(project, p), reviewTakeId: from ? null : (waiting?.id ?? null), fromTakeId: from });
   };
   // Something renders: closing this is safe, and the note says so.
   const rendering =
@@ -234,6 +244,7 @@ export function ReadinessDialog({
                     else actionRefs.current.delete(p.productId);
                   }}
                   onAction={() => openGenerate(p)}
+                  onReplace={() => openGenerate(p, true)}
                 />
               ))}
             </ul>
@@ -301,6 +312,7 @@ export function ReadinessDialog({
         open={generating !== null}
         target={generating?.target ?? null}
         reviewTakeId={generating?.reviewTakeId ?? null}
+        fromTakeId={generating?.fromTakeId ?? null}
         back={{ label: `Back to ${copy.title}`, onBack: () => setGenerating(null) }}
         onClose={() => setGenerating(null)}
       />
@@ -319,14 +331,18 @@ function ReadinessRow({
   row,
   actionRef,
   onAction,
+  onReplace,
 }: {
   row: ProductReadiness;
   actionRef: (el: HTMLButtonElement | null) => void;
   onAction: () => void;
+  onReplace: () => void;
 }) {
   const name = displayProductName(row.name);
   const copy = statusCopy(row.video);
   const action = actionLabel(copy.action);
+  // Settled and in use: no take renders beside it and none waits for review.
+  const replaceable = !action && row.video.state === "ready" && !row.video.next;
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-4 px-6 py-5">
       <RowThumb row={row} />
@@ -353,6 +369,24 @@ function ReadinessRow({
           }}
         >
           {action}
+        </Button>
+      )}
+      {/* Not an actionRef: the CTA's "fix this first" focus never lands on a ready row. */}
+      {replaceable && (
+        <Button
+          type="button"
+          hierarchy="ghost"
+          size="md"
+          aria-haspopup="dialog"
+          aria-label={`${REPLACE_LABEL} ${name} video`}
+          className={cn("max-sm:w-full", TAP)}
+          onClick={(e) => {
+            // Safari doesn't focus a clicked button; the gate returns focus here.
+            e.currentTarget.focus();
+            onReplace();
+          }}
+        >
+          {REPLACE_LABEL}
         </Button>
       )}
     </li>
