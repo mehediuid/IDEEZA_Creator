@@ -317,13 +317,17 @@ function TextareaCtl({ value, onCommit }: { value: string; onCommit: (v: string)
 }
 
 // Small icon button used beside a Select (gear = "settings", jump = "go to net").
-function IconAffordanceBtn({ svg, title, onClick }: { svg: string; title: string; onClick: () => void }) {
+// No `onClick` = nothing behind it yet: greyed, and `title` says why.
+function IconAffordanceBtn({ svg, title, onClick }: { svg: string; title: string; onClick?: () => void }) {
+  const off = !onClick;
   return (
     <button
       type="button"
       title={title}
+      aria-label={title}
+      disabled={off}
       onClick={onClick}
-      style={{ width: 22, height: 22, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: "pointer" }}
+      style={{ width: 22, height: 22, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.45 : 1 }}
     >
       <Icon html={svg} size={11} />
     </button>
@@ -558,7 +562,7 @@ function FieldRow({ field, obj, objs }: { field: InspectorField; obj: import("@/
         control = (
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
             <Select value={String(bound.value ?? options[0] ?? "")} onChange={bound.set} options={options.map((o) => ({ label: o, value: o }))} minWidth={104} />
-            <IconAffordanceBtn svg={GEAR_SVG} title="Settings" onClick={() => actions.flashToast(`${field.label} settings — coming soon`)} />
+            <IconAffordanceBtn svg={GEAR_SVG} title={`${field.label} settings aren't built yet.`} />
           </div>
         );
         break;
@@ -590,7 +594,8 @@ function FieldRow({ field, obj, objs }: { field: InspectorField; obj: import("@/
         control = (
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
             <Select value={String(bound.value ?? netOpts[0] ?? "")} onChange={bound.set} options={netOpts.map((o) => ({ label: o, value: o }))} minWidth={104} />
-            <IconAffordanceBtn svg={JUMP_SVG} title="Jump to net" onClick={() => actions.flashToast("Jump to net — coming soon")} />
+            {/* Jump = the net highlight the Nets tab and the canvas menu use. */}
+            <IconAffordanceBtn svg={JUMP_SVG} title={bound.value ? "Jump to net" : "This object has no net yet."} onClick={bound.value ? () => actions.highlightNet(String(bound!.value)) : undefined} />
           </div>
         );
         break;

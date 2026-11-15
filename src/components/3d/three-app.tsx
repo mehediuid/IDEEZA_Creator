@@ -37,7 +37,7 @@ import { readSettings } from "@/lib/settings/prefs";
 type ThreeMode = "demo" | "sketch" | "fullview" | "preview";
 type ModalId =
   | "preferences" | "units" | "grid" | "snap"
-  | "align" | "pattern" | "section" | "measure"
+  | "align" | "pattern"
   | "about" | "shortcuts" | "docs" | null;
 
 function Pill({ children, onClick, leading, trailing }: { children: React.ReactNode; onClick?: () => void; leading?: React.ReactNode; trailing?: React.ReactNode }) {
@@ -189,6 +189,9 @@ export function ThreeApp() {
 
   const [resetTick, setResetTick] = React.useState(0);
   const [fitTick, setFitTick] = React.useState(0);
+  // The view controls' zoom buttons: each press moves the camera toward (factor < 1)
+  // or away from the orbit target, as one wheel step does.
+  const [zoom, setZoom] = React.useState({ tick: 0, factor: 1 });
   const scope = editor?.scope ?? null;
   React.useEffect(() => {
     if (!keys || !scope) return;
@@ -409,9 +412,6 @@ export function ThreeApp() {
       mutateShape(id, (s) => ({ ...s, locked: !s.locked }));
       flashToast("Toggled lock");
     },
-    group: () => {
-      flashToast(`Grouped ${shapes.length} shapes`);
-    },
     hide: (id: string) => {
       mutateShape(id, (s) => ({ ...s, hidden: !s.hidden }));
       flashToast("Toggled visibility");
@@ -423,32 +423,6 @@ export function ThreeApp() {
     },
   };
 
-  // Modeling-op approximations — replace selected shape geometry & scale to
-  // give the user a visual hint that the operation ran.
-  const extrudeSelected = () => requireSel(() => {
-    mutateSelected((s) => ({ ...s, scale: [s.scale[0], s.scale[1] * 1.8, s.scale[2]] as [number, number, number] }));
-    flashToast("Extruded");
-  });
-  const revolveSelected = () => requireSel(() => {
-    mutateSelected((s) => ({ ...s, type: "torus", scale: [1, 1, 1] }));
-    flashToast("Revolved");
-  });
-  const sweepSelected = () => requireSel(() => {
-    mutateSelected((s) => ({ ...s, type: "cylinder", scale: [0.6, 1.4, 0.6] }));
-    flashToast("Swept");
-  });
-  const loftSelected = () => requireSel(() => {
-    mutateSelected((s) => ({ ...s, type: "cone", scale: [1.2, 1.6, 1.2] }));
-    flashToast("Lofted");
-  });
-  const filletSelected = () => requireSel(() => {
-    mutateSelected((s) => ({ ...s, type: "sphere" }));
-    flashToast("Filleted");
-  });
-  const chamferSelected = () => requireSel(() => {
-    mutateSelected((s) => ({ ...s, scale: [s.scale[0] * 0.9, s.scale[1], s.scale[2] * 0.9] as [number, number, number] }));
-    flashToast("Chamfered");
-  });
   // Shell (Assembly plan D6): a box becomes a hollow case of the same outer
   // size — floor, walls, bosses — with its lid on top.
   const shellSelected = () => requireSel(() => {
@@ -517,26 +491,6 @@ export function ThreeApp() {
     });
   };
 
-  // Boolean ops — for now, simulate. Union = no-op + flash; Subtract = remove
-  // a partner shape if there are ≥2; Intersect = keep only selected.
-  const booleanUnion = () => requireSel(() => flashToast("Union — shapes merged"));
-  const booleanSubtract = () => requireSel(() => {
-    if (shapes.length < 2) { flashToast("Need ≥2 shapes"); return; }
-    const other = shapes.find((s) => s.id !== selectedPart);
-    if (other) {
-      setShapes((arr) => arr.filter((s) => s.id !== other.id));
-      flashToast(`Subtracted ${other.type}`);
-    }
-  });
-  const booleanIntersect = () => requireSel(() => {
-    setShapes((arr) => arr.filter((s) => s.id === selectedPart));
-    flashToast("Intersect — kept selection");
-  });
-
-  const groupAll = () => {
-    flashToast(`Grouped ${shapes.length} shapes`);
-  };
-
   // ── Action dispatcher ────────────────────────────────────────────────────
   React.useEffect(() => {
     const handler = (e: Event) => {
@@ -550,30 +504,20 @@ export function ThreeApp() {
         // shapes & misc
         case "shape:sketch":     setMode("sketch"); return;
         case "shape:spline":     flashToast("Add spline (sketch mode)"); setMode("sketch"); return;
-        case "shape:import":     setModal("docs"); return;
         case "shape:enclosure":  addEnclosure(); return;
         // Modeling
-        case "model:extrude":    extrudeSelected(); return;
-        case "model:revolve":    revolveSelected(); return;
-        case "model:sweep":      sweepSelected(); return;
-        case "model:loft":       loftSelected(); return;
-        case "model:fillet":     filletSelected(); return;
-        case "model:chamfer":    chamferSelected(); return;
+        // Extrude, Revolve, Sweep, Loft, Fillet, Chamfer, the Booleans, Import,
+        // Group, Measure and Section are greyed (THREE_NOT_BUILT) and never sent.
         case "model:shell":      shellSelected(); return;
-        case "model:union":      booleanUnion(); return;
-        case "model:subtract":   booleanSubtract(); return;
-        case "model:intersect":  booleanIntersect(); return;
         case "model:mirror":     mirrorSelected("x"); return;
         case "model:pattern":    setModal("pattern"); return;
         // Transformation & Utilities
+        case "xform:select":     setTransformMode("none"); return;
         case "xform:move":       setTransformMode("translate"); flashToast("Move tool"); return;
         case "xform:rotate":     setTransformMode("rotate");    flashToast("Rotate tool"); return;
         case "xform:scale":      setTransformMode("scale");     flashToast("Scale tool"); return;
         case "xform:copy":       duplicateSelected(); return;
         case "xform:align":      setModal("align"); return;
-        case "xform:group":      groupAll(); return;
-        case "xform:measure":    setModal("measure"); return;
-        case "xform:section":    setModal("section"); return;
         case "xform:hide":       toggleHide(); return;
         case "xform:lock":       toggleLock(); return;
         // Settings menu
@@ -737,6 +681,7 @@ export function ThreeApp() {
           resolution={right.resolution[0]}
           resetTick={resetTick}
           fitTick={fitTick}
+          zoom={zoom}
         />
       </div>
 
@@ -749,8 +694,8 @@ export function ThreeApp() {
               topOffset={viewportTop + 24}
               onHome={() => setResetTick((t) => t + 1)}
               onFit={() => setFitTick((t) => t + 1)}
-              onZoomIn={() => flashToast("Wheel-zoom in the viewport")}
-              onZoomOut={() => flashToast("Wheel-zoom in the viewport")}
+              onZoomIn={() => setZoom((z) => ({ tick: z.tick + 1, factor: 1 / 1.25 }))}
+              onZoomOut={() => setZoom((z) => ({ tick: z.tick + 1, factor: 1.25 }))}
               onScreenshot={() => {
                 const canvas = document.querySelector<HTMLCanvasElement>(".pcb-app canvas");
                 if (!canvas) return;

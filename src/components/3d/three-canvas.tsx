@@ -43,6 +43,7 @@ export type ViewportProps = {
   resolution: string;          // first resolution dropdown — controls mesh segments
   resetTick: number;           // bumping resets the camera in-place (no remount)
   fitTick: number;             // bumping triggers fit-to-shapes
+  zoom?: { tick: number; factor: number }; // bumping tick scales the camera's distance to the target by factor
 };
 
 export function ThreeViewport(props: ViewportProps) {

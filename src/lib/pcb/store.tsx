@@ -102,9 +102,6 @@ export interface PcbActions {
   openSettings: (page?: SettingsPage) => void;
   closeSettings: () => void;
   setSettingsPage: (page: SettingsPage) => void;
-  /** Help ▸ Online Chat — the floating support widget (expanded vs bubble). */
-  setChatOpen: (v: boolean) => void;
-  toggleChat: () => void;
   // 3D-view controls — drive the three.js camera / render (real, no stubs).
   pcb3dFit: () => void;
   pcb3dPreset: (view: PcbState["pcb3d"]["preset"]) => void;
@@ -981,8 +978,6 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge({ settingsOpen: true, settingsPage: page ?? "system", openMenu: null }),
       closeSettings: () => merge({ settingsOpen: false }),
       setSettingsPage: (page) => merge({ settingsPage: page }),
-      setChatOpen: (v) => merge({ chatOpen: v, openMenu: null }),
-      toggleChat: () => merge((s) => ({ chatOpen: !s.chatOpen, openMenu: null })),
       pcb3dFit: () => merge((s) => ({ pcb3d: { ...s.pcb3d, fitNonce: s.pcb3d.fitNonce + 1 } })),
       pcb3dPreset: (view) =>
         merge((s) => ({ pcb3d: { ...s.pcb3d, preset: view, presetNonce: s.pcb3d.presetNonce + 1 } })),
