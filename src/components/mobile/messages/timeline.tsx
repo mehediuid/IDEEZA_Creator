@@ -1,6 +1,6 @@
 "use client";
 
-// A thread's timeline (MS-10 · 13 · 18 · 30): the safety line (M05 helper),
+// A thread's timeline (MS-10 · 13 · 18 · 30): the safety line (a centred system note),
 // a day break (A24 Divider with its label), context lines, and messages in
 // runs as Kit / Chat bubble — theirs left on bg/subtle, yours right on
 // bg/brand-subtle, the time under a run; in a team thread a received run
@@ -32,7 +32,7 @@ import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { useBubbleGestures } from "./gestures";
-import { BUBBLE, BubbleMeta, bubbleTone, ContextCard, InlineNote, TEXT_ACTION, type Side } from "./kit";
+import { BUBBLE, BubbleMeta, bubbleTone, ContextCard, SystemNote, TEXT_ACTION, type Side } from "./kit";
 import { useSubjectAccess } from "./view";
 
 const NEAR_BOTTOM_PX = 96;
@@ -224,10 +224,13 @@ function Unsent({ item, onRetry, onMenu }: { item: OutboxItem; onRetry: () => vo
           <SharedProject key={c.projectId} card={c} />
         ))}
       </div>
-      <BubbleMeta tone="error">Not sent</BubbleMeta>
-      <button type="button" onClick={onRetry} className={TEXT_ACTION}>
-        Retry
-      </button>
+      {/* One line under the bubble, as a chat app marks a message that didn't go. */}
+      <div className="flex items-center gap-4">
+        <BubbleMeta tone="error">Not sent</BubbleMeta>
+        <button type="button" onClick={onRetry} className={TEXT_ACTION}>
+          Retry
+        </button>
+      </div>
     </div>
   );
 }
@@ -320,7 +323,7 @@ export function Timeline({
       className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none"
     >
       <div ref={contentRef} className="flex min-h-full flex-col justify-end gap-6 px-8 pb-6 pt-4">
-        <InlineNote tone="helper">IDEEZA never asks you to pay or share your wallet phrase in Messages.</InlineNote>
+        <SystemNote>IDEEZA never asks you to pay or share your wallet phrase in Messages.</SystemNote>
         {rows.map((row) => {
           if (row.kind === "day") {
             return (

@@ -104,7 +104,7 @@ export default function LinkAccountsPage() {
   const passwordError = tried && !password ? "Enter your password." : "";
   return (
     <Screen
-      top={<TopBar back={answer.from} title="Link accounts" />}
+      top={<TopBar back={answer.from} />}
       footer={
         before.passwordless ? undefined : (
           <BottomBar>

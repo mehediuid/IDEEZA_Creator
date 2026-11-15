@@ -1,12 +1,13 @@
 "use client";
 
 // A thread (Figma MS-10…51, Shared kit KIT-RB-04…25, SK-04, OF-03, KB-02…02c):
-// the top bar ("Name · how they stand to it", or "Team · 5 people"; tap it
-// for the profile or the Members sheet) with ⋯, the context card (it folds to
-// one line while you read back), the timeline, and at the foot the request
-// bar above the composer — or, when you can't write, the Composer notice
-// that says why (you blocked them · they blocked you · the project was
-// deleted). /m/messages/new resolves an entry point's address like the web
+// the top bar as a chat app draws it (the avatar, the name and under it how
+// they stand to it — or the team and "5 people"; tap it for the profile or the
+// Members sheet) with ⋯, the subject pinned under it edge to edge (it folds to
+// the name while you read back; the whole bar opens it), the timeline, and at
+// the foot the request bar above the composer — or, when you can't write, the
+// Composer notice that says why (you blocked them · they blocked you · the
+// project was deleted). /m/messages/new resolves an entry point's address like the web
 // (`?to=…&project=…&about=…`, `?to=feed:…&post=…`, `?team=…`) into the thread
 // or a draft whose first Send creates it, or one card saying why it can't.
 // Every action is the web's (lib/messages/actions); a message that can't go
@@ -87,7 +88,11 @@ import { ME, type ContextRef, type Conversation, type MessageEntry, type Partici
 import { forgetUnsent, filesOfUnsent, keepUnsent, updateUnsent, useOutbox } from "@/lib/messages/use-outbox";
 import { useAuth } from "@/lib/account/auth";
 import { useMyProfile } from "@/lib/people/profile-store";
+import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ideeza/avatar";
+import { initialsOfName } from "@/lib/messages/people";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { PRESSED } from "../kit/press";
 import { ReportSheet, type ReportReason as SheetReason } from "../kit/report-sheet";
 import { ActionSheet, type ActionSheetItem } from "../kit/sheet";
 import { EmptyState, ErrorState } from "../kit/state";
@@ -96,8 +101,9 @@ import { useToast } from "../kit/toast";
 import { useGoBack } from "../nav-trail";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { Composer, type ComposerMode, type Draft } from "./composer";
-import { ComposerNotice, ContextCard, RequestBar, ThreadBones } from "./kit";
+import { ComposerNotice, RequestBar, SubjectBar, ThreadBones } from "./kit";
 import { MembersSheet, PhotoViewer, type Member } from "./sheets";
 import { Timeline, type SendingItem } from "./timeline";
 import { ActingLine, PhoneMessages, useAfter, useProfileHref, useSubjectAccess } from "./view";
@@ -366,17 +372,22 @@ function ThreadView({
   const askedListing = (conversationId ? askedListingOf(data, conversationId) : false) || pending?.kind === "listing";
   const relation = other ? people.relationOf(me, other.id, subject, { askedListing }) : null;
   const relationWord = relation?.short ?? (relation?.long ? relation.long.charAt(0).toLowerCase() + relation.long.slice(1) : null);
-  const title = team ? `Team · ${memberCount} ${memberCount === 1 ? "person" : "people"}` : `${otherPerson?.name ?? "Someone"}${relationWord ? ` · ${relationWord}` : ""}`;
-  // Under 360 wide the relation leaves the title (the context card and the request bar say it), so the name isn't cut.
-  const titleShown = team ? (
-    title
-  ) : (
-    <>
-      {otherPerson?.name ?? "Someone"}
-      {relationWord && <span className="max-[359px]:hidden"> · {relationWord}</span>}
-    </>
-  );
+  const peopleWord = `${memberCount} ${memberCount === 1 ? "person" : "people"}`;
+  const title = team ? `Team · ${peopleWord}` : `${otherPerson?.name ?? "Someone"}${relationWord ? ` · ${relationWord}` : ""}`;
   const recipientName = team ? `${subjectName} team` : (otherPerson?.name ?? "Someone");
+  // A chat app's header: the avatar, the name, and under it how they stand to this; a team thread
+  // reads "Team" over its size (the project's name is on the subject bar right under it).
+  const titleLine = team ? "Team" : (otherPerson?.name ?? "Someone");
+  const titleSub = team ? peopleWord : relationWord ? relationWord.charAt(0).toUpperCase() + relationWord.slice(1) : null;
+  const titleShown = (
+    <span className="inline-flex max-w-full items-center gap-4 align-middle">
+      <Avatar size="sm" initials={team ? initialsOfName(subjectName) : (otherPerson?.initials ?? "?")} />
+      <span className="flex min-w-0 flex-col items-start text-left">
+        <span className="max-w-full truncate">{titleLine}</span>
+        {titleSub && <span className={cn(T.meta, "max-w-full truncate")}>{titleSub}</span>}
+      </span>
+    </span>
+  );
   const block = other ? blockStateOf(data, me, other.id) : "none";
   const state = conversation ? stateOf(conversation, me) : null;
   const inRequests = !!conversation && !team && state?.folder === "requests";
@@ -631,7 +642,7 @@ function ThreadView({
         type="button"
         onClick={() => (team ? setLayer({ kind: "members" }) : otherHref && router.push(otherHref))}
         aria-label={team ? `${title}. Show members` : `${title}. View profile`}
-        className="max-w-full truncate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        className={cn("inline-flex max-w-full rounded-md px-2 py-1 outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus", PRESSED)}
       >
         {titleShown}
       </button>
@@ -678,15 +689,15 @@ function ThreadView({
         </>
       }
     >
-      <div className="flex shrink-0 flex-col gap-4 px-8 pb-4">
+      <SubjectBar
+        access={access}
+        caption={cardContext ? phoneContextLineOf(cardContext, infoOf(cardContext)) : null}
+        label={conversation ? "About this conversation" : "About"}
+        collapsed={away}
+      />
+      <div className="flex shrink-0 flex-col gap-4 px-8 pt-4 empty:hidden">
         <ActingLine />
         <OfflineBanner />
-        <ContextCard
-          access={access}
-          caption={cardContext ? phoneContextLineOf(cardContext, infoOf(cardContext)) : null}
-          label={conversation ? "About this conversation" : "About"}
-          collapsed={away}
-        />
       </div>
       <Timeline
         conversationId={conversationId}

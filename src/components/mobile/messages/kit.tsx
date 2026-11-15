@@ -16,12 +16,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Cancel01Icon, CancelCircleIcon, HelpCircleIcon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, CancelCircleIcon, HelpCircleIcon, InformationCircleIcon, LockIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { initialsOfName } from "@/lib/messages/people";
 import { cn } from "@/lib/utils";
+import { Chevron } from "../kit/list";
+import { PRESSED } from "../kit/press";
+import { Sheet } from "../kit/sheet";
 import { T } from "../type";
 import type { SubjectAccess } from "./view";
 
@@ -47,8 +50,8 @@ export const TEXT_ACTION = cn(
 
 // ── Avatar tile for a subject (a project or a post) ─────────────────────
 
-export function CoverTile({ access, size = 48 }: { access: Pick<SubjectAccess, "name" | "cover" | "gradient">; size?: 48 | 56 }) {
-  const box = cn("shrink-0 overflow-hidden rounded-lg", size === 48 ? "size-[48px]" : "size-[56px]");
+export function CoverTile({ access, size = 48 }: { access: Pick<SubjectAccess, "name" | "cover" | "gradient">; size?: 40 | 48 | 56 }) {
+  const box = cn("shrink-0 overflow-hidden", size === 40 ? "size-[40px] rounded-md" : size === 48 ? "size-[48px] rounded-lg" : "size-[56px] rounded-lg");
   const [failed, setFailed] = React.useState<string | null>(null);
   if (access.cover && failed !== access.cover) {
     const src = access.cover;
@@ -126,6 +129,64 @@ export function ContextCard({
   );
 }
 
+// ── Subject bar (the thread's pinned "what this is about") ──────────────
+
+/** Under the thread's top bar, edge to edge, the way a marketplace chat pins its item: the cover,
+ *  the name and how the conversation came about; the whole bar opens it (chevron). When the reader
+ *  can't open it, the note says why and there is no chevron; when the project or post is gone, the
+ *  bar says so. While you read back it folds to the name alone. */
+export function SubjectBar({
+  access,
+  caption,
+  label = "About this conversation",
+  collapsed = false,
+}: {
+  access: SubjectAccess;
+  caption: string | null;
+  /** Names the bar for assistive tech: "About" on a draft that hasn't started yet (MS-50). */
+  label?: string;
+  collapsed?: boolean;
+}) {
+  const bar = cn(
+    "flex w-full shrink-0 items-center gap-6 border-b-[length:var(--border-width-1)] border-solid border-border bg-bg-surface px-8 text-left transition-[min-height,padding] duration-fast",
+    collapsed ? "min-h-[44px] py-2" : "min-h-[56px] py-3",
+  );
+  if (access.ended) {
+    return (
+      <section aria-label={label} className={bar}>
+        <p className={cn(T.rowTitle, "min-w-0 flex-1 truncate text-text-tertiary")}>{access.ended}</p>
+      </section>
+    );
+  }
+  const body = (
+    <>
+      {!collapsed && <CoverTile access={access} size={40} />}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className={cn(T.rowTitle, "truncate")}>{access.name}</span>
+        {!collapsed && caption && <span className={cn(T.meta, "truncate")}>{caption}</span>}
+        {!collapsed && access.note && <span className={cn(T.meta, "text-text-tertiary")}>{access.note}</span>}
+      </span>
+    </>
+  );
+  if (!access.href) {
+    return (
+      <section aria-label={label} className={bar}>
+        {body}
+      </section>
+    );
+  }
+  return (
+    <Link
+      href={access.href}
+      aria-label={`${label}: ${access.name}${caption ? `, ${caption}` : ""}. Open`}
+      className={cn(bar, PRESSED, "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus")}
+    >
+      {body}
+      <Chevron />
+    </Link>
+  );
+}
+
 // ── Request bar, composer notice, composer context bar ──────────────────
 
 const DOCK = "border-t-[length:var(--border-width-1)] border-solid border-border bg-bg-surface";
@@ -145,28 +206,39 @@ export function RequestBar({
   /** Left out once you've blocked them. */
   onBlock: (() => void) | null;
 }) {
+  const [about, setAbout] = React.useState(false);
   return (
-    <section aria-label="Message request" className={cn(DOCK, "flex flex-col gap-4 px-8 py-6")}>
-      <div className="flex flex-col gap-1">
-        <p className={cn(T.label, "text-text-primary")}>Message request</p>
-        <p className={cn(T.meta, "text-text-primary")}>
+    <section aria-label="Message request" className={cn(DOCK, "flex flex-col gap-4 px-8 pb-6 pt-4")}>
+      <div className="flex items-center gap-2">
+        <p className={cn(T.rowTitle, "min-w-0 flex-1")}>
           {name} wants to message you about {subjectName}.
         </p>
-        <p className={T.meta}>Replying keeps it here. Accept moves it to your Inbox.</p>
+        <IconButton
+          hierarchy="ghost"
+          size="xl"
+          aria-label="About message requests"
+          icon={<Icon icon={InformationCircleIcon} size={20} />}
+          onClick={() => setAbout(true)}
+          className="-mr-4 shrink-0"
+        />
       </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Button size="md" onClick={onAccept}>
-          Accept
-        </Button>
-        <Button size="md" hierarchy="secondary" onClick={onDelete}>
-          Delete
-        </Button>
+      {/* An either/or, Instagram's order: the one filled button last, under the thumb. */}
+      <div className={cn("grid gap-4", onBlock ? "grid-cols-3" : "grid-cols-2")}>
         {onBlock && (
-          <Button size="md" hierarchy="ghost" onClick={onBlock}>
+          <Button size="xl" hierarchy="ghost" onClick={onBlock}>
             Block
           </Button>
         )}
+        <Button size="xl" hierarchy="secondary" onClick={onDelete}>
+          Delete
+        </Button>
+        <Button size="xl" onClick={onAccept}>
+          Accept
+        </Button>
       </div>
+      <Sheet open={about} onClose={() => setAbout(false)} title="Message request">
+        <p className={cn(T.body, "pb-4")}>Replying keeps it here. Accept moves it to your Inbox.</p>
+      </Sheet>
     </section>
   );
 }
@@ -206,6 +278,21 @@ export function InlineNote({ tone, children }: { tone: "helper" | "error"; child
         <Icon icon={tone === "error" ? CancelCircleIcon : HelpCircleIcon} size={16} />
       </span>
       <span className="min-w-0 flex-1">{children}</span>
+    </p>
+  );
+}
+
+// ── System note (the thread's safety line) ──────────────────────────────
+
+/** A line from IDEEZA itself at the top of a thread, centred on a quiet chip the way a chat app
+ *  shows its encryption notice: not a message, not an alert. */
+export function SystemNote({ children }: { children: React.ReactNode }) {
+  return (
+    <p className={cn(T.caption, "mx-auto max-w-[300px] text-balance rounded-lg bg-bg-subtle px-6 py-3 text-center")}>
+      <span className="mr-2 inline-flex align-middle text-[color:var(--color-icon-secondary)]">
+        <Icon icon={LockIcon} size={14} />
+      </span>
+      {children}
     </p>
   );
 }

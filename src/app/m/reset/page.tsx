@@ -109,7 +109,7 @@ export default function ResetPage() {
     const signUp = `/m/sign-up?${new URLSearchParams({ email: clean, ...(next === "/m" ? {} : { next }) })}`;
     return (
       <Screen
-        top={<TopBar back="/m/sign-in" onBack={() => setStep("email")} title="Reset password" />}
+        top={<TopBar back="/m/sign-in" onBack={() => setStep("email")} />}
         footer={
           <div className="px-8 pb-4 pt-4">
             <SwitchLine text="New to IDEEZA?" link="Create account" href={signUp} />
@@ -131,7 +131,7 @@ export default function ResetPage() {
   if (step === "code") {
     return (
       <Screen
-        top={<TopBar back="/m/sign-in" onBack={() => setStep("email")} title="Reset password" />}
+        top={<TopBar back="/m/sign-in" onBack={() => setStep("email")} />}
         footer={
           <BottomBar>
             <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setInbox((n) => n + 1)}>
@@ -159,7 +159,7 @@ export default function ResetPage() {
   if (step === "password") {
     return (
       <Screen
-        top={<TopBar back="/m/sign-in" onBack={() => setStep("code")} title="Reset password" />}
+        top={<TopBar back="/m/sign-in" onBack={() => setStep("code")} />}
         footer={
           <BottomBar>
             <Button type="submit" form="new-password" size="xl" className="w-full" loading={busy} disabled={!valid || !online}>
@@ -223,7 +223,7 @@ export default function ResetPage() {
 
   return (
     <Screen
-      top={<TopBar back="/m/sign-in" title="Reset password" />}
+      top={<TopBar back="/m/sign-in" />}
       footer={
         <BottomBar>
           <Button type="submit" form="reset-email" size="xl" className="w-full" loading={busy} disabled={!online}>
