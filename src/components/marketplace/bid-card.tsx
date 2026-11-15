@@ -130,6 +130,7 @@ export function BidCard({
   buyHeld = false,
   onBuyNow,
   facts,
+  details,
   wallet,
   announce,
 }: {
@@ -149,6 +150,8 @@ export function BidCard({
   buyHeld?: boolean;
   onBuyNow: () => void;
   facts: React.ReactNode;
+  /** The listing's small facts, under the button (offer-parts.tsx DealFacts). */
+  details?: React.ReactNode;
   wallet: React.ReactNode;
   announce: (message: string) => void;
 }) {
@@ -183,7 +186,7 @@ export function BidCard({
     });
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {facts}
       <BidHistory listing={listing} bids={bids} buyerId={buyerId} now={clock} />
       {ended ? (
@@ -232,6 +235,7 @@ export function BidCard({
           {buyerId !== null && wallet}
         </>
       )}
+      {details}
     </div>
   );
 }

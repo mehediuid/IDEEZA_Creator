@@ -11,16 +11,24 @@
 //   bidder" — follows it at once, in this tab and in another.
 // - The Banner atom is a polite live region: the new title, "Testnet demo ·
 //   shopping as Leo", is what the switch says aloud.
+// - On a listing's own page (`projectId`) the body ends with "Your project
+//   page": the way back to the owner's side lives in this prototype-only
+//   banner, never in the buyer's header (owner, 2026-11-15).
 
 import * as React from "react";
+import Link from "next/link";
 import { Banner, SelectMenu, type SelectOption } from "@/components/ideeza";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 
+/** The banner's one link: back to the person's own page for this project (a listing detail page only). */
+const INLINE_LINK =
+  "rounded-sm font-medium text-text-brand underline-offset-2 outline-none hover:text-text-brand-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus";
+
 const OPTIONS: SelectOption<DemoBuyerId>[] = DEMO_BUYERS.map((b) => ({ value: b.id, label: `${b.name} · demo creator` }));
 
-export function DemoBuyerBanner({ className }: { className?: string }) {
+export function DemoBuyerBanner({ className, projectId }: { className?: string; projectId?: string }) {
   const { buyer, setActiveBuyer } = useActiveBuyer();
   return (
     <Banner
@@ -40,6 +48,14 @@ export function DemoBuyerBanner({ className }: { className?: string }) {
     >
       Every listing here is yours, so a demo creator does the buying — test tokens in a test wallet. Nothing is sent to a
       blockchain.
+      {projectId && (
+        <>
+          {" "}
+          <Link href={`/projects/${projectId}`} className={INLINE_LINK}>
+            Your project page
+          </Link>
+        </>
+      )}
     </Banner>
   );
 }

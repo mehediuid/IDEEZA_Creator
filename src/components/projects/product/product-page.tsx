@@ -39,6 +39,7 @@
 // to the post's own.
 
 import * as React from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Add01Icon, CpuIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
@@ -62,6 +63,9 @@ import { isPreview, previewQuery, useFocusAfterPreview } from "../details/buyer-
 import { ProjectFrame } from "../details/frame";
 import { ProjectNotFound } from "../details/page-states";
 import { DemoBuyerBanner } from "@/components/marketplace/demo-buyer-banner";
+import { useCreatorName } from "@/components/marketplace/use-creator-name";
+import { PersonName } from "@/components/profile/person-name";
+import { ME } from "@/lib/messages/types";
 import { NotOnMarketplace } from "@/components/marketplace/market-project-page";
 import { SLOTS as PROJECT_SLOTS } from "../details/project-page";
 import { useProjectPageData, type ProjectPageContext } from "../details/use-project-page-data";
@@ -167,6 +171,8 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   const postCtx = context === "post";
   const post = React.useMemo(() => (postCtx && project && view ? minePostOf(project, view) : null), [postCtx, project, view]);
   const comments = useCommentCount(post ? post.id : null, NO_SEED);
+  // Explore marketplace names the creator as a buyer knows them, never "you" (owner, 2026-11-15).
+  const creatorName = useCreatorName();
 
   const name = product ? displayProductName(product.name) : "";
   // COR-7 — focus to the h1 and a polite "{product}" on arrival, once per
@@ -237,8 +243,19 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   // The chat this version was built in, while this browser has it: the build is changed there.
   const chat = ownerFacts && job ? (chats.find((c) => c.id === job.chatId) ?? null) : null;
   const image = bp?.conceptImageUrl || null;
-  const meta: React.ReactNode =
-    job && pieces ? (
+  const meta: React.ReactNode = market ? (
+    // A buyer reads what this product belongs to and who made it; how it was built is the maker's.
+    <>
+      Part of{" "}
+      <Link href={projectHref} className="rounded-sm font-medium text-text-brand outline-none hover:text-text-brand-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus">
+        {project.name}
+      </Link>
+      {" · "}Created by{" "}
+      <PersonName id={ME} tone="secondary">
+        {creatorName}
+      </PersonName>
+    </>
+  ) : job && pieces ? (
       <>
         AI build · <When at={job.endedAt ?? job.createdAt} /> ·{" "}
         {pieces.ready === pieces.total ? `All ${pieces.total} pieces ready` : `${pieces.ready} of ${pieces.total} pieces ready`}
@@ -268,7 +285,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
         // Explore marketplace's Testnet demo banner on the buyer view.
         banner={
           postCtx ? null : market ? (
-            <DemoBuyerBanner className="mb-10" />
+            <DemoBuyerBanner className="mb-10" projectId={project.id} />
           ) : (
             PROJECT_SLOTS.banners?.map((B, i) => (
               <B key={i} project={project} view={view} viewer={viewer} brief={ready.brief} now={ready.now} announce={announce} />

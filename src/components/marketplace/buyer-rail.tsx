@@ -21,10 +21,13 @@
 //   don't need the Main NFT (owner, 2026-10-11): with no Main listing the block
 //   holds the copies alone. Only the lock (sold in full) hides them.
 // - A project with neither has no block.
-// - A demo buyer's block ends with its one way to the creator, a link into
-//   Messages: "Get creator support" for a holder of any sale of the project
-//   (Main or a copy), about the newest one, else "Ask the creator", about the
-//   listing. A preview has none.
+// - The Main NFT reads as a buy box (owner, 2026-11-15; offer-parts.tsx):
+//   what is sold as the overline, the price large, the button and the wallet
+//   line, then the listing's facts small, three to a row; its activity line
+//   closes it.
+// - The way to the creator — "Get creator support" for a holder of any sale of
+//   the project (Main or a copy), about the newest one, else "Ask the
+//   creator", about the listing — is the Creator block's (market-rail.tsx).
 //
 // Every `can()` passes `view.canCtx` (listingLive, auction, holding); an auction
 // asks again at the card's own clock, so Place bid goes the moment it ends.
@@ -34,12 +37,11 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Banner, Button, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
-import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
+import { Button, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import { can } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
-import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
-import { auctionStateOf, timeLeftLabel } from "@/lib/market/auction";
+import { formatDate } from "@/lib/manual/project-summary";
+import { auctionStateOf } from "@/lib/market/auction";
 import { IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
 import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import { useMarket } from "@/lib/market/market-store";
@@ -50,11 +52,11 @@ import { ME } from "@/lib/messages/types";
 import { availableOf } from "@/lib/wallet/balances";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
 import { formatAmount } from "@/lib/wallet/money";
-import { networkLabelOf, testCoin } from "@/lib/wallet/request-view";
+import { testCoin } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { RailBlock, RailFact, RailFacts } from "@/components/projects/details/rail-block";
+import { RailBlock } from "@/components/projects/details/rail-block";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { cn } from "@/lib/utils";
 import { BidCard, useAfterDialogClose, useAuctionClock } from "./bid-card";
@@ -62,6 +64,7 @@ import { EditionOffers } from "./edition-offers";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { buyerNameOf, usePurchase } from "./purchase-dialog";
 import { PurchasedSummary } from "./purchased-summary";
+import { AuctionTop, DealFacts, OfferTop, soldWhatOf } from "./offer-parts";
 
 const QUIET_LINK =
   "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
@@ -84,59 +87,6 @@ function closedLine(view: ProjectView): { title: string; detail?: string } | nul
     };
   }
   return null;
-}
-
-/** The listing's facts, read-only for everyone (P2-MARKETPLACE-10, -11). */
-function ListingFacts({ listing, view, auction }: { listing: Listing; view: ProjectView; auction: AuctionState | null }) {
-  const minting =
-    view.mint.status === "lazyMinted"
-      ? "Lazy — the token is minted when you buy"
-      : view.mint.status === "onChain"
-        ? `Minted on ${networkLabelOf(listing.network)}`
-        : listing.mintingType === "lazy"
-          ? "Lazy — the token is minted when you buy"
-          : `Minted on ${networkLabelOf(listing.network)}`;
-  const ended = auction?.phase === "ended";
-  return (
-    <>
-      <RailFacts>
-        <RailFact label="Listing type">{listing.type === "auction" ? "Auction" : "Buy now"}</RailFact>
-        {listing.type === "auction" && auction ? (
-          <RailFact label={auction.top ? "Current bid" : "Starting bid"}>
-            <span className="font-semibold tabular-nums">
-              {formatAmount(auction.top?.amount ?? listing.minBid ?? "0", listing.token)}
-            </span>
-          </RailFact>
-        ) : (
-          <RailFact label="Price">
-            <span className="font-semibold tabular-nums">{formatAmount(listing.price ?? "0", listing.token)}</span>
-          </RailFact>
-        )}
-        <RailFact label="Selling percentage">
-          <span className="tabular-nums">{listing.percentSelling}%</span>
-        </RailFact>
-        {listing.type === "auction" && auction && (
-          <RailFact label={ended ? "Ended" : "Ends"}>
-            <span className="tabular-nums">
-              <time dateTime={new Date(listing.endsAt ?? listing.listedAt).toISOString()}>
-                {formatDateTime(listing.endsAt ?? listing.listedAt)}
-              </time>
-            </span>
-            {!ended && (
-              <span className="ml-2 inline-flex align-middle">
-                <Badge tone={auction.phase === "endingSoon" ? "warning" : "neutral"}>{timeLeftLabel(auction.msLeft)}</Badge>
-              </span>
-            )}
-          </RailFact>
-        )}
-        <RailFact label="Royalties">{royaltyText(listing.royaltiesPct)}</RailFact>
-        <RailFact label="Minting">{minting}</RailFact>
-        <RailFact label="Collection">{listing.collection || "—"}</RailFact>
-        <RailFact label="Blockchain">{networkLabelOf(listing.network)}</RailFact>
-      </RailFacts>
-      <Banner tone="info">{SHARE_SALE_NOTE}</Banner>
-    </>
-  );
 }
 
 /** "Paying from Mira's demo wallet · 0x7d50…8993 · 10 test MATIC" (P2-MARKETPLACE-13 as changed), then the
@@ -186,13 +136,10 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
   const clock = useAuctionClock(listing?.type === "auction" ? listing.endsAt : undefined, now);
   if (viewer.kind === "local-owner" || !can(viewer, "listing.seePublic", view.canCtx)) return null;
   const copies = view.lock === null && view.editions.some((t) => t.listing !== null);
-  const ask =
-    viewer.kind === "demo-buyer" ? <AskCreator projectId={project.id} sales={view.sales} buyerId={viewer.buyerId} /> : null;
   if (!listing) {
     return copies ? (
       <RailBlock title="Marketplace" meta="Copies" collapsible={false}>
         <EditionOffers project={project} view={view} viewer={viewer} announce={announce} alone />
-        {ask}
       </RailBlock>
     ) : null;
   }
@@ -208,14 +155,6 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
 
   return (
     <RailBlock title="Marketplace" meta={meta} collapsible={false}>
-      <ActivityNow
-        variant="line"
-        projectId={project.id}
-        target={{ kind: "main" }}
-        heading="Main NFT activity"
-        emptyNote={`No activity yet · listed ${formatDate(listing.listedAt)}`}
-        className="border-b border-solid border-border pb-3"
-      />
       {viewer.kind === "demo-buyer" ? (
         <BuyerBody
           project={project}
@@ -230,15 +169,23 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
       ) : (
         <PreviewBody project={project} view={view} listing={listing} auction={auction} clock={clock} announce={announce} />
       )}
+      {/* The Main NFT's activity, at the foot of its box. */}
+      <ActivityNow
+        variant="line"
+        projectId={project.id}
+        target={{ kind: "main" }}
+        heading="Main NFT activity"
+        emptyNote={`No activity yet · listed ${formatDate(listing.listedAt)}`}
+        className="border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-4"
+      />
       <EditionOffers project={project} view={view} viewer={viewer} announce={announce} />
-      {ask}
     </RailBlock>
   );
 }
 
 /** Get creator support (a holder, about the buyer's newest sale) or Ask the creator (about the
  *  listing): opens the buyer's conversation with the creator in Messages, acting as the buyer. */
-function AskCreator({ projectId, sales, buyerId }: { projectId: string; sales: Sale[]; buyerId: DemoBuyerId }) {
+export function AskCreator({ projectId, sales, buyerId }: { projectId: string; sales: Sale[]; buyerId: DemoBuyerId }) {
   const latest = sales
     .filter((s) => s.buyerId === buyerId)
     .reduce<Sale | null>((a, s) => (!a || s.at > a.at ? s : a), null);
@@ -282,7 +229,6 @@ function PreviewBody({
   announce: (m: string) => void;
 }) {
   const closed = closedLine(view);
-  const facts = <ListingFacts listing={listing} view={view} auction={auction} />;
   return (
     <>
       <TestnetDemoBadge className="self-start" />
@@ -300,12 +246,16 @@ function PreviewBody({
           canBuy={false}
           buyBusy={false}
           onBuyNow={() => {}}
-          facts={facts}
+          facts={<AuctionTop listing={listing} auction={auction} />}
+          details={<DealFacts listing={listing} view={view} />}
           wallet={null}
           announce={announce}
         />
       ) : (
-        facts
+        <div className="flex flex-col gap-6">
+          <OfferTop overline={soldWhatOf(listing)} price={formatAmount(listing.price ?? "0", listing.token)} />
+          <DealFacts listing={listing} view={view} />
+        </div>
       )}
       <Link href={`/marketplace/${project.id}`} className={QUIET_LINK}>
         Open in Explore marketplace
@@ -368,16 +318,15 @@ function BuyerBody({
     });
   };
 
-  const facts = <ListingFacts listing={listing} view={view} auction={auction} />;
   return (
     <>
       {holding && can(viewer, "purchase.seeSummary", ctx) && (
         <PurchasedSummary holding={holding} toggleRef={summaryRef} />
       )}
       {live && listing.type === "buyNow" ? (
-        <div className={cn("flex flex-col gap-8", holding && "border-t border-solid border-border pt-8")}>
+        <div className={cn("flex flex-col gap-6", holding && "border-t border-solid border-border pt-8")}>
           {holding && <h3 className="text-md font-bold text-text-primary">Buy another share</h3>}
-          {facts}
+          <OfferTop overline={soldWhatOf(listing)} price={formatAmount(listing.price ?? "0", listing.token)} />
           {canBuy && (
             <div className="flex flex-col gap-3">
               <Button
@@ -406,6 +355,7 @@ function BuyerBody({
             </div>
           )}
           <WalletLine buyerId={buyerId} listing={listing} verb="buy" now={clock} />
+          <DealFacts listing={listing} view={view} />
         </div>
       ) : live && auction ? (
         <div className={cn(holding && "border-t border-solid border-border pt-8")}>
@@ -421,7 +371,8 @@ function BuyerBody({
             buyBusy={busy}
             buyHeld={held}
             onBuyNow={() => void purchase("auctionBuyNow")}
-            facts={facts}
+            facts={<AuctionTop listing={listing} auction={auction} />}
+            details={<DealFacts listing={listing} view={view} />}
             wallet={<WalletLine buyerId={buyerId} listing={listing} verb="bid" now={clock} />}
             announce={announce}
           />

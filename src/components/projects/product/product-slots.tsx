@@ -31,6 +31,7 @@ import { ProductContributorsPanel } from "./product-contributors";
 import { ProductCustomers } from "./product-customers";
 import { ProductMediaPanel } from "./product-media";
 import { EditionBlock } from "../editions/edition-block";
+import { WholeProjectOffer } from "@/components/marketplace/whole-project-offer";
 
 /** What every product slot is rendered with. */
 export type ProductSlotProps = {
@@ -62,7 +63,14 @@ function ContributorsSlot(props: ProductSlotProps) {
 // T27's wiring (P2-TABS-24…27): the rail's Marketplace block, this product's
 // Physical and Virtual NFT editions — the buyer's side only since P0.
 function EditionsSlot(props: ProductSlotProps) {
-  return buyerSide(props.viewer) ? <EditionBlock {...props} /> : null;
+  if (!buyerSide(props.viewer)) return null;
+  // On Explore marketplace a product without copies of its own points to its project's offers.
+  return (
+    <>
+      <EditionBlock {...props} />
+      <WholeProjectOffer {...props} />
+    </>
+  );
 }
 
 // The owner's Sales tab (P2-CUSTOMERS-10): this product's copies' sales, product-tabs.tsx gates

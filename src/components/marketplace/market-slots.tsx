@@ -10,8 +10,12 @@
 // - tabs as a buyer sees them (`projectTabsFor`): Products, whose cards open
 //   `/marketplace/<id>/products/<productId>`, Media, Network when there is
 //   one, and Team (name and role) when there are contributors;
-// - the rail: the buyer rail first, then Details, Legal (only when filled) and
-//   the Project log (public lines only). Outcome, Versions and Manage are the
+// - the header: the project's media stage first (the Innovations post's own),
+//   then the read-only header naming the creator (market-header.tsx);
+// - the rail: its lead is the buyer rail (the buy box) and the Creator block
+//   together (MarketLead), above the tabs on a narrow page; then On
+//   Innovations (market-rail.tsx), Details, Legal (only when filled) and the
+//   Project log (public lines only). Outcome, Versions and Manage are the
 //   owner's and are absent.
 
 import * as React from "react";
@@ -24,9 +28,10 @@ import type { ProjectSlots, SlotProps } from "@/components/projects/details/slot
 import { BuyerRail } from "./buyer-rail";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
 import { MarketHeader } from "./market-header";
+import { CreatorRailBlock, StoryRailBlock } from "./market-rail";
 
-function DemoBannerSlot() {
-  return <DemoBuyerBanner className="mb-10" />;
+function DemoBannerSlot({ project }: SlotProps) {
+  return <DemoBuyerBanner className="mb-10" projectId={project.id} />;
 }
 
 /** The Products tab with the marketplace's own links. A buyer sees no owner-only fact and adds nothing. */
@@ -52,6 +57,18 @@ function MarketProductsSlot({ project, view, now }: SlotProps) {
   );
 }
 
+/** The rail's lead: the buy box, then the Creator block with the way to the creator, so on a
+ *  narrow page both stand above the tabs (the frame places the lead there) and beside the page
+ *  they top the rail. One surface, a hairline between them. */
+function MarketLead(props: SlotProps) {
+  return (
+    <div className="divide-y divide-border">
+      <BuyerRail {...props} />
+      <CreatorRailBlock {...props} />
+    </div>
+  );
+}
+
 export const MARKET_SLOTS: ProjectSlots = {
   banners: [DemoBannerSlot],
   header: MarketHeader,
@@ -62,7 +79,8 @@ export const MARKET_SLOTS: ProjectSlots = {
     team: SLOTS.tabs.team,
   },
   rail: {
-    marketplace: BuyerRail,
+    marketplace: MarketLead,
+    story: StoryRailBlock,
     details: SLOTS.rail.details,
     legal: SLOTS.rail.legal,
     log: SLOTS.rail.log,

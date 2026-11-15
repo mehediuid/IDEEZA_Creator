@@ -29,6 +29,11 @@ export function honestyLine(productName: string): string {
   return `Made in this browser from ${productName}'s image and on-screen text — the AI video model isn't connected yet. Your prompt is kept with the video.`;
 }
 
+/** The same honesty for someone who isn't the maker (a buyer, a visitor): nothing about "your" prompt. */
+export function viewerHonestyLine(productName: string): string {
+  return `Made in this browser from ${productName}'s image and on-screen text — the AI video model isn't connected yet.`;
+}
+
 export const SILENT_NOTE = "The video is silent.";
 
 /** Under the storyboard (owner, 2026-10-12): what the browser can make of it today. */
@@ -217,6 +222,9 @@ export const PROJECT_VIDEO_TITLE = "Project video";
 export const PROJECT_GROUP_META = "Made from your product videos";
 export const PROJECT_HONESTY =
   "Made in this browser from your product videos, silent for now. The intro, order, lines and sound are kept with the video for the AI video model.";
+/** PROJECT_HONESTY for someone who isn't the maker. */
+export const PROJECT_HONESTY_VIEWER =
+  "Made in this browser from the product videos, silent for now — the AI video model isn't connected yet.";
 
 /** "0:19" — a project video's length on its row. */
 export function clockOf(ms: number): string {

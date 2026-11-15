@@ -119,7 +119,9 @@ test("the product strip reads PRODUCT_SLOTS for its people tab and Media, with t
 test("P0: the product page is engineering for the owner — its Sales tab aside (2026-11-15), and Editions only on the buyer's side", () => {
   const slots = read(PRODUCT + "product-slots.tsx");
   assert.match(slots, /customers: CustomersSlot,/);
-  assert.match(slots, /return buyerSide\(props\.viewer\) \? <EditionBlock \{\.\.\.props\} \/> : null;/);
+  // The buyer's side only: the product's own copies, else (Explore marketplace) its project's offers (2026-11-15).
+  assert.match(slots, /if \(!buyerSide\(props\.viewer\)\) return null;/);
+  assert.match(slots, /<EditionBlock \{\.\.\.props\} \/>\s*<WholeProjectOffer \{\.\.\.props\} \/>/);
   const page = read(PRODUCT + "product-page.tsx");
   assert.match(page, /<VersionSelect/);
   assert.match(page, /<ProductRail\s+slot=\{slot\}\s+built=\{bp\}\s+confidence=\{confidence\}\s+partChanges=\{partChanges\}/, "Specs and Build check are the rail's");
@@ -138,10 +140,10 @@ test("P0: SLOTS is the engineering page — Team, and the commerce blocks only o
   for (const slot of ["MarketplaceSlot", "LegalSlot", "UtilityPillSlot"]) {
     assert.match(src, new RegExp(`function ${slot}\\(props: SlotProps\\) \\{\\s*return buyerSide\\(props\\.viewer\\) \\?`), slot);
   }
-  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "details", "legal", "versions", "log"\]/);
+  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "story", "details", "legal", "versions", "log"\]/);
   // Explore marketplace keeps reading the same slots (P2-MARKETPLACE-8).
   const market = read("components/marketplace/market-slots.tsx");
-  for (const key of ["team: SLOTS.tabs.team", "details: SLOTS.rail.details", "legal: SLOTS.rail.legal", "marketplace: BuyerRail"]) {
+  for (const key of ["team: SLOTS.tabs.team", "details: SLOTS.rail.details", "legal: SLOTS.rail.legal", "marketplace: MarketLead"]) {
     assert.ok(market.includes(key), key);
   }
 });
