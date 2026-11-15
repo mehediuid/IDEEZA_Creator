@@ -1,7 +1,7 @@
 "use client";
 
 // Build queue popups (10706:6681, 01–06): a build keeps running while the
-// maker is elsewhere, and a small pill under the top bar says where it is —
+// maker is elsewhere, and a slim bar under the top bar says where it is —
 // queued (and how many are ahead), starting, building with its percentage
 // and time left, then ready to review, needing a retry, stopped or paused.
 // The words are the web's (attention-banner.tsx), worked out by `pillOf`.
@@ -10,8 +10,14 @@
 // Notifications (quiet hours, a muted project, Builds off). Tapping opens the
 // build's chat; on that chat the pill says nothing, since the build is
 // already in front of the maker.
+//
+// It never covers the screen (mobile UX lens 13): it docks into the screen's
+// top dock slot (Screen draws one under its header, kit/dock.tsx), in the
+// layout flow, so the content starts under it. Only the Feed, whose clips run
+// full-bleed under its header, floats it there until it draws a slot of its own.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Alert02Icon, Cancel01Icon, CheckmarkCircle02Icon, Loading03Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
@@ -23,6 +29,9 @@ import { useToastGate } from "@/components/notifications/use-notices";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { useFramed } from "../device";
+import { useDockSlot } from "../kit/dock";
+import { Chevron } from "../kit/list";
+import { PRESSED } from "../kit/press";
 
 /** Under this long since it started, a running build is "just started". */
 const STARTING_MS = 4_000;
@@ -81,6 +90,7 @@ export function BuildPill() {
   const pathname = usePathname();
   const router = useRouter();
   const framed = useFramed();
+  const slot = useDockSlot("top");
   const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
     pillsMounted += 1;
@@ -121,6 +131,68 @@ export function BuildPill() {
     if (!pill.lasting) dismissAttention(job.id);
     router.push(`/m/ai/chat/${job.chatId}`);
   };
+  const surface =
+    pill.tone === "error"
+      ? "border-border-error bg-bg-error-subtle"
+      : pill.tone === "attention"
+        ? "border-[var(--color-border-warning)] bg-bg-warning-subtle"
+        : "border-border bg-bg-surface";
+  const lead = (
+    <span
+      className={cn(
+        "inline-flex shrink-0",
+        pill.tone === "working" && "text-[color:var(--color-icon-brand)] motion-safe:animate-spin",
+        pill.tone === "done" && "text-[color:var(--color-icon-success)]",
+        pill.tone === "error" && "text-[color:var(--color-icon-error)]",
+        pill.tone === "attention" && "text-[color:var(--color-icon-warning)]",
+      )}
+    >
+      <Icon icon={glyph} size={slot ? 20 : 16} />
+    </span>
+  );
+  const dismiss = !pill.lasting && (
+    <button
+      type="button"
+      onClick={() => dismissAttention(job.id)}
+      aria-label="Dismiss"
+      className={cn(
+        "inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+        PRESSED,
+        slot ? "mr-1" : "-ml-2",
+      )}
+    >
+      <Icon icon={Cancel01Icon} size={16} />
+    </button>
+  );
+
+  // Docked: a slim inset bar in the screen's flow, under its header — the whole bar opens the build.
+  if (slot)
+    return createPortal(
+      <div role="status" aria-live="polite" className="px-8 pb-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal">
+        <div className={cn("flex items-center overflow-hidden rounded-md border-[length:var(--border-width-1)] border-solid", surface)}>
+          <button
+            type="button"
+            onClick={open}
+            className={cn(
+              "flex min-h-[44px] min-w-0 flex-1 items-center gap-6 py-1 pl-6 text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus",
+              PRESSED,
+              pill.lasting ? "pr-4" : "pr-2",
+            )}
+          >
+            {lead}
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className={cn(T.rowTitle, "truncate", ink)}>{pill.title}</span>
+              {pill.detail && <span className={cn(T.meta, "line-clamp-2", pill.tone === "error" && ink)}>{pill.detail}</span>}
+            </span>
+            {pill.lasting && <Chevron />}
+          </button>
+          {dismiss}
+        </div>
+      </div>,
+      slot,
+    );
+  // No slot: only the Feed (full-bleed clips, no Screen) floats it, under its header.
+  if (pathname !== "/m") return null;
   return (
     // Under the sheets (z-overlay): an open sheet's scrim covers it, as it covers the screen.
     <div
@@ -134,44 +206,24 @@ export function BuildPill() {
       <div
         className={cn(
           "pointer-events-auto flex max-w-full items-center rounded-md border-[length:var(--border-width-1)] border-solid shadow-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal",
-          pill.tone === "error"
-            ? "border-border-error bg-bg-error-subtle"
-            : pill.tone === "attention"
-              ? "border-[var(--color-border-warning)] bg-bg-warning-subtle"
-              : "border-border bg-bg-surface",
+          surface,
         )}
       >
         <button
           type="button"
           onClick={open}
-          className="flex min-h-[44px] min-w-0 items-center gap-4 rounded-md px-6 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+          className={cn(
+            "flex min-h-[44px] min-w-0 items-center gap-4 rounded-md px-6 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+            PRESSED,
+          )}
         >
-          <span
-            className={cn(
-              "inline-flex shrink-0",
-              pill.tone === "working" && "text-[color:var(--color-icon-brand)] motion-safe:animate-spin",
-              pill.tone === "done" && "text-[color:var(--color-icon-success)]",
-              pill.tone === "error" && "text-[color:var(--color-icon-error)]",
-              pill.tone === "attention" && "text-[color:var(--color-icon-warning)]",
-            )}
-          >
-            <Icon icon={glyph} size={16} />
-          </span>
+          {lead}
           <span className="flex min-w-0 flex-col">
             <span className={cn(T.meta, "truncate", ink)}>{pill.title}</span>
             {pill.detail && <span className={cn(T.meta, "truncate", ink)}>{pill.detail}</span>}
           </span>
         </button>
-        {!pill.lasting && (
-          <button
-            type="button"
-            onClick={() => dismissAttention(job.id)}
-            aria-label="Dismiss"
-            className="-ml-2 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            <Icon icon={Cancel01Icon} size={16} />
-          </button>
-        )}
+        {dismiss}
       </div>
     </div>
   );

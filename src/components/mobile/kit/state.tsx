@@ -4,7 +4,11 @@
 // KIT-ER-01…04 10615:3808; M48 / M49 10615:3166): the DS StateCard at the
 // content's full width with the phone title (Heading/H3 24/32), a 32 px icon in
 // its 80 px disc, one Body/SM line and at most one action, always an XL button
-// (the kit binds Label/XL). Use these, not StateCard or a hand-made note:
+// (the kit binds Label/XL). On the phone it is a clean state, not a card
+// (mobile UX lens 12): no edge and no surface of its own, centred on whatever
+// it sits on with 20 px of air above and below, so a list, a sheet or a whole
+// page reads "nothing here" rather than "a box in the middle of the page".
+// Use these, not StateCard or a hand-made note:
 //
 //   <EmptyState icon={Folder01Icon} title="No projects yet" body="…" action={{ label: "Start a project", href: "/m/ai" }} />
 //   <ErrorState title="Couldn’t load Messages" body="…" action={{ label: "Try again", onClick: retry }} />
@@ -20,6 +24,9 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { StateCard } from "@/components/ideeza/state-card";
 import { cn } from "@/lib/utils";
+
+/** The phone's clean state: StateCard's words and disc, without its web card's edge and surface. */
+const CLEAN = "w-full border-transparent bg-transparent px-0 py-12";
 
 export type StateAction = { label: string; href: string; onClick?: never } | { label: string; onClick: () => void; href?: never };
 
@@ -52,7 +59,7 @@ export function EmptyState({ icon = Search01Icon, title, body, action, className
     <StateCard
       phone
       tone="empty"
-      className={cn("w-full", className)}
+      className={cn(CLEAN, className)}
       icon={<Icon icon={icon} size={32} />}
       title={title}
       body={body}
@@ -67,7 +74,7 @@ export function ErrorState({ icon = AlertCircleIcon, title, body, action, classN
     <StateCard
       phone
       tone="error"
-      className={cn("w-full", className)}
+      className={cn(CLEAN, className)}
       icon={<Icon icon={icon} size={32} />}
       title={title}
       body={body}
@@ -98,7 +105,7 @@ export function NotFoundState({
       tone="error"
       titleAs="h1"
       titleRef={ref}
-      className={cn("w-full", className)}
+      className={cn(CLEAN, className)}
       icon={<Icon icon={AlertCircleIcon} size={32} />}
       title={`This ${thing} isn’t here`}
       body={body}

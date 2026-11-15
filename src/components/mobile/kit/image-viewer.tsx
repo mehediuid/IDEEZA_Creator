@@ -34,6 +34,7 @@ import { HomeIndicator } from "../home-indicator";
 import { StatusBar } from "../status-bar";
 import { T } from "../type";
 import { MEDIA_GROUND, MEDIA_INK } from "./media";
+import { PRESSED_SECONDARY } from "./press";
 import { useLayer } from "./sheet";
 import { FOOT_ATTR, LAYER_ATTR } from "./toast";
 
@@ -99,7 +100,7 @@ export function ImageViewer(props: ImageViewerProps) {
       <StatusBar tone="media" />
       <header className="flex h-[56px] shrink-0 items-center justify-between gap-4 px-8">
         <span {...LIGHT}>
-          <IconButton hierarchy="secondary" size="xl" aria-label="Close" icon={<Icon icon={Cancel01Icon} size={22} />} onClick={onClose} />
+          <IconButton hierarchy="secondary" size="xl" aria-label="Close" className={PRESSED_SECONDARY} icon={<Icon icon={Cancel01Icon} size={22} />} onClick={onClose} />
         </span>
         <p className={cn(T.bodyStrong, MEDIA_INK, "tabular-nums")} aria-live="polite">
           {index + 1} of {count}
@@ -133,6 +134,7 @@ export function ImageViewer(props: ImageViewerProps) {
         <IconButton
           hierarchy="secondary"
           size="xl"
+          className={PRESSED_SECONDARY}
           aria-label={`Previous ${lower}`}
           disabled={index <= 0}
           icon={<Icon icon={ArrowLeft02Icon} size={22} />}
@@ -154,6 +156,7 @@ export function ImageViewer(props: ImageViewerProps) {
         <IconButton
           hierarchy="secondary"
           size="xl"
+          className={PRESSED_SECONDARY}
           aria-label={`Next ${lower}`}
           disabled={index >= count - 1}
           icon={<Icon icon={ArrowRight02Icon} size={22} />}

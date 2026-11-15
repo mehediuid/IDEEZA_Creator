@@ -33,6 +33,7 @@ import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { GuestGate } from "./account/guest-gate";
 import { HomeIndicator } from "./home-indicator";
+import { PRESSED_DIM } from "./kit/press";
 import { FOOT_ATTR } from "./kit/toast";
 import { SCROLL_ATTR } from "./screen";
 import { T } from "./type";
@@ -192,6 +193,7 @@ export function TabBar() {
                 }}
                 className={cn(
                   "flex h-[56px] min-w-[48px] flex-col items-center justify-center gap-2 border-t-[length:var(--border-width-2)] border-solid outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+                  PRESSED_DIM,
                   current ? "border-[var(--color-border-focus)]" : "border-transparent",
                 )}
               >

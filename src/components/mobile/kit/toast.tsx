@@ -14,7 +14,9 @@
 // sheet makes inert, so an Undo or Retry in it can always be tapped. The
 // distance from the foot is kept true while it shows (screens, bars and the
 // keyboard come and go). Anything floating over the foot that the toast must
-// stand above (the video render tray) carries FLOAT_ATTR.
+// stand above (the video render tray) carries FLOAT_ATTR. A field being typed
+// in is never under it either (mobile UX lens 13): with the keyboard up, a
+// focused field in the toast's band puts the toast 8 px above the field.
 //
 // A build's toasts (TO-03 running with its progress, TO-03b ready, TO-03c
 // stopped) are BUILD_TOASTS; pass the same `id` again to move a running
@@ -28,6 +30,7 @@ import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { TEXT_LINK } from "./bottom-bar";
+import { PRESSED_DIM } from "./press";
 
 export type ToastLead = "success" | "error" | "none";
 
@@ -101,11 +104,22 @@ export const LAYER_ATTR = "data-m-layer";
 /** The least room a toast needs above an edge (its card with an action, clear of the status bar). */
 const ROOM = 160;
 
+/** A toast card's usual height (a title and an action), until the shown one is measured. */
+const CARD = 96;
+
+/** A text field the keyboard is up for. */
+function typingIn(el: Element | null): el is HTMLElement {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.isContentEditable || el.tagName === "TEXTAREA") return true;
+  return el.tagName === "INPUT" && !/^(button|checkbox|radio|range|color|file|submit|reset|image)$/i.test((el as HTMLInputElement).type);
+}
+
 /** The toast's `bottom` in the viewport: 8 px (spacing/4) above the highest foot. Over an open
  *  sheet that is the top sheet's own foot (its actions or composer; the whole sheet when it has
  *  only rows, so no row is covered — unless the sheet is too tall to stand above); on a screen,
- *  the screen's foot and what floats on it. */
-function bottomOffset(root: HTMLElement): number {
+ *  the screen's foot and what floats on it. A focused field that the toast would sit on lifts
+ *  it above the field. */
+function bottomOffset(root: HTMLElement, card: number): number {
   const layers = document.querySelectorAll<HTMLElement>(`[${LAYER_ATTR}]`);
   const top = layers[layers.length - 1];
   const floor = top ? window.innerHeight : root.getBoundingClientRect().bottom;
@@ -115,11 +129,16 @@ function bottomOffset(root: HTMLElement): number {
     if (r.height > 0 && r.top < edge && r.top >= ROOM) edge = r.top;
   });
   const gap = parseFloat(getComputedStyle(root).getPropertyValue("--spacing-4")) || 0;
+  const field = document.activeElement;
+  if (typingIn(field) && (top ?? root).contains(field)) {
+    const r = field.getBoundingClientRect();
+    if (r.height > 0 && r.bottom > edge - gap - card && r.top < edge && r.top >= ROOM) edge = r.top;
+  }
   return Math.round(window.innerHeight - edge + gap);
 }
 
 /** Keeps the offset true while a toast shows. */
-function useBottom(rootId: string, active: boolean): number {
+function useBottom(rootId: string, active: boolean, card: React.RefObject<HTMLElement | null>): number {
   const [bottom, setBottom] = React.useState(0);
   React.useLayoutEffect(() => {
     if (!active) return;
@@ -127,7 +146,7 @@ function useBottom(rootId: string, active: boolean): number {
     const measure = () => {
       frame = 0;
       const root = document.getElementById(rootId);
-      if (root) setBottom(bottomOffset(root));
+      if (root) setBottom(bottomOffset(root, card.current?.offsetHeight || CARD));
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
@@ -137,6 +156,9 @@ function useBottom(rootId: string, active: boolean): number {
     mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
     window.addEventListener("resize", schedule);
     window.visualViewport?.addEventListener("resize", schedule);
+    // A field taking or losing focus (the keyboard, and the field the toast stays off).
+    document.addEventListener("focusin", schedule);
+    document.addEventListener("focusout", schedule);
     // A sheet rising (or a bar sliding) moves its foot without a DOM change.
     document.addEventListener("animationend", schedule, true);
     document.addEventListener("transitionend", schedule, true);
@@ -144,18 +166,21 @@ function useBottom(rootId: string, active: boolean): number {
       mo.disconnect();
       window.removeEventListener("resize", schedule);
       window.visualViewport?.removeEventListener("resize", schedule);
+      document.removeEventListener("focusin", schedule);
+      document.removeEventListener("focusout", schedule);
       document.removeEventListener("animationend", schedule, true);
       document.removeEventListener("transitionend", schedule, true);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [rootId, active]);
+  }, [rootId, active, card]);
   return bottom;
 }
 
 export function ToastProvider({ rootId, children }: { rootId: string; children: React.ReactNode }) {
   const [toast, setToast] = React.useState<Shown | null>(null);
   const seq = React.useRef(0);
-  const bottom = useBottom(rootId, toast !== null);
+  const holder = React.useRef<HTMLDivElement>(null);
+  const bottom = useBottom(rootId, toast !== null, holder);
 
   const show = React.useCallback((t: ToastInput) => {
     setToast((now) => {
@@ -177,6 +202,7 @@ export function ToastProvider({ rootId, children }: { rootId: string; children: 
       {typeof document !== "undefined" &&
         createPortal(
           <div
+            ref={holder}
             role="status"
             aria-live="polite"
             className="pointer-events-none fixed inset-x-8 z-toast flex justify-center font-sans"
@@ -211,7 +237,7 @@ function ToastCard({ toast, onDone }: { toast: Shown; onDone: () => void }) {
           <div className="flex pt-4">
             <button
               type="button"
-              className={cn(TEXT_LINK, "focus-visible:ring-2 focus-visible:ring-border-focus")}
+              className={cn(TEXT_LINK, "focus-visible:ring-2 focus-visible:ring-border-focus", PRESSED_DIM)}
               onClick={() => {
                 toast.action?.onClick();
                 onDone();

@@ -13,6 +13,11 @@
 //   (the form, from that take);
 // · the nudge (11o): every current product has its video — Make project video.
 // The tray carries FLOAT_ATTR, so a toast stacks above it instead of over it.
+// It never covers the screen (mobile UX lens 13): it docks, like a
+// mini-player, into the screen's foot dock slot (Screen draws one between the
+// content and its foot, kit/dock.tsx), so the content ends above it; on a
+// screen with only a top slot (the Feed) it docks under the header; with
+// neither it floats 8 above the foot as before.
 // × hides one (the web's acknowledge). Mounted by the web's
 // GlobalRenderIndicator on /m paths, inside the phone only: on a phone, or in
 // the desktop's phone frame (never the desktop page around it). It stays off
@@ -38,6 +43,8 @@ import { PROJECT_VIDEO_KEY } from "@/lib/video/types";
 import { cn } from "@/lib/utils";
 import { FramedProvider, useDeviceMode } from "../../device";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
+import { useDockSlot } from "../../kit/dock";
+import { PRESSED, PRESSED_DIM } from "../../kit/press";
 import { FLOAT_ATTR, FOOT_ATTR } from "../../kit/toast";
 import { T } from "../../type";
 
@@ -114,6 +121,9 @@ function Tray() {
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const { host, bottom } = useHost();
+  const footSlot = useDockSlot("foot");
+  const topSlot = useDockSlot("top");
+  const dock = footSlot ?? topSlot;
   const { jobs, hydrated, now, acknowledge, cancelRender } = useVideoJobs();
   const { projects } = useManualProjects();
   const { builds } = useCreateHistory();
@@ -185,25 +195,36 @@ function Tray() {
 
   return (
     <>
+      {/* The card's title, spoken from a region that is always on the page (the card itself moves into a
+          dock); the title alone, so a render's ticking time left isn't read out every half second. */}
       {createPortal(
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label="Video render status"
-          // A toast stands above the tray, never on it (kit/toast.tsx).
-          {...{ [FLOAT_ATTR]: "" }}
-          className="pointer-events-none absolute inset-x-8 z-overlay flex flex-col items-center gap-4"
-          style={{ bottom }}
-        >
-          {shown && <TrayCard key={shown.key} item={shown} onAction={() => act(shown)} onHide={() => hide(shown)} />}
-          {more && (
-            <p className={cn(T.caption, "pointer-events-auto rounded-full border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface px-6 py-1 shadow-1")}>
-              {more}
-            </p>
-          )}
-        </div>,
+        <p role="status" aria-live="polite" className="sr-only">
+          {shown?.title ?? ""}
+        </p>,
         host,
       )}
+      {(shown || more) &&
+        createPortal(
+          <div
+            role="group"
+            aria-label="Video render status"
+            // A toast stands above the tray, never on it (kit/toast.tsx).
+            {...{ [FLOAT_ATTR]: "" }}
+            className={cn(
+              "flex flex-col items-center gap-4",
+              dock ? (dock === footSlot ? "px-8 pb-4 pt-4" : "px-8 pb-4") : "pointer-events-none absolute inset-x-8 z-overlay",
+            )}
+            style={dock ? undefined : { bottom }}
+          >
+            {shown && <TrayCard key={shown.key} item={shown} onAction={() => act(shown)} onHide={() => hide(shown)} />}
+            {more && (
+              <p className={cn(T.caption, "pointer-events-auto rounded-full border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface px-6 py-1 shadow-1")}>
+                {more}
+              </p>
+            )}
+          </div>,
+          dock ?? host,
+        )}
       <ConfirmSheet
         open={cancelling !== null}
         onClose={() => setCancelling(null)}
@@ -246,7 +267,7 @@ function TrayCard({ item, onAction, onHide }: { item: TrayItem; onAction: () => 
             <button
               type="button"
               onClick={onAction}
-              className={cn(T.rowTitle, "-my-6 inline-flex min-h-[44px] items-center outline-none hover:underline focus-visible:underline text-text-brand")}
+              className={cn(T.rowTitle, "-my-6 inline-flex min-h-[44px] items-center outline-none hover:underline focus-visible:underline text-text-brand", PRESSED_DIM)}
             >
               {item.action.label}
             </button>
@@ -257,7 +278,10 @@ function TrayCard({ item, onAction, onHide }: { item: TrayItem; onAction: () => 
         type="button"
         aria-label={`Hide — ${item.title}`}
         onClick={onHide}
-        className="-m-4 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+        className={cn(
+          "-m-4 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
+          PRESSED,
+        )}
       >
         <Icon icon={Cancel01Icon} size={16} />
       </button>

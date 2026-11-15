@@ -12,9 +12,12 @@
 //   padding), then the home indicator. Pick-one sheets have no actions.
 // · ActionSheet — M12 Action Sheet: the same surface, radius/xl all round,
 //   floating on the 35 px sheet safe area. Handle, a centred Body/SM Medium
-//   title in text/secondary, 40 px rows (_Select item MD: a 16 px icon, Body/MD
-//   label, radius/md), then Cancel (A01 Secondary LG). The destructive row
-//   (Block, Delete) is the one red row.
+//   title in text/secondary, rows (_Select item MD: a 16 px icon, Body/MD
+//   label, radius/md; 44 tall, the phone's least tap target — lens 16), then
+//   Cancel (A01 Secondary LG). The destructive row (Block, Delete) is the one
+//   red row. Every row and the ✕ show the pressed layer (kit/press.ts).
+//   A sheet whose content scrolls draws a hairline under its header once it
+//   has scrolled (kit/scroll-edge.tsx).
 //
 // One scrim, however many layers: color/modal/overlay at opacity/overlay (the
 // --color-modal-scrim token), no blur, drawn by the bottom layer only — a
@@ -35,6 +38,8 @@ import { cn } from "@/lib/utils";
 import { useFramed, useVisibleViewport } from "../device";
 import { HomeIndicator } from "../home-indicator";
 import { T } from "../type";
+import { PRESSED } from "./press";
+import { ScrollEdge } from "./scroll-edge";
 import { FOOT_ATTR, LAYER_ATTR } from "./toast";
 
 /** A screen that wears one theme whatever the phone's (the way-in screens are
@@ -238,6 +243,7 @@ function SheetPanel({
 }) {
   const framed = useFramed();
   const drag = useDragToClose(panel, onClose);
+  const body = React.useRef<HTMLDivElement>(null);
   // Only rows (a pick-one sheet, a list): the whole sheet is its foot, so a toast stands above it.
   const rowsOnly = !actions && !footer;
   return (
@@ -265,15 +271,21 @@ function SheetPanel({
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+              className={cn(
+                "inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
+                PRESSED,
+              )}
             >
               <Icon icon={Cancel01Icon} size={24} />
             </button>
           )}
         </div>
       </div>
+      {children != null && <ScrollEdge target={body} />}
       {children != null && (
-        <div className={cn("flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain px-16 pb-4", fill && "flex-1")}>{children}</div>
+        <div ref={body} className={cn("flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain px-16 pb-4", fill && "flex-1")}>
+          {children}
+        </div>
       )}
       {footer && (
         <div {...{ [FOOT_ATTR]: "" }} className="shrink-0 px-16 pb-5 pt-4">
@@ -352,7 +364,8 @@ function ActionPanel({
                   it.onSelect();
                 }}
                 className={cn(
-                  "flex h-[40px] w-full items-center gap-4 rounded-md px-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
+                  "flex min-h-[44px] w-full items-center gap-4 rounded-md px-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
+                  PRESSED,
                   it.destructive ? "text-text-error" : "text-text-primary",
                 )}
               >

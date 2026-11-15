@@ -26,6 +26,7 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
+import { PRESSED } from "./press";
 
 /** The card: surface, border/default, radius/xl, clipping its rows. */
 export const LIST_CARD =
@@ -35,9 +36,12 @@ export const LIST_CARD =
 export const LIST_DIVIDERS =
   "[&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border";
 
-/** A content row inside a ListCard: its padding (12 / 16) and its press states. */
-export const LIST_ROW =
-  "flex w-full min-h-[48px] items-center gap-6 px-8 py-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus";
+/** A content row inside a ListCard: its padding (12 / 16) and its press states — the pressed
+ *  layer (kit/press.ts) lights only when the row is an enabled button or a link. */
+export const LIST_ROW = cn(
+  "flex w-full min-h-[48px] items-center gap-6 px-8 py-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus",
+  PRESSED,
+);
 
 export function ListCard({
   children,

@@ -10,12 +10,16 @@
 // this tab's history (nav-trail.ts), else it replaces this screen with its
 // parent (`back="/m/projects"`, or Home for `back`). So a deep link's Back
 // stays in the app, and two screens can't send each other round in a loop.
+//
+// Its buttons show the DS Secondary hover / pressed fills (the A02 Secondary
+// icon button draws none), so a tap answers under the finger (lens 16).
 
 import * as React from "react";
 import { ArrowLeft02Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { cn } from "@/lib/utils";
+import { PRESSED_SECONDARY } from "./kit/press";
 import { useGoBack } from "./nav-trail";
 import { T } from "./type";
 
@@ -50,6 +54,7 @@ export function TopBar({
             hierarchy="secondary"
             size="xl"
             aria-label="Back"
+            className={PRESSED_SECONDARY}
             icon={<Icon icon={ArrowLeft02Icon} size={22} />}
             onClick={onBack ? () => onBack(goBack) : goBack}
           />
@@ -65,6 +70,7 @@ export function TopBar({
             hierarchy="secondary"
             size="xl"
             aria-label={a.label}
+            className={PRESSED_SECONDARY}
             icon={<Icon icon={a.icon} size={22} />}
             onClick={a.onClick}
           />
