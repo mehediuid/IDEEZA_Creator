@@ -3,59 +3,86 @@
 // The product's ⋯ menu (owner, 2026-10-11: the product page made like the
 // project page). Beside Open in editor, owner-only and absent in a preview
 // (PPL-6):
-// - Rename product — a small dialog over `renameProduct`, the same write the
-//   editor's name field makes, through the same write guard ("editProduct":
-//   a live Buy-now listing asks to pause first; an auction or the lock
-//   refuses, said under the field);
+// - Edit name and description — the product's one editor for both
+//   (edit-product-details.tsx), absent on a locked project;
 // - Open chat “…” — the chat this version was built in, while it is in this
-//   browser: the build is changed there.
+//   browser: the build is changed there;
+// - Delete product… — set apart at the end, in the error colour
+//   (delete-product-dialog.tsx). While a rule blocks it (the project's only
+//   product, its copies listed or sold, the Main NFT listed, in an auction
+//   or sold) it stays in the menu, aria-disabled, with the reason under it.
 // The menu button is the project menu's (WAI-ARIA APG keys, Escape back to ⋯).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { BubbleChatIcon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, Delete02Icon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button, IconButton, ModalFrame, TextInput } from "@/components/ideeza";
+import { IconButton } from "@/components/ideeza";
+import { productDeleteBlockOf, productDeleteFactsOf } from "@/lib/manual/delete-plan";
 import { can } from "@/lib/manual/permissions";
-import { WRITE_FAILED } from "@/lib/manual/project-header";
 import { productRowsOf } from "@/lib/manual/project-read";
-import { displayProductName } from "@/lib/manual/products-tab-view";
-import { PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
-import { useWriteGuard } from "@/lib/manual/use-write-guard";
 import { cn } from "@/lib/utils";
-import { useStoreWrite } from "../details/use-store-write";
+import { DeleteProductDialog } from "./delete-product-dialog";
 import type { ProductSlotProps } from "./product-slots";
 
-const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
-const lengthOf = (s: string) => Array.from(s.trim()).length;
-
-type Item = { id: string; label: string; sub?: string; icon: Parameters<typeof Icon>[0]["icon"]; run: () => void };
+type Item = {
+  id: string;
+  label: string;
+  sub?: string;
+  icon: Parameters<typeof Icon>[0]["icon"];
+  danger?: boolean;
+  /** Why it can't be used right now: it stays, aria-disabled, with this under it. */
+  unavailable?: string;
+  run: () => void;
+};
 
 export function ProductMenu({
   slot,
   chat,
+  onEdit,
 }: {
   slot: ProductSlotProps;
   /** The chat this version was built in, while this browser has it. */
   chat: { title: string; href: string } | null;
+  /** Opens Edit name and description; null when the viewer may not edit the product. */
+  onEdit: (() => void) | null;
 }) {
-  const { view, viewer } = slot;
+  const { project, view, product, viewer } = slot;
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
-  const [layer, setLayer] = React.useState<"rename" | null>(null);
+  const [layer, setLayer] = React.useState<"delete" | null>(null);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const menuId = React.useId();
 
-  const canRename = can(viewer, "product.openEditor", view.canCtx);
+  const block = productDeleteBlockOf(
+    productDeleteFactsOf(
+      { products: productRowsOf(project).length, deleteFacts: view.deleteFacts, sales: view.sales, editions: view.editions },
+      product.id,
+    ),
+  );
 
-  const items: Item[] = [
-    ...(canRename ? [{ id: "rename", label: "Rename product", icon: PencilEdit01Icon, run: () => setLayer("rename") }] : []),
-    ...(chat
-      ? [{ id: "chat", label: `Open chat “${chat.title}”`, sub: "Where it was built — change it there", icon: BubbleChatIcon, run: () => router.push(chat.href) }]
-      : []),
-  ];
+  const items: Item[][] = [
+    [
+      ...(onEdit ? [{ id: "edit", label: "Edit name and description", icon: PencilEdit01Icon, run: onEdit }] : []),
+      ...(chat
+        ? [{ id: "chat", label: `Open chat “${chat.title}”`, sub: "Where it was built — change it there", icon: BubbleChatIcon, run: () => router.push(chat.href) }]
+        : []),
+    ],
+    can(viewer, "product.edit")
+      ? [
+          {
+            id: "delete",
+            label: "Delete product…",
+            icon: Delete02Icon,
+            danger: true,
+            unavailable: block?.reason,
+            run: () => setLayer("delete"),
+          },
+        ]
+      : [],
+  ].filter((g) => g.length > 0);
 
   const menuItems = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
   const focusItem = (at: "first" | "last") =>
@@ -133,21 +160,26 @@ export function ProductMenu({
           }}
           className="absolute right-0 top-full z-popover mt-2 flex w-[min(300px,calc(100vw-32px))] flex-col rounded-xl border border-solid border-border bg-bg-surface py-2 shadow-3 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-fast [@container(min-width:480px)]:left-0 [@container(min-width:480px)]:right-auto [@container(min-width:720px)]:left-auto [@container(min-width:720px)]:right-0"
         >
-          {items.map((item) => (
-            <MenuItem
-              key={item.id}
-              item={item}
-              onRun={() => {
-                close(true);
-                item.run();
-              }}
-            />
+          {items.map((group, gi) => (
+            <div key={gi} role="group" className={cn("flex flex-col", gi > 0 && "mt-2 border-t border-solid border-border pt-2")}>
+              {group.map((item) => (
+                <MenuItem
+                  key={item.id}
+                  item={item}
+                  onRun={() => {
+                    // The keyboard waits on ⋯, which each dialog hands it back to.
+                    close(true);
+                    item.run();
+                  }}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}
 
-      {layer === "rename" && (
-        <RenameDialog
+      {layer === "delete" && (
+        <DeleteProductDialog
           slot={slot}
           onClose={() => {
             setLayer(null);
@@ -161,140 +193,48 @@ export function ProductMenu({
 
 function MenuItem({ item, onRun }: { item: Item; onRun: () => void }) {
   const subId = React.useId();
+  const off = item.unavailable !== undefined;
+  const sub = item.unavailable ?? item.sub;
   return (
     <button
       type="button"
       role="menuitem"
       tabIndex={-1}
-      aria-describedby={item.sub ? subId : undefined}
-      onClick={onRun}
-      className="flex min-h-[44px] w-full items-start gap-4 px-5 py-3 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus motion-reduce:transition-none"
+      aria-disabled={off || undefined}
+      aria-describedby={sub ? subId : undefined}
+      onClick={() => {
+        if (!off) onRun();
+      }}
+      className={cn(
+        "flex min-h-[44px] w-full items-start gap-4 px-5 py-3 text-left outline-none transition-colors duration-fast motion-reduce:transition-none",
+        off
+          ? "cursor-not-allowed"
+          : item.danger
+            ? "hover:bg-bg-error-subtle focus-visible:bg-bg-error-subtle"
+            : "hover:bg-bg-subtle focus-visible:bg-bg-subtle",
+        "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus",
+      )}
     >
-      <Icon icon={item.icon} size={18} className="mt-[1px] shrink-0 text-text-secondary" />
+      <Icon
+        icon={item.icon}
+        size={18}
+        className={cn("mt-[1px] shrink-0", off ? "text-text-disabled" : item.danger ? "text-text-error" : "text-text-secondary")}
+      />
       <span className="flex min-w-0 flex-col gap-[2px]">
-        <span className="break-words text-md font-medium leading-md text-text-primary">{item.label}</span>
-        {item.sub && (
+        <span
+          className={cn(
+            "break-words text-md font-medium leading-md",
+            off ? "text-text-disabled" : item.danger ? "text-text-error" : "text-text-primary",
+          )}
+        >
+          {item.label}
+        </span>
+        {sub && (
           <span id={subId} className="text-sm leading-sm text-text-secondary">
-            {item.sub}
+            {sub}
           </span>
         )}
       </span>
     </button>
-  );
-}
-
-/** Rename product: one field. Save goes through the write guard; Escape, ✕ and Cancel close it. */
-function RenameDialog({ slot, onClose }: { slot: ProductSlotProps; onClose: () => void }) {
-  const { project, product, announce } = slot;
-  const { projects, renameProduct } = useManualProjects();
-  const gate = useWriteGuard(project.id);
-  const live = projects.find((p) => p.id === project.id) ?? project;
-  const row = productRowsOf(live).find((r) => r.id === product.id);
-  const current = row?.name.trim() ?? product.name.trim();
-  const [name, setName] = React.useState(current);
-  const [tried, setTried] = React.useState(false);
-  const [denied, setDenied] = React.useState<string | null>(null);
-  const [pending, setPending] = React.useState<string | null>(null);
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  const formId = React.useId();
-  const fieldId = React.useId();
-  const msgId = React.useId();
-
-  const value = name.trim();
-  const tooLong = lengthOf(name) > PROJECT_NAME_MAX;
-  const error = value === "" ? "Give the product a name." : tooLong ? `Keep it to ${PROJECT_NAME_MAX} characters.` : null;
-  const blocked = gate.reasonOf("editProduct");
-  const reason = denied ?? blocked;
-
-  const write = useStoreWrite(pending !== null && current === pending, () => {
-    if (pending !== null) announce(`Renamed to “${displayProductName(pending)}”`);
-    onClose();
-  });
-
-  const save = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (write.saving) return;
-    setTried(true);
-    if (error) {
-      inputRef.current?.focus();
-      return;
-    }
-    if (value === current && !write.failed) {
-      onClose();
-      return;
-    }
-    setDenied(null);
-    const outcome = gate.guard("editProduct", () => {
-      setPending(value);
-      write.start();
-      renameProduct(project.id, product.id, value);
-    });
-    if (outcome.kind === "refused") setDenied(outcome.reason);
-  };
-
-  const shownError = tried || tooLong ? error : null;
-  return (
-    <>
-      <ModalFrame
-        open
-        onClose={() => {
-          if (!write.saving) onClose();
-        }}
-        covered={gate.confirming}
-        size="sm"
-        title="Rename product"
-        description="The name shows on its card, its page and in the editor."
-        initialFocus={inputRef}
-        closeUnavailable={write.saving}
-        footer={
-          <div className="ml-auto flex flex-wrap items-center gap-4">
-            <Button type="button" hierarchy="ghost" size="lg" onClick={onClose} disabled={write.saving} className={TAP}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form={formId}
-              hierarchy="primary"
-              size="lg"
-              disabled={write.saving}
-              aria-disabled={blocked !== null || undefined}
-              aria-describedby={reason ? msgId : undefined}
-              className={cn(TAP, blocked !== null && "cursor-not-allowed opacity-60")}
-            >
-              {write.saving ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        }
-      >
-        <form id={formId} onSubmit={save} noValidate className="flex flex-col gap-2 pt-4">
-          <div className="flex items-baseline justify-between gap-4">
-            <label htmlFor={fieldId} className="text-md font-semibold text-text-primary">
-              Name
-            </label>
-            <span aria-hidden className={cn("text-sm tabular-nums text-text-secondary", tooLong && "text-text-error")}>
-              {`${lengthOf(name)}/${PROJECT_NAME_MAX}`}
-            </span>
-          </div>
-          <TextInput
-            ref={inputRef}
-            id={fieldId}
-            size="lg"
-            value={name}
-            onValueChange={setName}
-            invalid={shownError !== null}
-            aria-invalid={shownError !== null || undefined}
-            aria-describedby={msgId}
-            autoComplete="off"
-            containerClassName={TAP}
-          />
-          <div id={msgId} aria-live="polite" className="min-h-[20px] text-sm">
-            {shownError && <p className="text-text-error">{shownError}</p>}
-            {write.failed && <p className="text-text-error">{WRITE_FAILED}</p>}
-            {reason && <p className="text-text-secondary">{reason}</p>}
-          </div>
-        </form>
-      </ModalFrame>
-      {gate.dialog}
-    </>
   );
 }

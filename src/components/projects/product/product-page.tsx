@@ -6,10 +6,12 @@
 // - main: the breadcrumb; the header (owner, 2026-10-11: made like the project
 //   page's) — the concept image as a thumbnail from a 480 px header, the h1,
 //   the version select and one meta line ("AI build · {date} · All 5 pieces
-//   ready", or the unbuilt line), the frozen description; beside them ★ Open
-//   in editor (the page's one violet, C16) and the ⋯ menu (product-menu.tsx:
-//   Rename product, Activity, Open chat); then the lock line and the version
-//   notice; then the tab strip and its panel (product-tabs.tsx);
+//   ready", or the unbuilt line), the description — the maker's words on the
+//   current version, the build's frozen ones on an older version (H-7) — or,
+//   for the owner, "Add a description"; beside them ★ Open in editor (the
+//   page's one violet, C16) and the ⋯ menu (product-menu.tsx: Edit name and
+//   description, Open chat, Delete product); then the lock line and the
+//   version notice; then the tab strip and its panel (product-tabs.tsx);
 // - the rail: the Marketplace block (T27, the buyer's side only since Build
 //   and Earn P0), Specs and Build check (product-facts.tsx), then the Editor
 //   block (product-rail.tsx), right of the tabs from a 1024 px page container.
@@ -38,7 +40,8 @@
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CpuIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, CpuIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import { LeaveButton } from "@/components/create/leave-button";
 import { partChangesOf, partChangesText } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
@@ -54,6 +57,7 @@ import { productDocTitle } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
 import { LiveRegion, usePageArrival } from "../details/arrival";
 import { Breadcrumb, type Crumb } from "../details/breadcrumb";
+import { TextButton } from "../details/description-editor";
 import { isPreview, previewQuery, useFocusAfterPreview } from "../details/buyer-preview";
 import { ProjectFrame } from "../details/frame";
 import { ProjectNotFound } from "../details/page-states";
@@ -66,6 +70,7 @@ import { PostMissing } from "@/components/innovations/post-states";
 import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-store";
 import { minePostOf } from "@/lib/innovations/mine-post";
 import { postHref } from "@/lib/innovations/slug";
+import { useEditProductDetails } from "./edit-product-details";
 import { DeliverablesAccess } from "./product-deliverables";
 import { ClampedText, ConceptImage } from "./product-identity";
 import { ProductMenu } from "./product-menu";
@@ -175,6 +180,16 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   // PPL-5: this page has no Preview as buyer button, so Exit preview hands
   // focus to the h1 once the owner view is back.
   useFocusAfterPreview(viewer !== null && !isPreview(viewer), () => titleRef.current);
+  // Edit name and description: from the ⋯ menu and "Add a description", the owner's page only.
+  const canEditDetails = !!(view && viewer && ownerFacts && context === "project" && can(viewer, "product.edit", view.canCtx));
+  const edit = useEditProductDetails({
+    slot:
+      ready && project && view && viewer && product
+        ? { project, view, product, version: version ?? NO_VERSION, viewer, now: ready.now, announce }
+        : null,
+    canEdit: canEditDetails,
+    fallbackFocus: () => titleRef.current,
+  });
 
   if (data.state === "loading") return <ProductLoading />;
   const market = context === "market";
@@ -211,7 +226,10 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   const home = version?.home ?? 1;
   const hrefFor = (n: number) => `${pathname}${withQuery(search, { v: n === home ? null : String(n) })}`;
   const pieces = bp ? productPiecesOf(bp.items) : null;
-  const description = bp?.description?.trim() || product.description.trim();
+  // The maker's words on the version the product is at (a save writes the build's words there,
+  // so one cleared stays cleared); an older version keeps its build's (H-7).
+  const kept = product.description.trim();
+  const description = (version?.shown ?? home) === home ? kept : bp?.description?.trim() || kept;
   // P2-EDITOR-9 (as changed): the page's violet in every state, absent when the viewer may not
   // open the editor — every preview, and a project sold in full.
   const editor = can(viewer, "product.openEditor", view.canCtx) ? openInEditorOf(project, product.id) : null;
@@ -288,7 +306,16 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                         {meta && <p className="text-sm text-text-secondary">{meta}</p>}
                       </div>
                     )}
-                    {description && <ClampedText text={description} />}
+                    {description ? (
+                      <ClampedText text={description} />
+                    ) : canEditDetails ? (
+                      <div>
+                        <TextButton onClick={edit.open}>
+                          <Icon icon={Add01Icon} size={16} />
+                          Add a description
+                        </TextButton>
+                      </div>
+                    ) : null}
                     {!ownerFacts && (
                       <ActivityNow
                         projectId={project.id}
@@ -320,7 +347,11 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                       </LeaveButton>
                     )}
                     {ownerFacts && !market && (
-                      <ProductMenu slot={slot} chat={chat ? { title: chat.title.trim() || "Untitled chat", href: `/chat/${chat.id}` } : null} />
+                      <ProductMenu
+                        slot={slot}
+                        chat={chat ? { title: chat.title.trim() || "Untitled chat", href: `/chat/${chat.id}` } : null}
+                        onEdit={canEditDetails ? edit.open : null}
+                      />
                     )}
                   </div>
                 )}
@@ -359,6 +390,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
         }
       />
       <LiveRegion text={live} />
+      {edit.dialog}
       {addingAll && job && bp && (
         <AddPiecesDialog
           buildId={job.id}

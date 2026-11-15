@@ -110,20 +110,20 @@ test("the product page carries Open in editor and the Editor block, both gated o
 test("the product strip reads PRODUCT_SLOTS for its people tab and Media, with the strip's order (P2-EDITOR-16, 18)", () => {
   const tabs = read(PRODUCT + "product-tabs.tsx");
   assert.match(tabs, /panels\.contributors !== undefined &&\s*buyerSide\(viewer\) &&/, "Contributors is the buyer's side only (P0)");
-  assert.match(tabs, /customers: false,/, "Customers moved to Earn (P0)");
+  assert.match(tabs, /customers: panels\.customers !== undefined && can\(viewer, "customers\.see"\),/, "Sales is the owner's (2026-11-15)");
   assert.match(tabs, /label="Product sections"/);
   assert.match(tabs, /onTab\(id === tabs\[0\] \? null : id\)/, "the first tab is never written to ?tab=");
   assert.match(tabs, /mediaFirst: buyerSide\(viewer\),/, "a buyer's side opens on Media; the owner's on the pieces");
 });
 
-test("P0: the product page is engineering for the owner — no Customers panel, and Editions only on the buyer's side", () => {
+test("P0: the product page is engineering for the owner — its Sales tab aside (2026-11-15), and Editions only on the buyer's side", () => {
   const slots = read(PRODUCT + "product-slots.tsx");
-  assert.doesNotMatch(slots, /customers:|ProductCustomers/);
+  assert.match(slots, /customers: CustomersSlot,/);
   assert.match(slots, /return buyerSide\(props\.viewer\) \? <EditionBlock \{\.\.\.props\} \/> : null;/);
   const page = read(PRODUCT + "product-page.tsx");
   assert.match(page, /<VersionSelect/);
   assert.match(page, /<ProductRail\s+slot=\{slot\}\s+built=\{bp\}\s+confidence=\{confidence\}\s+partChanges=\{partChanges\}/, "Specs and Build check are the rail's");
-  assert.match(page, /<ProductMenu slot=\{slot\}/, "the owner's ⋯ menu");
+  assert.match(page, /<ProductMenu\s+slot=\{slot\}/, "the owner's ⋯ menu");
   assert.match(page, /\{lockLine && <LockLine line=\{lockLine\} \/>\}/);
 });
 
