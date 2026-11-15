@@ -14,7 +14,9 @@
 // - A demo buyer gets Buy now: quiet, full width, 44 px (the Main NFT's
 //   Buy now keeps the page's one violet, C16). It opens the one purchase
 //   request with the chosen tier (`useEditionPurchase`), which writes ONE
-//   Sale for the next unit; the product's Customers tab reads it.
+//   Sale for the next unit; the product's Customers tab reads it. While every
+//   unit left is in another tab's checkout, Buy now waits, greyed, with
+//   "Someone is buying this now. Try again in a few minutes." under it.
 // - A preview reads the same offers with their prices and no button (PPL-6).
 
 import * as React from "react";
@@ -24,6 +26,8 @@ import { RailFact, RailFacts } from "@/components/projects/details/rail-block";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
+import { checkoutBlocks, IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
+import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import { editionChainOf, editionOffersOf, isProjectScope, TIER_HELP, trackCardOf } from "@/lib/market/editions";
 import { KIND_LABEL, USE_LABEL } from "@/lib/market/sell-flow";
 import { PROJECT_SCOPE, type EditionTrack, type Listing } from "@/lib/market/types";
@@ -183,6 +187,9 @@ function BuyableOffer({
   // The track's own listing is live while this offer shows (only the lock hides it).
   const canBuy = !card.soldOut && can(viewer, "listing.buy", { ...view.canCtx, listingLive: true });
   const busy = busyId === track.id;
+  const holds = useCheckoutHolds();
+  const held = checkoutBlocks(holds.others(track.id), card.total - card.sold);
+  const heldId = React.useId();
   // One price when "with future updates" costs the same: no choice to make.
   const oneTier = track.listing.extended === track.listing.regular;
 
@@ -244,23 +251,31 @@ function BuyableOffer({
       </div>
       )}
       {canBuy ? (
-        <Button
-          type="button"
-          hierarchy="secondary"
-          size="lg"
-          className="h-[44px] w-full"
-          // Not `disabled`, which would drop focus before the wallet dialog reads its opener.
-          aria-disabled={busy || undefined}
-          onClick={async (e) => {
-            if (busy) return;
-            // Safari doesn't focus a clicked button.
-            e.currentTarget.focus();
-            const done = await buy(track, oneTier ? "extended" : tier);
-            if (done) announce(done);
-          }}
-        >
-          {`Buy now · ${formatAmount(tier === "regular" ? track.listing.regular : track.listing.extended, track.listing.token)}`}
-        </Button>
+        <div className="flex flex-col gap-3">
+          <Button
+            type="button"
+            hierarchy="secondary"
+            size="lg"
+            className={cn("h-[44px] w-full", held && "cursor-not-allowed opacity-60")}
+            // Not `disabled`, which would drop focus before the wallet dialog reads its opener.
+            aria-disabled={busy || held || undefined}
+            aria-describedby={held ? heldId : undefined}
+            onClick={async (e) => {
+              if (busy || held) return;
+              // Safari doesn't focus a clicked button.
+              e.currentTarget.focus();
+              const done = await buy(track, oneTier ? "extended" : tier);
+              if (done) announce(done);
+            }}
+          >
+            {`Buy now · ${formatAmount(tier === "regular" ? track.listing.regular : track.listing.extended, track.listing.token)}`}
+          </Button>
+          {held && (
+            <p id={heldId} className="m-0 text-md text-text-secondary">
+              {IN_CHECKOUT_BUYER_LINE}
+            </p>
+          )}
+        </div>
       ) : card.soldOut ? (
         <p className="m-0 text-md text-text-secondary">All {card.total} are sold.</p>
       ) : null}

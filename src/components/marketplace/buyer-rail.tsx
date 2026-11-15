@@ -9,6 +9,8 @@
 //   - a live Buy now reads its facts, ★ Buy now (the page's one violet, 44 px)
 //     and the wallet line — headed "Buy another share" for a holder;
 //   - a live auction is the Auction card (bid-card.tsx);
+//   - while another tab's checkout holds the listing, Buy waits, greyed, with
+//     "Someone is buying this now. Try again in a few minutes." under it;
 //   - paused, removed, closed with no bids and sold each say so, with no button.
 // - Preview as buyer (`?view=buyer`) and a contributor preview that may see
 //   the listing read the same facts with no button, the Testnet demo badge,
@@ -38,6 +40,8 @@ import { can } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { auctionStateOf, timeLeftLabel } from "@/lib/market/auction";
+import { IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
+import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import { useMarket } from "@/lib/market/market-store";
 import { holdingOf } from "@/lib/market/sales";
 import type { AuctionState, Listing, Sale } from "@/lib/market/types";
@@ -340,6 +344,10 @@ function BuyerBody({
   announce: (m: string) => void;
 }) {
   const { busy, buy } = usePurchase({ project, view, buyerId });
+  const holds = useCheckoutHolds();
+  // Another tab's checkout holds the listing: Buy waits until it settles or lapses.
+  const held = holds.others(listing.id) > 0;
+  const heldId = React.useId();
   const summaryRef = React.useRef<HTMLButtonElement>(null);
   const afterClose = useAfterDialogClose();
   // The Main share only: Purchased Summary and "Buy another share" are about it, whatever else the buyer holds.
@@ -371,23 +379,31 @@ function BuyerBody({
           {holding && <h3 className="text-md font-bold text-text-primary">Buy another share</h3>}
           {facts}
           {canBuy && (
-            <Button
-              type="button"
-              hierarchy="primary"
-              size="lg"
-              className="h-[44px] w-full"
-              // Not `disabled`: that drops its focus before the wallet dialog reads its opener,
-              // so Reject or Close would hand focus to <body> (the dialog covers it meanwhile).
-              aria-disabled={busy || undefined}
-              onClick={(e) => {
-                if (busy) return;
-                // Safari doesn't focus a clicked button.
-                e.currentTarget.focus();
-                void purchase("buyNow");
-              }}
-            >
-              Buy now
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                hierarchy="primary"
+                size="lg"
+                className={cn("h-[44px] w-full", held && "cursor-not-allowed opacity-60")}
+                // Not `disabled`: that drops its focus before the wallet dialog reads its opener,
+                // so Reject or Close would hand focus to <body> (the dialog covers it meanwhile).
+                aria-disabled={busy || held || undefined}
+                aria-describedby={held ? heldId : undefined}
+                onClick={(e) => {
+                  if (busy || held) return;
+                  // Safari doesn't focus a clicked button.
+                  e.currentTarget.focus();
+                  void purchase("buyNow");
+                }}
+              >
+                Buy now
+              </Button>
+              {held && (
+                <p id={heldId} className="m-0 text-md text-text-secondary">
+                  {IN_CHECKOUT_BUYER_LINE}
+                </p>
+              )}
+            </div>
           )}
           <WalletLine buyerId={buyerId} listing={listing} verb="buy" now={clock} />
         </div>
@@ -403,6 +419,7 @@ function BuyerBody({
             canBid={canBid}
             canBuy={canBuy}
             buyBusy={busy}
+            buyHeld={held}
             onBuyNow={() => void purchase("auctionBuyNow")}
             facts={facts}
             wallet={<WalletLine buyerId={buyerId} listing={listing} verb="bid" now={clock} />}

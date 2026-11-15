@@ -363,6 +363,28 @@ export function removeListing(ls: Listing[], id: string, now: number): Result {
   return { ok: true, listings };
 }
 
+/** The card's line once an auction has a bid, and why Cancel then refuses. */
+export const AUCTION_BIDS_LINE = "An auction can't be cancelled once someone bids.";
+
+/** Why the maker can't cancel `l` now, or null when they can: a live auction that nobody has
+ *  bid on and that hasn't ended (an ended one is settled by Close). */
+export function cancelBlockOf(l: Listing, bids: Bid[], now: number): string | null {
+  if (l.type !== "auction") return "Only an auction can be cancelled.";
+  if (l.status !== "live") return "Only a live auction can be cancelled.";
+  if (bids.some((b) => b.listingId === l.id)) return AUCTION_BIDS_LINE;
+  if (now >= (l.endsAt ?? now)) return "The auction has ended. Close it instead.";
+  return null;
+}
+
+/** Cancel auction: an auction `cancelBlockOf` allows comes down as a removed listing, so the
+ *  Main NFT is not listed again and the mint stays. Its terms are kept for the next listing. */
+export function cancelAuction(ls: Listing[], id: string, bids: Bid[], now: number): Result {
+  const listing = ls.find((l) => l.id === id);
+  if (!listing) return { ok: false, reason: "This listing no longer exists." };
+  const blocked = cancelBlockOf(listing, bids, now);
+  return blocked ? { ok: false, reason: blocked } : removeListing(ls, id, now);
+}
+
 /** Live buy now pauses; an already-paused listing appends the new change
  *  reason instead of starting a second pause (P2-LISTING-13). An auction is
  *  never paused — `editGateOf` blocks the write before this runs. */
