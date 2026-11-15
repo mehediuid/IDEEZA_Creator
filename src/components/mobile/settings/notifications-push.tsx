@@ -6,9 +6,9 @@
 // · Allowed: on. Only the phone can take it back, so the switch says where.
 // · Not asked yet: off; turning it on shows the kit's pre-prompt (PM-04) and
 //   Continue asks the browser.
-// · Blocked: "Off · Blocked in your phone's settings" and "Open phone
-//   settings", a sheet with the way to allow it; it closes by itself once the
-//   phone allows it.
+// · Blocked: "Off · Blocked in your phone's settings"; the row opens
+//   "Allow notifications" (ST-20b's Open phone settings), a sheet with the way
+//   to allow it; it closes by itself once the phone allows it.
 // · No support (iOS Safari in a tab): off, with the reason.
 
 import * as React from "react";
@@ -18,7 +18,6 @@ import type { PopupMode } from "@/lib/notifications/filter";
 import type { PopupPermission } from "@/lib/notifications/popups";
 import { Sheet } from "../kit/sheet";
 import { cn } from "@/lib/utils";
-import { TEXT_LINK } from "../kit/bottom-bar";
 import { T } from "../type";
 import { useToast } from "../kit/toast";
 import { SettingsRow } from "./kit";
@@ -79,22 +78,6 @@ export function PushRow({
     );
   }
   return <SettingsRow id="browser-popups" label={label} toggle={{ checked: false, onChange: onAsk }} disabled={disabled || permission === null} />;
-}
-
-/** ST-20b: the A03 link under the card while push is blocked. */
-export function PhoneSettingsLink({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
-  return (
-    <div className="-mt-2 flex">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className={cn(TEXT_LINK, "my-0 disabled:cursor-not-allowed disabled:text-text-disabled disabled:no-underline")}
-      >
-        Open phone settings
-      </button>
-    </div>
-  );
 }
 
 /** ST-20c, kit PM-04: asked before the browser's own prompt, which only comes once. */

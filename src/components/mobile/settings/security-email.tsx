@@ -1,6 +1,7 @@
 "use client";
 
-// AU-42 · Change email: the current one, the new one and your password (an
+// AU-42 · Change email (one title, the top bar's; the current email as a
+// grouped row, the page's lines under the field): the current one, the new one and your password (an
 // account with no password of its own skips it); Send code sends a 6-digit
 // code to the new address (the AU-12 code step), and the right code moves the
 // account there — its sign-in methods and security go with it. AU-42b: back
@@ -15,15 +16,14 @@ import { accountOf, changeAccountEmail, isCurrentPassword, isEmail, normalizeEma
 import { movePhoneAccount, phoneAccountOf, usePhoneAccounts } from "@/lib/account/phone";
 import { moveSecurity } from "@/lib/account/security";
 import { CodeStep } from "../account/code-step";
-import { ACCOUNT_CONTENT, AccountAlert, AccountHeading } from "../account/parts";
+import { ACCOUNT_CONTENT, AccountAlert } from "../account/parts";
 import { BottomBar } from "../kit/bottom-bar";
-import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { leaveTo } from "./kit";
+import { SettingsGroup, SettingsRow, leaveTo } from "./kit";
 
 const BACK = "/m/settings/security";
 
@@ -128,7 +128,6 @@ export function EmailSettings() {
       }
     >
       <form id="change-email" noValidate onSubmit={send} className={ACCOUNT_CONTENT}>
-        <AccountHeading title="Change your email">Receipts, payouts and sign-in codes go here. We’ll send a code to the new address.</AccountHeading>
         <AccountAlert
           alert={
             !online
@@ -138,32 +137,33 @@ export function EmailSettings() {
                 : null
           }
         />
+        {/* One title (the top bar's); the current email as a row; the page's two lines under the field they explain. */}
+        <SettingsGroup>
+          <SettingsRow label="Current email" value={current} />
+        </SettingsGroup>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <p className={T.rowTitle}>Current email</p>
-            <p className={cn(T.bodyLg, "flex h-[44px] items-center rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border-disabled)] bg-[var(--color-input-bg-disabled)] px-6 text-text-secondary")}>
-              {current}
-            </p>
+            <Field label="New email" htmlFor={ids.email.id} error={emailError} errorId={ids.email.errorId}>
+              <TextInput
+                id={ids.email.id}
+                size="xl"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                placeholder="name@example.com"
+                value={next}
+                onValueChange={(v) => {
+                  setNext(v);
+                  setTaken(false);
+                  setFailed(false);
+                }}
+                onBlur={() => setLeft(true)}
+                {...errorProps(emailError, ids.email.errorId)}
+              />
+            </Field>
+            <p className={T.meta}>Receipts, payouts and sign-in codes go here. We’ll send a code to the new address.</p>
           </div>
-          <Field label="New email" htmlFor={ids.email.id} error={emailError} errorId={ids.email.errorId}>
-            <TextInput
-              id={ids.email.id}
-              size="xl"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              autoCapitalize="none"
-              placeholder="name@example.com"
-              value={next}
-              onValueChange={(v) => {
-                setNext(v);
-                setTaken(false);
-                setFailed(false);
-              }}
-              onBlur={() => setLeft(true)}
-              {...errorProps(emailError, ids.email.errorId)}
-            />
-          </Field>
           {!passwordless && (
             <Field label="Your password" htmlFor={ids.password.id} error={passwordError} errorId={ids.password.errorId}>
               <PasswordInput

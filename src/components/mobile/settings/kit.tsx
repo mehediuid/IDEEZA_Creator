@@ -16,14 +16,21 @@
 //   kit's (kit/list.tsx); Settings keeps radius/lg (10690:137).
 // · ChoiceSheet — a pick-one row's M09 radio sheet, a hint per option, Done /
 //   Cancel; Done saves and says "Saved" (ST-93).
-// · SaveFailed — "Couldn't save. Nothing changed." with Try again under the
+// · SaveFailed — "Couldn’t save. Nothing changed." with Try again under the
 //   group whose control snapped back (ST-92). Toggles save silently.
+// · InfoButton — the ⓘ: a 44 px icon button that opens the kit Sheet with the
+//   words that don't fit on the row or under a heading (the mobile UX pass:
+//   one short line inline, the rest one tap away). A group takes it beside its
+//   label (`info`), a toggle or plain row at its end (`info`); a group's one
+//   line of footer under the card (`footer`), as iOS Settings does.
 
 import * as React from "react";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
+import { IconButton } from "@/components/ideeza/icon-button";
 import { Radio } from "@/components/ideeza/checkbox";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { Toggle } from "@/components/ideeza/toggle";
@@ -139,16 +146,67 @@ export function PageBones() {
   );
 }
 
-export function SettingsGroup({ label, id, children }: { label?: string; id?: string; children: React.ReactNode }) {
+/** What an ⓘ opens: the sheet's title and the words. */
+export type InfoText = { title: string; body: React.ReactNode };
+
+/** ⓘ — opens the kit Sheet with the words that don't fit inline. 44 px target, pulled into the line. */
+export function InfoButton({ info, label, className }: { info: InfoText; label?: string; className?: string }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <IconButton
+        type="button"
+        hierarchy="ghost"
+        size="xl"
+        aria-label={label ?? `About ${info.title}`}
+        aria-haspopup="dialog"
+        icon={
+          <span className="inline-flex text-[color:var(--color-icon-secondary)]">
+            <Icon icon={InformationCircleIcon} size={20} />
+          </span>
+        }
+        onClick={() => setOpen(true)}
+        className={cn("-my-7 shrink-0", className)}
+      />
+      <Sheet open={open} onClose={() => setOpen(false)} title={info.title}>
+        <div className={cn(T.body, "flex flex-col gap-4 [overflow-wrap:anywhere]")}>{info.body}</div>
+      </Sheet>
+    </>
+  );
+}
+
+export function SettingsGroup({
+  label,
+  id,
+  info,
+  footer,
+  children,
+}: {
+  label?: string;
+  id?: string;
+  /** ⓘ beside the label: the words that explain the whole group. */
+  info?: InfoText;
+  /** One line under the card (an iOS group footer). */
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const labelId = React.useId();
   return (
     <section id={id} aria-labelledby={label ? labelId : undefined} className={"flex flex-col gap-2 rounded-lg" + ARRIVED}>
-      {label && (
-        <h2 id={labelId} className={cn(T.meta, "text-text-tertiary")}>
-          {label}
-        </h2>
+      {(label || info) && (
+        <div className="flex min-h-[18px] items-center justify-between gap-4">
+          {label ? (
+            <h2 id={labelId} className={cn(T.meta, "text-text-tertiary")}>
+              {label}
+            </h2>
+          ) : (
+            <span />
+          )}
+          {info && <InfoButton info={info} className="-mr-6" />}
+        </div>
       )}
       <div className={cn(LIST_CARD, LIST_DIVIDERS, "rounded-lg")}>{children}</div>
+      {footer && <p className={T.meta}>{footer}</p>}
     </section>
   );
 }
@@ -176,6 +234,9 @@ type RowBase = {
   reason?: React.ReactNode;
   /** Anything else at the end (Copy, Edit). */
   trailing?: React.ReactNode;
+  /** ⓘ at the end with the full words, on a toggle or plain row only (a row that is a link or a
+   *  button can't hold another control). */
+  info?: InfoText;
 };
 
 type RowAction =
@@ -192,10 +253,16 @@ const STILL = "hover:bg-transparent";
 export function SettingsRow(props: SettingsRowProps) {
   const { id, icon, label, helper, value, badge, danger, plain, disabled, reason, trailing } = props;
   const chevron = !!(props.href || props.onClick) && !danger && !plain;
+  const info = props.info && !props.href && !props.onClick ? <InfoButton info={props.info} /> : null;
   const body = (
     <>
       {icon && (
-        <span className={cn("shrink-0", danger ? "text-[color:var(--color-icon-error)]" : "text-[color:var(--color-icon-default)]")}>
+        <span
+          className={cn(
+            "shrink-0",
+            disabled ? "text-[color:var(--color-icon-disabled)]" : danger ? "text-[color:var(--color-icon-error)]" : "text-[color:var(--color-icon-default)]",
+          )}
+        >
           <Icon icon={icon} size={24} />
         </span>
       )}
@@ -215,6 +282,7 @@ export function SettingsRow(props: SettingsRowProps) {
         </Badge>
       )}
       {trailing}
+      {info}
       {chevron && <Chevron disabled={disabled} />}
     </>
   );

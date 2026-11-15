@@ -116,6 +116,7 @@ export function RestoreSettings() {
           {problem.body}
         </Banner>
       )}
+      {/* The screen's only content until a file is read, so the intro stays whole (no ⓘ). */}
       <p className={cn(T.body, "text-text-primary")}>
         Choose a .zip that Download your information made, on this phone or another device. It replaces everything IDEEZA keeps on this phone, and
         you’ll see what it holds before anything changes.

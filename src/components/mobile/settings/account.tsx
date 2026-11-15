@@ -1,19 +1,20 @@
 "use client";
 
-// ST-10 · Account: the public profile card (what others see, Edit profile),
-// then Handle (Copy, Edit), Legal name (private, ST-12 sheet), Wallet (ST-13
+// ST-10 · Account: the public profile as one row (what others see; the row
+// opens Edit profile), then Handle (its value; the row opens the editor, which
+// also copies the profile link), Legal name (private, ST-12 sheet), Wallet (ST-13
 // connected → Done / Disconnect with a neutral confirm; ST-13b not connected
 // → Connect a wallet), and Security › Sign-in & security. ST-11…11c, the
 // handle editor, is account-handle.tsx. The web's Account page
 // (components/settings/account-page.tsx) decides the words and the stores.
 
 import * as React from "react";
-import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, Shield01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
-import { Button, buttonVariants } from "@/components/ideeza/button";
+import { Button } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { TextInput } from "@/components/ideeza/text-input";
@@ -27,7 +28,7 @@ import { demoAddress, makerId, readWallet, shortAddress, walletConnect, walletDi
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import { useDemoWallet, writeDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { ConfirmSheet } from "../kit/confirm-sheet";
-import { LIST_CARD } from "../kit/list";
+import { Chevron, LIST_ROW } from "../kit/list";
 import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 import { useOnline } from "../kit/states";
@@ -47,17 +48,13 @@ export function AccountSettings() {
         <WalletRow />
       </SettingsGroup>
       <SettingsGroup label="Security">
-        <SettingsRow
-          id="sign-in"
-          label="Sign-in & security"
-          helper="Password, 2-step sign-in, your devices, delete account"
-          href="/m/settings/security"
-        />
+        <SettingsRow id="sign-in" icon={Shield01Icon} label="Sign-in & security" helper="Password, 2-step sign-in, devices" href="/m/settings/security" />
       </SettingsGroup>
     </SettingsScreen>
   );
 }
 
+/** The public profile as one row (avatar, name, headline) that opens Edit profile. */
 function PublicProfile() {
   const { account } = useAuth();
   const { fields } = useMyProfile();
@@ -65,68 +62,32 @@ function PublicProfile() {
   const name = displayNameOf(fields.name || `${account?.firstName ?? ""} ${account?.lastName ?? ""}`.trim());
   const line = [fields.headline, fields.location].filter(Boolean).join(" · ");
   return (
-    <section
-      id="public-profile"
-      aria-label="Public profile"
-      className={cn(LIST_CARD, "scroll-mt-24 gap-6 rounded-lg p-8")}
-    >
-      <div className="flex items-center gap-6">
+    <SettingsGroup id="public-profile" label="Public profile">
+      <Link href="/m/profile/edit?from=settings" aria-label={`Edit profile: ${name}`} className={LIST_ROW}>
         <Avatar size="lg" initials={initialsOf(name, fields.latinName || null)} src={photo.url ?? undefined} className="shrink-0" />
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className={T.meta}>Public profile</p>
-          <p className={cn(T.name, "truncate")}>{name}</p>
-          <p className={cn(T.meta, "truncate", line ? "text-text-secondary" : "text-text-tertiary")}>{line || "No headline yet"}</p>
-        </div>
-      </div>
-      {/* cn() last, so the secondary border token isn't lost to the variants' own merge. */}
-      <Link href="/m/profile/edit?from=settings" className={cn(buttonVariants({ hierarchy: "secondary", size: "lg" }), "w-full border-solid")}>
-        Edit profile
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className={cn(T.name, "truncate")}>{name}</span>
+          <span className={cn(T.meta, "truncate", line ? "text-text-secondary" : "text-text-tertiary")}>{line || "No headline yet"}</span>
+        </span>
+        {/* "Edit" (the row is under Public profile) so the name keeps its room at 320. */}
+        <span aria-hidden className={cn(T.body, "shrink-0")}>
+          Edit
+        </span>
+        <Chevron />
       </Link>
-    </section>
+    </SettingsGroup>
   );
 }
 
+/** Handle: its value; the row opens the editor, where the profile link is copied. */
 function HandleRow() {
   const { fields } = useMyProfile();
-  const toast = useToast();
-  const [copied, setCopied] = React.useState(false);
-  const handle = ownHandleOf(fields.handle);
-  React.useEffect(() => {
-    if (!copied) return;
-    const t = window.setTimeout(() => setCopied(false), 2000);
-    return () => window.clearTimeout(t);
-  }, [copied]);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/creators/${handle}`);
-      setCopied(true);
-      toast({ title: "Link copied" });
-    } catch {
-      toast({ title: "Couldn’t copy the link.", lead: "error" });
-    }
-  };
   return (
     <SettingsRow
       id="handle"
       label="Handle"
-      helper={fields.handle ? `@${handle}` : "Not chosen yet"}
-      trailing={
-        <span className="-my-4 flex shrink-0 items-center gap-2">
-          <IconButton
-            hierarchy="ghost"
-            size="xl"
-            aria-label={copied ? "Copied" : "Copy profile link"}
-            icon={<Icon icon={copied ? Tick02Icon : Copy01Icon} size={20} />}
-            onClick={copy}
-          />
-          <Link
-            href="/m/settings/account/handle"
-            className={cn(T.rowTitle, "inline-flex min-h-[44px] items-center rounded-md px-4 outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
-          >
-            Edit
-          </Link>
-        </span>
-      }
+      value={fields.handle ? `@${ownHandleOf(fields.handle)}` : "Not chosen yet"}
+      href="/m/settings/account/handle"
     />
   );
 }

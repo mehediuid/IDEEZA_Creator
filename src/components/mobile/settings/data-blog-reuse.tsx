@@ -4,7 +4,8 @@
 // update" 10688:2): ST-62 the list with Revoke on each and Revoke access for
 // all your blogs, ST-62b its destructive confirm, ST-62c empty. What is
 // listed is the web's (lib/data/blog-reuse.ts): your blogs where you chose
-// "Give access to IDEEZA to future use". A blog IDEEZA has already shared
+// "Give access to IDEEZA to future use" (what that means is the list's ⓘ;
+// Revoke access for all is the red row at the foot). A blog IDEEZA has already shared
 // is locked by the blog's own rule; only support can change it.
 
 import * as React from "react";
@@ -16,7 +17,6 @@ import { reuseGrants, revokeReuse, type ReuseGrant } from "@/lib/data/blog-reuse
 import { useDates } from "@/lib/settings/use-dates";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { EmptyState } from "../kit/state";
-import { T } from "../type";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { SaveFailed, SettingsGroup, SettingsNote, SettingsRow, SettingsScreen, useSaver } from "./kit";
@@ -51,8 +51,18 @@ export function BlogReuseSettings() {
         />
       ) : (
         <>
-          <p className={T.body}>The blogs where you chose “Give access to IDEEZA to future use”. {REUSE_SCOPE}</p>
-          <SettingsGroup>
+          <SettingsGroup
+            label="Blogs IDEEZA can reuse"
+            info={{
+              title: "Blog reuse",
+              body: (
+                <>
+                  <p>The blogs where you chose “Give access to IDEEZA to future use”.</p>
+                  <p>{REUSE_SCOPE}</p>
+                </>
+              ),
+            }}
+          >
             {grants.map((g) => (
               <SettingsRow
                 key={g.id}
@@ -76,9 +86,9 @@ export function BlogReuseSettings() {
           </SettingsGroup>
           <SaveFailed saver={saver} group="blogs" />
           {open.length > 1 && (
-            <Button hierarchy="ghost" size="lg" className="w-fit" disabled={off} onClick={() => setConfirmAll(true)}>
-              Revoke access for all your blogs
-            </Button>
+            <SettingsGroup>
+              <SettingsRow id="revoke-all" label="Revoke access for all your blogs" danger onClick={() => setConfirmAll(true)} disabled={off} />
+            </SettingsGroup>
           )}
         </>
       )}

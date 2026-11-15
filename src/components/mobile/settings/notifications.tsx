@@ -9,11 +9,13 @@
 // The record and its rules are the web's (components/settings/
 // notifications-page.tsx): `ideeza:settings` notifications, and
 // appearance.keepNotices. Toggles save as they change (ST-92 when refused);
-// sheets save on Done. Each kind says what it covers, in the web's words;
-// "Credits and plan" links to the low mark once the phone has that page.
+// sheets save on Done. Each kind is a switch with no paragraph: what it covers,
+// in the web's words, is the group's ⓘ sheet; "Set the low mark" is a row
+// under Credits and plan (as Bids to hear about sits under Sales). While push
+// is blocked, the Push row itself opens "Allow notifications" (ST-20b's
+// "Open phone settings" link was the same sheet twice).
 
 import * as React from "react";
-import Link from "next/link";
 import { usePopupPermission } from "@/components/notifications/browser-popups";
 import { useNoticeClock } from "@/components/notifications/use-notices";
 import { popupModeOf, popupModePatch, quietWindowStart, type PopupMode } from "@/lib/notifications/filter";
@@ -23,8 +25,9 @@ import { useSettings } from "@/lib/settings/use-settings";
 import { useOnline } from "../kit/states";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
-import { CREDIT_ALERTS_HREF, ChoiceSheet, HELPER_LINK, SaveFailed, SettingsGroup, SettingsRow, SettingsScreen, useSaver, type ChoiceOption } from "./kit";
-import { PhoneSettingsLink, PushBlockedSheet, PushPrompt, PushRow } from "./notifications-push";
+import { LIST_DIVIDERS } from "../kit/list";
+import { CREDIT_ALERTS_HREF, ChoiceSheet, SaveFailed, SettingsGroup, SettingsRow, SettingsScreen, useSaver, type ChoiceOption } from "./kit";
+import { PushBlockedSheet, PushPrompt, PushRow } from "./notifications-push";
 import { BidsSheet, QuietHoursSheet, dollars } from "./notifications-sheets";
 
 type Prefs = SettingsV1["notifications"];
@@ -51,24 +54,11 @@ const ROW_IDS: Record<ShownKind, string> = {
   blog: "blog",
 };
 
-/** What each kind covers (the web's COVERS, with the phone's places). */
-const COVERS: Record<ShownKind, React.ReactNode> = {
+/** What each kind covers (the web's COVERS, with the phone's places): the group's ⓘ sheet. */
+const COVERS: Record<ShownKind, string> = {
   marketplace: "A sale of yours, a bid on your auction, and its last hour.",
   product: "A build ready to review, needing a retry or paused, and a video take that’s ready.",
-  coin: (
-    <>
-      Credits at or under your low mark, bought credits about to expire, your plan renewing, and a withdrawal method added, removed or made your
-      default.
-      {CREDIT_ALERTS_HREF && (
-        <>
-          {" "}
-          <Link href={CREDIT_ALERTS_HREF} className={HELPER_LINK}>
-            Set the low mark
-          </Link>
-        </>
-      )}
-    </>
-  ),
+  coin: "Credits at or under your low mark, bought credits about to expire, your plan renewing, and a withdrawal method added, removed or made your default.",
   message: "A new message or request. These count on the Messages badge, not the bell.",
   comments: "Comments and replies by others on the projects you shared.",
   teams: "New messages in your project teams’ conversations. These count on the Messages badge.",
@@ -140,12 +130,31 @@ export function NotificationsSettings() {
         />
       </SettingsGroup>
       <SaveFailed saver={saver} group="phone" />
-      {permission === "denied" && <PhoneSettingsLink onClick={() => setOpen("blocked")} disabled={off} />}
 
-      <SettingsGroup label="What you hear about">
+      {/* Each kind is a switch; what it covers is one tap away in the group's ⓘ, and the phone's
+          email / sound line is the group's footer. */}
+      <SettingsGroup
+        id="email"
+        label="What you hear about"
+        info={{
+          title: "What each one covers",
+          body: (
+            <dl className={cn("flex flex-col", LIST_DIVIDERS)}>
+              {SHOWN_KINDS.map((k) => (
+                <div key={k} className="flex flex-col gap-1 py-4">
+                  <dt className={T.rowTitle}>{KIND_LABELS[k]}</dt>
+                  <dd className={T.meta}>{COVERS[k]}</dd>
+                </div>
+              ))}
+            </dl>
+          ),
+        }}
+        footer="Email and text messages aren’t sent yet. Sound and vibration follow your phone’s settings."
+      >
         {SHOWN_KINDS.map((k) => (
           <React.Fragment key={k}>
-            <SettingsRow id={ROW_IDS[k]} label={KIND_LABELS[k]} helper={COVERS[k]} toggle={{ checked: n.channels[k].web, onChange: () => toggleKind(k) }} disabled={off} />
+            <SettingsRow id={ROW_IDS[k]} label={KIND_LABELS[k]} toggle={{ checked: n.channels[k].web, onChange: () => toggleKind(k) }} disabled={off} />
+            {k === "coin" && CREDIT_ALERTS_HREF && <SettingsRow id="low-mark" label="Set the low mark" href={CREDIT_ALERTS_HREF} />}
             {k === "marketplace" && (
               <SettingsRow
                 id="bid-threshold"
@@ -160,9 +169,6 @@ export function NotificationsSettings() {
         ))}
       </SettingsGroup>
       <SaveFailed saver={saver} group="kinds" />
-      <p id="email" className={cn(T.meta, "scroll-mt-24 rounded-sm data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus")}>
-        Email and text messages aren’t sent yet. Sound and vibration follow your phone’s settings.
-      </p>
 
       <SettingsGroup>
         <SettingsRow id="muted-projects" label="Muted projects" value={muted ? String(muted) : undefined} href="/m/settings/notifications/muted" />

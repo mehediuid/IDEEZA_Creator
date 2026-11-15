@@ -86,10 +86,10 @@ export function useReportsYouMade(): ReportRow[] | null {
   }, [ready, threads, posts.raw, profiles.raw, messages.raw, problems.raw, post]);
 }
 
-/** The web's safety line: IDEEZA can't act in real time. */
+/** The web's safety line: IDEEZA can't act in real time. At the foot, after what the person came for. */
 function Emergency() {
   return (
-    <p className={T.rowTitle}>
+    <p className={cn(T.meta, "text-text-primary")}>
       If you or someone else is in danger, contact your local emergency services now. IDEEZA can’t act in real time.
     </p>
   );
@@ -108,7 +108,6 @@ export function YourReportsSettings() {
 
   return (
     <SettingsScreen title="Your reports" loading={rows === null} offlineNote={false}>
-      <Emergency />
       {rows && rows.length === 0 ? (
         <EmptyState
           icon={Flag01Icon}
@@ -136,6 +135,7 @@ export function YourReportsSettings() {
           <SettingsNote>Every report you sent from this browser. Nobody reviews reports in the app yet, so each one is received and not reviewed.</SettingsNote>
         </>
       )}
+      <Emergency />
       <ReportSheet row={shown} open={openId !== null} onClose={() => setOpenId(null)} />
     </SettingsScreen>
   );

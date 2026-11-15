@@ -8,17 +8,19 @@
 //   AU-61b: blocked while money is moving (a withdrawal not complete yet, a
 //   bid on a live auction);
 // 3 keep a copy (Download your information is the primary button, made at
-//   once on the phone; "Continue without a copy" is the quiet way on);
+//   once on the phone; "Continue without a copy" is the quiet way on; once a
+//   copy is made, Continue and Download again);
 // 4 confirm it's you (the password; Google or Facebook once more for
 //   an account with no password) — wrong, deleting, couldn't (offline).
 // The furthest step reached is kept for the tab (sessionStorage), so a
-// reload stays on its step.
+// reload stays on its step. Facts are grouped rows, the ways out (Take a
+// break, Withdraw IDZ) rows with a chevron, every button in the bottom bar.
 // Then AU-64: deletion scheduled for 30 days; live listings come down now;
 // Done signs out to Welcome. Signing in before the date offers Restore
 // (AU-65, restore.tsx).
 
 import * as React from "react";
-import Link from "next/link";
+import { Coins01Icon, CreditCardIcon, Diamond01Icon, Download04Icon, Folder01Icon, Message01Icon, PauseIcon, Tag01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { useMakerIdz } from "@/components/balance/use-maker-idz";
@@ -42,15 +44,15 @@ import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
 import { ACCOUNT_CONTENT, AccountAlert, AccountHeading } from "../account/parts";
 import { WayButton } from "../account/ways-in";
-import { BottomBar, TEXT_LINK } from "../kit/bottom-bar";
+import { BottomBar } from "../kit/bottom-bar";
 import { T } from "../type";
-import { LIST_CARD } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { useOnline } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { DownloadStatus, useDownload } from "./data-download";
 import { useSessionAt } from "./security";
+import { SettingsGroup, SettingsRow } from "./kit";
 import { signOutToWelcome } from "./sign-out";
 
 /** The furthest step this tab reached, so a reload stays on its step. */
@@ -178,14 +180,11 @@ export function DeleteAccount() {
           <AccountHeading title={`Your account will be deleted on ${until}`}>
             Signing in before then restores it. We’ve sent the details to {email}.
           </AccountHeading>
-          <dl className="flex flex-col">
+          <SettingsGroup>
             {rows.map(([term, value]) => (
-              <div key={term} className="flex items-center justify-between gap-6 px-6 py-6">
-                <dt className={T.body}>{term}</dt>
-                <dd className={cn(T.body, "text-right text-text-primary")}>{value}</dd>
-              </div>
+              <SettingsRow key={term} label={term} value={value} />
             ))}
-          </dl>
+          </SettingsGroup>
         </div>
       </Screen>
     );
@@ -230,9 +229,14 @@ export function DeleteAccount() {
       <BottomBar>
         {/* AU-62: the copy is the primary; going on without one is the quiet way. */}
         {dl.made ? (
-          <Button size="xl" className="w-full" disabled={!!dl.busy} onClick={() => go(4)}>
-            Continue
-          </Button>
+          <>
+            <Button size="xl" className="w-full" disabled={!!dl.busy} onClick={() => go(4)}>
+              Continue
+            </Button>
+            <Button hierarchy="secondary" size="xl" className="w-full" loading={!!dl.busy} onClick={() => void dl.start()}>
+              Download again
+            </Button>
+          </>
         ) : (
           <>
             <Button size="xl" className="w-full" loading={!!dl.busy} onClick={() => void dl.start()}>
@@ -294,9 +298,9 @@ export function DeleteAccount() {
                 {note.length}/{LEAVE_NOTE_MAX}
               </p>
             </div>
-            <Link href="/m/settings/privacy?open=break" className={`${TEXT_LINK} self-start`}>
-              Need a pause? Take a break instead
-            </Link>
+            <SettingsGroup>
+              <SettingsRow icon={PauseIcon} label="Need a pause? Take a break instead" href="/m/settings/privacy?open=break" />
+            </SettingsGroup>
           </>
         )}
 
@@ -306,39 +310,33 @@ export function DeleteAccount() {
             {lose.moving.length > 0 && (
               <div className="flex flex-col gap-4">
                 <AccountAlert alert={{ tone: "error", title: "Finish these first", body: "Money that’s still moving has to settle before you can delete." }} />
-                <dl className="flex flex-col">
+                <SettingsGroup>
                   {lose.moving.map((m, i) => (
-                    <div key={i} className="flex items-center justify-between gap-6 px-6 py-6">
-                      <dt className={T.body}>{m.label}</dt>
-                      <dd className={cn(T.rowTitle, "text-right")}>{m.value}</dd>
-                    </div>
+                    <SettingsRow key={i} label={m.label} value={<span className="text-text-primary">{m.value}</span>} />
                   ))}
-                </dl>
+                </SettingsGroup>
               </div>
             )}
             {lose.ready && (
-              <dl className="flex flex-col">
+              <SettingsGroup>
                 {(
                   [
-                    ["Projects", `${lose.projects} · ${lose.shared} shared`],
-                    ["Minted NFTs", `${lose.minted} · stay with holders`],
-                    ["Live listings", lose.listings.length ? `${lose.listings.length} · taken down today` : "None"],
-                    ["IDZ balance", lose.idz === null ? "Wallet not connected" : `${lose.idz.toLocaleString("en-US")} IDZ`],
-                    ["Plan & credits", `${lose.paid ? `${lose.plan} ends` : lose.plan} · ${lose.credits} credits`],
-                    ["Messages", "Stay with the people you sent them to"],
+                    [Folder01Icon, "Projects", `${lose.projects} · ${lose.shared} shared`],
+                    [Diamond01Icon, "Minted NFTs", `${lose.minted} · stay with holders`],
+                    [Tag01Icon, "Live listings", lose.listings.length ? `${lose.listings.length} · taken down today` : "None"],
+                    [Coins01Icon, "IDZ balance", lose.idz === null ? "Wallet not connected" : `${lose.idz.toLocaleString("en-US")} IDZ`],
+                    [CreditCardIcon, "Plan & credits", `${lose.paid ? `${lose.plan} ends` : lose.plan} · ${lose.credits} credits`],
+                    [Message01Icon, "Messages", "Stay with the people you sent them to"],
                   ] as const
-                ).map(([term, value]) => (
-                  <div key={term} className="flex items-center justify-between gap-6 px-6 py-6">
-                    <dt className={cn(T.body, "shrink-0")}>{term}</dt>
-                    <dd className={cn(T.body, "text-right text-text-primary")}>{value}</dd>
-                  </div>
+                ).map(([icon, term, value]) => (
+                  <SettingsRow key={term} icon={icon} label={term} value={value} />
                 ))}
-              </dl>
+              </SettingsGroup>
             )}
             {lose.idz !== null && lose.idz > 0 && (
-              <Link href="/m/settings/idz-pay" className={`${TEXT_LINK} self-start`}>
-                Withdraw IDZ in Get paid first
-              </Link>
+              <SettingsGroup>
+                <SettingsRow icon={Wallet01Icon} label="Withdraw IDZ in Get paid first" href="/m/settings/idz-pay" />
+              </SettingsGroup>
             )}
           </>
         )}
@@ -346,18 +344,15 @@ export function DeleteAccount() {
         {step === 3 && (
           <>
             <AccountHeading title="Keep a copy">Download your projects, files and activity before you go.</AccountHeading>
-            <div className={cn(LIST_CARD, "gap-6 rounded-lg p-8")}>
-              <div className="flex flex-col gap-1">
-                <p className={T.rowTitle}>Download your information</p>
-                <p className={T.meta}>A .zip of your projects, files, messages and activity, made on this phone now.</p>
-              </div>
-              <DownloadStatus dl={dl} />
-              {dl.made && (
-                <Button hierarchy="secondary" size="xl" className="w-full" loading={!!dl.busy} onClick={() => void dl.start()}>
-                  Download again
-                </Button>
-              )}
-            </div>
+            {/* What the file is, then its progress; the buttons are the bottom bar's. */}
+            <SettingsGroup>
+              <SettingsRow
+                icon={Download04Icon}
+                label="Download your information"
+                helper="A .zip of your projects, files, messages and activity, made on this phone now."
+              />
+            </SettingsGroup>
+            <DownloadStatus dl={dl} />
           </>
         )}
 

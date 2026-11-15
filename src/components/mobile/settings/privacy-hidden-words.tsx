@@ -3,19 +3,24 @@
 // Settings › Privacy & safety › Hidden words (mobile Figma "Settings · 2026
 // update" 10688:2): ST-34 a 44 field and Add, the words as A18 chips whose ×
 // removes one with a toast and Undo, ST-34b empty. Each Add and × saves at
-// once (ST-92 when refused). The list and its rules are the web's
+// once (ST-92 when refused). The page keeps the field, one line (remaining,
+// comma) and the words (or the empty state); how they match is the top bar's
+// ⓘ sheet. The list and its rules are the web's
 // (components/settings/hidden-words.tsx): `ideeza:settings` blocking.
 // hiddenWords, up to 500, commas split words, `addWords` cleans them. What
 // they hide: someone else's comment on your shared projects and a message
 // request (lib/settings/audience.ts `hiddenWordIn`).
 
 import * as React from "react";
+import { InformationCircleIcon, TextIcon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ideeza/button";
 import { Tag } from "@/components/ideeza/tag";
 import { TextInput } from "@/components/ideeza/text-input";
 import { addWords, wordsRemaining } from "@/lib/settings/audience";
 import { HIDDEN_WORDS_MAX, readSettings, updateSettings } from "@/lib/settings/prefs";
 import { useSettings } from "@/lib/settings/use-settings";
+import { Sheet } from "../kit/sheet";
+import { EmptyState } from "../kit/state";
 import { useOnline } from "../kit/states";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
@@ -44,6 +49,7 @@ export function HiddenWordsSettings() {
   const saver = useSaver();
   const [typed, setTyped] = React.useState("");
   const [over, setOver] = React.useState(0);
+  const [info, setInfo] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const off = !online;
 
@@ -74,7 +80,11 @@ export function HiddenWordsSettings() {
   };
 
   return (
-    <SettingsScreen title="Hidden words" loading={!running}>
+    <SettingsScreen
+      title="Hidden words"
+      loading={!running}
+      actions={[{ icon: InformationCircleIcon, label: "How hidden words work", onClick: () => setInfo(true) }]}
+    >
       <form
         className="mt-2 flex gap-4"
         onSubmit={(e) => {
@@ -99,13 +109,22 @@ export function HiddenWordsSettings() {
           Add
         </Button>
       </form>
+      <p className={cn(T.meta, "-mt-2")}>
+        Remaining {wordsRemaining(words)} of {HIDDEN_WORDS_MAX}. Separate words with a comma.
+      </p>
       {over > 0 && (
         <p role="alert" className={cn(T.meta, "text-text-error")}>
           You can hide up to {HIDDEN_WORDS_MAX} words. {over} didn’t fit.
         </p>
       )}
       <SaveFailed saver={saver} group="words" />
-      {words.length > 0 && (
+      {words.length === 0 ? (
+        <EmptyState
+          icon={TextIcon}
+          title="No hidden words yet"
+          body="Someone else’s comment on your shared projects, or a message request, that uses one of these words is hidden."
+        />
+      ) : (
         <ul role="list" aria-label="Hidden words" className="flex flex-wrap gap-4">
           {words.map((w, i) => (
             <li key={w}>
@@ -116,17 +135,16 @@ export function HiddenWordsSettings() {
           ))}
         </ul>
       )}
-      <div className="flex flex-col gap-2">
-        <p className={T.meta}>
-          {words.length === 0 && "No hidden words yet. "}
+      <Sheet open={info} onClose={() => setInfo(false)} title="How hidden words work">
+        <p className={T.body}>
           Someone else’s comment on your shared projects, or a message request, that uses one of these words is hidden. The person who wrote it still
           sees it.
         </p>
-        <p className={cn(T.meta, "text-text-tertiary")}>
-          Remaining {wordsRemaining(words)} of {HIDDEN_WORDS_MAX}. Separate words with a comma. A word matches the whole word in any case and its
-          #tag; “#nft” matches only the tag.
+        <p className={T.body}>
+          You can hide up to {HIDDEN_WORDS_MAX} words. Separate words with a comma. A word matches the whole word in any case and its #tag; “#nft”
+          matches only the tag.
         </p>
-      </div>
+      </Sheet>
     </SettingsScreen>
   );
 }

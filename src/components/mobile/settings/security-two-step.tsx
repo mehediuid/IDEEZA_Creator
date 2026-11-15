@@ -1,8 +1,9 @@
 "use client";
 
 // AU-44 · Turn on 2-step sign-in: a) what it needs (an authenticator app;
-// codes change every 30 seconds; a backup code if the phone is lost);
-// b) add IDEEZA to the app — the setup key (Copy key, Open app) — then the
+// codes change every 30 seconds; a backup code if the phone is lost), as
+// three icon lines; b) add IDEEZA to the app — the setup key in a row with
+// its Copy, Open app under it — then the
 // 6-digit code it shows, checked as the 6th digit lands; c) the 10 backup
 // codes (Copy, Save to Files), Done. Nothing is saved until the app's code is
 // right; from then this sign-in counts as passed. A code typed offline is
@@ -12,10 +13,11 @@
 // on Sign-in & security.
 
 import * as React from "react";
-import { Copy01Icon, Download04Icon, Key01Icon } from "@hugeicons/core-free-icons";
+import { Clock01Icon, Copy01Icon, Download04Icon, Key01Icon, SmartPhone01Icon } from "@hugeicons/core-free-icons";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/dashboard/icon";
+import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
+import { IconButton } from "@/components/ideeza/icon-button";
 import { Spinner } from "@/components/ideeza/spinner";
 import { useAuth } from "@/lib/account/auth";
 import { keyInFours, newBackupCodes, newTotpSecret, totpMatches, twoStepOn, updateSecurity, useSecurity, type BackupCode } from "@/lib/account/security";
@@ -29,7 +31,7 @@ import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { leaveTo } from "./kit";
+import { SettingsGroup, SettingsRow, leaveTo } from "./kit";
 import { useSessionAt } from "./security";
 import { DemoAuthenticator } from "./two-step-parts";
 
@@ -176,18 +178,27 @@ export function TwoStepSettings() {
                   : null
             }
           />
-          <div className="flex flex-col gap-2 rounded-md bg-bg-subtle p-6">
-            <p className={T.meta}>Setup key</p>
-            <p className={cn(T.bodyLg, "font-mono tracking-wide")}>{keyInFours(secret)}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Button hierarchy="secondary" size="xl" iconLeading={<Icon icon={Copy01Icon} size={20} />} onClick={() => copy(secret, "Key")}>
-              Copy key
-            </Button>
-            <Button hierarchy="secondary" size="xl" iconLeading={<Icon icon={Key01Icon} size={20} />} onClick={() => setApp(true)}>
-              Open app
-            </Button>
-          </div>
+          {/* The key with its Copy in the row; Open app the one way to the app. */}
+          <SettingsGroup label="Setup key">
+            <SettingsRow
+              id="setup-key"
+              label={<span className={cn(T.bodyLg, "font-mono tracking-wide [overflow-wrap:anywhere]")}>{keyInFours(secret)}</span>}
+              trailing={
+                <IconButton
+                  type="button"
+                  hierarchy="ghost"
+                  size="xl"
+                  className="-my-4 shrink-0"
+                  aria-label="Copy key"
+                  icon={<Icon icon={Copy01Icon} size={20} />}
+                  onClick={() => copy(secret, "Key")}
+                />
+              }
+            />
+          </SettingsGroup>
+          <Button hierarchy="secondary" size="xl" className="w-full" iconLeading={<Icon icon={Key01Icon} size={20} />} onClick={() => setApp(true)}>
+            Open app
+          </Button>
           <div className="flex flex-col gap-4">
             <p className={cn(T.body, "text-text-primary")}>Then enter the 6-digit code it shows</p>
             <CodeCells value={code} onChange={onCode} invalid={phase === "wrong"} disabled={phase === "checking"} autoFocus />
@@ -217,10 +228,11 @@ export function TwoStepSettings() {
     );
   }
 
-  const needs: [string, string][] = [
-    ["You need", "An authenticator app"],
-    ["Codes change", "Every 30 seconds"],
-    ["Lost your phone?", "Use a backup code"],
+  // What it needs, as three icon lines (was a label / value table).
+  const needs: [IconValue, string][] = [
+    [SmartPhone01Icon, "You need an authenticator app"],
+    [Clock01Icon, "Codes change every 30 seconds"],
+    [Key01Icon, "Lost your phone? Use a backup code"],
   ];
   return (
     <Screen
@@ -238,14 +250,11 @@ export function TwoStepSettings() {
           When you sign in on a new device, you’ll also enter a code from an authenticator app.
         </AccountHeading>
         <AccountAlert alert={online ? null : { tone: "attention", title: "You’re offline", body: "Turn it on when you’re back online." }} />
-        <dl className="flex flex-col">
-          {needs.map(([term, value]) => (
-            <div key={term} className="flex items-center justify-between gap-6 px-6 py-6">
-              <dt className={T.body}>{term}</dt>
-              <dd className={cn(T.body, "text-right text-text-primary")}>{value}</dd>
-            </div>
+        <SettingsGroup>
+          {needs.map(([icon, line]) => (
+            <SettingsRow key={line} icon={icon} label={line} />
           ))}
-        </dl>
+        </SettingsGroup>
       </div>
     </Screen>
   );

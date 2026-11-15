@@ -9,12 +9,9 @@
 // the sign-in. Open authenticator app is the prototype's Demo app.
 
 import * as React from "react";
-import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
-import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
-import { IconButton } from "@/components/ideeza/icon-button";
 import { Spinner } from "@/components/ideeza/spinner";
 import { TextInput } from "@/components/ideeza/text-input";
 import { signOut, useAuth } from "@/lib/account/auth";
@@ -28,6 +25,7 @@ import { T } from "../type";
 import { CodeCells } from "../kit/code-cells";
 import { useOnline } from "../kit/states";
 import { Screen } from "../screen";
+import { TopBar } from "../top-bar";
 import { useSessionAt } from "./security";
 import { DemoAuthenticator } from "./two-step-parts";
 
@@ -92,15 +90,8 @@ export function TwoStepSignIn() {
     setPhase("wrong");
   };
 
-  const header = (
-    <header className="flex h-[56px] shrink-0 items-center justify-between gap-4 px-8">
-      <div className="flex min-w-[44px] shrink-0">
-        <IconButton hierarchy="secondary" size="xl" aria-label="Back" icon={<Icon icon={ArrowLeft02Icon} size={22} />} onClick={cancel} />
-      </div>
-      <h1 className={cn(T.screenTitle, "min-w-0 flex-1 truncate text-center")}>2-step sign-in</h1>
-      <div className="min-w-[44px] shrink-0" />
-    </header>
-  );
+  // One header: the heading below names the step (like Verify and Add your email); Back cancels the sign-in.
+  const header = <TopBar back="/m/sign-in" onBack={() => void cancel()} />;
 
   if (mode === "backup") {
     const error = phase === "wrong" ? "That backup code didn’t work, or it was used already." : "";

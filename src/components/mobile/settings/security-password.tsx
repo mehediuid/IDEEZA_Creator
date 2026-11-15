@@ -21,13 +21,11 @@ import { CodeStep } from "../account/code-step";
 import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, PasswordChecklist } from "../account/parts";
 import { CheckRow } from "../account/ways-in";
 import { BottomBar, TEXT_LINK } from "../kit/bottom-bar";
-import { cn } from "@/lib/utils";
-import { T } from "../type";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { leaveTo } from "./kit";
+import { SettingsGroup, SettingsRow, leaveTo } from "./kit";
 import { useThisDevice } from "./security";
 
 const BACK = "/m/settings/security";
@@ -305,13 +303,9 @@ function AddPassword({ email, via }: { email: string; via: keyof typeof PROVIDER
           {via ? `You sign in with ${PROVIDER_WORDS[via]}.` : "Your account has no password yet."} Add a password to sign in with your email too.
         </AccountHeading>
         <AccountAlert alert={online ? null : { tone: "attention", title: "You’re offline", body: "Send the code when you’re back online." }} />
-        <div className="flex flex-col gap-2">
-          <p className={T.rowTitle}>Email</p>
-          <p className={cn(T.bodyLg, "flex h-[44px] items-center rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border-disabled)] bg-[var(--color-input-bg-disabled)] px-6 text-text-secondary")}>
-            {email}
-          </p>
-          <p className={T.meta}>We’ll send a 6-digit code here first.</p>
-        </div>
+        <SettingsGroup footer="We’ll send a 6-digit code here first.">
+          <SettingsRow label="Email" value={email} />
+        </SettingsGroup>
       </div>
     </Screen>
   );

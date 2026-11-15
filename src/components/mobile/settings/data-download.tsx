@@ -24,7 +24,7 @@ import { BottomBar } from "../kit/bottom-bar";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { useToast } from "../kit/toast";
-import { SettingsGroup, SettingsNote, SettingsRow, SettingsScreen } from "./kit";
+import { SettingsGroup, SettingsRow, SettingsScreen } from "./kit";
 import { onPhone, useRunning } from "./data-parts";
 
 export type Made = { name: string; files: number; bytes: number };
@@ -159,16 +159,20 @@ export function DownloadSettings() {
           {dl.error.body}
         </Banner>
       )}
-      <p className={cn(T.body, "text-text-primary")}>
-        One .zip of everything IDEEZA keeps on this phone: pages you can open in any browser, your project files, your photos and videos, and a backup
-        you can restore here or on another device. It’s made here; nothing is sent anywhere.
-      </p>
-      <SettingsGroup label="The file holds">
+      {/* One line on top; the full description is the list's ⓘ, the care line its footer. */}
+      <p className={cn(T.body, "text-text-primary")}>One .zip of everything IDEEZA keeps on this phone. It’s made here; nothing is sent anywhere.</p>
+      <SettingsGroup
+        label="The file holds"
+        info={{
+          title: "Download your information",
+          body: "One .zip of everything IDEEZA keeps on this phone: pages you can open in any browser, your project files, your photos and videos, and a backup you can restore here or on another device. It’s made here; nothing is sent anywhere.",
+        }}
+        footer="Making the file can take a minute. It holds your private details, so keep it somewhere safe; it’s also your backup."
+      >
         {CATEGORIES.map((c) => (
           <SettingsRow key={c.id} label={c.label} helper={holds ? onPhone(holds[c.id]) : "Reading…"} />
         ))}
       </SettingsGroup>
-      <SettingsNote>Making the file can take a minute. It holds your private details, so keep it somewhere safe; it’s also your backup.</SettingsNote>
       {dl.busy && <Making busy={dl.busy} />}
     </SettingsScreen>
   );

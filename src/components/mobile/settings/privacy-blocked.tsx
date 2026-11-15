@@ -6,7 +6,8 @@
 // (a search once the list is long), Unblock with a toast and Undo (33b), and
 // empty (33c). Block someone sits in the bottom bar (KIT-RB-30) and opens the
 // people you've met (KIT-RB-31); blocking asks first (KIT-RB-20), then says so
-// with Undo (KIT-RB-21). Every Block and Unblock writes Messages' one blocked
+// with Undo (KIT-RB-21). The count is the list's label and what blocking
+// does is its ⓘ (no paragraph above the list). Every Block and Unblock writes Messages' one blocked
 // list (`ideeza:messages` blocks), the one a profile's and a conversation's
 // Block write too; the rows and words are the web's
 // (components/settings/blocked-people.tsx).
@@ -149,12 +150,6 @@ export function BlockedPeopleSettings() {
         />
       ) : (
         <>
-          <p className={T.body}>
-            People you block can’t message you, and their comments are hidden. You can’t message them or comment on their projects.
-          </p>
-          <p role="status" className={T.rowTitle}>
-            {rows.length === 1 ? "1 person blocked" : `${rows.length} people blocked`}
-          </p>
           {rows.length > SEARCH_FROM && (
             <SearchInput
               value={q}
@@ -167,7 +162,13 @@ export function BlockedPeopleSettings() {
           {shown.length === 0 ? (
             <p className={T.body}>No one you blocked matches “{q.trim()}”.</p>
           ) : (
-            <SettingsGroup>
+            <SettingsGroup
+              label={rows.length === 1 ? "1 person blocked" : `${rows.length} people blocked`}
+              info={{
+                title: "Blocked people",
+                body: "People you block can’t message you, and their comments are hidden. You can’t message them or comment on their projects.",
+              }}
+            >
               {shown.map((r) => (
                 <div key={r.person.id} className="flex items-center gap-6 px-8 py-6">
                   <Person p={r.person} line={lineOf(r)} />

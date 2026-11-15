@@ -11,7 +11,9 @@
 // this deployment's (the route reads its keys), and the services row opens
 // the web's list of each one. Toggles save as they change (ST-92 when
 // refused). The sub-pages are data-*.tsx; useDataRowValue is the Settings
-// root's row value.
+// root's row value. Every row says one line; the full words are its ⓘ (This
+// phone, IDEEZA's server, the two AI switches) or the sheet it opens (the
+// services; Keep this phone from clearing it, whose sheet holds Ask).
 
 import * as React from "react";
 import { useBlog } from "@/lib/blog/store";
@@ -21,6 +23,7 @@ import { reuseGrants } from "@/lib/data/blog-reuse";
 import { updateSettings, type SettingsV1 } from "@/lib/settings/prefs";
 import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
+import { AiNetworkIcon, CheckmarkCircle02Icon, CloudServerIcon, SmartPhone01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ideeza/button";
 import { Sheet } from "../kit/sheet";
 import { cn } from "@/lib/utils";
@@ -42,9 +45,6 @@ export function useDataRowValue(): { badge?: { tone: "warning"; text: string }; 
   if (at === null) return { badge: { tone: "warning", text: "No backup yet" } };
   return { value: `Backed up ${dates.date(at, { style: "day" })}` };
 }
-
-const ARRIVED =
-  "scroll-mt-24 rounded-sm data-[arrived]:outline data-[arrived]:outline-2 data-[arrived]:outline-offset-4 data-[arrived]:outline-border-focus";
 
 type Open = null | "services" | "erase";
 
@@ -71,38 +71,46 @@ export function DataSettings({ images, threeD }: { images: ImageService; threeD:
 
   return (
     <SettingsScreen title="AI & your data" loading={!running}>
+      {/* One line a row; each place's full words are its ⓘ (the services, their own sheet). */}
       <SettingsGroup label="Where your data goes">
         <SettingsRow
           id="where"
+          icon={SmartPhone01Icon}
           label="This phone"
-          helper="Everything you make and choose: projects, chats, builds, messages, blogs, settings, photos and videos. It stays until you erase it here or clear this site’s data."
+          helper="Everything you make and choose"
+          info={{
+            title: "This phone",
+            body: "Everything you make and choose: projects, chats, builds, messages, blogs, settings, photos and videos. It stays until you erase it here or clear this site’s data.",
+          }}
         />
         <SettingsRow
+          id="server"
+          icon={CloudServerIcon}
           label="IDEEZA’s server"
-          helper="Each concept image with its prompt, and each problem report you send, kept with no end date and no way to delete them yet. Anyone with an image’s address (a long random code) can open it."
+          helper="Concept images and problem reports"
+          info={{
+            title: "IDEEZA’s server",
+            body: "Each concept image with its prompt, and each problem report you send, kept with no end date and no way to delete them yet. Anyone with an image’s address (a long random code) can open it.",
+          }}
         />
-        <SettingsRow label={servicesTitle(threeD)} helper="The prompts you send, to make each result" onClick={() => setOpen("services")} />
+        <SettingsRow icon={AiNetworkIcon} label={servicesTitle(threeD)} helper="The prompts you send, to make each result" onClick={() => setOpen("services")} />
       </SettingsGroup>
       <SettingsGroup>
-        <div className={cn(T.body, "flex flex-col gap-2 px-8 py-6 text-text-primary")}>
-          <p id="training" className={ARRIVED}>
-            IDEEZA doesn’t train AI on your designs.
-          </p>
-          <p id="cookies" className={ARRIVED}>
-            IDEEZA sets no cookies and has no analytics or advertising trackers.
-          </p>
-        </div>
+        <SettingsRow id="training" icon={CheckmarkCircle02Icon} label="IDEEZA doesn’t train AI on your designs." />
+        <SettingsRow id="cookies" icon={CheckmarkCircle02Icon} label="IDEEZA sets no cookies and has no analytics or advertising trackers." />
       </SettingsGroup>
 
       <SettingsGroup label="AI">
         <SettingsRow
           id="ai"
           label="Use the volunteer GPU pool for images"
-          helper={
-            s.ai.volunteerPool
+          helper={s.ai.volunteerPool ? "Drawn by AI Horde volunteers" : "Off: concepts can’t be drawn"}
+          info={{
+            title: "Volunteer GPU pool",
+            body: s.ai.volunteerPool
               ? "Concept images and the 3D editor’s AI Generate are drawn by AI Horde volunteers."
-              : "Off: nothing goes to the volunteer pool, and this app has no other image service, so concepts can’t be drawn until you switch it back on."
-          }
+              : "Off: nothing goes to the volunteer pool, and this app has no other image service, so concepts can’t be drawn until you switch it back on.",
+          }}
           toggle={{ checked: horde && s.ai.volunteerPool, onChange: () => saveAi({ volunteerPool: !s.ai.volunteerPool }) }}
           disabled={off || !horde}
           reason={horde ? undefined : "This app draws images with Pollinations, not the volunteer pool."}
@@ -110,7 +118,11 @@ export function DataSettings({ images, threeD }: { images: ImageService; threeD:
         <SettingsRow
           id="editor-assist"
           label="AI help in the editors"
-          helper="The AI assistant in the PCB, Code, 3D and Preview editors, and AI Generate in the 3D editor. Off hides them."
+          helper="The AI assistant in the editors"
+          info={{
+            title: "AI help in the editors",
+            body: "The AI assistant in the PCB, Code, 3D and Preview editors, and AI Generate in the 3D editor. Off hides them.",
+          }}
           toggle={{ checked: s.ai.editorAssist, onChange: () => saveAi({ editorAssist: !s.ai.editorAssist }) }}
           disabled={off}
         />
@@ -148,33 +160,60 @@ export function DataSettings({ images, threeD }: { images: ImageService; threeD:
 
 const servicesTitle = (threeD: ThreeDService) => (threeD === "meshy" ? "Text, image, 3D and voice services" : "Text, image and voice services");
 
-/** The web's "Keep this browser from clearing it": not drawn on the phone, kept (a phone's browser clears unused sites first). */
+/** The web's "Keep this browser from clearing it": not drawn on the phone, kept (a phone's browser clears unused sites first).
+ *  The row says the state in a line; it opens a sheet with the web's full words, the space used and Ask. */
 function KeepRow({ disabled }: { disabled: boolean }) {
   const s = useStorageStatus();
   const [asked, setAsked] = React.useState<null | boolean>(null);
+  const [open, setOpen] = React.useState(false);
+  const [asking, setAsking] = React.useState(false);
   const use = s.usage !== null && s.quota ? ` IDEEZA uses ${sizeOf(s.usage)} of the ${sizeOf(s.quota)} this phone allows it.` : "";
-  const helper = !s.ready
-    ? undefined
+  const said = !s.ready
+    ? null
     : s.persisted === true
-      ? `This phone has agreed not to clear IDEEZA’s data on its own. Clearing this site’s data yourself still removes it.${use}`
+      ? { line: "This phone has agreed not to clear it", full: "This phone has agreed not to clear IDEEZA’s data on its own. Clearing this site’s data yourself still removes it." }
       : s.persisted === false
         ? asked === false
-          ? `This phone said no. Its browser decides by itself, mostly from how much you use a site, so keep a download.${use}`
-          : `When it runs low on space, this phone may clear IDEEZA’s data without asking. Ask it to keep it, and keep a download.${use}`
-        : `This phone can’t say whether it keeps site data, so keep a download.${use}`;
+          ? { line: "This phone said no", full: "This phone said no. Its browser decides by itself, mostly from how much you use a site, so keep a download." }
+          : { line: "This phone may clear it when low on space", full: "When it runs low on space, this phone may clear IDEEZA’s data without asking. Ask it to keep it, and keep a download." }
+        : { line: "This phone can’t say", full: "This phone can’t say whether it keeps site data, so keep a download." };
+  const canAsk = s.ready && s.persisted === false;
   return (
-    <SettingsRow
-      id="storage"
-      label="Keep this phone from clearing it"
-      helper={helper}
-      trailing={
-        s.ready && s.persisted === false ? (
-          <Button hierarchy="secondary" size="sm" className="shrink-0" disabled={disabled} onClick={async () => setAsked(await s.ask())}>
-            Ask
-          </Button>
-        ) : undefined
-      }
-    />
+    <>
+      <SettingsRow id="storage" label="Keep this phone from clearing it" helper={said?.line} onClick={() => setOpen(true)} disabled={!s.ready} />
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Keep this phone from clearing it"
+        actions={
+          canAsk ? (
+            <>
+              <Button
+                size="xl"
+                className="w-full"
+                loading={asking}
+                disabled={disabled}
+                onClick={async () => {
+                  setAsking(true);
+                  setAsked(await s.ask());
+                  setAsking(false);
+                }}
+              >
+                Ask
+              </Button>
+              <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setOpen(false)}>
+                Close
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        <p className={T.body}>
+          {said?.full}
+          {use}
+        </p>
+      </Sheet>
+    </>
   );
 }
 
