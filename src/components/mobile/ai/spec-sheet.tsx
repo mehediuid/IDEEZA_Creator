@@ -47,6 +47,7 @@ import { currentLabel, mm3, runtimeLabel } from "@/lib/spec/units";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { Sheet } from "../kit/sheet";
+import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
 import { PickField } from "./pick-sheet";
 import type { ConceptFlow } from "./use-concept-flow";
 
@@ -272,7 +273,7 @@ function Groups({
                       type="button"
                       aria-label={`Take out ${readableName(p)}`}
                       onClick={() => edit(removePart(edits, p, conceptParts))}
-                      className="inline-flex size-[28px] items-center justify-center rounded-full text-[color:var(--color-icon-default)] hover:bg-bg-subtle"
+                      className="relative inline-flex size-[28px] items-center justify-center rounded-full text-[color:var(--color-icon-default)] after:absolute after:-inset-4 after:content-[''] hover:bg-bg-subtle active:bg-bg-subtle"
                     >
                       <Icon icon={Cancel01Icon} size={12} />
                     </button>
@@ -438,7 +439,7 @@ function Groups({
       <span className="w-fit">
         <Badge tone={blocksBuild(spec) ? "error" : "success"}>{blocksBuild(spec) ? "● Doesn't fit" : "● Ready"}</Badge>
       </span>
-      <ul className="flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle">{groups}</ul>
+      <ul aria-label="Spec" className={cn(LIST_CARD, LIST_DIVIDERS)}>{groups}</ul>
       {kindNote && <Note>{kindNote}</Note>}
     </div>
   );
@@ -566,13 +567,13 @@ function GroupRow({
 }) {
   const id = React.useId();
   return (
-    <li className="border-b-[length:var(--border-width-1)] border-solid border-border-subtle last:border-b-0">
+    <li>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={id}
         onClick={onToggle}
-        className={cn("flex min-h-[64px] w-full items-center gap-4 px-7 py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus", open && "bg-bg-subtle")}
+        className={cn("flex min-h-[64px] w-full items-center gap-4 px-7 py-5 text-left outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus", open && "bg-bg-subtle")}
       >
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-3">
@@ -589,7 +590,7 @@ function GroupRow({
         <div id={id} className="flex flex-col gap-4 bg-bg-subtle px-7 pb-7">
           {children}
           {onReset && (
-            <button type="button" onClick={onReset} className={cn(T.rowTitle, "-my-2 min-h-[40px] w-fit text-text-brand hover:underline")}>
+            <button type="button" onClick={onReset} className={cn(T.rowTitle, "-my-3 min-h-[44px] w-fit text-text-brand hover:underline")}>
               Reset to suggested
             </button>
           )}
@@ -633,7 +634,7 @@ function Chips<T extends string>({ value, options, onChange }: { value: T; optio
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              T.meta, "inline-flex min-h-[36px] items-center gap-2 rounded-full border-[length:var(--border-width-1-5)] border-solid px-5 outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+              T.meta, "inline-flex min-h-[44px] items-center gap-2 rounded-full border-[length:var(--border-width-1-5)] border-solid px-5 outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
               on ? "border-border-brand bg-bg-surface text-text-brand" : "border-border-subtle bg-bg-surface text-text-primary",
             )}
           >

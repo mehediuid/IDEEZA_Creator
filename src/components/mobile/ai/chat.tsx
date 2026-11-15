@@ -161,7 +161,9 @@ export function AiChat({ chatId }: { chatId: string }) {
       </div>
       <CreditsFoot right={footRight} />
     </div>
-  ) : conceptStage || flow.held ? (
+  ) : conceptStage || flow.held || asking ? (
+    // While the project question is open its card carries the next step, so the composer
+    // (disabled until it's answered) gives the thumb zone up; the credits line stays.
     <div className="pt-2">
       <CreditsFoot right={footRight} />
     </div>

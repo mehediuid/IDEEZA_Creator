@@ -10,6 +10,10 @@
 // each failed one with its own Retry. ⋯ on a prompt deletes it, with the
 // web's rule for the builds that go with it.
 //
+// Each tab is one grouped list of clean rows (thumb, title with its time, one
+// line of the prompt or the pieces); a failed build carries one disclosure row
+// (Steps · k of n ready) with Try again at its end.
+//
 // The tab, the filter and the search are client state kept in the address
 // by replaceState: a tap never waits for the server and works offline, and a
 // reload keeps them. The Figma draws this switch segmented (visual-10).
@@ -42,7 +46,7 @@ import { cn } from "@/lib/utils";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { LIST_CARD } from "../kit/list";
+import { LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
 import { ActionSheet } from "../kit/sheet";
 import { EmptyState } from "../kit/state";
 import { ListBones } from "../kit/states";
@@ -244,20 +248,23 @@ export function AiHistory() {
               }
             />
           ) : tab === "prompts" ? (
-            <ul className="flex flex-col gap-3">
+            // One grouped list of clean rows (ChatGPT's history), not a card per row.
+            <ul aria-label="Prompts" className={cn(LIST_CARD, LIST_DIVIDERS)}>
               {shownPrompts.slice(0, shown).map((p) => {
                 const chat = chats.find((c) => c.id === p.chatId) ?? null;
                 return (
-                  <li key={p.chatId} className={cn(LIST_CARD, "flex-row items-center gap-2")}>
-                    <Link href={`/m/ai/chat/${p.chatId}`} className="flex min-w-0 flex-1 items-center gap-5 p-5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus">
+                  <li key={p.chatId} className="flex items-center">
+                    <Link href={`/m/ai/chat/${p.chatId}`} className={cn(LIST_ROW, "min-w-0 flex-1 items-start gap-5 pr-2")}>
                       <Thumb url={p.imageUrl} />
                       <span className="flex min-w-0 flex-1 flex-col">
-                        <span className={cn(T.rowTitle, "truncate")}>{p.name}</span>
+                        <span className="flex items-baseline justify-between gap-3">
+                          <span className={cn(T.rowTitle, "truncate")}>{p.name}</span>
+                          <span className={cn(T.meta, "shrink-0 text-text-tertiary")}>{dates.stamp(p.ts, now)}</span>
+                        </span>
                         <span className={cn(T.meta, "truncate")}>{p.prompt}</span>
                         <span className={cn(T.meta, "truncate text-text-tertiary")}>
-                          {dates.stamp(p.ts, now)}
-                          {p.projectName ? ` · In ${p.projectName}` : ""}
-                          {p.builds ? ` · ${p.builds} ${p.builds === 1 ? "build" : "builds"}` : " · No build yet"}
+                          {p.projectName ? `In ${p.projectName} · ` : ""}
+                          {p.builds ? `${p.builds} ${p.builds === 1 ? "build" : "builds"}` : "No build yet"}
                         </span>
                       </span>
                     </Link>
@@ -266,7 +273,7 @@ export function AiHistory() {
                         type="button"
                         aria-label={`More for ${p.name}`}
                         onClick={() => setMenuFor(chat)}
-                        className="mr-2 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                        className="mr-3 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
                       >
                         <Icon icon={MoreHorizontalIcon} size={18} />
                       </button>
@@ -276,7 +283,7 @@ export function AiHistory() {
               })}
             </ul>
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul aria-label="Builds" className={cn(LIST_CARD, LIST_DIVIDERS)}>
               {shownBuilds.slice(0, shown).map((b) => {
                 const job = buildById.get(b.id);
                 return <BuildRow key={b.id} row={b} now={now} onRetry={job ? () => retry(job) : undefined} onRetryStep={(productId, kind) => retryStep(b, productId, kind)} />;
@@ -284,7 +291,7 @@ export function AiHistory() {
             </ul>
           )}
           {hydrated && list.length > shown && (
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setShown((n) => n + PAGE)}>
+            <Button hierarchy="ghost" size="xl" className="w-full" onClick={() => setShown((n) => n + PAGE)}>
               Show more
             </Button>
           )}
@@ -310,11 +317,11 @@ function BuildRow({ row: b, now, onRetry, onRetryStep }: { row: BuildEntry; now:
   const done = b.products.reduce((n, g) => n + g.done, 0);
   const all = b.products.reduce((n, g) => n + g.steps.length, 0);
   return (
-    <li className={LIST_CARD}>
-      <Link href={`/m/ai/build/${b.id}`} className="flex items-center gap-5 p-5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus">
+    <li>
+      <Link href={`/m/ai/build/${b.id}`} className={cn(LIST_ROW, "items-start gap-5")}>
         <Thumb url={b.imageUrl} />
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex items-center justify-between gap-3">
+          <span className="flex items-start justify-between gap-3">
             <span className={cn(T.rowTitle, "truncate")}>{b.name}</span>
             <Badge tone={s.tone}>{b.status === "building" && b.progress !== undefined ? `${s.word} · ${b.progress}%` : s.word}</Badge>
           </span>
@@ -328,36 +335,42 @@ function BuildRow({ row: b, now, onRetry, onRetryStep }: { row: BuildEntry; now:
           </span>
         </span>
       </Link>
+      {/* A failed build: one disclosure row (Steps, how many are ready) with its one action at
+          the end, not two buttons hung in the row (lens 5 / 6). */}
       {failed && (
-        <div className="flex flex-col gap-3 px-5 pb-5">
-          <div className="flex gap-3">
+        <div className="border-t-[length:var(--border-width-1)] border-solid border-border">
+          <div className="flex items-center gap-3 pr-8">
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+              className={cn(LIST_ROW, "min-w-0 flex-1 gap-3 pr-2")}
+            >
+              <span className={T.rowTitle}>Steps</span>
+              <span className={cn(T.meta, "truncate")}>
+                {done} of {all} ready
+              </span>
+              <span className="ml-auto shrink-0 text-[color:var(--color-icon-default)]">
+                <Icon icon={open ? ArrowUp01Icon : ArrowDown01Icon} size={18} />
+              </span>
+            </button>
             {onRetry && (
-              <Button hierarchy="secondary" size="md" className="flex-1" iconLeading={<Icon icon={Refresh01Icon} size={16} />} onClick={onRetry}>
+              <Button hierarchy="secondary" size="lg" iconLeading={<Icon icon={Refresh01Icon} size={16} />} onClick={onRetry}>
                 Try again
               </Button>
             )}
-            <Button
-              hierarchy="ghost"
-              size="md"
-              className="flex-1"
-              aria-expanded={open}
-              iconTrailing={<Icon icon={open ? ArrowUp01Icon : ArrowDown01Icon} size={16} />}
-              onClick={() => setOpen((v) => !v)}
-            >
-              Steps
-            </Button>
           </div>
           {open && (
-            <ul className="flex flex-col gap-2">
+            <ul className={cn("mx-8 mb-4 rounded-lg bg-bg-subtle px-6", LIST_DIVIDERS)}>
               {b.products.flatMap((g) =>
                 g.steps.map((st) => (
-                  <li key={`${g.id}-${st.kind}`} className="flex min-h-[40px] items-center gap-4">
-                    <span className={cn(T.meta, "min-w-0 flex-1 truncate text-text-primary")}>
+                  <li key={`${g.id}-${st.kind}`} className="flex min-h-[48px] items-center gap-4 py-2">
+                    <span className={cn(T.rowTitle, "min-w-0 flex-1 truncate")}>
                       {b.products.length > 1 ? `${g.name} · ` : ""}
                       {ITEM_LABELS[st.kind as BuildItemKind] ?? st.kind}
                     </span>
                     {st.status === "failed" ? (
-                      <Button hierarchy="secondary" size="sm" onClick={() => onRetryStep(g.id, st.kind)}>
+                      <Button hierarchy="secondary" size="lg" onClick={() => onRetryStep(g.id, st.kind)}>
                         Retry
                       </Button>
                     ) : (

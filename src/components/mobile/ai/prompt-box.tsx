@@ -13,6 +13,8 @@
 // microphone level, ✕ to throw the words away and ✓ to put them in the box
 // (04). A browser that blocks the microphone shows "Microphone is off" over
 // the box (07); one with no recogniser keeps the mic off with its reason.
+// Every control is a 44 px tap target (the send and ✓ draw 32 inside it),
+// 8 px apart.
 
 import * as React from "react";
 import {
@@ -216,14 +218,17 @@ export function PromptBox({
 
         {listening ? (
           <div className="flex items-center gap-6">
+            {/* 32 px drawn, 44 px to tap (lens 16). */}
             <button
               type="button"
               onClick={voice.cancel}
               aria-label="Cancel — throw away what was said"
-              className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+              className="group -my-3 -ml-3 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none"
             >
-              <span className="inline-flex rounded-full border-[length:var(--border-width-1-5)] border-solid border-current p-1">
-                <Icon icon={Cancel01Icon} size={12} />
+              <span className="inline-flex size-[32px] items-center justify-center rounded-full transition-colors duration-fast group-hover:bg-bg-subtle group-active:bg-bg-subtle group-focus-visible:ring-2 group-focus-visible:ring-border-focus">
+                <span className="inline-flex rounded-full border-[length:var(--border-width-1-5)] border-solid border-current p-1">
+                  <Icon icon={Cancel01Icon} size={12} />
+                </span>
               </span>
             </button>
             <span aria-hidden className="flex h-[24px] min-w-0 flex-1 items-center gap-[2px] overflow-hidden">
@@ -242,9 +247,11 @@ export function PromptBox({
               type="button"
               onClick={voice.stop}
               aria-label="Done — put what was said in the box"
-              className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-md bg-bg-brand text-[color:var(--color-icon-on-brand)] outline-none hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+              className="group -my-3 -mr-3 inline-flex size-[44px] shrink-0 items-center justify-center outline-none"
             >
-              <Icon icon={Tick02Icon} size={18} />
+              <span className="inline-flex size-[32px] items-center justify-center rounded-md bg-bg-brand text-[color:var(--color-icon-on-brand)] transition-colors duration-fast group-hover:bg-bg-brand-hover group-active:bg-bg-brand-hover group-focus-visible:ring-2 group-focus-visible:ring-border-focus">
+                <Icon icon={Tick02Icon} size={18} />
+              </span>
             </button>
           </div>
         ) : (
@@ -255,7 +262,7 @@ export function PromptBox({
               disabled={disabled || !voice.supported}
               aria-label={voice.supported ? "Speak your idea" : "Voice input isn't available in this browser"}
               title={voice.supported ? undefined : "Voice input isn't available in this browser"}
-              className="-m-3 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:text-[color:var(--color-icon-disabled)] disabled:hover:bg-transparent"
+              className="-my-3 -ml-3 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:text-[color:var(--color-icon-disabled)] disabled:hover:bg-transparent"
             >
               <Icon icon={Mic01Icon} size={20} />
             </button>
@@ -268,11 +275,11 @@ export function PromptBox({
               aria-busy={refining || undefined}
               title={!online ? OFFLINE_REASON : undefined}
               className={cn(
-                T.body, "inline-flex min-h-[32px] items-center gap-2 rounded-md px-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed",
+                T.body, "-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:active:bg-transparent",
                 refining ? "text-text-brand" : "text-text-primary disabled:text-text-disabled",
               )}
             >
-              <span className={cn("inline-flex", refining && "motion-safe:animate-spin")}>
+              <span className={cn("inline-flex shrink-0", refining && "motion-safe:animate-spin")}>
                 <Icon icon={refining ? Refresh01Icon : MagicWand01Icon} size={16} />
               </span>
               Enhance
@@ -283,15 +290,19 @@ export function PromptBox({
               aria-disabled={!ready || undefined}
               aria-busy={busy || undefined}
               aria-label={sendKind === "generate" ? "Generate" : "Send"}
-              className={cn(
-                "inline-flex size-[32px] shrink-0 items-center justify-center rounded-md outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                ready || busy
-                  ? "bg-bg-brand text-[color:var(--color-icon-on-brand)] hover:bg-bg-brand-hover"
-                  : "cursor-not-allowed bg-bg-subtle text-[color:var(--color-icon-disabled)]",
-              )}
+              className={cn("group -my-3 -mr-3 inline-flex size-[44px] shrink-0 items-center justify-center outline-none", !(ready || busy) && "cursor-not-allowed")}
             >
-              <span className={cn("inline-flex", busy && "motion-safe:animate-spin")}>
-                <Icon icon={busy ? Refresh01Icon : sendKind === "generate" ? AiMagicIcon : ArrowUp02Icon} size={18} />
+              <span
+                className={cn(
+                  "inline-flex size-[32px] items-center justify-center rounded-md transition-colors duration-fast group-focus-visible:ring-2 group-focus-visible:ring-border-focus",
+                  ready || busy
+                    ? "bg-bg-brand text-[color:var(--color-icon-on-brand)] group-hover:bg-bg-brand-hover group-active:bg-bg-brand-hover"
+                    : "bg-bg-subtle text-[color:var(--color-icon-disabled)]",
+                )}
+              >
+                <span className={cn("inline-flex", busy && "motion-safe:animate-spin")}>
+                  <Icon icon={busy ? Refresh01Icon : sendKind === "generate" ? AiMagicIcon : ArrowUp02Icon} size={18} />
+                </span>
               </span>
             </button>
           </div>

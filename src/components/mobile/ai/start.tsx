@@ -1,9 +1,11 @@
 "use client";
 
 // The AI tab's first screen (Full AI flow 01–04, Voice prompt 01–04 and 07):
-// the hero over the AI wash, what a build makes, "Start from an idea" with
-// Shuffle, and the Prompt Box with the credits line under it. Typing hides
-// the ideas so the box can grow (02–04). Generate starts the web's chat
+// the hero over the AI wash (one line, the pieces as chips), "Start from an
+// idea" with Shuffle as two-line chips right above the composer, and the
+// Prompt Box pinned at the foot with the credits line under it; out of
+// credits, one slim state row with Buy credits sits above the box. Typing
+// hides the ideas so the box can grow (02–04). Generate starts the web's chat
 // (createChat, with the Quality picked here, as Home does) and opens it; the
 // first render waits for the setup question, so nothing is charged yet.
 // ⋯ holds History and Buy credits. A tab root: no Back (the tab bar is the
@@ -13,7 +15,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { ArrowDown01Icon, Clock01Icon, Coins01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, ArrowDown01Icon, Clock01Icon, Coins01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Button } from "@/components/ideeza/button";
@@ -109,6 +111,20 @@ export function AiStart() {
         top={<TopBar actions={[{ icon: MORE_ICON, label: "More", onClick: () => setMenu(true) }]} />}
         footer={
           <div className="pt-4">
+            {/* Out of credits: one slim state row above the composer with its one action
+                (lens 5, owner rule: never a warning hung under the form). The box still
+                takes a draft; Generate stays held with its reason. */}
+            {hydrated && !canRender && (
+              <div role="status" className="mx-8 mb-4 flex items-center gap-4 rounded-xl bg-bg-error-subtle py-3 pl-6 pr-3">
+                <span className="shrink-0 text-[color:var(--color-icon-error)]">
+                  <Icon icon={Coins01Icon} size={18} />
+                </span>
+                <p className={cn(T.rowTitle, "min-w-0 flex-1")}>Not enough credits for a concept.</p>
+                <Button size="lg" onClick={() => setBuying(true)}>
+                  Buy credits
+                </Button>
+              </div>
+            )}
             <PromptBox
               inputId={inputId}
               value={prompt}
@@ -123,40 +139,34 @@ export function AiStart() {
                   type="button"
                   aria-haspopup="dialog"
                   onClick={() => setQualityOpen(true)}
-                  className={cn(T.label, "inline-flex min-h-[32px] items-center gap-1 rounded-md px-3 text-text-secondary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
+                  className={cn(T.label, "-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-3 text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
                 >
                   <span className="sr-only">Quality: </span>
                   {QUALITY_INFO[quality].label}
-                  <Icon icon={ArrowDown01Icon} size={14} />
+                  <span className="inline-flex shrink-0">
+                    <Icon icon={ArrowDown01Icon} size={14} />
+                  </span>
                 </button>
               }
             />
-            {hydrated && !canRender && (
-              <p className={cn(T.meta, "flex items-center justify-between gap-4 px-8 pt-4 text-text-error")}>
-                Not enough credits for a concept.
-                <button type="button" onClick={() => setBuying(true)} className={cn(T.label, "-my-4 min-h-[44px] text-text-brand hover:underline")}>
-                  Buy credits
-                </button>
-              </p>
-            )}
             <CreditsFoot right={`${creditsLabel(CONCEPT_COST)} per concept`} />
           </div>
         }
       >
         <div className="flex min-h-full flex-col">
-          <section className="flex flex-col items-center gap-6 px-12 pt-12 text-center">
+          {/* The hero: one line under the headline (lens 1); the full "what a build
+              makes" sentence is in the credits line's ⓘ sheet, the chips name the pieces. */}
+          <section className="flex flex-col items-center gap-5 px-12 pt-10 text-center">
             <span className="px-8 py-2">
-              <IdeezaLogo mark height={45} decorative />
+              <IdeezaLogo mark height={40} decorative />
             </span>
             <h2 className={T.hero}>
               What will you
               <br />
               <span className="text-text-brand">build today?</span>
             </h2>
-            <p className={T.body}>
-              Describe a device in plain words. IDEEZA drafts the PCB, code, 3D module, assembly and wiring, plus a parts list.
-            </p>
-            <ul aria-label="You'll get" className="flex flex-wrap justify-center gap-2">
+            <p className={T.body}>Describe a device in plain words.</p>
+            <ul aria-label="You'll get" className="flex flex-wrap justify-center gap-2 pt-1">
               {PIECES_SHOWN.map((k) => (
                 <li key={k}>
                   <Tag size="sm">{ITEM_LABELS[k]}</Tag>
@@ -164,39 +174,37 @@ export function AiStart() {
               ))}
             </ul>
           </section>
+          {/* Suggestions as tappable chips right above the composer (ChatGPT / Perplexity):
+              a picture when the idea has one, its title and parts line; a tap fills the box. */}
           {!prompt.trim() && (
-            <section aria-labelledby="ideas-title" className="mt-auto flex flex-col gap-5 pb-2 pt-12">
-              <div className="flex items-center justify-between gap-4 px-8">
+            <section aria-labelledby="ideas-title" className="mt-auto flex flex-col gap-3 pb-1 pt-10">
+              <div className="flex items-center justify-between gap-4 pl-8 pr-5">
                 <h3 id="ideas-title" className={T.section}>
                   Start from an idea
                 </h3>
                 <Button
                   hierarchy="ghost"
-                  size="sm"
-                  iconLeading={<Icon icon={Refresh01Icon} size={14} />}
+                  size="lg"
+                  iconLeading={<Icon icon={Refresh01Icon} size={16} />}
                   onClick={() => setOffset((o) => (o + IDEAS_SHOWN) % IDEAS.length)}
                 >
                   Shuffle
                 </Button>
               </div>
-              <ul className="flex gap-7 overflow-x-auto px-8 pb-2 [scrollbar-width:none]">
+              <ul className="flex gap-4 overflow-x-auto px-8 pb-2 [scrollbar-width:none]">
                 {ideasAt(offset).map((idea) => (
-                  <li key={idea.title} className="w-[142px] shrink-0">
+                  <li key={idea.title} className="shrink-0">
                     <button
                       type="button"
                       onClick={() => pick(idea.title)}
-                      className="flex w-full flex-col gap-4 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                      className="flex min-h-[56px] max-w-[232px] items-center gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface py-3 pl-3 pr-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
                     >
-                      <span className="relative flex h-[92px] w-full items-center justify-center overflow-hidden rounded-lg bg-bg-brand-subtle">
-                        {idea.image ? (
-                          <Image src={idea.image} alt="" fill sizes="142px" className="object-cover" />
-                        ) : (
-                          <IdeezaLogo mark height={28} decorative />
-                        )}
+                      <span className="relative inline-flex size-[40px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-bg-brand-subtle text-[color:var(--color-icon-brand)]">
+                        {idea.image ? <Image src={idea.image} alt="" fill sizes="40px" className="object-cover" /> : <Icon icon={AiMagicIcon} size={18} />}
                       </span>
-                      <span className="flex flex-col">
-                        <span className={cn(T.label, "truncate text-text-primary")}>{idea.title}</span>
-                        <span className={cn(T.micro, "truncate text-text-tertiary")}>{idea.line}</span>
+                      <span className="flex min-w-0 flex-col">
+                        <span className={cn(T.rowTitle, "truncate")}>{idea.title}</span>
+                        <span className={cn(T.meta, "truncate text-text-tertiary")}>{idea.line}</span>
                       </span>
                     </button>
                   </li>
