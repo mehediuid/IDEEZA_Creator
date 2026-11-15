@@ -11,28 +11,39 @@
 //   once), Choose a license (LicenseSheet), Verify identity (the phone's one
 //   identity check, KYC Level 1 in Settings — the web links to Get paid's);
 //   each secondary, so the screen's one primary stays its own;
-// · MissingSteps / LevelCheck — "Before you can {verb}" with those steps.
+// · MissingSteps / LevelCheck — "Before you can {verb}" with those steps;
+// · the frame's pieces (Earn is a hub whose sections push their own screens):
+//   InfoButton — ⓘ beside a heading, its explanation in a sheet (lens 1);
+//   FactGrid — up to three facts, a small label over each value (lens 2);
+//   EarnLink — a link that opens a section of this Earn in place;
+//   EarnBar / useEarnTopActions — the open section's BottomBar and ⋯.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CheckmarkCircle02Icon, CircleIcon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, CircleIcon, InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field, useFieldIds } from "@/components/auth/auth-parts";
 import { Banner } from "@/components/ideeza/banner";
 import { Button, buttonVariants } from "@/components/ideeza/button";
+import { IconButton } from "@/components/ideeza/icon-button";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { LICENSES, type License } from "@/lib/brief/types";
 import type { LadderStep, LevelCheck as Check } from "@/lib/commerce/ladder";
 import { saveDraftLicense } from "@/lib/commerce/license";
+import type { EarnSection } from "@/lib/manual/earn-route";
 import { useManualProjects } from "@/lib/manual/projects";
 import { phoneEarnHref } from "@/lib/manual/phone-earn";
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
+import { BottomBar } from "../kit/bottom-bar";
 import { Sheet } from "../kit/sheet";
 import { SheetSelect } from "../kit/sheet-select";
 import { useToast } from "../kit/toast";
 import { LIST_CARD, LIST_ROW, ListCard } from "../kit/list";
+import type { TopBarAction } from "../top-bar";
+import { useEarn } from "./context";
 import { MakeVideosSheet } from "./sell/parts";
 import { T } from "../type";
 
@@ -65,6 +76,111 @@ export function FactRows({ rows, label }: { rows: readonly { label: string; valu
       ))}
     </ListCard>
   );
+}
+
+// ─────────────────────────── the frame's pieces ───────────────────────────
+
+/** ⓘ beside a heading (44 px): the heading's explanation, in the kit's sheet, so it isn't printed inline. */
+export function InfoButton({ title, label, children }: { title: string; label?: string; children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <IconButton
+        hierarchy="ghost"
+        size="xl"
+        aria-label={label ?? `About ${title}`}
+        aria-haspopup="dialog"
+        icon={<Icon icon={InformationCircleIcon} size={20} />}
+        onClick={() => setOpen(true)}
+        className="-my-3 shrink-0"
+      />
+      <Sheet open={open} onClose={() => setOpen(false)} title={title}>
+        {children}
+      </Sheet>
+    </>
+  );
+}
+
+export type GridFact = { label: string; value: string };
+
+/** Up to three facts in a row, a small label over each value (the buy box's facts). */
+export function FactGrid({ facts, className }: { facts: readonly GridFact[]; className?: string }) {
+  return (
+    <dl className={cn("grid grid-cols-3 gap-x-8 gap-y-6", className)}>
+      {facts.map((f) => (
+        <div key={f.label} className="flex min-w-0 flex-col gap-1">
+          <dt className={T.micro}>{f.label}</dt>
+          <dd className={cn(T.rowTitle, "break-words tabular-nums")}>{f.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Where a phone address lands inside this project's Earn (`…/earn`, `…/earn/money#customers`); null elsewhere
+ *  (the mint, another project, an address with a query, which a real navigation reads). */
+export function earnPlaceOf(href: string, projectId: string): { section: EarnSection; hash?: string } | null {
+  const base = `/m/projects/${encodeURIComponent(projectId)}/earn`;
+  if (!href.startsWith(base)) return null;
+  const m = /^(?:\/(sell|plan|money))?\/?(?:#(.+))?$/.exec(href.slice(base.length));
+  if (!m) return null;
+  return { section: (m[1] as EarnSection | undefined) ?? "overview", hash: m[2] };
+}
+
+/** A link inside Earn: a section of this project's Earn opens in place (pushed, no fetch, Back
+ *  comes back); anything else is an ordinary link. */
+export function EarnLink({
+  href,
+  className,
+  children,
+  ...rest
+}: { href: string; className?: string; children: React.ReactNode } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "className" | "onClick">) {
+  const { project, openSection } = useEarn();
+  const place = openSection ? earnPlaceOf(href, project.id) : null;
+  if (!place || !openSection)
+    return (
+      <Link href={href} className={className} {...rest}>
+        {children}
+      </Link>
+    );
+  return (
+    <a
+      href={href}
+      className={className}
+      {...rest}
+      onClick={(e) => {
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        openSection(place.section, place.hash);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+/** The open section's one primary, in a BottomBar pinned at the screen's foot (the thumb zone).
+ *  Inline where the screen has no foot of Earn's (the mint). */
+export function EarnBar({ children, className }: { children: React.ReactNode; className?: string }) {
+  const { footEl } = useEarn();
+  const bar = <BottomBar className={cn("gap-6 pt-8", className)}>{children}</BottomBar>;
+  if (footEl === undefined) return bar;
+  return footEl ? createPortal(bar, footEl) : null;
+}
+
+/** The open section's actions in the top bar's right slot (⋯), while it is shown. */
+export function useEarnTopActions(actions: readonly TopBarAction[]): void {
+  const { setTopActions } = useEarn();
+  const latest = React.useRef(actions);
+  React.useEffect(() => {
+    latest.current = actions;
+  });
+  const key = actions.map((a) => a.label).join("\n");
+  React.useEffect(() => {
+    if (!setTopActions) return;
+    setTopActions(latest.current.map((a) => ({ ...a, onClick: () => latest.current.find((b) => b.label === a.label)?.onClick() })));
+    return () => setTopActions([]);
+  }, [setTopActions, key]);
 }
 
 type FixProps = {

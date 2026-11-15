@@ -1,65 +1,67 @@
 "use client";
 
 // Earn on the phone (Figma "Project Details · 2026 update" 12–17; the web's
-// /projects/[id]/earn at 375 px, its words kept): the top bar "Earn" with Back
-// to the project; the project's name with the one status pill from the
-// commercial axis (`earnStatusOf`), the lock line once sold in full and, once
-// there is something to see, the link "Preview as others see it" (the web
-// header's words); the tabs Overview · Sell · Business plan · Money (the kit's
-// MobileTabs). A tab is client state: a tap swaps the panel at once and puts
-// the tab's own address in place (replaceState — no fetch, works offline, no
-// Back step), so a reload or a link still opens that tab.
+// /projects/[id]/earn, its words kept), as a native hub, not four tabs:
+// · the hub (`/earn`): the top bar "Earn" (Back to the project; it takes the
+//   project's name once the large title scrolls away; ⋯ holds Preview as
+//   others see it and Sell copies of a product), the name once as the large
+//   title with the one status pill from the commercial axis (`earnStatusOf`)
+//   and the lock line once sold in full, then the summary, the rows Sell ·
+//   Business plan · Money and the state's one action at the foot
+//   (overview-tab.tsx);
+// · a section (`/earn/sell`, `/earn/plan`, `/earn/money`): its own screen,
+//   the top bar "‹ {Section}" (Back to the hub) with the section's ⋯, its
+//   content and its one primary at the foot.
+// A row opens its section in place: the address is pushed (pushState — no
+// fetch, works offline) and Back pops it, so the hub comes back; a link or a
+// reload opens the section's own address. A `#part` (`#copies`, `#customers`)
+// is scrolled to once the section shows.
 //
 // Owner only (`canOpenEarn`): anyone else — a Feed sample included — gets
 // "Only the owner can manage earning". Bones while the stores are read; an
 // unknown address says the project isn't here.
 
 import * as React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LockIcon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Badge } from "@/components/ideeza/badge";
+import { usePathname, useRouter } from "next/navigation";
+import { LockIcon, ShoppingBag01Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { commercialFactsOf, commercialStateOf } from "@/lib/commerce/state";
 import type { EarnSection } from "@/lib/manual/earn-route";
-import { canOpenEarn, earnStatusOf } from "@/lib/manual/earn-view";
-import { labelOf } from "@/lib/manual/journey";
+import { canOpenEarn, earnNextOf } from "@/lib/manual/earn-view";
 import { can, hasAudience } from "@/lib/manual/permissions";
 import { PHONE_EARN_TABS, parsePhoneEarnSection, phoneEarnHref, phonePreviewHref } from "@/lib/manual/phone-earn";
 import { sampleProjectOf } from "@/lib/manual/phone-project";
-import { headerText } from "@/lib/manual/project-summary";
-import { cn } from "@/lib/utils";
+import { ActionSheet, type ActionSheetItem } from "../kit/sheet";
 import { EmptyState, NotFoundState } from "../kit/state";
 import { OfflineBanner } from "../kit/states";
-import { MobileTabs, tabPanelProps } from "../kit/tabs";
 import { Screen } from "../screen";
-import { TopBar } from "../top-bar";
+import { MORE_ICON, TopBar, type TopBarAction } from "../top-bar";
 import type { Ready } from "../project/context";
 import { EarnProvider, type EarnCtx } from "./context";
 import { EarnMoneyTab } from "./money-tab";
-import { EarnOverviewTab } from "./overview-tab";
+import { EarnHub } from "./overview-tab";
 import { PhoneWalletScope } from "./phone-wallet";
 import { EarnPlanTab } from "./plan-tab";
 import { EarnSellTab } from "./sell-tab";
-import { T } from "../type";
 
 export function EarnScreen({ id, section }: { id: string; section: EarnSection }) {
   const data = useProjectPageData(id, "project");
-  if (data.state === "loading") return <EarnLoading id={id} />;
+  if (data.state === "loading") return <EarnLoading id={id} section={section} />;
   if (data.state === "missing") return <EarnMissing id={id} />;
   return <EarnReady data={data} section={section} />;
 }
 
-function EarnLoading({ id }: { id: string }) {
+const LABEL: Record<EarnSection, string> = Object.fromEntries(PHONE_EARN_TABS.map((t) => [t.id, t.label])) as Record<EarnSection, string>;
+
+function EarnLoading({ id, section }: { id: string; section: EarnSection }) {
+  const hub = section === "overview";
   return (
-    <Screen top={<TopBar back={`/m/projects/${encodeURIComponent(id)}`} title="Earn" />}>
-      <div role="status" aria-label="Loading earning" className="flex flex-col gap-6 px-8 pb-8">
-        <Skeleton shape="text" size="md" />
-        <Skeleton shape="block" className="h-[40px] w-full" />
-        <Skeleton shape="block" className="h-[240px] w-full" />
-        <Skeleton shape="block" className="h-[120px] w-full" />
+    <Screen top={<TopBar back={hub ? `/m/projects/${encodeURIComponent(id)}` : phoneEarnHref(id)} title={hub ? "Earn" : LABEL[section]} />}>
+      <div role="status" aria-label="Loading earning" className="flex flex-col gap-8 px-8 pb-8 pt-2">
+        {hub && <Skeleton shape="text" size="lg" />}
+        <Skeleton shape="block" className="h-[200px] w-full" />
+        <Skeleton shape="block" className="h-[168px] w-full" />
       </div>
     </Screen>
   );
@@ -85,37 +87,47 @@ function EarnMissing({ id }: { id: string }) {
   );
 }
 
-const TAB_IDS = PHONE_EARN_TABS.map((t) => ({ value: t.id, label: t.label }));
-
-/** The tab in the address (`…/earn` is the Overview, `…/earn/<section>` the others). */
+/** The section in the address (`…/earn` is the hub, `…/earn/<section>` the others). */
 function sectionOfPath(pathname: string): EarnSection | null {
   const m = /\/earn(?:\/([a-z]+))?\/?$/.exec(pathname);
   if (!m) return null;
   return m[1] ? parsePhoneEarnSection(m[1]) : "overview";
 }
 
-/** Earn's tab as client state: shown at once, its address put in place by replaceState (no fetch). */
-function useEarnTab(projectId: string, opened: EarnSection): [EarnSection, (value: EarnSection) => void] {
+/** The open section, read from the address; `open` pushes a section's address in place (no fetch). */
+function useEarnSection(projectId: string, opened: EarnSection): [EarnSection, (section: EarnSection, hash?: string) => void] {
   const pathname = usePathname();
-  const [picked, setPicked] = React.useState<EarnSection | null>(null);
-  const [seen, setSeen] = React.useState(pathname);
-  if (pathname !== seen) {
-    setSeen(pathname);
-    setPicked(null);
-  }
-  const set = React.useCallback(
-    (value: EarnSection) => {
-      setPicked(value);
-      window.history.replaceState(null, "", phoneEarnHref(projectId, value));
+  const open = React.useCallback(
+    (section: EarnSection, hash?: string) => {
+      window.history.pushState(null, "", `${phoneEarnHref(projectId, section)}${hash ? `#${hash}` : ""}`);
     },
     [projectId],
   );
-  return [picked ?? sectionOfPath(pathname) ?? opened, set];
+  return [sectionOfPath(pathname) ?? opened, open];
+}
+
+/** The hub's large title has scrolled away (the top bar then says the project's name). Watched
+ *  again each time the hub shows, since its screen is a new one. */
+function useTitleGone(ref: React.RefObject<HTMLElement | null>, section: EarnSection): boolean {
+  const [gone, setGone] = React.useState<{ section: EarnSection; gone: boolean }>({ section, gone: false });
+  React.useEffect(() => {
+    const el = ref.current;
+    const scroller = el?.closest(".overflow-y-auto");
+    if (section !== "overview" || !el || !scroller) return;
+    const io = new IntersectionObserver(
+      ([e]) => setGone({ section, gone: !e.isIntersecting && e.boundingClientRect.top < (e.rootBounds?.top ?? 0) }),
+      { root: scroller },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, section]);
+  return gone.section === section && gone.gone;
 }
 
 function EarnReady({ data, section: opened }: { data: Ready; section: EarnSection }) {
   const { project, view, viewer, brief } = data;
-  const [section, setSection] = useEarnTab(project.id, opened);
+  const router = useRouter();
+  const [section, openSection] = useEarnSection(project.id, opened);
   const back = `/m/projects/${encodeURIComponent(project.id)}`;
   const commercial = commercialStateOf(commercialFactsOf(project, brief, { listing: view.listing, sales: view.sales }));
   const [live, setLive] = React.useState("");
@@ -123,52 +135,57 @@ function EarnReady({ data, section: opened }: { data: Ready; section: EarnSectio
     setLive("");
     window.setTimeout(() => setLive(message), 50);
   }, []);
-  const ctx = React.useMemo<EarnCtx>(() => ({ ...data, commercial, announce }), [data, commercial, announce]);
+  const [footEl, setFootEl] = React.useState<HTMLElement | null>(null);
+  const [topActions, setTopActions] = React.useState<TopBarAction[]>([]);
+  const [menu, setMenu] = React.useState(false);
+  const titleRef = React.useRef<HTMLHeadingElement>(null);
+  const titleGone = useTitleGone(titleRef, section);
+  const ctx = React.useMemo<EarnCtx>(
+    () => ({ ...data, commercial, announce, footEl, setTopActions, openSection }),
+    [data, commercial, announce, footEl, openSection],
+  );
+
+  // A `#part` in the address is brought into view once its section shows.
+  React.useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" })));
+    return () => cancelAnimationFrame(raf);
+  }, [section]);
 
   if (!canOpenEarn(viewer)) return <OwnerOnly back={back} name={project.name} />;
 
-  const status = earnStatusOf(commercial);
-  const text = headerText(view.summary, { viewer, now: { label: labelOf(view.current) } });
+  const hub = section === "overview";
+  const copiesOnSale = view.lock === null && view.editions.some((t) => t.listing !== null);
+  const isLive = earnNextOf(project.id, commercial, copiesOnSale).point === null;
   const preview = commercial !== "none" && can(viewer, "preview.enter") && hasAudience(view.summary.status, view.summary.showcase);
+  const hubItems: ActionSheetItem[] = [
+    ...(preview ? [{ label: "Preview as others see it", icon: ViewIcon, onSelect: () => router.push(phonePreviewHref(project.id, "buyer")) }] : []),
+    ...(isLive && commercial !== "given" ? [{ label: "Sell copies of a product", icon: ShoppingBag01Icon, onSelect: () => openSection("sell", "copies") }] : []),
+  ];
+  const actions: TopBarAction[] = hub
+    ? hubItems.length
+      ? [{ icon: MORE_ICON, label: "More earning actions", onClick: () => setMenu(true) }]
+      : []
+    : topActions;
 
   return (
     <PhoneWalletScope>
       <EarnProvider value={ctx}>
         <Screen
+          key={section}
           top={
-            <>
-              <TopBar back={back} title="Earn" />
-              <div className="flex flex-col gap-2 px-8 pb-6">
-                <div className="flex min-w-0 items-center gap-4">
-                  <p className={cn(T.rowTitle, "min-w-0 truncate")}>{project.name}</p>
-                  <Badge tone={status.tone} className="shrink-0">
-                    {status.word}
-                  </Badge>
-                </div>
-                {text.lockLine && (
-                  <p className={cn(T.meta, "flex items-start gap-2 text-text-primary")}>
-                    <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-                      <Icon icon={LockIcon} size={14} />
-                    </span>
-                    {text.lockLine}
-                  </p>
-                )}
-                {preview && (
-                  <Link
-                    href={phonePreviewHref(project.id, "buyer")}
-                    className={cn(T.rowTitle, "-my-3 inline-flex min-h-[44px] items-center self-start text-text-brand outline-none hover:underline focus-visible:underline")}
-                  >
-                    Preview as others see it
-                  </Link>
-                )}
-              </div>
-              <MobileTabs label="Earn" idBase="earn" width="hug" className="px-8" tabs={TAB_IDS} value={section} onChange={setSection} />
-            </>
+            hub ? (
+              <TopBar back={back} titleAs="p" title={titleGone ? project.name : "Earn"} actions={actions} />
+            ) : (
+              <TopBar back={phoneEarnHref(project.id)} title={LABEL[section]} actions={actions} />
+            )
           }
+          footer={<div ref={setFootEl} />}
         >
           <OfflineBanner />
-          <div {...tabPanelProps("earn", section)} className="px-8 pb-12 pt-8 outline-none">
-            {section === "overview" && <EarnOverviewTab />}
+          <div className={hub ? "px-8 pb-12 pt-2" : "px-8 pb-12 pt-4"}>
+            {hub && <EarnHub titleRef={titleRef} />}
             {section === "sell" && <EarnSellTab />}
             {section === "plan" && <EarnPlanTab />}
             {section === "money" && <EarnMoneyTab />}
@@ -177,8 +194,8 @@ function EarnReady({ data, section: opened }: { data: Ready; section: EarnSectio
             {live}
           </p>
         </Screen>
+        {hub && <ActionSheet open={menu} onClose={() => setMenu(false)} title="Earn" items={hubItems} />}
       </EarnProvider>
     </PhoneWalletScope>
   );
 }
-

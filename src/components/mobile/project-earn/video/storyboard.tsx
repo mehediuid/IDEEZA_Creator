@@ -1,7 +1,7 @@
 "use client";
 
-// 11f · Review your storyboard: the web's StoryboardEditor in the mobile
-// Figma's layout — the three scenes (0–3s · 3–6s · 6–10s) as cards, the first
+// 11f · Review your storyboard (the top bar's title): the web's
+// StoryboardEditor in the mobile Figma's layout — who drafted it, the three scenes (0–3s · 3–6s · 6–10s) as cards, the first
 // open, each with Visual description, Background audio, Music cue and Speech /
 // dialogue in DS Textareas, every field editable (at most 400 characters).
 
@@ -21,15 +21,13 @@ export function StoryboardEditor({ storyboard, onChange }: { storyboard: Storybo
     onChange({ ...storyboard, scenes });
   };
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h2 className={T.section}>Review your storyboard</h2>
-        <p className={T.meta}>
-          {storyboard.by === "ai"
-            ? "AI drafted 3 scenes · Edit freely before generating"
-            : "Drafted from your product and prompts — the AI didn't answer · Edit freely before generating"}
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      {/* "Review your storyboard" is the top bar's title; one line says who drafted it. */}
+      <p className={T.meta}>
+        {storyboard.by === "ai"
+          ? "AI drafted 3 scenes · Edit freely before generating"
+          : "Drafted from your product and prompts — the AI didn't answer · Edit freely before generating"}
+      </p>
       <ul className="flex flex-col gap-6">
         {storyboard.scenes.map((scene, i) => {
           const panel = `${id}-scene-${i}`;

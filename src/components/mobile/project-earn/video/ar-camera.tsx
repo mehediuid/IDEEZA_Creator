@@ -22,10 +22,11 @@
 //   can't open the phone's Settings, so after turning it on there the maker
 //   asks again here) and Upload a video.
 // · 11d Your clip: the clip, "10-second clip · Recorded on this phone · …",
-//   Use this clip (11v while it is kept; 11w when it couldn't be; 11x waits for
-//   a connection), Record again, Decide later (kept as a take to review from
-//   the row). A kept clip is a take of the product in the web's own record, so
-//   the Media tab and the Sell / Give readiness count it once it is in use.
+//   the didn't-send / offline banner, Record again and Decide later (kept as
+//   a take to review from the row) as rows; Use this clip at the foot (11v
+//   while it is kept; 11w when it couldn't be; 11x waits for a connection).
+//   A kept clip is a take of the product in the web's own record, so the
+//   Media tab and the Sell / Give readiness count it once it is in use.
 
 import * as React from "react";
 import { CameraRotated01Icon, Cancel01Icon, FlashIcon, FlashOffIcon } from "@hugeicons/core-free-icons";
@@ -66,7 +67,7 @@ import { Screen } from "../../screen";
 import { StatusBar } from "../../status-bar";
 import { TopBar } from "../../top-bar";
 import { CameraAskSheet, cameraPermission } from "./camera-ask";
-import { ChoiceList, clipKeptLine } from "./review";
+import { ChoiceList, UseBar, clipKeptLine } from "./review";
 import { VideoLoading, VideoUnavailable, keepClip, useLeave, useVideoScope, type ClipToKeep } from "./target";
 import { T } from "../../type";
 
@@ -400,7 +401,20 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
     const { clip, sending } = phase;
     const busy = sending === "busy";
     return (
-      <Screen top={<TopBar back title={TITLE} />} className="px-8 pb-12">
+      <Screen
+        top={<TopBar back title={TITLE} />}
+        footer={
+          <BottomBar className="gap-6 pt-8">
+            <UseBar
+              label={busy ? "Sending your clip…" : !online ? "Waiting for a connection" : sending === "failed" ? "Try again" : "Use this clip"}
+              disabled={!online}
+              loading={busy}
+              onUse={() => void keep(true)}
+            />
+          </BottomBar>
+        }
+        className="px-8 pb-12"
+      >
         <p className={cn(T.meta, "pb-8")}>{renderTitle(`For ${target.productName}`, target.projectName)}</p>
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-4">
@@ -410,21 +424,18 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
             <p className={T.meta}>{clipMetaOf(clip.durationMs, clip.how, formatDate(clip.madeAt))}</p>
             <p className={T.meta}>{clipKeptLine(target.productName)}</p>
           </div>
-          <div className="flex flex-col gap-6">
+          {sending === "failed" && (
+            <Banner tone="error" title="Your clip didn’t send">
+              Check your connection and try again. The clip is still on this phone.
+            </Banner>
+          )}
+          {!online && (
+            <Banner tone="attention" title="You’re offline">
+              Your clip stays on this phone. You can send it when you’re back online.
+            </Banner>
+          )}
+          <div className="flex flex-col gap-4">
             <h2 className={T.section}>Is this the clip you want?</h2>
-            {sending === "failed" && (
-              <Banner tone="error" title="Your clip didn’t send">
-                Check your connection and try again. The clip is still on this phone.
-              </Banner>
-            )}
-            {!online && (
-              <Banner tone="attention" title="You’re offline">
-                Your clip stays on this phone. You can send it when you’re back online.
-              </Banner>
-            )}
-            <Button size="xl" className="w-full" disabled={!online} loading={busy} onClick={() => void keep(true)}>
-              {busy ? "Sending your clip…" : !online ? "Waiting for a connection" : sending === "failed" ? "Try again" : "Use this clip"}
-            </Button>
             <ChoiceList
               label="Other choices"
               choices={[
