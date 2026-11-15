@@ -2,7 +2,8 @@
 
 // PR-08 · More about {First}: the profile's second half in one sheet — Skills,
 // Top specialties, Languages, Built with (from the parts lists of their shared
-// projects), Works on, and Links and social (each opens in the browser). A
+// projects), Works on, and Links and social (each opens in the browser); under
+// the title, since when they build on IDEEZA (moved from the meta line). A
 // visitor sees only the groups with something in them; on your own profile an
 // empty group says so, with the way to fill it in Edit profile.
 
@@ -41,6 +42,7 @@ export function MoreAboutSheet({
   open,
   onClose,
   title,
+  description,
   more,
   builtWithNote,
   own,
@@ -50,6 +52,8 @@ export function MoreAboutSheet({
   onClose: () => void;
   /** "More about Naim". */
   title: string;
+  /** "Building on IDEEZA since June 2025", when the profile's meta line left it to the sheet. */
+  description?: string;
   more: MoreAbout;
   /** "from the parts lists of 6 shared projects". */
   builtWithNote: string;
@@ -74,7 +78,7 @@ export function MoreAboutSheet({
       </>
     ) : null;
   return (
-    <Sheet open={open} onClose={onClose} title={title}>
+    <Sheet open={open} onClose={onClose} title={title} description={description}>
       <div className="flex flex-col gap-8 pb-4">
         <Group title="Skills" empty={add("skills")}>
           {more.skills.length ? <Chips chips={more.skills} /> : null}

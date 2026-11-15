@@ -75,6 +75,10 @@ export function metaLineOf(o: { location: string | null; localTime: string | nul
   return parts.length ? parts.join(" · ") : null;
 }
 
+/** "Building on IDEEZA since June 2025": the meta line's last part on its own (the phone's one
+ *  meta line keeps where and when; since when moves to the More about sheet). */
+export const sinceLineOf = (since: number) => `Building on IDEEZA since ${monthYearOf(since)}`;
+
 export const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 /** "naimrahman.dev/notes" from "https://www.naimrahman.dev/notes/". */

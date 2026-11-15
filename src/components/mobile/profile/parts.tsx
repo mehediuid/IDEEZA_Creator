@@ -91,6 +91,7 @@ export function Identity({
   demo: boolean;
   /** Their headline, or on your own empty profile the prompt that opens Edit profile. */
   headline: React.ReactNode;
+  /** One line: where they are and their local time (else since when they build on IDEEZA). */
   meta: string | null;
   /** How they are tied to you; only you see it. */
   relation: string | null;
@@ -107,14 +108,22 @@ export function Identity({
         </div>
         {latinName && <p className={cn(T.meta, "text-text-tertiary")}>{latinName}</p>}
         {headline && <div className={cn(T.body, "text-text-primary")}>{headline}</div>}
+        {meta && <p className={T.meta}>{meta}</p>}
       </div>
-      {meta && <p className={T.meta}>{meta}</p>}
-      {relation && (
-        <Badge tone="brand" className="self-start whitespace-normal text-left">
-          {relation}
-        </Badge>
+      {(openTo || relation) && (
+        <div className="flex flex-wrap gap-2">
+          {openTo && (
+            <Badge tone="success" className="whitespace-normal text-left">
+              {openTo}
+            </Badge>
+          )}
+          {relation && (
+            <Badge tone="brand" className="whitespace-normal text-left">
+              {relation}
+            </Badge>
+          )}
+        </div>
       )}
-      {openTo && <p className={T.meta}>{openTo}</p>}
     </div>
   );
 }
@@ -128,13 +137,14 @@ export function Prompt({ children, onClick }: { children: React.ReactNode; onCli
   );
 }
 
+/** The counts from shared work: the figure over its label, centred, four across (two by two on
+ *  the narrowest phones), so a label that takes two lines still reads as one row. */
 export function Stats({ stats }: { stats: readonly Stat[] }) {
   if (!stats.length) return null;
   return (
-    // Four across; two by two on the narrowest phones, where "Appreciations" outgrows a quarter.
-    <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-6 min-[360px]:grid-cols-4">
+    <dl className={cn("m-0 grid gap-x-4 gap-y-6 py-2", stats.length === 3 ? "grid-cols-3" : "grid-cols-2 min-[360px]:grid-cols-4")}>
       {stats.map((s) => (
-        <div key={s.label} className="flex min-w-0 flex-col-reverse justify-end">
+        <div key={s.label} className="flex min-w-0 flex-col-reverse items-center justify-end gap-1 text-center">
           <dt className={T.meta}>{s.label}</dt>
           <dd className={cn(T.section, "m-0 tabular-nums")}>{compactCount(s.value)}</dd>
         </div>

@@ -3,7 +3,8 @@
 // The Profile tab's search (master page "Main Profile-search" 10702:242636:
 // "Ideeza- search", "Recent searches", "…-delete"): Back and one field; with
 // nothing typed, your recent searches from here (newest first, See all past
-// five, ⋮ → Delete); typing lists the creators (photo, name, what they do)
+// five as a row at the list's foot, ⋮ → Delete; none yet: the kit's empty
+// state); typing lists the creators (photo, name, what they do)
 // and the videos that match, from Global Search's own index. A creator opens
 // their profile, a video its clip. Recent searches stay on this phone, apart
 // from Global Search's. What you typed stays in the address (`?q=`), so Back
@@ -11,10 +12,9 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft02Icon, Clock02Icon, Delete02Icon, MoreVerticalIcon, PlayIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ArrowLeft02Icon, Clock02Icon, Delete02Icon, MoreVerticalIcon, PlayIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
-import { Button } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ import { clipHref } from "@/lib/innovations/clips";
 import { recentIn, recentKeyOf, searchEntries, withRecent, withoutRecent, type RecentSearch } from "@/lib/innovations/search";
 import { PROFILE_SEARCH_RECENT_KEY, RECENT_SHOWN } from "@/lib/people/phone-profile";
 import { ActionSheet } from "../kit/sheet";
+import { EmptyState } from "../kit/state";
 import { ListBones } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { useGoBack } from "../nav-trail";
@@ -132,24 +133,12 @@ export function ProfileSearchScreen() {
           <ListBones rows={4} />
         ) : !q ? (
           recent.length === 0 ? (
-            <p className={T.body}>Find a creator or a video. What you search for stays here.</p>
+            <EmptyState title="Find a creator or a video" body="What you search for stays here." />
           ) : (
             <section aria-labelledby="recent-heading" className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-4">
-                <h2 id="recent-heading" className={T.section}>
-                  Recent searches
-                </h2>
-                {recent.length > RECENT_SHOWN && (
-                  <button
-                    type="button"
-                    aria-expanded={all}
-                    onClick={() => setAll((v) => !v)}
-                    className={cn(T.body, "-my-6 inline-flex min-h-[44px] items-center outline-none hover:underline focus-visible:underline")}
-                  >
-                    {all ? "Show less" : "See all"}
-                  </button>
-                )}
-              </div>
+              <h2 id="recent-heading" className={T.section}>
+                Recent searches
+              </h2>
               <ul className="m-0 flex list-none flex-col p-0">
                 {shown.map((r) => (
                   <li key={recentKeyOf(r)} className="flex items-center gap-2">
@@ -178,21 +167,29 @@ export function ProfileSearchScreen() {
                   </li>
                 ))}
               </ul>
+              {recent.length > RECENT_SHOWN && (
+                // See all / Show less as a row at the list's foot, not a link by the heading.
+                <button type="button" aria-expanded={all} onClick={() => setAll((v) => !v)} className={cn(ROW, "justify-between px-2")}>
+                  <span className={cn(T.rowTitle, "text-text-brand")}>{all ? "Show less" : `See all ${recent.length}`}</span>
+                  <span aria-hidden className={cn("shrink-0 text-[color:var(--color-icon-default)] transition-transform duration-normal motion-reduce:transition-none", all && "rotate-180")}>
+                    <Icon icon={ArrowDown01Icon} size={20} />
+                  </span>
+                </button>
+              )}
             </section>
           )
         ) : results.length === 0 ? (
-          <div role="status" className="flex flex-col items-start gap-4">
-            <p className={T.body}>No creators or videos match “{q}”.</p>
-            <Button
-              hierarchy="ghost"
-              size="xl"
-              onClick={() => {
-                setText("");
-                field.current?.focus();
+          <div role="status">
+            <EmptyState
+              title={`No creators or videos match “${q}”`}
+              action={{
+                label: "Clear search",
+                onClick: () => {
+                  setText("");
+                  field.current?.focus();
+                },
               }}
-            >
-              Clear search
-            </Button>
+            />
           </div>
         ) : (
           <ul aria-label="Results" className="m-0 flex list-none flex-col gap-2 p-0">

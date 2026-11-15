@@ -2,12 +2,14 @@
 
 // Profile tab root (master page "Ideeza-Main Profile" 10702:230343 and its
 // open-Settings state 10702:230445), with the facts of PR-01 "You hub"
-// (10674:659) folded in: the top bar with settings and search, your card
-// (photo, name, headline, "@handle · View profile", your level) that opens
-// your profile, then Wallet with your IDZ, Refer and Earn, Plan & pricing with
-// your plan and credits, Projects with how many you have, Saved Items,
-// Settings (opens in place on General · Payments · $IDZ Pay · Security · Help
-// and Support · Others) and Sign out. No Friends row (D-1).
+// (10674:659) folded in, laid out as grouped inset lists (the iOS Settings
+// pattern, mobile UX pass 2026-11-15): the top bar with settings and search
+// (a tab root, so no Back), your card (photo, name, headline, "@handle · View
+// profile", your level) that opens your profile, then Wallet with your IDZ,
+// Refer and Earn and Plan & pricing with your plan and credits; Projects with
+// how many you have and Saved Items; Settings, which opens in place on General
+// · Payments · $IDZ Pay · Security · Help and Support · Others; and Sign out as
+// a row. Every row that opens something carries the chevron. No Friends (D-1).
 
 import * as React from "react";
 import Link from "next/link";
@@ -18,6 +20,7 @@ import {
   CreditCardIcon,
   Globe02Icon,
   HelpCircleIcon,
+  Logout01Icon,
   MenuSquareIcon,
   Note03Icon,
   Search01Icon,
@@ -31,7 +34,6 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { useMakerIdz } from "@/components/balance/use-maker-idz";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
-import { Button } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { cn } from "@/lib/utils";
@@ -46,53 +48,15 @@ import { PHONE_SETTINGS_GENERAL_HREF, PHONE_SETTINGS_OTHERS_HREF, compactCount, 
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMyProfile } from "@/lib/people/profile-store";
 import { useSettings } from "@/lib/settings/use-settings";
-import { LIST_CARD } from "../kit/list";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { SignOutSheet } from "../settings/sign-out";
 
-/** A hub tile (master M26 List Item 10702:230373): 44 tall, a 24 px icon, the name in Body/MD Medium. */
-export const HUB_ROW =
-  "flex min-h-[44px] w-full items-center gap-8 rounded-md bg-bg-surface px-6 py-4 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus";
-
-type HubRowProps = {
-  icon: IconValue;
-  label: string;
-  value?: React.ReactNode;
-  danger?: boolean;
-} & ({ href: string; onClick?: never } | { onClick: () => void; href?: never } | { href?: never; onClick?: never });
-
-/** One tile of the hub and of its Settings lists: a link, a button, or (with neither) a fact. */
-export function HubRow(props: HubRowProps) {
-  const { icon, label, value, danger } = props;
-  const body = (
-    <>
-      <span className={cn("shrink-0", danger ? "text-[color:var(--color-icon-error)]" : "text-[color:var(--color-icon-default)]")}>
-        <Icon icon={icon} size={24} />
-      </span>
-      <span className={cn(T.bodyStrong, "min-w-0 flex-1 truncate", danger && "text-text-error")}>{label}</span>
-      {value}
-    </>
-  );
-  if (props.href)
-    return (
-      <Link href={props.href} className={HUB_ROW}>
-        {body}
-      </Link>
-    );
-  if (props.onClick)
-    return (
-      <button type="button" onClick={props.onClick} className={HUB_ROW}>
-        {body}
-      </button>
-    );
-  return <div className={cn(HUB_ROW, "hover:bg-bg-surface")}>{body}</div>;
-}
-
-/** A tile's value at its end ("Free · 28 credits", "5"). */
+/** A row's value at its end ("Free · 28 credits", "5"); the warning ink once credits run low. */
 export function HubValue({ children, warning }: { children: React.ReactNode; warning?: boolean }) {
-  return <span className={cn(T.body, "max-w-[55%] shrink-0 truncate text-right tabular-nums", warning && "text-text-warning")}>{children}</span>;
+  return <span className={cn("tabular-nums", warning && "text-text-warning")}>{children}</span>;
 }
 
 const SETTINGS: readonly { href: string; icon: IconValue; label: string }[] = [
@@ -147,10 +111,10 @@ function useSettingsOpen(): [boolean, () => void] {
 /** The Wallet row's figure: your IDZ while the demo wallet is connected. */
 function WalletValue() {
   const idz = useMakerIdz();
-  if (!idz.read) return <Skeleton shape="text" size="md" className="w-[64px]" />;
+  if (!idz.read) return <Skeleton shape="text" size="md" className="inline-block w-[64px]" />;
   if (!idz.connected || idz.idz === null) return <HubValue>Not connected</HubValue>;
   return (
-    <span className="flex shrink-0 items-center gap-4">
+    <span className="inline-flex items-center gap-4">
       <TestnetDemoBadge />
       <span className={cn(T.rowTitle, "tabular-nums text-text-brand")}>{compactCount(Number(idz.idz))} IDZ</span>
     </span>
@@ -162,7 +126,7 @@ function PlanValue() {
   const { hydrated: planRead, plan } = useCreatePlan();
   const { hydrated: creditsRead, ledger } = useCredits();
   const { lowAt } = useSettings().credits;
-  if (!planRead || !creditsRead) return <Skeleton shape="text" size="md" className="w-[96px]" />;
+  if (!planRead || !creditsRead) return <Skeleton shape="text" size="md" className="inline-block w-[96px]" />;
   const credits = creditTotals(ledger).remaining;
   return (
     <HubValue warning={runningLow(credits, lowAt)}>
@@ -173,7 +137,7 @@ function PlanValue() {
 
 function ProjectsValue() {
   const { hydrated, projects } = useManualProjects();
-  if (!hydrated) return <Skeleton shape="text" size="md" className="w-[24px]" />;
+  if (!hydrated) return <Skeleton shape="text" size="md" className="inline-block w-[24px]" />;
   return <HubValue>{projects.length}</HubValue>;
 }
 
@@ -203,13 +167,11 @@ export function ProfileHub() {
   const name = displayNameOf(fields.name || `${account?.firstName ?? ""} ${account?.lastName ?? ""}`.trim());
   const handle = ownHandleOf(fields.handle);
   const me = phoneProfileHref(handle);
-  const card = cn(LIST_CARD, "flex-row items-center gap-6 px-8 py-6");
 
   return (
     <Screen
       top={
         <TopBar
-          back
           title="Profile"
           actions={[
             { icon: Settings01Icon, label: "Settings", onClick: () => router.push("/m/settings") },
@@ -218,24 +180,23 @@ export function ProfileHub() {
         />
       }
     >
-      <div className="flex flex-col gap-12 px-8 pb-12 pt-2">
+      <div className="flex flex-col gap-8 px-8 pb-12 pt-2">
         {hydrated && photo.hydrated ? (
-          <Link
-            href={me}
-            aria-label={`${name}, view your profile`}
-            className={cn(card, "outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
-          >
-            <Avatar size="md" initials={initialsOf(name, fields.latinName || null)} src={photo.url ?? undefined} />
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className={cn(T.bodyStrong, "truncate")}>{name}</span>
-              {fields.headline && <span className={cn(T.body, "truncate")}>{fields.headline}</span>}
-              <span className={cn(T.meta, "truncate")}>{handle === ME ? "View profile" : `@${handle} · View profile`}</span>
-            </span>
-            <LevelBadge />
-          </Link>
+          <div className={LIST_CARD}>
+            <Link href={me} aria-label={`${name}, view your profile`} className={cn(LIST_ROW, "py-8")}>
+              <Avatar size="lg" phone initials={initialsOf(name, fields.latinName || null)} src={photo.url ?? undefined} />
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={cn(T.section, "truncate")}>{name}</span>
+                {fields.headline && <span className={cn(T.body, "truncate")}>{fields.headline}</span>}
+                <span className={cn(T.meta, "truncate")}>{handle === ME ? "View profile" : `@${handle} · View profile`}</span>
+              </span>
+              <LevelBadge />
+              <Chevron />
+            </Link>
+          </div>
         ) : (
-          <div aria-hidden className={card}>
-            <Skeleton shape="circle" className="size-[40px]" />
+          <div aria-hidden className={cn(LIST_CARD, "flex-row items-center gap-6 px-8 py-8")}>
+            <Skeleton shape="circle" className="size-[48px]" />
             <div className="flex flex-col gap-4">
               <Skeleton shape="text" size="md" className="w-[120px]" />
               <Skeleton shape="text" size="sm" className="w-[160px]" />
@@ -243,53 +204,57 @@ export function ProfileHub() {
           </div>
         )}
 
-        <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-16">
-            <nav aria-label="Your account" className="flex flex-col gap-6">
-              <HubRow href="/m/earn/wallet" icon={Wallet03Icon} label="Wallet" value={<WalletValue />} />
-              <HubRow href="/m/earn/refer" icon={Share01Icon} label="Refer and Earn" />
-              <HubRow href="/m/plans" icon={Tag01Icon} label="Plan & pricing" value={<PlanValue />} />
-              <HubRow href="/m/projects" icon={Note03Icon} label="Projects" value={<ProjectsValue />} />
-              <HubRow href="/m/saved" icon={AllBookmarkIcon} label="Saved Items" />
-            </nav>
+        <nav aria-label="Your account" className="flex flex-col gap-8">
+          <ListCard label="Money">
+            <ListRow href="/m/earn/wallet" icon={Wallet03Icon} title="Wallet" value={<WalletValue />} />
+            <ListRow href="/m/earn/refer" icon={Share01Icon} title="Refer and Earn" />
+            <ListRow href="/m/plans" icon={Tag01Icon} title="Plan & pricing" value={<PlanValue />} />
+          </ListCard>
+          <ListCard label="Your work">
+            <ListRow href="/m/projects" icon={Note03Icon} title="Projects" value={<ProjectsValue />} />
+            <ListRow href="/m/saved" icon={AllBookmarkIcon} title="Saved Items" />
+          </ListCard>
+        </nav>
 
-            <div className="flex flex-col gap-4">
-              <button
-                type="button"
-                aria-expanded={settingsOpen}
-                aria-controls={settingsId}
-                onClick={toggleSettings}
-                className={cn(HUB_ROW, "bg-transparent px-8")}
+        <ListCard>
+          <li>
+            <button type="button" aria-expanded={settingsOpen} aria-controls={settingsId} onClick={toggleSettings} className={LIST_ROW}>
+              <span className="shrink-0 text-[color:var(--color-icon-default)]">
+                <Icon icon={Settings01Icon} size={24} />
+              </span>
+              <span className={cn(T.body, "min-w-0 flex-1 truncate text-text-primary")}>Settings</span>
+              <span
+                aria-hidden
+                className={cn(
+                  "shrink-0 text-[color:var(--color-icon-default)] transition-transform duration-normal ease-decelerate motion-reduce:transition-none",
+                  settingsOpen && "rotate-180",
+                )}
               >
-                <span className="shrink-0 text-[color:var(--color-icon-default)]">
-                  <Icon icon={Settings01Icon} size={24} />
-                </span>
-                <span className={cn(T.bodyStrong, "min-w-0 flex-1 truncate")}>Settings</span>
-                <span
-                  className={cn(
-                    "shrink-0 text-[color:var(--color-icon-default)] transition-transform duration-normal ease-decelerate motion-reduce:transition-none",
-                    settingsOpen && "rotate-180",
-                  )}
-                >
-                  <Icon icon={ArrowDown01Icon} size={24} />
-                </span>
-              </button>
-              {settingsOpen && (
-                <ul id={settingsId} aria-label="Settings" className="m-0 flex list-none flex-col gap-4 p-0">
-                  {SETTINGS.map((s) => (
-                    <li key={s.href}>
-                      <HubRow href={s.href} icon={s.icon} label={s.label} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+                <Icon icon={ArrowDown01Icon} size={24} />
+              </span>
+            </button>
+          </li>
+          {settingsOpen && (
+            <li>
+              <ul id={settingsId} aria-label="Settings" className={cn("m-0 flex list-none flex-col p-0", LIST_DIVIDERS)}>
+                {SETTINGS.map((s) => (
+                  <ListRow key={s.href} href={s.href} icon={s.icon} title={s.label} />
+                ))}
+              </ul>
+            </li>
+          )}
+        </ListCard>
 
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setSignOut(true)}>
-            Sign out
-          </Button>
-        </div>
+        <ListCard>
+          <li>
+            <button type="button" onClick={() => setSignOut(true)} className={LIST_ROW}>
+              <span className="shrink-0 text-[color:var(--color-icon-default)]">
+                <Icon icon={Logout01Icon} size={24} />
+              </span>
+              <span className={cn(T.body, "min-w-0 flex-1 truncate text-text-primary")}>Sign out</span>
+            </button>
+          </li>
+        </ListCard>
       </div>
       <SignOutSheet open={signOut} onClose={() => setSignOut(false)} />
     </Screen>

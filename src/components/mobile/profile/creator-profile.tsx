@@ -10,11 +10,15 @@
 // couldn't load / offline (PR-20). The facts are the web profile's
 // (use-profile.ts); `me` is always you, as on the web. The Projects · Activity
 // tab lives in the address (`?tab=activity`), beside `?view=public`.
+// Mobile UX pass (2026-11-15): the top bar takes the name once the large name
+// scrolls away; one meta line (where · local time), since when moving to the
+// More about sheet; Open to as a chip; Only you see this as a grouped list;
+// Edit profile is your profile's one primary.
 
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Edit02Icon, ImageAdd01Icon, InboxIcon, PinIcon, PinOffIcon, Share08Icon, UserIcon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
+import { Edit02Icon, ImageAdd01Icon, InboxIcon, LockIcon, PinIcon, PinOffIcon, Share08Icon, SquareLock02Icon, UserGroupIcon, UserIcon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { useFollowing } from "@/components/profile/following-dialog";
 import { useBlocked } from "@/components/profile/person-actions";
@@ -38,6 +42,7 @@ import {
   phoneProjectHref,
   profileStatsOf,
   sampleProfileLocked,
+  sinceLineOf,
   type MoreAbout,
 } from "@/lib/people/phone-profile";
 import { deleteCover, putCover, useMyCover, useMyPhoto } from "@/lib/people/photo-store";
@@ -46,12 +51,13 @@ import { useMyProfile } from "@/lib/people/profile-store";
 import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { BottomBar } from "../kit/bottom-bar";
+import { ListCard, ListRow } from "../kit/list";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { ActionSheet } from "../kit/sheet";
 import { EmptyState, ErrorState, NotFoundState } from "../kit/state";
 import { OfflineBanner, useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
-import { Screen } from "../screen";
+import { SCROLL_ATTR, Screen } from "../screen";
 import { MORE_ICON, TopBar, type TopBarAction } from "../top-bar";
 import { T } from "../type";
 import { useFollow } from "./follow";
@@ -68,6 +74,33 @@ const HANDLE_HREF = "/m/settings/account/handle";
 const WRITE_FAILED = "This phone couldn’t save that. Nothing changed.";
 
 const isProfileShape = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** The one meta line under the headline (where · local time; with no location, since when) and
+ *  the since line it leaves for the More about sheet. */
+function metaOf(location: string | null, localTime: string | null, since: number | null): { meta: string | null; since: string | null } {
+  return {
+    meta: metaLineOf({ location, localTime, since: location ? null : since }),
+    since: location && since !== null ? sinceLineOf(since) : null,
+  };
+}
+
+/** True once the large name has scrolled up out of the screen's content: the top bar takes it then.
+ *  A callback ref, since the name mounts only once the profile is read. */
+function useNameGone(): [boolean, (el: HTMLHeadingElement | null) => void] {
+  const [el, setEl] = React.useState<HTMLHeadingElement | null>(null);
+  const [gone, setGone] = React.useState(false);
+  React.useEffect(() => {
+    if (!el) return;
+    const root = el.closest<HTMLElement>(`[${SCROLL_ATTR}]`);
+    const io = new IntersectionObserver(([e]) => setGone(!e.isIntersecting && e.boundingClientRect.top < (e.rootBounds?.top ?? 0)), { root });
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      setGone(false);
+    };
+  }, [el]);
+  return [gone, setEl];
+}
 
 // ─────────────────────────── states ───────────────────────────
 
@@ -227,6 +260,7 @@ function OwnProfile({
   const [followingOpen, setFollowingOpen] = React.useState(false);
   const [pinFor, setPinFor] = React.useState<MadeItem | null>(null);
   const { hydrated: planRead, plan } = useCreatePlan();
+  const [nameGone, nameRef] = useNameGone();
   // PR-33 from the profile: Add / Change cover saves the cover on its own, without the form.
   const coverPicker = usePicturePicker({
     has: { cover: !!coverUrl },
@@ -269,6 +303,8 @@ function OwnProfile({
   const top = (
     <TopBar
       back
+      title={nameGone ? shownName : undefined}
+      titleAs="p"
       actions={[
         ...(owner
           ? [
@@ -312,7 +348,7 @@ function OwnProfile({
         {banner}
         <CoverAndAvatar cover={undefined} avatar={avatar} />
         <div className={CONTENT}>
-          <Identity name={shownName} latinName={person.latinName} demo={false} headline={null} meta={null} relation={null} openTo={null} />
+          <Identity titleRef={nameRef} name={shownName} latinName={person.latinName} demo={false} headline={null} meta={null} relation={null} openTo={null} />
           <LockedCard first={first} />
         </div>
         {ownMenu}
@@ -331,13 +367,13 @@ function OwnProfile({
     links: linkRowsOf(fields.links, fields.social),
   };
   const summary = moreAboutSummaryOf(more);
-  const meta = metaLineOf({
+  const { meta, since } = metaOf(
     // Settings › Privacy & safety › Show my location and local time: others see neither until
     // it's on; you always see the location you typed, and the time only when it's on.
-    location: fields.location && (owner || audience.showLocalTime) ? fields.location : null,
-    localTime: fields.location && audience.showLocalTime ? localTimeOf(fields.timeZone, data.now, locale) : null,
-    since: data.since,
-  });
+    fields.location && (owner || audience.showLocalTime) ? fields.location : null,
+    fields.location && audience.showLocalTime ? localTimeOf(fields.timeZone, data.now, locale) : null,
+    data.since,
+  );
 
   const onPin = (item: MadeItem) => {
     if (!item.projectId) return;
@@ -352,22 +388,26 @@ function OwnProfile({
   const filled = !!(fields.headline || fields.bio || fields.location || fields.openTo || fields.links.length || Object.values(fields.social).some(Boolean));
   const ownerRows = owner && (
     <section aria-label="Only you see this" className="flex flex-col gap-2">
-      {made.length > 0 && <h2 className={cn(T.meta, "text-text-tertiary")}>Only you see this</h2>}
       {made.length === 0 && (
         <p className={T.meta}>
           {filled ? "Others see your profile. Share a project and it shows here." : "Others see your name and nothing else yet."}
         </p>
       )}
-      <div className="-mx-6 flex flex-col">
-        {made.length > 0 && (
-          <InfoRow label={`${data.counts.shown} ${data.counts.shown === 1 ? "project is" : "projects are"} public`} href="/m/projects" />
-        )}
-        {data.counts.hidden > 0 && <InfoRow label={`${data.counts.hidden} private in My projects`} href="/m/projects" />}
-        {followingCount !== null && (made.length > 0 || followingCount > 0) && (
-          <InfoRow label={`You follow ${followingCount}`} onClick={() => setFollowingOpen(true)} />
-        )}
-        {audience.locked && <InfoRow label="Your profile is locked" value="Privacy & safety" href={PRIVACY_HREF} />}
-      </div>
+      {(made.length > 0 || data.counts.hidden > 0 || (followingCount ?? 0) > 0 || audience.locked) && (
+        <>
+          <h2 className={cn(T.meta, "px-2 text-text-tertiary")}>Only you see this</h2>
+          <ListCard>
+            {made.length > 0 && (
+              <ListRow icon={ViewIcon} title={`${data.counts.shown} ${data.counts.shown === 1 ? "project is" : "projects are"} public`} href="/m/projects" />
+            )}
+            {data.counts.hidden > 0 && <ListRow icon={SquareLock02Icon} title={`${data.counts.hidden} private in My projects`} href="/m/projects" />}
+            {followingCount !== null && (made.length > 0 || followingCount > 0) && (
+              <ListRow icon={UserGroupIcon} title={`You follow ${followingCount}`} onClick={() => setFollowingOpen(true)} />
+            )}
+            {audience.locked && <ListRow icon={LockIcon} title="Your profile is locked" value="Privacy & safety" href={PRIVACY_HREF} />}
+          </ListCard>
+        </>
+      )}
     </section>
   );
 
@@ -379,7 +419,7 @@ function OwnProfile({
       footer={
         owner ? (
           <BottomBar>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={edit}>
+            <Button size="xl" className="w-full" onClick={edit}>
               Edit profile
             </Button>
           </BottomBar>
@@ -402,6 +442,7 @@ function OwnProfile({
       />
       <div className={CONTENT}>
         <Identity
+          titleRef={nameRef}
           name={shownName}
           latinName={person.latinName}
           demo={false}
@@ -412,9 +453,9 @@ function OwnProfile({
         />
         <Stats stats={profileStatsOf(made, 0)} />
         <About text={fields.bio} prompt={owner ? <Prompt onClick={edit}>Add a few lines about your work</Prompt> : undefined} />
-        {(summary || (owner && made.length > 0)) && (
+        {(summary || since || (owner && made.length > 0)) && (
           <div className="-mx-6">
-            <InfoRow label={`More about ${first ?? "you"}`} value={summary ?? "Add skills and links"} onClick={() => setMoreOpen(true)} />
+            <InfoRow label={`More about ${first ?? "you"}`} value={summary ?? (owner ? "Add skills and links" : undefined)} onClick={() => setMoreOpen(true)} />
           </div>
         )}
         {ownerRows}
@@ -441,6 +482,7 @@ function OwnProfile({
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
         title={`More about ${first ?? "you"}`}
+        description={since ?? undefined}
         more={more}
         builtWithNote={`from the parts lists of ${made.length === 1 ? "1 shared project" : `${made.length} shared projects`}`}
         own={owner}
@@ -474,6 +516,7 @@ function OtherProfile({ person }: { person: Person }) {
   const online = useOnline();
   const [menu, setMenu] = React.useState(false);
   const [moreOpen, setMoreOpen] = React.useState(false);
+  const [nameGone, nameRef] = useNameGone();
 
   if (!data.ready || !blocks.hydrated) return <Loading />;
 
@@ -482,12 +525,20 @@ function OtherProfile({ person }: { person: Person }) {
   const about = data.about;
   const more: MoreAbout = { skills: [], specialities: [], languages: [], builtWith: data.builtWith, worksOn: data.worksOn, links: [] };
   const summary = moreAboutSummaryOf(more);
+  const { meta, since } = metaOf(about?.location ?? null, about ? localTimeOf(about.timeZone, data.now, locale) : null, data.since);
   // PR-17: a locked profile shows who they are and no more, unless you work with them (the tie).
   // Follow, Message and ⋯ stay.
   const locked = sampleProfileLocked(person.id) && !data.tie && !blocked;
   // The web's reason, in the phone's words: the first name, the typographic apostrophe.
   const refusal = data.refusal ? curly(data.refusal.replace(person.name, first)) : null;
-  const top = <TopBar back actions={[{ icon: MORE_ICON, label: `More actions for ${person.name}`, onClick: () => setMenu(true) }]} />;
+  const top = (
+    <TopBar
+      back
+      title={nameGone ? person.name : undefined}
+      titleAs="p"
+      actions={[{ icon: MORE_ICON, label: `More actions for ${person.name}`, onClick: () => setMenu(true) }]}
+    />
+  );
   const bar = blocked ? undefined : (
     <ViewerBar
       person={person}
@@ -509,7 +560,7 @@ function OtherProfile({ person }: { person: Person }) {
         )}
         <CoverAndAvatar cover={undefined} avatar={photo} />
         <div className={CONTENT}>
-          <Identity name={person.name} latinName={person.latinName} demo headline={null} meta={null} relation={null} openTo={null} />
+          <Identity titleRef={nameRef} name={person.name} latinName={person.latinName} demo headline={null} meta={null} relation={null} openTo={null} />
           <LockedCard first={first} />
         </div>
         <PersonMenu person={person} open={menu} onClose={() => setMenu(false)} blocked={blocked} />
@@ -531,19 +582,20 @@ function OtherProfile({ person }: { person: Person }) {
       <div className={CONTENT}>
         {blocked && <BlockedBanner person={person} />}
         <Identity
+          titleRef={nameRef}
           name={person.name}
           latinName={person.latinName}
           demo
           headline={about?.headline ?? null}
-          meta={metaLineOf({ location: about?.location ?? null, localTime: about ? localTimeOf(about.timeZone, data.now, locale) : null, since: data.since })}
+          meta={meta}
           relation={blocked ? null : data.tie}
           openTo={!blocked && about?.openTo ? OPEN_TO_WORDS[about.openTo] : null}
         />
         <Stats stats={profileStatsOf(data.made, data.appreciations)} />
         <About text={about?.bio ?? ""} />
-        {summary && (
+        {(summary || since) && (
           <div className="-mx-6">
-            <InfoRow label={`More about ${first}`} value={summary} onClick={() => setMoreOpen(true)} />
+            <InfoRow label={`More about ${first}`} value={summary ?? undefined} onClick={() => setMoreOpen(true)} />
           </div>
         )}
         {data.made.length > 0 ? (
@@ -557,6 +609,7 @@ function OtherProfile({ person }: { person: Person }) {
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
         title={`More about ${first}`}
+        description={since ?? undefined}
         more={more}
         builtWithNote={`from the parts lists of ${data.made.length === 1 ? "1 shared project" : `${data.made.length} shared projects`}`}
         own={false}
