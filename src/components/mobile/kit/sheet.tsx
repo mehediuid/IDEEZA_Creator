@@ -283,7 +283,10 @@ function SheetPanel({
       </div>
       {children != null && <ScrollEdge target={body} />}
       {children != null && (
-        <div ref={body} className={cn("flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain px-16 pb-4", fill && "flex-1")}>
+        // Children never shrink to fit: the body scrolls instead. A card that clips its corners
+        // (`overflow: hidden`) would otherwise be squeezed below its rows when the sheet is full
+        // (owner 2026-11-15: the second product's row was cut off in "Add to marketplace").
+        <div ref={body} className={cn("flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain px-16 pb-4 [&>*]:shrink-0", fill && "flex-1")}>
           {children}
         </div>
       )}

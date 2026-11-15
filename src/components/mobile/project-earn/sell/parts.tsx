@@ -530,8 +530,11 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
           const c = statusCopy(p.video);
           const label = actionLabel(c.action);
           const ready = p.video.state === "ready";
-          return (
-            <li key={p.productId} className="flex items-start gap-6 p-6">
+          const name = displayProductName(p.name);
+          // One compact row per product (owner 2026-11-15: two products didn't fit the sheet): the
+          // video's state, and its action as the row's last line — the whole row opens the video maker.
+          const body = (
+            <>
               <Thumb url={p.thumb}>
                 {ready && (
                   <span aria-hidden className={cn(MEDIA_CHIP, "absolute size-[28px] justify-center p-0")}>
@@ -539,15 +542,28 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
                   </span>
                 )}
               </Thumb>
-              <span className="flex min-w-0 flex-1 flex-col gap-2">
-                <span className={cn(T.rowTitle, "truncate")}>{displayProductName(p.name)}</span>
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={cn(T.rowTitle, "truncate")}>{name}</span>
                 <span className={cn(T.meta, ready ? "text-text-success" : "text-text-secondary")}>{c.text}</span>
-                {label && (
-                  <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(phoneProductVideoHref(project.id, p.productId))}>
-                    {label}
-                  </Button>
-                )}
+                {label && <span className={cn(T.rowTitle, "text-text-brand")}>{label}</span>}
               </span>
+              {label && <Chevron />}
+            </>
+          );
+          return (
+            <li key={p.productId}>
+              {label ? (
+                <button
+                  type="button"
+                  aria-label={`${name}: ${label}`}
+                  onClick={() => router.push(phoneProductVideoHref(project.id, p.productId))}
+                  className={cn(LIST_ROW, PRESSED, "w-full items-center text-left")}
+                >
+                  {body}
+                </button>
+              ) : (
+                <div className={cn(LIST_ROW, "items-center hover:bg-transparent active:bg-transparent")}>{body}</div>
+              )}
             </li>
           );
         })}
