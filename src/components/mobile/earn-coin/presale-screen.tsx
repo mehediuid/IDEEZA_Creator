@@ -2,19 +2,23 @@
 
 // Buy IDEEZA Coin (Figma "Buy IDEEZA Coin" 229538, 229602–229902, 230004–
 // 230129; the web's presale dialog, components/balance/presale-dialog.tsx):
-// one screen, three steps, each its own address so Back walks them:
-// - the presale card: Buy $IDZ Token, In Presale Now! with the round, the
-//   countdown to the round's real end, UNTIL PRICE INCREASE with the next
-//   price, TOTAL USD RAISED (the demo purchases), the one price, and the buy
-//   form (You get ⇅ You pay, the coin sheet, the whitelist, the gas line,
-//   every check from lib/wallet/presale.ts). Before a wallet is connected
-//   (Figma 229602) the form already quotes at the presale price, without Max
-//   or a balance, and its button is Buy With Crypto (then Don't have a
-//   wallet?); the amount typed is kept through the connect step;
-// - Connect Wallet (`?step=connect`): the Demo wallet first and on, the four
-//   real wallets Soon (web D9), I don't have a wallet;
+// one screen, three steps, each its own address so Back walks them. Laid out
+// for a phone (UX pass 2026-11-15, lens 6 / 8 / 11 / 14):
+// - the round, summary first: Buy $IDZ Token as the overline with In Presale
+//   Now! and the round, the countdown until the price increase, then the next
+//   price, TOTAL USD RAISED (the demo purchases) and the round's end as facts;
+//   then the buy form (You get ⇅ You pay, the coin sheet, the whitelist, the
+//   available balance with Max in the pay box, the gas line, every check from
+//   lib/wallet/presale.ts). Buy $IDZ is the BottomBar's, so it stays above the
+//   keyboard. Before a wallet is connected (Figma 229602) the form already
+//   quotes at the presale price, without Max or a balance, and the BottomBar
+//   holds Buy With Crypto and Don't have a wallet?; the amount typed is kept
+//   through the connect step. White paper (Soon) and the risk line close it;
+// - Connect Wallet (`?step=connect`): the wallets as rows — the Demo wallet
+//   first and on, the four real wallets Soon (web D9) — then I don't have a
+//   wallet; the second paragraph is behind ⓘ;
 // - Need a wallet? (`?step=wallet`): the IDEEZA Wallet app's steps, its QR
-//   Coming soon, Use the Demo wallet.
+//   Coming soon; Use the Demo wallet in the BottomBar.
 // Buy $IDZ goes through the wallet sheet (purpose `buyIdz`); once it
 // confirms, the Buy $IDZ tab shows the purchase and its success sheet. The
 // draft and the wallet sheet belong to the screen, not the form, so a wallet
@@ -24,7 +28,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDataTransferVerticalIcon, ArrowDown01Icon, CoinbaseIcon, Download04Icon, QrCodeIcon, Tick02Icon, Wallet01Icon, Wallet02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDataTransferVerticalIcon, ArrowDown01Icon, CoinbaseIcon, Download04Icon, HelpCircleIcon, QrCodeIcon, Tick02Icon, Wallet01Icon, Wallet02Icon } from "@hugeicons/core-free-icons";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { IdzCoin } from "@/components/balance/idz-coin";
 import { PayCoinGlyph } from "@/components/balance/pay-coin-glyph";
@@ -33,6 +37,7 @@ import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
+import { Spinner } from "@/components/ideeza/spinner";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { persistWallet } from "@/components/wallet/wallet-provider";
 import { cn } from "@/lib/utils";
@@ -62,13 +67,16 @@ import { TIMING } from "@/lib/wallet/request";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { Amount, DemoWallet, IdentityId } from "@/lib/wallet/types";
 import type { MarketData } from "@/lib/market/types";
+import { BottomBar, TEXT_LINK } from "../kit/bottom-bar";
+import { Eyebrow } from "../kit/eyebrow";
+import { ListCard, ListRow } from "../kit/list";
 import { PickList } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { CARD, useEarnState } from "./parts";
+import { CARD, FactGrid, SectionHead, TestnetLine, useEarnState } from "./parts";
 import { useWalletSheet } from "./wallet-sheet";
 
 const SOON_WALLETS = ["IDEEZA Wallet", "MetaMask", "Wallet Connect", "Coinbase Wallet"] as const;
@@ -144,47 +152,54 @@ export function PresaleScreen() {
     if (next) writeReferralData(next);
   };
 
+  const form = useBuyForm({
+    wallet,
+    id: connected ? id : null,
+    market,
+    now,
+    draft,
+    setDraft,
+    sheet,
+    onConnect: () => router.push("/m/earn/presale?step=connect"),
+    onNoWallet: () => router.push("/m/earn/presale?step=wallet"),
+    onBought: (who, idz, txHash) => {
+      countReferral(who, idz);
+      setDraft(EMPTY_DRAFT);
+      router.replace(`/m/earn/buy?bought=${txHash}`);
+    },
+  });
+
   let body: React.ReactNode;
+  let footer: React.ReactNode = null;
   if (step === "connect") body = <ConnectStep connecting={connecting} error={error} onDemo={connect} onNoWallet={() => router.push("/m/earn/presale?step=wallet")} />;
-  else if (step === "wallet") body = <NeedWalletStep connecting={connecting} error={error} onDemo={connect} />;
-  else
+  else if (step === "wallet") {
+    body = <NeedWalletStep error={error} />;
+    footer = (
+      <BottomBar>
+        <Button size="xl" className="w-full" loading={connecting} onClick={connect}>
+          {connecting ? "Connecting…" : "Use the Demo wallet"}
+        </Button>
+      </BottomBar>
+    );
+  } else {
     body = (
-      <div className="flex flex-col gap-12">
-        <div className={cn(CARD, "flex flex-col gap-8 p-8 text-center")}>
-          <PresaleHead now={now} raised={totalRaisedOf(wallet)} />
-          {invitedBy && (
-            <p className={cn(T.meta, "rounded-lg bg-bg-brand-subtle px-6 py-3 text-text-primary")}>
-              Invited by {shortAddress(demoAddress(invitedBy.identity))} · {campaignOf(invitedBy.campaign)?.name ?? invitedBy.campaign}
-            </p>
-          )}
-          {!wallet ? (
-            <Skeleton shape="block" className="h-[280px] w-full" />
-          ) : (
-            <BuyForm
-              wallet={wallet}
-              id={connected ? id : null}
-              market={market}
-              now={now}
-              draft={draft}
-              setDraft={setDraft}
-              sheet={sheet}
-              onConnect={() => router.push("/m/earn/presale?step=connect")}
-              onNoWallet={() => router.push("/m/earn/presale?step=wallet")}
-              onBought={(who, idz, txHash) => {
-                countReferral(who, idz);
-                setDraft(EMPTY_DRAFT);
-                router.replace(`/m/earn/buy?bought=${txHash}`);
-              }}
-            />
-          )}
-        </div>
+      <div className="flex flex-col gap-8">
+        <PresaleHead now={now} raised={totalRaisedOf(wallet)} />
+        {invitedBy && (
+          <p className={cn(T.meta, "rounded-lg bg-bg-brand-subtle px-6 py-3 text-text-primary")}>
+            Invited by {shortAddress(demoAddress(invitedBy.identity))} · {campaignOf(invitedBy.campaign)?.name ?? invitedBy.campaign}
+          </p>
+        )}
+        {!wallet ? <Skeleton shape="block" className="h-[280px] w-full" /> : form.form}
         <WhitePaper />
-        <p className={cn(T.meta, "text-center")}>Testnet demo, no real money. IDZ can lose value; this isn’t investment advice.</p>
+        <TestnetLine>Testnet demo, no real money. IDZ can lose value; this isn’t investment advice.</TestnetLine>
       </div>
     );
+    footer = wallet ? form.footer : null;
+  }
 
   return (
-    <Screen top={<TopBar back="/m/earn/buy" title="Buy IDEEZA Coin" />} className="px-8 pb-8 pt-4">
+    <Screen top={<TopBar back="/m/earn/buy" title="Buy IDEEZA Coin" />} footer={footer} className="px-8 pb-8 pt-2">
       {body}
       {sheet.sheet}
     </Screen>
@@ -204,38 +219,49 @@ const ROUND_UNITS = [
   { key: "seconds", name: "Seconds" },
 ] as const;
 
+/** The round (Figma 229538), summary first: Buy $IDZ Token as the overline with where the round
+ *  stands, the countdown until the price increase, then three facts — the next price, the total USD
+ *  raised (the demo purchases) and when the round ends. */
 function PresaleHead({ now, raised }: { now: number; raised: Amount }) {
   const open = presaleOpenAt(now);
   const c = countdownOf(PRESALE.endsAt - now);
+  const ends = whenWithZone(PRESALE.endsAt);
+  const [day, ...time] = ends.split(", ");
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h2 className={cn(T.title, "text-text-brand")}>Buy $IDZ Token</h2>
-        <p className={T.bodyStrong}>{open ? `In Presale Now! · ${PRESALE.round}` : `${PRESALE.round} has ended`}</p>
+    <section aria-labelledby="presale-title" className={cn(CARD, "flex flex-col gap-6 p-8")}>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h2 id="presale-title">
+          <Eyebrow as="span">Buy $IDZ Token</Eyebrow>
+        </h2>
+        <Badge tone={open ? "brand" : "neutral"}>{open ? `In Presale Now! · ${PRESALE.round}` : `${PRESALE.round} has ended`}</Badge>
       </div>
-      <div role="timer" aria-label={`${c.days} days ${c.hours} hours ${c.minutes} minutes until the price increase`} className="grid grid-cols-4 gap-6">
-        {ROUND_UNITS.map((u) => (
-          <div key={u.key} aria-hidden className="flex min-w-0 flex-col items-center gap-1 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface py-5">
-            <span className={cn(T.title, "tabular-nums")}>{pad(c[u.key])}</span>
-            <span className={cn(T.micro, "font-mono")}>{u.name}</span>
-          </div>
-        ))}
+      <div className="flex flex-col gap-3">
+        <p className={T.meta}>Until price increase</p>
+        <div role="timer" aria-label={`${c.days} days ${c.hours} hours ${c.minutes} minutes until the price increase`} className="grid grid-cols-4 gap-4">
+          {ROUND_UNITS.map((u) => (
+            <div key={u.key} aria-hidden className="flex min-w-0 flex-col items-center rounded-lg bg-bg-subtle py-3">
+              <span className={cn(T.section, "tabular-nums")}>{pad(c[u.key])}</span>
+              <span className={T.micro}>{u.name}</span>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="flex flex-col gap-2">
-        <p className={cn(T.overline, "rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-subtle py-3 font-mono text-text-primary")}>
-          Until price increase
-        </p>
-        <p className={T.meta}>
-          {open
-            ? `Then 1 $IDZ = ${formatPrice(PRESALE.nextPrice)}. ${PRESALE.round} ends ${whenWithZone(PRESALE.endsAt)}.`
-            : `It ended ${whenWithZone(PRESALE.endsAt)}. The next round opens at 1 $IDZ = ${formatPrice(PRESALE.nextPrice)}.`}
-        </p>
-      </div>
-      <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-        <span className={cn(T.overline, "font-mono tabular-nums")}>Total USD raised: {formatUsd(raised)}</span>
-        <TestnetDemoBadge />
-      </p>
-    </div>
+      <FactGrid
+        facts={[
+          { label: open ? "Then 1 $IDZ =" : "Next round", value: formatPrice(PRESALE.nextPrice) },
+          { label: "Total USD raised", value: formatUsd(raised) },
+          {
+            label: open ? `${PRESALE.round} ends` : "It ended",
+            value: (
+              <>
+                <span className="block">{day}</span>
+                {time.length > 0 && <span className={cn(T.micro, "block")}>{time.join(", ")}</span>}
+              </>
+            ),
+          },
+        ]}
+      />
+    </section>
   );
 }
 
@@ -259,101 +285,100 @@ function RateLine({ price, whitelisted, coin }: { price: Amount; whitelisted?: b
   );
 }
 
-/** No white paper exists yet (web C2f): it says Soon instead of downloading nothing. */
+/** No white paper exists yet (web C2f): a disabled row that says Soon instead of downloading nothing. */
 function WhitePaper() {
   return (
-    <p className={cn(T.bodyLg, "flex items-center justify-center gap-6 text-text-disabled")} aria-disabled>
-      <span aria-hidden className="inline-flex size-[36px] items-center justify-center rounded-lg border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-surface">
-        <Icon icon={Download04Icon} size={20} />
-      </span>
-      Download White Paper
-      <span className={cn(T.meta, "text-text-tertiary")}>Soon</span>
-    </p>
+    <ListCard label="White paper">
+      <ListRow icon={Download04Icon} title="Download White Paper" disabled reason="Soon" onClick={() => undefined} />
+    </ListCard>
   );
 }
 
-function StepCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className={cn(CARD, "flex flex-col gap-8 p-8 text-center")}>
-      <h2 className={cn(T.title, "flex items-center justify-center gap-4 border-b-[length:var(--border-width-1)] border-solid border-border pb-8")}>
-        <span aria-hidden className="text-[color:var(--color-icon-secondary)]">
-          <Icon icon={Wallet01Icon} size={24} />
-        </span>
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
-}
+const WALLET_ICON_BOX = "inline-flex size-[40px] shrink-0 items-center justify-center rounded-full bg-bg-subtle text-[color:var(--color-icon-default)]";
 
+/** Connect Wallet (Figma 230004): the wallets as rows — the Demo wallet first and on, the four real
+ *  wallets Soon (web D9) — and "I don't have a wallet". The second paragraph sits behind ⓘ. */
 function ConnectStep({ connecting, error, onDemo, onNoWallet }: { connecting: boolean; error: string | null; onDemo: () => void; onNoWallet: () => void }) {
   return (
-    <StepCard title="Connect Wallet">
-      <div className={cn(T.body, "flex flex-col gap-6")}>
-        <p>To buy into this token sale, connect a wallet so you can receive your $IDZ.</p>
-        <p>
-          If you already have a wallet, choose it below. If you don’t, the <span className="font-medium text-text-brand">IDEEZA Wallet</span> app is on its way; until then the Demo wallet works here on testnet.
-        </p>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <SectionHead
+          info={
+            <p>
+              If you already have a wallet, choose it below. If you don’t, the IDEEZA Wallet app is on its way; until then the Demo wallet works here on testnet.
+            </p>
+          }
+          infoTitle="Choosing a wallet"
+        >
+          Connect Wallet
+        </SectionHead>
+        <p className={T.body}>To buy into this token sale, connect a wallet so you can receive your $IDZ.</p>
       </div>
-      <ul className="flex flex-col gap-6">
-        <li>
-          <Button size="xl" className="w-full justify-between" loading={connecting} onClick={onDemo}>
-            <span>{connecting ? "Connecting…" : "Demo wallet"}</span>
-            {!connecting && <TestnetDemoBadge />}
-          </Button>
-        </li>
+      <ListCard label="Wallets">
+        <ListRow
+          onClick={() => {
+            if (!connecting) onDemo();
+          }}
+          leading={
+            <span aria-hidden className={cn(WALLET_ICON_BOX, "bg-bg-brand-subtle text-[color:var(--color-icon-brand)]")}>
+              <Icon icon={Wallet01Icon} size={20} />
+            </span>
+          }
+          title={connecting ? "Connecting…" : "Demo wallet"}
+          meta="Works here on testnet"
+          trailing={connecting ? <Spinner size={20} /> : <TestnetDemoBadge />}
+        />
         {SOON_WALLETS.map((w) => (
-          <li key={w}>
-            <Button hierarchy="secondary" size="xl" disabled className="w-full justify-between" title="Opens once real wallets can connect">
-              <span className="inline-flex items-center gap-4">
+          <ListRow
+            key={w}
+            disabled
+            reason="Soon · opens once real wallets can connect"
+            onClick={() => undefined}
+            leading={
+              <span aria-hidden className={WALLET_ICON_BOX}>
                 {w === "IDEEZA Wallet" ? (
                   <IdeezaLogo mark height={20} decorative />
                 ) : (
                   <Icon icon={w === "Coinbase Wallet" ? CoinbaseIcon : w === "MetaMask" ? Wallet01Icon : Wallet02Icon} size={20} />
                 )}
-                {w}
               </span>
-              <span className={T.micro}>Soon</span>
-            </Button>
-          </li>
+            }
+            title={w}
+          />
         ))}
-        <li>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onNoWallet}>
-            I don’t have a wallet
-          </Button>
-        </li>
-      </ul>
+      </ListCard>
+      <ListCard label="No wallet">
+        <ListRow onClick={onNoWallet} icon={HelpCircleIcon} title="I don’t have a wallet" />
+      </ListCard>
       {error && <Banner tone="error">{error}</Banner>}
-    </StepCard>
+    </div>
   );
 }
 
-function NeedWalletStep({ connecting, error, onDemo }: { connecting: boolean; error: string | null; onDemo: () => void }) {
+/** Need a wallet? (Figma 230129): the IDEEZA Wallet app's steps and its QR, Coming soon; Use the Demo
+ *  wallet is the BottomBar's. */
+function NeedWalletStep({ error }: { error: string | null }) {
   return (
-    <StepCard title="Need a wallet?">
-      <div className="flex items-start gap-6 text-left">
-        <IdeezaLogo mark height={48} decorative className="shrink-0" />
-        <p className={T.bodyLg}>
-          IDEEZA Wallet is a beginner-friendly app that makes it easy to buy our presale token. Follow the steps below to get started.
-        </p>
+    <div className="flex flex-col gap-6">
+      <SectionHead>Need a wallet?</SectionHead>
+      <div className="flex items-start gap-6">
+        <IdeezaLogo mark height={40} decorative className="shrink-0" />
+        <p className={T.body}>IDEEZA Wallet is a beginner-friendly app that makes it easy to buy our presale token. Follow the steps below to get started.</p>
       </div>
-      <div className="flex items-center justify-between gap-6 rounded-xl bg-bg-subtle p-6 text-left">
-        <ol className={cn(T.body, "flex list-decimal flex-col gap-1 pl-8 text-text-primary")}>
+      <div className={cn(CARD, "flex items-center justify-between gap-6 p-8")}>
+        <ol className={cn(T.body, "flex list-decimal flex-col gap-2 pl-8 text-text-primary")}>
           <li>Download the IDEEZA Wallet app</li>
           <li>Create your account</li>
           <li>Buy in-app with card or crypto</li>
         </ol>
-        <div className="flex size-[72px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface text-text-tertiary">
+        <div className="flex size-[72px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-subtle text-text-tertiary">
           <Icon icon={QrCodeIcon} size={24} />
           <span className={cn(T.micro, "text-text-tertiary")}>Coming soon</span>
         </div>
       </div>
-      <p className={T.body}>The app isn’t out yet, so there is no code to scan. Until it is, buy with the Demo wallet here on testnet.</p>
+      <TestnetLine>The app isn’t out yet, so there is no code to scan. Until it is, buy with the Demo wallet here on testnet.</TestnetLine>
       {error && <Banner tone="error">{error}</Banner>}
-      <Button size="xl" className="w-full" loading={connecting} onClick={onDemo}>
-        {connecting ? "Connecting…" : "Use the Demo wallet"}
-      </Button>
-    </StepCard>
+    </div>
   );
 }
 
@@ -364,7 +389,10 @@ const INPUT = cn(T.bodyLg, "min-w-0 flex-1 bg-transparent tabular-nums outline-n
 /** Before a wallet is connected the form only quotes: no balance stops it. */
 const NO_LIMIT = { coin: "1000000000", gas: "1000000000" };
 
-function BuyForm({
+/** The buy form and its BottomBar: the boxes, rate and gas lines go in the content; Buy $IDZ (or Buy
+ *  With Crypto and Don't have a wallet? before connecting) goes in the thumb zone, so it stays above
+ *  the keyboard. A hook, so the screen can pin the footer. */
+function useBuyForm({
   wallet,
   id,
   market,
@@ -376,7 +404,7 @@ function BuyForm({
   onNoWallet,
   onBought,
 }: {
-  wallet: DemoWallet;
+  wallet: DemoWallet | undefined;
   /** The connected account; null before connecting (the form quotes, Buy With Crypto connects). */
   id: IdentityId | null;
   market: MarketData;
@@ -387,7 +415,7 @@ function BuyForm({
   onConnect: () => void;
   onNoWallet: () => void;
   onBought: (who: IdentityId, idz: Amount, txHash: string) => void;
-}) {
+}): { form: React.ReactNode; footer: React.ReactNode } {
   const [coins, setCoins] = React.useState(false);
   const [whyWhitelist, setWhyWhitelist] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
@@ -407,7 +435,7 @@ function BuyForm({
   const [maxNote, setMaxNote] = React.useState<string | null>(null);
   const getErr = shown?.field === "get" ? shown.text : null;
   const payErr = maxNote ?? (shown?.field === "pay" ? shown.text : null);
-  const walletNetwork = id ? (wallet.identities[id]?.network ?? PRESALE.network) : PRESALE.network;
+  const walletNetwork = id ? (wallet?.identities[id]?.network ?? PRESALE.network) : PRESALE.network;
 
   const type = (field: "get" | "pay") => (e: React.ChangeEvent<HTMLInputElement>) => {
     setMaxNote(null);
@@ -525,6 +553,14 @@ function BuyForm({
             </button>
           )}
         </div>
+        {id && (
+          <p className={cn(T.meta, "flex flex-wrap items-center justify-between gap-x-4 border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-2")}>
+            <span className="tabular-nums">Available balance = {formatAmount(have.coin, coin)}</span>
+            <Button hierarchy="ghost" size="sm" onClick={useMax}>
+              Max
+            </Button>
+          </p>
+        )}
       </div>
       {payErr && (
         <p id={ids.payErr} role={maxNote ? "alert" : undefined} className={cn(T.caption, "text-left text-text-error")}>
@@ -541,7 +577,7 @@ function BuyForm({
     </div>
   );
 
-  return (
+  const form = (
     <div className="flex flex-col gap-8">
       <RateLine price={price} whitelisted={whitelisted} coin={coin} />
       <div className="flex flex-col">
@@ -570,32 +606,6 @@ function BuyForm({
       )}
       {note && <Banner tone="info">{note}</Banner>}
       {shown?.field === "form" && <p className={cn(T.caption, "text-text-error")}>{shown.text}</p>}
-      {id ? (
-        <>
-          <Button size="xl" className="w-full aria-disabled:cursor-not-allowed aria-disabled:opacity-60" aria-disabled={!!check.error || undefined} loading={sheet.busy} onClick={buy}>
-            Buy $IDZ
-          </Button>
-          <p className={cn(T.body, "flex flex-wrap items-center justify-center gap-x-4")}>
-            <span className="tabular-nums">Available balance = {formatAmount(have.coin, coin)}</span>
-            <Button hierarchy="ghost" size="sm" onClick={useMax}>
-              Max
-            </Button>
-          </p>
-        </>
-      ) : (
-        <>
-          <Button size="xl" className="w-full" disabled={!presaleOpenAt(now)} onClick={onConnect}>
-            Buy With Crypto
-          </Button>
-          <button
-            type="button"
-            onClick={onNoWallet}
-            className={cn(T.body, "self-center rounded-xs underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus")}
-          >
-            Don’t have a wallet?
-          </button>
-        </>
-      )}
       <Sheet open={coins} onClose={() => setCoins(false)} title="Pay with" description={`On ${networkLabelOf(PRESALE.network)}`}>
         <PickList
           label="Pay with"
@@ -610,4 +620,23 @@ function BuyForm({
       </Sheet>
     </div>
   );
+
+  const footer = id ? (
+    <BottomBar>
+      <Button size="xl" className="w-full aria-disabled:cursor-not-allowed aria-disabled:opacity-60" aria-disabled={!!check.error || undefined} loading={sheet.busy} onClick={buy}>
+        Buy $IDZ
+      </Button>
+    </BottomBar>
+  ) : (
+    <BottomBar>
+      <Button size="xl" className="w-full" disabled={!presaleOpenAt(now)} onClick={onConnect}>
+        Buy With Crypto
+      </Button>
+      <button type="button" onClick={onNoWallet} className={cn(TEXT_LINK, "my-0 self-center")}>
+        Don’t have a wallet?
+      </button>
+    </BottomBar>
+  );
+
+  return { form, footer };
 }

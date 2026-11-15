@@ -3,22 +3,23 @@
 // Stake List (Figma "Stacking" 228684): search the demo staking contracts by
 // name or address; each card (the Figma's dark card with the brand glow) has
 // its name, address, chain ID and its best APR still open, and opens the
-// contract's staking options. A paused or blocked contract says so.
+// contract's staking options. A paused or blocked contract says so. The
+// testnet line closes the list once (UX pass 2026-11-15).
 
 import * as React from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ideeza/badge";
 import { SearchInput } from "@/components/ideeza/search-input";
-import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { cn } from "@/lib/utils";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
-import { aprText, chainIdOf, contractStatusOf, searchContracts, topAprOf } from "@/lib/wallet/staking";
+import { STAKE_TIME_LINE, aprText, chainIdOf, contractStatusOf, searchContracts, topAprOf } from "@/lib/wallet/staking";
 import { useStakeAdmin } from "@/lib/wallet/use-earn-stores";
+import { PRESSED } from "../kit/press";
 import { EmptyState } from "../kit/state";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { useEarnState } from "./parts";
+import { TestnetLine, useEarnState } from "./parts";
 
 export function StakeList() {
   const [query, setQuery] = React.useState("");
@@ -29,7 +30,6 @@ export function StakeList() {
     <Screen top={<TopBar back title="Stake List" />} className="px-8 pb-8 pt-4">
       <div className="flex flex-col gap-8">
         <SearchInput size="xl" value={query} onValueChange={setQuery} onClear={() => setQuery("")} placeholder="Search" aria-label="Search contracts by name or address" />
-        <TestnetDemoBadge className="self-start" />
         {shown.length === 0 ? (
           <EmptyState title="No contract matches" body={`No contract matches “${query.trim()}”.`} action={{ label: "Clear search", onClick: () => setQuery("") }} />
         ) : (
@@ -41,7 +41,7 @@ export function StakeList() {
                   <Link
                     href={`/m/earn/contract/${c.id}`}
                     data-theme="dark"
-                    className="flex h-full min-h-[88px] flex-col justify-between gap-4 overflow-hidden rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-page bg-[radial-gradient(circle_at_100%_70%,color-mix(in_srgb,var(--color-violet-600)_55%,transparent),transparent_55%)] p-5 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className={cn(PRESSED, "flex h-full min-h-[88px] flex-col justify-between gap-4 overflow-hidden rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-page bg-[radial-gradient(circle_at_100%_70%,color-mix(in_srgb,var(--color-violet-600)_55%,transparent),transparent_55%)] p-5 outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
                   >
                     <span className="flex flex-col">
                       <span className={cn(T.name, "truncate")}>{c.name}</span>
@@ -65,6 +65,7 @@ export function StakeList() {
             })}
           </ul>
         )}
+        <TestnetLine>{STAKE_TIME_LINE}</TestnetLine>
       </div>
     </Screen>
   );
