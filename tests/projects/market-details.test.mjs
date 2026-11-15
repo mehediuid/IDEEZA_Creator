@@ -83,3 +83,26 @@ test("a market product page names its project and creator, and points to the pro
   assert.match(offer, /tracksOf\(product\.id, view\.editions\)\.some\(\(t\) => t\.listing !== null\)/);
   assert.match(offer, /href=\{`\/marketplace\/\$\{project\.id\}`\}/);
 });
+
+test("copies: Physical / Virtual tabs of compact rows, the version asked after Buy, never a card per offer", () => {
+  const src = read(MARKET + "edition-offers.tsx");
+  // Tabs with each kind's lowest price; a kind alone is a plain heading; a holder opens on what they own.
+  assert.match(src, /role="tablist"/);
+  assert.match(src, /fromLine\(lowest\(k\)\)/);
+  assert.match(src, /held \?\? kinds\[0\]/);
+  // What the kind gets you, said once, in the product page's words.
+  assert.match(src, /helperLineOf\(kind, project\.name\)/);
+  // One row per offer with a small secondary Buy; the page itself has no radio and no copy "Buy now".
+  assert.match(src, /function CopyRow\(/);
+  assert.match(src, /hierarchy="secondary"\s+size="md"/);
+  const page = src.slice(0, src.indexOf("<ModalFrame"));
+  assert.doesNotMatch(page, /role="radiogroup"|type="radio"/);
+  assert.doesNotMatch(page.replace(/\/\/.*$/gm, ""), />\s*Buy now\s*</);
+  // Two prices: the one popup style asks first, on the picked price; one price goes straight to the wallet.
+  assert.match(src, /if \(oneTier\) void go\("extended"\);\s*else setChoosing\(true\);/);
+  assert.match(src, /initialFocus=\{pickedRef\}/);
+  // Many rows fold each product into one line.
+  assert.match(src, /export const ROWS_OPEN = 6;/);
+  assert.match(src, /folded=\{fold && !isProjectScope\(g\.productId\)\}/);
+  assert.doesNotMatch(src, /BuyableOffer|OfferFrame/, "the old card per offer is gone");
+});
