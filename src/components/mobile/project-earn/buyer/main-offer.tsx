@@ -6,27 +6,30 @@
 // `usePlaceBid` sign through the phone's wallet sheet (PhoneWalletScope), the
 // `can()` answers come from `view.canCtx`, the auction asks again at its own
 // clock (`useAuctionClock`).
-// · A holder reads Purchase summary first (18e), then "Buy another share" when
-//   the creator has another share on sale.
-// · Buy now (18b): the price line, the listing's facts, the wallet line and
-//   the share-sale note. The button is the bottom bar's.
-// · An auction (18f): the price line with its time left, the facts, Bid
-//   history (n), who leads, Your bid (the bar's Place bid submits it), the
-//   wallet line and the note, Buy now with X. Outbid (18j), won (18k) and lost
-//   (18l) each lead with a banner; once ended, the web's sentence replaces the
-//   field.
+// · A holder reads their receipt first (18e: what they own, Token · Paid ·
+//   Purchased, All details closed), then "Buy another share" when the creator
+//   has another share on sale.
+// · Buy now (18b): a buy box (owner 2026-11-12: the page read as a
+//   spreadsheet) — what is sold, the price large, the facts three to a row,
+//   the wallet line, the activity line and the Testnet demo line; the
+//   share-sale note under it. The button is the bottom bar's.
+// · An auction (18f): the same box with the top (or starting) bid, its time
+//   left, Bid history (n), who leads, Your bid (the bar's Place bid submits
+//   it), Buy now with X. Outbid (18j), won (18k) and lost (18l) each lead with
+//   a banner; once ended, the web's sentence replaces the field.
 // · Paused, removed, closed with no bids and sold each say so.
 // · Main NFT activity: the newest sale, else the newest NFT entry, else "No
 //   activity yet · listed {date}".
 
 import * as React from "react";
+import { Activity01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { TextInput } from "@/components/ideeza/text-input";
 import { freeMicrosFor, usePlaceBid } from "@/components/marketplace/bid-dialog";
 import { buyerNameOf } from "@/components/marketplace/purchase-dialog";
-import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
+import { SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import { historyOf, labelOf } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import type { ProjectView } from "@/lib/manual/project-read";
@@ -42,8 +45,9 @@ import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
-import { CardNote, Disclosure, NftActivityLine, OfferCard, OfferRowsCard, WalletLine, type OfferRow } from "./parts";
-import { LIST_CARD } from "../../project/parts";
+import { BuyBox, Disclosure, IconLine, ReceiptCard, WalletLine, type BoxFact } from "./parts";
+import { LIST_CARD } from "../../kit/list";
+import { T } from "../../type";
 
 export const BID_FORM_ID = "market-bid-form";
 
@@ -77,42 +81,59 @@ export function bidStandingOf(listing: Listing, state: AuctionState, bids: Bid[]
   return mine ? "outbid" : "none";
 }
 
-/** The listing's facts, as the web reads them (buyer-rail.tsx `ListingFacts`). */
-function mintingOf(listing: Listing, view: ProjectView): string {
-  if (view.mint.status === "lazyMinted") return "Lazy — the token is minted when you buy";
-  if (view.mint.status === "onChain") return `Minted on ${networkLabelOf(listing.network)}`;
-  return listing.mintingType === "lazy" ? "Lazy — the token is minted when you buy" : `Minted on ${networkLabelOf(listing.network)}`;
+/** The listing's facts, as the web reads them (buyer-rail.tsx `ListingFacts`), short for the box's
+ *  grid; what Royalties and Lazy mean is said once under it (`factNotesOf`). */
+function isLazy(listing: Listing, view: ProjectView): boolean {
+  if (view.mint.status === "lazyMinted") return true;
+  if (view.mint.status === "onChain") return false;
+  return listing.mintingType === "lazy";
 }
 
-function tailRows(listing: Listing, view: ProjectView): OfferRow[] {
+function tailFacts(listing: Listing, view: ProjectView): BoxFact[] {
   return [
-    { label: "Royalties", value: royaltyText(listing.royaltiesPct) },
-    { label: "Minting", value: mintingOf(listing, view) },
+    { label: "Chain", value: networkLabelOf(listing.network) },
+    { label: "Royalties", value: `${listing.royaltiesPct}%` },
+    { label: "Minting", value: isLazy(listing, view) ? "Lazy" : "Minted" },
     { label: "Collection", value: listing.collection || "—" },
-    { label: "Blockchain", value: networkLabelOf(listing.network) },
   ];
 }
 
-/** 18b: a live Buy now listing's card. */
-export function BuyNowCard({ listing, view, buyerId }: { listing: Listing; view: ProjectView; buyerId: DemoBuyerId | null }) {
+function factNotesOf(listing: Listing, view: ProjectView): string {
+  return `Royalties are a share of resales, if marketplaces honor them.${isLazy(listing, view) ? " Lazy: the token is minted when you buy." : ""}`;
+}
+
+/** "Whole project · Main NFT", or the share on sale. */
+function soldWhat(listing: Listing): string {
+  return listing.percentSelling >= 100 ? "Whole project · Main NFT" : `Main NFT · ${listing.percentSelling}% of the project`;
+}
+
+/** 18b: a live Buy now listing's box — the bottom bar's Buy now buys it. `foot`: the activity line and
+ *  the Testnet demo line, under the wallet's. */
+export function BuyNowCard({ listing, view, buyerId, foot }: { listing: Listing; view: ProjectView; buyerId: DemoBuyerId | null; foot?: React.ReactNode }) {
   const price = formatAmount(listing.price ?? "0", listing.token);
   return (
-    <OfferCard
-      title={`Buy now · ${price}`}
-      sub={`Main NFT · ${listing.percentSelling}% of the project`}
-      rows={[
-        { label: "Listing type", value: "Buy now" },
-        { label: "Price", value: price },
-        { label: "Selling percentage", value: `${listing.percentSelling}%` },
-        ...tailRows(listing, view),
-      ]}
-      foot={
-        <>
-          {buyerId && <WalletLine buyerId={buyerId} token={listing.token} network={listing.network} verb="buy" />}
-          <CardNote>{SHARE_SALE_NOTE}</CardNote>
-        </>
-      }
-    />
+    <div className="flex flex-col gap-3">
+      <BuyBox
+        label={`${soldWhat(listing)}, buy now for ${price}`}
+        overline={soldWhat(listing)}
+        price={price}
+        facts={[{ label: "Listing", value: "Buy now" }, { label: "Share", value: `${listing.percentSelling}%` }, ...tailFacts(listing, view)]}
+        notes={factNotesOf(listing, view)}
+        foot={
+          (buyerId || foot) && (
+            <>
+              {buyerId && (
+                <IconLine icon={Wallet01Icon}>
+                  <WalletLine buyerId={buyerId} token={listing.token} network={listing.network} verb="buy" />
+                </IconLine>
+              )}
+              {foot}
+            </>
+          )
+        }
+      />
+      <p className={cn(T.caption, "text-text-tertiary")}>{SHARE_SALE_NOTE}</p>
+    </div>
   );
 }
 
@@ -146,7 +167,8 @@ export function StandingBanner({ standing, listing, state, bids, buyerId }: { st
   return null;
 }
 
-/** 18f: the auction card. `buyerId` null in a preview, which reads it and never bids. */
+/** 18f: the auction box. `buyerId` null in a preview, which reads it and never bids. `foot`: the
+ *  activity line and the Testnet demo line, under the wallet's. */
 export function AuctionCard({
   project,
   listing,
@@ -160,6 +182,7 @@ export function AuctionCard({
   onBuyNow,
   onPlaced,
   focusBid,
+  foot,
 }: {
   project: ManualProject;
   listing: Listing;
@@ -174,25 +197,21 @@ export function AuctionCard({
   onPlaced: (sentence: string) => void;
   /** Bumped by the bar's Place bid when the field wasn't on screen: focus it. */
   focusBid: number;
+  foot?: React.ReactNode;
 }) {
   const ended = state.phase === "ended";
   const top = state.top;
   const rows = bidsOf(listing.id, view.bids);
   const leads = buyerId !== null && top?.bidderId === buyerId;
   const leaderRef = React.useRef<HTMLParagraphElement>(null);
-  const title = ended
-    ? top
-      ? `Auction ended · top bid ${formatAmount(top.amount, listing.token)}`
-      : "Auction ended"
-    : top
-      ? `Auction · top bid ${formatAmount(top.amount, listing.token)}`
-      : `Auction · starting bid ${formatAmount(listing.minBid ?? "0", listing.token)}`;
-  const facts: OfferRow[] = [
+  const count = `${rows.length} ${rows.length === 1 ? "bid" : "bids"}`;
+  const price = formatAmount(top?.amount ?? listing.minBid ?? "0", listing.token);
+  const sub = ended ? (top ? `Auction ended · top bid · ${count}` : "Auction ended · no bids") : top ? `Top bid · ${count}` : "Starting bid";
+  const facts: BoxFact[] = [
     { label: "Minimum bid", value: formatAmount(listing.minBid ?? "0", listing.token) },
-    ...(listing.auctionBuyNow ? [{ label: "Buy now price", value: formatAmount(listing.auctionBuyNow, listing.token) }] : []),
-    ...(top ? [{ label: "Top bid", value: `${formatAmount(top.amount, listing.token)} · ${rows.length} ${rows.length === 1 ? "bid" : "bids"}` }] : []),
+    ...(listing.auctionBuyNow ? [{ label: "Buy now", value: formatAmount(listing.auctionBuyNow, listing.token) }] : []),
     { label: ended ? "Ended" : "Ends", value: formatDateTime(listing.endsAt ?? listing.listedAt) },
-    ...tailRows(listing, view),
+    ...tailFacts(listing, view),
   ];
 
   // Once it ends, a bidder reads the outcome in the banner above (StandingBanner).
@@ -201,69 +220,81 @@ export function AuctionCard({
     ? bidder
       ? null
       : top
-        ? `Auction ended ${formatDateTime(listing.endsAt ?? listing.listedAt)}. Highest bid ${formatAmount(top.amount, listing.token)} by ${buyerLabel(top.bidderId)} — the sale completes when the creator closes the auction.`
+        ? `Highest bid ${formatAmount(top.amount, listing.token)} by ${buyerLabel(top.bidderId)} — the sale completes when the creator closes the auction.`
         : "Ended with no bids."
     : leads
       ? null
       : top
         ? `Top bid ${formatAmount(top.amount, listing.token)}, by ${buyerLabel(top.bidderId)}. Bid more than ${formatAmount(top.amount, listing.token)}.`
         : `No bids yet. Bid at least ${formatAmount(listing.minBid ?? "0", listing.token)}.`;
+  const wallet = !ended && buyerId !== null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-lg font-semibold leading-lg text-text-primary">{title}</p>
-          <p className="text-sm leading-sm text-text-secondary">{`Main NFT · ${listing.percentSelling}% of the project`}</p>
-        </div>
-        {!ended && (
-          <Badge tone={state.phase === "endingSoon" ? "warning" : "success"} className="shrink-0">
-            {timeLeftLabel(state.msLeft)}
-          </Badge>
+    <div className="flex flex-col gap-3">
+      <BuyBox
+        label={`${soldWhat(listing)}, auction`}
+        overline={`Auction · ${soldWhat(listing)}`}
+        price={price}
+        sub={sub}
+        aside={
+          !ended && (
+            <Badge tone={state.phase === "endingSoon" ? "warning" : "success"} className="shrink-0">
+              {timeLeftLabel(state.msLeft)}
+            </Badge>
+          )
+        }
+        facts={facts}
+        notes={factNotesOf(listing, view)}
+        foot={
+          (wallet || foot) && (
+            <>
+              {wallet && (
+                <IconLine icon={Wallet01Icon}>
+                  <WalletLine buyerId={buyerId} token={listing.token} network={listing.network} verb="bid" />
+                </IconLine>
+              )}
+              {foot}
+            </>
+          )
+        }
+      >
+        <BidHistory listing={listing} rows={rows} buyerId={buyerId} now={clock} />
+        {leads && !ended ? (
+          <p ref={leaderRef} tabIndex={-1} className={cn(T.rowTitle, "outline-none text-text-success")}>
+            You&apos;re the highest bidder.
+          </p>
+        ) : (
+          status && <p className={T.body}>{status}</p>
         )}
-      </div>
-      <OfferRowsCard rows={facts} label="Auction facts" />
-      <BidHistory listing={listing} rows={rows} buyerId={buyerId} now={clock} />
-      {leads && !ended ? (
-        <p ref={leaderRef} tabIndex={-1} className="text-md font-medium leading-md text-text-success outline-none">
-          You&apos;re the highest bidder.
-        </p>
-      ) : (
-        status && <p className="text-md font-medium leading-md text-text-primary">{status}</p>
-      )}
-      {!ended && buyerId !== null && canBid && (
-        <BidForm
-          project={project}
-          listing={listing}
-          state={state}
-          clock={clock}
-          buyerId={buyerId}
-          focusBid={focusBid}
-          onPlaced={(sentence) => {
-            onPlaced(sentence);
-            requestAnimationFrame(() => leaderRef.current?.focus());
-          }}
-        />
-      )}
-      {!ended && (
-        <div className="flex flex-col gap-2">
-          {buyerId && <WalletLine buyerId={buyerId} token={listing.token} network={listing.network} verb="bid" />}
-          <CardNote>{SHARE_SALE_NOTE}</CardNote>
-        </div>
-      )}
-      {!ended && canBuy && listing.auctionBuyNow && (
-        <Button
-          hierarchy="secondary"
-          size="xl"
-          className="w-full"
-          aria-disabled={buyBusy || undefined}
-          onClick={() => {
-            if (!buyBusy) onBuyNow();
-          }}
-        >
-          {`Buy now with ${formatAmount(listing.auctionBuyNow, listing.token)}`}
-        </Button>
-      )}
+        {!ended && buyerId !== null && canBid && (
+          <BidForm
+            project={project}
+            listing={listing}
+            state={state}
+            clock={clock}
+            buyerId={buyerId}
+            focusBid={focusBid}
+            onPlaced={(sentence) => {
+              onPlaced(sentence);
+              requestAnimationFrame(() => leaderRef.current?.focus());
+            }}
+          />
+        )}
+        {!ended && canBuy && listing.auctionBuyNow && (
+          <Button
+            hierarchy="secondary"
+            size="xl"
+            className="w-full"
+            aria-disabled={buyBusy || undefined}
+            onClick={() => {
+              if (!buyBusy) onBuyNow();
+            }}
+          >
+            {`Buy now with ${formatAmount(listing.auctionBuyNow, listing.token)}`}
+          </Button>
+        )}
+      </BuyBox>
+      {!ended && <p className={cn(T.caption, "text-text-tertiary")}>{SHARE_SALE_NOTE}</p>}
     </div>
   );
 }
@@ -291,11 +322,11 @@ function BidHistory({ listing, rows, buyerId, now }: { listing: Listing; rows: B
       <Disclosure title={`Bid history (${rows.length})`} open={open} onToggle={() => setOpen((v) => !v)} controls={id} />
       <div id={id} hidden={!open}>
         {rows.length === 0 ? (
-          <p className="text-md leading-md text-text-secondary">No bids yet.</p>
+          <p className={T.body}>No bids yet.</p>
         ) : (
           <ol className={cn(LIST_CARD, "px-8 py-2")}>
             {shown.map((b) => (
-              <li key={b.id} className="flex flex-wrap items-baseline gap-x-2 border-b-[length:var(--border-width-1)] border-solid border-border-subtle py-4 text-md leading-md text-text-primary last:border-b-0">
+              <li key={b.id} className={cn(T.body, "flex flex-wrap items-baseline gap-x-2 border-b-[length:var(--border-width-1)] border-solid border-border py-4 last:border-b-0 text-text-primary")}>
                 <span className="font-semibold tabular-nums">{formatAmount(b.amount, listing.token)}</span>
                 <span>·</span>
                 <span>{b.bidderId === buyerId ? `You (${buyerNameOf(b.bidderId)})` : buyerLabel(b.bidderId)}</span>
@@ -311,7 +342,7 @@ function BidHistory({ listing, rows, buyerId, now }: { listing: Listing; rows: B
           <button
             type="button"
             onClick={() => setAll(true)}
-            className="inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline"
+            className={cn(T.rowTitle, "inline-flex min-h-[44px] items-center outline-none hover:underline focus-visible:underline text-text-brand")}
           >
             {`Show all (${rows.length})`}
           </button>
@@ -374,7 +405,7 @@ function BidForm({
 
   return (
     <form id={BID_FORM_ID} onSubmit={submit} noValidate className="flex flex-col gap-3">
-      <label htmlFor={fieldId} className="text-md font-medium leading-md text-text-primary">
+      <label htmlFor={fieldId} className={T.rowTitle}>
         Your bid
       </label>
       <TextInput
@@ -402,7 +433,7 @@ function BidForm({
         className="tabular-nums"
       />
       {error && (
-        <p id={errorId} className="text-sm leading-sm text-text-error">
+        <p id={errorId} className={cn(T.meta, "text-text-error")}>
           {error}
         </p>
       )}
@@ -410,7 +441,8 @@ function BidForm({
   );
 }
 
-/** Main NFT activity: the newest Main sale, else the newest NFT entry, else when it was listed. */
+/** Main NFT activity, one line in the buy box's foot: the newest Main sale, else the newest NFT
+ *  entry, else when it was listed. */
 export function MainActivity({ projectId, sales, listedAt }: { projectId: string; sales: Sale[]; listedAt: number }) {
   const { record } = useJourney(projectId);
   const sale = sales.filter((s) => s.item.nft === "main").reduce<Sale | null>((a, s) => (!a || s.at > a.at ? s : a), null);
@@ -420,14 +452,19 @@ export function MainActivity({ projectId, sales, listedAt }: { projectId: string
     : entry
       ? `${labelOf(entry)} · ${formatDate(entry.createdAt)}`
       : `No activity yet · listed ${formatDate(listedAt)}`;
-  return <NftActivityLine heading="Main NFT activity" line={line} />;
+  return (
+    <IconLine icon={Activity01Icon}>
+      <p className={cn(T.meta, "tabular-nums")}>
+        <span className="sr-only">Main NFT activity: </span>
+        {line}
+      </p>
+    </IconLine>
+  );
 }
 
 /** 18e: what the active buyer holds of the Main NFT, from their own Sale records (the web's Purchased
- *  Summary), open at first. */
+ *  Summary), as a receipt card. */
 export function PurchaseSummary({ holding, toggleRef }: { holding: { sharePct: number; sales: Sale[] }; toggleRef?: React.Ref<HTMLButtonElement> }) {
-  const [open, setOpen] = React.useState(true);
-  const id = React.useId();
   const sales = [...holding.sales].sort((a, b) => a.at - b.at);
   const latest = sales[sales.length - 1];
   const n = sales.length;
@@ -440,26 +477,24 @@ export function PurchaseSummary({ holding, toggleRef }: { holding: { sharePct: n
   const price = sum(sales.map((s) => ({ amount: s.price, coin: s.token })));
   const fee = sum(sales.map((s) => ({ amount: s.fees.network.amount, coin: s.fees.network.coin })));
   return (
-    <section aria-label="Purchase summary" className="flex flex-col gap-4">
-      <Disclosure title="Purchase summary" open={open} onToggle={() => setOpen((v) => !v)} controls={id} toggleRef={toggleRef} className="w-full justify-between" />
-      <div id={id} hidden={!open} className="flex flex-col gap-4">
-        <OfferRowsCard
-          label="Purchase summary"
-          rows={[
-            { label: "Collection", value: latest.collection },
-            { label: "Blockchain", value: networkLabelOf(latest.network) },
-            { label: "NFT type", value: "Main NFT" },
-            { label: "Token ID", value: tokenId !== null ? `#${tokenId}` : "Not assigned" },
-            { label: "Your share", value: `${holding.sharePct}% of the project${n > 1 ? ` in ${n} purchases` : ""}` },
-            { label: "Price paid", value: `${price} (+ ${fee} network fee)` },
-            { label: "Purchased from", value: "You (the creator)" },
-            { label: "Transaction", value: `${shortAddress(latest.txHash)} · Demo` },
-            { label: "Purchased", value: formatDateTime(latest.at) },
-          ]}
-        />
-        <p className="text-sm leading-sm text-text-secondary">Not on a blockchain — this is a testnet demo.</p>
-      </div>
-    </section>
+    <ReceiptCard
+      label="Purchase summary"
+      overline="Your purchase · Main NFT"
+      headline={`You own ${holding.sharePct}% of the project${n > 1 ? ` · ${n} purchases` : ""}`}
+      facts={[
+        { label: "Token", value: tokenId !== null ? `#${tokenId}` : "Not assigned" },
+        { label: "Paid", value: price },
+        { label: "Purchased", value: formatDate(latest.at) },
+      ]}
+      details={[
+        { label: "Collection", value: latest.collection },
+        { label: "Blockchain", value: networkLabelOf(latest.network) },
+        { label: "Price paid", value: `${price} (+ ${fee} network fee)` },
+        { label: "Purchased from", value: "You (the creator)" },
+        { label: "Transaction", value: `${shortAddress(latest.txHash)} · Demo` },
+        { label: "Purchased", value: formatDateTime(latest.at) },
+      ]}
+      toggleRef={toggleRef}
+    />
   );
 }
-

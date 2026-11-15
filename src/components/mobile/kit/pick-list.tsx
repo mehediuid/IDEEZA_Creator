@@ -1,7 +1,8 @@
 "use client";
 
 // The one pick-one list of /m: _Select item rows (M12 10362:1563) in a sheet —
-// MD 40 tall with the label in Body/MD, or LG 48 with a helper line under it;
+// MD with the label in Body/MD (44 tall, the phone's least tap target, lens
+// 16), or LG 48 with a helper line under it, both with the pressed layer;
 // the picked row carries the brand tick at its end. A pick applies on tap and
 // closes the sheet (kit rule: a pick-one sheet has no button). Settings' own
 // choices with Done (ST-31, radio on the left) are not this.
@@ -14,6 +15,7 @@ import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
+import { PRESSED } from "./press";
 import { Sheet } from "./sheet";
 
 export type PickOption<V extends string = string> = {
@@ -54,7 +56,8 @@ export function PickList<V extends string>({
               onClick={() => onPick(o.value)}
               className={cn(
                 "flex w-full items-center gap-4 rounded-md px-8 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:hover:bg-transparent",
-                lg ? "min-h-[48px] py-2" : "h-[40px]",
+                PRESSED,
+                lg ? "min-h-[48px] py-2" : "min-h-[44px]",
               )}
             >
               {o.icon && (

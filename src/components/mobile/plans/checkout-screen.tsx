@@ -5,21 +5,27 @@
 // Success & Failed"). The web's checkout logic (components/credits/
 // checkout-page.tsx): `?plan=builder&cycle=yearly`, `?pack=pro` or
 // `?credits=80`; an upgrade from a paid plan takes the unused time off; the
-// welcome offer halves a first plan payment; the plan's discount comes off
-// credits. Card and PayPal aren't available yet (web), so the method is
-// Crypto from the Demo wallet, USDT or IDZ, signed in the kit's wallet sheet
-// (KIT-WS) — the plan or the credits land in the same commit as the debit.
-// There are no coupon codes: the coupon row shows the welcome offer when it
-// applies, and otherwise says no codes are on offer. Then the full-screen
-// result: Upgrade completed / Payment successful, or Payment failed.
+// welcome offer halves a first plan payment; a plan takes a coupon code
+// (lib/create/coupons.ts: off what is left today, each code once, and one
+// discount per order — the bigger of the offer and the coupon); the plan's
+// discount comes off credits. Card and PayPal aren't available yet (web: an
+// info line in the wallet row), so the method is Crypto from the Demo wallet,
+// USDT or IDZ, signed in the kit's wallet sheet (KIT-WS) — the plan or the
+// credits land in the same commit as the debit. A token the wallet can't pay
+// with is off and says what you have. The total and the one button sit in
+// the Bottom action bar: Connect wallet while none is connected, then Pay
+// $x. Offline, Pay is off with its reason and nothing is bought. Then the
+// full-screen result: Upgrade completed / Credits added (kept in the address
+// as `?done=<order>`, so a reload shows the result, not the form again), or
+// Payment failed with the wallet's own reason.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckmarkCircle02Icon, CreditCardIcon, InformationCircleIcon, PaypalIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, CheckmarkCircle02Icon, DiscountTag01Icon, InformationCircleIcon, PlusSignIcon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
-import { StateCard } from "@/components/ideeza/state-card";
+import { IconButton } from "@/components/ideeza/icon-button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { TextInput } from "@/components/ideeza/text-input";
 import { Toggle } from "@/components/ideeza/toggle";
@@ -28,8 +34,9 @@ import { useWalletStatus, type PayCoin } from "@/components/credits/payment-pick
 import { useWelcomeOffer } from "@/components/credits/welcome-offer";
 import { planSummaryOf } from "@/lib/account/money-phone";
 import { useDefaultToken } from "@/lib/account/payment";
-import { invoiceNumber } from "@/lib/account/invoices";
+import { invoiceNumber, invoicesOf } from "@/lib/account/invoices";
 import { OFFER_OFF, countdown, offerPrice, spendOffer } from "@/lib/account/welcome-offer";
+import { checkCoupon, couponRule, couponSaving, couponsUsed, pickDiscount, type AppliedCoupon, type Coupon } from "@/lib/create/coupons";
 import { needsConfirm } from "@/lib/create/credit-limits";
 import { VALIDITY_MONTHS, addMonths, coinAmount, usd } from "@/lib/create/credit-pricing";
 import { checkoutOrderOf, type CheckoutOrder } from "@/lib/create/checkout-route";
@@ -37,58 +44,138 @@ import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { planOf, priceOf, quoteUpgrade, relationOf } from "@/lib/create/plans";
 import { useSettings } from "@/lib/settings/use-settings";
+import { compareAmounts, formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import { cn } from "@/lib/utils";
 import { ConnectSheet } from "../earn-coin/parts";
 import { useWalletSheet } from "../earn-coin/wallet-sheet";
 import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
-import { ListBones } from "../kit/states";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
+import { EmptyState } from "../kit/state";
+import { ListBones, OfflineBanner, useOnline } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { CARD, LINK, ResultView, Row, dateOf, invoicePath, n, newOrderId, pct } from "./parts";
+import { T } from "../type";
+import { CARD, HAIRLINE, InfoLine, OFFLINE_REASON, ResultView, Row, SectionHead, dateOf, invoicePath, n, newOrderId, pct, usePayBalances } from "./parts";
+
+const cents = (v: number) => Math.round(v * 100) / 100;
+/** The time a code is checked at (outside render, so the component stays pure). */
+const wallClock = () => Date.now();
+const COINS = ["USDT", "IDZ"] as const;
 
 export function CheckoutScreen() {
   const params = useSearchParams();
   const order = checkoutOrderOf((k) => params.get(k));
-  return order ? <Checkout key={params.toString()} order={order} /> : <NothingToPay line="This link doesn’t name a plan or credits to buy. Choose one on Plan & pricing." />;
+  const done = params.get("done");
+  if (!order) return <NothingToPay line="This link doesn’t name a plan or credits to buy. Choose one on Plan & pricing." />;
+  const key = [params.get("plan"), params.get("cycle"), params.get("pack"), params.get("credits")].join("|");
+  return done ? <Done key={done} order={order} orderId={done} /> : <Checkout key={key} order={order} />;
 }
 
 function NothingToPay({ line }: { line: string }) {
-  const router = useRouter();
   return (
-    <Screen top={<TopBar back title="Checkout" />} className="px-8 pt-8">
-      <StateCard
-        tone="empty"
-        className="w-full"
-        icon={<Icon icon={InformationCircleIcon} size={24} />}
-        title="Nothing to pay for"
-        body={line}
-        action={
-          <Button size="lg" onClick={() => router.push("/m/plans")}>
-            See plans
-          </Button>
-        }
+    <Screen top={<TopBar back="/m/plans" title="Checkout" />} className="px-8 pt-8">
+      <EmptyState icon={InformationCircleIcon} title="Nothing to pay for" body={line} action={{ label: "See plans", href: "/m/plans" }} />
+    </Screen>
+  );
+}
+
+function Bones() {
+  return (
+    <Screen top={<TopBar back="/m/plans" title="Checkout" />} className="px-8 pt-8">
+      <ListBones rows={4} />
+    </Screen>
+  );
+}
+
+/** "Builder · Annual", "Pro pack", "Custom credits". */
+function whatOf(order: CheckoutOrder, pack: string | undefined): string {
+  if (order.kind === "plan") return `${planOf(order.tier).name} · ${order.cycle === "yearly" ? "Annual" : "Monthly"}`;
+  return pack ? `${pack} pack` : "Custom credits";
+}
+
+/** The result of a payment that went through, read back from its invoice — so a reload shows it again
+ *  in place of the form (and its Pay button). */
+function Done({ order, orderId }: { order: CheckoutOrder; orderId: string }) {
+  const router = useRouter();
+  const { hydrated: planReady, sub } = useCreatePlan();
+  const { hydrated: creditsReady, balance, ledger } = useCredits();
+  const discount = useCreditDiscount();
+  const invoice = React.useMemo(() => invoicesOf(ledger, sub.orders).find((i) => i.id === orderId) ?? null, [ledger, sub.orders, orderId]);
+  if (!planReady || !creditsReady) return <Bones />;
+  if (!invoice) return <Checkout order={order} />;
+  if (order.kind === "plan") {
+    const target = planOf(order.tier);
+    const saved = invoice.coupon ? ` You saved ${usd(invoice.coupon.amount)} with ${invoice.coupon.code}.` : "";
+    return (
+      <Screen>
+        <ResultView
+          tone="success"
+          title="Upgrade completed"
+          line={`You’re all set on ${target.name}. ${n(target.credits)} AI credits are added for this month.${saved}`}
+          rows={[
+            { label: "Plan", value: whatOf(order, undefined) },
+            { label: "Amount paid", value: usd(invoice.paid) },
+            { label: "Date", value: dateOf(invoice.ts) },
+            { label: "Invoice", value: `#${invoiceNumber(invoice.id, invoice.ts)}` },
+          ]}
+          primary={{ label: "Start creating", href: "/m/ai" }}
+          secondary={{ label: "View invoice", href: invoicePath(invoice.id) }}
+          onClose={() => router.replace("/m/plans?tab=billing")}
+        />
+      </Screen>
+    );
+  }
+  const credits = orderOf(order.kind === "pack" ? { kind: "pack", id: order.id } : { kind: "custom", credits: order.credits }, discount);
+  const added = credits.base + credits.bonus;
+  return (
+    <Screen>
+      <ResultView
+        tone="success"
+        title="Credits added"
+        line={`${n(added)} credits have been added to your balance.`}
+        rows={[
+          { label: "Pack", value: whatOf(order, credits.pack) },
+          { label: "Credits added", value: `+${n(added)}`, tone: "success" },
+          { label: "Balance now", value: `${n(balance)} credits` },
+          { label: "Amount paid", value: usd(invoice.paid) },
+        ]}
+        primary={{ label: "Start creating", href: "/m/ai" }}
+        secondary={{ label: "View receipt", href: invoicePath(invoice.id) }}
+        onClose={() => router.replace("/m/plans?tab=credits")}
       />
     </Screen>
   );
 }
 
-type Phase = { kind: "form" } | { kind: "done"; id: string; at: number; paid: number; balance: number } | { kind: "failed"; message: string };
+type Phase = { kind: "form" } | { kind: "failed"; message: string };
+type CouponMessage = { text: string; tone: "error" | "info" };
 
 const NETWORK = "baseSepolia" as const;
 
+/** Why the wallet didn't take a payment, in the wallet sheet's own words. */
+const FAIL_WORDS: Record<string, string> = {
+  walletDisconnected: "Your wallet disconnected before it confirmed.",
+  networkChanged: "Your wallet switched network before it confirmed.",
+  accountChanged: "Your wallet switched account before it confirmed.",
+  insufficientFunds: "Your balance changed before it confirmed.",
+  storageFailed: "This browser couldn’t save it (storage is full or blocked).",
+};
+
 function Checkout({ order }: { order: CheckoutOrder }) {
   const router = useRouter();
+  const online = useOnline();
   const { hydrated: planReady, sub, plan: current, start, cancel } = useCreatePlan();
-  const { hydrated: creditsReady, balance, purchase } = useCredits();
+  const { hydrated: creditsReady, purchase } = useCredits();
   const welcome = useWelcomeOffer();
   const discount = useCreditDiscount();
   const wallet = useWalletStatus();
+  const balances = usePayBalances(NETWORK);
   const defaultToken = useDefaultToken();
   const { request, sheet } = useWalletSheet();
   const { confirmAbove } = useSettings().credits;
-  const [coin, setCoin] = React.useState<PayCoin>(defaultToken);
+  const [picked, setPicked] = React.useState<PayCoin>(defaultToken);
   const [autoRenew, setAutoRenew] = React.useState(true);
   const [phase, setPhase] = React.useState<Phase>({ kind: "form" });
   const [paying, setPaying] = React.useState(false);
@@ -97,13 +184,13 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   const [connecting, setConnecting] = React.useState(false);
   const [orderId, setOrderId] = React.useState(() => newOrderId(order.kind === "plan" ? "plan" : "order"));
   const [now] = React.useState(() => Date.now());
+  const [coupon, setCoupon] = React.useState<Coupon | null>(null);
+  const [couponDraft, setCouponDraft] = React.useState("");
+  const [couponMsg, setCouponMsg] = React.useState<CouponMessage | null>(null);
+  // `paying` is state, so two presses in one tick would both read false: the lock is a ref.
+  const inFlight = React.useRef(false);
 
-  if (!planReady || !creditsReady)
-    return (
-      <Screen top={<TopBar back title="Checkout" />} className="px-8 pt-8">
-        <ListBones rows={4} />
-      </Screen>
-    );
+  if (!planReady || !creditsReady) return <Bones />;
 
   const isPlan = order.kind === "plan";
   const target = isPlan ? planOf(order.tier) : null;
@@ -111,48 +198,16 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   const rel = isPlan ? relationOf(sub, order.tier, cycle) : null;
   const quote = isPlan ? quoteUpgrade(sub, order.tier, cycle, now) : null;
   const credits = !isPlan ? orderOf(order.kind === "pack" ? { kind: "pack", id: order.id } : { kind: "custom", credits: order.credits }, discount) : null;
-  const offered = isPlan && welcome.ready && welcome.live && sub.tier === "free" ? offerPrice(quote!.due) : null;
-  const due = isPlan ? (offered ? offered.final : quote!.due) : credits!.price.final;
-  const what = isPlan ? `${target!.name} · ${cycle === "yearly" ? "Annual" : "Monthly"}` : credits!.pack ? `${credits!.pack} pack` : "Custom credits";
-
-  if (phase.kind === "done") {
-    const number = invoiceNumber(phase.id, phase.at);
-    return (
-      <Screen>
-        {isPlan ? (
-          <ResultView
-            tone="success"
-            title="Upgrade completed"
-            line={`You’re all set on ${target!.name}. ${n(target!.credits)} AI credits are added for this month.`}
-            rows={[
-              { label: "Plan", value: what },
-              { label: "Amount paid", value: usd(phase.paid) },
-              { label: "Date", value: dateOf(phase.at) },
-              { label: "Transaction", value: `#${number}` },
-            ]}
-            primary={{ label: "Start creating", href: "/m/ai" }}
-            secondary={{ label: "View invoice", href: invoicePath(phase.id) }}
-            onClose={() => router.replace("/m/plans?tab=billing")}
-          />
-        ) : (
-          <ResultView
-            tone="success"
-            title="Credits added"
-            line={`${n(credits!.base + credits!.bonus)} credits have been added to your balance.`}
-            rows={[
-              { label: "Pack", value: credits!.pack ?? "Custom credits" },
-              { label: "Credits added", value: `+${n(credits!.base + credits!.bonus)}`, tone: "success" },
-              { label: "New balance", value: `${n(phase.balance)} credits` },
-              { label: "Amount paid", value: usd(phase.paid) },
-            ]}
-            primary={{ label: "Start creating", href: "/m/ai" }}
-            secondary={{ label: "View receipt", href: invoicePath(phase.id) }}
-            onClose={() => router.replace("/m/plans?tab=credits")}
-          />
-        )}
-      </Screen>
-    );
-  }
+  // The welcome offer: half off the first payment of a plan bought from Free while it runs.
+  const offer = isPlan && welcome.ready && welcome.live && sub.tier === "free" ? offerPrice(quote!.due) : null;
+  // A coupon: off what is left today. One discount per order, the bigger one.
+  const couponOff = isPlan && coupon ? couponSaving(coupon, quote!.due) : null;
+  const winner = isPlan ? pickDiscount(offer?.saving ?? null, couponOff) : null;
+  const offered = winner === "offer" ? offer : null;
+  const couponApplied: AppliedCoupon | null = winner === "coupon" && coupon && couponOff ? { code: coupon.code, amount: couponOff, rule: couponRule(coupon) } : null;
+  const due = isPlan ? cents(Math.max(0, quote!.due - (offered?.saving ?? 0) - (couponApplied?.amount ?? 0))) : credits!.price.final;
+  const used = couponsUsed(sub.orders);
+  const what = whatOf(order, credits?.pack);
 
   if (phase.kind === "failed") {
     return (
@@ -190,6 +245,19 @@ function Checkout({ order }: { order: CheckoutOrder }) {
     return <NothingToPay line={line} />;
   }
 
+  // The token you pay with: the one you picked, unless the wallet can't cover it and can cover the other.
+  const short = (c: PayCoin) => !!balances && due > 0 && compareAmounts(balances[c], String(coinAmount(due, c))) < 0;
+  const other: PayCoin = picked === "USDT" ? "IDZ" : "USDT";
+  const coin: PayCoin = short(picked) && !short(other) ? other : picked;
+  const noFunds = short("USDT") && short("IDZ");
+
+  /** The result takes the form's place in the address, so a reload can't pay twice. */
+  const showDone = (id: string) => {
+    const q = new URLSearchParams(window.location.search);
+    q.set("done", id);
+    window.history.replaceState(null, "", `${window.location.pathname}?${q.toString()}`);
+  };
+
   const finishPlan = (pay: { paidWith: string; txHash?: string; payer?: string }) => {
     start(order.kind === "plan" ? order.tier : "free", cycle, {
       orderId,
@@ -198,6 +266,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
       price: quote!.price,
       credit: quote!.unused,
       ...(offered ? { offer: offered.saving } : {}),
+      ...(couponApplied ? { coupon: couponApplied } : {}),
       txHash: pay.txHash,
       payer: pay.payer,
     });
@@ -205,18 +274,58 @@ function Checkout({ order }: { order: CheckoutOrder }) {
     if (!autoRenew) cancel();
   };
 
+  // ── the coupon (the web's rules and words) ──
+  const applyCoupon = () => {
+    if (!isPlan || paying) return;
+    const r = checkCoupon(couponDraft, { tier: order.tier, due: quote!.due, now: wallClock(), used });
+    if (!r.ok) {
+      setCouponMsg({ text: r.message, tone: "error" });
+      return;
+    }
+    if (offer && offer.saving >= r.saving) {
+      setCouponMsg({ text: `Your welcome offer already saves more (${usd(offer.saving)}). One discount per order, so this coupon isn’t added.`, tone: "info" });
+      return;
+    }
+    setCoupon(r.coupon);
+    setCouponDraft("");
+    setCouponMsg(null);
+  };
+  const removeCoupon = () => {
+    setCoupon(null);
+    setCouponDraft("");
+    setCouponMsg(null);
+  };
+  /** Pay checks the code again: one that stopped working comes off, and nothing is charged. */
+  const couponStillGood = (): boolean => {
+    if (!isPlan || !couponApplied) return true;
+    const r = checkCoupon(couponApplied.code, { tier: order.tier, due: quote!.due, now: wallClock(), used });
+    if (r.ok) return true;
+    setCoupon(null);
+    setCouponDraft(couponApplied.code);
+    setCouponMsg({ text: r.message, tone: "error" });
+    setNote("Your coupon was taken off, so the price changed. Nothing was charged. Check the total, then pay again.");
+    return false;
+  };
+
   const pay = async (confirmed = false) => {
-    if (paying) return;
+    if (paying || inFlight.current) return;
     setNote(null);
+    if (!online) {
+      setNote(OFFLINE_REASON);
+      return;
+    }
+    if (!couponStillGood()) return;
     if (!confirmed && due > 0 && needsConfirm(due, confirmAbove)) {
       setAsking(true);
       return;
     }
     if (isPlan && due === 0) {
-      finishPlan({ paidWith: "Covered by unused time" });
-      setPhase({ kind: "done", id: orderId, at: now, paid: 0, balance });
+      inFlight.current = true;
+      finishPlan({ paidWith: quote!.due > 0 && couponApplied ? "Covered by coupon" : "Covered by unused time" });
+      showDone(orderId);
       return;
     }
+    inFlight.current = true;
     setPaying(true);
     try {
       const result = await request(
@@ -229,11 +338,15 @@ function Checkout({ order }: { order: CheckoutOrder }) {
           summary: isPlan
             ? [
                 { label: "Plan", value: `${target!.name} · ${cycle === "yearly" ? "billed yearly" : "billed monthly"}` },
+                ...(couponApplied ? [{ label: "Coupon", value: `${couponApplied.code} · −${usd(couponApplied.amount)}` }] : []),
                 { label: "Due today", value: usd(due) },
+                // The sheet lists what leaves the wallet for USDT itself; IDZ is said here.
+                ...(coin === "IDZ" ? [{ label: "You pay", value: `≈ ${coinAmount(due, "IDZ").toLocaleString("en-US")} IDZ` }] : []),
               ]
             : [
                 { label: "Credits", value: `${credits!.pack ? `${credits!.pack} pack` : "Custom credits"} · ${creditsLine(credits!.base, credits!.bonus)}` },
                 { label: "Price", value: usd(due) },
+                ...(coin === "IDZ" ? [{ label: "You pay", value: `≈ ${coinAmount(due, "IDZ").toLocaleString("en-US")} IDZ` }] : []),
               ],
           note: "Testnet demo, no real money moves.",
           doneLine: isPlan ? `You’re on ${target!.name}.` : `${n(credits!.base + credits!.bonus)} credits added to your account.`,
@@ -259,15 +372,11 @@ function Checkout({ order }: { order: CheckoutOrder }) {
           },
         },
       );
-      if (result.ok) {
-        const added = credits ? credits.base + credits.bonus : 0;
-        setPhase({ kind: "done", id: orderId, at: result.proof.at, paid: due, balance: balance + added });
-      } else if (result.reason === "rejected") {
-        setNote("Payment cancelled in the wallet. Nothing was charged.");
-      } else {
-        setPhase({ kind: "failed", message: result.message ?? "The wallet couldn’t take the payment." });
-      }
+      if (result.ok) showDone(orderId);
+      else if (result.reason === "rejected") setNote("Payment cancelled in the wallet. Nothing was charged.");
+      else setPhase({ kind: "failed", message: result.message || FAIL_WORDS[result.reason] || "The wallet couldn’t take the payment." });
     } finally {
+      inFlight.current = false;
       setPaying(false);
     }
   };
@@ -276,145 +385,191 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   const per = isPlan ? priceOf(order.tier, cycle) : null;
   const summary = isPlan ? planSummaryOf(target!.monthly, order.tier, cycle) : null;
   const ctaLabel = due === 0 ? "Confirm upgrade" : `Pay ${usd(due)}`;
-  const blocked = due > 0 && !wallet.connected;
+  const noWallet = due > 0 && !wallet.connected;
+  const reason = !online ? OFFLINE_REASON : noWallet ? null : due > 0 && noFunds ? "Your demo wallet doesn’t hold enough test USDT or IDZ for this." : null;
 
   return (
     <Screen
-      top={<TopBar back title="Checkout" />}
+      top={<TopBar back="/m/plans" title="Checkout" />}
       className="px-8 pb-8 pt-4"
       footer={
         <BottomBar>
-          <Button size="xl" className="w-full" loading={paying} disabled={blocked} onClick={() => pay()}>
-            {blocked ? "Connect your wallet to pay" : ctaLabel}
-          </Button>
+          <p className={cn(T.section, "flex items-center justify-between")}>
+            Total <span className="tabular-nums">{usd(due)}</span>
+          </p>
+          {(reason || note) && (
+            <p id="pay-why" role="status" className={T.caption}>
+              {reason ?? note}
+            </p>
+          )}
+          {noWallet ? (
+            <Button size="xl" className="w-full" disabled={!online} aria-describedby={reason ? "pay-why" : undefined} onClick={() => setConnecting(true)}>
+              Connect wallet
+            </Button>
+          ) : (
+            <Button size="xl" className="w-full" loading={paying} disabled={!!reason} aria-describedby={reason || note ? "pay-why" : undefined} onClick={() => pay()}>
+              {ctaLabel}
+            </Button>
+          )}
         </BottomBar>
       }
     >
       <div className="flex flex-col gap-8">
-        <section aria-label="What you’re buying" className={cn(CARD, "flex flex-col gap-3 p-8")}>
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-medium leading-xl text-text-primary">{isPlan ? `${target!.name} plan` : credits!.pack ? `${credits!.pack} pack` : "Custom AI credits"}</h2>
-            <Badge tone="brand">{isPlan ? (cycle === "yearly" ? "Annual" : "Monthly") : `${VALIDITY_MONTHS} months`}</Badge>
-          </div>
-          <p className="flex items-center justify-between gap-4 text-md leading-md">
-            <span className="text-text-secondary">{isPlan ? (cycle === "yearly" ? "Billed annually" : "Billed monthly") : creditsLine(credits!.base, credits!.bonus)}</span>
-            <span className="inline-flex items-center gap-3 tabular-nums text-text-primary">
-              <TestnetDemoBadge />
-              {isPlan ? `${usd(per!.period)} / ${cycle === "yearly" ? "yr" : "mo"}` : usd(credits!.price.base)}
+        <OfflineBanner />
+        <section aria-label="What you’re buying" className={LIST_CARD}>
+          <button
+            type="button"
+            onClick={() => router.push(isPlan ? "/m/plans" : "/m/plans?tab=credits")}
+            aria-label={`${isPlan ? `${target!.name} plan` : credits!.pack ? `${credits!.pack} pack` : "Custom AI credits"}. ${isPlan ? "Change plan" : "Change pack"}`}
+            className={cn(LIST_ROW, "items-start active:bg-bg-subtle")}
+          >
+            <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <span className="flex flex-wrap items-center gap-3">
+                <span className={T.section}>{isPlan ? `${target!.name} plan` : credits!.pack ? `${credits!.pack} pack` : "Custom AI credits"}</span>
+                <Badge tone="brand">{isPlan ? (cycle === "yearly" ? "Annual" : "Monthly") : `${VALIDITY_MONTHS} months`}</Badge>
+              </span>
+              <span className={cn(T.body, "flex flex-wrap items-center gap-x-3 gap-y-1")}>
+                {isPlan ? (cycle === "yearly" ? "Billed annually" : "Billed monthly") : creditsLine(credits!.base, credits!.bonus)}
+                <span className="tabular-nums text-text-primary">· {isPlan ? `${usd(per!.period)} / ${cycle === "yearly" ? "yr" : "mo"}` : usd(credits!.price.base)}</span>
+              </span>
+              <span className="flex flex-wrap items-center gap-3">
+                <span className={cn(T.rowTitle, "text-text-brand")}>{isPlan ? "Change plan" : "Change pack"}</span>
+                <TestnetDemoBadge />
+              </span>
             </span>
-          </p>
-          <button type="button" onClick={() => router.push(isPlan ? "/m/plans" : "/m/plans?tab=credits")} className={cn(LINK, "self-start")}>
-            {isPlan ? "Change plan" : "Change pack"}
+            <Chevron className="self-center" />
           </button>
         </section>
 
         {fromPaid && (
           <section aria-labelledby="confirm-upgrade" className="flex flex-col gap-4">
-            <h2 id="confirm-upgrade" className="text-xl font-medium leading-xl text-text-primary">
+            <SectionHead
+              id="confirm-upgrade"
+              info={
+                <p className={T.body}>
+                  Your plan becomes {target!.name} now. The unused time on {current.name} comes off today’s price, and the next billing is on {dateOf(quote!.renewsAt)}. Cancel any time.
+                </p>
+              }
+            >
               Confirm your upgrade
-            </h2>
+            </SectionHead>
             <div className="grid grid-cols-2 gap-4">
               <PlanTile label="From" name={current.name} line={`${usd(priceOf(sub.tier, sub.cycle).perMonth)} / month`} />
               <PlanTile label="Upgrading to" name={target!.name} line={`${usd(per!.perMonth)} / month`} brand />
             </div>
-            <p className="rounded-xl bg-bg-subtle p-6 text-md leading-md text-text-secondary">
-              Your plan becomes {target!.name} now. The unused time on {current.name} comes off today’s price, and the next billing is on {dateOf(quote!.renewsAt)}. Cancel any time.
-            </p>
+            <p className={T.meta}>Starts now · next billing {dateOf(quote!.renewsAt)}</p>
           </section>
         )}
 
-        {isPlan &&
-          (offered ? (
-            <p role="status" className="flex items-start gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-[var(--color-border-success)] bg-bg-success-subtle p-6 text-md leading-md text-text-success">
-              <Icon icon={CheckmarkCircle02Icon} size={18} />
-              <span className="flex flex-col">
-                <span className="font-medium">Welcome offer applied</span>
-                <span>
-                  You saved {usd(offered.saving)}. It ends in <span className="tabular-nums">{countdown(welcome.left)}</span>.
-                </span>
+        {offered && (
+          <p role="status" className={cn(T.body, "flex items-start gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-[var(--color-border-success)] bg-bg-success-subtle p-6 text-text-success")}>
+            <Icon icon={CheckmarkCircle02Icon} size={18} />
+            <span className="flex flex-col">
+              <span className={cn(T.rowTitle, "text-text-success")}>Welcome offer applied</span>
+              <span>
+                You saved {usd(offered.saving)}. It ends in <span className="tabular-nums">{countdown(welcome.left)}</span>.
               </span>
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-4">
-                <TextInput size="xl" containerClassName="flex-1" placeholder="Have a coupon? Enter code" disabled aria-label="Coupon code" aria-describedby="coupon-why" />
-                <Button hierarchy="secondary" size="xl" disabled>
-                  Apply
-                </Button>
-              </div>
-              <p id="coupon-why" className="text-sm leading-sm text-text-tertiary">
-                No coupon codes are on offer yet.
-              </p>
-            </div>
-          ))}
+            </span>
+          </p>
+        )}
 
         {due > 0 && (
-          <section aria-labelledby="pay-method" className="flex flex-col gap-6">
-            <h2 id="pay-method" className="text-xl font-medium leading-xl text-text-primary">
-              Payment method
+          <section aria-labelledby="pay-method" className="flex flex-col gap-4">
+            <h2 id="pay-method" className={T.section}>
+              Pay with crypto
             </h2>
-            <div role="radiogroup" aria-label="Payment method" className="flex flex-wrap gap-4">
-              <MethodChip icon={CreditCardIcon} label="Card" off />
-              <MethodChip icon={PaypalIcon} label="PayPal" off />
-              <MethodChip icon={Wallet01Icon} label="Crypto" />
-            </div>
-            <p className="text-sm leading-sm text-text-tertiary">Card and PayPal aren’t available yet.</p>
-            <div className={cn(CARD, "flex flex-col gap-6 p-8")}>
-              <div className="flex flex-col gap-2">
-                <h3 className="text-lg font-medium leading-lg text-text-primary">Pay with crypto</h3>
-                <p className="text-md leading-md text-text-secondary">Choose a token and connect your wallet to pay.</p>
+            <div className={cn(LIST_CARD, LIST_DIVIDERS)}>
+              <div className="flex flex-col gap-4 px-8 py-6">
+                <p className={T.meta}>Choose a token and connect your wallet to pay.</p>
+                <div role="radiogroup" aria-label="Token" className="flex gap-4">
+                  {COINS.map((c) => {
+                    const on = coin === c;
+                    const off = short(c);
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        disabled={off}
+                        onClick={() => setPicked(c)}
+                        className={cn(
+                          "flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-4 py-3 outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed",
+                          on ? "border-border-brand bg-bg-brand-subtle" : "border-border active:bg-bg-subtle",
+                        )}
+                      >
+                        <span className={cn(T.rowTitle, "inline-flex items-center gap-3", on && "text-text-brand", off && "text-text-disabled")}>
+                          <span aria-hidden className={cn("size-[10px] rounded-full border-[length:var(--border-width-2)] border-solid", on ? "border-border-brand bg-bg-brand" : "border-border")} />
+                          {c}
+                        </span>
+                        {balances && (
+                          <span className={cn(T.micro, "tabular-nums", off && "text-text-error")}>
+                            {off ? "Not enough: you have " : "You have "}
+                            {formatAmount(balances[c], c)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div role="radiogroup" aria-label="Token" className="flex gap-4">
-                {(["USDT", "IDZ"] as const).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    role="radio"
-                    aria-checked={coin === c}
-                    onClick={() => setCoin(c)}
-                    className={cn(
-                      "inline-flex min-h-[44px] flex-1 items-center justify-center gap-3 rounded-xl border-[length:var(--border-width-1-5)] border-solid text-md font-medium leading-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
-                      coin === c ? "border-border-brand bg-bg-brand-subtle text-text-brand" : "border-border-subtle text-text-primary",
-                    )}
-                  >
-                    <span aria-hidden className={cn("size-[10px] rounded-full border-[length:var(--border-width-2)] border-solid", coin === c ? "border-border-brand bg-bg-brand" : "border-border")} />
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <dl className="flex flex-col">
-                <Row label="Amount due">≈ {coinAmount(due, coin).toLocaleString("en-US")} {coin}</Row>
+              <dl className="flex flex-col px-8 py-3">
+                <Row label="Amount due">
+                  ≈ {coinAmount(due, coin).toLocaleString("en-US")} {coin}
+                </Row>
                 <Row label="Network">{networkLabelOf(NETWORK)}</Row>
               </dl>
-              {wallet.connected ? (
-                <p className="flex items-center gap-3 text-md leading-md text-text-success">
-                  <Icon icon={CheckmarkCircle02Icon} size={16} />
-                  Wallet connected · {wallet.short}
-                </p>
-              ) : (
-                <Button size="xl" className="w-full" onClick={() => setConnecting(true)}>
-                  Connect wallet
-                </Button>
-              )}
+              <div className={cn(LIST_ROW, "hover:bg-transparent")}>
+                <span className="shrink-0 text-[color:var(--color-icon-default)]">
+                  <Icon icon={Wallet01Icon} size={24} />
+                </span>
+                <span className={cn(T.body, "flex-1 text-text-primary")}>Demo wallet</span>
+                {wallet.connected ? (
+                  <span className={cn(T.caption, "inline-flex shrink-0 items-center gap-2 text-text-success")}>
+                    <Icon icon={CheckmarkCircle02Icon} size={16} />
+                    Wallet connected · {wallet.short}
+                  </span>
+                ) : (
+                  <span className={cn(T.caption, "shrink-0")}>Not connected</span>
+                )}
+              </div>
             </div>
+            <InfoLine>Card and PayPal aren’t available yet.</InfoLine>
           </section>
         )}
-        {due === 0 && isPlan && <p className="text-md leading-md text-text-secondary">The unused time on {current.name} covers this upgrade. Nothing to pay today.</p>}
+        {due === 0 && isPlan && (
+          <p className={T.body}>{quote!.due > 0 ? "Your coupon covers this upgrade." : `The unused time on ${current.name} covers this upgrade.`} Nothing to pay today.</p>
+        )}
+
+        {/* Nothing to pay today (the unused time covers it): no code can help, so no field. */}
+        {isPlan && quote!.due > 0 && (
+          <CouponRow
+            applied={couponApplied}
+            draft={couponDraft}
+            message={couponMsg}
+            disabled={paying}
+            onDraft={(v) => {
+              setCouponDraft(v);
+              setCouponMsg(null);
+            }}
+            onApply={applyCoupon}
+            onRemove={removeCoupon}
+          />
+        )}
+        {couponApplied && offer && <p className={T.meta}>Your coupon saves more than the welcome offer, so the offer isn’t used.</p>}
 
         {isPlan && (
-          <label className={cn(CARD, "flex cursor-pointer items-center justify-between gap-6 p-8")}>
+          <label className={cn(LIST_CARD, "cursor-pointer flex-row items-center justify-between gap-6 px-8 py-6")}>
             <span className="flex flex-col gap-1">
-              <span className="text-md font-medium leading-md text-text-primary">Auto-renew subscription</span>
-              <span className="text-sm leading-sm text-text-secondary">
-                {autoRenew ? `Renews on ${dateOf(quote!.renewsAt)}. You can cancel any time.` : `Ends on ${dateOf(quote!.renewsAt)}, then you’re on Free.`}
-              </span>
+              <span className={T.rowTitle}>Auto-renew subscription</span>
+              <span className={T.meta}>{autoRenew ? `Renews on ${dateOf(quote!.renewsAt)}. You can cancel any time.` : `Ends on ${dateOf(quote!.renewsAt)}, then you’re on Free.`}</span>
             </span>
             <Toggle checked={autoRenew} onChange={() => setAutoRenew((v) => !v)} aria-label="Auto-renew subscription" />
           </label>
         )}
 
         <section aria-labelledby="summary" className={cn(CARD, "flex flex-col p-8")}>
-          <h2 id="summary" className="pb-2 text-xl font-medium leading-xl text-text-primary">
+          <h2 id="summary" className={cn(T.section, "pb-2")}>
             Summary
           </h2>
           <dl className="flex flex-col">
@@ -436,6 +591,11 @@ function Checkout({ order }: { order: CheckoutOrder }) {
                     −{usd(offered.saving)}
                   </Row>
                 )}
+                {couponApplied && (
+                  <Row label={`Coupon ${couponApplied.code} (${couponApplied.rule})`} tone="success">
+                    −{usd(couponApplied.amount)}
+                  </Row>
+                )}
               </>
             ) : (
               <>
@@ -450,14 +610,9 @@ function Checkout({ order }: { order: CheckoutOrder }) {
             )}
             <Row label="Tax">{usd(0)}</Row>
           </dl>
-          <p className="mt-3 flex items-center justify-between border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-6 text-2xl font-medium leading-2xl text-text-primary">
+          <p className={cn(T.section, HAIRLINE, "mt-3 flex items-center justify-between border-t-[length:var(--border-width-1)] pt-6")}>
             Total <span className="tabular-nums">{usd(due)}</span>
           </p>
-          {note && (
-            <p role="status" className="pt-4 text-sm leading-sm text-text-secondary">
-              {note}
-            </p>
-          )}
         </section>
       </div>
       <ConnectSheet open={connecting} onClose={() => setConnecting(false)} description="You pay from it. This is the testnet demo wallet — test funds only, nothing is written to a real blockchain." />
@@ -479,32 +634,121 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   );
 }
 
-function MethodChip({ icon, label, off }: { icon: typeof Wallet01Icon; label: string; off?: boolean }) {
+/** "Have a coupon?" (Figma Upgrade & Checkout › Coupon; the web's CouponField): the link, the code and
+ *  Apply, the reason it doesn't work, and the applied code with ✓ and ✕ to take it off. */
+function CouponRow({
+  applied,
+  draft,
+  message,
+  disabled,
+  onDraft,
+  onApply,
+  onRemove,
+}: {
+  applied: AppliedCoupon | null;
+  draft: string;
+  message: CouponMessage | null;
+  /** While the payment runs: neither Apply nor ✕ answers. */
+  disabled?: boolean;
+  onDraft: (value: string) => void;
+  onApply: () => void;
+  onRemove: () => void;
+}) {
+  const [opened, setOpened] = React.useState(false);
+  const open = opened || !!applied || !!message || draft !== "";
+  const inputId = React.useId();
+  const supportId = React.useId();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  if (!open)
+    return (
+      <button
+        type="button"
+        aria-expanded={false}
+        onClick={() => {
+          setOpened(true);
+          requestAnimationFrame(() => inputRef.current?.focus());
+        }}
+        className={cn(LIST_CARD, LIST_ROW, "flex-row active:bg-bg-subtle")}
+      >
+        <span className="shrink-0 text-[color:var(--color-icon-default)]">
+          <Icon icon={DiscountTag01Icon} size={24} />
+        </span>
+        <span className={cn(T.body, "flex-1 text-text-primary")}>Have a coupon?</span>
+        <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+          <Icon icon={PlusSignIcon} size={20} />
+        </span>
+      </button>
+    );
+
+  const error = message?.tone === "error";
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={!off}
-      disabled={off}
-      title={off ? "Not available yet" : undefined}
-      className={cn(
-        "inline-flex min-h-[44px] items-center gap-3 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 text-md leading-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
-        off ? "cursor-not-allowed border-border-subtle text-text-disabled" : "border-border-brand bg-bg-brand-subtle font-medium text-text-brand",
+    <div className="flex flex-col gap-4">
+      <label htmlFor={inputId} className={T.label}>
+        Have a coupon?
+      </label>
+      {applied ? (
+        <>
+          <TextInput
+            id={inputId}
+            size="xl"
+            readOnly
+            value={applied.code}
+            leading={<Icon icon={Tick02Icon} size={16} />}
+            aria-describedby={supportId}
+            action={<IconButton type="button" size="sm" aria-label={`Remove coupon ${applied.code}`} disabled={disabled} onClick={onRemove} icon={<Icon icon={Cancel01Icon} size={16} />} />}
+          />
+          <p id={supportId} role="status" className={T.caption}>
+            Coupon applied: {usd(applied.amount)} off. Off today’s payment only. Renewals are at the full price.
+          </p>
+        </>
+      ) : (
+        <form
+          noValidate
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!disabled) onApply();
+          }}
+        >
+          <div className="flex items-start gap-4">
+            <TextInput
+              ref={inputRef}
+              id={inputId}
+              size="xl"
+              value={draft}
+              onValueChange={(v) => onDraft(v.toUpperCase())}
+              placeholder="Enter coupon code"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              maxLength={32}
+              invalid={error}
+              aria-invalid={error || undefined}
+              aria-describedby={message ? supportId : undefined}
+              containerClassName="min-w-0 flex-1"
+            />
+            <Button type="submit" hierarchy="tonal" size="xl" disabled={disabled}>
+              Apply
+            </Button>
+          </div>
+          {message && (
+            <p id={supportId} role={error ? "alert" : "status"} className={cn(T.caption, error && "text-text-error")}>
+              {message.text}
+            </p>
+          )}
+        </form>
       )}
-    >
-      <Icon icon={icon} size={16} />
-      {label}
-      {off && <span className="text-xs leading-xs">Soon</span>}
-    </button>
+    </div>
   );
 }
 
 function PlanTile({ label, name, line, brand }: { label: string; name: string; line: string; brand?: boolean }) {
   return (
     <div className={cn("flex flex-col gap-1 rounded-xl p-6", brand ? "bg-bg-brand-subtle" : "bg-bg-subtle")}>
-      <span className="text-sm leading-sm text-text-secondary">{label}</span>
-      <span className={cn("text-xl font-medium leading-xl", brand ? "text-text-brand" : "text-text-primary")}>{name}</span>
-      <span className="text-sm leading-sm text-text-secondary">{line}</span>
+      <span className={T.meta}>{label}</span>
+      <span className={cn(T.section, brand && "text-text-brand")}>{name}</span>
+      <span className={T.meta}>{line}</span>
     </div>
   );
 }

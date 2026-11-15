@@ -13,6 +13,8 @@
 // microphone level, ✕ to throw the words away and ✓ to put them in the box
 // (04). A browser that blocks the microphone shows "Microphone is off" over
 // the box (07); one with no recogniser keeps the mic off with its reason.
+// Every control is a 44 px tap target (the send and ✓ draw 32 inside it),
+// 8 px apart.
 
 import * as React from "react";
 import {
@@ -28,6 +30,10 @@ import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { useVoiceInput } from "@/lib/voice/use-voice-input";
 import { cn } from "@/lib/utils";
+import { usePrePrompt } from "../kit/permission-sheet";
+import { useOnline } from "../kit/states";
+import { OFFLINE_REASON } from "./parts";
+import { T } from "../type";
 
 const BARS = 44;
 /** The box grows to about five lines, then scrolls inside. */
@@ -69,6 +75,10 @@ export function PromptBox({
   const [refining, setRefining] = React.useState(false);
   const [held, setHeld] = React.useState<string | null>(null);
   const [micOff, setMicOff] = React.useState(false);
+  const [enhanceFailed, setEnhanceFailed] = React.useState(false);
+  // Offline, nothing here reaches the model: send and Enhance are held with the reason.
+  const online = useOnline();
+  const mic = usePrePrompt("microphone", { body: "To describe your device by voice. You can always type it instead." });
   const valueRef = React.useRef(value);
   React.useEffect(() => {
     valueRef.current = value;
@@ -103,12 +113,16 @@ export function PromptBox({
   }, [value, listening]);
 
   const trimmed = value.trim();
-  const ready = !!trimmed && canSend && !disabled && !busy && !refining;
+  const ready = !!trimmed && canSend && online && !disabled && !busy && !refining;
 
   const send = () => {
     if (busy || disabled) return;
     if (!trimmed) {
       ta.current?.focus();
+      return;
+    }
+    if (!online) {
+      setHeld(OFFLINE_REASON);
       return;
     }
     if (!canSend) {
@@ -120,8 +134,9 @@ export function PromptBox({
   };
 
   const enhance = async () => {
-    if (!trimmed || refining || disabled) return;
+    if (!trimmed || refining || disabled || !online) return;
     setRefining(true);
+    setEnhanceFailed(false);
     try {
       const res = await fetch("/api/refine", {
         method: "POST",
@@ -129,20 +144,21 @@ export function PromptBox({
         body: JSON.stringify({ prompt: trimmed, mode: enhanceMode }),
       });
       const data = (await res.json()) as { refined?: string };
-      if (data.refined?.trim()) {
-        onChange(data.refined.trim());
-        requestAnimationFrame(() => ta.current?.focus());
-      }
+      if (!res.ok || !data.refined?.trim()) throw new Error("no rewrite");
+      onChange(data.refined.trim());
+      requestAnimationFrame(() => ta.current?.focus());
     } catch {
-      // The draft stays as it was.
+      // The draft stays as it was, and the maker is told so.
+      setEnhanceFailed(true);
     } finally {
       setRefining(false);
     }
   };
 
+  // KIT-PM-03: the first time, a pre-prompt says why before the browser asks.
   const startVoice = () => {
     setMicOff(false);
-    voice.start();
+    mic.ask(() => voice.start());
   };
 
   const recorded = voice.levels.length > BARS ? voice.levels.slice(-BARS) : voice.levels;
@@ -159,7 +175,7 @@ export function PromptBox({
             </button>
           }
         >
-          Microphone access was blocked — allow it in the browser to use voice. You can still type it.
+          Turn it on in your browser&apos;s settings to speak your idea. You can still type it.
         </Banner>
       )}
       <div
@@ -170,11 +186,11 @@ export function PromptBox({
       >
         {listening ? (
           <div className="flex min-h-[24px] flex-col gap-3" role="status" aria-live="polite">
-            <p className="inline-flex items-center gap-3 text-md leading-md text-text-secondary">
+            <p className={cn(T.body, "inline-flex items-center gap-3")}>
               <span aria-hidden className="size-[8px] rounded-full bg-bg-brand motion-safe:animate-pulse" />
               Listening…
             </p>
-            {voice.interim.trim() && <p className="text-md leading-md text-text-primary">{voice.interim.trim()}</p>}
+            {voice.interim.trim() && <p className={cn(T.body, "text-text-primary")}>{voice.interim.trim()}</p>}
           </div>
         ) : (
           <textarea
@@ -186,6 +202,7 @@ export function PromptBox({
             onChange={(e) => {
               onChange(e.target.value);
               if (held) setHeld(null);
+              if (enhanceFailed) setEnhanceFailed(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -195,20 +212,23 @@ export function PromptBox({
             }}
             placeholder={placeholder}
             aria-label={placeholder}
-            className="block min-h-[24px] w-full resize-none bg-transparent text-lg leading-lg text-text-primary outline-none placeholder:text-[color:var(--color-input-placeholder)] disabled:cursor-not-allowed"
+            className={cn(T.bodyLg, "block min-h-[24px] w-full resize-none bg-transparent outline-none placeholder:text-[color:var(--color-input-placeholder)] disabled:cursor-not-allowed")}
           />
         )}
 
         {listening ? (
           <div className="flex items-center gap-6">
+            {/* 32 px drawn, 44 px to tap (lens 16). */}
             <button
               type="button"
               onClick={voice.cancel}
               aria-label="Cancel — throw away what was said"
-              className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+              className="group -my-3 -ml-3 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none"
             >
-              <span className="inline-flex rounded-full border-[length:var(--border-width-1-5)] border-solid border-current p-1">
-                <Icon icon={Cancel01Icon} size={12} />
+              <span className="inline-flex size-[32px] items-center justify-center rounded-full transition-colors duration-fast group-hover:bg-bg-subtle group-active:bg-bg-subtle group-focus-visible:ring-2 group-focus-visible:ring-border-focus">
+                <span className="inline-flex rounded-full border-[length:var(--border-width-1-5)] border-solid border-current p-1">
+                  <Icon icon={Cancel01Icon} size={12} />
+                </span>
               </span>
             </button>
             <span aria-hidden className="flex h-[24px] min-w-0 flex-1 items-center gap-[2px] overflow-hidden">
@@ -227,9 +247,11 @@ export function PromptBox({
               type="button"
               onClick={voice.stop}
               aria-label="Done — put what was said in the box"
-              className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-md bg-bg-brand text-[color:var(--color-icon-on-brand)] outline-none hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+              className="group -my-3 -mr-3 inline-flex size-[44px] shrink-0 items-center justify-center outline-none"
             >
-              <Icon icon={Tick02Icon} size={18} />
+              <span className="inline-flex size-[32px] items-center justify-center rounded-md bg-bg-brand text-[color:var(--color-icon-on-brand)] transition-colors duration-fast group-hover:bg-bg-brand-hover group-active:bg-bg-brand-hover group-focus-visible:ring-2 group-focus-visible:ring-border-focus">
+                <Icon icon={Tick02Icon} size={18} />
+              </span>
             </button>
           </div>
         ) : (
@@ -240,7 +262,7 @@ export function PromptBox({
               disabled={disabled || !voice.supported}
               aria-label={voice.supported ? "Speak your idea" : "Voice input isn't available in this browser"}
               title={voice.supported ? undefined : "Voice input isn't available in this browser"}
-              className="-m-3 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:text-[color:var(--color-icon-disabled)] disabled:hover:bg-transparent"
+              className="-my-3 -ml-3 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:text-[color:var(--color-icon-disabled)] disabled:hover:bg-transparent"
             >
               <Icon icon={Mic01Icon} size={20} />
             </button>
@@ -249,14 +271,15 @@ export function PromptBox({
             <button
               type="button"
               onClick={enhance}
-              disabled={disabled || !trimmed || refining}
+              disabled={disabled || !trimmed || refining || !online}
               aria-busy={refining || undefined}
+              title={!online ? OFFLINE_REASON : undefined}
               className={cn(
-                "inline-flex min-h-[32px] items-center gap-2 rounded-md px-2 text-md leading-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed",
+                T.body, "-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:active:bg-transparent",
                 refining ? "text-text-brand" : "text-text-primary disabled:text-text-disabled",
               )}
             >
-              <span className={cn("inline-flex", refining && "motion-safe:animate-spin")}>
+              <span className={cn("inline-flex shrink-0", refining && "motion-safe:animate-spin")}>
                 <Icon icon={refining ? Refresh01Icon : MagicWand01Icon} size={16} />
               </span>
               Enhance
@@ -267,25 +290,35 @@ export function PromptBox({
               aria-disabled={!ready || undefined}
               aria-busy={busy || undefined}
               aria-label={sendKind === "generate" ? "Generate" : "Send"}
-              className={cn(
-                "inline-flex size-[32px] shrink-0 items-center justify-center rounded-md outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                ready || busy
-                  ? "bg-bg-brand text-[color:var(--color-icon-on-brand)] hover:bg-bg-brand-hover"
-                  : "cursor-not-allowed bg-bg-subtle text-[color:var(--color-icon-disabled)]",
-              )}
+              className={cn("group -my-3 -mr-3 inline-flex size-[44px] shrink-0 items-center justify-center outline-none", !(ready || busy) && "cursor-not-allowed")}
             >
-              <span className={cn("inline-flex", busy && "motion-safe:animate-spin")}>
-                <Icon icon={busy ? Refresh01Icon : sendKind === "generate" ? AiMagicIcon : ArrowUp02Icon} size={18} />
+              <span
+                className={cn(
+                  "inline-flex size-[32px] items-center justify-center rounded-md transition-colors duration-fast group-focus-visible:ring-2 group-focus-visible:ring-border-focus",
+                  ready || busy
+                    ? "bg-bg-brand text-[color:var(--color-icon-on-brand)] group-hover:bg-bg-brand-hover group-active:bg-bg-brand-hover"
+                    : "bg-bg-subtle text-[color:var(--color-icon-disabled)]",
+                )}
+              >
+                <span className={cn("inline-flex", busy && "motion-safe:animate-spin")}>
+                  <Icon icon={busy ? Refresh01Icon : sendKind === "generate" ? AiMagicIcon : ArrowUp02Icon} size={18} />
+                </span>
               </span>
             </button>
           </div>
         )}
       </div>
+      {enhanceFailed && (
+        <p role="status" className={T.meta}>
+          Couldn&apos;t enhance — your words are unchanged.
+        </p>
+      )}
       {held && (
-        <p role="status" className="text-sm leading-sm text-text-error">
+        <p role="status" className={cn(T.meta, "text-text-error")}>
           {held}
         </p>
       )}
+      {mic.sheet}
     </div>
   );
 }

@@ -1,179 +1,134 @@
 "use client";
 
-// 01 · Overview (owner decisions M2, M3, M5, M6): what the web's rail and
-// Products tab say, in one column —
-// · Activity: the current entry (the web's `view.current`) and + Add; the full
-//   timeline is the Activity tab;
-// · Products: the count and pieces line, the Build check, the first 3 rows,
-//   See all → the Products tab;
-// · Versions: the current version, See all → the Versions screen (05);
-// · About: Created, Parts, Team ›, Network ›, Stored (`aboutRowsOf`; Team and
-//   Network open their own screens, 06);
+// The project page under its products (owner decisions M2, M3, M5, M6; mobile
+// UX pass 2026-11-15: a hub of rows, not tabs):
+// · the hub — one card of rows that push a screen, each with its icon, its
+//   live value and the chevron: Activity (the web's `view.current`, "Now: …"),
+//   Media (the project video's state), Versions (the current version and when
+//   it was saved, 05), Team and Network (`aboutRowsOf`, 06);
+// · About: Created, Parts, Stored;
 // · Recent (20b): the web's rail log, once the project has gone out.
 
 import * as React from "react";
-import Link from "next/link";
-import { Add01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { buttonVariants } from "@/components/ideeza/button";
-import { Badge } from "@/components/ideeza/badge";
+import { Activity01Icon, GitBranchIcon, ShareKnowledgeIcon, UserGroupIcon, Video01Icon } from "@hugeicons/core-free-icons";
+import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { can } from "@/lib/manual/permissions";
+import { engineeringMetaOf, stageLineOf } from "@/lib/manual/project-header";
 import { formatDate } from "@/lib/manual/project-summary";
-import { shortOf } from "@/lib/manual/journey";
+import { labelOf } from "@/lib/manual/journey";
+import { currentProductsOf } from "@/lib/manual/readiness";
 import { aboutRowsOf } from "@/lib/manual/rail-copy";
-import { LOG_SHOWN, logLinesOf, versionGroupsOf } from "@/lib/manual/rail-rows";
-import { phoneProjectHref, phoneProjectPath } from "@/lib/manual/phone-project";
+import { LOG_SHOWN, logLinesOf } from "@/lib/manual/rail-rows";
+import { phoneProjectHref, phoneProjectPath, phoneWords } from "@/lib/manual/phone-project";
 import { PROTOCOLS } from "@/lib/network/catalog";
 import { useProjectNetwork } from "@/lib/network/store";
+import { projectVideoStatusOf } from "@/lib/video/project-video";
+import { useProjectVideos } from "@/lib/video/store";
+import { projectRowCopy, resolutionOf } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import { ListCard as KitListCard, ListRow } from "../kit/list";
+import { T } from "../type";
 import { useProject } from "./context";
-import { BuildCheckLine, useProductRows } from "./product-rows";
-import { Chevron, InfoRow, LIST_CARD, ListCard, ProductRow, SectionHeading, SubLine } from "./parts";
+import { InfoRow, LINK_MD, ListCard, SectionHeading } from "./parts";
 
-export function OverviewTab() {
-  const { project, view, viewer } = useProject();
-  const owner = can(viewer, "facts.seeOwnerOnly");
-  return (
-    <div className="flex flex-col gap-12">
-      <ActivitySection />
-      <ProductsSection />
-      <VersionsSection />
-      <AboutSection />
-      {owner && view.summary.status !== "draft" && <RecentSection key={project.id} />}
-    </div>
-  );
-}
+const text = (parts: { kind: string; text?: string; time?: { text: string } }[]) =>
+  parts.map((m) => (m.kind === "time" ? (m.time?.text ?? "") : (m.text ?? ""))).join("");
 
-function ActivitySection() {
-  const { project, view, viewer } = useProject();
-  const now = view.current;
-  const canAdd = can(viewer, "activity.write", view.canCtx);
-  return (
-    <section aria-labelledby="ov-activity" className="flex flex-col gap-4">
-      <SectionHeading
-        id="ov-activity"
-        title="Activity"
-        action={
-          canAdd ? (
-            <Link
-              href={phoneProjectPath(project.id, "activity/new")}
-              aria-label="Add activity"
-              className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}
-            >
-              <Icon icon={Add01Icon} size={20} />
-              Add
-            </Link>
-          ) : undefined
-        }
-      />
-      <Link
-        href={phoneProjectHref(project.id, "activity")}
-        className={cn(LIST_CARD, "gap-3 px-8 py-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle")}
-      >
-        <span className="flex items-center gap-4">
-          <Badge tone="brand-outline">{shortOf(now)}</Badge>
-          <span className="text-md leading-md text-text-secondary">{formatDate(now.createdAt)}</span>
-        </span>
-        <span className="line-clamp-2 text-md leading-md text-text-primary">{now.description || "Project created."}</span>
-      </Link>
-    </section>
-  );
-}
-
-function ProductsSection() {
-  const { project } = useProject();
-  const { rows, line, headline } = useProductRows();
-  return (
-    <section aria-labelledby="ov-products" className="flex flex-col gap-4">
-      <SectionHeading
-        id="ov-products"
-        title="Products"
-        link={rows.length ? { href: phoneProjectHref(project.id, "products"), label: "See all", aria: "See all products" } : undefined}
-      />
-      <SubLine>{line}</SubLine>
-      <BuildCheckLine headline={headline} />
-      {rows.length > 0 ? (
-        <ListCard label="Products">
-          {rows.slice(0, 3).map((r) => (
-            <ProductRow key={r.id} href={r.href} thumb={r.thumb} name={r.name} stage={r.stage} meta={r.meta} facts={r.facts} />
-          ))}
-        </ListCard>
-      ) : (
-        <SubLine>No products yet. Add one on the Products tab.</SubLine>
-      )}
-    </section>
-  );
-}
-
-function VersionsSection() {
-  const { project, view } = useProject();
-  const groups = React.useMemo(() => versionGroupsOf(view.versions, view.lineages, project.id), [view.versions, view.lineages, project.id]);
-  const group = groups.find((g) => g.rows.some((r) => r.title.endsWith("current"))) ?? groups[0];
-  const row = group?.rows.find((r) => r.title.endsWith("current")) ?? group?.rows[0];
-  if (!group || !row) return null;
-  const saved = row.saved?.map((m) => (m.kind === "time" ? m.time.text : m.text)).join("") ?? null;
-  const href = phoneProjectPath(project.id, "versions");
-  return (
-    <section aria-labelledby="ov-versions" className="flex flex-col gap-4">
-      <SectionHeading id="ov-versions" title="Versions" link={{ href, label: "See all", aria: "See all versions" }} />
-      <Link
-        href={href}
-        className={cn(LIST_CARD, "flex-row items-center gap-6 p-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle")}
-      >
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-md font-semibold leading-md text-text-primary">{row.title}</span>
-          <span className="text-sm leading-sm text-text-secondary">{[saved, row.pieces].filter(Boolean).join(" · ")}</span>
-          <span className="truncate text-sm leading-sm text-text-secondary">{group.heading}</span>
-        </span>
-        <Chevron />
-      </Link>
-    </section>
-  );
-}
-
-function AboutSection() {
+/** The rows About used to carry, in the phone's order, with the network's protocol named. */
+function useAboutRows() {
   const { project, view, viewer } = useProject();
   const owner = can(viewer, "facts.seeOwnerOnly");
   const { network } = useProjectNetwork(owner ? project.id : null);
-  const rows = React.useMemo(() => {
+  return React.useMemo(() => {
     const built = view.products.filter((p) => p.built && !p.dropped);
     const protocol = network ? (PROTOCOLS.find((x) => x.key === network.protocol) ?? null) : null;
-    const all = aboutRowsOf({
+    const rows = aboutRowsOf({
       createdAt: project.createdAt,
       parts: built.length ? built.reduce((n, p) => n + (p.built?.product.parts.length ?? 0), 0) : null,
       network: network ? { protocol: protocol?.radioLabel ?? protocol?.name ?? "Custom", links: network.links.length } : null,
       team: (project.contributors ?? []).length,
     });
-    // The phone's order (Figma 01): Created, Parts, Team, Network, Stored.
-    const order = ["created", "parts", "team", "network", "stored"];
-    return [...all].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+    return Object.fromEntries(rows.map((r) => [r.key, { label: r.label, value: text(r.value) }])) as Record<string, { label: string; value: string } | undefined>;
   }, [project, view.products, network]);
-  const hrefOf: Record<string, string> = {
-    team: phoneProjectPath(project.id, "team"),
-    network: phoneProjectPath(project.id, "network"),
-  };
+}
+
+/** The project video's state in a line: the take in use, else the web's row words. */
+function useMediaLine(): string | null {
+  const { project, view } = useProject();
+  const { record } = useProjectVideos(project.id);
+  const { jobs, now } = useVideoJobs();
+  if (currentProductsOf(view.products).length === 0) return null;
+  const status = projectVideoStatusOf({ products: view.products, videos: record, jobs, now });
+  const take = status.video.state === "ready" ? status.video.take : null;
+  if (take && status.state === "ready") {
+    return ["Project video", `Take ${take.n}`, resolutionOf(take.quality), take.clip ? `${Math.round(take.clip.durationMs / 1000)} s` : null]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return projectRowCopy(status).text;
+}
+
+export function ProjectHub() {
+  const { project, view, viewer } = useProject();
+  const owner = can(viewer, "facts.seeOwnerOnly");
+  const about = useAboutRows();
+  const mediaLine = useMediaLine();
+  const now = view.current;
+  // "v1 · Saved Nov 7, 2026[ · build not in this browser]": the header's old second line.
+  const version = view.engineering.state === "empty" ? null : (stageLineOf(view.engineering, view.summary).split(" · ").pop() ?? null);
+  const saved = text(engineeringMetaOf(view.summary, null));
+  return (
+    <KitListCard label="Project">
+      <ListRow
+        href={phoneProjectHref(project.id, "activity")}
+        icon={Activity01Icon}
+        title="Activity"
+        meta={`Now: ${labelOf(now)} · ${formatDate(now.createdAt)}`}
+      />
+      <ListRow href={phoneProjectHref(project.id, "media")} icon={Video01Icon} title="Media" meta={mediaLine ?? undefined} />
+      <ListRow
+        href={phoneProjectPath(project.id, "versions")}
+        icon={GitBranchIcon}
+        title="Versions"
+        meta={[version, saved].filter(Boolean).join(" · ")}
+      />
+      {about.team &&
+        (owner ? (
+          <ListRow href={phoneProjectPath(project.id, "team")} icon={UserGroupIcon} title="Team" value={about.team.value} />
+        ) : (
+          <ListRow icon={UserGroupIcon} title="Team" value={about.team.value} />
+        ))}
+      {about.network &&
+        (owner ? (
+          <ListRow href={phoneProjectPath(project.id, "network")} icon={ShareKnowledgeIcon} title="Network" value={about.network.value} />
+        ) : (
+          <ListRow icon={ShareKnowledgeIcon} title="Network" value={about.network.value} />
+        ))}
+    </KitListCard>
+  );
+}
+
+export function ProjectAbout() {
+  const about = useAboutRows();
+  const rows = (["created", "parts", "stored"] as const).map((k) => about[k]).filter((r): r is { label: string; value: string } => !!r);
   return (
     <section aria-labelledby="ov-about" className="flex flex-col gap-4">
       <SectionHeading id="ov-about" title="About" />
       <ListCard label="About">
         {rows.map((r) => (
-          <InfoRow
-            key={r.key}
-            label={r.label}
-            value={r.value.map((m) => (m.kind === "time" ? m.time.text : m.text)).join("")}
-            href={owner ? hrefOf[r.key] : undefined}
-          />
+          <InfoRow key={r.label} label={r.label} value={r.value} />
         ))}
       </ListCard>
     </section>
   );
 }
 
-function RecentSection() {
-  const { view } = useProject();
+export function ProjectRecent() {
+  const { view, viewer } = useProject();
+  const owner = can(viewer, "facts.seeOwnerOnly");
   const lines = React.useMemo(() => logLinesOf(view.log, { network: true, products: view.products }), [view.log, view.products]);
   const [all, setAll] = React.useState(false);
-  if (lines.length === 0) return null;
+  if (!owner || view.summary.status === "draft" || lines.length === 0) return null;
   const shown = all ? lines : lines.slice(0, LOG_SHOWN);
   return (
     <section aria-labelledby="ov-recent" className="flex flex-col gap-4">
@@ -181,9 +136,10 @@ function RecentSection() {
       <ul className="flex flex-col gap-6">
         {shown.map((l) => (
           <li key={l.key} className="flex flex-col gap-1">
-            <span className="text-md font-medium leading-md text-text-primary">{l.title}</span>
-            {l.note && <span className="text-sm leading-sm text-text-secondary">{l.note}</span>}
-            <span className="text-sm leading-sm text-text-tertiary">{l.when.map((m) => (m.kind === "time" ? m.time.text : m.text)).join("")}</span>
+            {/* The phone has no Innovations: the web's "Shared to Innovations" reads "Shared to Feed". */}
+            <span className={T.rowTitle}>{phoneWords(l.title)}</span>
+            {l.note && <span className={T.meta}>{phoneWords(l.note)}</span>}
+            <span className={cn(T.meta, "text-text-tertiary")}>{l.when.map((m) => (m.kind === "time" ? m.time.text : m.text)).join("")}</span>
           </li>
         ))}
       </ul>
@@ -192,7 +148,7 @@ function RecentSection() {
           <button
             type="button"
             onClick={() => setAll((v) => !v)}
-            className="-my-6 inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline"
+            className={cn(LINK_MD, "-my-6 inline-flex min-h-[44px] items-center")}
           >
             {all ? "Show less" : `Show all (${lines.length})`}
           </button>

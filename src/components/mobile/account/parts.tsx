@@ -2,13 +2,15 @@
 
 // Small pieces every Account screen shares (mobile Figma AU-*): the heading
 // (Heading/H4, then Body/SM in text/secondary, 4 apart), the live password
-// checklist, the M01 alert slot, and Splash.
+// checklist, the M01 alert slot (and the one alert for a browser that won't
+// save), where a new account goes first, and Splash.
 
 import * as React from "react";
 import { AiMagicIcon, CheckmarkCircle02Icon, CircleIcon, CpuIcon, Image01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Banner, type BannerTone } from "@/components/ideeza/banner";
+import { currentAccount, needsSourceQuestion, readAccounts, readSession } from "@/lib/account/auth";
 import { phonePasswordChecks } from "@/lib/account/phone";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
@@ -16,8 +18,8 @@ import { T } from "../type";
 export function AccountHeading({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="text-3xl font-semibold leading-3xl text-text-primary">{title}</h2>
-      {children && <p className="text-md leading-md text-text-secondary [overflow-wrap:anywhere]">{children}</p>}
+      <h2 className={T.title}>{title}</h2>
+      {children && <p className={cn(T.body, "[overflow-wrap:anywhere]")}>{children}</p>}
     </div>
   );
 }
@@ -25,20 +27,45 @@ export function AccountHeading({ title, children }: { title: string; children?: 
 /** The Account screens' content column: 16 to the sides, 12 apart, 16 below. */
 export const ACCOUNT_CONTENT = "flex flex-col gap-6 px-8 pb-8";
 
-/** "Password checklist (live)": each rule ticks (icon and text success) as it is met. */
+/** How far along a new password is, in the web's words and inks (auth-parts' LEVELS), by rules met. */
+const STRENGTH = [
+  { word: "Weak", ink: "text-text-error", bar: "bg-[var(--color-icon-error)]" },
+  { word: "Weak", ink: "text-text-error", bar: "bg-[var(--color-icon-error)]" },
+  { word: "Fair", ink: "text-text-warning", bar: "bg-[var(--color-icon-warning)]" },
+  { word: "Fair", ink: "text-text-warning", bar: "bg-[var(--color-icon-warning)]" },
+  { word: "Almost there", ink: "text-text-warning", bar: "bg-[var(--color-icon-warning)]" },
+  { word: "Strong", ink: "text-text-success", bar: "bg-[var(--color-icon-success)]" },
+] as const;
+
+/** "Password checklist (live)": the web's five rules, each ticking (icon and
+ *  text success) as it is met, under the web's strength bar (one segment a
+ *  rule, Weak · Fair · Almost there · Strong). */
 export function PasswordChecklist({ password, id }: { password: string; id?: string }) {
+  const checks = phonePasswordChecks(password);
+  const met = checks.filter((c) => c.met).length;
+  const level = STRENGTH[password ? met : 0];
   return (
-    <ul id={id} aria-label="Password rules" className="flex flex-col gap-2">
-      {phonePasswordChecks(password).map((c) => (
-        <li key={c.id} className={cn("flex items-center gap-4 text-sm leading-sm", c.met ? "text-text-success" : "text-text-secondary")}>
-          <span className={c.met ? "text-[color:var(--color-icon-success)]" : "text-[color:var(--color-icon-secondary)]"}>
-            <Icon icon={c.met ? CheckmarkCircle02Icon : CircleIcon} size={16} />
-          </span>
-          {c.label}
-          <span className="sr-only">{c.met ? "(done)" : "(not yet)"}</span>
-        </li>
-      ))}
-    </ul>
+    <div id={id} className="flex flex-col gap-3">
+      <div className="flex items-center gap-4">
+        <div aria-hidden className="flex flex-1 gap-2">
+          {checks.map((c, i) => (
+            <span key={c.id} className={cn("h-[4px] flex-1 rounded-full", password && i < met ? level.bar : "bg-[var(--color-border-default)]")} />
+          ))}
+        </div>
+        <span className={cn(T.meta, password ? level.ink : "text-text-tertiary")}>{password ? level.word : "Password rules"}</span>
+      </div>
+      <ul aria-label="Password rules" className="flex flex-col gap-2">
+        {checks.map((c) => (
+          <li key={c.id} className={cn(T.meta, "flex items-center gap-4", c.met && "text-text-success")}>
+            <span className={c.met ? "text-[color:var(--color-icon-success)]" : "text-[color:var(--color-icon-secondary)]"}>
+              <Icon icon={c.met ? CheckmarkCircle02Icon : CircleIcon} size={16} />
+            </span>
+            {c.label}
+            <span className="sr-only">{c.met ? "(done)" : "(not yet)"}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -52,6 +79,24 @@ export function AccountAlert({ alert }: { alert: AlertSpec | null }) {
       {alert.body}
     </Banner>
   );
+}
+
+/** The browser refused to save (storage full or blocked): the web's words, on every way-in screen. */
+export const REFUSED_ALERT: AlertSpec = {
+  tone: "error",
+  title: "Couldn’t save",
+  body: "This browser wouldn’t save that. Check that it allows this site to store data, then try again.",
+};
+
+/** Where a new account goes once it is in, as on the web: the one question
+ *  ("Where did you hear about IDEEZA?") when the link that brought it didn't
+ *  say, then the Welcome map; both carry where it was going. Nothing else is
+ *  asked: the name and birthday came with Sign up, and the handle and the rest
+ *  of the profile wait in Settings and Edit profile, as on the web. */
+export function landingAfterSignUp(next: string): string {
+  const account = currentAccount(readAccounts(), readSession());
+  const tail = next === "/m" ? "" : `?next=${encodeURIComponent(next)}`;
+  return `${account && needsSourceQuestion(account) ? "/m/source" : "/m/welcome-map"}${tail}`;
 }
 
 /** AU-01 · Splash: IDEEZA's brand moment while the app works out where to

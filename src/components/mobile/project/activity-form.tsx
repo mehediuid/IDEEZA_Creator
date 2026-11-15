@@ -10,12 +10,13 @@
 // Add now waits while files save (04o). Editing keeps at least one file, so
 // the only one can't be removed (04e). Cancel · Add now ride on the keyboard
 // (04s). A price snapshot is taken when it is added while listed (04i).
+// Cancel and Back ask "Discard this activity?" once anything was typed or
+// attached (07g pattern), since the files picked here are dropped on leaving.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { ArrowDown01Icon, Cancel01Icon, CloudUploadIcon, Doc01Icon, Image01Icon, Pdf01Icon, Video01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Cancel01Icon, CloudUploadIcon, Doc01Icon, Image01Icon, InformationCircleIcon, Pdf01Icon, Video01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
+import { FIELD_LABEL, Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { Radio } from "@/components/ideeza/checkbox";
@@ -34,11 +35,14 @@ import type { ListingMetadata } from "@/lib/market/types";
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
+import { ConfirmSheet } from "../kit/confirm-sheet";
+import { useGoBack } from "../nav-trail";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { ProjectLoading } from "./project-screen";
+import { T } from "../type";
+import { ProjectLoading, ProjectMissing } from "./project-screen";
 
 const NAME_MAX = 40;
 const DESCRIPTION_MAX = 400;
@@ -97,12 +101,12 @@ export function ActivityFormScreen({
   if (data.state === "loading" || (data.state === "ready" && !hydrated)) return <ProjectLoading />;
   const product = productId && data.state === "ready" ? (data.view.products.find((p) => p.id === productId) ?? null) : null;
   const back = productId ? phoneProductPath(projectId, productId, "activity") : phoneProjectHref(projectId, "activity");
-  if (data.state === "missing") return <Missing back="/m/projects" text="We couldn't find this project" />;
-  if (productId && !product) return <Missing back={phoneProjectHref(projectId, "products")} text="We couldn't find this product" />;
+  if (data.state === "missing") return <ProjectMissing />;
+  if (productId && !product) return <ProjectMissing thing="product" back={phoneProjectHref(projectId, "products")} backLabel="Back to Products" />;
   const target: ActivityTarget = product ? { kind: "product", productId: product.id } : TARGET;
   const defaultAt = product ? productAddedAt(data.project, data.view.refs, product) : data.project.createdAt;
   const entry = activityId ? (historyOf(record, data.project.id, target, defaultAt).find((e) => e.id === activityId && !e.isDefault) ?? null) : null;
-  if (activityId && !entry) return <Missing back={back} text="We couldn't find this activity" />;
+  if (activityId && !entry) return <ProjectMissing thing="activity" back={back} backLabel="Back to Activity" />;
   return (
     <ActivityForm
       key={entry?.id ?? "new"}
@@ -113,14 +117,6 @@ export function ActivityFormScreen({
       target={target}
       forName={product ? displayProductName(product.name) : null}
     />
-  );
-}
-
-function Missing({ back, text }: { back: string; text: string }) {
-  return (
-    <Screen top={<TopBar back={back} />} className="px-8">
-      <p className="pt-8 text-lg font-semibold leading-lg text-text-primary">{text}</p>
-    </Screen>
   );
 }
 
@@ -159,7 +155,6 @@ function ActivityForm({
   /** A product's name: the form says whose activity it adds and where its NFTs' activity is. */
   forName?: string | null;
 }) {
-  const router = useRouter();
   const toast = useToast();
   const { record, write } = useJourney(projectId);
   const listingFacts = useListingFacts(projectId, products);
@@ -167,6 +162,7 @@ function ActivityForm({
   const ids = useFieldIds(["type", "name", "description", "media"] as const);
   const [type, setType] = React.useState(entry?.type ?? "");
   const [picking, setPicking] = React.useState(false);
+  const [rules, setRules] = React.useState(false);
   const [customName, setCustomName] = React.useState(entry?.customName ?? "");
   const [description, setDescription] = React.useState(entry?.description ?? "");
   const [urls, setUrls] = React.useState<string[]>(entry?.urls ?? []);
@@ -178,6 +174,8 @@ function ActivityForm({
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
+  const [leaving, setLeaving] = React.useState<(() => void) | null>(null);
+  const goBack = useGoBack(back);
 
   // A file this form wrote is dropped again unless the entry is saved (quota is real).
   const filesRef = React.useRef(files);
@@ -297,31 +295,41 @@ function ActivityForm({
     }
     submitted.current = true;
     toast({ title: `${labelOf({ target, type, customName })} ${mode === "add" ? "added" : "updated"}` });
-    router.push(back);
+    goBack();
   };
 
   const failed = files.filter((f) => f.status === "error").length;
+  // Anything typed, linked or attached that Save hasn't kept yet.
+  const dirty = entry
+    ? type !== entry.type ||
+      customName !== (entry.customName ?? "") ||
+      description !== entry.description ||
+      urls.join("\n") !== entry.urls.join("\n") ||
+      files.length !== entry.media.length ||
+      files.some((f) => f.isNew)
+    : type !== "" || customName.trim() !== "" || description.trim() !== "" || urls.some((u) => u.trim()) || files.length > 0;
+  const leave = (go: () => void) => (dirty && !saving ? setLeaving(() => go) : go());
   return (
     <Screen
-      top={<TopBar back={back} title={mode === "add" ? "Add new activity" : "Edit activity"} />}
+      top={
+        <TopBar
+          back={back}
+          onBack={leave}
+          title={mode === "add" ? "Add new activity" : "Edit activity"}
+          actions={[{ icon: InformationCircleIcon, label: "What this needs", onClick: () => setRules(true) }]}
+        />
+      }
       footer={
-        <BottomBar className="flex-row gap-6 pt-8">
-          <Button hierarchy="secondary" size="xl" className="flex-1" onClick={() => router.push(back)}>
-            Cancel
-          </Button>
-          <Button size="xl" className="flex-1" type="submit" form="m-activity-form" loading={busy}>
+        // Back (with its Discard changes? ask) is the way out, so the bar holds the one primary.
+        <BottomBar className="pt-8">
+          <Button size="xl" className="w-full" type="submit" form="m-activity-form" loading={busy}>
             {mode === "add" ? "Add now" : "Update"}
           </Button>
         </BottomBar>
       }
     >
       <form id="m-activity-form" onSubmit={submit} noValidate className="flex flex-col gap-8 px-8 pb-12">
-        {forName && <p className="text-md leading-md text-text-secondary">For {forName}. Its NFTs get their own activity in Earn › Sell.</p>}
-        <p className="text-md leading-md text-text-secondary">
-          {mode === "add"
-            ? "Add at least one photo, video, PDF or document as proof — people who buy it see it in the journey. Everything is required unless it says optional."
-            : "Changes update this entry in the journey. It keeps at least one file."}
-        </p>
+        {forName && <p className={T.body}>For {forName}. Its NFTs get their own activity in Earn › Sell.</p>}
 
         <Field label="Activity type" htmlFor={ids.type.id} error={typeError} errorId={ids.type.errorId}>
           <button
@@ -335,7 +343,7 @@ function ActivityForm({
               typeError ? "border-[var(--color-input-border-error)]" : "border-[var(--color-input-border)]",
             )}
           >
-            <span className={cn("truncate text-lg leading-lg", picked ? "text-[color:var(--color-input-text)]" : "text-[color:var(--color-input-placeholder)]")}>
+            <span className={cn(T.bodyLg, "truncate", picked ? "text-[color:var(--color-input-text)]" : "text-[color:var(--color-input-placeholder)]")}>
               {picked?.label ?? "Choose a type"}
             </span>
             <Icon icon={ArrowDown01Icon} size={16} className="shrink-0 text-[color:var(--color-icon-default)]" />
@@ -345,21 +353,28 @@ function ActivityForm({
         {isOthers && (
           <Field label="Activity Name" htmlFor={ids.name.id} error={nameError} errorId={ids.name.errorId}>
             <TextInput id={ids.name.id} size="xl" value={customName} onValueChange={setCustomName} autoComplete="off" {...errorProps(nameError, ids.name.errorId)} />
-            <span className="text-sm leading-sm text-text-secondary">
+            <span className={T.caption}>
               {nameLen}/{NAME_MAX}
             </span>
           </Field>
         )}
 
         <Field label="Description" htmlFor={ids.description.id} error={descError} errorId={ids.description.errorId}>
-          <Textarea id={ids.description.id} rows={4} value={description} onValueChange={setDescription} {...errorProps(descError, ids.description.errorId)} />
-          <span className="text-sm leading-sm text-text-secondary">
+          <Textarea
+            id={ids.description.id}
+            rows={4}
+            value={description}
+            onValueChange={setDescription}
+            placeholder="What happened at this stage?"
+            {...errorProps(descError, ids.description.errorId)}
+          />
+          <span className={T.caption}>
             {descLen}/{DESCRIPTION_MAX}
           </span>
         </Field>
 
         <div className="flex flex-col gap-3">
-          <p className="text-md font-medium leading-md text-text-primary">Attach links (optional)</p>
+          <p className={FIELD_LABEL}>Attach links (optional)</p>
           {urls.map((u, i) => (
             <div key={i} className="flex flex-col gap-2">
               <div className="flex items-center gap-4">
@@ -378,7 +393,7 @@ function ActivityForm({
                   <Icon icon={Cancel01Icon} size={20} />
                 </Button>
               </div>
-              {urlErrors[i] && <p className="text-sm leading-sm text-text-error">{urlErrors[i]}</p>}
+              {urlErrors[i] && <p className={cn(T.caption, "text-text-error")}>{urlErrors[i]}</p>}
             </div>
           ))}
           <div>
@@ -389,7 +404,7 @@ function ActivityForm({
         </div>
 
         <div className="flex flex-col gap-3">
-          <p id={ids.media.id} className="text-md font-medium leading-md text-text-primary">
+          <p id={ids.media.id} className={FIELD_LABEL}>
             Attach media
           </p>
           <button
@@ -402,15 +417,15 @@ function ActivityForm({
             )}
           >
             <Icon icon={CloudUploadIcon} size={24} className="text-[color:var(--color-icon-default)]" />
-            <span className="text-md font-medium leading-md text-text-primary">Tap to add a photo, video or file</span>
-            <span className="text-sm leading-sm text-text-secondary">PNG, JPG, PDF, DOC, GIF, Video or DOCX</span>
+            <span className={T.rowTitle}>Tap to add a photo, video or file</span>
+            <span className={T.meta}>PNG, JPG, PDF, DOC, GIF, Video or DOCX</span>
           </button>
           <input ref={fileRef} type="file" multiple accept={ACCEPT} className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => {
             addFiles(e.target.files);
             e.target.value = "";
           }} />
           {mediaError && (
-            <p id={ids.media.errorId} className="text-sm leading-sm text-text-error">
+            <p id={ids.media.errorId} className={cn(T.caption, "text-text-error")}>
               {mediaError}
             </p>
           )}
@@ -429,8 +444,8 @@ function ActivityForm({
                       )}
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="truncate text-md leading-md text-text-primary">{f.name}</span>
-                      <span className={cn("text-sm leading-sm", f.status === "error" ? "text-text-error" : "text-text-secondary")}>
+                      <span className={cn(T.body, "truncate text-text-primary")}>{f.name}</span>
+                      <span className={cn(T.meta, f.status === "error" && "text-text-error")}>
                         {sizeOf(f.size)}
                         {f.status === "saving" ? " · Saving…" : f.status === "error" ? " · Couldn't save this file" : ""}
                       </span>
@@ -450,7 +465,7 @@ function ActivityForm({
               })}
             </ul>
           )}
-          {mode === "edit" && count <= 1 && <p className="text-sm leading-sm text-text-secondary">Keep at least one file as proof. Add another to remove this one.</p>}
+          {mode === "edit" && count <= 1 && <p className={T.meta}>Keep at least one file as proof. Add another to remove this one.</p>}
           {(failed > 0 || rejected > 0) && (
             <Banner tone="error" title={failed > 0 ? "Couldn't save — this browser's storage is full." : "Some files weren't added."}>
               {[
@@ -482,13 +497,35 @@ function ActivityForm({
                 />
                 <Radio checked={type === t.id} decorative className="mt-1" />
                 <span className="flex flex-col gap-1">
-                  <span className="text-lg leading-lg text-text-primary">{t.label}</span>
-                  <span className="text-sm leading-sm text-text-secondary">{t.help}</span>
+                  <span className={T.bodyLg}>{t.label}</span>
+                  <span className={T.meta}>{t.help}</span>
                 </span>
               </label>
             </li>
           ))}
         </ul>
+      </Sheet>
+      <ConfirmSheet
+        open={leaving !== null}
+        onClose={() => setLeaving(null)}
+        title={mode === "add" ? "Discard this activity?" : "Discard your changes?"}
+        body={mode === "add" ? "What you typed and the files you added aren’t saved yet." : "Your changes to this activity aren’t saved yet."}
+        verb="Discard"
+        destructive
+        cancelLabel="Keep editing"
+        onConfirm={() => {
+          const go = leaving;
+          setLeaving(null);
+          go?.();
+        }}
+      />
+      {/* The form's rules (lens 1: off the form, one tap away). */}
+      <Sheet open={rules} onClose={() => setRules(false)} title={mode === "add" ? "Add new activity" : "Edit activity"}>
+        <p className={cn(T.body, "pb-8")}>
+          {mode === "add"
+            ? "Add at least one photo, video, PDF or document as proof — people who buy it see it in the journey. Everything is required unless it says optional."
+            : "Changes update this entry in the journey. It keeps at least one file."}
+        </p>
       </Sheet>
     </Screen>
   );

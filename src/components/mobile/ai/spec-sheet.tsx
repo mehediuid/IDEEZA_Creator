@@ -45,7 +45,9 @@ import { MM_MAX, MM_MIN, WALL_MAX_MM, WALL_MIN_MM, WALL_STEP_MM, asMm3, cleanEdi
 import { ENVIRONMENT_KEYS, MATERIALS, MCU_KEYS, type AddableKey, type BatteryKey, type ChargePortKey, type EnvironmentKey, type McuKey, type RadioKey, type SpecEdits } from "@/lib/spec/types";
 import { currentLabel, mm3, runtimeLabel } from "@/lib/spec/units";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
+import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
 import { PickField } from "./pick-sheet";
 import type { ConceptFlow } from "./use-concept-flow";
 
@@ -87,7 +89,7 @@ export function SpecSheet({ flow, productId, onClose }: { flow: ConceptFlow; pro
           >
             Done
           </Button>
-          <p className="text-center text-sm leading-sm text-text-tertiary">Changes save as you go · the build uses these parts · the image stays as the look</p>
+          <p className={cn(T.meta, "text-center text-text-tertiary")}>Changes save as you go · the build uses these parts · the image stays as the look</p>
         </>
       }
     >
@@ -264,14 +266,14 @@ function Groups({
             <Label>{DOES_LABEL[role]}</Label>
             <ul className="flex flex-wrap gap-3">
               {own.map((p, i) => (
-                <li key={`${p.name}-${i}`} className="inline-flex min-h-[32px] items-center gap-2 rounded-full bg-bg-surface pl-5 pr-2 text-sm leading-sm text-text-primary ring-1 ring-border-subtle">
+                <li key={`${p.name}-${i}`} className={cn(T.meta, "inline-flex min-h-[32px] items-center gap-2 rounded-full bg-bg-surface pl-5 pr-2 text-text-primary ring-1 ring-border-subtle")}>
                   {readableName(p)}
                   {editable && (
                     <button
                       type="button"
                       aria-label={`Take out ${readableName(p)}`}
                       onClick={() => edit(removePart(edits, p, conceptParts))}
-                      className="inline-flex size-[28px] items-center justify-center rounded-full text-[color:var(--color-icon-default)] hover:bg-bg-subtle"
+                      className="relative inline-flex size-[28px] items-center justify-center rounded-full text-[color:var(--color-icon-default)] after:absolute after:-inset-4 after:content-[''] hover:bg-bg-subtle active:bg-bg-subtle"
                     >
                       <Icon icon={Cancel01Icon} size={12} />
                     </button>
@@ -437,7 +439,7 @@ function Groups({
       <span className="w-fit">
         <Badge tone={blocksBuild(spec) ? "error" : "success"}>{blocksBuild(spec) ? "● Doesn't fit" : "● Ready"}</Badge>
       </span>
-      <ul className="flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle">{groups}</ul>
+      <ul aria-label="Spec" className={cn(LIST_CARD, LIST_DIVIDERS)}>{groups}</ul>
       {kindNote && <Note>{kindNote}</Note>}
     </div>
   );
@@ -494,7 +496,7 @@ function SizeGroup({
         <div className="grid grid-cols-3 gap-4">
           {(["l", "w", "h"] as const).map((k) => (
             <label key={k} className="flex flex-col gap-2">
-              <span className="text-sm leading-sm text-text-secondary">{k === "l" ? "Length" : k === "w" ? "Width" : "Height"}, mm</span>
+              <span className={T.meta}>{k === "l" ? "Length" : k === "w" ? "Width" : "Height"}, mm</span>
               <TextInput
                 size="lg"
                 inputMode="numeric"
@@ -565,20 +567,20 @@ function GroupRow({
 }) {
   const id = React.useId();
   return (
-    <li className="border-b-[length:var(--border-width-1)] border-solid border-border-subtle last:border-b-0">
+    <li>
       <button
         type="button"
         aria-expanded={open}
         aria-controls={id}
         onClick={onToggle}
-        className={cn("flex min-h-[64px] w-full items-center gap-4 px-7 py-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus", open && "bg-bg-subtle")}
+        className={cn("flex min-h-[64px] w-full items-center gap-4 px-7 py-5 text-left outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus", open && "bg-bg-subtle")}
       >
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-3">
-            <span className="text-lg font-medium leading-lg text-text-primary">{title}</span>
-            {tag && <span className="text-sm leading-sm text-text-blue">{tag}</span>}
+            <span className={T.bodyStrong}>{title}</span>
+            {tag && <span className={cn(T.meta, "text-text-blue")}>{tag}</span>}
           </span>
-          <span className={cn("truncate text-sm leading-sm", valueTone === "error" ? "text-text-error" : valueTone === "warn" ? "text-text-warning" : "text-text-secondary")}>{value}</span>
+          <span className={cn(T.meta, "truncate", valueTone === "error" ? "text-text-error" : valueTone === "warn" ? "text-text-warning" : "text-text-secondary")}>{value}</span>
         </span>
         <span className="text-[color:var(--color-icon-default)]">
           <Icon icon={open ? ArrowUp01Icon : ArrowDown01Icon} size={18} />
@@ -588,7 +590,7 @@ function GroupRow({
         <div id={id} className="flex flex-col gap-4 bg-bg-subtle px-7 pb-7">
           {children}
           {onReset && (
-            <button type="button" onClick={onReset} className="-my-2 min-h-[40px] w-fit text-md font-medium leading-md text-text-brand hover:underline">
+            <button type="button" onClick={onReset} className={cn(T.rowTitle, "-my-3 min-h-[44px] w-fit text-text-brand hover:underline")}>
               Reset to suggested
             </button>
           )}
@@ -599,11 +601,11 @@ function GroupRow({
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm font-medium leading-sm text-text-secondary">{children}</p>;
+  return <p className={cn(T.label, "text-text-secondary")}>{children}</p>;
 }
 
 function Note({ children, tone = "plain" }: { children: React.ReactNode; tone?: "plain" | "warn" | "error" }) {
-  return <p className={cn("text-sm leading-sm", tone === "error" ? "text-text-error" : tone === "warn" ? "text-text-warning" : "text-text-secondary")}>{children}</p>;
+  return <p className={cn(T.meta, tone === "error" ? "text-text-error" : tone === "warn" ? "text-text-warning" : "text-text-secondary")}>{children}</p>;
 }
 
 function Rows({ rows }: { rows: [string, string][] }) {
@@ -611,8 +613,8 @@ function Rows({ rows }: { rows: [string, string][] }) {
     <dl className="flex flex-col">
       {rows.map(([k, v]) => (
         <div key={k} className="grid grid-cols-[112px_1fr] gap-4 border-b-[length:var(--border-width-1)] border-solid border-border-subtle py-3 last:border-b-0">
-          <dt className="text-sm leading-sm text-text-secondary">{k}</dt>
-          <dd className="text-sm leading-sm text-text-primary">{v}</dd>
+          <dt className={T.meta}>{k}</dt>
+          <dd className={cn(T.meta, "text-text-primary")}>{v}</dd>
         </div>
       ))}
     </dl>
@@ -632,7 +634,7 @@ function Chips<T extends string>({ value, options, onChange }: { value: T; optio
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "inline-flex min-h-[36px] items-center gap-2 rounded-full border-[length:var(--border-width-1-5)] border-solid px-5 text-sm leading-sm outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+              T.meta, "inline-flex min-h-[44px] items-center gap-2 rounded-full border-[length:var(--border-width-1-5)] border-solid px-5 outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
               on ? "border-border-brand bg-bg-surface text-text-brand" : "border-border-subtle bg-bg-surface text-text-primary",
             )}
           >

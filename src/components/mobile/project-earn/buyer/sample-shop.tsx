@@ -11,14 +11,21 @@
 // page then shows what the active buyer holds (Purchase summary) and the bar
 // turns to Get creator support. Samples sell by Buy now only.
 //
-// sample-project.tsx mounts the pieces: SampleShop around its screen, the
-// banner over its header, SampleMarketSection in its Overview (the Feed's
-// `?tab=marketplace` scrolls to it) and SampleShopBar as its bottom bar.
+// sample-project.tsx mounts the pieces: SampleShop around its screen,
+// SampleMarketSection right under the title (owner 2026-11-12: the page the
+// Feed's pill opens was a spreadsheet — a loud demo banner on top, a table of
+// rows that said the price twice, empty "activity" headings and a Buy button
+// on every card). Now, as a product page: one buy box — "Whole project ·
+// Main NFT", the price large, three facts (Listing, Share, Chain), the wallet
+// line, the last sale and the Testnet demo line with Change — the share-sale
+// note under it, then the copies as rows (icon, name, price, sold bar, a
+// small Buy). The bottom bar's Buy now buys the Main NFT, so the box has no
+// button of its own; with the Main NFT gone it brings the copies into view.
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { BubbleChatIcon, Coins01Icon } from "@hugeicons/core-free-icons";
+import { Activity01Icon, BubbleChatIcon, Coins01Icon, CubeIcon, PackageIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { scrollWithin } from "@/components/create/anchors";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
@@ -51,10 +58,11 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../../kit/bottom-bar";
-import { LIST_CARD, SectionHeading } from "../../project/parts";
+import { LIST_CARD, LIST_DIVIDERS } from "../../kit/list";
 import { PhoneWalletScope } from "../phone-wallet";
 import { readSampleSales, useSampleSales, writeSampleSales } from "./sample-sales-store";
-import { CardNote, ClosedCard, DemoShopBanner, Disclosure, NftActivityLine, OfferCard, OfferRowsCard, PurchaseDoneSheet, WalletLine, type DoneFacts } from "./parts";
+import { BuyBox, ClosedCard, DemoShopBanner, IconLine, PurchaseDoneSheet, ReceiptCard, WalletLine, type DoneFacts } from "./parts";
+import { T } from "../../type";
 
 /** The web's words for a project sold in full (lib/market/purchase.ts). */
 const LOCKED = "This project was sold in full, so its NFTs aren't for sale any more.";
@@ -72,8 +80,10 @@ type Shop = {
   buy: (offer: SampleOffer) => void;
 };
 
-/** The Marketplace block's id: the bar's Buy now brings the copies into view by it. */
+/** The marketplace block's id: with the Main NFT gone, the bar's Buy now brings the copies into view by it. */
 const SECTION_ID = "sample-market";
+/** The copies' list, which a product's Buy a copy brings into view. */
+const COPIES_ID = "sample-copies";
 
 const Ctx = React.createContext<Shop | null>(null);
 
@@ -154,34 +164,23 @@ function ShopProvider({ post, id, children }: { post: InnovationPost; id: string
   );
 }
 
-/** "Testnet demo · shopping as Mira" over the header, while the project is on sale. */
-export function SampleShopBanner() {
-  return useShop() ? <DemoShopBanner body={SAMPLE_BANNER_BODY} /> : null;
-}
-
-/** The Overview's Marketplace block: what the active buyer holds, the Main NFT, the copies. */
+/** Right under the title: what the active buyer holds, the Main NFT's buy box, then the copies. */
 export function SampleMarketSection() {
   const shop = useShop();
-  const params = useSearchParams();
-  const wantsMarket = params.get("tab") === "marketplace";
-  const ref = React.useRef<HTMLElement>(null);
-  React.useEffect(() => {
-    if (wantsMarket) ref.current?.scrollIntoView({ block: "start" });
-  }, [wantsMarket]);
   if (!shop) return null;
-  const { post, id, offers, sales, buyerId, holding, busy, buy } = shop;
+  const { post, id, offers, sales, buyerId, holding } = shop;
   const main = offers.find((o) => o.kind === "main") ?? null;
   const copies = offers.filter((o) => o.kind !== "main");
   const mainState = main ? offerStateOf(main, id, sales) : null;
   const mainSale = mainState?.soldTo ?? null;
+  const lastMain = mainSale
+    ? `Bought by ${buyerLabel(mainSale.buyerId)} · ${formatAmount(mainSale.price, mainSale.token)} · ${formatDate(mainSale.at)}`
+    : "No sales yet";
   return (
-    <section
-      ref={ref}
-      id={SECTION_ID}
-      aria-labelledby="sv-market"
-      className="flex scroll-mt-[48px] flex-col gap-4"
-    >
-      <SectionHeading id="sv-market" title="Marketplace" />
+    <section id={SECTION_ID} aria-labelledby="sv-market" className="flex flex-col gap-6 px-8 pb-8">
+      <h2 id="sv-market" className="sr-only">
+        Marketplace
+      </h2>
       {holding.length > 0 && <SamplePurchaseSummary holding={holding} creator={post.creator.name} copies={copies} />}
       {main &&
         (mainSale ? (
@@ -189,101 +188,179 @@ export function SampleMarketSection() {
             <ClosedCard title={`Sold on ${formatDate(mainSale.at)}.`} detail={`Sold for ${formatAmount(mainSale.price, mainSale.token)} · the whole project`} />
           )
         ) : (
-          <OfferCard
-            title={`Buy now · ${formatAmount(main.price, main.token)}`}
-            sub="Main NFT · the whole project"
-            rows={[
-              { label: "Listing type", value: "Buy now" },
-              { label: "Price", value: formatAmount(main.price, main.token) },
-              { label: "Selling percentage", value: "100%" },
-              { label: "Blockchain", value: networkLabelOf(SAMPLE_NETWORK) },
-            ]}
-            foot={
-              <>
-                <WalletLine buyerId={buyerId} token={main.token} network={SAMPLE_NETWORK} verb="buy" />
-                <CardNote>{SHARE_SALE_NOTE}</CardNote>
-              </>
-            }
-          />
+          <div className="flex flex-col gap-3">
+            <BuyBox
+              label="Main NFT, the whole project"
+              overline="Whole project · Main NFT"
+              price={formatAmount(main.price, main.token)}
+              facts={[
+                { label: "Listing", value: "Buy now" },
+                { label: "Share", value: "100%" },
+                { label: "Chain", value: networkLabelOf(SAMPLE_NETWORK) },
+              ]}
+              foot={
+                <>
+                  <IconLine icon={Wallet01Icon}>
+                    <WalletLine buyerId={buyerId} token={main.token} network={SAMPLE_NETWORK} verb="buy" />
+                  </IconLine>
+                  <IconLine icon={Activity01Icon}>
+                    <p className={T.meta}>
+                      <span className="sr-only">Main NFT activity: </span>
+                      {lastMain}
+                    </p>
+                  </IconLine>
+                  <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
+                </>
+              }
+            />
+            <p className={cn(T.caption, "text-text-tertiary")}>{SHARE_SALE_NOTE}</p>
+          </div>
         ))}
-      {main && (
-        <NftActivityLine
-          heading="Main NFT activity"
-          line={mainSale ? `Bought by ${buyerLabel(mainSale.buyerId)} · ${formatAmount(mainSale.price, mainSale.token)} · ${formatDate(mainSale.at)}` : "No activity yet"}
-        />
-      )}
-      {copies.length > 0 && (
-        <div className="flex flex-col gap-4">
-          <h3 className="text-md font-medium leading-md text-text-primary">Whole project</h3>
-          {copies.map((o) => {
-            const state = offerStateOf(o, id, sales);
-            const why = sampleBuyBlock(o, id, sales);
-            const last = sales.filter((s) => s.kind === o.kind).at(-1) ?? null;
-            return (
-              <section key={o.kind} aria-label={o.name} className={cn(LIST_CARD, "gap-4 p-6")}>
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="min-w-0 text-md font-medium leading-md text-text-primary">{o.name}</span>
-                  {state.count !== null && state.of !== null && (
-                    <span className="shrink-0 text-sm leading-sm tabular-nums text-text-secondary">{state.soldOut ? "Sold out" : `${state.count} of ${state.of} sold`}</span>
-                  )}
-                </div>
-                <p className="text-sm leading-sm text-text-secondary">
-                  {last ? `Bought by ${buyerLabel(last.buyerId)} · ${formatAmount(last.price, last.token)} · ${formatDate(last.at)}` : "No activity yet"}
-                </p>
-                {state.locked ? (
-                  <p className="text-md leading-md text-text-secondary">{LOCKED}</p>
-                ) : state.soldOut ? (
-                  <p className="text-md leading-md text-text-secondary">{`All ${state.of} are sold.`}</p>
-                ) : (
-                  <Button
-                    hierarchy="secondary"
-                    size="xl"
-                    className="w-full"
-                    data-copy-buy=""
-                    aria-disabled={busy !== null || why !== null || undefined}
-                    onClick={() => {
-                      if (busy === null && why === null) buy(o);
-                    }}
-                  >
-                    {`Buy now · ${formatAmount(o.price, o.token)}`}
-                  </Button>
-                )}
-              </section>
-            );
-          })}
-        </div>
-      )}
+      {!main && <DemoShopBanner body={SAMPLE_BANNER_BODY} line />}
+      <SampleCopies />
     </section>
   );
 }
 
-/** What the active buyer holds of this sample, newest first. */
+/** The copies on sale, as rows: an icon, the name, the price, how many are sold, and a small Buy.
+ *  The project page shows them under its buy box; a product's page shows them as its own. */
+export function SampleCopies({ sub = "Of the whole project, each with its own NFT." }: { sub?: string }) {
+  const shop = useShop();
+  if (!shop) return null;
+  const { id, offers, sales, busy, buy } = shop;
+  const copies = offers.filter((o) => o.kind !== "main");
+  return (
+    <>
+      {copies.length > 0 && (
+        <section id={COPIES_ID} aria-labelledby="sv-copies" className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <h3 id="sv-copies" className={T.section}>
+              Copies
+            </h3>
+            <p className={T.meta}>{sub}</p>
+          </div>
+          <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
+            {copies.map((o) => {
+              const state = offerStateOf(o, id, sales);
+              const why = sampleBuyBlock(o, id, sales);
+              const last = sales.filter((x) => x.kind === o.kind).at(-1) ?? null;
+              const price = formatAmount(o.price, o.token);
+              const share = state.count !== null && state.of ? Math.min(100, Math.round((state.count / state.of) * 100)) : null;
+              return (
+                <li key={o.kind} className="flex items-center gap-6 px-8 py-6">
+                  <span aria-hidden className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-lg bg-bg-subtle text-[color:var(--color-icon-default)]">
+                    <Icon icon={o.kind === "physical" ? PackageIcon : CubeIcon} size={20} />
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={cn(T.rowTitle, "break-words")}>{o.name}</span>
+                    <span className={cn(T.meta, "tabular-nums text-text-primary")}>{price}</span>
+                    {state.count !== null && state.of !== null && (
+                      <span className="flex items-center gap-3">
+                        <span aria-hidden className="h-[4px] w-[56px] shrink-0 overflow-hidden rounded-full bg-[var(--color-border-default)]">
+                          <span className="block h-full rounded-full bg-bg-brand" style={{ width: `${share ?? 0}%` }} />
+                        </span>
+                        <span className={cn(T.caption, "tabular-nums")}>{state.soldOut ? "Sold out" : `${state.count} of ${state.of} sold`}</span>
+                      </span>
+                    )}
+                    {last && (
+                      <span className={T.caption}>{`Bought by ${buyerLabel(last.buyerId)} · ${formatAmount(last.price, last.token)} · ${formatDate(last.at)}`}</span>
+                    )}
+                    {state.locked && <span className={T.caption}>{LOCKED}</span>}
+                  </div>
+                  {!state.locked && !state.soldOut && (
+                    <Button
+                      hierarchy="secondary"
+                      size="md"
+                      className="shrink-0"
+                      data-copy-buy=""
+                      aria-label={`Buy ${o.name} for ${price}`}
+                      aria-disabled={busy !== null || why !== null || undefined}
+                      loading={busy === o.kind}
+                      onClick={() => {
+                        if (busy === null && why === null) buy(o);
+                      }}
+                    >
+                      Buy
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+    </>
+  );
+}
+
+/** A product's bottom bar: what copies start at, and Buy a copy — the one copy straight away, or,
+ *  with more than one, the copies brought into view to pick from. */
+export function SampleCopyBar() {
+  const shop = useShop();
+  if (!shop) return null;
+  const { offers, id, sales, busy, buy } = shop;
+  const open = offers.filter((o) => o.kind !== "main" && sampleBuyBlock(o, id, sales) === null);
+  const all = offers.filter((o) => o.kind !== "main");
+  if (!all.length) return null;
+  const from = all.reduce((a, o) => (Number(o.price) < Number(a.price) ? o : a), all[0]);
+  return (
+    <BottomBar className="pt-6">
+      <div className="flex items-center gap-6">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className={T.meta}>Copies from</span>
+          <span className={cn(T.section, "tabular-nums")}>{formatAmount(from.price, from.token)}</span>
+        </span>
+        {open.length ? (
+          <Button
+            size="xl"
+            className="min-w-0 flex-1"
+            loading={busy !== null}
+            onClick={() => {
+              if (busy !== null) return;
+              if (open.length === 1) return buy(open[0]);
+              const el = document.getElementById(COPIES_ID)?.querySelector<HTMLButtonElement>("[data-copy-buy]");
+              if (!el) return;
+              scrollWithin(el, "nearest", "smooth");
+              el.focus({ preventScroll: true });
+            }}
+          >
+            Buy a copy
+          </Button>
+        ) : (
+          <p className={cn(T.body, "min-w-0 flex-1 text-right")}>All copies are sold.</p>
+        )}
+      </div>
+    </BottomBar>
+  );
+}
+
+/** What the active buyer holds of this sample, newest first: a receipt card per purchase. */
 function SamplePurchaseSummary({ holding, creator, copies }: { holding: SampleSale[]; creator: string; copies: SampleOffer[] }) {
-  const [open, setOpen] = React.useState(true);
-  const id = React.useId();
   return (
     <section aria-label="Purchase summary" className="flex flex-col gap-4">
-      <Disclosure title="Purchase summary" open={open} onToggle={() => setOpen((v) => !v)} controls={id} className="w-full justify-between" />
-      <div id={id} hidden={!open} className="flex flex-col gap-4">
-        {holding.map((s) => (
-          <OfferRowsCard
+      {holding.map((s) => {
+        const serial = s.serial !== null ? serialText(s.serial, copies.find((o) => o.kind === s.kind)?.sold?.of ?? null) : null;
+        return (
+          <ReceiptCard
             key={s.id}
             label={s.name}
-            rows={[
+            overline={`Your purchase · ${s.name}`}
+            headline={s.kind === "main" ? "You own the whole project" : serial ? `You own copy ${serial}` : "You own a copy"}
+            facts={[
+              { label: "Paid", value: formatAmount(s.price, s.token) },
+              { label: "Chain", value: networkLabelOf(s.network) },
+              { label: "Purchased", value: formatDate(s.at) },
+            ]}
+            details={[
               { label: "NFT type", value: s.name },
-              s.kind === "main"
-                ? { label: "Your share", value: "100% of the project" }
-                : { label: "Copy", value: s.serial !== null ? serialText(s.serial, copies.find((o) => o.kind === s.kind)?.sold?.of ?? null) : "—" },
-              { label: "Blockchain", value: networkLabelOf(s.network) },
               { label: "Price paid", value: `${formatAmount(s.price, s.token)} (+ ${formatAmount(s.networkFee, s.token)} network fee)` },
               { label: "Purchased from", value: creator },
               { label: "Transaction", value: `${shortAddress(s.txHash)} · Demo` },
               { label: "Purchased", value: formatDateTime(s.at) },
             ]}
           />
-        ))}
-        <p className="text-sm leading-sm text-text-secondary">Not on a blockchain — this is a testnet demo.</p>
-      </div>
+        );
+      })}
     </section>
   );
 }
@@ -318,9 +395,10 @@ export function SampleShopBar({ ask }: { ask: string }) {
           onClick={() => {
             if (busy !== null) return;
             if (main) return buy(main);
-            const el = document.getElementById(SECTION_ID);
-            el?.scrollIntoView({ block: "start" });
-            el?.querySelector<HTMLButtonElement>("[data-copy-buy]")?.focus();
+            const el = document.getElementById(SECTION_ID)?.querySelector<HTMLButtonElement>("[data-copy-buy]");
+            if (!el) return;
+            scrollWithin(el, "nearest", "smooth");
+            el.focus({ preventScroll: true });
           }}
         >
           Buy now

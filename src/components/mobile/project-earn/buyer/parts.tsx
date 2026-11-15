@@ -9,16 +9,20 @@
 // · PreviewBanner — M01 Info with Exit preview (18, 19);
 // · ProjectTop — the name and its chips, the meta line, the description
 //   clamped to 3 lines (Show more); ViewerTabs (M14 Line Full);
-// · OfferCard / OfferRows — a listing's card: its price line, Info rows and a
-//   foot (the wallet line, the share-sale note);
+// · BuyBox — a listing as a product page sells it (owner 2026-11-12): what
+//   is sold as an overline, the price large, short facts in a grid, a ruled
+//   foot (the wallet line, the last activity, the Testnet demo line);
+//   IconLine puts a small mark before a foot line;
+// · OfferCard / OfferRows — a seller's card: its price line, Info rows and a
+//   foot;
 // · WalletLine — "Paying from Mira's demo wallet · 0x… · 0.5 test ETH";
 // · NftActivityLine, ProjectActivity (Now + Earlier, or "No journey shared
 //   yet."), LegalSection, HolderBenefits, AboutRows;
 // · PurchaseDoneSheet — 18d, after the wallet sheet confirms.
 
 import * as React from "react";
-import { ArrowDown01Icon, CheckmarkCircle01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
+import { ArrowDown01Icon, CheckmarkCircle01Icon, TestTube01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
@@ -42,33 +46,49 @@ import { useActiveBuyer, useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { Sheet } from "../../kit/sheet";
-import { LIST_CARD, LIST_ROW, ListCard, SectionHeading } from "../../project/parts";
+import { LIST_CARD, LIST_DIVIDERS, ListCard } from "../../kit/list";
+import { MobileTabs } from "../../kit/tabs";
+import { SectionHeading } from "../../project/parts";
+import { T } from "../../type";
 
-const NOTE = "text-sm leading-sm text-text-secondary";
+const NOTE = T.meta;
 /** A text action on the kit's 44 px tap area. */
 const TEXT_ACTION =
-  "-my-6 inline-flex min-h-[44px] items-center self-start text-md font-medium leading-md outline-none hover:underline focus-visible:underline";
+  cn(T.rowTitle, "-my-6 inline-flex min-h-[44px] items-center self-start outline-none hover:underline focus-visible:underline");
 
 // ─────────────────────────── banners ───────────────────────────
 
-/** 18b–18h: the Testnet demo banner and its one switch of who is shopping. */
-export function DemoShopBanner({ body }: { body: string }) {
+/** 18b–18h: the Testnet demo banner, one line, and its one switch of who is shopping. Why a demo
+ *  creator does the buying (`body`) is said in the Shop-as sheet (Note MFR-10: one line). `line`
+ *  draws it as a quiet line with a test-tube mark and "Change" (the sample page's buy box). */
+export function DemoShopBanner({ body, line = false }: { body: string; line?: boolean }) {
   const { buyer, setActiveBuyer } = useActiveBuyer();
   const [open, setOpen] = React.useState(false);
   return (
-    <div className="px-8 pb-6">
-      <Banner
-        tone="attention"
-        title={`Testnet demo · shopping as ${buyer.name}`}
-        action={
-          <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={TEXT_ACTION}>
-            Shop as someone else
+    <div className={line ? undefined : "px-8 pb-6"}>
+      {line ? (
+        <p className={cn(T.meta, "flex flex-wrap items-center gap-x-2")}>
+          <span aria-hidden className="text-[color:var(--color-icon-warning)]">
+            <Icon icon={TestTube01Icon} size={16} />
+          </span>
+          <span>Testnet demo · shopping as {buyer.name}</span>
+          <span aria-hidden>·</span>
+          <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={cn(TEXT_ACTION, T.meta, "-my-4 font-medium text-text-brand")}>
+            Change<span className="sr-only"> who is shopping</span>
           </button>
-        }
-      >
-        {body}
-      </Banner>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Shopping as" description="Mira, Leo and Sam are demo creators with test tokens in a test wallet.">
+        </p>
+      ) : (
+        <Banner
+          tone="attention"
+          title={`Testnet demo · shopping as ${buyer.name}`}
+          action={
+            <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={TEXT_ACTION}>
+              Shop as someone else
+            </button>
+          }
+        />
+      )}
+      <Sheet open={open} onClose={() => setOpen(false)} title="Shopping as" description={`${body} Mira, Leo and Sam are demo creators.`}>
         <ul role="listbox" aria-label="Shopping as" className="-mx-8 flex flex-col">
           {DEMO_BUYERS.map((b) => (
             <li key={b.id}>
@@ -80,7 +100,7 @@ export function DemoShopBanner({ body }: { body: string }) {
                   setActiveBuyer(b.id);
                   setOpen(false);
                 }}
-                className="flex h-[44px] w-full items-center justify-between gap-4 rounded-md px-8 text-left text-lg leading-lg text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                className={cn(T.bodyLg, "flex h-[44px] w-full items-center justify-between gap-4 rounded-md px-8 text-left outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
               >
                 {`${b.name} · demo creator`}
                 {b.id === buyer.id && (
@@ -143,7 +163,7 @@ export function ProjectTop({
     <header className="flex flex-col gap-6 px-8 pb-8">
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 ref={titleRef} className="min-w-0 break-words text-2xl font-semibold leading-2xl text-text-primary">
+          <h1 ref={titleRef} className={cn(T.title, "min-w-0 break-words")}>
             {name}
           </h1>
           {chips}
@@ -152,7 +172,7 @@ export function ProjectTop({
       </div>
       {description.trim() && (
         <div className="flex flex-col gap-2">
-          <p ref={ref} id={id} className={cn("whitespace-pre-line break-words text-md leading-md text-text-secondary", !expanded && "line-clamp-3")}>
+          <p ref={ref} id={id} className={cn(T.body, "whitespace-pre-line break-words", !expanded && "line-clamp-3")}>
             {description}
           </p>
           {(clamps || expanded) && (
@@ -162,7 +182,7 @@ export function ProjectTop({
                 aria-expanded={expanded}
                 aria-controls={id}
                 onClick={() => setExpanded((v) => !v)}
-                className="-my-6 inline-flex min-h-[44px] items-center text-sm font-medium leading-sm text-text-brand outline-none hover:underline focus-visible:underline"
+                className={cn(T.caption, "-my-6 inline-flex min-h-[44px] items-center outline-none hover:underline focus-visible:underline text-text-brand")}
               >
                 {expanded ? "Show less" : "Show more"}
               </button>
@@ -176,48 +196,14 @@ export function ProjectTop({
 
 export type ViewerTab<T extends string> = { id: T; label: string };
 
-/** M14 Tabs, Line Full, pinned under the top bar while the page scrolls. */
+/** The id the viewer's tabs and their panels share (`tabPanelProps(VIEWER_TABS_ID, tab)`). */
+export const VIEWER_TABS_ID = "bv";
+
+/** M14 Tabs, Line Full (the kit's MobileTabs), pinned under the top bar while the page scrolls. */
 export function ViewerTabs<T extends string>({ tabs, tab, onChange }: { tabs: readonly ViewerTab<T>[]; tab: T; onChange: (t: T) => void }) {
-  const refs = React.useRef(new Map<T, HTMLButtonElement>());
-  const move = (from: number, dir: 1 | -1) => {
-    const next = tabs[(from + dir + tabs.length) % tabs.length];
-    onChange(next.id);
-    refs.current.get(next.id)?.focus();
-  };
   return (
     <div className="sticky top-0 z-10 bg-bg-page">
-      <div role="tablist" aria-label="Project" className="flex border-b-[length:var(--border-width-1)] border-solid border-border-default">
-        {tabs.map((t, i) => {
-          const on = t.id === tab;
-          return (
-            <button
-              key={t.id}
-              ref={(el) => {
-                if (el) refs.current.set(t.id, el);
-              }}
-              id={`tab-${t.id}`}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              aria-controls={`panel-${t.id}`}
-              tabIndex={on ? 0 : -1}
-              onClick={() => onChange(t.id)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-                  e.preventDefault();
-                  move(i, e.key === "ArrowRight" ? 1 : -1);
-                }
-              }}
-              className={cn(
-                "-mb-[var(--border-width-1)] flex h-[40px] min-w-0 flex-1 items-center justify-center border-b-[length:var(--border-width-2)] border-solid px-2 text-md font-medium leading-md outline-none transition-colors duration-fast focus-visible:bg-bg-subtle",
-                on ? "border-[var(--color-border-brand)] text-text-brand" : "border-transparent text-text-secondary hover:text-text-primary",
-              )}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+      <MobileTabs label="Project" idBase={VIEWER_TABS_ID} tabs={tabs.map((t) => ({ value: t.id, label: t.label }))} value={tab} onChange={onChange} />
     </div>
   );
 }
@@ -236,18 +222,137 @@ export function useScrolledPast(target: React.RefObject<HTMLElement | null>): bo
   return gone;
 }
 
-// ─────────────────────────── a listing's card ───────────────────────────
+// ─────────────────────────── a listing's buy box ───────────────────────────
+
+export type BoxFact = { label: string; value: string };
+
+/** A fact in a buy box: a small label over its value. */
+function Fact({ label, value }: BoxFact) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <dt className={T.micro}>{label}</dt>
+      <dd className={cn(T.rowTitle, "break-words")}>{value}</dd>
+    </div>
+  );
+}
+
+/** A line in a buy box's foot with its small mark (the wallet, the testnet). */
+export function IconLine({ icon, children }: { icon: IconValue; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span aria-hidden className="mt-[2px] shrink-0 text-[color:var(--color-icon-secondary)]">
+        <Icon icon={icon} size={16} />
+      </span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+/** A listing as a product page sells it: the overline, the price large (`sub` under it, `aside`
+ *  beside it), the facts three to a row, `notes` under them, then `children` (the bids, the
+ *  field) and the ruled `foot`. The buy button is the bottom bar's. */
+export function BuyBox({
+  label,
+  overline,
+  price,
+  sub,
+  aside,
+  facts,
+  notes,
+  foot,
+  children,
+}: {
+  label: string;
+  overline: string;
+  price: string;
+  sub?: string;
+  aside?: React.ReactNode;
+  facts: readonly BoxFact[];
+  notes?: string | null;
+  foot?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <section aria-label={label} className={cn(LIST_CARD, "gap-6 p-8")}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className={T.overline}>{overline}</p>
+          <p className={cn(T.display, "break-words tabular-nums")}>{price}</p>
+          {sub && <p className={cn(T.meta, "tabular-nums")}>{sub}</p>}
+        </div>
+        {aside}
+      </div>
+      <dl className="grid grid-cols-3 gap-x-8 gap-y-6">
+        {facts.map((f) => (
+          <Fact key={f.label} label={f.label} value={f.value} />
+        ))}
+      </dl>
+      {notes && <p className={T.caption}>{notes}</p>}
+      {children}
+      {foot && <div className="flex flex-col gap-3 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">{foot}</div>}
+    </section>
+  );
+}
+
+/** What the buyer holds, as a receipt (owner 2026-11-12: no tables under the title): the overline,
+ *  what they own in large type, three facts, then every detail behind "All details" (closed), and
+ *  the testnet note. `toggleRef` is that button, which the bar's View your share brings into view. */
+export function ReceiptCard({
+  label,
+  overline,
+  headline,
+  facts,
+  details,
+  toggleRef,
+}: {
+  label: string;
+  overline: string;
+  headline: string;
+  facts: readonly BoxFact[];
+  details: readonly OfferRow[];
+  toggleRef?: React.Ref<HTMLButtonElement>;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const id = React.useId();
+  return (
+    <section aria-label={label} className={cn(LIST_CARD, "gap-6 p-8")}>
+      <div className="flex items-start gap-4">
+        <span aria-hidden className="mt-1 shrink-0 text-[color:var(--color-icon-success)]">
+          <Icon icon={CheckmarkCircle01Icon} size={24} />
+        </span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className={T.overline}>{overline}</p>
+          <p className={cn(T.section, "break-words")}>{headline}</p>
+        </div>
+      </div>
+      <dl className="grid grid-cols-3 gap-x-8 gap-y-6">
+        {facts.map((f) => (
+          <Fact key={f.label} label={f.label} value={f.value} />
+        ))}
+      </dl>
+      <div className="flex flex-col gap-4 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
+        <Disclosure title="All details" open={open} onToggle={() => setOpen((v) => !v)} controls={id} toggleRef={toggleRef} className="w-full justify-between" />
+        <div id={id} hidden={!open} className="-mx-6">
+          <OfferRows rows={details} />
+        </div>
+        <p className={T.meta}>Not on a blockchain — this is a testnet demo.</p>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────── a seller's card ───────────────────────────
 
 export type OfferRow = { label: string; value: React.ReactNode };
 
 /** Info rows that wrap a long value (Royalties, Minting) instead of cutting it. */
 export function OfferRows({ rows }: { rows: readonly OfferRow[] }) {
   return (
-    <ul className="flex flex-col">
+    <ul className={cn("flex flex-col", LIST_DIVIDERS)}>
       {rows.map((r) => (
-        <li key={r.label} className={cn(LIST_ROW, "flex min-h-[44px] items-start justify-between gap-6 p-6")}>
-          <span className="shrink-0 text-md leading-md text-text-secondary">{r.label}</span>
-          <span className="min-w-0 break-words text-right text-md leading-md text-text-primary">{r.value}</span>
+        <li key={r.label} className="flex min-h-[44px] items-start justify-between gap-6 p-6">
+          <span className={cn(T.body, "shrink-0")}>{r.label}</span>
+          <span className={cn(T.body, "min-w-0 break-words text-right text-text-primary")}>{r.value}</span>
         </li>
       ))}
     </ul>
@@ -270,12 +375,12 @@ export function OfferCard({
   foot?: React.ReactNode;
   label?: string;
 }) {
-  const line = "border-[length:var(--border-width-1)] border-x-0 border-solid border-border-subtle";
+  const line = "border-[length:var(--border-width-1)] border-x-0 border-solid border-border";
   return (
     <section aria-label={label ?? title} className={LIST_CARD}>
       <div className={cn("flex items-start justify-between gap-4 px-8 py-6", line, "border-t-0")}>
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-md font-semibold leading-md text-text-primary">{title}</p>
+          <p className={T.section}>{title}</p>
           {sub && <p className={NOTE}>{sub}</p>}
         </div>
         {aside}
@@ -309,11 +414,11 @@ export function CardNote({ children }: { children: React.ReactNode }) {
   return <p className={NOTE}>{children}</p>;
 }
 
-/** "Main NFT activity" and its one line. */
+/** "Main NFT activity" and its one line, as a section (a seller's). */
 export function NftActivityLine({ heading, line }: { heading: string; line: string }) {
   return (
     <section aria-label={heading} className="flex flex-col gap-1">
-      <h3 className="text-md font-medium leading-md text-text-primary">{heading}</h3>
+      <h3 className={T.section}>{heading}</h3>
       <p className={NOTE}>{line}</p>
     </section>
   );
@@ -323,8 +428,8 @@ export function NftActivityLine({ heading, line }: { heading: string; line: stri
 export function ClosedCard({ title, detail }: { title: string; detail?: string }) {
   return (
     <div className={cn(LIST_CARD, "gap-1 px-8 py-6")}>
-      <p className="text-md font-medium leading-md text-text-primary">{title}</p>
-      {detail && <p className="text-md leading-md tabular-nums text-text-secondary">{detail}</p>}
+      <p className={T.rowTitle}>{title}</p>
+      {detail && <p className={cn(T.body, "tabular-nums")}>{detail}</p>}
     </div>
   );
 }
@@ -352,7 +457,7 @@ export function Disclosure({
       aria-expanded={open}
       aria-controls={controls}
       onClick={onToggle}
-      className={cn("-my-6 flex min-h-[44px] items-center gap-2 text-left text-md font-medium leading-md text-text-primary outline-none focus-visible:underline", className)}
+      className={cn(T.rowTitle, "-my-6 flex min-h-[44px] items-center gap-2 text-left outline-none focus-visible:underline", className)}
     >
       {title}
       <span aria-hidden className={cn("inline-flex text-[color:var(--color-icon-default)] transition-transform duration-fast motion-reduce:transition-none", open && "rotate-180")}>
@@ -381,11 +486,11 @@ export function ProjectActivity({ projectId, createdAt }: { projectId: string; c
       ) : (
         <div className={cn(LIST_CARD, "gap-3 px-8 py-6")}>
           <span className="flex flex-wrap items-center gap-4">
-            <span className="text-sm font-medium leading-sm text-text-secondary">Now</span>
+            <span className={T.meta}>Now</span>
             <Badge tone="brand-outline">{labelOf(current)}</Badge>
-            <span className="text-md leading-md text-text-secondary">{formatDate(current.createdAt)}</span>
+            <span className={T.body}>{formatDate(current.createdAt)}</span>
           </span>
-          {current.description && <p className="line-clamp-3 text-md leading-md text-text-primary">{current.description}</p>}
+          {current.description && <p className={cn(T.body, "line-clamp-3 text-text-primary")}>{current.description}</p>}
           {earlier.length > 0 && (
             <>
               <button
@@ -393,18 +498,18 @@ export function ProjectActivity({ projectId, createdAt }: { projectId: string; c
                 aria-expanded={open}
                 aria-controls={listId}
                 onClick={() => setOpen((v) => !v)}
-                className="-my-6 inline-flex min-h-[44px] items-center self-start text-sm font-medium leading-sm text-text-brand outline-none hover:underline focus-visible:underline"
+                className={cn(T.caption, "-my-6 inline-flex min-h-[44px] items-center self-start outline-none hover:underline focus-visible:underline text-text-brand")}
               >
                 {open ? "Hide earlier" : `Earlier (${earlier.length})`}
               </button>
               <ol id={listId} hidden={!open} className="flex flex-col">
                 {earlier.map((e) => (
-                  <li key={e.id} className="flex flex-col gap-1 border-t-[length:var(--border-width-1)] border-solid border-border-subtle py-4 last:pb-0">
+                  <li key={e.id} className="flex flex-col gap-1 border-t-[length:var(--border-width-1)] border-solid border-border py-4 last:pb-0">
                     <span className="flex flex-wrap items-center gap-4">
-                      <span className="text-md font-medium leading-md text-text-primary">{labelOf(e)}</span>
-                      <span className="text-sm leading-sm text-text-secondary">{formatDate(e.createdAt)}</span>
+                      <span className={T.rowTitle}>{labelOf(e)}</span>
+                      <span className={T.meta}>{formatDate(e.createdAt)}</span>
                     </span>
-                    {e.description && <span className="text-md leading-md text-text-secondary">{e.description}</span>}
+                    {e.description && <span className={T.body}>{e.description}</span>}
                   </li>
                 ))}
               </ol>
@@ -430,12 +535,12 @@ export function LegalSection({ legal }: { legal: ProjectLegal | undefined }) {
           const value = [r.text, ...(r.attorney ? [`Attorney: ${r.attorney}`] : [])].filter(Boolean).join(" · ");
           const body = (
             <>
-              <span className="shrink-0 text-md leading-md text-text-secondary">{RIGHT_LABEL[r.kind]}</span>
-              <span className={cn("min-w-0 flex-1 break-words text-right text-md leading-md", r.url ? "text-text-brand" : "text-text-primary")}>{value}</span>
+              <span className={cn(T.body, "shrink-0")}>{RIGHT_LABEL[r.kind]}</span>
+              <span className={cn(T.body, "min-w-0 flex-1 break-words text-right", r.url ? "text-text-brand" : "text-text-primary")}>{value}</span>
             </>
           );
           return (
-            <li key={r.id} className={LIST_ROW}>
+            <li key={r.id}>
               {r.url ? (
                 <button
                   type="button"
@@ -452,7 +557,7 @@ export function LegalSection({ legal }: { legal: ProjectLegal | undefined }) {
           );
         })}
       </ListCard>
-      <p className={NOTE}>As stated by you — not verified.</p>
+      <p className={NOTE}>As stated by the creator — not verified. Links open outside IDEEZA.</p>
       <ConfirmSheet
         open={url !== null}
         onClose={() => setUrl(null)}
@@ -468,6 +573,11 @@ export function LegalSection({ legal }: { legal: ProjectLegal | undefined }) {
   );
 }
 
+/** A benefit's length said to the one who would own it, under "Owning this NFT gives you:". */
+function holderDurationText(d: Parameters<typeof benefitDurationText>[0]): string {
+  return "whileHeld" in d ? "For as long as you hold it" : benefitDurationText(d);
+}
+
 /** What owning the Main NFT gives, while the live or sold Main listing names benefits. */
 export function HolderBenefits({ listing }: { listing: ListingView }) {
   const benefits = utilityBenefitsOf(listing);
@@ -477,7 +587,7 @@ export function HolderBenefits({ listing }: { listing: ListingView }) {
     <section aria-labelledby="bv-benefits" className="flex flex-col gap-4">
       <SectionHeading id="bv-benefits" title="Holder benefits" />
       <p className={NOTE}>{copy.lead}</p>
-      <OfferRowsCard rows={benefits.map((b) => ({ label: b.name, value: benefitDurationText(b.duration) }))} label="Holder benefits" />
+      <OfferRowsCard rows={benefits.map((b) => ({ label: b.name, value: holderDurationText(b.duration) }))} label="Holder benefits" />
       <p className={NOTE}>{copy.note}</p>
     </section>
   );
@@ -525,7 +635,7 @@ export function PurchaseDoneSheet({ done, onClose }: { done: DoneFacts | null; o
         <span aria-hidden className="text-[color:var(--color-icon-success)]">
           <Icon icon={CheckmarkCircle01Icon} size={40} />
         </span>
-        <p className="text-md leading-md text-text-primary">{done?.sentence}</p>
+        <p className={cn(T.body, "text-text-primary")}>{done?.sentence}</p>
       </div>
       {rows.length > 0 && <OfferRowsCard rows={rows} label="Purchase" />}
     </Sheet>

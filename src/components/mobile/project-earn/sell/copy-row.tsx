@@ -1,28 +1,29 @@
 "use client";
 
 // A Physical or Virtual row of one scope (the whole project or a product) and
-// its Manage (Figma 14, 15d, 15e–15g; the web's editions.tsx CopyRow and
-// edition-block.tsx EditionTracks). The state is `copyRowStateOf`, first match
-// wins, and never asks the Main listing:
-// · Sell opens the copies sheet with the kind preset (sell-copies.tsx);
-//   given, sold in full, an unknown collection or a dropped product grey it
-//   with the reason as the state;
-// · Manage opens the scope's uses under the row: a listed use's card
-//   ({kind} · Personal use, On the marketplace, Copies sold, Price / Price with
-//   future updates / Royalties, Edit · Add copies · Remove listing), a made
-//   but unlisted one's Add to marketplace, and the other use's "Not selling"
-//   with Sell … copies too; "Nothing is minted or listed on a real blockchain.";
+// its screen (mobile UX pass 2026-11-15; Figma 14, 15d, 15e–15g; the web's
+// editions.tsx CopyRow and edition-block.tsx EditionTracks). The state is
+// `copyRowStateOf`, first match wins, and never asks the Main listing:
+// · nothing made yet — the row opens the copies sheet with the kind preset
+//   (sell-copies.tsx); given, sold in full, an unknown collection or a dropped
+//   product grey it with the reason as the state;
+// · something made or on sale — the row pushes the copies screen: one card
+//   per use ({kind} · Personal use: On the marketplace, the price large, with
+//   future updates under it, Copies sold, Royalties; ⋯ Edit · Add copies ·
+//   Remove listing), a made but unlisted use's "Not selling", Activity, and
+//   "Nothing is minted or listed on a real blockchain."; the bottom bar's one
+//   primary: Add to marketplace (a made, unlisted use) or Sell … copies too;
 // · Edit (15f) and Add copies (15e) sign through the phone's wallet sheet;
-//   Remove listing (15g) asks first.
-// The NFT activity line sits in the row once the scope has copies.
+//   Remove listing (15g) asks first. Each write says so in a toast.
 
 import * as React from "react";
-import { Add01Icon, Delete02Icon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Delete02Icon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field } from "@/components/auth/auth-parts";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
+import { IconButton } from "@/components/ideeza/icon-button";
 import { TextInput } from "@/components/ideeza/text-input";
 import { createRequestOf, EDITION_DEMO_LINE, failureCopy, writeTracks } from "@/components/projects/editions/create-dialog";
 import { UPDATED_LINE } from "@/components/projects/editions/edit-dialog";
@@ -47,26 +48,26 @@ import { copiesSoldLineOf, copyRowStateOf, KIND_LABEL, PRICE_LABEL, trackNameOf,
 import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
-import { Sheet } from "../../kit/sheet";
+import { ActionSheet, Sheet } from "../../kit/sheet";
 import { SheetSelect } from "../../kit/sheet-select";
 import { useToast } from "../../kit/toast";
 import { useEarn } from "../context";
 import { FactRows } from "../parts";
-import { NftActivityLine } from "./nft-activity";
-import { CheckRow, DoneNote, RowButton, SellRow, StateLines, SUB } from "./parts";
+import { NftActivityRow } from "./nft-activity";
+import { CheckRow, FullLayer, KIND_ICON, PrimaryBar, ROWS_CARD, SellListRow, SUB, SummaryCard } from "./parts";
 import { SellCopiesSheet, type CopyScope } from "./sell-copies";
+import { cn } from "@/lib/utils";
+import { useBackState } from "../../nav-trail";
+import { T } from "../../type";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
 type Dialog = { kind: "edit"; track: Listed } | { kind: "add"; track: EditionTrack } | { kind: "remove"; track: EditionTrack } | null;
 
 export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }) {
   const { project, view, viewer, brief, announce } = useEarn();
-  const [sell, setSell] = React.useState<{ use: EditionUse | null } | null>(null);
-  const [open, setOpen] = React.useState(false);
-  const [note, setNote] = React.useState<string | null>(null);
-  const base = `${scope.id}-${kind}`;
-  const stateId = `state-${base}`;
-  const panelId = `manage-${base}`;
+  const toast = useToast();
+  const [sell, setSell] = useBackState<{ use: EditionUse | null } | null>(`copies-sell-${scope.id}-${kind}`, null);
+  const [screen, setScreen] = useBackState(`copies-screen-${scope.id}-${kind}`, false);
   const main = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, view.mint.status === "legacy" && brief ? brief.state : null);
   const status = view.summary.status;
@@ -82,47 +83,31 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
     tracks: view.editions,
     sales: view.sales,
   });
-
-  const startSell = (use: EditionUse | null) => {
-    setNote(null);
-    setSell({ use });
-  };
-
-  const action =
-    state.kind === "manage" ? (
-      <RowButton label="Manage" expanded={open} controls={panelId} onClick={() => setOpen((o) => !o)} />
-    ) : state.kind === "sell" ? (
-      <RowButton label="Sell" onClick={() => startSell(null)} />
-    ) : (
-      <RowButton label="Sell" disabled describedBy={stateId} />
-    );
   const hasCopies = view.editions.some((t) => t.productId === scope.id && t.kind === kind);
+  const said = (message: string) => {
+    announce(message);
+    toast({ title: message });
+  };
+  const startSell = (use: EditionUse | null) => setSell({ use });
+  const name = `${KIND_LABEL[kind]} · ${scope.product ? scope.name : "Whole project"}`;
 
   return (
-    <SellRow
-      label={KIND_LABEL[kind]}
-      stateId={stateId}
-      state={
-        <div className="flex flex-col gap-1">
-          {state.kind === "manage" ? <StateLines lines={state.lines} live /> : <StateLines lines={[state.line]} />}
-          {hasCopies && <NftActivityLine target={{ kind, scope: scope.id }} />}
-        </div>
-      }
-      action={action}
-    >
-      {note && (
-        <div className="px-8 pb-6">
-          <DoneNote note={note} />
-        </div>
+    <>
+      {state.kind === "manage" ? (
+        <SellListRow icon={KIND_ICON[kind]} title={KIND_LABEL[kind]} state={state.lines} live onClick={() => setScreen(true)} label={`${name}: ${state.lines.join(", ")}`} />
+      ) : state.kind === "sell" ? (
+        <SellListRow
+          icon={KIND_ICON[kind]}
+          title={KIND_LABEL[kind]}
+          state={[state.line]}
+          onClick={() => (hasCopies ? setScreen(true) : startSell(null))}
+          label={`${name}: ${state.line}. ${hasCopies ? "Open" : "Sell"}`}
+        />
+      ) : (
+        <SellListRow icon={KIND_ICON[kind]} title={KIND_LABEL[kind]} state={[state.line]} disabled />
       )}
-      {state.kind === "manage" && open && chain && (
-        <div id={panelId} className="flex flex-col gap-8 border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-8 py-6">
-          <Tracks kind={kind} scope={scope} chain={chain} more={state.more} onSell={startSell} onNote={(m) => {
-            setNote(m);
-            announce(m);
-          }} />
-          <p className={SUB}>{EDITION_DEMO_LINE}</p>
-        </div>
+      {screen && chain && (
+        <CopiesScreen kind={kind} scope={scope} chain={chain} more={state.kind === "manage" ? state.more : null} onSell={startSell} onNote={said} onClose={() => setScreen(false)} />
       )}
       {sell && (
         <SellCopiesSheet
@@ -132,24 +117,24 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
           onClose={() => setSell(null)}
           onDone={(message) => {
             setSell(null);
-            setNote(message);
-            announce(message);
-            setOpen(true);
+            said(message);
+            setScreen(true);
           }}
         />
       )}
-    </SellRow>
+    </>
   );
 }
 
-/** 15d · each use of this kind for the scope. */
-function Tracks({
+/** 15d · the scope's copies of this kind, one card per use, and the one thing to do next. */
+function CopiesScreen({
   kind,
   scope,
   chain,
   more,
   onSell,
   onNote,
+  onClose,
 }: {
   kind: EditionKind;
   scope: CopyScope;
@@ -157,39 +142,89 @@ function Tracks({
   more: EditionUse | null;
   onSell: (use: EditionUse) => void;
   onNote: (message: string) => void;
+  onClose: () => void;
 }) {
   const { project, view } = useEarn();
   const toast = useToast();
   const [dialog, setDialog] = React.useState<Dialog>(null);
+  const [menu, setMenu] = React.useState<Listed | null>(null);
+  const reasonId = React.useId();
   const lockReason = lockedListReason(view.lock !== null, project.name);
   const ofKind = tracksOf(scope.id, view.editions).filter((t) => t.kind === kind);
+  const unlisted = ofKind.find((t) => !t.listing) ?? null;
+  const open = more && !ofKind.some((t) => t.use === more) ? more : null;
   const done = (message: string) => {
     setDialog(null);
     onNote(message);
   };
+
+  let primary: React.ReactNode = null;
+  let reason: string | null = null;
+  if (unlisted) {
+    reason = lockReason;
+    primary = (
+      <Button size="xl" className="w-full" aria-haspopup="dialog" aria-disabled={lockReason ? true : undefined} aria-describedby={lockReason ? reasonId : undefined} onClick={() => !lockReason && onSell(unlisted.use)}>
+        Add to marketplace
+      </Button>
+    );
+  } else if (open) {
+    primary = (
+      <Button size="xl" className="w-full" aria-haspopup="dialog" onClick={() => onSell(open)}>
+        {`Sell ${USE_LABEL[open].toLowerCase()} copies too`}
+      </Button>
+    );
+  }
+
   return (
     <>
-      {PHONE_USES.map((use, i) => {
-        const t = ofKind.find((x) => x.use === use);
-        const name = `${KIND_LABEL[kind]} · ${USE_LABEL[use]}`;
-        if (!t && more !== use) return null;
-        return (
-          <section key={use} aria-label={name} className={i > 0 ? "flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-8" : "flex flex-col gap-4"}>
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <h4 className="text-md font-medium leading-md text-text-primary">{name}</h4>
-              <Badge tone={t?.listing ? "success" : "neutral"}>{t?.listing ? "On the marketplace" : "Not selling"}</Badge>
-            </div>
-            {t ? (
-              <TrackBody track={t} listBlocked={lockReason} hidden={t.listing !== null && view.lock !== null} onList={() => onSell(use)} onDialog={setDialog} />
-            ) : (
-              <Button hierarchy="secondary" size="xl" className="self-start" aria-haspopup="dialog" onClick={() => onSell(use)}>
-                {`Sell ${USE_LABEL[use].toLowerCase()} copies too`}
-              </Button>
-            )}
-          </section>
-        );
-      })}
-
+      <FullLayer
+        title={KIND_LABEL[kind]}
+        onBack={onClose}
+        footer={
+          primary ? (
+            <PrimaryBar reason={reason} reasonId={reasonId}>
+              {primary}
+            </PrimaryBar>
+          ) : undefined
+        }
+      >
+        <div className="flex flex-col gap-8 px-8 pb-12 pt-4">
+          <p className={cn(T.meta, "break-words")}>{scope.product ? `Product · ${scope.name}` : `Whole project · ${project.name}`}</p>
+          {PHONE_USES.map((use) => {
+            const t = ofKind.find((x) => x.use === use);
+            if (t) return <TrackCard key={use} track={t} onMenu={setMenu} />;
+            if (open !== use) return null;
+            return (
+              <SummaryCard
+                key={use}
+                label={`${KIND_LABEL[kind]} · ${USE_LABEL[use]}`}
+                overline={USE_LABEL[use]}
+                chip={<Badge tone="neutral">Not selling</Badge>}
+                headline="Not selling"
+                amount={false}
+              />
+            );
+          })}
+          <ul aria-label={`${KIND_LABEL[kind]} activity`} className={ROWS_CARD}>
+            <NftActivityRow target={{ kind, scope: scope.id }} />
+          </ul>
+          <p className={SUB}>{EDITION_DEMO_LINE}</p>
+        </div>
+      </FullLayer>
+      <ActionSheet
+        open={menu !== null}
+        onClose={() => setMenu(null)}
+        title={menu ? trackNameOf(menu) : undefined}
+        items={
+          menu
+            ? [
+                { label: "Edit", icon: PencilEdit01Icon, onSelect: () => setDialog({ kind: "edit", track: menu }) },
+                { label: "Add copies", icon: Add01Icon, onSelect: () => setDialog({ kind: "add", track: menu }) },
+                { label: "Remove listing", icon: Delete02Icon, destructive: true, onSelect: () => setDialog({ kind: "remove", track: menu }) },
+              ]
+            : []
+        }
+      />
       {dialog?.kind === "edit" && <EditCopiesSheet track={dialog.track} scope={scope} chain={chain} onClose={() => setDialog(null)} onDone={done} />}
       {dialog?.kind === "add" && <AddCopiesSheet track={dialog.track} scope={scope} chain={chain} onClose={() => setDialog(null)} onDone={done} />}
       <ConfirmSheet
@@ -218,56 +253,51 @@ function Tracks({
   );
 }
 
-function TrackBody({
-  track,
-  listBlocked,
-  hidden,
-  onList,
-  onDialog,
-}: {
-  track: EditionTrack;
-  listBlocked: string | null;
-  hidden: boolean;
-  onList: () => void;
-  onDialog: (d: Dialog) => void;
-}) {
+/** One use's card: listed (the price large, sold, royalties, ⋯) or made but not listed. */
+function TrackCard({ track, onMenu }: { track: EditionTrack; onMenu: (t: Listed) => void }) {
   const { project, view } = useEarn();
   const card = trackCardOf(track, view.sales);
   const listing = track.listing;
+  const name = trackNameOf(track);
+  const sold = copiesSoldLineOf(card);
+  if (!listing) {
+    return (
+      <SummaryCard
+        label={name}
+        overline={USE_LABEL[track.use]}
+        chip={<Badge tone="neutral">Not selling</Badge>}
+        headline="Not selling"
+        amount={false}
+        sub={sold}
+        note={lockedListReason(view.lock !== null, project.name)}
+      />
+    );
+  }
+  const hidden = view.lock !== null;
   return (
-    <>
-      <p className={card.soldOut ? "text-sm leading-sm text-text-success" : SUB}>{copiesSoldLineOf(card)}</p>
-      {listing ? (
-        <>
-          <FactRows
-            label={trackNameOf(track)}
-            rows={[
-              { label: PRICE_LABEL.regular, value: formatAmount(listing.regular, listing.token) },
-              { label: PRICE_LABEL.extended, value: formatAmount(listing.extended, listing.token) },
-              { label: "Royalties", value: `${listing.royaltyPct}% on resales` },
-            ]}
-          />
-          {hidden && <p className={SUB}>{`Off Explore marketplace: ${project.name} was sold in full.`}</p>}
-          <div className="flex flex-wrap gap-4">
-            <Button hierarchy="secondary" size="xl" iconLeading={<Icon icon={PencilEdit01Icon} size={20} />} onClick={() => onDialog({ kind: "edit", track: track as Listed })}>
-              Edit
-            </Button>
-            <Button hierarchy="secondary" size="xl" iconLeading={<Icon icon={Add01Icon} size={20} />} onClick={() => onDialog({ kind: "add", track })}>
-              Add copies
-            </Button>
-            <Button hierarchy="secondary" size="xl" iconLeading={<Icon icon={Delete02Icon} size={20} />} onClick={() => onDialog({ kind: "remove", track })}>
-              Remove listing
-            </Button>
-          </div>
-        </>
-      ) : listBlocked ? (
-        <p className={SUB}>{listBlocked}</p>
-      ) : (
-        <Button hierarchy="secondary" size="xl" className="self-start" aria-haspopup="dialog" onClick={onList}>
-          Add to marketplace
-        </Button>
-      )}
-    </>
+    <SummaryCard
+      label={name}
+      overline={USE_LABEL[track.use]}
+      chip={<Badge tone="success">On the marketplace</Badge>}
+      headline={formatAmount(listing.regular, listing.token)}
+      sub={`${PRICE_LABEL.extended}: ${formatAmount(listing.extended, listing.token)}`}
+      aside={
+        <IconButton
+          hierarchy="ghost"
+          size="xl"
+          aria-label={`Actions for ${name}`}
+          aria-haspopup="dialog"
+          icon={<Icon icon={MoreHorizontalIcon} size={20} />}
+          onClick={() => onMenu(track as Listed)}
+          className="-mr-4 -mt-4 text-[color:var(--color-icon-default)]"
+        />
+      }
+      facts={[
+        { label: "Copies sold", value: card.soldOut ? "Sold out" : `${card.sold} of ${card.total}` },
+        { label: "Royalties", value: `${listing.royaltyPct}% on resales` },
+      ]}
+      note={hidden ? `Off Explore marketplace: ${project.name} was sold in full.` : null}
+    />
   );
 }
 
@@ -349,11 +379,8 @@ function EditCopiesSheet({
           <Button size="xl" className="w-full" loading={busy} onClick={() => void submit()}>
             {busy ? "Updating…" : "Update"}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
           {problem && (
-            <p role="alert" className="text-sm leading-sm text-text-error">
+            <p role="alert" className={cn(T.meta, "text-text-error")}>
               {problem.message}
             </p>
           )}
@@ -397,10 +424,10 @@ function EditCopiesSheet({
         />
         {!err("royalties") && <span className={SUB}>Paid to you on every resale.</span>}
       </Field>
-      <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default p-6">
-        <span className="text-sm font-semibold leading-sm text-text-tertiary">Each sale</span>
+      <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-6">
+        <span className={cn(T.label, "text-text-tertiary")}>Each sale</span>
         {each.map((r) => (
-          <p key={r} className="text-md leading-md tabular-nums text-text-secondary">
+          <p key={r} className={cn(T.body, "tabular-nums")}>
             {r}
           </p>
         ))}
@@ -472,11 +499,8 @@ function AddCopiesSheet({
           <Button size="xl" className="w-full" loading={busy} onClick={() => void submit()}>
             {busy ? "Adding…" : "Add NFTs"}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
           {boxProblem && (
-            <p id={`${prefix}-reason`} role="alert" className="text-sm leading-sm text-text-error">
+            <p id={`${prefix}-reason`} role="alert" className={cn(T.meta, "text-text-error")}>
               {boxProblem}
             </p>
           )}

@@ -5,6 +5,7 @@
 // then the next step — or one line under the cells: the code didn't work, or
 // it expired (Resend code). Five wrong codes lock the step for 10 minutes
 // (an M01 alert counts down). Offline keeps the code and checks it on Try
+// again. A browser that won't save what the code unlocks says so, with Try
 // again. Resend waits 30 s after each code. The code itself comes from the
 // prototype's Demo email, shown on the page as the web's is (owner
 // 2026-11-04): its button types the code in by itself, digit by digit, and
@@ -23,12 +24,12 @@ import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { CodeCells } from "../kit/code-cells";
 import { useOnline } from "../kit/states";
-import { AccountAlert, AccountHeading, type AlertSpec } from "./parts";
+import { AccountAlert, AccountHeading, REFUSED_ALERT, type AlertSpec } from "./parts";
 import { TEXT_LINK } from "../kit/bottom-bar";
 import { T } from "../type";
 import { cn } from "@/lib/utils";
 
-type Phase = "typing" | "checking" | "wrong" | "expired" | "offline" | "done";
+type Phase = "typing" | "checking" | "wrong" | "expired" | "offline" | "done" | "refused";
 
 /** Now, ticking every second while something counts down. */
 function useNow(ticking: boolean): number {
@@ -64,8 +65,8 @@ export function CodeStep({
   /** The success line once the code is right ("Email verified"); none goes straight on. */
   doneLabel?: string;
   offlineBody: string;
-  /** The code was right: go on. */
-  onDone: () => void | Promise<void>;
+  /** The code was right: go on. `false` back means the browser wouldn't save it. */
+  onDone: () => void | boolean | Promise<void | boolean>;
   /** How many times the bar's "Open email app" was pressed: each press fills
    *  the code in from the Demo email. */
   inbox: number;
@@ -86,6 +87,13 @@ export function CodeStep({
   const locked = !!record && now < record.lockedUntil;
   const wait = record ? resendWait(record, now) : 0;
 
+  const finish = () => {
+    setPhase("done");
+    void Promise.resolve(onDone()).then((ok) => {
+      if (ok === false) setPhase("refused");
+    });
+  };
+
   const submit = (typed: string) => {
     if (!navigator.onLine) {
       setPhase("offline");
@@ -100,10 +108,8 @@ export function CodeStep({
       }
       const out = checkCode(r, typed, Date.now());
       saveCode(out.record);
-      if (out.result === "ok") {
-        setPhase("done");
-        void onDone();
-      } else if (out.result === "locked") {
+      if (out.result === "ok") finish();
+      else if (out.result === "locked") {
         setValue("");
         setPhase("typing");
       } else setPhase(out.result);
@@ -163,20 +169,29 @@ export function CodeStep({
 
   const alert: AlertSpec | null = locked
     ? { tone: "error", title: "Too many tries", body: `Try again in ${clockOf(record!.lockedUntil - now)}.` }
-    : phase === "offline" || (!online && value.length === 6 && phase !== "done")
+    : phase === "refused"
       ? {
-          tone: "attention",
-          title: "You’re offline",
-          body: offlineBody,
+          ...REFUSED_ALERT,
           action: (
-            <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => submit(value)}>
+            <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={finish}>
               Try again
             </button>
           ),
         }
-      : null;
+      : phase === "offline" || (!online && value.length === 6 && phase !== "done")
+        ? {
+            tone: "attention",
+            title: "You’re offline",
+            body: offlineBody,
+            action: (
+              <button type="button" className="font-medium underline-offset-2 hover:underline" onClick={() => submit(value)}>
+                Try again
+              </button>
+            ),
+          }
+        : null;
 
-  const busy = phase === "checking" || phase === "done";
+  const busy = phase === "checking" || phase === "done" || phase === "refused";
   return (
     <div className="flex flex-col gap-6">
       <AccountHeading title={title}>{intro}</AccountHeading>
@@ -189,7 +204,7 @@ export function CodeStep({
           disabled={busy || locked}
           autoFocus
         />
-        <p aria-live="polite" className="flex min-h-[18px] items-center gap-4 text-sm leading-sm">
+        <p aria-live="polite" className={cn(T.meta, "flex min-h-[18px] items-center gap-4")}>
           {phase === "checking" ? (
             <>
               <Spinner size={16} />
@@ -209,10 +224,10 @@ export function CodeStep({
           ) : null}
         </p>
       </div>
-      {phase !== "done" && (
+      {!busy && (
         <div className="flex flex-col items-start gap-2">
           {wait > 0 ? (
-            <p className="text-sm leading-sm text-text-tertiary">Resend in {clockOf(wait)}</p>
+            <p className={cn(T.meta, "text-text-tertiary")}>Resend in {clockOf(wait)}</p>
           ) : (
             <button type="button" className={TEXT_LINK} onClick={resend}>
               Resend code
@@ -223,7 +238,7 @@ export function CodeStep({
           </button>
         </div>
       )}
-      {phase !== "done" && !locked && <DemoEmailCard purpose={purpose} code={demoCode} busy={busy} onFill={fill} />}
+      {phase !== "done" && phase !== "refused" && !locked && <DemoEmailCard purpose={purpose} code={demoCode} busy={busy} onFill={fill} />}
     </div>
   );
 }

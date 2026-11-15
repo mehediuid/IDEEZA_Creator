@@ -17,6 +17,8 @@ import { Spinner } from "@/components/ideeza/spinner";
 import { Textarea } from "@/components/ideeza/text-input";
 import { videoScenePrompt } from "@/lib/brief/video-prompt";
 import { Sheet } from "../../kit/sheet";
+import { cn } from "@/lib/utils";
+import { T } from "../../type";
 
 export function PromptHelpSheet({
   open,
@@ -132,23 +134,20 @@ function PromptHelp({
           >
             Use this prompt
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >
       <div className="flex flex-col gap-3">
-        <label htmlFor={ideaId} className="text-sm font-medium leading-sm text-text-primary">
+        <label htmlFor={ideaId} className={cn(T.label, "text-text-primary")}>
           Write your idea
         </label>
         <Textarea id={ideaId} rows={3} value={idea} onValueChange={setIdea} placeholder="make a gesture and voice controlled electric fan for me" className="resize-none" />
-        <p className="text-sm leading-sm text-text-secondary">One or two lines is enough.</p>
+        <p className={T.meta}>One or two lines is enough.</p>
       </div>
 
       {!hasResult &&
         (pending ? (
-          <p role="status" className="flex min-h-[44px] items-center gap-4 text-lg font-medium leading-lg text-text-primary">
+          <p role="status" className={cn(T.bodyStrong, "flex min-h-[44px] items-center gap-4")}>
             <Spinner size={20} />
             Generating…
           </p>
@@ -164,14 +163,14 @@ function PromptHelp({
             >
               Generate a prompt
             </Button>
-            {!trimmedIdea && <p className="text-sm leading-sm text-text-secondary">Write your idea first.</p>}
+            {!trimmedIdea && <p className={T.meta}>Write your idea first.</p>}
           </div>
         ))}
 
       {hasResult && (
         <>
           <div className="flex flex-col gap-3">
-            <label htmlFor={refinedId} className="text-sm font-medium leading-sm text-text-primary">
+            <label htmlFor={refinedId} className={cn(T.label, "text-text-primary")}>
               Refined prompt
             </label>
             <Textarea ref={refinedRef} id={refinedId} rows={4} value={refined} onValueChange={setRefined} className="resize-none" />

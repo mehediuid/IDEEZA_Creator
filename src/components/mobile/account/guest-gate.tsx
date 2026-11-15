@@ -7,7 +7,6 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Button } from "@/components/ideeza/button";
 import { Sheet } from "../kit/sheet";
 import { WaysIn, useProviderSheet } from "./ways-in";
 
@@ -36,11 +35,6 @@ export function GuestGate({
         onClose={onClose}
         title={title}
         description={description}
-        actions={
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Not now
-          </Button>
-        }
       >
         <WaysIn
           onProvider={(p) => {

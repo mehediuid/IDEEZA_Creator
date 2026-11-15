@@ -13,7 +13,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 const SRC = new URL("../../src/", import.meta.url);
 const read = (path) => readFileSync(new URL(path, SRC), "utf8");
 
-export const STRICT = false;
+export const STRICT = true;
 
 function filesUnder(dir) {
   const out = [];

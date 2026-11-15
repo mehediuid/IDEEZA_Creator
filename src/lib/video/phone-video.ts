@@ -186,22 +186,49 @@ export function qualityOfHeight(height: number): VideoQuality {
   return height >= 720 ? "high" : "low";
 }
 
-export type CameraTrouble = "denied" | "missing" | "unsupported";
+export type CameraTrouble = "denied" | "busy" | "missing" | "unsupported";
 
 /** Why the camera didn't open, from the browser's error name. */
 export function cameraTroubleOf(name: string | null | undefined): CameraTrouble {
   if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") return "denied";
-  if (name === "NotFoundError" || name === "DevicesNotFoundError" || name === "OverconstrainedError" || name === "NotReadableError" || name === "AbortError")
-    return "missing";
+  // In use by another app, or a hiccup while it opened: trying again can work.
+  if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError") return "busy";
+  if (name === "NotFoundError" || name === "DevicesNotFoundError" || name === "OverconstrainedError") return "missing";
   return "unsupported";
 }
 
 /** 11t's words, per trouble; each ends on the way out that always works — upload a clip. */
 export const CAMERA_TROUBLE_COPY: Record<CameraTrouble, { title: string; text: string }> = {
-  denied: { title: "The camera is off for IDEEZA", text: "Turn it on in your phone’s Settings, or upload a clip you already have." },
+  denied: {
+    title: "The camera is off for IDEEZA",
+    text: "Turn on Camera for this site in your browser’s settings, then try again. Or upload a clip you already have.",
+  },
+  busy: { title: "The camera is busy", text: "Another app may be using it. Close that app and try again, or upload a clip you already have." },
   missing: { title: "There’s no camera to record with", text: "This phone’s camera isn’t available right now. Upload a clip you already have." },
   unsupported: { title: "This phone can’t record here", text: "Recording isn’t available in this browser. Upload a clip you already have." },
 };
+
+/** Try again is worth offering: the camera was turned off, busy or not found — not a browser that can't record. */
+export function cameraCanRetry(trouble: CameraTrouble): boolean {
+  return trouble !== "unsupported";
+}
+
+/** The camera's two sides: the back one (the product) first; Flip switches. */
+export type CameraFacing = "environment" | "user";
+
+export function flipFacing(facing: CameraFacing): CameraFacing {
+  return facing === "environment" ? "user" : "environment";
+}
+
+/** The flash is the camera's torch, where its track has one (never the front camera). */
+export const FLASH_UNAVAILABLE = "Flash isn’t available on this camera";
+
+export function flashLabel(can: boolean, on: boolean): string {
+  return !can ? FLASH_UNAVAILABLE : on ? "Turn the flash off" : "Turn the flash on";
+}
+
+/** Said once when a clip records with no microphone (turned off, or Not now). */
+export const SILENT_CLIP = "Recording without sound. The microphone is off.";
 
 /** How a kept clip was made: with this phone's camera, or picked from its videos. */
 export type ClipOrigin = "camera" | "upload";

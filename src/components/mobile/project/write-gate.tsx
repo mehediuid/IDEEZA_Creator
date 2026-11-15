@@ -15,7 +15,9 @@ import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { decideWrite, NO_UNDO, writeGuardsNow, type Undo, type WriteChange } from "@/lib/manual/guards";
 import { useManualProjects } from "@/lib/manual/projects";
+import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
+import { T } from "../type";
 
 export type GateOutcome = { kind: "ran" } | { kind: "confirming" } | { kind: "refused"; reason: string };
 
@@ -113,26 +115,23 @@ function PauseSheet({ open, error, onCancel, onConfirm }: { open: boolean; error
           >
             Pause and continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
-          </Button>
-          {!ticked && <p className="text-right text-sm leading-sm text-text-secondary">Tick the box to continue.</p>}
+          {!ticked && <p className={cn(T.meta, "text-right")}>Tick the box to continue.</p>}
         </>
       }
     >
-      <p className="text-md leading-md text-text-secondary">
+      <p className={T.body}>
         The marketplace shows this project as it was listed. Changing it takes the listing off the marketplace until you relist it.
       </p>
       <Banner tone="attention">
         The listing is paused while you make changes. Relist it in Earn › Sell once every product has its AI video and the project video is made.
       </Banner>
-      <label className="relative flex min-h-[44px] cursor-pointer items-center gap-4 text-md font-medium leading-md text-text-primary">
+      <label className={cn(T.rowTitle, "relative flex min-h-[44px] cursor-pointer items-center gap-4")}>
         <input type="checkbox" className="sr-only" checked={ticked} onChange={() => setTicked((t) => !t)} />
         <Checkbox checked={ticked} decorative />
         I understand the listing will be paused
       </label>
       {error && (
-        <p role="alert" className="text-md leading-md text-text-error">
+        <p role="alert" className={cn(T.body, "text-text-error")}>
           {error}
         </p>
       )}

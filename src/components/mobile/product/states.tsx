@@ -9,13 +9,14 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { FolderSearchIcon, HelpCircleIcon, Store01Icon } from "@hugeicons/core-free-icons";
+import { HelpCircleIcon, Store01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { buttonVariants } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { StateCard } from "@/components/ideeza/state-card";
 import { cn } from "@/lib/utils";
+import { ErrorState, NotFoundState } from "../kit/state";
 import { useOnline } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
@@ -34,17 +35,7 @@ export function ProductLoading() {
   if (stuck && online) {
     return (
       <Screen top={<TopBar back />} className="px-8 pb-8">
-        <Banner
-          tone="error"
-          title="We couldn’t load this product"
-          action={
-            <button type="button" onClick={() => window.location.reload()} className="-my-6 inline-flex min-h-[44px] items-center text-md font-medium leading-md outline-none hover:underline focus-visible:underline">
-              Try again
-            </button>
-          }
-        >
-          Check your connection and try again.
-        </Banner>
+        <ErrorState title="We couldn’t load this product" body="Check your connection and try again." action={{ label: "Try again", onClick: () => window.location.reload() }} />
       </Screen>
     );
   }
@@ -75,30 +66,23 @@ export function ProductLoading() {
   );
 }
 
-function CardScreen({ title, top, children }: { title?: string; top?: React.ReactNode; children: React.ReactNode }) {
+/** The card is the page: Back in the bar, and the card's title is the screen's one h1. */
+function CardScreen({ back = true, children }: { back?: string | true; children: React.ReactNode }) {
   return (
-    <Screen top={top ?? <TopBar back title={title} />} className="px-8 pb-8">
+    <Screen top={<TopBar back={back} />} className="px-8 pb-8">
       {children}
     </Screen>
   );
 }
 
-/** 10v · Product not found. */
+/** 10v · Product not found (KIT-ER-04's card). */
 export function ProductMissing({ projectName, back }: { projectName: string; back: string }) {
   return (
-    <CardScreen title="Product">
-      <StateCard
-        tone="empty"
-        className="w-full"
-        titleAs="h1"
-        icon={<Icon icon={HelpCircleIcon} size={32} />}
-        title={`This product isn’t in ${projectName}`}
-        body="Its link doesn’t match any product in this project. It may have been removed."
-        action={
-          <Link href={back} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-            Back to the project
-          </Link>
-        }
+    <CardScreen back={back}>
+      <NotFoundState
+        thing="product"
+        body={`Its link doesn’t match any product in ${projectName}. It may have been removed.`}
+        action={{ label: "Back to the project", href: back }}
       />
     </CardScreen>
   );
@@ -107,21 +91,28 @@ export function ProductMissing({ projectName, back }: { projectName: string; bac
 /** An address that matches no project in this browser (the project page's 20d). */
 export function ProjectMissing() {
   return (
-    <CardScreen>
-      <StateCard
-        tone="empty"
-        className="w-full"
-        titleAs="h1"
-        icon={<Icon icon={FolderSearchIcon} size={32} />}
-        title="We couldn't find this project"
-        body="It may have been deleted, or it was made in another browser."
-        action={
-          <Link href="/m/projects" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-            Back to My projects
-          </Link>
-        }
-      />
+    <CardScreen back="/m/projects">
+      <NotFoundState thing="project" body="It may have been deleted, or it was made in another browser." action={{ label: "Back to My projects", href: "/m/projects" }} />
     </CardScreen>
+  );
+}
+
+/** A piece the build doesn't have, or one this viewer can't open (10v's card on a piece screen). */
+export function PieceMissing({ title, body, back }: { title: string; body: string; back: string }) {
+  return (
+    <StateCard
+      phone
+      tone="empty"
+      className="w-full"
+      icon={<Icon icon={HelpCircleIcon} size={32} />}
+      title={title}
+      body={body}
+      action={
+        <Link href={back} replace className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "border-solid")}>
+          Back to Build
+        </Link>
+      }
+    />
   );
 }
 
@@ -129,8 +120,9 @@ export function ProjectMissing() {
  *  marketplace items live on the Feed, so that is where Back goes. */
 export function OffMarket({ paused }: { paused: boolean }) {
   return (
-    <CardScreen title="Explore marketplace">
+    <CardScreen>
       <StateCard
+        phone
         tone="empty"
         className="w-full"
         titleAs="h1"
@@ -142,7 +134,7 @@ export function OffMarket({ paused }: { paused: boolean }) {
             : "This page shows only projects their creator added to Explore marketplace. This one may never have been listed, or its creator took it off."
         }
         action={
-          <Link href="/m" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
+          <Link href="/m" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "border-solid")}>
             Back to the Feed
           </Link>
         }

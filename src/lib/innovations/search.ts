@@ -1,14 +1,16 @@
 // Global Search on the phone (mobile Figma, Design - Light Mode › Global
-// Search): one field over People, Post (the Feed's clips), Projects, Parts &
-// Agile Module, Marketplace and Blog. Typing offers a few matches per kind
-// (People, Projects, Blogs, as the Figma draws); Search shows every kind, or
-// one under its chip. Recent searches (a query or a person opened) are kept on
-// this phone, newest first, ten at most.
+// Search): one field over People, Post (the Feed's clips, yours too),
+// Projects, Parts & Agile Module, Marketplace and Blog, then — as the web's
+// search finds them — Settings rows and Help & tutorials. Typing offers a few
+// matches per kind (People, Projects, Blogs, as the Figma draws); Search shows
+// every kind, or one under its chip. Recent searches (a query or a person
+// opened) are kept on this phone, newest first, ten at most, only while
+// Settings › Search history keeps searches.
 //
 // The index is built by the screen from the stores the web already keeps;
 // these functions only rank and group it. Pure, relative imports only.
 
-export type SearchKind = "people" | "post" | "projects" | "parts" | "marketplace" | "blog";
+export type SearchKind = "people" | "post" | "projects" | "parts" | "marketplace" | "blog" | "settings" | "help";
 
 export const SEARCH_KINDS: readonly { id: SearchKind; label: string }[] = [
   { id: "people", label: "People" },
@@ -17,6 +19,8 @@ export const SEARCH_KINDS: readonly { id: SearchKind; label: string }[] = [
   { id: "parts", label: "Parts & Agile Module" },
   { id: "marketplace", label: "Marketplace" },
   { id: "blog", label: "Blog" },
+  { id: "settings", label: "Settings" },
+  { id: "help", label: "Help & tutorials" },
 ];
 
 /** What typing offers, in this order (Figma "When User writing something on Search bar"). */
@@ -29,6 +33,8 @@ export const SUGGEST_LABEL: Readonly<Record<SearchKind, string>> = {
   parts: "Parts & Agile Module",
   marketplace: "Marketplace",
   blog: "Blogs",
+  settings: "Settings",
+  help: "Help & tutorials",
 };
 
 export type SearchEntry<T = unknown> = {

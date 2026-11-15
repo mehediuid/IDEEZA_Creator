@@ -2,13 +2,15 @@
 
 // A contract's Staking Options (Figma "Stacking" 227865) and the Stake sheet
 // (227896 not connected, 227999 connected, 228108 with an amount) and its
-// success (228221). Each option: its name and Est. APR, Lockup Period,
-// Reward Token, Stake. The sheet lists the option's terms (Stake Details),
-// then the amount: Connect Wallet until a wallet is connected, then the
-// balance with Max, the wallet's address, and the reward the amount earns
-// over the lock-up; every check from lib/wallet/staking.ts. Stake goes
-// through the wallet sheet; once it confirms, the success sheet offers the
-// Stake tab's activity or the new stake's rewards.
+// success (228221). Each option is a card: its name with the Est. APR large,
+// Lockup Period and Reward Token as facts, Stake (UX pass 2026-11-15, lens 2).
+// The sheet leads with the amount — Connect wallet until a wallet is
+// connected, then the balance with Max, the wallet's address and the reward
+// the amount earns over the lock-up — then the three terms that matter (Est.
+// APR, Lock-up Period, Wallet Limit) and the option's ten terms behind "Stake
+// Details"; every check from lib/wallet/staking.ts. Stake goes through the
+// wallet sheet; once it confirms, the success sheet offers the Stake tab's
+// activity or the new stake's rewards.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -17,9 +19,7 @@ import { IdzCoin } from "@/components/balance/idz-coin";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
-import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { TextInput } from "@/components/ideeza/text-input";
-import { StateCard } from "@/components/ideeza/state-card";
 import { estimateGas } from "@/lib/commerce/gas";
 import { cn } from "@/lib/utils";
 import { availableOf } from "@/lib/wallet/balances";
@@ -44,9 +44,11 @@ import {
 } from "@/lib/wallet/staking";
 import { useStakeAdmin } from "@/lib/wallet/use-earn-stores";
 import { Sheet } from "../kit/sheet";
+import { NotFoundState } from "../kit/state";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { CARD, ConnectSheet, CopyChip, InfoRow, SECTION_TITLE, useEarnState } from "./parts";
+import { T } from "../type";
+import { AllDetails, CARD, ConnectSheet, CopyChip, FactGrid, SectionHead, TestnetLine, useEarnState } from "./parts";
 import { useWalletSheet } from "./wallet-sheet";
 
 export function StakeContractScreen({ contractId }: { contractId: string }) {
@@ -60,7 +62,7 @@ export function StakeContractScreen({ contractId }: { contractId: string }) {
   if (!c) {
     return (
       <Screen top={<TopBar back title="Staking" />} className="px-8 pb-8 pt-4">
-        <StateCard tone="empty" className="w-full" icon={<Icon icon={Tick02Icon} size={32} />} title="This contract isn’t here" body="It may have been taken off the Stake List." />
+        <NotFoundState thing="contract" body="It may have been taken off the Stake List." action={{ label: "Go to Stake List", href: "/m/earn/stake/contracts" }} />
       </Screen>
     );
   }
@@ -68,29 +70,41 @@ export function StakeContractScreen({ contractId }: { contractId: string }) {
 
   return (
     <Screen top={<TopBar back title={c.name} />} className="px-8 pb-8 pt-4">
-      <div className="flex flex-col gap-8">
-        <h2 className={SECTION_TITLE}>Staking Options</h2>
+      <div className="flex flex-col gap-6">
+        <SectionHead>Staking Options</SectionHead>
         {status !== "active" && <Banner tone={status === "blocked" ? "error" : "attention"}>{`${STATUS_WORDS[status]}. ${status === "blocked" ? "Nothing can be staked in it." : "Staking opens again when it resumes."}`}</Banner>}
-        <ul className="flex flex-col gap-8">
+        <ul className="flex flex-col gap-6">
           {c.options.map((o) => {
             const block = stakeBlockOf(o, status, now);
             const noteId = `option-${o.id}`;
             return (
-              <li key={o.id} className={cn(CARD, "flex flex-col gap-4 p-8")}>
-                <dl className="flex flex-col gap-3">
-                  <InfoRow label={o.name}>
-                    <span className="text-md leading-md text-text-success">{aprText(o.aprBps)}</span> Est. APR
-                  </InfoRow>
-                  <InfoRow label="Lockup Period:">{daysText(o.lockDays)}</InfoRow>
-                  <InfoRow label="Reward Token:">
-                    <IdzCoin height={18} /> IDZ
-                  </InfoRow>
-                </dl>
-                <div className="flex items-center justify-between gap-6">
-                  <span id={noteId} className="text-sm leading-sm text-text-secondary">
+              <li key={o.id} className={cn(CARD, "flex flex-col gap-6 p-8")}>
+                <div className="flex items-start justify-between gap-6">
+                  <p className={cn(T.section, "min-w-0")}>{o.name}</p>
+                  <span className="flex shrink-0 flex-col items-end">
+                    <span className={cn(T.section, "tabular-nums text-text-success")}>{aprText(o.aprBps)}</span>
+                    <span className={T.micro}>Est. APR</span>
+                  </span>
+                </div>
+                <FactGrid
+                  cols={2}
+                  facts={[
+                    { label: "Lockup Period", value: daysText(o.lockDays) },
+                    {
+                      label: "Reward Token",
+                      value: (
+                        <span className="inline-flex items-center gap-2">
+                          <IdzCoin height={16} /> IDZ
+                        </span>
+                      ),
+                    },
+                  ]}
+                />
+                <div className="flex items-center justify-between gap-6 border-t-[length:var(--border-width-1)] border-solid border-border pt-6">
+                  <span id={noteId} className={cn(T.meta, "min-w-0")}>
                     {block && status === "active" ? block : ""}
                   </span>
-                  <Button size="md" className="w-[96px] shrink-0" disabled={!!block} aria-describedby={block ? noteId : undefined} onClick={() => setPicked(o)}>
+                  <Button size="md" className="shrink-0" disabled={!!block} aria-describedby={block ? noteId : undefined} onClick={() => setPicked(o)}>
                     Stake
                   </Button>
                 </div>
@@ -98,7 +112,7 @@ export function StakeContractScreen({ contractId }: { contractId: string }) {
             );
           })}
         </ul>
-        <p className="text-sm leading-sm text-text-secondary">{STAKE_TIME_LINE}</p>
+        <TestnetLine>{STAKE_TIME_LINE}</TestnetLine>
       </div>
       {picked && (
         <StakeSheet
@@ -200,29 +214,19 @@ function StakeSheet({
         open
         onClose={onClose}
         title="Staking Options"
+        description={`${o.name} · ${c.name}`}
         actions={
           <Button size="xl" className="w-full aria-disabled:cursor-not-allowed aria-disabled:opacity-60" aria-disabled={(connected && !!check.error) || undefined} loading={sheet.busy} onClick={stake}>
             Stake
           </Button>
         }
       >
-        <p className="flex items-center justify-between gap-4 text-lg font-medium leading-lg text-text-primary">
-          Stake Details
-          <TestnetDemoBadge />
-        </p>
-        <dl className="flex flex-col gap-4 rounded-xl bg-bg-subtle p-8">
-          {rows.map((r) => (
-            <InfoRow key={r.label} label={r.label}>
-              {r.value}
-            </InfoRow>
-          ))}
-        </dl>
         <div className="flex items-center justify-between gap-6">
-          <label htmlFor={`${errId}-amount`} className="text-lg font-medium leading-lg text-text-primary">
+          <label htmlFor={`${errId}-amount`} className={T.section}>
             Stake Amount
           </label>
           {connected ? (
-            <span className="flex items-center gap-3 text-md leading-md text-text-primary">
+            <span className={cn(T.body, "flex items-center gap-3 text-text-primary")}>
               Balance {formatAmount(available, "IDZ")}
               <button
                 type="button"
@@ -231,14 +235,14 @@ function StakeSheet({
                   setText(max === "0" ? "" : max);
                   setTouched(true);
                 }}
-                className="rounded-xs font-medium text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                className={cn(T.rowTitle, "-my-4 inline-flex min-h-[44px] items-center rounded-xs px-2 text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus active:opacity-[var(--opacity-muted)]")}
               >
                 Max
               </button>
             </span>
           ) : (
-            <button type="button" onClick={() => setConnecting(true)} className="rounded-xs text-lg leading-lg text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-              Connect Wallet
+            <button type="button" onClick={() => setConnecting(true)} className={cn(T.rowTitle, "-my-4 inline-flex min-h-[44px] items-center rounded-xs px-2 text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus active:opacity-[var(--opacity-muted)]")}>
+              Connect wallet
             </button>
           )}
         </div>
@@ -257,7 +261,7 @@ function StakeSheet({
           aria-describedby={shown ? errId : undefined}
         />
         {shown && (
-          <p id={errId} className="text-sm leading-sm text-text-error">
+          <p id={errId} className={cn(T.caption, "text-text-error")}>
             {shown.text}
           </p>
         )}
@@ -265,13 +269,22 @@ function StakeSheet({
           <div className="flex flex-wrap items-center justify-between gap-4">
             <CopyChip value={demoAddress(id)} what="Wallet address" />
             {check.reward && !check.error && (
-              <span className="text-md leading-md text-text-primary">
-                Reward <span className="font-medium text-text-success">{formatAmount(check.reward, "IDZ")}</span> in {daysText(o.lockDays)}
+              <span className={cn(T.body, "text-text-primary")}>
+                Reward <span className="text-text-success">{formatAmount(check.reward, "IDZ")}</span> in {daysText(o.lockDays)}
               </span>
             )}
           </div>
         )}
+        <FactGrid
+          facts={[
+            { label: "Est. APR", value: aprText(o.aprBps), tone: "success" },
+            { label: "Lock-up Period", value: daysText(o.lockDays) },
+            { label: "Wallet Limit", value: formatAmount(o.walletLimit, "IDZ") },
+          ]}
+        />
+        <AllDetails title="Stake Details" rows={rows} />
         {note && <Banner tone="info">{note}</Banner>}
+        <TestnetLine />
       </Sheet>
       <ConnectSheet open={connecting} onClose={() => setConnecting(false)} description="Your stake and its rewards go to it. This is the testnet demo wallet — test funds only." />
       {sheet.sheet}

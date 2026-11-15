@@ -20,7 +20,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight01Icon,
   CpuIcon,
   CodeIcon,
   CubeIcon,
@@ -35,6 +34,7 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
+import { Tag } from "@/components/ideeza/tag";
 import { CreditBadge } from "@/components/credits/credit-badge";
 import { stateRowFor, useMinuteClock } from "@/components/create/build-status";
 import { useCredits } from "@/lib/create/credits";
@@ -59,7 +59,8 @@ import { useToast } from "../kit/toast";
 import { BuyCreditsSheet } from "./buy-credits-sheet";
 import { JobModel } from "./deliverables";
 import { T } from "../type";
-import { CARD } from "./parts";
+import { Chevron, LIST_CARD, LIST_DIVIDERS } from "../kit/list";
+import { OFFLINE_REASON } from "./parts";
 import type { ConceptFlow, Gate } from "./use-concept-flow";
 
 export const PIECE_ICON: Record<BuildItemKind, IconValue> = {
@@ -125,51 +126,46 @@ export function BuildConfirmSheet({
               <Button size="xl" className="w-full" onClick={() => setBuying(true)}>
                 Buy credits
               </Button>
-              <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-                Cancel
-              </Button>
             </>
           ) : (
             <>
-              <Button size="xl" className="w-full" loading={flow.submitting} onClick={build}>
-                Build <CreditBadge credits={cost} onBrand />
+              <Button size="xl" className="w-full" loading={flow.submitting} disabled={!flow.online} onClick={build}>
+                Build <CreditBadge credits={cost} onBrand={flow.online} />
               </Button>
-              <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose} disabled={flow.submitting}>
-                Cancel
-              </Button>
+              {!flow.online && (
+                <p role="status" className={cn(T.meta, "text-center")}>
+                  {OFFLINE_REASON}
+                </p>
+              )}
             </>
           )
         }
       >
-        <ul className="flex flex-col rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle">
+        <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
           {rows.map((r, i) => (
-            <li key={r.id} className={cn("flex flex-col gap-1 px-6 py-5", i > 0 && "border-t-[length:var(--border-width-1)] border-solid border-border-subtle")}>
+            <li key={r.id} className="flex flex-col gap-1 px-6 py-5">
               <span className="flex items-baseline justify-between gap-4">
-                <span className="text-lg font-medium leading-lg text-text-primary">{r.name}</span>
-                <span className="shrink-0 text-sm leading-sm text-text-secondary">
+                <span className={T.rowTitle}>{r.name}</span>
+                <span className={cn(T.meta, "shrink-0")}>
                   {r.pieces} pieces · {r.cost} credits
                 </span>
               </span>
-              {gate?.lines[i] && <span className="text-sm leading-sm text-text-tertiary">{gate.lines[i].replace(/^.*? — /, "")}</span>}
+              {gate?.lines[i] && <span className={cn(T.meta, "text-text-tertiary")}>{gate.lines[i].replace(/^.*? — /, "")}</span>}
             </li>
           ))}
         </ul>
         <div className="flex flex-col gap-3 rounded-xl bg-bg-subtle p-7">
-          <p className="text-sm leading-sm text-text-secondary">
+          <p className={T.meta}>
             Your concept images are a visual reference. The engineered output may differ from them.
           </p>
-          <p className="text-sm leading-sm text-text-secondary">
+          <p className={T.meta}>
             Automated design rule checks run on completion. If issues are found, you&apos;ll still receive the full output with a{" "}
-            <strong className="font-semibold text-text-primary">Draft</strong> label and a list of what needs review.
+            <span className={cn(T.label, "text-text-primary")}>Draft</span> label and a list of what needs review.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <span className="rounded-full border-[length:var(--border-width-1)] border-solid border-border-subtle px-5 py-1 text-sm leading-sm text-text-secondary">
-            {hydrated ? (short ? `You have ${balance} — ${cost - balance} short` : `${cost} credits · ${balance} → ${balance - cost} after`) : `${cost} credits`}
-          </span>
-          <span className="rounded-full border-[length:var(--border-width-1)] border-solid border-border-subtle px-5 py-1 text-sm leading-sm text-text-secondary">
-            {aboutTime(flow.state.seconds).replace(/^about/, "About")}
-          </span>
+          <Tag>{hydrated ? (short ? `You have ${balance} — ${cost - balance} short` : `${cost} credits · ${balance} → ${balance - cost} after`) : `${cost} credits`}</Tag>
+          <Tag>{aboutTime(flow.state.seconds).replace(/^about/, "About")}</Tag>
         </div>
       </Sheet>
       <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={cost} />
@@ -232,13 +228,13 @@ function ProductChips({
               {p.image && <Image src={p.image} alt="" fill sizes="38px" className="object-cover" unoptimized />}
             </span>
             <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-medium leading-sm text-text-primary">{p.name}</span>
+              <span className={cn(T.label, "truncate text-text-primary")}>{p.name}</span>
               <span
                 className={cn(
-                  "truncate text-xs leading-xs",
+                  T.micro, "truncate",
                   s.tone === "success" && "text-text-success",
                   s.tone === "brand" && "text-text-brand",
-                  s.tone === "error" && "font-medium text-text-error",
+                  s.tone === "error" && "text-text-error",
                   s.tone === "plain" && "text-text-secondary",
                 )}
               >
@@ -263,8 +259,8 @@ function FailedPiece({ job, product, kind, pieces }: { job: BuildJob; product: P
           <Icon icon={PIECE_ICON[kind]} size={20} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-md font-medium leading-md text-text-error">{PIECE_ROW_LABEL[kind]} didn&apos;t finish</span>
-          <span className="text-sm leading-sm text-text-secondary">{failedPieceNote(kind, pieces)}</span>
+          <span className={cn(T.rowTitle, "text-text-error")}>{PIECE_ROW_LABEL[kind]} didn&apos;t finish</span>
+          <span className={T.meta}>{failedPieceNote(kind, pieces)}</span>
         </span>
       </div>
       <Button
@@ -291,7 +287,7 @@ function PiecesSheet({ job, product, open, onClose }: { job: BuildJob; product: 
   const ready = live.filter((i) => i.status === "ready").length;
   return (
     <Sheet open={open} onClose={onClose} title="Pieces" description={`${product.name} · ${ready} of ${live.length} ready`}>
-      <ul className="flex flex-col divide-y divide-border-subtle overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle">
+      <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
         {product.items
           .filter((i) => i.status !== "skipped" || i.omitted)
           .map((item) => {
@@ -308,13 +304,13 @@ function PiecesSheet({ job, product, open, onClose }: { job: BuildJob; product: 
                     onClose();
                     router.push(`/m/ai/build/${job.id}?product=${product.id}&tab=${item.kind}`);
                   }}
-                  className="min-h-[44px] min-w-0 flex-1 text-left text-lg leading-lg text-text-primary outline-none focus-visible:underline"
+                  className={cn(T.body, "min-h-[44px] min-w-0 flex-1 text-left text-text-primary outline-none focus-visible:underline")}
                 >
                   {PIECE_ROW_LABEL[item.kind]}
                 </button>
                 <span
                   className={cn(
-                    "shrink-0 text-sm leading-sm",
+                    T.meta, "shrink-0",
                     word.tone === "done" && "text-text-success",
                     word.tone === "error" && "text-text-error",
                     word.tone === "working" && "text-text-brand",
@@ -333,9 +329,7 @@ function PiecesSheet({ job, product, open, onClose }: { job: BuildJob; product: 
                     <Icon icon={Refresh01Icon} size={18} />
                   </button>
                 ) : (
-                  <span className="shrink-0 text-[color:var(--color-icon-default)]">
-                    <Icon icon={ArrowRight01Icon} size={16} />
-                  </span>
+                  <Chevron />
                 )}
               </li>
             );
@@ -360,7 +354,7 @@ export function BuildCard({ job, product, onProduct }: { job: BuildJob; product:
   const percent = status === "ready" ? 100 : status === "queued" || status === "failed" ? 0 : roll.progress;
   const name = job.projectChoiceName?.trim() || job.title;
   const each = new Set(products.map((p) => p.items.filter((i) => i.status !== "skipped").length));
-  const piecesLine = each.size === 1 ? `${[...each][0]} pieces each` : `${allItems(job).filter((i) => i.status !== "skipped").length} pieces`;
+  const piecesLine = each.size === 1 ? `${[...each][0]} pieces${products.length > 1 ? " each" : ""}` : `${allItems(job).filter((i) => i.status !== "skipped").length} pieces`;
   const pieces: PieceLite[] = shown.items.map((i) => ({ kind: i.kind, status: i.status, progress: i.progress, omitted: i.omitted }));
   const systemFailure = job.failure === "system";
   const live = shown.items.filter((i) => i.status !== "skipped");
@@ -379,7 +373,7 @@ export function BuildCard({ job, product, onProduct }: { job: BuildJob; product:
 
   return (
     <section aria-label={row.sectionLabel} className="flex flex-col gap-5">
-      <div className={cn(CARD, "flex flex-col gap-5 p-4")}>
+      <div className={cn(LIST_CARD, "flex flex-col gap-5 p-4")}>
         <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg bg-bg-subtle">
           {shown.conceptImageUrl && <Image src={shown.conceptImageUrl} alt={`${shown.name}, the approved concept`} fill sizes="343px" className="object-cover" unoptimized />}
           <span className="absolute left-4 top-4">
@@ -389,37 +383,37 @@ export function BuildCard({ job, product, onProduct }: { job: BuildJob; product:
         </div>
         <div className="flex flex-col gap-5 px-2 pb-2">
           <div className="flex min-w-0 flex-col">
-            <p className="truncate text-lg font-semibold leading-lg text-text-primary">{name}</p>
-            <p className="text-sm leading-sm text-text-secondary">
+            <p className={cn(T.section, "truncate")}>{name}</p>
+            <p className={T.meta}>
               {products.length} {products.length === 1 ? "product" : "products"} · {piecesLine}
             </p>
           </div>
           {products.length > 1 && <ProductChips products={products} shownId={shown.id} onProduct={onProduct} systemFailure={systemFailure} queued={status === "queued"} />}
           <div className="flex flex-col gap-3">
-            <p className="text-md font-medium leading-md text-text-primary">{stage}</p>
+            <p className={T.rowTitle}>{stage}</p>
             <ProgressBar value={percent} label={`${name} build progress`} />
-            <p className="text-sm leading-sm text-text-secondary">
+            <p className={T.meta}>
               {row.banner ? `${row.banner.title}. ${row.banner.body}` : "Runs in the background. You can leave, and we'll notify you when it's ready."}
             </p>
-            {row.meta && <p className="text-sm leading-sm text-text-tertiary">{row.meta}</p>}
+            {row.meta && <p className={cn(T.meta, "text-text-tertiary")}>{row.meta}</p>}
           </div>
           {job.blocked === "credits" && (
-            <button type="button" onClick={() => setBuying(true)} className="-my-3 min-h-[40px] w-fit text-md font-medium leading-md text-text-brand hover:underline">
+            <button type="button" onClick={() => setBuying(true)} className={cn(T.rowTitle, "-my-3 min-h-[40px] w-fit text-text-brand hover:underline")}>
               Buy credits
             </button>
           )}
           {row.actions === "cancelQueued" && (
-            <button type="button" onClick={() => cancelBuild(job.id)} className="-my-3 min-h-[40px] w-fit text-md font-medium leading-md text-text-brand hover:underline">
+            <button type="button" onClick={() => cancelBuild(job.id)} className={cn(T.rowTitle, "-my-3 min-h-[40px] w-fit text-text-brand hover:underline")}>
               Cancel this build
             </button>
           )}
           {row.actions === "retryAll" && (
-            <button type="button" onClick={() => retryBuild(job.id)} className="-my-3 inline-flex min-h-[40px] w-fit items-center gap-2 text-md font-medium leading-md text-text-brand hover:underline">
+            <button type="button" onClick={() => retryBuild(job.id)} className={cn(T.rowTitle, "-my-3 inline-flex min-h-[40px] w-fit items-center gap-2 text-text-brand hover:underline")}>
               Try this build again <CreditBadge credits={jobCost(job)} />
             </button>
           )}
           {isOverrunning(job, now) && (
-            <button type="button" onClick={() => failBuildSystem(job.id)} className="-my-3 min-h-[40px] w-fit text-md font-medium leading-md text-text-error hover:underline">
+            <button type="button" onClick={() => failBuildSystem(job.id)} className={cn(T.rowTitle, "-my-3 min-h-[40px] w-fit text-text-error hover:underline")}>
               Stop and refund
             </button>
           )}
@@ -489,17 +483,17 @@ export function FinishedCard({
   const showing = has3d ? view : "image";
   const seg = (on: boolean) =>
     cn(
-      "min-h-[40px] flex-1 rounded-lg text-md font-medium leading-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+      T.rowTitle, "min-h-[40px] flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
       on ? "bg-bg-surface text-text-primary shadow-sm" : "text-text-secondary",
     );
   return (
     <section aria-label="Build finished" className="flex flex-col gap-5">
       {total > 1 && <ProductChips products={products} leftOut={leftOut} shownId={shown.id} onProduct={onProduct} systemFailure={false} queued={false} />}
-      <div className={cn(CARD, "flex flex-col gap-5 p-4")}>
+      <div className={cn(LIST_CARD, "flex flex-col gap-5 p-4")}>
         <div className="flex items-start justify-between gap-4 px-2 pt-1">
           <div className="flex min-w-0 flex-col">
-            <p className="truncate text-lg font-semibold leading-lg text-text-primary">{shown.name}</p>
-            <p className="truncate text-sm leading-sm text-text-secondary">
+            <p className={cn(T.section, "truncate")}>{shown.name}</p>
+            <p className={cn(T.meta, "truncate")}>
               {total > 1
                 ? `${projectName} · Product ${index + 1} of ${total}`
                 : failed.length
@@ -574,7 +568,7 @@ function LeftOutCard({
     }
   };
   return (
-    <div className={cn(CARD, "flex flex-col gap-5 p-4")}>
+    <div className={cn(LIST_CARD, "flex flex-col gap-5 p-4")}>
       <div className="flex items-start justify-between gap-4 px-2 pt-1">
         <div className="flex min-w-0 flex-col">
           <p className={cn(T.section, "truncate")}>{item.name}</p>
@@ -593,9 +587,10 @@ function LeftOutCard({
           Its concept stays in {projectName}. Build it any time, no need to draw it again.
         </p>
       </div>
-      <Button size="lg" className="w-full" loading={flow.preparing} onClick={build}>
-        Build {item.name} <CreditBadge credits={item.cost} onBrand />
+      <Button size="lg" className="w-full" loading={flow.preparing} disabled={!flow.online} onClick={build}>
+        Build {item.name} <CreditBadge credits={item.cost} onBrand={flow.online} />
       </Button>
+      {!flow.online && <p className={cn(T.meta, "text-center")}>{OFFLINE_REASON}</p>}
       <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={item.cost} />
     </div>
   );

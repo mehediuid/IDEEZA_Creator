@@ -2,20 +2,25 @@
 
 // Earn Coin › Refer & Earn (Figma "Refer & Earn" 228855 Generate Link, 228900
 // Connect Your Wallet, 228949 the campaign, 229005 the wallet menu, 229066 /
-// 229159 / 229224 its activity, waiting for approval, claiming). Before a
-// link: Refer and Earn with IDEEZA and Generate Link, which asks for the
-// wallet first (the rewards go to it). With one: the campaign card — its
-// name and the wallet (Disconnect), the publisher, the chain ID and History,
-// the link to copy, Referred Users · $IDZ Earned · Points, and where the
-// campaign stands (lock-up countdown, waiting for approval, ready, claimed).
-// Activity lists every referral by campaign and name; Claim all points claims
-// the campaign's points as IDZ through the wallet sheet once it is approved.
-// A Demo sheet plays a demo creator coming through the link (prototype only).
-// Logic: lib/wallet/referral.ts.
+// 229159 / 229224 its activity, waiting for approval, claiming), laid out for
+// a phone (UX pass 2026-11-15). Before a link: "Your referral link" with Refer
+// and Earn with IDEEZA, and Generate Link in the BottomBar, which asks for the
+// wallet first (the rewards go to it). With one: the campaign card, summary
+// first — its name and where it stands (lock-up countdown, waiting for
+// approval, ready, claimed), the link to copy or share, Referred Users · $IDZ
+// Earned · Points — then two rows: Campaign details (the publisher, the chain
+// ID, the wallet with Disconnect) and Campaign History. The BottomBar holds
+// Claim all points (off, with why, until the campaign is approved; it claims
+// the campaign's points as IDZ through the wallet sheet), then Join the next
+// campaign. Activity: search by name, a By Campaign chip, one row per
+// referral, each opening its sheet with every field. ⋯ holds Share link and,
+// prototype only, "Demo: simulate a referral" (a demo creator coming through
+// the link). Logic: lib/wallet/referral.ts. Named Figma departure: the heading
+// over the Generate Link card says "Your referral link" (the Figma's "Current
+// Balance" there is a copy of the Buy tab's label and doesn't describe it).
 
 import * as React from "react";
-import Link from "next/link";
-import { Clock01Icon, LinkSquare02Icon, Logout02Icon, Share08Icon, Tick02Icon, ArrowDown01Icon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { Clock01Icon, Copy01Icon, LinkSquare02Icon, Logout02Icon, Note01Icon, Settings02Icon, Share08Icon, Tick02Icon, UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { IdzCoin } from "@/components/balance/idz-coin";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
@@ -55,12 +60,19 @@ import {
 import { chainIdOf } from "@/lib/wallet/staking";
 import type { DemoBuyerId, IdentityId } from "@/lib/wallet/types";
 import { readReferralData, useReferralData, writeReferralData } from "@/lib/wallet/use-earn-stores";
+import { BottomBar } from "../kit/bottom-bar";
+import { LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard, ListRow } from "../kit/list";
+import { PickList } from "../kit/pick-list";
+import { PRESSED } from "../kit/press";
 import { ActionSheet, Sheet } from "../kit/sheet";
+import { EmptyState } from "../kit/state";
+import { tabPanelProps } from "../kit/tabs";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { useEarnMenu } from "./earn-menu";
-import { CARD, ConnectSheet, EmptyCard, FilterButton, InfoRow, SECTION_TITLE, EarnTabs, clockOf, useCopy, useEarnState, whenOf } from "./parts";
+import { CARD, ConnectSheet, CopyChip, DetailRows, EARN_TABS_ID, EarnTabs, FactGrid, FilterChips, SectionHead, clockOf, useCopy, useEarnState, whenOf } from "./parts";
 import { useWalletSheet } from "./wallet-sheet";
 
 const STORAGE = "This browser couldn’t save it — storage is full or blocked.";
@@ -91,7 +103,6 @@ export function ReferTab() {
       }
     } else void copy(url, "Link copied");
   };
-  const menu = useEarnMenu({ extra: url ? [{ label: "Share link", icon: Share08Icon, onSelect: () => void share() }] : [] });
 
   const generate = () => {
     if (!id) return;
@@ -122,69 +133,85 @@ export function ReferTab() {
   };
 
   const next = data && id ? nextCampaignOf(data, wallet, id) : null;
+  const ready = !!data && !!wallet;
+  const hasCampaign = !!(link && state && campaign && stats && url);
+  const menu = useEarnMenu({
+    extra: [
+      ...(url ? [{ label: "Share link", icon: Share08Icon, onSelect: () => void share() }] : []),
+      ...(link && state?.phase === "running" ? [{ label: "Demo: simulate a referral", icon: Settings02Icon, onSelect: () => setDemo(true) }] : []),
+    ],
+  });
+
+  // The tab's one primary, in the thumb zone: Generate Link, then Claim all points (with why it's
+  // off until the campaign is approved), then joining the next campaign.
+  let bar: React.ReactNode = null;
+  if (ready && !hasCampaign)
+    bar = (
+      <Button size="xl" className="w-full" onClick={onGenerate}>
+        Generate Link
+      </Button>
+    );
+  else if (hasCampaign && state?.phase === "claimed")
+    bar = next ? (
+      <Button size="xl" className="w-full" onClick={onGenerate}>
+        Join {next.name}
+      </Button>
+    ) : null;
+  else if (hasCampaign)
+    bar = (
+      <>
+        <Button size="xl" className="w-full" disabled={!!claimBlock || sheet.busy} aria-describedby={claimBlock ? "claim-points-why" : undefined} onClick={claimAll}>
+          Claim all points
+        </Button>
+        {claimBlock && (
+          <p id="claim-points-why" className={cn(T.meta, "text-center")}>
+            {claimBlock}
+          </p>
+        )}
+      </>
+    );
 
   return (
-    <Screen top={<TopBar back="/m/earn" title="Earn Coin" actions={[menu.action]} />} className="px-8 pb-8">
-      <div className="flex flex-col gap-12">
+    <Screen top={<TopBar back="/m/earn" title="Earn Coin" actions={[menu.action]} />} footer={bar ? <BottomBar>{bar}</BottomBar> : undefined} className="px-8 pb-8">
+      <div className="flex flex-col gap-10">
         <EarnTabs />
-        {!data || !wallet ? (
-          <Skeleton shape="block" className="h-[240px] w-full" />
-        ) : !link || !state || !campaign || !stats || !url ? (
-          <div className={cn(CARD, "flex flex-col items-center gap-8 p-8 text-center")}>
-            <p className="text-2xl font-medium leading-2xl text-text-primary">Refer and Earn with IDEEZA</p>
-            {next && (
-              <p className="text-md leading-md text-text-secondary">
-                Join {next.name}: you earn {next.percent}% of the IDZ the creators you bring buy, in points you claim as IDZ.
-              </p>
-            )}
-            <Button size="xl" className="w-full" onClick={onGenerate}>
-              Generate Link
-            </Button>
-          </div>
-        ) : (
-          <CampaignCard
-            link={link}
-            state={state}
-            stats={stats}
-            url={url}
-            connected={connected}
-            id={link.identity}
-            now={now}
-            onConnect={() => setAsking(true)}
-            next={next?.name ?? null}
-            onNext={onGenerate}
-          />
-        )}
-
-        {link && state?.phase === "running" && (
-          <div className="flex flex-col gap-6 rounded-xl border-[length:var(--border-width-1)] border-dashed border-border p-8">
-            <div className="flex items-center gap-4">
-              <Badge tone="warning">Demo</Badge>
-              <span className="text-sm leading-sm text-text-secondary">Prototype only</span>
-            </div>
-            <p className="text-md leading-md text-text-primary">Nobody else opens a link in the demo. Play a demo creator who comes through yours and buys IDZ.</p>
-            <Button hierarchy="secondary" size="lg" className="self-start" onClick={() => setDemo(true)}>
-              Simulate a referral
-            </Button>
-          </div>
-        )}
-
-        <section className="flex flex-col gap-8" aria-labelledby="refer-activity">
-          <h2 id="refer-activity" className={SECTION_TITLE}>
-            Activity
-          </h2>
-          {rows.length === 0 ? (
-            <EmptyCard lines={["No data found."]} />
+        <div {...tabPanelProps(EARN_TABS_ID, "refer")} className="flex flex-col gap-10 outline-none">
+          {!ready ? (
+            <Skeleton shape="block" className="h-[240px] w-full" />
+          ) : !hasCampaign || !link || !state || !stats || !url ? (
+            <section className="flex flex-col gap-4" aria-labelledby="refer-link">
+              <SectionHead id="refer-link">Your referral link</SectionHead>
+              <div className={cn(CARD, "flex flex-col items-center gap-4 p-8 text-center")}>
+                <span aria-hidden className="inline-flex size-[48px] items-center justify-center rounded-full bg-bg-brand-subtle text-[color:var(--color-icon-brand)]">
+                  <Icon icon={UserAdd01Icon} size={24} />
+                </span>
+                <p className={T.section}>Refer and Earn with IDEEZA</p>
+                {next && (
+                  <p className={T.body}>
+                    Join {next.name}: you earn {next.percent}% of the IDZ the creators you bring buy, in points you claim as IDZ.
+                  </p>
+                )}
+              </div>
+            </section>
           ) : (
-            <ReferralActivity rows={rows} now={now} claimBlock={claimBlock} busy={sheet.busy} onClaim={claimAll} />
+            <CampaignCard link={link} state={state} stats={stats} url={url} connected={connected} id={link.identity} now={now} onConnect={() => setAsking(true)} onShare={() => void share()} next={next?.name ?? null} />
           )}
-        </section>
+
+          <section className="flex flex-col gap-4" aria-labelledby="refer-activity">
+            <SectionHead id="refer-activity">Activity</SectionHead>
+            {rows.length === 0 ? (
+              <EmptyState icon={Note01Icon} title="No data found" body="Referrals through your link show here." />
+            ) : (
+              <ReferralActivity rows={rows} now={now} />
+            )}
+          </section>
+        </div>
       </div>
       <ConnectSheet
         open={asking}
         onClose={() => setAsking(false)}
         onConnected={() => !link && generate()}
-        description="Your referral rewards go to this wallet, so the link needs it. You can change the wallet until the lock-up ends."
+        description="Your referral rewards go to this wallet, so the link needs it. This is the testnet demo wallet — test funds only."
       />
       {id && link && <DemoReferralSheet open={demo} onClose={() => setDemo(false)} identity={id} percent={campaign?.percent ?? 0} />}
       {sheet.sheet}
@@ -203,13 +230,16 @@ function PhasePill({ state, now }: { state: CampaignState; now: number }) {
           ? "Approved · ready to claim"
           : "Claimed";
   return (
-    <p role={state.phase === "running" ? "timer" : "status"} className="flex h-[36px] items-center justify-center gap-3 rounded-full bg-bg-brand-subtle text-md font-medium leading-md tabular-nums text-text-brand">
+    <p role={state.phase === "running" ? "timer" : "status"} className={cn(T.rowTitle, "flex h-[36px] items-center justify-center gap-3 rounded-full bg-bg-brand-subtle tabular-nums text-text-brand")}>
       <Icon icon={state.phase === "claimed" ? Tick02Icon : Clock01Icon} size={16} />
       {text}
     </p>
   );
 }
 
+/** The campaign (Figma 228949), summary first: its name and where it stands, the link to copy or
+ *  share, the three figures; the publisher, chain and wallet behind "Campaign details", the
+ *  campaign's history behind its row. */
 function CampaignCard({
   link,
   state,
@@ -219,8 +249,8 @@ function CampaignCard({
   id,
   now,
   onConnect,
+  onShare,
   next,
-  onNext,
 }: {
   link: ReferralLink;
   state: CampaignState;
@@ -230,99 +260,127 @@ function CampaignCard({
   id: IdentityId;
   now: number;
   onConnect: () => void;
+  onShare: () => void;
   next: string | null;
-  onNext: () => void;
 }) {
   const copy = useCopy();
-  const toast = useToast();
-  const [walletMenu, setWalletMenu] = React.useState(false);
+  const [details, setDetails] = React.useState(false);
   const campaign = campaignOf(link.campaign);
   const address = demoAddress(id);
-  const disconnect = () => {
-    if (persistWallet(walletDisconnect(readWallet(), id))) toast({ title: "Wallet disconnected" });
-    else toast({ title: STORAGE, lead: "error" });
-  };
-  const tiles = [
-    { value: String(stats.users), label: "Referred Users" },
-    { value: formatAmount(stats.earned, "IDZ").replace(/ IDZ$/, ""), label: "$IDZ Earned" },
-    { value: formatAmount(stats.points, "IDZ").replace(/ IDZ$/, ""), label: "Points" },
-  ];
+  const icon = "inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus";
   return (
-    <div className={cn(CARD, "flex flex-col gap-6 p-8")}>
-      <div className="flex items-start justify-between gap-4">
-        <h2 className="min-w-0 text-3xl font-medium leading-3xl text-text-primary">{campaign?.name ?? link.campaign}</h2>
-        <button
-          type="button"
-          aria-haspopup="dialog"
-          onClick={connected ? () => setWalletMenu(true) : onConnect}
-          className="inline-flex h-[28px] shrink-0 items-center gap-2 rounded-full bg-bg-brand-subtle px-4 text-sm leading-xs text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          {connected ? shortAddress(address) : "Connect wallet"}
-          <Icon icon={ArrowDown01Icon} size={14} />
-        </button>
-      </div>
-      <div className="flex flex-col gap-3 font-mono text-md leading-md text-text-primary">
-        <p>Publisher: {shortAddress(REFERRAL_PUBLISHER)}</p>
-        <p className="flex items-center justify-between gap-4">
-          <span>Chain ID: {chainIdOf(REFERRAL_NETWORK)}</span>
-          <Link href="/m/earn/history" className="font-sans text-lg leading-lg text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-            History
-          </Link>
-        </p>
-      </div>
-      <div className="flex h-[40px] items-center justify-between gap-4 rounded-lg border-[length:var(--border-width-1)] border-solid border-border pl-6 pr-2">
-        <span className="flex min-w-0 items-center gap-3 text-md leading-md text-text-primary">
+    <section aria-labelledby="refer-campaign" className={cn(LIST_CARD)}>
+      <div className="flex flex-col gap-6 p-8">
+        <h2 id="refer-campaign" className={cn(T.title, "min-w-0")}>
+          {campaign?.name ?? link.campaign}
+        </h2>
+        <PhasePill state={state} now={now} />
+        <div className="flex h-[48px] items-center gap-2 rounded-lg border-[length:var(--border-width-1)] border-solid border-border pl-6 pr-1">
           <span aria-hidden className="shrink-0 text-[color:var(--color-icon-secondary)]">
             <Icon icon={LinkSquare02Icon} size={16} />
           </span>
-          <span className="truncate">{url}</span>
-        </span>
-        <button
-          type="button"
-          aria-label="Copy your referral link"
-          onClick={() => copy(url, "Link copied")}
-          className="inline-flex size-[36px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          <Icon icon={Copy01Icon} size={18} />
-        </button>
+          <span className={cn(T.body, "min-w-0 flex-1 truncate text-text-primary")}>{url}</span>
+          <button type="button" aria-label="Copy your referral link" onClick={() => copy(url, "Link copied")} className={cn(icon, PRESSED)}>
+            <Icon icon={Copy01Icon} size={18} />
+          </button>
+          <button type="button" aria-label="Share your referral link" onClick={onShare} className={cn(icon, PRESSED)}>
+            <Icon icon={Share08Icon} size={18} />
+          </button>
+        </div>
+        <FactGrid
+          facts={[
+            { label: "Referred Users", value: String(stats.users) },
+            { label: "$IDZ Earned", value: formatAmount(stats.earned, "IDZ").replace(/ IDZ$/, "") },
+            { label: "Points", value: formatAmount(stats.points, "IDZ").replace(/ IDZ$/, "") },
+          ]}
+        />
+        <p className={cn(T.meta, "flex flex-wrap items-center gap-x-4 gap-y-2")}>
+          <TestnetDemoBadge />1 point = 1 IDZ when it’s claimed.
+        </p>
+        {state.phase === "claimed" && !next && <p className={cn(T.body, "text-center")}>You’ve joined every campaign.</p>}
       </div>
-      <dl className="grid grid-cols-3 gap-4">
-        {tiles.map((t) => (
-          <div key={t.label} className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-subtle p-4">
-            <dt className="order-2 text-xs leading-xs text-text-secondary">{t.label}</dt>
-            <dd className="order-1 truncate text-2xl font-medium leading-2xl tabular-nums text-text-primary">{t.value}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="-mt-2 flex items-center gap-4 text-sm leading-sm text-text-secondary">
-        <TestnetDemoBadge />1 point = 1 IDZ when it’s claimed.
-      </p>
-      <PhasePill state={state} now={now} />
-      {state.phase === "claimed" &&
-        (next ? (
-          <Button size="xl" className="w-full" onClick={onNext}>
-            Join {next}
-          </Button>
-        ) : (
-          <p className="text-center text-md leading-md text-text-secondary">You’ve joined every campaign.</p>
-        ))}
-      <ActionSheet
-        open={walletMenu}
-        onClose={() => setWalletMenu(false)}
-        title={`${shortAddress(address)} · Connected`}
-        items={[{ label: "Disconnect", icon: Logout02Icon, destructive: true, onSelect: disconnect }]}
-      />
-    </div>
+      <ul className={cn("flex flex-col border-t-[length:var(--border-width-1)] border-solid border-border", LIST_DIVIDERS)}>
+        <ListRow onClick={() => setDetails(true)} title="Campaign details" meta={`${connected ? `Wallet ${shortAddress(address)}` : "Wallet not connected"} · Chain ID ${chainIdOf(REFERRAL_NETWORK)}`} />
+        <ListRow href="/m/earn/history" title="Campaign History" meta="Every campaign’s referrals" />
+      </ul>
+      <CampaignDetailsSheet open={details} onClose={() => setDetails(false)} id={id} connected={connected} onConnect={onConnect} />
+    </section>
   );
 }
 
-/** One referral (Figma 229066's card): its campaign and Claimed / Not Claimed, then the referred creator's purchase and what it earned. */
-export function ReferralCard({ r, title = true }: { r: ReferralRow; title?: boolean }) {
+/** Publisher, chain and the wallet the rewards go to (the old card's mono lines and its wallet chip). */
+function CampaignDetailsSheet({ open, onClose, id, connected, onConnect }: { open: boolean; onClose: () => void; id: IdentityId; connected: boolean; onConnect: () => void }) {
+  const toast = useToast();
+  const [confirm, setConfirm] = React.useState(false);
+  const address = demoAddress(id);
+  const disconnect = () => {
+    setConfirm(false);
+    if (persistWallet(walletDisconnect(readWallet(), id))) toast({ title: "Wallet disconnected" });
+    else toast({ title: STORAGE, lead: "error" });
+  };
   return (
-    <li className={cn(CARD, "flex flex-col gap-6 p-8")}>
-      {title && (
-        <div className="flex items-center justify-between gap-6">
-          <p className="truncate text-2xl font-medium leading-2xl text-text-primary">{r.campaignName}</p>
+    <>
+      <Sheet
+        open={open}
+        onClose={onClose}
+        title="Campaign details"
+        actions={
+          connected ? (
+            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setConfirm(true)}>
+              Disconnect wallet
+            </Button>
+          ) : (
+            <Button
+              size="xl"
+              className="w-full"
+              onClick={() => {
+                onClose();
+                onConnect();
+              }}
+            >
+              Connect wallet
+            </Button>
+          )
+        }
+      >
+        <DetailRows
+          rows={[
+            { label: "Publisher", value: <CopyChip value={REFERRAL_PUBLISHER} what="Publisher address" /> },
+            { label: "Chain ID", value: String(chainIdOf(REFERRAL_NETWORK)) },
+            { label: "Wallet", value: connected ? <CopyChip value={address} what="Wallet address" /> : "Not connected" },
+          ]}
+        />
+        <p className={T.meta}>Your referral rewards go to this wallet.</p>
+      </Sheet>
+      <ActionSheet
+        open={confirm}
+        onClose={() => setConfirm(false)}
+        title={`${shortAddress(address)} · Connected`}
+        items={[{ label: "Disconnect", icon: Logout02Icon, destructive: true, onSelect: disconnect }]}
+      />
+    </>
+  );
+}
+
+/** One referral as a row (Figma 229066's card, summary first): who, the campaign and what they bought;
+ *  the points and Claimed / Not Claimed at the end. */
+function ReferralItem({ r, onOpen }: { r: ReferralRow; onOpen: () => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={onOpen}
+        className={cn(LIST_ROW, "min-h-[64px]")}
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className={cn(T.rowTitle, "truncate")}>{r.name}</span>
+          <span className={cn(T.meta, "truncate")}>
+            {r.campaignName} · bought {formatAmount(r.bought, "IDZ")}
+          </span>
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          <span className={cn(T.rowTitle, "tabular-nums")}>{formatAmount(r.points, "IDZ").replace(/ IDZ$/, "")} pts</span>
           {r.claimed ? (
             <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
               Claimed
@@ -330,69 +388,81 @@ export function ReferralCard({ r, title = true }: { r: ReferralRow; title?: bool
           ) : (
             <Badge tone="error">Not Claimed</Badge>
           )}
-        </div>
-      )}
-      <dl className="flex flex-col gap-3">
-        <InfoRow label="Referred User">{r.name}</InfoRow>
-        <InfoRow label="Total Purchase">
-          <IdzCoin height={18} />
-          {formatAmount(r.bought, "IDZ")}
-        </InfoRow>
-        <InfoRow label="Refer Token Earn">
-          <IdzCoin height={18} />
-          {formatAmount(r.earned, "IDZ")}
-        </InfoRow>
-        <InfoRow label="Refer Point Earn">{formatAmount(r.points, "IDZ").replace(/ IDZ$/, "")} Points</InfoRow>
-        <InfoRow label="Last Purchase Time">{whenOf(r.at)}</InfoRow>
-      </dl>
+        </span>
+      </button>
     </li>
   );
 }
 
-function ReferralActivity({
-  rows,
-  now,
-  claimBlock,
-  busy,
-  onClaim,
-}: {
-  rows: ReferralRow[];
-  now: number;
-  claimBlock: string | null;
-  busy: boolean;
-  onClaim: () => void;
-}) {
+/** Every field of a referral (the old card's table). */
+function ReferralSheet({ r, onClose }: { r: ReferralRow; onClose: () => void }) {
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title={r.name}
+      description={r.campaignName}
+    >
+      <DetailRows
+        rows={[
+          {
+            label: "Status",
+            value: r.claimed ? (
+              <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
+                Claimed
+              </Badge>
+            ) : (
+              <Badge tone="error">Not Claimed</Badge>
+            ),
+          },
+          { label: "Referred User", value: r.name },
+          { label: "Total Purchase", value: <><IdzCoin height={18} />{formatAmount(r.bought, "IDZ")}</> },
+          { label: "Refer Token Earn", value: <><IdzCoin height={18} />{formatAmount(r.earned, "IDZ")}</> },
+          { label: "Refer Point Earn", value: `${formatAmount(r.points, "IDZ").replace(/ IDZ$/, "")} Points` },
+          { label: "Last Purchase Time", value: whenOf(r.at) },
+        ]}
+      />
+    </Sheet>
+  );
+}
+
+/** Referrals as one list card of rows, each opening its sheet (Refer & Earn and Campaign History). */
+export function ReferralList({ rows }: { rows: readonly ReferralRow[] }) {
+  const [openId, setOpenId] = React.useState<string | null>(null);
+  const opened = openId ? (rows.find((r) => r.id === openId) ?? null) : null;
+  return (
+    <>
+      <ListCard label="Referrals">
+        {rows.map((r) => (
+          <ReferralItem key={r.id} r={r} onOpen={() => setOpenId(r.id)} />
+        ))}
+      </ListCard>
+      {opened && <ReferralSheet r={opened} onClose={() => setOpenId(null)} />}
+    </>
+  );
+}
+
+function ReferralActivity({ rows, now }: { rows: ReferralRow[]; now: number }) {
   const [campaign, setCampaign] = React.useState("all");
   const [search, setSearch] = React.useState("");
   const shown = filterReferrals(rows, { campaign, search, range: "all" }, now);
   const joined = CAMPAIGNS.filter((c) => rows.some((r) => r.campaign === c.id));
+  const clear = () => {
+    setSearch("");
+    setCampaign("all");
+  };
   return (
     <>
-      <div className="flex items-center gap-6">
-        <FilterButton
-          label="By Campaign"
-          value={campaign}
-          onChange={setCampaign}
-          options={[{ value: "all", label: "Every campaign" }, ...joined.map((c) => ({ value: c.id, label: c.name }))]}
-        />
-        <Button size="xl" className="shrink-0 px-6" disabled={!!claimBlock || busy} aria-describedby={claimBlock ? "claim-points-why" : undefined} onClick={onClaim}>
-          Claim all points
-        </Button>
-      </div>
-      {claimBlock && (
-        <p id="claim-points-why" className="-mt-4 text-sm leading-sm text-text-secondary">
-          {claimBlock}
-        </p>
-      )}
-      <SearchInput value={search} onValueChange={setSearch} onClear={() => setSearch("")} placeholder="Search by user name" aria-label="Search by user name" />
+      <SearchInput size="xl" value={search} onValueChange={setSearch} onClear={() => setSearch("")} placeholder="Search by user name" aria-label="Search by user name" />
+      <FilterChips
+        label="Filter referrals"
+        onClear={() => setCampaign("all")}
+        chips={[{ label: "By Campaign", value: campaign, onChange: setCampaign, options: [{ value: "all", label: "Every campaign" }, ...joined.map((c) => ({ value: c.id, label: c.name }))] }]}
+      />
       {shown.length === 0 ? (
-        <EmptyCard lines={["No referral matches."]} />
+        <EmptyState title="No referral matches" body="Try another name or campaign." action={{ label: "Clear filters", onClick: clear }} />
       ) : (
-        <ul className="flex flex-col gap-8">
-          {shown.map((r) => (
-            <ReferralCard key={r.id} r={r} />
-          ))}
-        </ul>
+        <ReferralList rows={shown} />
       )}
     </>
   );
@@ -429,34 +499,15 @@ function DemoReferralSheet({ open, onClose, identity, percent }: { open: boolean
           <Button size="xl" className="w-full" onClick={add}>
             Add referral
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
-          </Button>
         </>
       }
     >
-      <fieldset className="flex flex-col gap-2">
-        <legend className="pb-2 text-md font-medium leading-md text-text-primary">Who</legend>
-        {REFERRED.map((b) => (
-          <button
-            key={b}
-            type="button"
-            role="radio"
-            aria-checked={b === who}
-            onClick={() => setWho(b)}
-            className="flex h-[44px] w-full items-center justify-between rounded-lg px-6 text-left text-lg leading-lg text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            {referredNameOf(b)}
-            {b === who && (
-              <span className="text-[color:var(--color-icon-brand)]">
-                <Icon icon={Tick02Icon} size={16} />
-              </span>
-            )}
-          </button>
-        ))}
-      </fieldset>
+      <div className="flex flex-col gap-2">
+        <p className={T.label}>Who</p>
+        <PickList label="Who" options={REFERRED.map((b) => ({ value: b, label: referredNameOf(b) }))} value={who} onPick={setWho} />
+      </div>
       <label className="flex flex-col gap-2">
-        <span className="text-md font-medium leading-md text-text-primary">IDZ they buy</span>
+        <span className={T.label}>IDZ they buy</span>
         <TextInput
           size="xl"
           inputMode="decimal"
@@ -470,10 +521,12 @@ function DemoReferralSheet({ open, onClose, identity, percent }: { open: boolean
         />
       </label>
       {error ? (
-        <p className="text-sm leading-sm text-text-error">{error}</p>
+        <p role="alert" className={cn(T.caption, "text-text-error")}>
+          {error}
+        </p>
       ) : (
         check.ok && (
-          <p className="text-md leading-md text-text-secondary">
+          <p className={T.body}>
             You earn {formatAmount(earnOf(check.value, percent), "IDZ").replace(/ IDZ$/, "")} points ({percent}%).
           </p>
         )

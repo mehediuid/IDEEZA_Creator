@@ -17,6 +17,7 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DS_DEFAULT_BUTTON_PAD, FramedProvider, PATH_MESSAGE, useDeviceMode, useVisibleViewport } from "./device";
 import { MobileGate } from "./account/mobile-gate";
+import { BuildWatcher } from "./ai/build-watcher";
 import { BackOnlineToast } from "./kit/states";
 import { PendingToast, ToastProvider } from "./kit/toast";
 import { useNavTrail } from "./nav-trail";
@@ -93,7 +94,9 @@ function MobileApp({ framed, children }: { framed: boolean; children: React.Reac
     <FramedProvider value={framed}>
       <div
         id={MOBILE_APP_ID}
-        className="relative h-dvh overflow-hidden bg-bg-page font-sans text-text-primary"
+        // `clip`, not `hidden`: a hidden box can still be scrolled by a scrollIntoView inside it,
+        // which slid the whole app up (top bar gone, a gap under the bottom bar).
+        className="relative h-dvh overflow-clip bg-bg-page font-sans text-text-primary"
         style={keyboard ? { height: keyboard.height, ...(keyboard.top ? { transform: `translateY(${keyboard.top}px)` } : {}) } : undefined}
       >
         <ToastProvider rootId={MOBILE_APP_ID}>
@@ -103,6 +106,7 @@ function MobileApp({ framed, children }: { framed: boolean; children: React.Reac
           </React.Suspense>
           <BackOnlineToast />
           <PendingToast />
+          <BuildWatcher />
         </ToastProvider>
       </div>
     </FramedProvider>

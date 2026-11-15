@@ -18,6 +18,7 @@ import { CREDIT_PACKS, VALIDITY_MONTHS, coinAmount, packCovering, usd, type Pack
 import { useCredits } from "@/lib/create/credits";
 import { useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useWalletSheet } from "../earn-coin/wallet-sheet";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
@@ -113,9 +114,6 @@ function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
           <Button size="xl" className="w-full" loading={paying} onClick={pay}>
             Pay {usd(order.price.final)}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose} disabled={paying}>
-            Cancel
-          </Button>
         </>
       }
     >
@@ -136,22 +134,22 @@ function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
               )}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="inline-flex items-center gap-3 text-lg font-semibold leading-lg text-text-primary">
+                <span className={cn(T.section, "inline-flex items-center gap-3")}>
                   {p.name}
-                  {p.popular && <Badge tone="brand">Most popular</Badge>}
+                  {p.popular && <Badge tone="brand-solid">Most popular</Badge>}
                 </span>
-                <span className="text-sm leading-sm text-text-secondary">{creditsLine(o.base, o.bonus)}</span>
+                <span className={T.meta}>{creditsLine(o.base, o.bonus)}</span>
               </span>
               <span className="flex flex-col items-end">
-                <span className="text-lg font-semibold leading-lg tabular-nums text-text-primary">{usd(o.price.final)}</span>
-                {o.price.saved > 0 && <span className="text-sm leading-sm text-text-tertiary line-through">{usd(o.price.base)}</span>}
+                <span className={cn(T.section, "tabular-nums")}>{usd(o.price.final)}</span>
+                {o.price.saved > 0 && <span className={cn(T.meta, "text-text-tertiary line-through")}>{usd(o.price.base)}</span>}
               </span>
             </button>
           );
         })}
       </div>
       <div className="flex flex-col gap-3">
-        <p className="inline-flex items-center gap-3 text-md font-medium leading-md text-text-primary">
+        <p className={cn(T.rowTitle, "inline-flex items-center gap-3")}>
           Pay with the Demo wallet <TestnetDemoBadge />
         </p>
         <div role="radiogroup" aria-label="Token" className="flex gap-4">
@@ -163,7 +161,7 @@ function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
               aria-checked={coin === c}
               onClick={() => setCoin(c)}
               className={cn(
-                "inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border-[length:var(--border-width-1-5)] border-solid text-md font-medium leading-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+                T.rowTitle, "inline-flex min-h-[44px] flex-1 items-center justify-center rounded-xl border-[length:var(--border-width-1-5)] border-solid outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
                 coin === c ? "border-border-brand bg-bg-brand-subtle text-text-brand" : "border-border-subtle text-text-primary",
               )}
             >
@@ -173,7 +171,7 @@ function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
         </div>
       </div>
       {note && (
-        <p role="status" className={cn("text-sm leading-sm", note.tone === "error" ? "text-text-error" : "text-text-secondary")}>
+        <p role="status" className={cn(T.meta, note.tone === "error" ? "text-text-error" : "text-text-secondary")}>
           {note.text}
         </p>
       )}

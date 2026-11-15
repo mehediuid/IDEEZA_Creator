@@ -1,15 +1,16 @@
 "use client";
 
-// 04 · Activity tab (M3; 04, 04d, 04g, 04h, 04i, 04m, 04n, 04t): the web's
-// Activity History drawer as a tab, the project's own journey, newest first
-// (`historyOf`, the synthesized Planning last). "+ Add new activity" (A01
-// Tonal: the bar's Publish is the screen's one primary) opens the full-screen
-// form. Each entry: its type and the ? help (a sheet, the phone has no hover),
+// 04 · Activity (M3; 04, 04d, 04g, 04h, 04i, 04m, 04n, 04t): the web's
+// Activity History drawer as a screen of its own (`?tab=activity`, the page's
+// Activity row), the project's own journey, newest first (`historyOf`, the
+// synthesized Planning last). "+ Add new activity" is the screen's bar (its
+// one primary, in the thumb zone) and opens the full-screen form. Each entry: its type and the ? help (a sheet, the phone has no hover),
 // the date, the description, the price snapshot taken while it was listed
 // (04i; a tap opens the prices), its proof — photo, video and file tiles that
-// open the proof viewer (04n) and link rows that ask first (04h) — and ⋮ with
-// Edit Activity · Delete Activity (04d), Delete asking first (04g). Planning is
-// made automatically, so it has no ⋮.
+// open the proof viewer (04n: the kit's full-screen viewer, "Prototype · proof
+// 1 of 3 · date", ← Download →) and link rows that ask first (04h) — and ⋮
+// with Edit activity · Delete activity (04d), Delete asking first (04g).
+// Planning is made automatically, so it has no ⋮.
 
 import * as React from "react";
 import Link from "next/link";
@@ -19,6 +20,7 @@ import {
   ArrowRight01Icon,
   Delete02Icon,
   Doc01Icon,
+  Download04Icon,
   HelpCircleIcon,
   MoreVerticalIcon,
   PencilEdit01Icon,
@@ -26,7 +28,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
-import { Button, buttonVariants } from "@/components/ideeza/button";
+import { buttonVariants } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { getMediaFile, removeActivity, useJourney } from "@/lib/manual/journey-store";
 import { helpOf, historyOf, labelOf, type JourneyEntry, type MediaRef, type PriceSnapshot } from "@/lib/manual/journey";
@@ -35,11 +37,29 @@ import { formatDate } from "@/lib/manual/project-summary";
 import { formatAmount } from "@/lib/manual/rail-copy";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
+import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { ImageViewer } from "../kit/image-viewer";
+import { MEDIA_INK } from "../kit/media";
 import { ActionSheet, Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { T } from "../type";
 import { useProject } from "./context";
 import { LIST_CARD, LIST_ROW } from "./parts";
+
+/** The Activity screen's one primary: Add new activity, in the thumb zone. */
+export function ActivityBar() {
+  const { project, view, viewer } = useProject();
+  if (!can(viewer, "activity.write", view.canCtx)) return null;
+  return (
+    <BottomBar className="pt-8">
+      <Link href={phoneProjectPath(project.id, "activity/new")} className={cn(buttonVariants({ size: "xl" }), "w-full")}>
+        <Icon icon={Add01Icon} size={20} />
+        Add new activity
+      </Link>
+    </BottomBar>
+  );
+}
 
 export function ActivityTab() {
   const { project, view, viewer } = useProject();
@@ -53,12 +73,12 @@ export function ActivityTab() {
   const [help, setHelp] = React.useState<JourneyEntry | null>(null);
   const [link, setLink] = React.useState<string | null>(null);
   const [prices, setPrices] = React.useState<PriceSnapshot | null>(null);
-  const [viewing, setViewing] = React.useState<{ media: MediaRef[]; index: number } | null>(null);
+  const [viewing, setViewing] = React.useState<Viewing | null>(null);
   const editHref = (e: JourneyEntry) => phoneProjectPath(project.id, `activity/${encodeURIComponent(e.id)}`);
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-sm leading-sm text-text-secondary">
+      <p className={T.meta}>
         {project.name} · newest first.
         {canWrite && entries.some((e) => !e.isDefault) && (
           <>
@@ -67,17 +87,11 @@ export function ActivityTab() {
           </>
         )}
       </p>
-      {canWrite && (
-        <Link href={phoneProjectPath(project.id, "activity/new")} className={cn(buttonVariants({ hierarchy: "tonal", size: "xl" }), "w-full")}>
-          <Icon icon={Add01Icon} size={20} />
-          Add new activity
-        </Link>
-      )}
       <ul aria-label="Activity" className={LIST_CARD}>
         {entries.map((e) => (
           <li key={e.id} className={cn(LIST_ROW, "flex flex-col gap-4 p-8")}>
             <div className="flex items-center gap-2">
-              <span className="text-md font-semibold leading-md text-text-primary">{labelOf(e)}</span>
+              <span className={T.name}>{labelOf(e)}</span>
               {helpOf(e) && (
                 <button
                   type="button"
@@ -103,17 +117,17 @@ export function ActivityTab() {
               )}
             </div>
             <div className="flex flex-col gap-2">
-              <time dateTime={new Date(e.createdAt).toISOString()} className="text-sm leading-sm text-text-secondary">
+              <time dateTime={new Date(e.createdAt).toISOString()} className={T.meta}>
                 {formatDate(e.createdAt)}
               </time>
-              <p className="whitespace-pre-line break-words text-md leading-md text-text-primary">{e.isDefault ? "Project created." : e.description}</p>
+              <p className={cn(T.body, "whitespace-pre-line break-words text-text-primary")}>{e.isDefault ? "Project created." : e.description}</p>
             </div>
             {e.pricing && <PriceLine pricing={e.pricing} onOpen={() => setPrices(e.pricing!)} />}
             {e.media.length > 0 && (
               <ul className="flex flex-wrap gap-4">
                 {e.media.map((m, i) => (
                   <li key={m.id}>
-                    <ProofTile media={m} onOpen={() => setViewing({ media: e.media, index: i })} />
+                    <ProofTile media={m} onOpen={() => setViewing({ media: e.media, index: i, label: labelOf(e), at: e.createdAt })} />
                   </li>
                 ))}
               </ul>
@@ -128,8 +142,8 @@ export function ActivityTab() {
                       onClick={() => setLink(u)}
                       className="flex min-h-[44px] w-full items-center gap-6 text-left outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle"
                     >
-                      <span className="w-[56px] shrink-0 text-md leading-md text-text-secondary">Link</span>
-                      <span className="min-w-0 flex-1 truncate text-md leading-md text-text-primary">{u.replace(/^https:\/\//i, "")}</span>
+                      <span className={cn(T.body, "w-[56px] shrink-0")}>Link</span>
+                      <span className={cn(T.body, "min-w-0 flex-1 truncate text-text-primary")}>{u.replace(/^https:\/\//i, "")}</span>
                       <Icon icon={ArrowRight01Icon} size={20} className="shrink-0 text-[color:var(--color-icon-default)]" />
                     </button>
                   </li>
@@ -147,8 +161,8 @@ export function ActivityTab() {
         items={
           actions
             ? [
-                { label: "Edit Activity", icon: PencilEdit01Icon, onSelect: () => router.push(editHref(actions)) },
-                { label: "Delete Activity", icon: Delete02Icon, destructive: true, onSelect: () => setDeleting(actions) },
+                { label: "Edit activity", icon: PencilEdit01Icon, onSelect: () => router.push(editHref(actions)) },
+                { label: "Delete activity", icon: Delete02Icon, destructive: true, onSelect: () => setDeleting(actions) },
               ]
             : []
         }
@@ -172,7 +186,7 @@ export function ActivityTab() {
         }}
       />
       <Sheet open={help !== null} onClose={() => setHelp(null)} title={help ? `What is ${labelOf(help)}?` : ""}>
-        {help && <p className="pb-8 text-md leading-md text-text-secondary">{helpOf(help)}</p>}
+        {help && <p className={cn(T.body, "pb-8")}>{helpOf(help)}</p>}
       </Sheet>
       <ConfirmSheet
         open={link !== null}
@@ -180,7 +194,7 @@ export function ActivityTab() {
         title="Open this link in a new tab?"
         body={
           <>
-            <span className="block break-all font-medium text-text-primary">{link}</span>
+            <span className="block break-all text-text-primary">{link}</span>
             <span className="mt-2 block">It leaves IDEEZA — only open links you trust.</span>
           </>
         }
@@ -230,22 +244,22 @@ function PricesSheet({ pricing, onClose }: { pricing: PriceSnapshot | null; onCl
       {pricing && (
         <div className="flex flex-col gap-6 pb-8">
           {pricing.main && (
-            <div className="flex items-center justify-between text-md leading-md">
-              <span className="text-text-secondary">Main NFT</span>
+            <div className={cn(T.body, "flex items-center justify-between")}>
+              <span>Main NFT</span>
               <span className="text-text-primary">{formatAmount(pricing.main, pricing.token)}</span>
             </div>
           )}
           {pricing.editions.map((r, i) => (
             <div key={i} className="flex flex-col gap-2">
-              <p className="text-md font-medium leading-md text-text-tertiary">
+              <p className={cn(T.rowTitle, "text-text-tertiary")}>
                 {nameOf(r.productId)} · {r.kind === "physical" ? "Physical" : "Virtual"}
               </p>
-              <div className="flex items-center justify-between text-md leading-md">
-                <span className="text-text-secondary">{USE_LABEL[r.use]} · Regular</span>
+              <div className={cn(T.body, "flex items-center justify-between")}>
+                <span>{USE_LABEL[r.use]} · Regular</span>
                 <span className="text-text-primary">{formatAmount(r.regular, pricing.token)}</span>
               </div>
-              <div className="flex items-center justify-between text-md leading-md">
-                <span className="text-text-secondary">{USE_LABEL[r.use]} · Extended</span>
+              <div className={cn(T.body, "flex items-center justify-between")}>
+                <span>{USE_LABEL[r.use]} · Extended</span>
                 <span className="text-text-primary">{formatAmount(r.extended, pricing.token)}</span>
               </div>
             </div>
@@ -294,61 +308,73 @@ export function ProofTile({ media, onOpen }: { media: MediaRef; onOpen: () => vo
       ) : (
         <span className="flex flex-col items-center gap-1 text-[color:var(--color-icon-secondary)]">
           <Icon icon={media.kind === "pdf" ? Pdf01Icon : Doc01Icon} size={20} />
-          <span className="text-xs leading-xs text-text-secondary">{media.kind === "pdf" ? "PDF" : media.kind === "video" ? "Video" : "DOC"}</span>
+          <span className={T.micro}>{media.kind === "pdf" ? "PDF" : media.kind === "video" ? "Video" : "DOC"}</span>
         </span>
       )}
     </button>
   );
 }
 
+/** What the proof viewer shows: an entry's files and which one; the entry's type and date make
+ *  the caption ("Prototype · proof 1 of 3 · Oct 28, 2026"). */
+export type Viewing = { media: MediaRef[]; index: number; label?: string; at?: number };
+
+const KIND_WORD = { image: "photo", video: "video", pdf: "PDF", doc: "document" } as const;
+
+/** 04n · the proof viewer: the kit's full-screen viewer (it reuses 03b). A photo shows full size,
+ *  a video plays in place, a PDF or a document says what it is; Download saves the file. */
 export function ProofViewer({
   viewing,
   onIndex,
   onClose,
 }: {
-  viewing: { media: MediaRef[]; index: number } | null;
+  viewing: Viewing | null;
   onIndex: (i: number) => void;
   onClose: () => void;
 }) {
-  const m = viewing ? viewing.media[viewing.index] : null;
+  const m = viewing ? (viewing.media[viewing.index] ?? null) : null;
   const url = useMediaUrl(m?.blobKey ?? null);
   const count = viewing?.media.length ?? 0;
-  return (
-    <Sheet
-      open={viewing !== null}
-      onClose={onClose}
-      title={m?.name ?? ""}
-      description={viewing && count > 1 ? `${viewing.index + 1} of ${count}` : undefined}
-      actions={
-        viewing && count > 1 ? (
-          <div className="flex gap-6">
-            <Button hierarchy="secondary" size="xl" className="flex-1" onClick={() => onIndex((viewing.index - 1 + count) % count)}>
-              Previous
-            </Button>
-            <Button hierarchy="secondary" size="xl" className="flex-1" onClick={() => onIndex((viewing.index + 1) % count)}>
-              Next
-            </Button>
-          </div>
-        ) : undefined
-      }
-    >
-      {m && (
-        <div className="flex flex-col gap-6 pb-8">
-          {!url ? (
-            <p className="text-md leading-md text-text-secondary">This file isn&apos;t in this browser any more.</p>
-          ) : m.kind === "image" ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a proof file from this browser
-            <img src={url} alt={m.name} className="max-h-[60vh] w-full rounded-md bg-bg-inverse object-contain" />
-          ) : m.kind === "video" ? (
-            <video src={url} controls playsInline aria-label={m.name} className="max-h-[60vh] w-full rounded-md bg-bg-inverse" />
-          ) : (
-            <a href={url} target="_blank" rel="noopener noreferrer" download={m.name} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
+  const caption = viewing && m
+    ? [viewing.label, `proof ${viewing.index + 1} of ${count}`, viewing.at ? formatDate(viewing.at) : null].filter(Boolean).join(" · ")
+    : undefined;
+  const note = !m
+    ? null
+    : !url
+      ? "This file isn’t in this browser any more."
+      : m.kind === "video"
+        ? // The platform's player, in place of the picture (a video is phrasing content).
+          <video src={url} controls playsInline aria-label={m.name} className="max-h-[50vh] w-full" />
+        : m.kind === "image"
+          ? null
+          : (
+            <span className={cn(MEDIA_INK, "inline-flex items-center gap-2")}>
               <Icon icon={m.kind === "pdf" ? Pdf01Icon : Doc01Icon} size={20} />
-              Open {m.kind === "pdf" ? "the PDF" : "the document"}
-            </a>
-          )}
-        </div>
-      )}
-    </Sheet>
+              {m.name}
+            </span>
+          );
+  return (
+    <ImageViewer
+      open={viewing !== null && m !== null}
+      onClose={onClose}
+      index={viewing?.index ?? 0}
+      count={count}
+      onIndex={onIndex}
+      noun="Proof"
+      src={m?.kind === "image" ? url : null}
+      alt={m?.name ?? ""}
+      caption={caption}
+      note={note}
+      action={
+        url && m ? (
+          <a href={url} download={m.name} aria-label={`Download the ${KIND_WORD[m.kind]}`} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "flex-1")}>
+            <Icon icon={Download04Icon} size={20} />
+            Download
+          </a>
+        ) : (
+          <span className="flex-1" />
+        )
+      }
+    />
   );
 }

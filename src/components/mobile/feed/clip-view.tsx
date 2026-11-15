@@ -4,22 +4,38 @@
 // and "Play and pause a clip"). The video fills the screen under a dark scrim
 // at the top and the bottom; everything over it is the Dark semantic mode, so
 // its text is white (owner rule). At the foot, the creator (A16b, • Follow),
-// the Project / Product chip, the title (H6) and two lines of the description
-// with "more" — the title and the description open the item's details; the
-// video itself plays or pauses. Under them, the item's marketplace offers. On
+// the title (H6, at most two lines) and one line of the description with
+// "more" — the title and the description open the item's details; the
+// video itself plays or pauses. Under them, one slim pill for the item's
+// marketplace offers (clip-offers.tsx). The text block keeps to the lower
+// fifth of the screen, so the video is what you see (owner 2026-11-12). On
 // the right, the clip side nav: 3D, AR/VR, appreciate (with its count),
 // comments (with theirs), share and ⋯.
 //
 // It plays only while it is the clip on screen (muted, looping, inline); with
-// Data saver on it waits for a tap. A clip that can't load says so with Try
-// again. 3D swaps the video for the item's 3D view in place.
+// Data saver on (Settings › Appearance) it waits for a tap. A clip that can't
+// load says so with Try again. 3D shows the item's 3D view over the video,
+// which stays loaded under it and plays on when 3D is left.
+//
+// A project you shared plays its video in use from this browser's clip store
+// (`takeId`); it carries no Follow, and says so when the video isn't here. A
+// clip you shared to your Feed leads with "You shared" and your caption.
+//
+// Owner 2026-11-12: no chip row over the video. Whether it is a project or a
+// product is an icon in front of the title (layers: a project, a chip: a
+// product), said in words to screen readers. Nothing says Minted: the Feed
+// shows only what is on the marketplace, and a listing goes live only after
+// the mint, so every clip is minted. The project's Activity ("Ready for
+// manufacture") is left to its details page.
 
 import * as React from "react";
 import {
   Alert02Icon,
   Blockchain01Icon,
   CommentAdd02Icon,
+  CpuIcon,
   FavouriteIcon,
+  Layers01Icon,
   MoreHorizontalIcon,
   PauseIcon,
   PlayIcon,
@@ -30,10 +46,94 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Button } from "@/components/ideeza/button";
 import { Spinner } from "@/components/ideeza/spinner";
+import { useClipUrl } from "@/components/video-jobs/video-player";
 import { formatCount } from "@/lib/feed";
 import type { ClipOffer, FeedClip } from "@/lib/innovations/clips";
+import { AUDIENCES } from "@/lib/innovations/feed-prefs";
 import { cn } from "@/lib/utils";
+import { MEDIA_INK } from "../kit/media";
+import { T } from "../type";
 import { ClipOffers } from "./clip-offers";
+
+/** A clip's own note (can't play, not in this browser): a small dark glass card, centred between
+ *  the screen's left edge and the side buttons. */
+const CLIP_NOTE =
+  "absolute inset-x-[64px] top-[40%] flex -translate-y-1/2 flex-col items-center gap-2 rounded-xl bg-[var(--color-modal-scrim)] px-8 py-6 text-center backdrop-blur-sm";
+
+/** The clip's creator, its type icon, its title and a line of its description: the text column the
+ *  Feed and AR/VR mode share. The title and the description open the item's details. */
+export function ClipText({
+  clip,
+  following,
+  onCreator,
+  onFollow,
+  onDetails,
+}: {
+  clip: FeedClip;
+  following: boolean;
+  onCreator: () => void;
+  onFollow: () => void;
+  onDetails: () => void;
+}) {
+  const audience = clip.share ? (AUDIENCES.find((a) => a.id === clip.share?.audience)?.label ?? "Public") : null;
+  const kind = clip.kind === "project" ? "Project" : "Product";
+  return (
+    <div className="flex min-w-0 flex-col items-start gap-4">
+      {clip.share && (
+        <p className={cn(T.meta, MEDIA_INK, "flex max-w-full flex-col")}>
+          <span>You shared · {audience}</span>
+          {clip.share.caption && <span className="line-clamp-2 [overflow-wrap:anywhere]">{clip.share.caption}</span>}
+        </p>
+      )}
+      <div className="flex max-w-full items-center gap-4">
+        <button
+          type="button"
+          onClick={onCreator}
+          className="flex min-w-0 items-center gap-6 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        >
+          <Avatar size="md" initials={clip.creator.initials} color={clip.creator.color} />
+          <span className={cn(T.bodyStrong, MEDIA_INK, "truncate")}>{clip.creator.name}</span>
+        </button>
+        {clip.source !== "mine" && (
+          <>
+            <span aria-hidden className={cn(T.name, "shrink-0 text-text-disabled")}>
+              •
+            </span>
+            <button
+              type="button"
+              aria-pressed={following}
+              onClick={onFollow}
+              className={cn(
+                T.rowTitle,
+                MEDIA_INK,
+                "shrink-0 rounded-sm border-[length:var(--border-width-1-5)] border-solid border-[var(--color-glass-border-strong)] px-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+              )}
+            >
+              {following ? "Following" : "Follow"}
+            </button>
+          </>
+        )}
+      </div>
+      <button type="button" onClick={onDetails} className="flex w-full min-w-0 flex-col gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
+        <span className={cn(T.section, MEDIA_INK, "flex items-start gap-3")}>
+          <span aria-hidden title={kind} className="mt-[2px] shrink-0">
+            <Icon icon={clip.kind === "project" ? Layers01Icon : CpuIcon} size={20} />
+          </span>
+          <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">
+            <span className="sr-only">{kind}: </span>
+            {clip.title}
+          </span>
+        </span>
+        {clip.description && (
+          <span className={cn(T.body, MEDIA_INK, "flex w-full min-w-0 gap-2")}>
+            <span className="min-w-0 truncate">{clip.description.trim()}</span>
+            <span className="shrink-0 text-text-tertiary">more</span>
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
 
 export type ClipHandlers = {
   onDetails: () => void;
@@ -59,18 +159,6 @@ export type ClipState = {
 };
 
 const SEEN_MS = 1000;
-/** About two lines of Body/MD in the clip's text column. */
-const SHORT_CHARS = 56;
-
-/** The description's first two lines, then "...": "more" follows it (Figma). */
-export function shortOf(text: string): string {
-  const t = text.trim();
-  if (t.length <= SHORT_CHARS) return `${t} `;
-  const cut = t.slice(0, SHORT_CHARS);
-  const space = cut.lastIndexOf(" ");
-  return `${(space > 30 ? cut.slice(0, space) : cut).replace(/[,.;:]$/, "")}...`;
-}
-
 export function ClipView({
   clip,
   state,
@@ -96,6 +184,13 @@ export function ClipView({
   className?: string;
 }) {
   const video = React.useRef<HTMLVideoElement>(null);
+  // A project you shared plays from this browser's clip store; a sample plays its file.
+  const own = useClipUrl(near ? clip.takeId : null);
+  const mine = clip.source === "mine";
+  const src = mine ? own.url : clip.video.src;
+  const poster = (mine ? own.posterUrl : null) ?? clip.poster;
+  /** Your video isn't in this browser (never made here, or its file is gone). */
+  const lost = mine && (clip.takeId === null || own.state === "lost");
   // Tapped to pause (or, with Data saver, not yet tapped to play).
   const [paused, setPaused] = React.useState(false);
   const [started, setStarted] = React.useState(false);
@@ -116,15 +211,20 @@ export function ClipView({
   }
 
   const waitsForTap = dataSaver && !started;
-  const playing = active && !suspended && !paused && !waitsForTap && !model && !failed;
+  const playing = active && !suspended && !paused && !waitsForTap && !model && !failed && !lost;
 
   React.useEffect(() => {
     const v = video.current;
     if (!v) return;
     v.playbackRate = speed;
-    if (playing) v.play().catch(() => setPaused(true));
-    else v.pause();
-  }, [playing, speed, near]);
+    if (playing) {
+      // Only a browser that refuses to start it needs a tap; a play() cut short by a pause, a
+      // new source or a reload (AbortError) is not the viewer pausing.
+      v.play().catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === "NotAllowedError") setPaused(true);
+      });
+    } else v.pause();
+  }, [playing, speed, near, src]);
 
   const seen = React.useRef(handlers.onSeen);
   React.useEffect(() => {
@@ -143,7 +243,7 @@ export function ClipView({
   }, [flash]);
 
   const toggle = () => {
-    if (model || failed) return;
+    if (model || failed || lost) return;
     if (waitsForTap) {
       setStarted(true);
       setPaused(false);
@@ -159,45 +259,43 @@ export function ClipView({
     video.current?.load();
   };
 
-  const showPlay = active && !model && !failed && (paused || waitsForTap);
+  const showPlay = active && !model && !failed && !lost && (paused || waitsForTap);
   const centre = showPlay ? "play" : flash;
 
   return (
     <article aria-label={`${clip.kind === "project" ? "Project" : "Product"}: ${clip.title}`} className={cn("relative h-full w-full overflow-hidden bg-[var(--color-black)]", className)}>
-      {model ? (
-        <ModelView clip={clip} />
-      ) : (
-        <>
-          {clip.poster && (
-            // eslint-disable-next-line @next/next/no-img-element -- the clip's still, under the video while it loads
-            <img src={clip.poster} alt="" className="absolute inset-0 size-full object-cover" />
-          )}
-          {near && (
-            <video
-              ref={video}
-              src={clip.video.src}
-              poster={clip.poster ?? undefined}
-              muted
-              loop
-              playsInline
-              preload={active && !dataSaver ? "auto" : "metadata"}
-              aria-label={clip.video.label}
-              onLoadedMetadata={(e) => handlers.onHeight?.(e.currentTarget.videoHeight)}
-              onWaiting={() => setWaiting(true)}
-              onPlaying={() => setWaiting(false)}
-              onError={() => setFailed(true)}
-              className="absolute inset-0 size-full object-cover"
-            />
-          )}
-        </>
+      {poster && (
+        // eslint-disable-next-line @next/next/no-img-element -- the clip's still, under the video while it loads
+        <img src={poster} alt="" className="absolute inset-0 size-full object-cover" />
       )}
+      {near && src && (
+        <video
+          ref={video}
+          src={src}
+          poster={poster ?? undefined}
+          muted
+          loop
+          playsInline
+          preload={active && !dataSaver ? "auto" : "metadata"}
+          aria-label={clip.video.label}
+          aria-hidden={model || undefined}
+          onLoadedMetadata={(e) => handlers.onHeight?.(e.currentTarget.videoHeight)}
+          onWaiting={() => setWaiting(true)}
+          onPlaying={() => setWaiting(false)}
+          onError={() => setFailed(true)}
+          className="absolute inset-0 size-full object-cover"
+        />
+      )}
+      {model && <ModelView clip={clip} poster={poster} />}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[140px] bg-gradient-to-b from-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)] to-transparent" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[56%] bg-gradient-to-b from-transparent from-[14%] to-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[40%] bg-gradient-to-b from-transparent from-[10%] to-[color:color-mix(in_srgb,var(--color-black)_70%,transparent)]" />
+      {/* Behind the side buttons: a light picture (a product shot on white) keeps their white marks readable. */}
+      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-[96px] bg-gradient-to-l from-[color:color-mix(in_srgb,var(--color-black)_45%,transparent)] to-transparent" />
 
       <button
         type="button"
         aria-label={model ? "3D view" : playing ? "Pause" : "Play"}
-        disabled={model || failed}
+        disabled={model || failed || lost}
         onClick={toggle}
         className="absolute inset-0 cursor-default outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
       />
@@ -216,58 +314,37 @@ export function ClipView({
             <Spinner size={32} />
           </span>
         )}
-        {failed && (
-          <div className="pointer-events-auto absolute inset-x-8 top-1/2 flex -translate-y-1/2 flex-col items-center gap-6 text-center">
+        {/* A clip that can't play says so in a small glass card, clear of the side buttons and
+            readable on any picture (owner 2026-11-12: nothing big laid over the video). */}
+        {failed && !model && (
+          <div className={cn(CLIP_NOTE, "pointer-events-auto")}>
             <span className="text-[color:var(--color-icon-error)]">
               <Icon icon={Alert02Icon} size={24} />
             </span>
-            <p className="text-lg font-medium leading-lg">Couldn’t play this clip</p>
-            <Button hierarchy="secondary" size="md" onClick={retry}>
+            <p className={cn(T.rowTitle, MEDIA_INK)}>Couldn’t play this clip</p>
+            <Button hierarchy="secondary" size="md" className="mt-2" onClick={retry}>
               Try again
             </Button>
           </div>
         )}
+        {lost && !model && (
+          <div role="status" className={CLIP_NOTE}>
+            <span className={MEDIA_INK}>
+              <Icon icon={Alert02Icon} size={24} />
+            </span>
+            <p className={cn(T.rowTitle, MEDIA_INK)}>This video isn’t in this browser</p>
+            <p className={cn(T.meta, MEDIA_INK)}>It plays where it was made. Your post is still on the Feed.</p>
+          </div>
+        )}
 
         <div className="flex items-end gap-6 px-8 pb-6">
-          <div className="pointer-events-auto flex min-w-0 flex-1 flex-col gap-8">
-            <div className="flex flex-col items-start gap-4">
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={handlers.onCreator}
-                  className="flex items-center gap-6 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-                >
-                  <Avatar size="md" initials={clip.creator.initials} color={clip.creator.color} />
-                  <span className="text-lg font-medium leading-lg">{clip.creator.name}</span>
-                </button>
-                <span aria-hidden className="text-md font-semibold leading-md text-text-disabled">
-                  •
-                </span>
-                <button
-                  type="button"
-                  aria-pressed={state.following}
-                  onClick={handlers.onFollow}
-                  className="rounded-sm border-[length:var(--border-width-1-5)] border-solid border-[var(--color-glass-border-strong)] px-2 text-md font-medium leading-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-                >
-                  {state.following ? "Following" : "Follow"}
-                </button>
-              </div>
-              <span className="rounded-full bg-bg-inverse px-4 py-2 text-sm leading-xs text-text-inverse">
-                {clip.kind === "project" ? "Project" : "Product"}
-              </span>
-              <button type="button" onClick={handlers.onDetails} className="flex flex-col gap-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-                <span className="text-lg font-semibold leading-lg">{clip.title}</span>
-                <span className="text-lg leading-lg">
-                  {shortOf(clip.description)}
-                  <span className="text-text-tertiary">more</span>
-                </span>
-              </button>
-            </div>
+          <div className="pointer-events-auto flex min-w-0 flex-1 flex-col gap-5">
+            <ClipText clip={clip} following={state.following} onCreator={handlers.onCreator} onFollow={handlers.onFollow} onDetails={handlers.onDetails} />
             <ClipOffers offers={clip.offers} onBuy={handlers.onBuy} />
           </div>
 
           <nav aria-label="Clip actions" className="pointer-events-auto flex w-[44px] shrink-0 flex-col items-center gap-4">
-            <SideButton icon={Blockchain01Icon} label="3D" pressed={model} onClick={() => setModel((m) => !m)} />
+            <SideButton icon={Blockchain01Icon} label="3D" pressed={model} on={model} onClick={() => setModel((m) => !m)} />
             <SideButton icon={VirtualRealityVr01Icon} label="AR/VR" onClick={handlers.onArVr} />
             <SideButton
               icon={FavouriteIcon}
@@ -298,6 +375,7 @@ function SideButton({
   name,
   pressed,
   filled,
+  on,
   onClick,
 }: {
   icon: IconValue;
@@ -305,6 +383,8 @@ function SideButton({
   name?: string;
   pressed?: boolean;
   filled?: boolean;
+  /** Drawn as switched on (3D): the glass fill behind it, so it reads as the way back too. */
+  on?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -313,27 +393,30 @@ function SideButton({
       aria-label={name ?? label}
       aria-pressed={pressed}
       onClick={onClick}
-      className="flex min-h-[44px] w-[44px] flex-col items-center justify-center gap-4 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+      className={cn(
+        "flex min-h-[44px] w-[44px] flex-col items-center justify-center gap-4 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+        on && "bg-[var(--color-glass-fill-sm)]",
+      )}
     >
-      <span className={cn(filled ? "text-[color:var(--color-icon-error)] [&_path]:fill-current" : "text-text-primary")}>
+      <span className={cn(filled ? "text-[color:var(--color-icon-error)] [&_path]:fill-current" : MEDIA_INK)}>
         <Icon icon={icon} size={24} />
       </span>
-      {label && <span className="whitespace-nowrap text-md leading-md">{label}</span>}
+      {label && <span className={cn(T.body, MEDIA_INK, "whitespace-nowrap")}>{label}</span>}
     </button>
   );
 }
 
-/** "3D view mode" (Clip ⋯ menu 03): the item's model in place of its video. A sample post has no
- *  3D file (the web's words), so this is its render, on the light stage the Figma draws. */
-function ModelView({ clip }: { clip: FeedClip }) {
+/** "3D view mode" (Clip ⋯ menu 03): the item's model over its video. A Feed post has no 3D file
+ *  here (the web's words), so this is its render, on the light stage the Figma draws. */
+function ModelView({ clip, poster }: { clip: FeedClip; poster: string | null }) {
   return (
     <div data-theme="light" className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-[var(--color-white)] to-[var(--color-gray-300)]">
-      {clip.poster && (
+      {poster && (
         // eslint-disable-next-line @next/next/no-img-element -- the item's render
-        <img src={clip.poster} alt={`${clip.title}, its render`} className="max-h-[50%] w-full object-contain px-12" />
+        <img src={poster} alt={`${clip.title}, its render`} className="max-h-[50%] w-full object-contain px-12" />
       )}
-      <p className="absolute inset-x-8 top-[120px] rounded-md bg-[var(--color-glass-fill-lg)] px-6 py-4 text-center text-md leading-md text-text-primary">
-        This sample post has no 3D file; this is its render.
+      <p className={cn(T.body, "absolute inset-x-8 top-[120px] rounded-md bg-[var(--color-glass-fill-lg)] px-6 py-4 text-center text-text-primary")}>
+        {clip.source === "mine" ? "This is its picture. Open the project for its 3D model." : "This sample post has no 3D file; this is its render."} Tap 3D again for the video.
       </p>
     </div>
   );

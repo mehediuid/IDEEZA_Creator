@@ -2,7 +2,8 @@
 
 // The five tabs (Figma Navbar Container): the tab bar stays mounted while you
 // move between them, and the screen above it scrolls on its own. A running
-// build's pill (AI create's build queue popups) shows over every tab.
+// build's bar (AI create's build queue popups) shows on every tab, docked
+// under the screen's header (ai/build-pill.tsx), never over its content.
 
 import { BuildPill } from "@/components/mobile/ai/build-pill";
 import { TabBarProvider } from "@/components/mobile/device";

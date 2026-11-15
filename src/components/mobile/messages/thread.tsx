@@ -1,22 +1,26 @@
 "use client";
 
 // A thread (Figma MS-10…51, Shared kit KIT-RB-04…25, SK-04, OF-03, KB-02…02c):
-// the top bar ("Name · how they stand to it", or "Team · 5 people"; tap it
-// for the profile or the Members sheet) with ⋯, the context card (it folds to
-// one line while you read back), the timeline, and at the foot the request
-// bar above the composer — or, when you can't write, the Composer notice
-// that says why (you blocked them · they blocked you · the project was
-// deleted). /m/messages/new resolves an entry point's address like the web
+// the top bar as a chat app draws it (the avatar, the name and under it how
+// they stand to it — or the team and "5 people"; tap it for the profile or the
+// Members sheet) with ⋯, the subject pinned under it edge to edge (it folds to
+// the name while you read back; the whole bar opens it), the timeline, and at
+// the foot the request bar above the composer — or, when you can't write, the
+// Composer notice that says why (you blocked them · they blocked you · the
+// project was deleted). /m/messages/new resolves an entry point's address like the web
 // (`?to=…&project=…&about=…`, `?to=feed:…&post=…`, `?team=…`) into the thread
 // or a draft whose first Send creates it, or one card saying why it can't.
 // Every action is the web's (lib/messages/actions); a message that can't go
-// stays on this phone as Not sent (phone.ts outbox).
+// stays on this phone as Not sent (phone.ts outbox). While the tab acts as a
+// demo creator (`?as=`, a listing's Ask the creator) the acting line says so.
+// A store that can't be read shows Couldn't load, never "deleted".
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircleIcon,
   ArchiveIcon,
+  ArrowTurnBackwardIcon,
   Copy01Icon,
   Delete02Icon,
   InboxIcon,
@@ -30,8 +34,6 @@ import {
   UserIcon,
   UserMultipleIcon,
 } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Button } from "@/components/ideeza/button";
 import { useContextInfo } from "@/components/messages/context-card";
 import { useMessagesView } from "@/components/messages/messages-context";
 import { PROJECTS } from "@/lib/feed";
@@ -60,6 +62,9 @@ import {
   phoneContextSentenceOf,
   photosOf,
   quoteLineOf,
+  START_GONE_BODY,
+  START_NOTHING_BODY,
+  startPersonIdOf,
   type OutboxItem,
 } from "@/lib/messages/phone";
 import {
@@ -83,25 +88,36 @@ import { ME, type ContextRef, type Conversation, type MessageEntry, type Partici
 import { forgetUnsent, filesOfUnsent, keepUnsent, updateUnsent, useOutbox } from "@/lib/messages/use-outbox";
 import { useAuth } from "@/lib/account/auth";
 import { useMyProfile } from "@/lib/people/profile-store";
+import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ideeza/avatar";
+import { initialsOfName } from "@/lib/messages/people";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { PRESSED } from "../kit/press";
 import { ReportSheet, type ReportReason as SheetReason } from "../kit/report-sheet";
 import { ActionSheet, type ActionSheetItem } from "../kit/sheet";
+import { EmptyState, ErrorState } from "../kit/state";
 import { OfflineBanner, useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
+import { useGoBack } from "../nav-trail";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 import { Composer, type ComposerMode, type Draft } from "./composer";
-import { ComposerNotice, ContextCard, NoteCard, RequestBar, ThreadBones, type NoteTone } from "./kit";
+import { ComposerNotice, RequestBar, SubjectBar, ThreadBones } from "./kit";
 import { MembersSheet, PhotoViewer, type Member } from "./sheets";
 import { Timeline, type SendingItem } from "./timeline";
-import { PhoneMessages, useAfter, useProfileHref, useSubjectAccess } from "./view";
+import { ActingLine, PhoneMessages, useAfter, useProfileHref, useSubjectAccess } from "./view";
 
+// The web's reasons, in its order (components/messages/report-dialog).
 const REASONS: SheetReason[] = [
-  { id: "scam", label: "Scam or asks to pay outside IDEEZA" },
   { id: "spam", label: "Spam" },
-  { id: "harassment", label: "Harassment or hate" },
+  { id: "scam", label: "Scam or asks to pay outside IDEEZA" },
+  { id: "harassment", label: "Harassment" },
   { id: "other", label: "Something else" },
 ];
+
+/** Which kit state a card that stands for the whole screen is: nothing to show, a thing that's gone, or not allowed. */
+type NoteTone = "empty" | "missing" | "locked";
 
 const EMPTY: never[] = [];
 
@@ -123,19 +139,18 @@ export function StartPage() {
   );
 }
 
+const noSend = async () => null;
+const noSave = () => null;
+
+/** MS-25 / KIT-SK-04: the top bar (the name when it's known), bones after 300 ms, and the
+ *  composer as it will be, off until the conversation is read. */
 function Loading({ title }: { title?: string }) {
   const show = useAfter(300);
   return (
     <Screen
-      top={<TopBar back title={title} />}
+      top={<TopBar back={M_MESSAGES_HREF} title={title} />}
       className="flex flex-col justify-end px-8 pb-6"
-      footer={
-        <div className="flex items-end gap-4 border-t-[length:var(--border-width-1)] border-solid border-border bg-bg-surface py-6 pl-8 pr-8">
-          <p aria-hidden className="flex h-[44px] flex-1 items-center rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-6 text-lg leading-lg text-[color:var(--color-input-placeholder)]">
-            Write a message
-          </p>
-        </div>
-      }
+      footer={<Composer recipientName="this conversation" mode={null} onCloseMode={noSave} contextLine={null} canAddProject={false} disabled onSend={noSend} onSaveEdit={noSave} />}
     >
       {show && <ThreadBones />}
     </Screen>
@@ -143,41 +158,44 @@ function Loading({ title }: { title?: string }) {
 }
 
 function Cant({ tone, icon, title, body }: { tone: NoteTone; icon: typeof InboxIcon; title: string; body: string }) {
-  const router = useRouter();
+  const goBack = useGoBack(M_MESSAGES_HREF);
+  const State = tone === "missing" ? ErrorState : EmptyState;
   return (
-    <Screen top={<TopBar back title="Message" />} className="flex flex-col justify-center px-8 pb-16">
-      <NoteCard
-        tone={tone}
-        icon={<Icon icon={icon} size={32} />}
-        title={title}
-        body={body}
-        titleAs="h2"
-        action={
-          <Button
-            hierarchy="secondary"
-            size="md"
-            onClick={() => (window.history.length > 1 ? router.back() : router.push(M_MESSAGES_HREF))}
-          >
-            Back
-          </Button>
-        }
+    <Screen top={<TopBar back={M_MESSAGES_HREF} title="Message" />} className="flex flex-col justify-center gap-6 px-8 pb-16">
+      <ActingLine />
+      <State icon={icon} title={title} body={body} action={{ label: "Back", onClick: goBack }} />
+    </Screen>
+  );
+}
+
+/** MS-08c on a conversation's own address: the messages couldn't be read, so nothing is said to be gone. */
+function Unreadable() {
+  return (
+    <Screen top={<TopBar back={M_MESSAGES_HREF} title="Message" />} className="flex flex-col justify-center px-8 pb-16">
+      <ErrorState
+        title="Couldn’t load messages"
+        body="Check your connection, or try again in a moment."
+        action={{ label: "Try again", onClick: () => window.location.reload() }}
       />
     </Screen>
   );
 }
 
 function ThreadRoute({ id }: { id: string }) {
-  const { ready, data, me, people } = useMessagesView();
+  const { ready, unreadable, data, me, people } = useMessagesView();
   const params = useSearchParams();
   const router = useRouter();
   const aboutRaw = params.get("about");
   const about = React.useMemo(() => aboutIn(aboutRaw), [aboutRaw]);
+  // A deleted request is on its way back to Requests: hold the screen, never "isn't available".
+  const [leaving, setLeaving] = React.useState(false);
 
-  if (!ready) return <Loading />;
+  if (unreadable) return <Unreadable />;
+  if (!ready || leaving) return <Loading />;
   const conversation = conversationOf(data, id);
   const teamIds = conversation?.kind === "team" && conversation.subject.kind === "project" ? people.teamIdsOf(conversation.subject.projectId) : [];
   if (!conversation || !visibleTo(conversation, me, teamIds)) {
-    return <Cant tone="missing" icon={AlertCircleIcon} title="This conversation isn’t available" body="It may have been deleted." />;
+    return <Cant tone="missing" icon={AlertCircleIcon} title="This conversation isn’t available" body={START_GONE_BODY} />;
   }
   return (
     <ThreadView
@@ -187,6 +205,7 @@ function ThreadRoute({ id }: { id: string }) {
       kind={conversation.kind}
       other={otherOf(conversation, me)}
       pending={about}
+      onLeaving={setLeaving}
       onSent={() => {
         if (aboutRaw) router.replace(mThreadHref(conversation.id));
       }}
@@ -199,25 +218,27 @@ type Resolved =
   | { ok: true; create: NewConversation; subject: Subject; other: Participant | null; context: ContextRef };
 
 function StartRoute() {
-  const { ready, data, me, people } = useMessagesView();
+  const { ready, unreadable, data, me, people } = useMessagesView();
   const { projects } = useManualProjects();
   const params = useSearchParams();
   const router = useRouter();
   const start = React.useMemo(() => parseStart(params), [params]);
+  const creatorIds = React.useMemo(() => people.sources.creators.map((c) => c.id), [people.sources.creators]);
 
   const resolved = React.useMemo<Resolved | null>(() => {
     if (!ready) return null;
-    if (!start) return { ok: false, tone: "empty", icon: InboxIcon, title: "Nothing to start", body: "This link doesn't say who to message or what about." };
+    if (!start) return { ok: false, tone: "empty", icon: InboxIcon, title: "Nothing to start", body: START_NOTHING_BODY };
     if (start.kind === "post") {
       const post = PROJECTS.find((p) => p.slug === start.slug);
       // The phone has no Innovations (Feed), so the Figma's words.
       if (!post) return { ok: false, tone: "missing", icon: AlertCircleIcon, title: "Post not found", body: "It may have been removed." };
       const subject: Subject = { kind: "post", slug: post.slug, title: post.title };
-      const to = { id: start.to, name: people.nameOf(start.to) };
+      const toId = startPersonIdOf(start.to, creatorIds);
+      const to = { id: toId, name: people.nameOf(toId) };
       return { ok: true, create: { kind: "direct", subject, to }, subject, other: to, context: { kind: "post" } };
     }
     const project = projects.find((p) => p.id === start.projectId);
-    if (!project) return { ok: false, tone: "missing", icon: AlertCircleIcon, title: "Project not found", body: "This project no longer exists." };
+    if (!project) return { ok: false, tone: "missing", icon: AlertCircleIcon, title: "Project not found", body: START_GONE_BODY };
     const name = project.name.trim() || "Untitled project";
     const subject: Subject = { kind: "project", projectId: project.id, name };
     if (start.kind === "team") {
@@ -226,9 +247,10 @@ function StartRoute() {
       }
       return { ok: true, create: { kind: "team", projectId: project.id, projectName: name }, subject, other: null, context: { kind: "team" } };
     }
-    const to = { id: start.to, name: people.nameOf(start.to) };
+    const toId = startPersonIdOf(start.to, creatorIds);
+    const to = { id: toId, name: people.nameOf(toId) };
     return { ok: true, create: { kind: "direct", subject, to }, subject, other: to, context: start.about };
-  }, [ready, start, projects, people, me]);
+  }, [ready, start, projects, people, me, creatorIds]);
 
   const existing = resolved?.ok ? conversationByKey(data, keyOfNew(resolved.create, me)) : null;
   const existingId = existing?.id ?? null;
@@ -240,7 +262,8 @@ function StartRoute() {
     router.replace(mThreadHref(existingId, context));
   }, [existingId, declined, me, context, router]);
 
-  if (!resolved || existingId) return <Loading />;
+  if (unreadable) return <Unreadable />;
+  if (!resolved || existingId) return <Loading title={existing && resolved?.ok && resolved.other ? resolved.other.name : undefined} />;
   if (!resolved.ok) return <Cant tone={resolved.tone} icon={resolved.icon} title={resolved.title} body={resolved.body} />;
   if (resolved.other) {
     const check = canStart(data, me, resolved.other.id, resolved.context, people.policy);
@@ -294,6 +317,7 @@ function ThreadView({
   other,
   create,
   pending,
+  onLeaving,
   onSent,
 }: {
   /** Null for a draft: nothing is stored until the first Send. */
@@ -304,6 +328,8 @@ function ThreadView({
   create?: NewConversation;
   /** The entry point's context (`?about=`), sent before the next message when it differs. */
   pending: ContextRef | null;
+  /** The thread is being left for good (a deleted request): its route holds the screen meanwhile. */
+  onLeaving?: (leaving: boolean) => void;
   onSent: (conversationId: string) => void;
 }) {
   const { data, me, meAs, people, unreadable } = useMessagesView();
@@ -346,8 +372,22 @@ function ThreadView({
   const askedListing = (conversationId ? askedListingOf(data, conversationId) : false) || pending?.kind === "listing";
   const relation = other ? people.relationOf(me, other.id, subject, { askedListing }) : null;
   const relationWord = relation?.short ?? (relation?.long ? relation.long.charAt(0).toLowerCase() + relation.long.slice(1) : null);
-  const title = team ? `Team · ${memberCount} ${memberCount === 1 ? "person" : "people"}` : `${otherPerson?.name ?? "Someone"}${relationWord ? ` · ${relationWord}` : ""}`;
+  const peopleWord = `${memberCount} ${memberCount === 1 ? "person" : "people"}`;
+  const title = team ? `Team · ${peopleWord}` : `${otherPerson?.name ?? "Someone"}${relationWord ? ` · ${relationWord}` : ""}`;
   const recipientName = team ? `${subjectName} team` : (otherPerson?.name ?? "Someone");
+  // A chat app's header: the avatar, the name, and under it how they stand to this; a team thread
+  // reads "Team" over its size (the project's name is on the subject bar right under it).
+  const titleLine = team ? "Team" : (otherPerson?.name ?? "Someone");
+  const titleSub = team ? peopleWord : relationWord ? relationWord.charAt(0).toUpperCase() + relationWord.slice(1) : null;
+  const titleShown = (
+    <span className="inline-flex max-w-full items-center gap-4 align-middle">
+      <Avatar size="sm" initials={team ? initialsOfName(subjectName) : (otherPerson?.initials ?? "?")} />
+      <span className="flex min-w-0 flex-col items-start text-left">
+        <span className="max-w-full truncate">{titleLine}</span>
+        {titleSub && <span className={cn(T.meta, "max-w-full truncate")}>{titleSub}</span>}
+      </span>
+    </span>
+  );
   const block = other ? blockStateOf(data, me, other.id) : "none";
   const state = conversation ? stateOf(conversation, me) : null;
   const inRequests = !!conversation && !team && state?.folder === "requests";
@@ -498,29 +538,30 @@ function ThreadView({
 
   // ── menus ──
 
+  // MS-23 and the web's order: … Archive · Block · Report. A draft (MS-50) has only View profile:
+  // the rest needs a stored conversation.
+  const profileItem: ActionSheetItem[] = !team && otherHref ? [{ label: "View profile", icon: UserIcon, onSelect: () => router.push(otherHref) }] : [];
   const threadItems: ActionSheetItem[] =
     conversation && state
       ? [
-          ...(team
-            ? [{ label: "Members", icon: UserMultipleIcon, onSelect: () => setLayer({ kind: "members" }) }]
-            : otherHref
-              ? [{ label: "View profile", icon: UserIcon, onSelect: () => router.push(otherHref) }]
-              : []),
+          ...(team ? [{ label: "Members", icon: UserMultipleIcon, onSelect: () => setLayer({ kind: "members" }) }] : profileItem),
           { label: state.muted ? "Unmute" : "Mute", icon: state.muted ? Notification01Icon : NotificationOff01Icon, onSelect: () => toggle("muted") },
           { label: state.archived ? "Unarchive" : "Archive", icon: ArchiveIcon, onSelect: () => toggle("archived") },
-          { label: "Report conversation", icon: AlertCircleIcon, onSelect: () => setLayer({ kind: "report", blockName: alsoBlockName }) },
           ...(otherPerson
             ? block === "byMe"
               ? [{ label: `Unblock ${first}`, icon: UserBlock01Icon, onSelect: doUnblock }]
               : [{ label: `Block ${first}`, icon: UserBlock01Icon, destructive: true, onSelect: () => setLayer({ kind: "block" }) }]
             : []),
+          { label: "Report conversation", icon: AlertCircleIcon, onSelect: () => setLayer({ kind: "report", blockName: alsoBlockName }) },
         ]
-      : [];
+      : profileItem;
 
   /** `at`: when the menu opened, for the 15 minutes Edit and Delete have. */
   const messageMenu = (e: MessageEntry, at: number): { title: string; items: ActionSheetItem[] } => {
     const mine = e.from === me;
     const items: ActionSheetItem[] = [];
+    // Reply without the swipe: for a keyboard, a screen reader, or anyone who doesn't know the gesture.
+    if (e.deletedAt === undefined) items.push({ label: "Reply", icon: ArrowTurnBackwardIcon, onSelect: () => setMode({ kind: "reply", entryId: e.id }) });
     if (e.deletedAt === undefined && e.text) {
       items.push({
         label: "Copy",
@@ -568,7 +609,7 @@ function ThreadView({
     if (!team || !projectId) return [];
     const t = people.sources.teams.find((x) => x.projectId === projectId);
     return [
-      { id: ME, name: myName, role: "Creator", you: true, href: profileHref(ME) },
+      { id: ME, name: myName, role: "Creator", you: me === ME, href: profileHref(ME) },
       ...(t?.members ?? []).map((m) => ({ id: m.id, name: m.name, role: m.role, you: m.id === me, href: profileHref(m.id) })),
     ];
   }, [team, projectId, people.sources.teams, myName, me, profileHref]);
@@ -601,19 +642,19 @@ function ThreadView({
         type="button"
         onClick={() => (team ? setLayer({ kind: "members" }) : otherHref && router.push(otherHref))}
         aria-label={team ? `${title}. Show members` : `${title}. View profile`}
-        className="max-w-full truncate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        className={cn("inline-flex max-w-full rounded-md px-2 py-1 outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus", PRESSED)}
       >
-        {title}
+        {titleShown}
       </button>
     ) : (
-      title
+      titleShown
     );
 
   return (
     <Screen
       top={
         <TopBar
-          back
+          back={M_MESSAGES_HREF}
           title={titleNode}
           actions={threadItems.length ? [{ icon: MoreHorizontalIcon, label: "Conversation actions", onClick: () => setMenu({ kind: "thread" }) }] : []}
         />
@@ -623,14 +664,21 @@ function ThreadView({
         <>
           {inRequests && conversation && otherPerson && (
             <RequestBar
+              name={otherPerson.name}
+              subjectName={subjectName}
               onAccept={() => {
                 const r = setMember(conversation.id, me, { folder: "inbox" });
                 if (r.ok) toastAfterFoot({ title: "Moved to your Inbox." });
                 else fail(r.reason);
               }}
               onDelete={() => {
+                // The route holds the screen while this leaves: the request is gone from view at once.
+                onLeaving?.(true);
                 const r = setMember(conversation.id, me, { declined: true });
-                if (!r.ok) return fail(r.reason);
+                if (!r.ok) {
+                  onLeaving?.(false);
+                  return fail(r.reason);
+                }
                 router.replace(M_REQUESTS_HREF);
                 toast({ title: "Request deleted." });
               }}
@@ -641,14 +689,15 @@ function ThreadView({
         </>
       }
     >
-      <div className="flex shrink-0 flex-col gap-4 px-8 pb-4">
+      <SubjectBar
+        access={access}
+        caption={cardContext ? phoneContextLineOf(cardContext, infoOf(cardContext)) : null}
+        label={conversation ? "About this conversation" : "About"}
+        collapsed={away}
+      />
+      <div className="flex shrink-0 flex-col gap-4 px-8 pt-4 empty:hidden">
+        <ActingLine />
         <OfflineBanner />
-        <ContextCard
-          access={access}
-          caption={cardContext ? phoneContextLineOf(cardContext, infoOf(cardContext)) : null}
-          label={conversation ? "About this conversation" : "About"}
-          collapsed={away}
-        />
       </div>
       <Timeline
         conversationId={conversationId}
@@ -685,7 +734,7 @@ function ThreadView({
           onClose={() => setLayer(null)}
           teamName={`${subjectName} team`}
           members={teamMembers}
-          teamHref={projectGone || !projectId ? null : `/m/projects/${projectId}?tab=team`}
+          teamHref={projectGone || !projectId ? null : `/m/projects/${projectId}/team`}
         />
       )}
       {conversation && (
@@ -695,6 +744,7 @@ function ThreadView({
           title={layer?.kind === "report" && layer.entryId ? "Report message" : "Report conversation"}
           description={otherPerson ? `${first} won’t know who reported.` : "They won’t know who reported."}
           reasons={REASONS}
+          draftKey={`messages:${conversation.id}:${layer?.kind === "report" && layer.entryId ? layer.entryId : "conversation"}`}
           blockName={layer?.kind === "report" ? layer.blockName : undefined}
           onSend={async (input) => {
             const r = reportConversation({

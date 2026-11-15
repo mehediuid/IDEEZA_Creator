@@ -2,8 +2,10 @@
 
 // Shared kit confirms (KIT-CF-01…03, MFR-28): a Sheet whose title is a question
 // naming the thing and whose button is the verb — never Yes / OK / Confirm.
-// Stacked, the action on top: Primary for a neutral confirm, Danger for a
-// destructive one. A typed confirm keeps the action off until the name is
+// The way back and the action share one row (owner 2026-11-15: two stacked
+// XL buttons wasted the thumb zone), the action on the right: Primary for a
+// neutral confirm, Danger for a destructive one. Labels too long for half a
+// row stack instead, the action on top. A typed confirm keeps the action off until the name is
 // typed exactly. ("Can't yet" sends you where to fix it: build that with
 // Sheet and a Primary that goes there.) While it works the sheet can't be
 // closed; if `onConfirm` throws, an M01 error says nothing changed and the
@@ -49,6 +51,8 @@ export function ConfirmSheet({
   const [failed, setFailed] = React.useState(false);
   const fieldId = React.useId();
   const matches = !typed || text.trim() === typed;
+  // Half a row holds about 16 characters at 375 px; longer labels stack.
+  const row = Math.max(verb.length, cancelLabel.length, failed ? 9 : 0) <= 16;
   // Kit rule: a field error shows on blur or submit, never while typing.
   const mismatch = !!typed && checked && text.trim() !== "" && !matches;
 
@@ -81,21 +85,21 @@ export function ConfirmSheet({
       onClose={close}
       title={title}
       actions={
-        <>
+        <div className={row ? "flex gap-4" : "flex flex-col-reverse gap-4"}>
+          <Button hierarchy="secondary" size="xl" className={row ? "min-w-0 flex-1" : "w-full"} disabled={busy} onClick={close}>
+            {cancelLabel}
+          </Button>
           <Button
             hierarchy={destructive ? "danger" : "primary"}
             size="xl"
-            className="w-full"
+            className={row ? "min-w-0 flex-1" : "w-full"}
             disabled={!matches}
             loading={busy}
             onClick={confirm}
           >
             {failed ? "Try again" : verb}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" disabled={busy} onClick={close}>
-            {cancelLabel}
-          </Button>
-        </>
+        </div>
       }
     >
       {failed && (

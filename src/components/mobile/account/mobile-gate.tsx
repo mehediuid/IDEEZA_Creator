@@ -5,23 +5,34 @@
 // Splash shows. Then:
 // · the way-in screens are for the signed out (signed in, they go on); the
 //   first time the app opens signed out, the onboarding comes before Welcome;
-// · Name and handle, the profile steps and the Welcome map need an account;
+// · the one question and the Welcome map (after sign-up) need an account;
 // · the tabs need an account — except Home, which a guest who chose Explore
 //   first may browse; anyone else goes to Welcome, carrying where they were
 //   going. The Shared kit is open to all.
 // Signed in, a sign-in that still owes something goes there first: the 2-step
 // code (AU-07), then Restore for an account set to be deleted (AU-65).
-// Signed in, the Face ID offer comes once per phone, on the first tab screen.
+// Signed in, on a tab screen, one thing at a time and in this order: the tour
+// when Look around first asked for it, then the welcome offer (on Home, once
+// per account, as on the web).
+// A link's utm_source is kept from whatever screen it opens.
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { SESSION_KEY, signOut, useAuth } from "@/lib/account/auth";
-import { ENTRY_PATH, SETUP_PATH, isAlive, mobileNext, readPhone, updatePhone, updatePhoneAccount, usePhone } from "@/lib/account/phone";
+import {
+  ENTRY_PATH,
+  SETUP_PATH,
+  isAlive,
+  keepUtm,
+  mobileNext,
+  usePhone,
+} from "@/lib/account/phone";
 import { owedOf, readDeviceId, useSecurity } from "@/lib/account/security";
 import { parseStored, useStoredKey } from "@/lib/key-store";
-import { Button } from "@/components/ideeza/button";
-import { ForcedThemeContext, Sheet } from "../kit/sheet";
+import { ForcedThemeContext } from "../kit/sheet";
 import { SplashScreen } from "../screen";
+import { PhoneTour } from "./phone-tour";
+import { WelcomeOfferSheet } from "./welcome-offer-sheet";
 
 /** The screens a sign-in may owe before the app opens. */
 const OWED_PATH = /^\/m\/(two-step|restore)(\/|$)/;
@@ -46,8 +57,9 @@ function redirectFor(
   }
   if (OWED_PATH.test(pathname)) return signedIn ? mobileNext(asked) : "/m/welcome";
   if (ENTRY_PATH.test(pathname)) {
-    // Reset is also reached from Settings; the Shared kit's state demos open signed in too.
-    if (!signedIn || /^\/m\/(reset|verify)(\/|$)/.test(pathname) || /[?&](demo|error)=/.test(search)) return null;
+    // Reset is also reached from Settings; the Shared kit's state demos (`?demo=`) open signed in
+    // too. A provider's error (`?error=`) is only ever shown to someone signed out.
+    if (!signedIn || /^\/m\/(reset|verify)(\/|$)/.test(pathname) || /[?&]demo=/.test(search)) return null;
     return mobileNext(new URLSearchParams(search).get("next"));
   }
   if (SETUP_PATH.test(pathname)) return signedIn ? null : "/m/welcome";
@@ -91,6 +103,9 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
     if (target) router.replace(target);
   }, [target, router]);
 
+  // The campaign tag of the link that opened the app, for the account made from it.
+  React.useEffect(() => keepUtm(window.location.search), []);
+
   const [holding, setHolding] = React.useState(true);
   React.useEffect(() => {
     const id = window.setTimeout(
@@ -131,39 +146,10 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      {signedIn && account && tabScreen && phone.faceIdPending && !phone.faceIdOffered && <FaceIdOffer email={account.email} />}
+      {signedIn &&
+        account &&
+        tabScreen &&
+        (phone.tourPending ? <PhoneTour /> : <WelcomeOfferSheet />)}
     </>
-  );
-}
-
-
-/** AU-08 · Face ID offer: once, after the first sign-in on this phone. */
-function FaceIdOffer({ email }: { email: string }) {
-  const [open, setOpen] = React.useState(true);
-  const done = (use: boolean) => {
-    if (use) updatePhoneAccount(email, (a) => ({ ...a, faceId: true }));
-    updatePhone({ ...readPhone(), faceIdPending: false, faceIdOffered: true });
-    setOpen(false);
-  };
-  return (
-    <Sheet
-      open={open}
-      onClose={() => done(false)}
-      title="Sign in with Face ID next time"
-      actions={
-        <>
-          <Button size="xl" className="w-full" onClick={() => done(true)}>
-            Use Face ID
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => done(false)}>
-            Not now
-          </Button>
-        </>
-      }
-    >
-      <p className="text-md leading-md text-text-secondary">
-        Faster, and no password to type. Change it any time in Sign-in &amp; security.
-      </p>
-    </Sheet>
   );
 }

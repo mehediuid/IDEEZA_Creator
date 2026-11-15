@@ -9,10 +9,13 @@
 // screenshots shrunk in the browser, the page it is about (captured from
 // where you came, not typed) and "Send page and device details" (unticked).
 // It goes to /api/reports; "Report sent" gives the reference to quote.
-// Offline or a failed send keeps everything for Try again.
+// Offline or a failed send keeps everything for Try again. The words and
+// picks are the web's draft (`ideeza:report-draft`), so leaving the screen
+// or reloading loses nothing but the screenshots (kept in memory only, and
+// it says so); a link may fill an empty draft (`?details=`, `?kind=`).
 
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { CheckmarkCircle02Icon, Delete02Icon, Upload04Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
@@ -32,6 +35,9 @@ import {
   asksImpact,
   detailsCopy,
   draftErrors,
+  isImpact,
+  isKind,
+  isReportId,
   titleOf,
   type ReportContext,
   type ReportImpact,
@@ -44,9 +50,11 @@ import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
 import { Sheet } from "../kit/sheet";
 import { SheetSelect } from "../kit/sheet-select";
-import { useOnline } from "../kit/states";
+import { OfflineBanner, useOnline } from "../kit/states";
+import { useGoBack } from "../nav-trail";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
 
 /** A report's id: 32 hex digits, minted with the draft so a retry sends the same report. */
 export function newReportId(): string {
@@ -81,22 +89,71 @@ export async function postReport(payload: ReportPayload & { images: { width: num
 
 type Shot = ReportImage & { url: string };
 
+/** The web's unsent draft (components/support/report-problem.tsx): one per browser, words only. */
+const DRAFT_KEY = "ideeza:report-draft";
+type Draft = { id: string; kind: ReportKind | null; impact: ReportImpact | null; details: string; includeContext: boolean };
+
+function loadDraft(): Draft {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "null") as Record<string, unknown> | null;
+    if (d && isReportId(d.id))
+      return {
+        id: d.id,
+        kind: isKind(d.kind) ? d.kind : null,
+        impact: isImpact(d.impact) ? d.impact : null,
+        details: typeof d.details === "string" ? d.details.slice(0, DETAILS_MAX) : "",
+        includeContext: d.includeContext === true,
+      };
+  } catch {
+    // Unreadable or blocked storage: a fresh draft.
+  }
+  return { id: newReportId(), kind: null, impact: null, details: "", includeContext: false };
+}
+
+function keepDraft(d: Draft): void {
+  try {
+    if (!d.kind && !d.impact && !d.details.trim()) localStorage.removeItem(DRAFT_KEY);
+    else localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  } catch {
+    // A full or blocked storage only costs the draft's survival of a reload.
+  }
+}
+
+function dropDraft(): void {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Nothing to drop.
+  }
+}
+
 export function ReportScreen() {
-  const router = useRouter();
   const params = useSearchParams();
   const online = useOnline();
   const raw = params.get("from") ?? "";
   const from = raw.startsWith("/m") ? raw : "/m/help";
+  const done = useGoBack(from);
   const [context] = React.useState(() => phoneContext(from));
   const ids = useFieldIds(["kind", "impact", "details", "images"] as const);
-  const [id, setId] = React.useState(newReportId);
-  const [kind, setKind] = React.useState<ReportKind | null>(null);
-  const [impact, setImpact] = React.useState<ReportImpact | null>(null);
-  const [details, setDetails] = React.useState("");
+  // The draft as kept; a link's `?details=` / `?kind=` fill only what it leaves empty (the web's prefill rule).
+  const [start] = React.useState<Draft>(() => {
+    const d = loadDraft();
+    const prefill = params.get("details")?.trim();
+    const k = params.get("kind");
+    return {
+      ...d,
+      details: prefill && !d.details.trim() ? prefill.slice(0, DETAILS_MAX) : d.details,
+      kind: !d.kind && isKind(k) ? k : d.kind,
+    };
+  });
+  const [id, setId] = React.useState(start.id);
+  const [kind, setKind] = React.useState<ReportKind | null>(start.kind);
+  const [impact, setImpact] = React.useState<ReportImpact | null>(start.impact);
+  const [details, setDetails] = React.useState(start.details);
   const [shots, setShots] = React.useState<Shot[]>([]);
   const [preparing, setPreparing] = React.useState(0);
   const [imageNote, setImageNote] = React.useState<string | null>(null);
-  const [includeContext, setIncludeContext] = React.useState(false);
+  const [includeContext, setIncludeContext] = React.useState(start.includeContext);
   const [tried, setTried] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [sendError, setSendError] = React.useState<string | null>(null);
@@ -108,6 +165,10 @@ export function ReportScreen() {
     shotsRef.current = shots;
   }, [shots]);
   React.useEffect(() => () => shotsRef.current.forEach((s) => URL.revokeObjectURL(s.url)), []);
+  // Every change is kept, so leaving the screen (or a reload) loses nothing typed; a sent report clears it.
+  React.useEffect(() => {
+    if (!sent) keepDraft({ id, kind, impact, details, includeContext });
+  }, [id, kind, impact, details, includeContext, sent]);
 
   const errors = tried ? draftErrors({ kind, impact, details }) : [];
   const errorOf = (f: "kind" | "impact" | "details") => errors.find((e) => e.field === f)?.message;
@@ -167,6 +228,7 @@ export function ReportScreen() {
       }
       if (!r.ref) throw new Error(`status ${r.status}`);
       rememberSentReport({ ref: r.ref, kind: k, title: payload.title, at: Date.now() });
+      dropDraft();
       setSent(r.ref);
     } catch {
       setSendError("Couldn’t send your report. Nothing was lost, so try again.");
@@ -178,47 +240,48 @@ export function ReportScreen() {
   const count = details.trim().length;
   return (
     <Screen
-      top={<TopBar back title="Report a problem" />}
+      top={<TopBar back={from} title="Report a problem" />}
       className="px-8 pb-8 pt-4"
       footer={
         <BottomBar>
           {sendError && (
-            <p role="alert" className="text-sm leading-sm text-text-error">
+            <p role="alert" className={cn(T.caption, "text-text-error")}>
               {sendError}
             </p>
           )}
           <Button size="xl" className="w-full" loading={sending} disabled={preparing > 0} onClick={send}>
-            {sending ? "Sending…" : sendError ? "Try again" : "Submit"}
+            {sending ? "Sending…" : sendError ? "Try again" : "Send report"}
           </Button>
         </BottomBar>
       }
     >
       <div className="flex flex-col gap-8">
+        <OfflineBanner />
         <Field label="What’s it about?*" htmlFor={ids.kind.id} error={errorOf("kind")} errorId={ids.kind.errorId}>
           <SheetSelect
             id={ids.kind.id}
             title="What’s it about?"
-            placeholder="Select an issue"
+            placeholder="Choose one"
             value={kind ?? ""}
-            options={KINDS.map((k) => ({ value: k.value, label: k.sub ? `${k.label} (${k.sub.toLowerCase()})` : k.label }))}
+            options={KINDS.map((k) => ({ value: k.value, label: k.sub ? `${k.label}: ${k.sub}` : k.label }))}
             onChange={(v) => setKind(v as ReportKind)}
             invalid={!!errorOf("kind")}
           />
         </Field>
         {asksImpact(kind) && (
           <fieldset className="flex flex-col gap-4" aria-describedby={errorOf("impact") ? ids.impact.errorId : undefined}>
-            <legend id={ids.impact.id} tabIndex={-1} className="pb-4 text-md font-medium leading-md text-text-primary outline-none">
-              How much is it getting in your way?*
+            <legend id={ids.impact.id} tabIndex={-1} className={cn(T.label, "pb-4 outline-none")}>
+              How much is this getting in your way?*
             </legend>
             {IMPACTS.map((im) => (
-              <label key={im.value} className={cn("relative flex min-h-[44px] cursor-pointer items-center gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus", impact === im.value ? "border-border-brand bg-bg-brand-subtle" : "border-border-subtle bg-bg-surface")}>
+              <label key={im.value} className={cn("relative flex min-h-[44px] cursor-pointer items-center gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus", impact === im.value ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface")}>
                 <input type="radio" name="impact" className="sr-only" checked={impact === im.value} onChange={() => setImpact(im.value)} />
                 <Radio checked={impact === im.value} decorative />
-                <span className="text-md leading-md text-text-primary">{im.label}</span>
+                <span className={cn(T.body, "text-text-primary")}>{im.label}</span>
               </label>
             ))}
             {errorOf("impact") && (
-              <p id={ids.impact.errorId} className="text-sm leading-sm text-text-error">
+              <p id={ids.impact.errorId} className={cn(T.caption, "text-text-error")}>
                 {errorOf("impact")}
               </p>
             )}
@@ -235,7 +298,7 @@ export function ReportScreen() {
             aria-describedby={`${ids.details.id}-hint${errorOf("details") ? ` ${ids.details.errorId}` : ""}`}
           />
         </Field>
-        <p id={`${ids.details.id}-hint`} className="-mt-6 flex justify-between gap-4 text-sm leading-sm text-text-tertiary">
+        <p id={`${ids.details.id}-hint`} className={cn(T.caption, "-mt-6 flex justify-between gap-4 text-text-tertiary")}>
           {copy.hint}
           {count >= DETAILS_COUNTER_FROM && (
             <span className={cn("tabular-nums", count > DETAILS_MAX && "text-text-error")}>
@@ -244,8 +307,8 @@ export function ReportScreen() {
           )}
         </p>
         <div className="flex flex-col gap-3">
-          <span className="text-md font-medium leading-md text-text-primary">Page</span>
-          <p className="flex h-[44px] items-center rounded-xl bg-bg-subtle px-6 text-lg leading-lg text-text-secondary">{context.page}</p>
+          <span className={T.label}>Page</span>
+          <p className={cn(T.bodyLg, "flex h-[44px] items-center rounded-xl bg-bg-subtle px-6 text-text-secondary")}>{context.page}</p>
         </div>
         <div className="flex flex-col gap-4">
           <input
@@ -271,8 +334,8 @@ export function ReportScreen() {
             <span aria-hidden className="text-[color:var(--color-icon-default)]">
               <Icon icon={Upload04Icon} size={22} />
             </span>
-            <span className="text-md leading-md text-text-primary">Tap to add a screenshot</span>
-            <span className="text-sm leading-sm text-text-secondary">PNG, JPG or WebP · up to {IMAGES_MAX}</span>
+            <span className={cn(T.body, "text-text-primary")}>Tap to add a screenshot</span>
+            <span className={T.meta}>PNG, JPG or WebP · up to {IMAGES_MAX}. Screenshots aren’t kept if you leave this screen.</span>
           </button>
           {(shots.length > 0 || preparing > 0) && (
             <ul className="flex gap-4">
@@ -297,14 +360,14 @@ export function ReportScreen() {
               ))}
             </ul>
           )}
-          {imageNote && <p className="text-sm leading-sm text-text-secondary">{imageNote}</p>}
+          {imageNote && <p className={T.caption}>{imageNote}</p>}
         </div>
         <label className="relative flex cursor-pointer items-start gap-5 rounded-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus">
           <input type="checkbox" className="sr-only" checked={includeContext} onChange={() => setIncludeContext((v) => !v)} />
           <Checkbox checked={includeContext} decorative className="mt-1" />
           <span className="flex flex-col gap-1">
-            <span className="text-md leading-md text-text-primary">Send page and device details</span>
-            <span className="text-sm leading-sm text-text-secondary">
+            <span className={cn(T.body, "text-text-primary")}>Send page and device details</span>
+            <span className={T.meta}>
               {context.page} · {context.browser} on {context.os}
             </span>
           </span>
@@ -312,11 +375,11 @@ export function ReportScreen() {
       </div>
       <Sheet
         open={sent !== null}
-        onClose={() => router.back()}
+        onClose={done}
         title="Report sent"
         description="Thanks. The IDEEZA team has it."
         actions={
-          <Button size="xl" className="w-full" onClick={() => router.back()}>
+          <Button size="xl" className="w-full" onClick={done}>
             Done
           </Button>
         }
@@ -324,7 +387,7 @@ export function ReportScreen() {
         <span aria-hidden className="self-center text-text-success">
           <Icon icon={CheckmarkCircle02Icon} size={40} />
         </span>
-        <p className="text-center text-md leading-md text-text-primary">
+        <p className={cn(T.body, "text-center text-text-primary")}>
           Your reference is <span className="font-mono font-medium">{sent}</span>. Settings › Your reports keeps it.
         </p>
       </Sheet>

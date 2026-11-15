@@ -27,6 +27,8 @@ import {
 import { countLabel } from "@/lib/manual/project-summary";
 import { phoneHrefOf } from "@/lib/manual/phone-project";
 import type { ProjectProduct } from "@/lib/manual/project-read";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useProject } from "./context";
 
 const UNBUILT_NOTE: Record<Exclude<ProjectProduct["state"], "built">, string> = {
@@ -62,6 +64,7 @@ export function useProductRows(): {
   const { project, view, viewer } = useProject();
   const { record: journey } = useJourney(project.id);
   const owner = can(viewer, "facts.seeOwnerOnly");
+  const canEdit = can(viewer, "product.edit", view.canCtx);
   return React.useMemo(() => {
     const cards = productsTabView(view, { owner, journey, project });
     const heading = productsHeadingOf(
@@ -79,7 +82,10 @@ export function useProductRows(): {
       const meta = pp.dropped
         ? droppedNoteOf(pp.dropped.current, pp.dropped.lastIn)
         : pp.state !== "built"
-          ? UNBUILT_NOTE[pp.state]
+          ? // The editor clause is for whoever can open it; a viewer reads "Made by hand".
+            pp.state === "hand" && !canEdit
+            ? "Made by hand"
+            : UNBUILT_NOTE[pp.state]
           : [conf ? `Build check: ${TIER_LABEL[conf.tier]}` : null, card?.video ?? null].filter(Boolean).join(" · ");
       const facts = pp.built
         ? productFacts(specOfSource(pp.built.product), pp.built.product.parts)
@@ -106,14 +112,14 @@ export function useProductRows(): {
       line: [countLabel(heading.count), pieces].filter(Boolean).join(" · "),
       headline: headlineConfidenceOf(current),
     };
-  }, [project, view, owner, journey]);
+  }, [project, view, owner, canEdit, journey]);
 }
 
 /** "Build check: [Draft] 6 passed · 1 not run ⌄" — the web's badge and its disclosure. */
 export function BuildCheckLine({ headline }: { headline: ProductConfidence | null }) {
   if (!headline) return null;
   return (
-    <div className="flex flex-wrap items-center gap-3 text-sm leading-sm text-text-secondary">
+    <div className={cn(T.meta, "flex flex-wrap items-center gap-3")}>
       <span>Build check:</span>
       <ConfidenceBadge confidence={headline} />
     </div>

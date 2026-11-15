@@ -12,6 +12,7 @@ import { Button } from "@/components/ideeza/button";
 import { signOut } from "@/lib/account/auth";
 import { updatePhone } from "@/lib/account/phone";
 import { Sheet } from "../kit/sheet";
+import { T } from "../type";
 import { useOnline } from "../kit/states";
 import { toastAfterReload } from "../kit/toast";
 
@@ -40,13 +41,10 @@ export function SignOutSheet({ open, onClose }: { open: boolean; onClose: () => 
           <Button size="xl" className="w-full" loading={busy} onClick={go}>
             {online ? "Sign out" : "Sign out anyway"}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            {online ? "Cancel" : "Stay signed in"}
-          </Button>
         </>
       }
     >
-      <p className="text-md leading-md text-text-secondary">
+      <p className={T.body}>
         {online
           ? "Your projects stay in your account. Builds keep running."
           : "You’re offline. Signing in again needs a connection, so you can’t get back in until you’re online."}

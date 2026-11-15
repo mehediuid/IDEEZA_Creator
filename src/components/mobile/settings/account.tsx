@@ -1,19 +1,20 @@
 "use client";
 
-// ST-10 · Account: the public profile card (what others see, Edit profile),
-// then Handle (Copy, Edit), Legal name (private, ST-12 sheet), Wallet (ST-13
+// ST-10 · Account: the public profile as one row (what others see; the row
+// opens Edit profile), then Handle (its value; the row opens the editor, which
+// also copies the profile link), Legal name (private, ST-12 sheet), Wallet (ST-13
 // connected → Done / Disconnect with a neutral confirm; ST-13b not connected
 // → Connect a wallet), and Security › Sign-in & security. ST-11…11c, the
 // handle editor, is account-handle.tsx. The web's Account page
 // (components/settings/account-page.tsx) decides the words and the stores.
 
 import * as React from "react";
-import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, Shield01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
-import { Button, buttonVariants } from "@/components/ideeza/button";
+import { Button } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { TextInput } from "@/components/ideeza/text-input";
@@ -27,6 +28,8 @@ import { demoAddress, makerId, readWallet, shortAddress, walletConnect, walletDi
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import { useDemoWallet, writeDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { Chevron, LIST_ROW } from "../kit/list";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
@@ -45,17 +48,13 @@ export function AccountSettings() {
         <WalletRow />
       </SettingsGroup>
       <SettingsGroup label="Security">
-        <SettingsRow
-          id="sign-in"
-          label="Sign-in & security"
-          helper="Password, 2-step sign-in, your devices, delete account"
-          href="/m/settings/security"
-        />
+        <SettingsRow id="sign-in" icon={Shield01Icon} label="Sign-in & security" helper="Password, 2-step sign-in, devices" href="/m/settings/security" />
       </SettingsGroup>
     </SettingsScreen>
   );
 }
 
+/** The public profile as one row (avatar, name, headline) that opens Edit profile. */
 function PublicProfile() {
   const { account } = useAuth();
   const { fields } = useMyProfile();
@@ -63,68 +62,32 @@ function PublicProfile() {
   const name = displayNameOf(fields.name || `${account?.firstName ?? ""} ${account?.lastName ?? ""}`.trim());
   const line = [fields.headline, fields.location].filter(Boolean).join(" · ");
   return (
-    <section
-      id="public-profile"
-      aria-label="Public profile"
-      className="flex scroll-mt-24 flex-col gap-6 rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8"
-    >
-      <div className="flex items-center gap-6">
+    <SettingsGroup id="public-profile" label="Public profile">
+      <Link href="/m/profile/edit?from=settings" aria-label={`Edit profile: ${name}`} className={LIST_ROW}>
         <Avatar size="lg" initials={initialsOf(name, fields.latinName || null)} src={photo.url ?? undefined} className="shrink-0" />
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-sm leading-sm text-text-secondary">Public profile</p>
-          <p className="truncate text-md font-semibold leading-md text-text-primary">{name}</p>
-          <p className={cn("truncate text-sm leading-sm", line ? "text-text-secondary" : "text-text-tertiary")}>{line || "No headline yet"}</p>
-        </div>
-      </div>
-      {/* The phone's Profile has no Edit profile yet: the web's opens with its dialog. */}
-      <Link href="/m/profile/edit" className={buttonVariants({ hierarchy: "secondary", size: "lg", className: "w-full border-solid" })}>
-        Edit profile
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className={cn(T.name, "truncate")}>{name}</span>
+          <span className={cn(T.meta, "truncate", line ? "text-text-secondary" : "text-text-tertiary")}>{line || "No headline yet"}</span>
+        </span>
+        {/* "Edit" (the row is under Public profile) so the name keeps its room at 320. */}
+        <span aria-hidden className={cn(T.body, "shrink-0")}>
+          Edit
+        </span>
+        <Chevron />
       </Link>
-    </section>
+    </SettingsGroup>
   );
 }
 
+/** Handle: its value; the row opens the editor, where the profile link is copied. */
 function HandleRow() {
   const { fields } = useMyProfile();
-  const toast = useToast();
-  const [copied, setCopied] = React.useState(false);
-  const handle = ownHandleOf(fields.handle);
-  React.useEffect(() => {
-    if (!copied) return;
-    const t = window.setTimeout(() => setCopied(false), 2000);
-    return () => window.clearTimeout(t);
-  }, [copied]);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/creators/${handle}`);
-      setCopied(true);
-      toast({ title: "Link copied" });
-    } catch {
-      toast({ title: "Couldn’t copy the link.", lead: "error" });
-    }
-  };
   return (
     <SettingsRow
       id="handle"
       label="Handle"
-      helper={fields.handle ? `@${handle}` : "Not chosen yet"}
-      trailing={
-        <span className="-my-4 flex shrink-0 items-center gap-2">
-          <IconButton
-            hierarchy="ghost"
-            size="xl"
-            aria-label={copied ? "Copied" : "Copy profile link"}
-            icon={<Icon icon={copied ? Tick02Icon : Copy01Icon} size={20} />}
-            onClick={copy}
-          />
-          <Link
-            href="/m/settings/account/handle"
-            className="inline-flex min-h-[44px] items-center rounded-md px-4 text-md font-medium leading-md text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            Edit
-          </Link>
-        </span>
-      }
+      value={fields.handle ? `@${ownHandleOf(fields.handle)}` : "Not chosen yet"}
+      href="/m/settings/account/handle"
     />
   );
 }
@@ -178,9 +141,6 @@ function LegalNameSheet({ open, onClose, initial }: { open: boolean; onClose: ()
           <Button type="submit" form="legal-name-form" size="xl" className="w-full">
             Save
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >
@@ -201,7 +161,7 @@ function LegalNameSheet({ open, onClose, initial }: { open: boolean; onClose: ()
             {...errorProps(error, ids.name.errorId)}
           />
         </Field>
-        <p className="text-sm leading-sm text-text-secondary">Private. Your full name as it is written on your ID, used for the identity check and on invoices.</p>
+        <p className={T.meta}>Private. Your full name as it is written on your ID, used for the identity check and on invoices.</p>
       </form>
     </Sheet>
   );
@@ -217,6 +177,14 @@ function WalletRow() {
   const state = wallet && id ? wallet.identities[id] : undefined;
   const connected = !!(id && state?.connected);
   const address = id ? demoAddress(id) : "";
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      toast({ title: "Address copied" });
+    } catch {
+      toast({ title: "Couldn’t copy the address.", lead: "error" });
+    }
+  };
 
   const write = (change: "connect" | "disconnect") => {
     if (!id) return false;
@@ -268,26 +236,33 @@ function WalletRow() {
               >
                 Connect a wallet
               </Button>
-              <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setOpen(false)}>
-                Not now
-              </Button>
             </>
           )
         }
       >
         {connected && state ? (
           <div className="flex flex-col gap-4">
-            <p className="font-mono text-lg leading-lg text-text-primary [overflow-wrap:anywhere]">{address}</p>
-            <p className="flex flex-wrap items-center gap-4 text-md leading-md text-text-secondary">
+            <div className="flex items-start gap-4">
+              <p className={cn(T.bodyLg, "min-w-0 flex-1 font-mono [overflow-wrap:anywhere]")}>{address}</p>
+              <IconButton
+                hierarchy="ghost"
+                size="xl"
+                className="-my-4 shrink-0"
+                aria-label="Copy address"
+                icon={<Icon icon={Copy01Icon} size={20} />}
+                onClick={copyAddress}
+              />
+            </div>
+            <p className={cn(T.body, "flex flex-wrap items-center gap-4")}>
               Network: {networkLabelOf(state.network)}
               <TestnetDemoBadge />
             </p>
-            <p className="text-md leading-md text-text-secondary">This is a test network. Nothing here has real value yet.</p>
+            <p className={T.body}>This is a test network. Nothing here has real value yet.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             <TestnetDemoBadge className="self-start" />
-            <p className="text-md leading-md text-text-secondary">
+            <p className={T.body}>
               Connect to sign sales and receive copies. You approve each step in your wallet app; IDEEZA never sees your recovery phrase.
             </p>
           </div>

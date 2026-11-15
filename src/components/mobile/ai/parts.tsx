@@ -2,9 +2,9 @@
 
 // Small parts the AI tab's screens share (mobile Figma "AI create · 2026
 // update"): the step line under the top bar, the prompt bubble, the progress
-// ring of a drawing or a piece, the caps label over a card, the credits line
-// under the composer and the sheet its (i) opens, the held composer of a
-// booked build, and the web's sentences for a concept that couldn't be drawn.
+// ring of a drawing or a piece, the dashed card, the credits line under the
+// composer and the sheet its (i) opens, the web's sentences for a concept
+// that couldn't be drawn, and the reason an AI action is held while offline.
 
 import * as React from "react";
 import { Coins01Icon, InformationCircleIcon } from "@hugeicons/core-free-icons";
@@ -16,6 +16,7 @@ import { PIECES, PICKABLE_KINDS, defaultPick, pickCost } from "@/lib/create/piec
 import { QUALITIES, QUALITY_INFO } from "@/lib/create/quality";
 import { STEPS, promptPreview, stepsReached, type FlowStage } from "@/lib/mobile-ai/flow";
 import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 
 // ─────────────────────────── the step line ───────────────────────────
@@ -36,7 +37,7 @@ export function Stepper({ stage }: { stage: FlowStage }) {
                 aria-hidden
                 className={cn("mt-1 size-[12px] rounded-full", on ? "bg-bg-brand" : "bg-bg-subtle ring-1 ring-border")}
               />
-              <span className={cn("text-sm leading-sm", on ? "text-text-primary" : "text-text-tertiary", current && "font-medium")}>{s}</span>
+              <span className={cn(T.meta, on ? "text-text-primary" : "text-text-tertiary")}>{s}</span>
             </span>
             {i < STEPS.length - 1 && (
               <span aria-hidden className={cn("mt-[9px] h-[2px] flex-1 rounded-full", i < reached - 1 ? "bg-bg-brand" : "bg-bg-subtle")} />
@@ -58,13 +59,13 @@ export function PromptBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
       <div className="flex max-w-[280px] flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-[var(--color-ai-prompt-border)] bg-[var(--color-ai-prompt-bg)] px-7 py-6">
-        <p className="whitespace-pre-wrap break-words text-md leading-md text-text-primary">{open || !short ? text : short}</p>
+        <p className={cn(T.body, "whitespace-pre-wrap break-words text-text-primary")}>{open || !short ? text : short}</p>
         {short && (
           <button
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="-my-3 inline-flex min-h-[32px] w-fit items-center text-sm font-medium leading-sm text-text-brand outline-none hover:underline focus-visible:underline"
+            className={cn(T.label, "-my-3 inline-flex min-h-[32px] w-fit items-center text-text-brand outline-none hover:underline focus-visible:underline")}
           >
             {open ? "Show less" : "Show full prompt"}
           </button>
@@ -105,34 +106,14 @@ export function ProgressRing({ value, label, size = 40 }: { value: number; label
           strokeDashoffset={c * (1 - v / 100)}
         />
       </svg>
-      <span className="relative text-xs font-medium leading-xs tabular-nums text-text-primary">{Math.round(v)}%</span>
+      <span className={cn(T.micro, "relative tabular-nums text-text-primary")}>{Math.round(v)}%</span>
     </span>
   );
 }
 
-// ─────────────────────────── labels ───────────────────────────
+// ─────────────────────────── cards ───────────────────────────
 
-/** The small caps line over a card: CONCEPTS, BUILDING, BUILD FINISHED. */
-export function Eyebrow({ children, tone = "brand" }: { children: React.ReactNode; tone?: "brand" | "success" | "error" | "quiet" }) {
-  return (
-    <p
-      className={cn(
-        "text-sm font-medium uppercase leading-sm",
-        tone === "brand" && "text-text-brand",
-        tone === "success" && "text-text-success",
-        tone === "error" && "text-text-error",
-        tone === "quiet" && "text-text-tertiary",
-      )}
-    >
-      {children}
-    </p>
-  );
-}
-
-/** A card on the chat: bg/surface, border/subtle, radius/xl. */
-export const CARD = "rounded-xl border-[length:var(--border-width-1)] border-solid border-border-subtle bg-bg-surface";
-
-/** The same, dashed — the reading card and the Build line. */
+/** A dashed card — the reading card and the Build line (solid cards are the kit's LIST_CARD). */
 export const DASHED = "rounded-xl border-[length:var(--border-width-1)] border-dashed";
 
 // ─────────────────────────── credits ───────────────────────────
@@ -144,18 +125,18 @@ export function CreditsFoot({ right }: { right: React.ReactNode }) {
   const [info, setInfo] = React.useState(false);
   return (
     <div className="flex items-center justify-between gap-4 px-8 pb-4 pt-5">
-      <p className="inline-flex items-center gap-2 text-sm leading-sm text-text-secondary">
+      <p className={cn(T.meta, "inline-flex items-center gap-2")}>
         <span className="text-[color:var(--color-icon-brand)]">
           <Icon icon={Coins01Icon} size={14} />
         </span>
-        <span className="font-semibold tabular-nums text-text-brand">{hydrated ? balance.toLocaleString("en-US") : "…"}</span>
+        <span className={cn(T.label, "tabular-nums text-text-brand")}>{hydrated ? balance.toLocaleString("en-US") : "…"}</span>
         Credits
       </p>
       <button
         type="button"
         onClick={() => setInfo(true)}
         aria-haspopup="dialog"
-        className="-my-4 inline-flex min-h-[44px] items-center gap-2 text-sm leading-sm text-text-secondary outline-none hover:text-text-primary focus-visible:underline"
+        className={cn(T.meta, "-my-4 inline-flex min-h-[44px] items-center gap-2 outline-none hover:text-text-primary focus-visible:underline")}
       >
         {right}
         <span className="text-[color:var(--color-icon-default)]">
@@ -194,28 +175,15 @@ export function CreditsInfoSheet({ open, onClose }: { open: boolean; onClose: ()
       <dl className="flex flex-col">
         {rows.map(([k, v]) => (
           <div key={k} className="flex items-baseline justify-between gap-6 border-b-[length:var(--border-width-1)] border-solid border-border-subtle py-5 last:border-b-0">
-            <dt className="text-md leading-md text-text-secondary">{k}</dt>
-            <dd className="text-md font-medium leading-md text-text-primary">{v}</dd>
+            <dt className={T.body}>{k}</dt>
+            <dd className={T.rowTitle}>{v}</dd>
           </div>
         ))}
       </dl>
-      <p className="text-sm leading-sm text-text-tertiary">
+      <p className={cn(T.meta, "text-text-tertiary")}>
         A build makes {PICKABLE_KINDS.map((k) => PIECES[k].name).join(", ")} for each product, plus its parts list. A render that fails costs nothing.
       </p>
     </Sheet>
-  );
-}
-
-// ─────────────────────────── the held composer ───────────────────────────
-
-/** Once a build holds the concepts, the composer says why it draws nothing (16–18). */
-export function HeldComposer({ text }: { text: string }) {
-  return (
-    <div className="px-8">
-      <p className="rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border-focus)] bg-bg-surface px-8 py-7 text-md leading-md text-text-secondary">
-        {text}
-      </p>
-    </div>
   );
 }
 
@@ -240,3 +208,6 @@ export const FAIL_COPY: Record<ConceptFailReason, string> = {
 };
 
 export const FAIL_FALLBACK = "The request didn't reach the model. Nothing was charged — your credit balance is unchanged.";
+
+/** Why every AI action (draw, refine, build, enhance) is held while the phone is offline. */
+export const OFFLINE_REASON = "You’re offline. This needs a connection.";

@@ -5,6 +5,7 @@
 // The words are the Figma's, section by section.
 
 import { Sheet } from "../kit/sheet";
+import { T } from "../type";
 
 const SECTIONS: readonly { title: string; body: string }[] = [
   {
@@ -30,8 +31,8 @@ export function TermsSheet({ open, onClose }: { open: boolean; onClose: () => vo
     <Sheet open={open} onClose={onClose} title="Terms of Service" description="ideeza.com/terms · Updated Oct 1, 2026">
       {SECTIONS.map((s) => (
         <section key={s.title} className="flex flex-col gap-2">
-          <h3 className="text-md font-medium leading-md text-text-primary">{s.title}</h3>
-          <p className="text-md leading-md text-text-secondary">{s.body}</p>
+          <h3 className={T.section}>{s.title}</h3>
+          <p className={T.body}>{s.body}</p>
         </section>
       ))}
     </Sheet>

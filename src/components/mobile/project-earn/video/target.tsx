@@ -9,12 +9,8 @@
 // one writer that keeps such a clip as a take of the product.
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Video01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { StateCard } from "@/components/ideeza/state-card";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { videoTargetOf, type VideoTarget } from "@/components/video-jobs/generate-video-dialog";
 import { readStoredKey, useStoredKey, writeStoredKey } from "@/lib/key-store";
@@ -27,6 +23,8 @@ import { deleteClips, putClip } from "@/lib/video/clip-store";
 import { defaultLines } from "@/lib/video/product-video";
 import { RECORDED_KEY, addClipTake, parseRecorded, withRecorded, type ClipOrigin, type KeptClip } from "@/lib/video/phone-video";
 import { readProjectVideos, writeProjectVideos } from "@/lib/video/store";
+import { EmptyState, NotFoundState } from "../../kit/state";
+import { useGoBack } from "../../nav-trail";
 import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
 
@@ -75,33 +73,21 @@ export function VideoLoading({ title }: { title: string }) {
 /** No such project, or no such current product in it; or (with `reason`) one whose video can't change. */
 export function VideoUnavailable({ title, projectId, reason }: { title: string; projectId: string; reason?: string }) {
   return (
-    <Screen top={<TopBar back title={title} />} className="px-8 pb-8">
+    <Screen top={<TopBar back={phoneProjectHref(projectId, reason ? "media" : "products")} title={title} />} className="px-8 pb-8">
       <div className="flex h-full items-center">
-        <StateCard
-          tone="empty"
-          className="w-full"
-          titleAs="h1"
-          icon={<Icon icon={Video01Icon} size={32} />}
-          title={reason ? "This video can’t change now" : "We couldn’t find this product"}
-          body={reason ?? "It may have been removed from the project."}
-          action={
-            <Link href={phoneProjectHref(projectId, reason ? "media" : "products")} className="text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline">
-              Back to the project
-            </Link>
-          }
-        />
+        {reason ? (
+          <EmptyState icon={Video01Icon} title="This video can’t change now" body={reason} action={{ label: "Back to the project", href: phoneProjectHref(projectId, "media") }} />
+        ) : (
+          <NotFoundState thing="product" body="It may have been removed from the project." action={{ label: "Back to the project", href: phoneProjectHref(projectId, "products") }} />
+        )}
       </div>
     </Screen>
   );
 }
 
-/** Back to wherever the maker came from; the project's Media tab when there is nowhere. */
+/** Back to wherever the maker came from; the project's Media tab when there is nowhere (never a push). */
 export function useLeave(projectId: string): () => void {
-  const router = useRouter();
-  return React.useCallback(() => {
-    if (window.history.length > 1) router.back();
-    else router.push(phoneProjectHref(projectId, "media"));
-  }, [router, projectId]);
+  return useGoBack(phoneProjectHref(projectId, "media"));
 }
 
 // ─────────────────────────── clips this phone made ───────────────────────────

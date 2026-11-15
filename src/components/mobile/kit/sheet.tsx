@@ -12,9 +12,12 @@
 //   padding), then the home indicator. Pick-one sheets have no actions.
 // · ActionSheet — M12 Action Sheet: the same surface, radius/xl all round,
 //   floating on the 35 px sheet safe area. Handle, a centred Body/SM Medium
-//   title in text/secondary, 40 px rows (_Select item MD: a 16 px icon, Body/MD
-//   label, radius/md), then Cancel (A01 Secondary LG). The destructive row
-//   (Block, Delete) is the one red row.
+//   title in text/secondary, rows (_Select item MD: a 16 px icon, Body/MD
+//   label, radius/md; 44 tall, the phone's least tap target — lens 16), then
+//   Cancel (A01 Secondary LG). The destructive row (Block, Delete) is the one
+//   red row. Every row and the ✕ show the pressed layer (kit/press.ts).
+//   A sheet whose content scrolls draws a hairline under its header once it
+//   has scrolled (kit/scroll-edge.tsx).
 //
 // One scrim, however many layers: color/modal/overlay at opacity/overlay (the
 // --color-modal-scrim token), no blur, drawn by the bottom layer only — a
@@ -35,6 +38,8 @@ import { cn } from "@/lib/utils";
 import { useFramed, useVisibleViewport } from "../device";
 import { HomeIndicator } from "../home-indicator";
 import { T } from "../type";
+import { PRESSED } from "./press";
+import { ScrollEdge } from "./scroll-edge";
 import { FOOT_ATTR, LAYER_ATTR } from "./toast";
 
 /** A screen that wears one theme whatever the phone's (the way-in screens are
@@ -44,14 +49,27 @@ export const ForcedThemeContext = React.createContext<"dark" | null>(null);
 
 const APP_ID = "m-app";
 
-/** Open layers, oldest first: only the top one answers Escape, only the bottom one draws the scrim. */
-const layers: number[] = [];
+/** Open layers, oldest first: only the top one answers Escape. One scrim, drawn by the lowest
+ *  sheet — or, over a full-screen layer (the image viewer covers what is under it), by the
+ *  lowest sheet above that. */
+const layers: { id: number; opaque: boolean }[] = [];
 let nextLayer = 0;
 const watchers = new Set<() => void>();
 const changed = () => watchers.forEach((w) => w());
 
-/** Registers an open layer; true while it is the bottom one (the one with the scrim). */
-function useLayer(open: boolean, onClose: () => void): boolean {
+function scrimOwner(): number | undefined {
+  let owner: number | undefined;
+  for (const l of layers) {
+    if (l.opaque) owner = undefined;
+    else if (owner === undefined) owner = l.id;
+  }
+  return owner;
+}
+
+/** Registers an open layer: the app behind goes inert, Escape closes the top layer only.
+ *  True while it is the layer that draws the scrim. `opaque`: a full-screen layer with a
+ *  ground of its own (kit/image-viewer.tsx). */
+export function useLayer(open: boolean, onClose: () => void, opaque = false): boolean {
   const close = React.useRef(onClose);
   const [base, setBase] = React.useState(true);
   React.useEffect(() => {
@@ -61,14 +79,14 @@ function useLayer(open: boolean, onClose: () => void): boolean {
   React.useLayoutEffect(() => {
     if (!open) return;
     const id = ++nextLayer;
-    layers.push(id);
-    const watch = () => setBase(layers[0] === id);
+    layers.push({ id, opaque });
+    const watch = () => setBase(scrimOwner() === id);
     watchers.add(watch);
     changed();
     const app = document.getElementById(APP_ID);
     if (layers.length === 1) app?.setAttribute("inert", "");
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && layers[layers.length - 1] === id) {
+      if (e.key === "Escape" && layers[layers.length - 1]?.id === id) {
         e.stopPropagation();
         close.current();
       }
@@ -77,11 +95,14 @@ function useLayer(open: boolean, onClose: () => void): boolean {
     return () => {
       document.removeEventListener("keydown", onKey);
       watchers.delete(watch);
-      layers.splice(layers.indexOf(id), 1);
+      layers.splice(
+        layers.findIndex((l) => l.id === id),
+        1,
+      );
       changed();
       if (layers.length === 0) app?.removeAttribute("inert");
     };
-  }, [open]);
+  }, [open, opaque]);
   return base;
 }
 
@@ -182,7 +203,10 @@ export function Sheet({
   onClose: () => void;
   title: string;
   description?: React.ReactNode;
-  /** _Modal actions: XL buttons, stacked, the action first. Left out on pick-one sheets. */
+  /** _Modal actions: the one primary (XL). The ✕, a swipe down and the scrim close the sheet, so
+   *  no Cancel button under it (owner 2026-11-15: stacked buttons wasted the thumb zone). A
+   *  reason or helper line (`<p>`) sits above the button, whatever its order here. Left out on
+   *  pick-one sheets. */
   actions?: React.ReactNode;
   /** No ✕: a step that can't be left (a submitted transaction confirming). */
   hideClose?: boolean;
@@ -222,8 +246,12 @@ function SheetPanel({
 }) {
   const framed = useFramed();
   const drag = useDragToClose(panel, onClose);
+  const body = React.useRef<HTMLDivElement>(null);
+  // Only rows (a pick-one sheet, a list): the whole sheet is its foot, so a toast stands above it.
+  const rowsOnly = !actions && !footer;
   return (
     <div
+      {...(rowsOnly ? { [FOOT_ATTR]: "" } : {})}
       className={cn(
         "flex min-h-0 flex-col rounded-t-xl border-b-0 pt-6",
         SURFACE,
@@ -246,15 +274,24 @@ function SheetPanel({
               type="button"
               aria-label="Close"
               onClick={onClose}
-              className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+              className={cn(
+                "inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
+                PRESSED,
+              )}
             >
               <Icon icon={Cancel01Icon} size={24} />
             </button>
           )}
         </div>
       </div>
+      {children != null && <ScrollEdge target={body} />}
       {children != null && (
-        <div className={cn("flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain px-16 pb-4", fill && "flex-1")}>{children}</div>
+        // Children never shrink to fit: the body scrolls instead. A card that clips its corners
+        // (`overflow: hidden`) would otherwise be squeezed below its rows when the sheet is full
+        // (owner 2026-11-15: the second product's row was cut off in "Add to marketplace").
+        <div ref={body} className={cn("flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain px-16 pb-4 [&>*]:shrink-0", fill && "flex-1")}>
+          {children}
+        </div>
       )}
       {footer && (
         <div {...{ [FOOT_ATTR]: "" }} className="shrink-0 px-16 pb-5 pt-4">
@@ -262,8 +299,8 @@ function SheetPanel({
         </div>
       )}
       {actions && (
-        <div {...{ [FOOT_ATTR]: "" }} className="shrink-0 pb-5 pt-4">
-          <div className="flex flex-col gap-6 border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-16 pb-16 pt-8">
+        <div {...{ [FOOT_ATTR]: "" }} className="shrink-0 pt-4">
+          <div className="flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-16 pb-6 pt-6 [&>p]:order-first">
             {actions}
           </div>
         </div>
@@ -333,7 +370,8 @@ function ActionPanel({
                   it.onSelect();
                 }}
                 className={cn(
-                  "flex h-[40px] w-full items-center gap-4 rounded-md px-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
+                  "flex min-h-[44px] w-full items-center gap-4 rounded-md px-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
+                  PRESSED,
                   it.destructive ? "text-text-error" : "text-text-primary",
                 )}
               >

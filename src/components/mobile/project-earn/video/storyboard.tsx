@@ -1,7 +1,7 @@
 "use client";
 
-// 11f · Review your storyboard: the web's StoryboardEditor in the mobile
-// Figma's layout — the three scenes (0–3s · 3–6s · 6–10s) as cards, the first
+// 11f · Review your storyboard (the top bar's title): the web's
+// StoryboardEditor in the mobile Figma's layout — who drafted it, the three scenes (0–3s · 3–6s · 6–10s) as cards, the first
 // open, each with Visual description, Background audio, Music cue and Speech /
 // dialogue in DS Textareas, every field editable (at most 400 characters).
 
@@ -10,6 +10,8 @@ import { ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Textarea } from "@/components/ideeza/text-input";
 import { SCENE_FIELD_MAX, SCENE_SPANS, type Scene, type Storyboard } from "@/lib/video/storyboard";
+import { cn } from "@/lib/utils";
+import { T } from "../../type";
 
 export function StoryboardEditor({ storyboard, onChange }: { storyboard: Storyboard; onChange: (next: Storyboard) => void }) {
   const id = React.useId();
@@ -19,21 +21,19 @@ export function StoryboardEditor({ storyboard, onChange }: { storyboard: Storybo
     onChange({ ...storyboard, scenes });
   };
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold leading-lg text-text-primary">Review your storyboard</h2>
-        <p className="text-sm leading-sm text-text-secondary">
-          {storyboard.by === "ai"
-            ? "AI drafted 3 scenes · Edit freely before generating"
-            : "Drafted from your product and prompts — the AI didn't answer · Edit freely before generating"}
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      {/* "Review your storyboard" is the top bar's title; one line says who drafted it. */}
+      <p className={T.meta}>
+        {storyboard.by === "ai"
+          ? "AI drafted 3 scenes · Edit freely before generating"
+          : "Drafted from your product and prompts — the AI didn't answer · Edit freely before generating"}
+      </p>
       <ul className="flex flex-col gap-6">
         {storyboard.scenes.map((scene, i) => {
           const panel = `${id}-scene-${i}`;
           const isOpen = open[i];
           return (
-            <li key={i} className="overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default bg-bg-surface">
+            <li key={i} className="overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface">
               <button
                 type="button"
                 aria-expanded={isOpen}
@@ -41,7 +41,7 @@ export function StoryboardEditor({ storyboard, onChange }: { storyboard: Storybo
                 onClick={() => setOpen((o) => o.map((v, j) => (j === i ? !v : v)))}
                 className="flex min-h-[48px] w-full items-center justify-between gap-4 px-6 py-5 text-left outline-none focus-visible:bg-bg-subtle"
               >
-                <span className="text-md font-medium leading-md text-text-primary">
+                <span className={T.rowTitle}>
                   Scene {i + 1} · {SCENE_SPANS[i]}
                 </span>
                 <Icon icon={isOpen ? ArrowUp01Icon : ArrowDown01Icon} size={20} className="text-[color:var(--color-icon-default)]" />
@@ -66,7 +66,7 @@ function SceneField({ label, rows, value, onValue, placeholder }: { label: strin
   const id = React.useId();
   return (
     <div className="flex flex-col gap-3">
-      <label htmlFor={id} className="text-sm font-medium leading-sm text-text-primary">
+      <label htmlFor={id} className={cn(T.label, "text-text-primary")}>
         {label}
       </label>
       <Textarea id={id} rows={rows} value={value} onValueChange={onValue} placeholder={placeholder} maxLength={SCENE_FIELD_MAX} className="resize-none" />

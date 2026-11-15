@@ -9,8 +9,10 @@
 // text/tertiary when not. The orb (48) has no label. Under the row: the home
 // indicator (21) in the phone frame, the safe-area inset on a phone.
 //
-// Like the web's sidebar, Message carries a dot while the Inbox has unread
-// conversations and the AI orb a red dot while a build needs you. Each tab
+// Like the web's sidebar, Message carries the count of unread Inbox
+// conversations (a brand pill on the icon, "99+" past 99; the same number the
+// web shows, `countsFor().unread`) and the AI orb a red dot while a build
+// needs you. Each tab
 // remembers where you were in it (this tab of the browser): leaving Earn ›
 // Stake for Messages and coming back opens Stake again; tapping the tab you
 // are on goes to its root, and on its root scrolls the screen to the top.
@@ -31,6 +33,7 @@ import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { GuestGate } from "./account/guest-gate";
 import { HomeIndicator } from "./home-indicator";
+import { PRESSED_DIM } from "./kit/press";
 import { FOOT_ATTR } from "./kit/toast";
 import { SCROLL_ATTR } from "./screen";
 import { T } from "./type";
@@ -138,7 +141,15 @@ function useAttention(pathname: string): number {
   return attentionBuilds.filter((a) => a.job.chatId !== open).length;
 }
 
+/** Each tab's link carries its root path here, so the phone's tour can point at it. */
+export const TAB_ATTR = "data-tab";
+
 const DOT = "pointer-events-none absolute right-0 top-0 size-[8px] rounded-full";
+/** The unread count on a tab's icon: a 16 px brand pill, Caption/SM in text/on-brand. */
+const COUNT = cn(
+  T.micro,
+  "pointer-events-none absolute -top-2 left-[14px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-bg-brand px-2 tabular-nums text-[color:var(--color-text-on-brand)]",
+);
 
 export function TabBar() {
   const pathname = usePathname();
@@ -167,6 +178,7 @@ export function TabBar() {
                 href={current ? t.href : (last[t.href] ?? t.href)}
                 aria-current={current ? "page" : undefined}
                 aria-label={said}
+                {...{ [TAB_ATTR]: t.href }}
                 onClick={(e) => {
                   if (!signedIn && t.gate) {
                     e.preventDefault();
@@ -181,6 +193,7 @@ export function TabBar() {
                 }}
                 className={cn(
                   "flex h-[56px] min-w-[48px] flex-col items-center justify-center gap-2 border-t-[length:var(--border-width-2)] border-solid outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+                  PRESSED_DIM,
                   current ? "border-[var(--color-border-focus)]" : "border-transparent",
                 )}
               >
@@ -193,7 +206,11 @@ export function TabBar() {
                       )}
                     >
                       <Icon icon={t.icon} size={24} />
-                      {dot > 0 && <span aria-hidden className={cn(DOT, "bg-bg-brand")} />}
+                      {dot > 0 && (
+                        <span aria-hidden className={COUNT}>
+                          {dot > 99 ? "99+" : dot}
+                        </span>
+                      )}
                     </span>
                     <span className={cn(T.micro, "whitespace-nowrap", !current && "text-text-tertiary")}>{t.label}</span>
                   </>

@@ -59,6 +59,31 @@ test("the meta line, the Ready sheet's preview and line, the versions footer", (
   assert.match(p.planMenuNote(true), /finished writing/);
 });
 
+test("a stopped or partial plan can be finished: what's left, the missing kinds back in place, one word for 1", () => {
+  const v = version(2, [section("a", "identity", "done"), section("b", "brand", "failed"), section("x", "custom", "done", "added"), section("c", "swot", "pending")]);
+  assert.deepEqual(p.missingKindsOf(v), ["market", "pricing", "problem", "landing"]);
+  assert.equal(p.sectionsLeftOf(v), 5);
+  assert.equal(p.runLineOf({ version: 2, next: 2, startedAt: 1 }, false, v), "Writing stopped with 5 of 7 sections left.");
+  const all = p.withMissingSections(v, 36, (k) => `T ${k}`);
+  assert.deepEqual(all.map((s) => s.kind), ["identity", "brand", "custom", "market", "swot", "pricing", "problem", "landing"]);
+  assert.equal(all.find((s) => s.kind === "market").state, "pending");
+  assert.equal(all.find((s) => s.kind === "market").title, "T market");
+  const done = p.completionPlanOf(plan([version(1, [section("z", "identity", "done")]), v], 1), 2, 36, (k) => k);
+  assert.equal(done.current, 2);
+  assert.deepEqual(done.run, { version: 2, next: 1, startedAt: 36 });
+  assert.equal(done.versions.find((x) => x.n === 2).sections.length, 8);
+  assert.equal(done.versions.find((x) => x.n === 2).sections.find((s) => s.kind === "brand").state, "pending");
+  assert.equal(p.unwrittenCountOf(v), 6);
+  assert.equal(done.versions.find((x) => x.n === 1).sections.length, 1);
+  const whole = version(3, ["identity", "brand", "market", "swot", "pricing", "problem", "landing"].map((k, i) => section(String(i), k, "done")));
+  assert.equal(p.completionPlanOf(plan([whole], 3), 3, 1, (k) => k), null);
+  assert.equal(p.readyTitleOf(whole), "Your business plan is ready");
+  const one = version(4, [section("a", "identity", "done")]);
+  assert.equal(p.readyTitleOf(one), "Your plan is partly written (1 of 7)");
+  assert.equal(p.readyLineOf(one), "1 section · saved to this project");
+  assert.match(p.planMetaLine("Lamp", one), / · 1 section$/);
+});
+
 test("money: a sale row's lines, ?sale= read against the rows", () => {
   assert.equal(p.saleItemLine({ item: "Main NFT", share: "10%" }), "Main NFT · 10% share");
   assert.equal(p.saleItemLine({ item: "Pump Controller · Virtual", share: null }), "Pump Controller · Virtual");

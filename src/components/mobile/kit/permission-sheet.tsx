@@ -74,9 +74,6 @@ export function PermissionSheet({
           <Button size="xl" className="w-full" onClick={onContinue}>
             Continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onNotNow}>
-            Not now
-          </Button>
         </>
       }
     >

@@ -7,6 +7,8 @@
 
 import { Button } from "@/components/ideeza/button";
 import { Sheet } from "../../kit/sheet";
+import { cn } from "@/lib/utils";
+import { T } from "../../type";
 
 /** What the phone says about the camera, without asking: "unknown" where it won't say. */
 export async function cameraPermission(): Promise<PermissionState | "unknown"> {
@@ -29,13 +31,10 @@ export function CameraAskSheet({ open, onAllow, onClose }: { open: boolean; onAl
           <Button size="xl" className="w-full" onClick={onAllow}>
             Allow camera
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Not now
-          </Button>
         </>
       }
     >
-      <p className="text-md leading-md text-text-primary">
+      <p className={cn(T.body, "text-text-primary")}>
         IDEEZA needs the camera to record your product. Your clip stays on this phone until you choose to use it.
       </p>
     </Sheet>

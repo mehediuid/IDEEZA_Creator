@@ -1,33 +1,39 @@
 "use client";
 
-// 03 · Media tab (03, 03b, 03c, 03f–03h): the web's Media tab in its order —
+// 03 · Media (03, 03b, 03c, 03f–03h): the web's Media tab on a screen of its
+// own (`?tab=media`, the page's Media row), in its order —
 // · Project video: while there is none (or it is out of date, rendering,
-//   failed) its row says why, with the web's action (Make project video,
-//   Update, Try again, Review → the Project video screen, 03d / 03e); once
-//   ready, the player, "Take n · 480p · 19 s · Made {date}", What's in this
-//   video (the scenes), Regenerate and Takes (n): In use, Use this, delete
-//   (03f, the take's file goes);
-// · Product videos: one compact row per current product (the web shows a
+//   failed) its card says why; the web's action (Make project video, Update,
+//   Try again, Review → the Project video screen, 03d / 03e) is the screen's
+//   bar. Once ready, the player, "Take n · 480p · 19 s · Made {date}", then
+//   rows: What's in this video (the scenes, a sheet), Takes (n) (a sheet: In
+//   use, Use this, delete — the take's file goes, 03f) and Regenerate;
+// · Product videos: one whole-row tap per current product (the web shows a
 //   tile): a ready one plays in a sheet, the others say their state with the
-//   web's action, which opens the product page where its video is made;
+//   web's action word and open the product page, where its video is made;
+// · Assembly snapshots (owner): the pictures Product Preview's Snapshot kept,
+//   as the web's Media tab lists them; a tap opens the viewer, where Remove
+//   asks first;
 // · From your builds: the concept images in a 3-column grid, the Cover chip
 //   on the cover; a tap opens the image viewer (03b), where "Use as cover"
-//   lives (03g "This image is the cover", 03h the toast).
+//   lives (03g "This image is the cover", 03h the toast). The page's cover
+//   opens the same viewer (`BuildImagesViewer`).
+// Every picture opens in the kit's one full-screen viewer (kit/image-viewer:
+// dark in both themes, white text, ✕, "n of N", the caption, ← action →).
 
 import * as React from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Alert02Icon,
-  ArrowLeft02Icon,
-  ArrowRight02Icon,
   Bookmark02Icon,
-  Cancel01Icon,
   CheckmarkCircle02Icon,
   Delete02Icon,
+  Film01Icon,
+  ListViewIcon,
   LockIcon,
   PlayCircleIcon,
   PlayIcon,
+  RepeatIcon,
   Tick02Icon,
   VideoOffIcon,
 } from "@hugeicons/core-free-icons";
@@ -46,6 +52,7 @@ import { currentProductsOf } from "@/lib/manual/readiness";
 import { phoneHrefOf, phoneProjectPath } from "@/lib/manual/phone-project";
 import { describeJoin, projectVideoStatusOf } from "@/lib/video/project-video";
 import { productVideoStatus } from "@/lib/video/product-video";
+import { readSnapshots, removeSnapshot, type Snapshot } from "@/lib/manual/snapshots";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY, type VideoTake } from "@/lib/video/types";
 import {
@@ -59,9 +66,15 @@ import {
   videosGroupMeta,
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { ImageViewer } from "../kit/image-viewer";
+import { Chevron, ListCard as KitListCard, ListRow } from "../kit/list";
+import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { PRESSED } from "../kit/press";
+import { T } from "../type";
 import { useProject } from "./context";
 import { LIST_CARD, LIST_ROW, ListCard, SectionHeading, Thumb } from "./parts";
 import { PhoneVideo } from "./video";
@@ -71,6 +84,7 @@ export function MediaTab() {
     <div className="flex flex-col gap-12">
       <ProjectVideoSection />
       <ProductVideosSection />
+      <SnapshotsSection />
       <BuildImagesSection />
     </div>
   );
@@ -97,44 +111,66 @@ const TONE_INK: Record<string, string> = {
 function SectionMeta({ title, meta }: { title: string; meta: string | null }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <h2 className="text-lg font-semibold leading-lg text-text-primary">{title}</h2>
-      {meta && <span className="text-sm leading-sm text-text-secondary">{meta}</span>}
+      <h2 className={T.section}>{title}</h2>
+      {meta && <span className={T.meta}>{meta}</span>}
     </div>
   );
 }
 
 // ─────────────────────────── Project video (03, 03c, 03f) ───────────────────────────
 
-function ProjectVideoSection() {
+/** The project video's state, its takes and its one action (Make project video, Update, Try
+ *  again, Review → the Project video screen), read by the section and the screen's bar. */
+function useProjectVideoState() {
   const { project, view, viewer } = useProject();
   const owner = can(viewer, "video.generate", view.canCtx);
   const { record } = useProjectVideos(project.id);
-  const { jobs, now, pickTake, deleteTake } = useVideoJobs();
-  const toast = useToast();
-  const [showTakes, setShowTakes] = React.useState(false);
-  const [playingId, setPlayingId] = React.useState<string | null>(null);
-  const [deleting, setDeleting] = React.useState<VideoTake | null>(null);
+  const { jobs, now } = useVideoJobs();
   const current = currentProductsOf(view.products);
-  if (current.length === 0) return null;
-
   const status = projectVideoStatusOf({ products: view.products, videos: record, jobs, now });
   const copy = projectRowCopy(status);
   const v = status.video;
   const inUse = v.state === "ready" ? v.take : null;
   const takes = record?.products[PROJECT_VIDEO_KEY]?.takes ?? [];
-  const playing = (playingId && takes.find((t) => t.id === playingId && t.readyAt && !t.failure)) || inUse;
   const videoHref = phoneProjectPath(project.id, "video");
-  const actionHref = copy.action === "review" && (status.review ?? (v.state === "review" ? v.take : null))
-    ? `${videoHref}?review=${encodeURIComponent((status.review ?? (v.state === "review" ? v.take : null))!.id)}`
-    : videoHref;
-  const actionText = projectActionLabel(copy.action);
+  const toReview = copy.action === "review" ? (status.review ?? (v.state === "review" ? v.take : null)) : null;
+  const actionHref = toReview ? `${videoHref}?review=${encodeURIComponent(toReview.id)}` : videoHref;
+  return { owner, current, status, copy, v, inUse, takes, videoHref, actionHref, actionText: projectActionLabel(copy.action) };
+}
+
+/** The Media screen's one primary: the project video's action, when it has one. */
+export function MediaBar() {
+  const { owner, current, actionText, actionHref } = useProjectVideoState();
+  if (!owner || current.length === 0 || !actionText) return null;
+  return (
+    <BottomBar className="pt-8">
+      <Link href={actionHref} className={cn(buttonVariants({ size: "xl" }), "w-full")}>
+        {actionText}
+      </Link>
+    </BottomBar>
+  );
+}
+
+function ProjectVideoSection() {
+  const { project } = useProject();
+  const { owner, current, status, copy, v, inUse, takes, videoHref } = useProjectVideoState();
+  const { pickTake, deleteTake } = useVideoJobs();
+  const toast = useToast();
+  const [sheet, setSheet] = React.useState<"takes" | "scenes" | null>(null);
+  const [playingId, setPlayingId] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState<VideoTake | null>(null);
+  if (current.length === 0) return null;
+
+  const playing = (playingId && takes.find((t) => t.id === playingId && t.readyAt && !t.failure)) || inUse;
   const showRow = !inUse || status.state !== "ready" || copy.action !== null;
+  const canRegenerate = copy.action === null && status.state === "ready" && !(v.state === "ready" && v.next);
 
   if (!owner && !inUse) return null;
   return (
     <section aria-label={PROJECT_VIDEO_TITLE} className="flex flex-col gap-4">
       <SectionMeta title={PROJECT_VIDEO_TITLE} meta={owner ? PROJECT_GROUP_META : null} />
       {owner && showRow && (
+        // Its state; its action is the screen's bar.
         <div className={cn(LIST_CARD, !inUse && "border-dashed", "flex-row items-start gap-6 p-6")}>
           <span className="grid size-[56px] shrink-0 grid-cols-2 grid-rows-2 gap-[1px] overflow-hidden rounded-md bg-bg-surface-raised">
             {current.slice(0, 4).map((p) => (
@@ -142,27 +178,22 @@ function ProjectVideoSection() {
             ))}
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-2">
-            <span className="truncate text-md font-semibold leading-md text-text-primary">{project.name}</span>
-            <span className={cn("flex items-start gap-2 text-sm leading-sm", TONE_INK[copy.tone])}>
+            <span className={cn(T.name, "truncate")}>{project.name}</span>
+            <span className={cn(T.meta, "flex items-start gap-2", TONE_INK[copy.tone])}>
               <span aria-hidden className="mt-[2px]">
                 <Icon icon={TONE_ICON[copy.icon] ?? LockIcon} size={14} />
               </span>
               <span className="text-text-secondary">{copy.text}</span>
             </span>
-            {copy.sub && <span className="text-sm leading-sm text-text-secondary">{copy.sub}</span>}
+            {copy.sub && <span className={T.meta}>{copy.sub}</span>}
             {copy.progress !== null && <ProgressBar value={copy.progress} label="Project video render" />}
-            {actionText && (
-              <Link href={actionHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "self-start")}>
-                {actionText}
-              </Link>
-            )}
           </span>
         </div>
       )}
       {playing && (
         <div className="flex flex-col gap-4">
           <PhoneVideo takeId={playing.id} label={`${project.name} project video`} />
-          <p className="text-sm leading-sm text-text-secondary">
+          <p className={T.meta}>
             {[
               `Take ${playing.n}`,
               resolutionOf(playing.quality),
@@ -172,91 +203,88 @@ function ProjectVideoSection() {
               .filter(Boolean)
               .join(" · ")}
           </p>
-          {playing.join && (
-            <details className="group">
-              <summary className="-my-6 flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-md font-medium leading-md text-text-primary">
-                What&apos;s in this video
-              </summary>
-              <ul className="mt-4 flex flex-col gap-2 text-sm leading-sm text-text-secondary">
-                {describeJoin(playing.join).map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-          {owner && (
-            <div className="flex flex-wrap gap-4">
-              {copy.action === null && status.state === "ready" && !(v.state === "ready" && v.next) && (
-                <Link href={videoHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-                  Regenerate
-                </Link>
-              )}
-              <Button hierarchy="secondary" size="xl" aria-expanded={showTakes} onClick={() => setShowTakes((x) => !x)}>
-                Takes ({takes.length})
-              </Button>
-            </div>
-          )}
-          {owner && showTakes && (
-            <ListCard label="Takes">
-              {[...takes].reverse().map((t) => {
-                const ready = !!t.readyAt && !t.failure;
-                const using = inUse?.id === t.id;
-                return (
-                  <li key={t.id} className={cn(LIST_ROW, "flex items-center gap-4 p-6")}>
-                    <button
-                      type="button"
-                      disabled={!ready}
-                      aria-label={`Play take ${t.n}`}
-                      onClick={() => setPlayingId(t.id)}
-                      className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:text-text-disabled"
-                    >
-                      <Icon icon={PlayCircleIcon} size={20} />
-                    </button>
-                    <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="text-md font-medium leading-md text-text-primary">Take {t.n}</span>
-                      <span className="text-sm leading-sm text-text-secondary">
-                        {[resolutionOf(t.quality), t.clip ? `${Math.round(t.clip.durationMs / 1000)} s` : null, formatDate(t.createdAt), t.failure ? "Failed" : !t.readyAt ? "Rendering" : null]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </span>
-                    {using ? (
-                      <Badge tone="success">In use</Badge>
-                    ) : (
-                      <>
-                        {ready && (
-                          <Button
-                            hierarchy="ghost"
-                            size="lg"
-                            onClick={() => {
-                              if (pickTake(project.id, PROJECT_VIDEO_KEY, t.id).ok) {
-                                setPlayingId(t.id);
-                                toast({ title: `Take ${t.n} is now the project video.` });
-                              } else toast({ title: "That take couldn't be put in use. Try again.", lead: "error" });
-                            }}
-                          >
-                            Use this
-                          </Button>
-                        )}
-                        <Button
-                          hierarchy="secondary"
-                          size="xl"
-                          iconOnly
-                          aria-label={`Delete take ${t.n}`}
-                          disabled={!t.readyAt && !t.failure}
-                          onClick={() => setDeleting(t)}
-                        >
-                          <Icon icon={Delete02Icon} size={20} />
-                        </Button>
-                      </>
-                    )}
-                  </li>
-                );
-              })}
-            </ListCard>
+          {(playing.join || owner) && (
+            <KitListCard label="Project video">
+              {playing.join && <ListRow icon={ListViewIcon} title="What’s in this video" onClick={() => setSheet("scenes")} />}
+              {owner && <ListRow icon={Film01Icon} title="Takes" value={String(takes.length)} onClick={() => setSheet("takes")} />}
+              {owner && canRegenerate && <ListRow icon={RepeatIcon} title="Regenerate" href={videoHref} />}
+            </KitListCard>
           )}
         </div>
       )}
+      <Sheet open={sheet === "scenes" && !!playing?.join} onClose={() => setSheet(null)} title="What’s in this video">
+        {playing?.join && (
+          <ul className={cn(T.body, "flex flex-col gap-2 pb-8")}>
+            {describeJoin(playing.join).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
+      </Sheet>
+      <Sheet open={sheet === "takes"} onClose={() => setSheet(null)} title={`Takes (${takes.length})`}>
+        <div className="pb-8">
+          <ListCard label="Takes">
+            {[...takes].reverse().map((t) => {
+              const ready = !!t.readyAt && !t.failure;
+              const using = inUse?.id === t.id;
+              return (
+                <li key={t.id} className={cn(LIST_ROW, "flex items-center gap-4 p-6")}>
+                  <button
+                    type="button"
+                    disabled={!ready}
+                    aria-label={`Play take ${t.n}`}
+                    onClick={() => {
+                      setPlayingId(t.id);
+                      setSheet(null);
+                    }}
+                    className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:text-text-disabled"
+                  >
+                    <Icon icon={PlayCircleIcon} size={20} />
+                  </button>
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={T.rowTitle}>Take {t.n}</span>
+                    <span className={T.meta}>
+                      {[resolutionOf(t.quality), t.clip ? `${Math.round(t.clip.durationMs / 1000)} s` : null, formatDate(t.createdAt), t.failure ? "Failed" : !t.readyAt ? "Rendering" : null]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                  {using ? (
+                    <Badge tone="success">In use</Badge>
+                  ) : (
+                    <>
+                      {ready && (
+                        <Button
+                          hierarchy="ghost"
+                          size="lg"
+                          onClick={() => {
+                            if (pickTake(project.id, PROJECT_VIDEO_KEY, t.id).ok) {
+                              setPlayingId(t.id);
+                              toast({ title: `Take ${t.n} is now the project video.` });
+                            } else toast({ title: "That take couldn't be put in use. Try again.", lead: "error" });
+                          }}
+                        >
+                          Use this
+                        </Button>
+                      )}
+                      <Button
+                        hierarchy="secondary"
+                        size="xl"
+                        iconOnly
+                        aria-label={`Delete take ${t.n}`}
+                        disabled={!t.readyAt && !t.failure}
+                        onClick={() => setDeleting(t)}
+                      >
+                        <Icon icon={Delete02Icon} size={20} />
+                      </Button>
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ListCard>
+        </div>
+      </Sheet>
       <ConfirmSheet
         open={deleting !== null}
         onClose={() => setDeleting(null)}
@@ -279,6 +307,10 @@ function ProjectVideoSection() {
 
 // ─────────────────────────── Product videos ───────────────────────────
 
+const ROW_TAP = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
+
+/** Each current product's video as one whole-row tap: a ready one plays in a sheet; the others
+ *  open the product page, where its video is made, the web's action word as the row's last line. */
 function ProductVideosSection() {
   const { project, view, viewer } = useProject();
   const owner = can(viewer, "video.generate", view.canCtx);
@@ -298,54 +330,43 @@ function ProductVideosSection() {
         {shown.map(({ product, name, status }) => {
           const copy = statusCopy(status);
           const take = status.state === "ready" ? status.take : null;
-          const label = actionLabel(copy.action);
+          const label = owner ? actionLabel(copy.action) : null;
           const href = phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(product.id)}`) ?? "#";
-          const thumb = (
-            <Thumb url={product.built?.product.conceptImageUrl}>
-              {take && (
-                <span aria-hidden className="absolute inline-flex size-[28px] items-center justify-center rounded-full bg-bg-inverse text-text-inverse">
-                  <Icon icon={PlayIcon} size={16} />
+          const body = (
+            <>
+              <Thumb url={product.built?.product.conceptImageUrl}>
+                {take && (
+                  <span aria-hidden className={cn(MEDIA_GROUND, MEDIA_INK, "absolute inline-flex size-[28px] items-center justify-center rounded-full")}>
+                    <Icon icon={PlayIcon} size={16} />
+                  </span>
+                )}
+              </Thumb>
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={cn(T.name, "truncate")}>{name}</span>
+                <span className={cn(T.meta, "flex items-center gap-2", TONE_INK[copy.tone])}>
+                  <Icon icon={TONE_ICON[copy.icon] ?? VideoOffIcon} size={14} />
+                  <span className="text-text-secondary">
+                    {take ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ") : copy.text}
+                  </span>
                 </span>
-              )}
-            </Thumb>
-          );
-          const text = (
-            <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className="truncate text-md font-semibold leading-md text-text-primary">{name}</span>
-              <span className={cn("flex items-center gap-2 text-sm leading-sm", TONE_INK[copy.tone])}>
-                <Icon icon={TONE_ICON[copy.icon] ?? VideoOffIcon} size={14} />
-                <span className="text-text-secondary">
-                  {take ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ") : copy.text}
-                </span>
+                {copy.progress !== null && <ProgressBar value={copy.progress} label={`${name} video render`} />}
+                {!take && label && <span className={cn(T.rowTitle, "text-text-brand")}>{label}</span>}
               </span>
-              {copy.progress !== null && <ProgressBar value={copy.progress} label={`${name} video render`} />}
-            </span>
+              {!take && owner && <Chevron />}
+            </>
           );
           return (
             <li key={product.id} className={LIST_ROW}>
               {take ? (
-                <button
-                  type="button"
-                  aria-haspopup="dialog"
-                  aria-label={`Play ${name} video`}
-                  onClick={() => setWatching({ take, name })}
-                  className="flex w-full items-center gap-6 p-6 text-left outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle"
-                >
-                  {thumb}
-                  {text}
+                <button type="button" aria-haspopup="dialog" aria-label={`Play ${name} video`} onClick={() => setWatching({ take, name })} className={ROW_TAP}>
+                  {body}
                 </button>
+              ) : owner ? (
+                <Link href={href} className={ROW_TAP}>
+                  {body}
+                </Link>
               ) : (
-                <div className="flex w-full items-start gap-6 p-6">
-                  {thumb}
-                  <span className="flex min-w-0 flex-1 flex-col gap-4">
-                    {text}
-                    {owner && label && (
-                      <Link href={href} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "self-start")}>
-                        {label}
-                      </Link>
-                    )}
-                  </span>
-                </div>
+                <div className={cn(ROW_TAP, "hover:bg-transparent")}>{body}</div>
               )}
             </li>
           );
@@ -370,7 +391,7 @@ function BuildImagesSection() {
     return (
       <section aria-label="From your builds" className="flex flex-col gap-4">
         <SectionHeading title="From your builds" />
-        <p className="text-md leading-md text-text-secondary">No images yet. A build&apos;s concept images show here once it is saved to this project.</p>
+        <p className={T.body}>No images yet. A build&apos;s concept images show here once it is saved to this project.</p>
       </section>
     );
   }
@@ -398,16 +419,16 @@ function BuildImagesSection() {
                   </span>
                 )}
               </span>
-              <span className="line-clamp-2 text-sm leading-sm text-text-secondary">
+              <span className={cn(T.meta, "line-clamp-2")}>
                 {t.name} · v{t.version}
               </span>
             </button>
           </li>
         ))}
       </ul>
-      {ownerFacts && <p className="text-sm leading-sm text-text-secondary">Tap an image to see it full size or make it the cover.</p>}
-      {at !== null && (
-        <ImageViewer
+      {ownerFacts && <p className={T.meta}>Tap an image to see it full size or make it the cover.</p>}
+      {at !== null && at < tiles.length && (
+        <BuildImageViewer
           tiles={tiles}
           index={at}
           coverUrl={coverUrl}
@@ -424,8 +445,120 @@ function BuildImagesSection() {
 
 type Tile = ReturnType<typeof mediaTilesOf>[number];
 
-/** 03b · the image viewer, full screen on the DS inverse surface. */
-export function ImageViewer({
+/** The build images full size, opened at `startUrl` (the page's cover): Use as cover lives here. */
+export function BuildImagesViewer({ startUrl, onClose }: { startUrl: string | null; onClose: () => void }) {
+  const { project, view, viewer, gate } = useProject();
+  const tiles = React.useMemo(() => mediaTilesOf(view.refs), [view.refs]);
+  const [at, setAt] = React.useState(() => Math.max(0, tiles.findIndex((t) => t.url === startUrl)));
+  if (tiles.length === 0) return null;
+  return (
+    <BuildImageViewer
+      tiles={tiles}
+      index={Math.min(at, tiles.length - 1)}
+      coverUrl={coverOf(project, view.refs)}
+      canCover={can(viewer, "product.edit", view.canCtx)}
+      gate={gate}
+      projectId={project.id}
+      onIndex={setAt}
+      onClose={onClose}
+    />
+  );
+}
+
+// ─────────────────────────── Assembly snapshots (the web's SnapshotsGroup) ───────────────────────────
+
+const snapshotWhen = (at: number) => new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+function SnapshotsSection() {
+  const { project, view, viewer } = useProject();
+  const owner = can(viewer, "facts.seeOwnerOnly", view.canCtx);
+  const canRemove = can(viewer, "product.edit", view.canCtx);
+  const toast = useToast();
+  const [list, setList] = React.useState<Snapshot[]>([]);
+  const [at, setAt] = React.useState<number | null>(null);
+  const [removing, setRemoving] = React.useState<Snapshot | null>(null);
+  React.useEffect(() => {
+    const read = () => {
+      try {
+        setList(readSnapshots(project.id, window.localStorage));
+      } catch {
+        setList([]);
+      }
+    };
+    read();
+    window.addEventListener("storage", read);
+    return () => window.removeEventListener("storage", read);
+  }, [project.id]);
+  if (!owner || list.length === 0) return null;
+  const open = at !== null && at < list.length ? list[at] : null;
+  return (
+    <section aria-label="Assembly snapshots" className="flex flex-col gap-4">
+      <SectionHeading title="Assembly snapshots" />
+      <ul className="grid grid-cols-3 gap-4">
+        {list.map((snap, i) => (
+          <li key={snap.id}>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-label={`${snap.productName}, assembled, ${snapshotWhen(snap.at)}`}
+              onClick={() => setAt(i)}
+              className="flex w-full flex-col gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              <span className="relative block aspect-square w-full overflow-hidden rounded-md bg-bg-surface-raised">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a local data URL */}
+                <img src={snap.dataUrl} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" />
+              </span>
+              <span className={cn(T.meta, "line-clamp-2")}>{snap.productName}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <ImageViewer
+        open={open !== null}
+        onClose={() => setAt(null)}
+        index={at ?? 0}
+        count={list.length}
+        onIndex={setAt}
+        noun="Snapshot"
+        src={open?.dataUrl ?? null}
+        alt={open ? `${open.productName}, assembled` : ""}
+        caption={open ? `${open.productName} · ${snapshotWhen(open.at)}` : undefined}
+        action={
+          canRemove && open ? (
+            <Button hierarchy="secondary" size="xl" className="flex-1" onClick={() => setRemoving(open)}>
+              Remove
+            </Button>
+          ) : undefined
+        }
+      />
+      <ConfirmSheet
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title="Remove this snapshot?"
+        body="The picture is removed from this browser. It can’t be undone."
+        verb="Remove snapshot"
+        destructive
+        onConfirm={() => {
+          const snap = removing;
+          if (!snap) return;
+          try {
+            const next = removeSnapshot(project.id, snap.id, window.localStorage);
+            setList(next);
+            setAt(null);
+            toast({ title: "Snapshot removed" });
+          } catch {
+            toast({ title: "It couldn’t be removed. This browser’s storage refused.", lead: "error" });
+          }
+        }}
+      />
+    </section>
+  );
+}
+
+// ─────────────────────────── 03b · the image viewer ───────────────────────────
+
+/** 03b · a build's concept images full size, with Use as cover (03g, 03h). */
+function BuildImageViewer({
   tiles,
   index,
   coverUrl,
@@ -449,22 +582,6 @@ export function ImageViewer({
   const [refused, setRefused] = React.useState<string | null>(null);
   const tile = tiles[index];
   const isCover = tile.url === coverUrl;
-  const step = (d: 1 | -1) => onIndex((index + d + tiles.length) % tiles.length);
-
-  React.useEffect(() => {
-    const app = document.getElementById("m-app");
-    app?.setAttribute("inert", "");
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight") onIndex((index + 1) % tiles.length);
-      else if (e.key === "ArrowLeft") onIndex((index - 1 + tiles.length) % tiles.length);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      app?.removeAttribute("inert");
-    };
-  }, [index, tiles.length, onClose, onIndex]);
 
   const useAsCover = () => {
     setRefused(null);
@@ -475,46 +592,33 @@ export function ImageViewer({
     if (out.kind === "refused") setRefused(out.reason);
   };
 
-  return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={`${tile.name} image`} className="fixed inset-0 z-sheet flex flex-col bg-bg-inverse font-sans text-text-inverse">
-      <div className="flex h-[56px] shrink-0 items-center gap-4 px-8 pt-[env(safe-area-inset-top)]">
-        <Button hierarchy="inverse" size="xl" iconOnly aria-label="Close" onClick={onClose} autoFocus>
-          <Icon icon={Cancel01Icon} size={22} />
-        </Button>
-        <p className="flex-1 text-center text-lg font-semibold leading-lg" aria-live="polite">
-          {index + 1} of {tiles.length}
-        </p>
-        <span className="w-[44px]" />
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a concept image from the build store */}
-        <img src={tile.url} alt={`${tile.name}, version ${tile.version}`} className="max-h-full w-full object-contain" />
-        <p className="text-md leading-md">
-          {tile.name} · v{tile.version}
-        </p>
-        {refused && <p className="px-8 text-center text-md leading-md">{refused}</p>}
-      </div>
-      <div className="flex shrink-0 items-center gap-4 px-8 pb-[calc(var(--spacing-8)_+_env(safe-area-inset-bottom))] pt-4">
-        <Button hierarchy="inverse" size="xl" iconOnly aria-label="Previous image" disabled={tiles.length < 2} onClick={() => step(-1)}>
-          <Icon icon={ArrowLeft02Icon} size={22} />
-        </Button>
-        {canCover &&
-          (isCover ? (
-            <p className="flex h-[44px] flex-1 items-center justify-center gap-2 text-lg font-semibold leading-lg">
-              <Icon icon={Tick02Icon} size={20} />
-              This image is the cover
-            </p>
-          ) : (
-            <Button hierarchy="inverse" size="xl" className="flex-1" iconLeading={<Icon icon={Tick02Icon} size={20} />} onClick={useAsCover}>
-              Use as cover
-            </Button>
-          ))}
-        {!canCover && <span className="flex-1" />}
-        <Button hierarchy="inverse" size="xl" iconOnly aria-label="Next image" disabled={tiles.length < 2} onClick={() => step(1)}>
-          <Icon icon={ArrowRight02Icon} size={22} />
-        </Button>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <ImageViewer
+      open
+      onClose={onClose}
+      index={index}
+      count={tiles.length}
+      onIndex={(i) => {
+        setRefused(null);
+        onIndex(i);
+      }}
+      noun="Image"
+      src={tile.url}
+      alt={`${tile.name}, version ${tile.version}`}
+      caption={`${tile.name} · v${tile.version}`}
+      note={refused}
+      action={
+        !canCover ? undefined : isCover ? (
+          <p className={cn(T.bodyStrong, MEDIA_INK, "flex h-[44px] flex-1 items-center justify-center gap-2")}>
+            <Icon icon={Tick02Icon} size={20} />
+            This image is the cover
+          </p>
+        ) : (
+          <Button hierarchy="secondary" size="xl" className="flex-1" iconLeading={<Icon icon={Tick02Icon} size={20} />} onClick={useAsCover}>
+            Use as cover
+          </Button>
+        )
+      }
+    />
   );
 }

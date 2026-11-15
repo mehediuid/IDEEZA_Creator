@@ -151,6 +151,7 @@ try {
       localStorage.setItem("ideeza:accounts", JSON.stringify(accounts));
       localStorage.setItem("ideeza:session", JSON.stringify({ v: 1, email: "maya@demo.test", at: now }));
       localStorage.setItem("ideeza:m:phone", JSON.stringify({ explored: true, faceIdOffered: true, faceIdPending: false, cameraAsked: true, photosAsked: true }));
+      localStorage.setItem("ideeza:welcome-offer", JSON.stringify({ v: 1, byEmail: { "maya@demo.test": { startedAt: Date.now(), closedAt: Date.now(), usedAt: null } } }));
       return true;
     })()`);
   }

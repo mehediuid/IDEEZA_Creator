@@ -1,15 +1,15 @@
 // The mobile prototype's own way in (mobile Figma "Account · 2026 update",
 // AU-01…33). The accounts themselves are the web's (auth.ts) — one person, one
-// account, on either — and this keeps only what the phone adds: its four
-// password rules, the six-digit codes for verifying and resetting, the
-// sign-in tries, how each account signs in on the phone (Apple, Google,
-// Facebook, a password) and Face ID, and what this phone remembers (Explore
-// first, the Face ID offer). Relative imports only, so node:test can load it.
+// account, on either — and this keeps only what the phone adds: the six-digit
+// codes for verifying and resetting, the sign-in tries, how each account signs
+// in on the phone (Google, Facebook, a password), and what this phone
+// remembers (the tour to start, the link's campaign tag). The password rules are the web's, so a
+// password made on the phone works on the web too. Relative imports only, so
+// node:test can load it.
 
 import * as React from "react";
 import { parseStored, readStoredKey, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
-import { PASSWORD_MAX, normalizeEmail } from "./auth";
-import { handleProblem } from "../people/ids";
+import { PASSWORD_RULES, normalizeEmail, passwordProblem, sourceFromUtm, type PasswordRuleId } from "./auth";
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
@@ -22,24 +22,19 @@ export function clockOf(ms: number): string {
 
 // ─────────────────────────── the password (AU-10, AU-32) ───────────────────────────
 
-export const PHONE_PASSWORD_RULES = [
-  { id: "length", label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-  { id: "letter", label: "A letter", test: (p: string) => /\p{L}/u.test(p) },
-  { id: "number", label: "A number", test: (p: string) => /\p{N}/u.test(p) },
-  { id: "symbol", label: "A symbol", test: (p: string) => /[^\p{L}\p{N}\s]/u.test(p) },
-] as const;
+/** The web's five rules (auth.ts), in the checklist's order: one account works on both. */
+export const PHONE_PASSWORD_RULES = PASSWORD_RULES;
 
-export type PhonePasswordRule = (typeof PHONE_PASSWORD_RULES)[number]["id"];
+export type PhonePasswordRule = PasswordRuleId;
 
 /** Each rule, in the checklist's order, and whether the password meets it. */
 export function phonePasswordChecks(password: string): { id: PhonePasswordRule; label: string; met: boolean }[] {
   return PHONE_PASSWORD_RULES.map((r) => ({ id: r.id, label: r.label, met: r.test(password) }));
 }
 
-/** "" when the password meets every rule; otherwise what is wrong, in a sentence. */
+/** "" when the password meets every rule; otherwise what it still needs, in the web's sentence. */
 export function phonePasswordProblem(password: string): string {
-  if (password.length > PASSWORD_MAX) return `Use at most ${PASSWORD_MAX} characters.`;
-  return PHONE_PASSWORD_RULES.every((r) => r.test(password)) ? "" : "Your password doesn’t meet every rule yet.";
+  return passwordProblem(password);
 }
 
 // ─────────────────────────── six-digit codes (AU-12, AU-31) ───────────────────────────
@@ -175,9 +170,10 @@ export function saveTries(tries: SignInTries): WriteResult {
 
 // ─────────────────────────── how each account signs in on the phone ───────────────────────────
 
-export type Provider = "apple" | "google" | "facebook";
-export const PROVIDERS: readonly Provider[] = ["apple", "google", "facebook"];
-export const PROVIDER_WORDS: Record<Provider, string> = { apple: "Apple", google: "Google", facebook: "Facebook" };
+/** The web's two providers; the phone has no Apple (owner 2026-11-09 and 11-12). */
+export type Provider = "google" | "facebook";
+export const PROVIDERS: readonly Provider[] = ["google", "facebook"];
+export const PROVIDER_WORDS: Record<Provider, string> = { google: "Google", facebook: "Facebook" };
 
 export const PHONE_ACCOUNTS_KEY = "ideeza:m:accounts";
 
@@ -186,11 +182,9 @@ export type PhoneAccount = {
   providers: Provider[];
   /** Made through a provider: no password of its own yet (AU-41h adds one). */
   passwordless: boolean;
-  /** "Use Face ID" was chosen (AU-08). */
-  faceId: boolean;
 };
 
-const NO_PHONE_ACCOUNT: PhoneAccount = { providers: [], passwordless: false, faceId: false };
+const NO_PHONE_ACCOUNT: PhoneAccount = { providers: [], passwordless: false };
 
 export function normalizePhoneAccounts(raw: unknown): Record<string, PhoneAccount> {
   if (!isObj(raw)) return {};
@@ -198,7 +192,7 @@ export function normalizePhoneAccounts(raw: unknown): Record<string, PhoneAccoun
   for (const [email, v] of Object.entries(raw)) {
     if (!isObj(v)) continue;
     const providers = Array.isArray(v.providers) ? PROVIDERS.filter((p) => (v.providers as unknown[]).includes(p)) : [];
-    out[normalizeEmail(email)] = { providers, passwordless: v.passwordless === true, faceId: v.faceId === true };
+    out[normalizeEmail(email)] = { providers, passwordless: v.passwordless === true };
   }
   return out;
 }
@@ -266,10 +260,8 @@ export type PhoneState = {
   onboarded: boolean;
   /** Logged in without Remember me: the sign-in lasts while this tab does, and the next cold start signs out. */
   forgetSession: boolean;
-  /** The Face ID offer was made on this phone (it is made once). */
-  faceIdOffered: boolean;
-  /** Show the Face ID offer on the next screen (set by the first sign-in here). */
-  faceIdPending: boolean;
+  /** Look around first was chosen on the Welcome map: the tour starts on the next tab screen. */
+  tourPending: boolean;
   /** The kit's pre-prompts (KIT-PM-01 camera, PM-02 photos, PM-03 microphone) come once, at
    *  first use; PM-04 notifications once, after the first build starts. */
   cameraAsked: boolean;
@@ -284,8 +276,7 @@ export function normalizePhone(raw: unknown): PhoneState {
     explored: r.explored === true,
     onboarded: r.onboarded === true,
     forgetSession: r.forgetSession === true,
-    faceIdOffered: r.faceIdOffered === true,
-    faceIdPending: r.faceIdPending === true,
+    tourPending: r.tourPending === true,
     cameraAsked: r.cameraAsked === true,
     photosAsked: r.photosAsked === true,
     micAsked: r.micAsked === true,
@@ -325,14 +316,37 @@ export function usePhone(): { hydrated: boolean; phone: PhoneState } {
   return React.useMemo(() => ({ hydrated: k.hydrated, phone: normalizePhone(parseStored(k.raw).value) }), [k.hydrated, k.raw]);
 }
 
-/** After a sign-in: the Face ID offer, once per phone. */
-/** After any sign-in on the phone: the Face ID offer once, and Remember me —
- *  `remember` false (Log In with the box unticked) makes this sign-in last
- *  only while the tab does; every other way in is remembered. */
+/** After any sign-in on the phone: Remember me — `remember` false (Log In with
+ *  the box unticked) makes this sign-in last only while the tab does; every
+ *  other way in is remembered. */
 export function afterPhoneSignIn(remember = true): void {
-  const p = readPhone();
-  updatePhone({ ...(!p.faceIdOffered ? { faceIdPending: true } : null), forgetSession: !remember });
+  updatePhone({ forgetSession: !remember });
   markAlive();
+}
+
+// ─────────────────────────── the link's campaign tag ───────────────────────────
+
+/** A link's utm_source, kept for this tab from the first screen it opens until
+ *  the account is made (the web keeps it on Sign up's own address). */
+export const UTM_KEY = "ideeza:m:utm";
+
+/** Keeps the address's utm_source, when it has one. */
+export function keepUtm(search: string): void {
+  const source = sourceFromUtm(new URLSearchParams(search).get("utm_source"));
+  if (!source) return;
+  try {
+    window.sessionStorage.setItem(UTM_KEY, source);
+  } catch {
+    // Storage refused: the question is asked instead.
+  }
+}
+
+export function readUtm(): string {
+  try {
+    return sourceFromUtm(window.sessionStorage.getItem(UTM_KEY));
+  } catch {
+    return "";
+  }
 }
 
 // ─────────────────────────── a provider's answer, between its sheet and "Signing you in" ───────────────────────────
@@ -372,49 +386,16 @@ export function saveProviderAnswer(a: ProviderAnswer | null): WriteResult {
   return writeStoredKey(PROVIDER_KEY, a);
 }
 
-/** Apple's "Hide my email": a relay address stands in for theirs (AU-04d). */
-export function relayAddress(random: () => number = Math.random): string {
-  return `${Math.floor(random() * 36 ** 8).toString(36).padStart(8, "0")}@privaterelay.appleid.com`;
-}
-
 // ─────────────────────────── where to go ───────────────────────────
 
 /** The way-in screens: open to anyone signed out. */
 export const ENTRY_PATH = /^\/m\/(onboarding|welcome|sign-in|sign-up|verify|reset|signing-in|add-email|link)(\/|$)/;
-/** After sign-up: name and handle, the profile steps and the Welcome map. */
-export const SETUP_PATH = /^\/m\/(handle|setup|welcome-map)(\/|$)/;
+/** After sign-up, as on the web: the one question (when the link didn't say) and the Welcome map. */
+export const SETUP_PATH = /^\/m\/(source|welcome-map)(\/|$)/;
 
 /** A mobile path to go back to: only the prototype's own, never a way-in screen (unless `entryOk`). */
 export function mobileNext(raw: string | null | undefined, fallback = "/m", entryOk = false): string {
   if (!raw || !/^\/m(\/|\?|#|$)/.test(raw) || raw.startsWith("//")) return fallback;
   if (!entryOk && ENTRY_PATH.test(raw.split(/[?#]/)[0])) return fallback;
   return raw;
-}
-
-// ─────────────────────────── handle suggestions (AU-13c) ───────────────────────────
-
-/** A name as a handle: Latin letters and numbers, hyphens between words. */
-export function handleBaseOf(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 30)
-    .replace(/-+$/g, "");
-}
-
-/** Three free handles near the name (or what was typed, when the name has no Latin letters). */
-export function handleSuggestions(name: string, typed: string, isFree: (h: string) => boolean = (h) => handleProblem(h) === null): string[] {
-  const base = handleBaseOf(name) || handleBaseOf(typed);
-  if (!base) return [];
-  const first = base.split("-")[0];
-  const candidates = [`${base}-1`, base.replace(/-/g, ""), `${first}-makes`, `${base}-2`, `${first}-builds`, `${base}-3`];
-  const out: string[] = [];
-  for (const c of candidates) {
-    if (c !== typed && !out.includes(c) && isFree(c)) out.push(c);
-    if (out.length === 3) break;
-  }
-  return out;
 }

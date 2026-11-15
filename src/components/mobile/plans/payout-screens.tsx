@@ -7,15 +7,17 @@
 //   (the web's MethodDialog: addMethod, methodRequest). The Figma's bank
 //   screens ask for account and ID numbers, which the app doesn't take.
 // · Withdraw money (/m/settings/idz-pay/withdraw): the available balance,
-//   the method, Full balance or Other amount, the fee ($0.00) and the total,
-//   then the wallet's signature — the web's "confirm it's you", in place of
+//   the method, Full balance or Other amount, the fee ($0.00) and the total
+//   (the amount you withdraw is the screen's figure; Withdraw $x sits in the
+//   Bottom action bar, the top bar's Back cancels), then the wallet's signature — the web's "confirm it's you", in place of
 //   the Figma's emailed code — and "Withdrawal recorded" with the way to the
-//   history. Identity (Level 1) comes first, as the web asks it at the first
+//   history. A withdrawal in IDZ pays out at the app's one IDZ price.
+//   Offline, Withdraw and Add wait with their reason. Identity (Level 1) comes first, as the web asks it at the first
 //   withdrawal; a first withdrawal with no method sets one up first.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckmarkCircle02Icon, PencilEdit02Icon, UserIdVerificationIcon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, PencilEdit02Icon, UserIdVerificationIcon, Wallet02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Radio } from "@/components/ideeza/checkbox";
@@ -28,18 +30,24 @@ import { networkName } from "@/components/settings/get-paid/parts";
 import { randomId } from "@/lib/market/sales";
 import { METHOD_LABEL_MAX, addMethod, centsFloor, formatUsd, recordWithdrawal, subtractWithdrawn, withdrawAmountProblem, type PayoutStore, type Withdrawal } from "@/lib/account/payout";
 import { readPayoutNow, updatePayout } from "@/lib/account/use-payout";
+import { shortAddress } from "@/lib/wallet/demo-wallet";
 import type { Amount } from "@/lib/wallet/types";
-import { compareAmounts, formatAmount, normalizeAmount } from "@/lib/wallet/money";
+import { compareAmounts, normalizeAmount } from "@/lib/wallet/money";
 import { cn } from "@/lib/utils";
 import { useWalletSheet } from "../earn-coin/wallet-sheet";
 import { BottomBar } from "../kit/bottom-bar";
+import { LIST_ROW, ListCard, ListRow } from "../kit/list";
+import { PickSheet } from "../kit/pick-list";
+import { EmptyState } from "../kit/state";
+import { OfflineBanner, useOnline } from "../kit/states";
 import { Sheet } from "../kit/sheet";
 import { SheetSelect } from "../kit/sheet-select";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { SAVE_FAILED, useGetPaid } from "./get-paid-screen";
-import { BulletList, CARD, Row, RowsCard, SECTION_TITLE } from "./parts";
+import { T } from "../type";
+import { IDZ_RATE_LINE, SAVE_FAILED, useGetPaid } from "./get-paid-screen";
+import { BulletList, Hero, OFFLINE_REASON, Row, RowsCard, payoutLine } from "./parts";
 
 const PAYOUT_NETWORK = "baseSepolia" as const;
 const PROBLEM: Record<"address" | "duplicate" | "full", string> = {
@@ -64,7 +72,7 @@ function nextOf(params: URLSearchParams, fallback: string): string {
 
 function Loading({ title }: { title: string }) {
   return (
-    <Screen top={<TopBar back title={title} />} className="px-8 pt-4">
+    <Screen top={<TopBar back="/m/settings/idz-pay" title={title} />} className="px-8 pt-4">
       <Skeleton shape="block" className="h-[240px] w-full" />
     </Screen>
   );
@@ -82,6 +90,7 @@ function MethodBody({ store }: { store: PayoutStore }) {
   const router = useRouter();
   const params = useSearchParams();
   const toast = useToast();
+  const online = useOnline();
   const form = useMethodForm(store);
   const { request, sheet } = useWalletSheet();
   const [step, setStep] = React.useState<"form" | "review">("form");
@@ -102,6 +111,7 @@ function MethodBody({ store }: { store: PayoutStore }) {
   const add = async () => {
     if (busy) return;
     setFailure(null);
+    if (!online) return setFailure(OFFLINE_REASON);
     const becomesDefault = store.methods.length === 0;
     const id = randomId("wm_");
     setBusy(true);
@@ -127,18 +137,25 @@ function MethodBody({ store }: { store: PayoutStore }) {
     } else if (result.reason !== "rejected") setFailure(result.message ?? "The wallet didn’t confirm it. Nothing was added; try again.");
   };
 
-  const choice = (on: boolean) => cn("flex min-h-[64px] cursor-pointer items-start gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 py-5", on ? "border-border-brand bg-bg-brand-subtle" : "border-border-subtle bg-bg-surface");
+  const choice = (on: boolean) => cn("flex min-h-[64px] cursor-pointer items-start gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 py-5", on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface");
 
   return (
     <Screen
-      top={<TopBar back title="Information setup" />}
+      top={<TopBar back={next} title="Information setup" />}
       className="px-8 pb-8 pt-4"
       footer={
         <BottomBar>
+          {step === "review" && !online && (
+            <p id="add-why" role="status" className={T.caption}>
+              {OFFLINE_REASON}
+            </p>
+          )}
           <Button
             size="xl"
             className="w-full"
             loading={busy}
+            disabled={step === "review" && !online}
+            aria-describedby={step === "review" && !online ? "add-why" : undefined}
             onClick={() => {
               if (step === "review") return void add();
               const p = form.problemOf(store);
@@ -153,7 +170,8 @@ function MethodBody({ store }: { store: PayoutStore }) {
     >
       {step === "form" ? (
         <div className="flex flex-col gap-8">
-          <h2 className="text-md font-medium leading-md text-text-secondary">Wallet information</h2>
+          <OfflineBanner />
+          <h2 className={T.section}>Wallet information</h2>
           <fieldset className="flex flex-col gap-4">
             <legend className="sr-only">Wallet</legend>
             {!mineTaken && (
@@ -161,8 +179,8 @@ function MethodBody({ store }: { store: PayoutStore }) {
                 <input type="radio" name="source" checked={!paste} onChange={() => set({ source: "mine" })} className="sr-only" />
                 <Radio checked={!paste} decorative className="mt-1" />
                 <span className="flex min-w-0 flex-col gap-1">
-                  <span className="text-md font-medium leading-md text-text-primary">Your demo wallet</span>
-                  <span className="text-sm leading-sm text-text-secondary [overflow-wrap:anywhere]">
+                  <span className={T.rowTitle}>Your demo wallet</span>
+                  <span className={cn(T.meta, "[overflow-wrap:anywhere]")}>
                     {wallet.label} · <span className="font-mono">{wallet.address}</span>
                   </span>
                 </span>
@@ -172,8 +190,8 @@ function MethodBody({ store }: { store: PayoutStore }) {
               <input type="radio" name="source" checked={paste} onChange={() => set({ source: "paste" })} className="sr-only" />
               <Radio checked={paste} decorative className="mt-1" />
               <span className="flex min-w-0 flex-col gap-1">
-                <span className="text-md font-medium leading-md text-text-primary">Another wallet address</span>
-                <span className="text-sm leading-sm text-text-secondary">Any wallet you own, a receive-only one too.</span>
+                <span className={T.rowTitle}>Another wallet address</span>
+                <span className={T.meta}>Any wallet you own, a receive-only one too.</span>
               </span>
             </label>
           </fieldset>
@@ -193,26 +211,27 @@ function MethodBody({ store }: { store: PayoutStore }) {
               />
             </Field>
           )}
-          {paste && !problem && <p className="-mt-6 text-sm leading-sm text-text-tertiary">Check it carefully: a payment sent to a wrong address can’t be taken back.</p>}
+          {paste && !problem && <p className={cn(T.caption, "-mt-6 text-text-tertiary")}>Check it carefully: a payment sent to a wrong address can’t be taken back.</p>}
           {!paste && problem && (
-            <p role="alert" className="text-sm leading-sm text-text-error">
+            <p role="alert" className={cn(T.caption, "text-text-error")}>
               {problem}
             </p>
           )}
           <Field label="Network" htmlFor="network">
             <SheetSelect id="network" title="Network" value={PAYOUT_NETWORK} options={[{ value: PAYOUT_NETWORK, label: networkName(PAYOUT_NETWORK) }]} onChange={() => {}} />
           </Field>
-          <p className="-mt-6 text-sm leading-sm text-text-tertiary">Withdrawals to this address are sent on this network.</p>
+          <p className={cn(T.caption, "-mt-6 text-text-tertiary")}>Withdrawals to this address are sent on this network.</p>
           <Field label="Name it (optional)" htmlFor={ids.label.id}>
             <TextInput id={ids.label.id} size="xl" value={state.label} maxLength={METHOD_LABEL_MAX} onValueChange={(v) => set({ label: v })} autoComplete="off" placeholder={paste ? "Crypto wallet" : wallet.label} />
           </Field>
         </div>
       ) : (
         <div className="flex flex-col gap-8">
-          <h2 className="text-md font-medium leading-md text-text-secondary">Review all information</h2>
+          <OfflineBanner />
+          <h2 className={T.section}>Review all information</h2>
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium leading-lg text-text-primary">Wallet information</h3>
+              <h3 className={T.rowTitle}>Wallet information</h3>
               <button type="button" aria-label="Edit the wallet information" onClick={() => setStep("form")} className="inline-flex size-[44px] items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus">
                 <Icon icon={PencilEdit02Icon} size={20} />
               </button>
@@ -226,12 +245,12 @@ function MethodBody({ store }: { store: PayoutStore }) {
               <Row label="Default">{store.methods.length === 0 ? "Yes, withdrawals go here first" : "No"}</Row>
             </RowsCard>
           </section>
-          <p className="flex flex-wrap items-center gap-3 text-sm leading-sm text-text-secondary">
+          <p className={cn(T.meta, "flex flex-wrap items-center gap-3")}>
             <TestnetDemoBadge />
             You sign it in your demo wallet. Nothing is charged and no coins move.
           </p>
           {failure && (
-            <p role="alert" className="text-sm leading-sm text-text-error">
+            <p role="alert" className={cn(T.caption, "text-text-error")}>
               {failure}
             </p>
           )}
@@ -266,16 +285,8 @@ function NeedsIdentity() {
   const router = useRouter();
   const [open, setOpen] = React.useState(true);
   return (
-    <Screen top={<TopBar back title="Withdraw money" />} className="px-8 pt-4">
-      <div className={cn(CARD, "flex flex-col items-center gap-6 p-8 text-center")}>
-        <span aria-hidden className="text-text-brand">
-          <Icon icon={UserIdVerificationIcon} size={28} />
-        </span>
-        <p className="text-md leading-md text-text-secondary">Your first withdrawal asks you to verify your identity.</p>
-        <Button size="xl" className="w-full" onClick={() => setOpen(true)}>
-          Verify your identity
-        </Button>
-      </div>
+    <Screen top={<TopBar back="/m/settings/idz-pay" title="Withdraw money" />} className="px-8 pt-4">
+      <EmptyState icon={UserIdVerificationIcon} title="Verify your identity" body="Your first withdrawal asks you to verify your identity." action={{ label: "Verify your identity", onClick: () => setOpen(true) }} />
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
@@ -287,7 +298,7 @@ function NeedsIdentity() {
           </Button>
         }
       >
-        <p className="text-md font-medium leading-md text-text-primary">What you’ll need:</p>
+        <p className={T.rowTitle}>What you’ll need:</p>
         <BulletList items={["Your full legal name", "Your account’s verified email", "Your mobile number, to get a code", "Your country of residence"]} />
       </Sheet>
     </Screen>
@@ -296,6 +307,7 @@ function NeedsIdentity() {
 
 function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount }) {
   const router = useRouter();
+  const online = useOnline();
   const { request, sheet } = useWalletSheet();
   const [methodId, setMethodId] = React.useState<string>(store.defaultMethodId ?? store.methods[0].id);
   const [mode, setMode] = React.useState<"full" | "other">("full");
@@ -304,6 +316,7 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
   const [busy, setBusy] = React.useState(false);
   const [failure, setFailure] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState<Withdrawal | null>(null);
+  const [picking, setPicking] = React.useState(false);
   const otherRef = React.useRef<HTMLInputElement>(null);
 
   const available = centsFloor(subtractWithdrawn(earned, store.withdrawals));
@@ -316,6 +329,7 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
   const withdraw = async () => {
     if (busy) return;
     setFailure(null);
+    if (!online) return setFailure(OFFLINE_REASON);
     if (problem || !amount || compareAmounts(amount, "0") <= 0) {
       setShown(true);
       if (problem) otherRef.current?.focus();
@@ -332,7 +346,7 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
         title: "Withdraw your earnings",
         summary: [
           { label: "Amount", value: `${formatUsd(amount)} (demo rate)` },
-          { label: "You receive", value: formatAmount(amount, token) },
+          { label: "You receive", value: payoutLine(amount, token) },
           { label: "To", value: method.label },
           { label: "Address", value: method.address },
           { label: "Network", value: networkName(method.network) },
@@ -367,56 +381,49 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
     else if (result.reason !== "rejected") setFailure(result.message ?? "The wallet didn’t confirm it. Nothing was withdrawn; try again.");
   };
 
-  const radio = (on: boolean) => cn("flex min-h-[52px] cursor-pointer items-center gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6", on ? "border-border-brand bg-bg-brand-subtle" : "border-border-subtle bg-bg-surface");
+  const radio = (on: boolean) => cn("flex min-h-[52px] cursor-pointer items-center gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 transition-colors duration-fast", on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface active:bg-bg-subtle");
+  const total = amount ? formatUsd(amount) : "$0.00";
+  const why = nothing ? "Nothing to withdraw right now. Your share of each sale lands here." : !online ? OFFLINE_REASON : null;
 
   return (
     <Screen
-      top={<TopBar back title="Withdraw money" />}
-      className="px-8 pb-8 pt-4"
+      top={<TopBar back="/m/settings/idz-pay" title="Withdraw money" />}
+      className="px-8 pb-8"
       footer={
         <BottomBar>
-          <div className="flex gap-4">
-            <Button hierarchy="secondary" size="xl" className="flex-1" onClick={() => router.back()} disabled={busy}>
-              Cancel
-            </Button>
-            <Button size="xl" className="flex-1" loading={busy} disabled={nothing} onClick={withdraw}>
-              Withdraw
-            </Button>
-          </div>
+          {(why || failure) && (
+            <p id="withdraw-why" role={failure ? "alert" : "status"} className={cn(T.caption, failure && "text-text-error")}>
+              {failure ?? why}
+            </p>
+          )}
+          <Button size="xl" className="w-full" loading={busy} disabled={nothing || !online} aria-describedby={why || failure ? "withdraw-why" : undefined} onClick={withdraw}>
+            {amount && !nothing ? `Withdraw ${total}` : "Withdraw"}
+          </Button>
         </BottomBar>
       }
     >
-      <div className="flex flex-col gap-8">
-        <RowsCard>
-          <Row label="Available balance">
-            <span className="inline-flex items-center gap-3">
+      <div className="flex flex-col gap-10">
+        <OfflineBanner />
+        <Hero
+          label="You withdraw"
+          meta={
+            <>
               <TestnetDemoBadge />
-              {formatUsd(available)}
-            </span>
-          </Row>
-          <Row label="Withdrawal method">
-            {store.methods.length > 1 ? (
-              <SheetSelect
-                title="Withdrawal method"
-                value={method.id}
-                onChange={setMethodId}
-                options={store.methods.map((m) => ({ value: m.id, label: `${m.label}${m.id === store.defaultMethodId ? " (default)" : ""}` }))}
-                className="h-[36px] min-w-[160px]"
-              />
-            ) : (
-              method.label
-            )}
-          </Row>
-        </RowsCard>
+              <span>Available balance {formatUsd(available)}</span>
+            </>
+          }
+        >
+          <span className={cn(T.amountHero, "text-text-brand")}>{total}</span>
+        </Hero>
         <section aria-labelledby="amount" className="flex flex-col gap-4">
-          <h2 id="amount" className={SECTION_TITLE}>
+          <h2 id="amount" className={T.section}>
             Amount
           </h2>
           <label className={radio(mode === "full")}>
             <input type="radio" name="amount" checked={mode === "full"} onChange={() => setMode("full")} className="sr-only" />
             <Radio checked={mode === "full"} decorative />
-            <span className="flex-1 text-md leading-md tabular-nums text-text-primary">{formatUsd(available)}</span>
-            <span className="text-sm leading-sm text-text-secondary">Full balance</span>
+            <span className={cn(T.body, "flex-1 text-text-primary")}>Full balance</span>
+            <span className={cn(T.body, "tabular-nums")}>{formatUsd(available)}</span>
           </label>
           <div className={cn(radio(mode === "other"), "flex-col items-stretch gap-4 py-5")}>
             <label className="flex cursor-pointer items-center gap-5">
@@ -431,7 +438,7 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
                 className="sr-only"
               />
               <Radio checked={mode === "other"} decorative />
-              <span className="text-md leading-md text-text-primary">Other amount</span>
+              <span className={cn(T.body, "text-text-primary")}>Other amount</span>
             </label>
             {mode === "other" && (
               <>
@@ -441,7 +448,7 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
                   inputMode="decimal"
                   aria-label="Other amount in US dollars"
                   prefixText="$"
-                  suffix={<span className="text-md leading-md text-text-secondary">USD</span>}
+                  suffix="USD"
                   value={other}
                   onValueChange={setOther}
                   onBlur={() => setShown(true)}
@@ -450,7 +457,7 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
                   aria-describedby={shown && problem ? "other-error" : undefined}
                 />
                 {shown && problem && (
-                  <p id="other-error" className="text-sm leading-sm text-text-error">
+                  <p id="other-error" className={cn(T.caption, "text-text-error")}>
                     {problem}
                   </p>
                 )}
@@ -458,25 +465,32 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
             )}
           </div>
         </section>
-        <div className={cn(CARD, "flex items-start justify-between gap-4 p-6")}>
-          <span className="flex flex-col gap-1">
-            <span className="text-md leading-md text-text-primary">
-              Withdrawal fee <span className="text-text-secondary">(per withdrawal)</span>
-            </span>
-            <span className="text-sm leading-sm text-text-secondary">You receive {amount ? formatAmount(amount, token) : `— ${token}`}.</span>
-          </span>
-          <span className="text-md leading-md tabular-nums text-text-primary">−$0.00</span>
-        </div>
-        <p className="flex items-center justify-between rounded-xl bg-bg-brand-subtle px-6 py-5 text-xl font-medium leading-xl text-text-primary">
-          Total amount <span className="tabular-nums">{amount ? formatUsd(amount) : "$0.00"}</span>
-        </p>
-        {nothing && <p className="text-sm leading-sm text-text-secondary">Nothing to withdraw right now. Your share of each sale lands here.</p>}
-        {failure && (
-          <p role="alert" className="text-sm leading-sm text-text-error">
-            {failure}
-          </p>
-        )}
+        <ListCard label="Withdrawal">
+          {store.methods.length > 1 ? (
+            <ListRow icon={Wallet02Icon} title="Withdrawal method" meta={`${shortAddress(method.address)} · ${networkName(method.network)}`} value={method.label} onClick={() => setPicking(true)} />
+          ) : (
+            <ListRow icon={Wallet02Icon} title="Withdrawal method" meta={`${shortAddress(method.address)} · ${networkName(method.network)}`} value={method.label} />
+          )}
+          <ListRow
+            title="You receive"
+            meta={token === "IDZ" ? `At the demo rate ${IDZ_RATE_LINE}` : undefined}
+            value={<span className="tabular-nums text-text-primary">{amount ? payoutLine(amount, token) : `— ${token}`}</span>}
+          />
+          <ListRow title="Withdrawal fee" meta="Per withdrawal" value={<span className="tabular-nums text-text-primary">−$0.00</span>} />
+          <li className={cn(LIST_ROW, "hover:bg-transparent")}>
+            <span className={cn(T.section, "flex-1")}>Total amount</span>
+            <span className={cn(T.section, "tabular-nums")}>{total}</span>
+          </li>
+        </ListCard>
       </div>
+      <PickSheet
+        open={picking}
+        onClose={() => setPicking(false)}
+        title="Withdrawal method"
+        value={method.id}
+        options={store.methods.map((m) => ({ value: m.id, label: `${m.label}${m.id === store.defaultMethodId ? " (default)" : ""}`, helper: `${shortAddress(m.address)} · ${networkName(m.network)}` }))}
+        onPick={setMethodId}
+      />
       <Sheet
         open={sent !== null}
         onClose={() => router.replace("/m/settings/idz-pay")}
@@ -486,9 +500,6 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
             <Button size="xl" className="w-full" onClick={() => sent && router.replace(`/m/settings/idz-pay/history?tx=${sent.id}`)}>
               See it in history
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => router.replace("/m/settings/idz-pay")}>
-              Close
-            </Button>
           </>
         }
       >
@@ -496,12 +507,12 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
           <Icon icon={CheckmarkCircle02Icon} size={40} />
         </span>
         {sent && (
-          <p className="text-md leading-md text-text-primary">
-            {formatUsd(sent.amount)} as {formatAmount(sent.amount, sent.token)} to {sent.to.label} on {sent.to.network ? networkName(sent.to.network) : "its network"}, reference{" "}
+          <p className={cn(T.body, "text-text-primary")}>
+            {formatUsd(sent.amount)} as {payoutLine(sent.amount, sent.token)} to {sent.to.label} on {sent.to.network ? networkName(sent.to.network) : "its network"}, reference{" "}
             <span className="font-mono">{sent.id}</span>.
           </p>
         )}
-        <p className="flex flex-wrap items-center gap-3 text-sm leading-sm text-text-secondary">
+        <p className={cn(T.meta, "flex flex-wrap items-center gap-3")}>
           <TestnetDemoBadge /> Recorded as complete. No coins moved.
         </p>
       </Sheet>

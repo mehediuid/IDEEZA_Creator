@@ -2,7 +2,8 @@
 
 // 11 · Generate video (full screen): the web's Generate video dialog on its
 // own phone screen, "For {Product} · {Project}" under the top bar, every view
-// of it in the mobile Figma's layout:
+// of it in the mobile Figma's layout, its one primary at the foot (the top
+// bar's Back is the dialog's Cancel: it leaves, as Cancel did):
 // · the form (11, 11p, 11q, 11r): AR or AI; AI's prompts (Need prompt help?
 //   opens 11i–11k), Auto generate video / audio, the quality; Generate video
 //   storyboard, held with the web's reason while nothing is written (11q).
@@ -14,10 +15,13 @@
 //   Generate video · Regenerate storyboard (asks first once a scene was
 //   edited, 11z).
 // · render (11g): "Take n · Stage i of 5 · …", the progress, Notify me when
-//   it's ready; Close (it keeps rendering, the tray follows you) · Cancel
-//   render (asks first, 11y).
-// · review (11b, `?review=<takeId>`): Use this video and the web's other
-//   choices; a clip this phone recorded or uploaded reviews as 11d.
+//   it's ready; Cancel render (asks first, 11y) · Close in one row. Close
+//   (and Back) go back to where the maker came from, which opens what it
+//   had open (nav-trail useBackState: the Sell gate, a sheet); the render
+//   keeps going and the tray follows.
+// · review (11b, `?review=<takeId>`): Use this video at the foot, the web's
+//   other choices as rows; a clip this phone recorded or uploaded reviews as
+//   11d (Use this clip at the foot).
 // · failed (11h): the one failure line; Try again (the form, from that take,
 //   as `?from=<takeId>` does) · Close.
 // The take is the web's: the same record (`ideeza:video:<projectId>`) the
@@ -58,9 +62,11 @@ import { TopBar } from "../../top-bar";
 import { CameraAskSheet, cameraPermission } from "./camera-ask";
 import { VideoFormFields } from "./form";
 import { PromptHelpSheet } from "./prompt-help";
-import { ChoiceList, TakeReview, clipKeptLine } from "./review";
+import { ChoiceList, TakeReview, UseBar, clipKeptLine, inUseNote } from "./review";
 import { StoryboardEditor } from "./storyboard";
 import { VideoLoading, VideoUnavailable, useLeave, useRecordedTakes, useVideoScope } from "./target";
+import { cn } from "@/lib/utils";
+import { T } from "../../type";
 
 const TITLE = "Generate video";
 /** The web's RENDER_KEEPS_RUNNING, where the phone shows the render: its tray, at the foot. */
@@ -290,7 +296,7 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
   };
 
   const forLine = (
-    <p className="pb-8 text-sm leading-sm text-text-secondary">{renderTitle(`For ${target.productName}`, target.projectName)}</p>
+    <p className={cn(T.meta, "pb-8")}>{renderTitle(`For ${target.productName}`, target.projectName)}</p>
   );
 
   let body: React.ReactNode;
@@ -311,8 +317,23 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     );
     footer = (
       <>
+        {shownBlocker && (
+          <p id={blockId} className={T.meta}>
+            {shownBlocker}
+          </p>
+        )}
         {value.method === "ai" ? (
-          <Button size="xl" className="w-full" disabled={!!blocker} aria-describedby={shownBlocker ? blockId : undefined} onClick={() => void draftStoryboardNow(null)}>
+          <Button
+            size="xl"
+            className={cn("w-full", blocker && "cursor-not-allowed opacity-60")}
+            aria-disabled={!!blocker || undefined}
+            aria-describedby={shownBlocker ? blockId : undefined}
+            onClick={() => {
+              // Stays pressable while something is missing: the press marks the empty prompt and goes to it (the web, and the mint's 13h).
+              if (blocker) requestAnimationFrame(() => document.querySelector<HTMLElement>('textarea[aria-invalid="true"]')?.focus());
+              void draftStoryboardNow(null);
+            }}
+          >
             Generate video storyboard
           </Button>
         ) : (
@@ -320,22 +341,14 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
             Open camera
           </Button>
         )}
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={leave}>
-          Cancel
-        </Button>
-        {shownBlocker && (
-          <p id={blockId} className="text-sm leading-sm text-text-secondary">
-            {shownBlocker}
-          </p>
-        )}
       </>
     );
   } else if (view === "drafting") {
     body = (
       <div role="status" className="flex flex-col items-center gap-4 pt-8 text-center">
         <Spinner size={32} />
-        <p className="text-lg font-semibold leading-lg text-text-primary">Drafting your storyboard…</p>
-        <p className="text-md leading-md text-text-secondary">
+        <p className={T.section}>Drafting your storyboard…</p>
+        <p className={T.body}>
           AI is writing 3 scenes for {target.productName} from your prompts. This can take up to 40 seconds.
         </p>
       </div>
@@ -347,10 +360,11 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     );
   } else if (view === "storyboard" && mode.kind === "storyboard") {
     const sb = mode.storyboard;
+    title = "Review your storyboard";
     body = (
       <div className="flex flex-col gap-8">
         <StoryboardEditor storyboard={sb} onChange={(next) => setMode({ kind: "storyboard", storyboard: next, edited: true })} />
-        <p className="text-sm leading-sm text-text-tertiary">{storyboardHonesty(target.productName)}</p>
+        <p className={cn(T.meta, "text-text-tertiary")}>{storyboardHonesty(target.productName)}</p>
       </div>
     );
     footer = (
@@ -367,29 +381,30 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     const { total, etaSec } = progressOf(job, now);
     body = (
       <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default bg-bg-surface p-8">
-          <h2 className="text-md font-medium leading-md text-text-primary">{stageLine(take.n, job.stage)}</h2>
+        <div className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
+          <h2 className={T.section}>{stageLine(take.n, job.stage)}</h2>
           <ProgressBar value={total} label={`${target.productName} video`} />
-          <p className="text-sm leading-sm text-text-secondary">{trayProgressLine(total, etaSec)}</p>
+          <p className={T.meta}>{trayProgressLine(total, etaSec)}</p>
           <label className="relative -my-3 flex min-h-[44px] cursor-pointer items-center gap-4">
             <input type="checkbox" className="peer sr-only" checked={job.browserNotify} onChange={() => setBrowserNotify(job.id, !job.browserNotify)} />
             <Checkbox checked={job.browserNotify} decorative className="peer-focus-visible:shadow-focus-brand" />
-            <span className="text-md leading-md text-text-primary">Notify me when it&apos;s ready</span>
+            <span className={cn(T.body, "text-text-primary")}>Notify me when it&apos;s ready</span>
           </label>
         </div>
-        <p className="text-sm leading-sm text-text-secondary">{KEEPS_RUNNING}</p>
-        <p className="text-sm leading-sm text-text-tertiary">{honestyLine(target.productName)}</p>
+        <p className={T.meta}>{KEEPS_RUNNING}</p>
+        <p className={cn(T.meta, "text-text-tertiary")}>{honestyLine(target.productName)}</p>
       </div>
     );
+    // One row (owner 2026-11-15): Close goes back to where the maker came from, the render goes on.
     footer = (
-      <>
-        <Button size="xl" className="w-full" onClick={leave}>
-          Close
-        </Button>
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setConfirmCancel(true)}>
+      <div className="flex gap-4">
+        <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" onClick={() => setConfirmCancel(true)}>
           Cancel render
         </Button>
-      </>
+        <Button size="xl" className="min-w-0 flex-1" onClick={leave}>
+          Close
+        </Button>
+      </div>
     );
   } else if (view === "review" && take) {
     title = "Review the video";
@@ -398,7 +413,6 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
         take={take}
         video={video}
         productName={target.productName}
-        error={error}
         onUse={(chosen) => chooseTake(chosen, take)}
         choices={[
           { title: "Make another take", text: "The same storyboard, a new render", onClick: () => makeAnother(take) },
@@ -408,25 +422,18 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
         ]}
       />
     );
+    footer = <UseBar label="Use this video" note={inUseNote(take, video)} error={error} onUse={() => chooseTake(take, take)} />;
   } else if (view === "clip" && take && how) {
     title = "Your clip";
     body = (
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-4">
           <PhoneVideo takeId={take.id} label={`${target.productName} clip, take ${take.n}`} />
-          <p className="text-sm leading-sm text-text-secondary">{clipMetaOf(take.clip?.durationMs ?? 0, how, formatDate(take.readyAt ?? take.createdAt))}</p>
-          <p className="text-sm leading-sm text-text-secondary">{clipKeptLine(target.productName)}</p>
+          <p className={T.meta}>{clipMetaOf(take.clip?.durationMs ?? 0, how, formatDate(take.readyAt ?? take.createdAt))}</p>
+          <p className={T.meta}>{clipKeptLine(target.productName)}</p>
         </div>
-        <div className="flex flex-col gap-6">
-          <h2 className="text-lg font-semibold leading-lg text-text-primary">Is this the clip you want?</h2>
-          <Button size="xl" className="w-full" onClick={() => chooseTake(take, take)}>
-            Use this clip
-          </Button>
-          {error && (
-            <p role="alert" className="text-md leading-md text-text-error">
-              {error}
-            </p>
-          )}
+        <div className="flex flex-col gap-4">
+          <h2 className={T.section}>Is this the clip you want?</h2>
           <ChoiceList
             label="Other choices"
             choices={[
@@ -444,18 +451,19 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
         </div>
       </div>
     );
+    footer = <UseBar label="Use this clip" note={inUseNote(take, video)} error={error} onUse={() => chooseTake(take, take)} />;
   } else {
     const kind = take?.failure?.kind ?? "interrupted";
     body = <Banner tone="error">{FAILURE_COPY[kind]}</Banner>;
     footer = (
-      <>
-        <Button size="xl" className="w-full" onClick={() => toForm(take)}>
-          Try again
-        </Button>
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={leave}>
+      <div className="flex gap-4">
+        <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" onClick={leave}>
           Close
         </Button>
-      </>
+        <Button size="xl" className="min-w-0 flex-1" onClick={() => toForm(take)}>
+          Try again
+        </Button>
+      </div>
     );
   }
 
@@ -464,7 +472,7 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
       {forLine}
       {body}
       {error && view !== "review" && view !== "clip" && (
-        <p role="alert" className="pt-6 text-md leading-md text-text-error">
+        <p role="alert" className={cn(T.body, "pt-6 text-text-error")}>
           {error}
         </p>
       )}

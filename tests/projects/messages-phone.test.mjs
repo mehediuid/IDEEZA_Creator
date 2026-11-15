@@ -22,6 +22,8 @@ import {
   putOutbox,
   quoteLineOf,
   quoteOf,
+  sameDay,
+  startPersonIdOf,
   threadRowsOf,
   unreadCountOf,
 } from "../../.tmp-test/lib/messages/phone.js";
@@ -136,4 +138,19 @@ test("the outbox keeps what couldn't go, replaces a retry in place and drops wha
   assert.deepEqual(normalizeOutbox(JSON.parse(JSON.stringify(two))), two);
   assert.deepEqual(normalizeOutbox([{ id: "x" }, "junk", null]), []);
   assert.deepEqual(normalizeOutbox("nope"), []);
+});
+
+test("a start link's bare Feed creator id is the person feed:<id>; anything else stays as it is", () => {
+  const creators = ["c1", "c2"];
+  assert.equal(startPersonIdOf("c2", creators), "feed:c2");
+  assert.equal(startPersonIdOf("feed:c2", creators), "feed:c2");
+  assert.equal(startPersonIdOf(ME, creators), ME);
+  assert.equal(startPersonIdOf("buyer-mira", creators), "buyer-mira");
+  assert.equal(startPersonIdOf("ctb_rafi", creators), "ctb_rafi");
+});
+
+test("sameDay: the quiet-mode line drops the date only for today", () => {
+  const morning = new Date(2026, 10, 12, 9, 0).getTime();
+  assert.equal(sameDay(morning, new Date(2026, 10, 12, 23, 59).getTime()), true);
+  assert.equal(sameDay(morning, new Date(2026, 10, 13, 0, 1).getTime()), false);
 });

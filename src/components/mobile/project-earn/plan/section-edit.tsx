@@ -25,12 +25,13 @@ import type { PlanSection, PricingTier } from "@/lib/manual/business-plan";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { Sheet } from "../../kit/sheet";
-import { Chevron } from "../../project/parts";
+import { Chevron } from "../../kit/list";
 import { EARN_NOTE } from "../parts";
 import { FIELD_LABEL } from "./section-view";
+import { T } from "../../type";
 
 const IMPROVE_CHIPS = ["Make it shorter", "Add more detail", "More formal tone"];
-const BLOCK = "rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default p-6";
+const BLOCK = "rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-6";
 
 /** ⋯ › Edit: which written section to edit. */
 export function SectionPickSheet({
@@ -57,7 +58,7 @@ export function SectionPickSheet({
               }}
               className="flex min-h-[44px] w-full items-center gap-4 rounded-md px-8 py-3 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
             >
-              <span className="min-w-0 flex-1 truncate text-lg leading-lg text-text-primary">{s.title}</span>
+              <span className={cn(T.bodyLg, "min-w-0 flex-1 truncate")}>{s.title}</span>
               <Badge tone={s.origin === "ai" ? "neutral" : "info"} className="shrink-0">
                 {provenanceLabel(s.origin)}
               </Badge>
@@ -194,11 +195,11 @@ function ImproveBlock({
   if (proposal) {
     return (
       <div className={cn(BLOCK, "flex flex-col gap-4 border-[var(--color-border-brand)] bg-bg-brand-subtle")}>
-        <p className="text-md font-semibold leading-md text-text-primary">Proposed rewrite</p>
+        <p className={T.label}>Proposed rewrite</p>
         {Object.entries(proposal).map(([key, value]) => (
           <div key={key} className="flex flex-col gap-1">
             <p className={FIELD_LABEL}>{labelize(key)}</p>
-            <p className="text-md leading-md text-text-primary">
+            <p className={cn(T.body, "text-text-primary")}>
               {isTiers(value) ? value.map((t) => `${t.name} · ${t.price}`).join(" · ") : Array.isArray(value) ? value.join(" · ") : value}
             </p>
           </div>
@@ -235,16 +236,16 @@ function ImproveBlock({
       </div>
       <p className={EARN_NOTE}>Rewrites this section only.</p>
       {failed && (
-        <p role="status" className="text-md leading-md text-text-error">
+        <p role="status" className={cn(T.body, "text-text-error")}>
           Couldn&apos;t rewrite this section. Try again in a moment.
         </p>
       )}
-      <div className="flex flex-col gap-4">
-        <Button hierarchy="secondary" size="xl" className="w-full" loading={busy} onClick={run}>
-          Improve
-        </Button>
-        <Button hierarchy="ghost" size="xl" className="w-full" disabled={busy} onClick={() => setOpen(false)}>
+      <div className="flex gap-4">
+        <Button hierarchy="ghost" size="xl" className="min-w-0 flex-1" disabled={busy} onClick={() => setOpen(false)}>
           Cancel
+        </Button>
+        <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" loading={busy} onClick={run}>
+          Improve
         </Button>
       </div>
     </div>
@@ -314,9 +315,6 @@ export function SectionEditSheet({
             >
               Save changes
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={leave}>
-              Cancel
-            </Button>
             {saveBlocked && (
               <p id={blockedId} role="status" className={EARN_NOTE}>
                 {saveBlocked}
@@ -342,7 +340,7 @@ export function SectionEditSheet({
             onChange={(v) => setDraft({ ...draft, fields: { ...draft.fields, [key]: v } })}
           />
         ))}
-        {(draft.kind === "market" || draft.kind === "pricing") && <p className="text-sm leading-sm text-text-tertiary">{ESTIMATE_NOTE}</p>}
+        {(draft.kind === "market" || draft.kind === "pricing") && <p className={cn(T.meta, "text-text-tertiary")}>{ESTIMATE_NOTE}</p>}
         <ImproveBlock
           section={draft}
           planPrompt={planPrompt}

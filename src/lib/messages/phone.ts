@@ -6,7 +6,7 @@
 // (Shared kit KIT-OF-03). Pure, relative imports.
 
 import { conversationHref, startHref, type StartParams } from "./links";
-import { contextLineOf, contextSentenceOf } from "./people";
+import { contextLineOf, contextSentenceOf, FEED_PREFIX, feedPersonId } from "./people";
 import { isUnread, stateOf } from "./rules";
 import {
   type CardRef,
@@ -38,6 +38,20 @@ export function mStartHref(p: StartParams): string {
   return phoneHrefOf(startHref(p));
 }
 
+/** Settings › Privacy & safety on the phone, opened at "Who can message you" or at Take a break
+ *  (the web's `#message` and `#take-a-break`), and its Hidden words page. */
+export const M_MESSAGE_SETTINGS_HREF = "/m/settings/privacy?open=message";
+export const M_QUIET_MODE_HREF = "/m/settings/privacy?open=break";
+export const M_HIDDEN_WORDS_HREF = "/m/settings/privacy/hidden-words";
+
+/** Who a start link's `to` names. A Feed post's link may carry its creator's bare id ("c2"):
+ *  that is the person "feed:c2", as the web's creator row writes it, so the draft finds the
+ *  creator, their block and the conversation already open with them. */
+export function startPersonIdOf(to: string, creatorIds: readonly string[]): PersonId {
+  if (to.startsWith(FEED_PREFIX) || !creatorIds.includes(to)) return to;
+  return feedPersonId(to);
+}
+
 // ─────────────────────────── words ───────────────────────────
 
 type ContextInfo = Parameters<typeof contextLineOf>[1];
@@ -50,6 +64,15 @@ export function phoneContextLineOf(c: ContextRef | null, info: ContextInfo = {})
 /** A context line in the timeline ("About the listing"), the post one in the phone's words. */
 export function phoneContextSentenceOf(c: ContextRef, info: ContextInfo = {}): string {
   return c.kind === "post" ? "About the Feed post" : contextSentenceOf(c, info);
+}
+
+/** The start card's words where the phone's Figma (MS-51b) has its own; the web's otherwise. */
+export const START_NOTHING_BODY = "Open a profile, post or listing and tap Message.";
+export const START_GONE_BODY = "It may have been deleted.";
+
+/** Whether two instants fall on the same calendar day here. */
+export function sameDay(a: number, b: number): boolean {
+  return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
 // ─────────────────────────── the list ───────────────────────────

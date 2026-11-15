@@ -8,11 +8,14 @@
 // the model, then Generate project video — rendered in this browser by the
 // web's video jobs (it keeps going if you leave). A render in progress shows
 // its progress with Cancel render. A finished take nobody chose yet comes
-// first (`?review=` or the status's own): Use this video · Make another take
-// (the same scenes) · Change scenes · Decide later.
+// first (`?review=` or the status's own): Use this video in the bar (the note
+// above it while another take is in use), then Make another take (the same
+// scenes) · Change scenes · Decide later as rows, as the product video's
+// review draws them (project-earn/video/review.tsx). While it can't be made
+// yet (11q, blocked), each product is listed with its video's state and the
+// web's action (Generate AI video…), so the screen is never a dead end.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
@@ -35,11 +38,16 @@ import { PROJECT_VIDEO_KEY, VIDEO_QUALITY, qualityOpen, type JoinPlan, type OnSc
 import { HIGH_LOCKED_NOTE, LINE_MAX, PROJECT_HONESTY, RENDER_KEEPS_RUNNING } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
+import { ChoiceList, UseBar } from "../project-earn/video/review";
 import { useToast } from "../kit/toast";
+import { useGoBack } from "../nav-trail";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
+import type { Ready } from "./context";
 import { Thumb } from "./parts";
-import { ProjectLoading } from "./project-screen";
+import { ProjectLoading, ProjectMissing } from "./project-screen";
+import { ReadinessRows, useReadinessOf } from "./sheets";
 import { PhoneVideo } from "./video";
 
 const secs = (ms: number) => `${Math.round(ms / 100) / 10} s`;
@@ -47,27 +55,22 @@ const secs = (ms: number) => `${Math.round(ms / 100) / 10} s`;
 export function ProjectVideoScreen({ projectId, reviewId }: { projectId: string; reviewId: string | null }) {
   const data = useProjectPageData(projectId, "project");
   if (data.state === "loading") return <ProjectLoading />;
-  if (data.state === "missing")
-    return (
-      <Screen top={<TopBar back="/m/projects" />} className="px-8">
-        <p className="pt-8 text-lg font-semibold leading-lg text-text-primary">We couldn&apos;t find this project</p>
-      </Screen>
-    );
-  return <ProjectVideo project={data.project} products={data.view.products} reviewId={reviewId} />;
+  if (data.state === "missing") return <ProjectMissing />;
+  return <ProjectVideo data={data} reviewId={reviewId} />;
 }
 
-function ProjectVideo({
-  project,
-  products,
-  reviewId,
-}: {
-  project: { id: string; name: string; description: string };
-  products: ReturnType<typeof currentProductsOf>;
-  reviewId: string | null;
-}) {
-  const router = useRouter();
+/** 11q · nothing to make yet: each product's video, with the way to make the ones missing. */
+function Blocked({ data }: { data: Ready }) {
+  const readiness = useReadinessOf(data.project, data.view, data.brief, "videos");
+  return <ReadinessRows readiness={readiness} projectId={data.project.id} projectVideo={false} />;
+}
+
+function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null }) {
+  const { project } = data;
+  const products = data.view.products;
   const toast = useToast();
   const back = phoneProjectHref(project.id, "media");
+  const goBack = useGoBack(back);
   const { record, hydrated } = useProjectVideos(project.id);
   const { jobs, now, hydrated: jobsHydrated, startProjectVideo, saveDraft, cancelRender, pickTake, declineTake, acknowledge } = useVideoJobs();
   const { sub } = useCreatePlan();
@@ -138,7 +141,7 @@ function ProjectVideo({
     if (!reviewTake) return;
     if (!pickTake(project.id, PROJECT_VIDEO_KEY, reviewTake.id).ok) return setError(WRITE_ERROR_MESSAGE);
     toast({ title: `Take ${reviewTake.n} is now the project video.` });
-    router.push(back);
+    goBack();
   };
   const anotherTake = () => {
     if (!reviewTake || !fresh) return;
@@ -170,42 +173,37 @@ function ProjectVideo({
     body = (
       <div className="flex flex-col gap-6">
         <PhoneVideo takeId={reviewTake.id} label={`${project.name} project video, take ${reviewTake.n}`} />
-        <p className="text-sm leading-sm text-text-secondary">
+        <p className={T.meta}>
           Take {reviewTake.n} · {VIDEO_QUALITY[reviewTake.quality].resolution}
           {reviewTake.clip ? ` · ${secs(reviewTake.clip.durationMs)}` : ""}
         </p>
-        <h2 className="text-lg font-semibold leading-lg text-text-primary">Is this the video you want?</h2>
-        {status.video.state === "ready" && status.video.take.id !== reviewTake.id && (
-          <p className="text-md leading-md text-text-secondary">Take {status.video.take.n} stays in use until you choose.</p>
-        )}
+        <h2 className={T.section}>Is this the video you want?</h2>
+        {/* One primary in the bar; the other answers are rows (the product video's review). */}
+        <ChoiceList
+          label="Other choices"
+          choices={[
+            ...(fresh ? [{ title: "Make another take", text: "The same scenes, a new render", onClick: anotherTake }] : []),
+            { title: "Change scenes", text: "The intro, the order, the labels", onClick: changeScenes },
+            { title: "Decide later", text: "Keep it to review from the row", onClick: goBack },
+          ]}
+        />
       </div>
     );
     footer = (
-      <>
-        <Button size="xl" className="w-full" onClick={useIt}>
-          Use this video
-        </Button>
-        {fresh && (
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={anotherTake}>
-            Make another take
-          </Button>
-        )}
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={changeScenes}>
-          Change scenes
-        </Button>
-        <Button hierarchy="ghost" size="xl" className="w-full" onClick={() => router.push(back)}>
-          Decide later
-        </Button>
-      </>
+      <UseBar
+        label="Use this video"
+        note={status.video.state === "ready" && status.video.take.id !== reviewTake.id ? `Take ${status.video.take.n} stays in use until you choose.` : null}
+        onUse={useIt}
+      />
     );
   } else if (renderingTake && !editing) {
     const p = renderingJob ? progressOf(renderingJob, now) : null;
     const pct = p ? p.total : 0;
     body = (
       <div className="flex flex-col gap-6">
-        <h2 className="text-lg font-semibold leading-lg text-text-primary">Making take {renderingTake.n}</h2>
+        <h2 className={T.section}>Making take {renderingTake.n}</h2>
         <ProgressBar value={pct} label={`${project.name} project video`} />
-        <p className="text-md leading-md text-text-secondary">{RENDER_KEEPS_RUNNING}</p>
+        <p className={T.body}>{RENDER_KEEPS_RUNNING}</p>
       </div>
     );
     footer = (
@@ -213,18 +211,21 @@ function ProjectVideo({
         <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => cancelRender(renderingTake.id)}>
           Cancel render
         </Button>
-        <Button hierarchy="ghost" size="xl" className="w-full" onClick={() => router.push(back)}>
+        <Button hierarchy="ghost" size="xl" className="w-full" onClick={goBack}>
           Close
         </Button>
       </>
     );
   } else if (!plan) {
     body = (
-      <Banner tone="info" title="Not yet">
-        {status.state === "waiting"
-          ? `The project video is made from every product's video. ${status.ready} of ${status.total} are ready.`
-          : "Every current product needs a video in use first."}
-      </Banner>
+      <div className="flex flex-col gap-6">
+        <Banner tone="info" title="Not yet">
+          {status.state === "waiting"
+            ? `The project video is made from every product's video. ${status.ready} of ${status.total} are ready.`
+            : "Every current product needs a video in use first."}
+        </Banner>
+        <Blocked data={data} />
+      </div>
     );
   } else {
     const total = joinLengthMs(plan);
@@ -239,8 +240,8 @@ function ProjectVideo({
     const locked = !qualityOpen("high", sub.tier);
     body = (
       <div className="flex flex-col gap-6">
-        <p className="text-sm leading-sm text-text-secondary">{project.name} · made from your product videos</p>
-        <div aria-hidden className="flex h-[28px] overflow-hidden rounded-md border-[length:var(--border-width-1)] border-solid border-border text-xs leading-xs">
+        <p className={T.meta}>{project.name} · made from your product videos</p>
+        <div aria-hidden className={cn(T.micro, "flex h-[28px] overflow-hidden rounded-md border-[length:var(--border-width-1)] border-solid border-border")}>
           <span className="flex items-center justify-center bg-bg-brand-subtle px-2 text-text-brand" style={{ flexGrow: INTRO_MS }}>
             Intro
           </span>
@@ -253,7 +254,7 @@ function ProjectVideo({
             Outro
           </span>
         </div>
-        <p className="flex justify-between gap-4 text-sm leading-sm text-text-secondary">
+        <p className={cn(T.meta, "flex justify-between gap-4")}>
           <span>
             {secs(total)} in all · each product {secs(each)}
           </span>
@@ -270,8 +271,8 @@ function ProjectVideo({
             <div className="flex min-w-0 flex-1 flex-col gap-3">
               <div className="flex items-center gap-4">
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-md font-medium leading-md text-text-primary">{nameOf(c.productId)}</span>
-                  <span className="text-sm leading-sm text-text-secondary">{secs(c.ms)} from its video</span>
+                  <span className={cn(T.rowTitle, "truncate")}>{nameOf(c.productId)}</span>
+                  <span className={T.meta}>{secs(c.ms)} from its video</span>
                 </span>
                 <Button hierarchy="secondary" size="xl" iconOnly aria-label={`Move ${nameOf(c.productId)} earlier`} disabled={i === 0} onClick={() => move(i, -1)}>
                   <Icon icon={ArrowUp01Icon} size={20} />
@@ -295,7 +296,7 @@ function ProjectVideo({
         </Part>
 
         <div role="radiogroup" aria-label="Video quality" className="flex flex-col gap-4">
-          <p className="text-md font-medium leading-md text-text-primary">Select video quality · {secs(total)}</p>
+          <p className={T.rowTitle}>Select video quality · {secs(total)}</p>
           {(["low", "high"] as const).map((q) => {
             const off = q === "high" && locked;
             const on = quality === q;
@@ -311,37 +312,31 @@ function ProjectVideo({
                 <input type="radio" name="m-pv-quality" className="sr-only" checked={on} disabled={off} onChange={() => setQuality(q)} />
                 <Radio checked={on} disabled={off} decorative className="mt-1" />
                 <span className="flex flex-col gap-1">
-                  <span className="flex items-center gap-4 text-md font-medium leading-md text-text-primary">
+                  <span className={cn(T.rowTitle, "flex items-center gap-4")}>
                     {VIDEO_QUALITY[q].label}
                     {q === "high" && <Badge tone="brand">Disruptor</Badge>}
                   </span>
-                  <span className="text-sm leading-sm text-text-secondary">
+                  <span className={T.meta}>
                     {secs(total)} · {VIDEO_QUALITY[q].resolution}
                   </span>
                 </span>
               </label>
             );
           })}
-          {locked && <p className="text-sm leading-sm text-text-secondary">{HIGH_LOCKED_NOTE}</p>}
+          {locked && <p className={T.meta}>{HIGH_LOCKED_NOTE}</p>}
         </div>
         <label className="flex flex-col gap-2">
-          <span className="text-md font-medium leading-md text-text-primary">
-            Sound <span className="text-sm font-regular leading-sm text-text-secondary">Optional — left to AI when empty</span>
-          </span>
+          <span className={T.rowTitle}>Sound</span>
+          <span className={T.meta}>Optional — left to AI when empty</span>
           <TextInput size="xl" value={sound} onValueChange={setSound} placeholder="e.g. upbeat electronic, light whoosh between scenes" />
         </label>
-        <p className="text-sm leading-sm text-text-tertiary">{PROJECT_HONESTY}</p>
+        <p className={cn(T.meta, "text-text-tertiary")}>{PROJECT_HONESTY}</p>
       </div>
     );
     footer = (
-      <>
-        <Button size="xl" className="w-full" onClick={generate}>
-          Generate project video
-        </Button>
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => router.push(back)}>
-          Cancel
-        </Button>
-      </>
+      <Button size="xl" className="w-full" onClick={generate}>
+        Generate project video
+      </Button>
     );
   }
 
@@ -353,7 +348,7 @@ function ProjectVideo({
     >
       {body}
       {error && (
-        <p role="alert" className="pt-6 text-md leading-md text-text-error">
+        <p role="alert" className={cn(T.body, "pt-6 text-text-error")}>
           {error}
         </p>
       )}
@@ -364,11 +359,11 @@ function ProjectVideo({
 function Part({ label, sub, children }: { label: string; sub: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-6">
-      <span className="flex size-[56px] shrink-0 items-center justify-center rounded-md bg-bg-brand-subtle text-sm leading-sm text-text-brand">{label}</span>
+      <span className={cn(T.caption, "flex size-[56px] shrink-0 items-center justify-center rounded-md bg-bg-brand-subtle text-text-brand")}>{label}</span>
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <span className="flex flex-col">
-          <span className="text-md font-medium leading-md text-text-primary">{label}</span>
-          <span className="text-sm leading-sm text-text-secondary">{sub}</span>
+          <span className={T.rowTitle}>{label}</span>
+          <span className={T.meta}>{sub}</span>
         </span>
         {children}
       </div>

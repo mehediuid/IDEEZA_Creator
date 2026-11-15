@@ -4,20 +4,32 @@
 // · 11s: opened directly while the phone hasn't been asked yet, the app asks
 //   first (Use your camera?); from Generate video it has already asked.
 // · 11u ready to record → 11c recording: the live camera full screen, the one
-//   exit (✕), the guide card, the REC timer, the progress and "0:04 of 0:10",
-//   the shutter; it stops itself at 10 seconds (MediaRecorder, video only).
-// · 11t camera off: why, in words (turned off, no camera, can't record in
-//   this browser), Try again (the browser can't open the phone's Settings, so
-//   after turning it on there the maker asks again here) and Upload a video.
+//   exit (✕), Flash and Flip in the bar's right slot, the guide card, the REC
+//   timer, the progress and "0:04 of 0:10", the shutter; it stops itself at
+//   10 seconds (MediaRecorder).
+//   - Flip switches between the back and the front camera (`facingMode`),
+//     reopening the stream; it hides while recording.
+//   - Flash is the camera's torch (`applyConstraints({ advanced: [{ torch }] })`)
+//     where the track has one; otherwise it stays off and says "Flash isn't
+//     available on this camera".
+//   - Sound: before the first recording the kit's microphone pre-prompt
+//     (KIT-PM-03) says why; Continue records with sound, Not now (or a
+//     microphone turned off) records the clip without it.
+// · While the camera opens, Upload a video is already there (a slow or ignored
+//   phone prompt is never a dead end).
+// · 11t camera off: why, in words (turned off — with how to turn it on —
+//   busy, no camera, can't record in this browser), Try again (the browser
+//   can't open the phone's Settings, so after turning it on there the maker
+//   asks again here) and Upload a video.
 // · 11d Your clip: the clip, "10-second clip · Recorded on this phone · …",
-//   Use this clip (11v while it is kept; 11w when it couldn't be; 11x waits for
-//   a connection), Record again, Decide later (kept as a take to review from
-//   the row). A kept clip is a take of the product in the web's own record, so
-//   the Media tab and the Sell / Give readiness count it once it is in use.
-// Flash and flip wait on decision D-8.
+//   the didn't-send / offline banner, Record again and Decide later (kept as
+//   a take to review from the row) as rows; Use this clip at the foot (11v
+//   while it is kept; 11w when it couldn't be; 11x waits for a connection).
+//   A kept clip is a take of the product in the web's own record, so the
+//   Media tab and the Sell / Give readiness count it once it is in use.
 
 import * as React from "react";
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { CameraRotated01Icon, Cancel01Icon, FlashIcon, FlashOffIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
@@ -25,20 +37,29 @@ import { IconButton } from "@/components/ideeza/icon-button";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { Spinner } from "@/components/ideeza/spinner";
 import type { VideoTarget } from "@/components/video-jobs/generate-video-dialog";
+import { readPhone, updatePhone } from "@/lib/account/phone";
 import { formatDate } from "@/lib/manual/project-summary";
 import {
   CAMERA_TROUBLE_COPY,
+  FLASH_UNAVAILABLE,
   RECORD_MS,
+  SILENT_CLIP,
+  cameraCanRetry,
   cameraTroubleOf,
   clipMetaOf,
+  flashLabel,
+  flipFacing,
   pickRecorderMime,
   recordClock,
+  type CameraFacing,
   type CameraTrouble,
   type ClipOrigin,
 } from "@/lib/video/phone-video";
 import { clockOf, renderTitle } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../../kit/bottom-bar";
+import { MEDIA_GROUND, MEDIA_INK } from "../../kit/media";
+import { PermissionSheet } from "../../kit/permission-sheet";
 import { useOnline } from "../../kit/states";
 import { useToast } from "../../kit/toast";
 import { HomeIndicator } from "../../home-indicator";
@@ -46,8 +67,9 @@ import { Screen } from "../../screen";
 import { StatusBar } from "../../status-bar";
 import { TopBar } from "../../top-bar";
 import { CameraAskSheet, cameraPermission } from "./camera-ask";
-import { ChoiceList, clipKeptLine } from "./review";
+import { ChoiceList, UseBar, clipKeptLine } from "./review";
 import { VideoLoading, VideoUnavailable, keepClip, useLeave, useVideoScope, type ClipToKeep } from "./target";
+import { T } from "../../type";
 
 const TITLE = "Your clip";
 
@@ -131,21 +153,33 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
   const poster = React.useRef<Blob | null>(null);
   const upload = React.useRef<HTMLInputElement>(null);
   const alive = React.useRef(true);
+  const [facing, setFacing] = React.useState<CameraFacing>("environment");
+  const [flash, setFlash] = React.useState({ can: false, on: false });
+  // Sound: the microphone's own stream, asked for at the first recording.
+  const mic = React.useRef<MediaStream | null>(null);
+  const [askMic, setAskMic] = React.useState(false);
+  const silent = React.useRef(false);
+  const saidSilent = React.useRef(false);
+  const starting = React.useRef(false);
 
   const stopStream = React.useCallback(() => {
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
+    mic.current?.getTracks().forEach((t) => t.stop());
+    mic.current = null;
   }, []);
 
-  const open = React.useCallback(async () => {
+  const open = React.useCallback(async (face: CameraFacing = "environment") => {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setPhase({ kind: "off", trouble: "unsupported" });
       return;
     }
     setPhase({ kind: "opening" });
+    // One camera at a time: the other side opens once this one is let go.
+    stopStream();
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: { ideal: face }, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       if (!alive.current) {
@@ -153,12 +187,29 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
         return;
       }
       stream.current = s;
+      const caps = s.getVideoTracks()[0]?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined;
+      setFlash({ can: caps?.torch === true, on: false });
+      setFacing(face);
       setElapsed(0);
       setPhase({ kind: "ready" });
     } catch (e) {
       if (alive.current) setPhase({ kind: "off", trouble: cameraTroubleOf(e instanceof Error ? e.name : null) });
     }
-  }, []);
+  }, [stopStream]);
+
+  const flip = () => void open(flipFacing(facing));
+  const toggleFlash = async () => {
+    const track = stream.current?.getVideoTracks()[0];
+    if (!track || !flash.can) return toast({ title: FLASH_UNAVAILABLE });
+    const on = !flash.on;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+      if (alive.current) setFlash({ can: true, on });
+    } catch {
+      if (alive.current) setFlash({ can: false, on: false });
+      toast({ title: FLASH_UNAVAILABLE });
+    }
+  };
 
   // First the app's own ask (11s) while the phone hasn't been asked; then the camera.
   React.useEffect(() => {
@@ -175,6 +226,7 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
       alive.current = false;
       if (recorder.current?.state === "recording") recorder.current.stop();
       stream.current?.getTracks().forEach((t) => t.stop());
+      mic.current?.getTracks().forEach((t) => t.stop());
     };
   }, [asked, open]);
 
@@ -222,9 +274,11 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
     const s = stream.current;
     if (!s) return;
     const mime = pickRecorderMime((m) => MediaRecorder.isTypeSupported(m));
+    // The picture, and the microphone's sound when there is one.
+    const source = mic.current ? new MediaStream([...s.getVideoTracks(), ...mic.current.getAudioTracks()]) : s;
     let rec: MediaRecorder;
     try {
-      rec = mime ? new MediaRecorder(s, { mimeType: mime }) : new MediaRecorder(s);
+      rec = mime ? new MediaRecorder(source, { mimeType: mime }) : new MediaRecorder(source);
     } catch {
       setPhase({ kind: "off", trouble: "unsupported" });
       return;
@@ -244,6 +298,34 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
   const stop = React.useCallback(() => {
     if (recorder.current?.state === "recording") recorder.current.stop();
   }, []);
+  /** Starts the clip, with the microphone's sound when `sound` and the phone allows it. */
+  const begin = async (sound: boolean) => {
+    if (starting.current) return;
+    starting.current = true;
+    try {
+      if (sound && !mic.current) {
+        try {
+          mic.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch {
+          mic.current = null;
+        }
+      }
+      if (!alive.current) return;
+      if (!mic.current && !saidSilent.current) {
+        saidSilent.current = true;
+        toast({ title: SILENT_CLIP });
+      }
+      record();
+    } finally {
+      starting.current = false;
+    }
+  };
+  /** The shutter: the app says why it wants the microphone before the phone asks (KIT-PM-03). */
+  const shutter = () => {
+    if (silent.current) void begin(false);
+    else if (readPhone().micAsked) void begin(true);
+    else setAskMic(true);
+  };
 
   // The clock while recording: the poster at 1.5 s, and the stop at 10.
   React.useEffect(() => {
@@ -291,7 +373,7 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
   };
   const recordAgain = () => {
     setUploadError(null);
-    void open();
+    void open(facing);
   };
   const close = () => {
     stop();
@@ -319,31 +401,41 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
     const { clip, sending } = phase;
     const busy = sending === "busy";
     return (
-      <Screen top={<TopBar back title={TITLE} />} className="px-8 pb-12">
-        <p className="pb-8 text-sm leading-sm text-text-secondary">{renderTitle(`For ${target.productName}`, target.projectName)}</p>
+      <Screen
+        top={<TopBar back title={TITLE} />}
+        footer={
+          <BottomBar className="gap-6 pt-8">
+            <UseBar
+              label={busy ? "Sending your clip…" : !online ? "Waiting for a connection" : sending === "failed" ? "Try again" : "Use this clip"}
+              disabled={!online}
+              loading={busy}
+              onUse={() => void keep(true)}
+            />
+          </BottomBar>
+        }
+        className="px-8 pb-12"
+      >
+        <p className={cn(T.meta, "pb-8")}>{renderTitle(`For ${target.productName}`, target.projectName)}</p>
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-4">
-            <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-md bg-bg-inverse">
+            <div className={cn(MEDIA_GROUND, "relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-md")}>
               <video src={clip.url} controls playsInline preload="metadata" aria-label={`${target.productName} clip`} className="size-full object-contain" />
             </div>
-            <p className="text-sm leading-sm text-text-secondary">{clipMetaOf(clip.durationMs, clip.how, formatDate(clip.madeAt))}</p>
-            <p className="text-sm leading-sm text-text-secondary">{clipKeptLine(target.productName)}</p>
+            <p className={T.meta}>{clipMetaOf(clip.durationMs, clip.how, formatDate(clip.madeAt))}</p>
+            <p className={T.meta}>{clipKeptLine(target.productName)}</p>
           </div>
-          <div className="flex flex-col gap-6">
-            <h2 className="text-lg font-semibold leading-lg text-text-primary">Is this the clip you want?</h2>
-            {sending === "failed" && (
-              <Banner tone="error" title="Your clip didn’t send">
-                Check your connection and try again. The clip is still on this phone.
-              </Banner>
-            )}
-            {!online && (
-              <Banner tone="attention" title="You’re offline">
-                Your clip stays on this phone. You can send it when you’re back online.
-              </Banner>
-            )}
-            <Button size="xl" className="w-full" disabled={!online} loading={busy} onClick={() => void keep(true)}>
-              {busy ? "Sending your clip…" : !online ? "Waiting for a connection" : sending === "failed" ? "Try again" : "Use this clip"}
-            </Button>
+          {sending === "failed" && (
+            <Banner tone="error" title="Your clip didn’t send">
+              Check your connection and try again. The clip is still on this phone.
+            </Banner>
+          )}
+          {!online && (
+            <Banner tone="attention" title="You’re offline">
+              Your clip stays on this phone. You can send it when you’re back online.
+            </Banner>
+          )}
+          <div className="flex flex-col gap-4">
+            <h2 className={T.section}>Is this the clip you want?</h2>
             <ChoiceList
               label="Other choices"
               choices={[
@@ -361,7 +453,7 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
   const recording = phase.kind === "recording";
   const shown = recording ? elapsed : 0;
   return (
-    <div data-theme="light" className="relative flex h-full flex-col overflow-hidden bg-bg-inverse font-sans">
+    <div data-theme="light" className={cn(MEDIA_GROUND, "relative flex h-full flex-col overflow-hidden font-sans")}>
       {live && (
         <video ref={preview} muted playsInline autoPlay aria-label="Camera preview" className="absolute inset-0 size-full object-cover" />
       )}
@@ -369,17 +461,37 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
         <StatusBar tone="media" />
         <div className="flex items-center gap-4 px-8 pt-2">
           <IconButton hierarchy="secondary" size="xl" aria-label="Close the camera" icon={<Icon icon={Cancel01Icon} size={22} />} onClick={close} />
-          <span className="flex-1" />
-          {recording && (
-            <span className="rounded-full bg-bg-error px-4 py-1 text-sm leading-sm text-text-inverse tabular-nums">
-              REC {clockOf(Math.min(elapsed, RECORD_MS))}
-            </span>
+          <span className="flex flex-1 justify-center">
+            {recording && (
+              <span className={cn(T.caption, MEDIA_INK, "rounded-full bg-bg-error px-4 py-1 tabular-nums")}>REC {clockOf(Math.min(elapsed, RECORD_MS))}</span>
+            )}
+          </span>
+          {live && (
+            <IconButton
+              hierarchy="secondary"
+              size="xl"
+              aria-label={flashLabel(flash.can, flash.on)}
+              aria-pressed={flash.can ? flash.on : undefined}
+              aria-disabled={!flash.can || undefined}
+              className={cn(!flash.can && "opacity-60")}
+              icon={<Icon icon={flash.on ? FlashIcon : FlashOffIcon} size={22} />}
+              onClick={() => void toggleFlash()}
+            />
+          )}
+          {phase.kind === "ready" && (
+            <IconButton
+              hierarchy="secondary"
+              size="xl"
+              aria-label={facing === "environment" ? "Switch to the front camera" : "Switch to the back camera"}
+              icon={<Icon icon={CameraRotated01Icon} size={22} />}
+              onClick={flip}
+            />
           )}
         </div>
         {live && (
-          <div className="mx-8 mt-4 flex flex-col gap-1 rounded-xl bg-[color-mix(in_srgb,var(--color-bg-inverse)_80%,transparent)] px-8 py-6 text-text-inverse">
-            <p className="text-md font-medium leading-md">{recording ? "Record a 10-second clip" : "Ready when you are"}</p>
-            <p className="text-sm leading-sm">
+          <div className={cn(MEDIA_INK, "mx-8 mt-4 flex flex-col gap-1 rounded-xl bg-[color-mix(in_srgb,var(--color-bg-inverse)_80%,transparent)] px-8 py-6")}>
+            <p className={cn(T.rowTitle, MEDIA_INK)}>{recording ? "Record a 10-second clip" : "Ready when you are"}</p>
+            <p className={cn(T.meta, MEDIA_INK)}>
               {recording
                 ? "Walk around the product. The app trims it and sends it here."
                 : "Hold the phone steady, tap the button, then walk slowly around the product for 10 seconds."}
@@ -388,21 +500,26 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
         )}
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-16 text-center text-text-inverse">
+      <div className={cn(MEDIA_INK, "relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-16 text-center")}>
         {phase.kind === "opening" && (
-          <p role="status" className="flex items-center gap-4 text-md leading-md">
-            <Spinner size={20} />
-            Opening the camera…
-          </p>
+          <>
+            <p role="status" className={cn(T.body, MEDIA_INK, "flex items-center gap-4")}>
+              <Spinner size={20} />
+              Opening the camera…
+            </p>
+            <Button hierarchy="inverse" size="xl" className="mt-6" onClick={() => upload.current?.click()}>
+              Upload a video
+            </Button>
+          </>
         )}
         {phase.kind === "off" && (
           <>
-            <p className="text-md font-medium leading-md">{CAMERA_TROUBLE_COPY[phase.trouble].title}</p>
-            <p className="text-sm leading-sm">{CAMERA_TROUBLE_COPY[phase.trouble].text}</p>
+            <p className={cn(T.rowTitle, MEDIA_INK)}>{CAMERA_TROUBLE_COPY[phase.trouble].title}</p>
+            <p className={cn(T.meta, MEDIA_INK)}>{CAMERA_TROUBLE_COPY[phase.trouble].text}</p>
           </>
         )}
         {uploadError && (
-          <p role="alert" className="pt-4 text-sm leading-sm">
+          <p role="alert" className={cn(T.meta, MEDIA_INK, "pt-4")}>
             {uploadError}
           </p>
         )}
@@ -411,7 +528,7 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
       {phase.kind === "off" ? (
         <div className="relative">
           <BottomBar className="gap-6 border-t-0 bg-transparent pt-8">
-            {phase.trouble === "denied" && (
+            {cameraCanRetry(phase.trouble) && (
               <Button size="xl" className="w-full" onClick={recordAgain}>
                 Try again
               </Button>
@@ -425,12 +542,12 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
       ) : (
         <div className="relative flex flex-col items-center gap-6 bg-[color-mix(in_srgb,var(--color-bg-inverse)_90%,transparent)] px-16 pt-8">
           <ProgressBar value={(shown / RECORD_MS) * 100} label="Recording" />
-          <p className="text-sm leading-sm text-text-inverse tabular-nums">{recordClock(shown)}</p>
+          <p className={cn(T.meta, MEDIA_INK, "tabular-nums")}>{recordClock(shown)}</p>
           <button
             type="button"
             aria-label={recording ? "Stop recording" : "Start recording"}
             disabled={phase.kind !== "ready" && !recording}
-            onClick={recording ? stop : record}
+            onClick={recording ? stop : shutter}
             className="inline-flex size-[72px] items-center justify-center rounded-full border-[length:var(--border-width-2)] border-solid border-[color:var(--color-text-inverse)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-border-focus-inverse)] disabled:opacity-50"
           >
             <span aria-hidden className={cn("bg-[var(--color-icon-error)]", recording ? "size-[28px] rounded-md" : "size-[56px] rounded-full")} />
@@ -439,6 +556,21 @@ function ArCamera({ target, fromVideo, asked }: { target: VideoTarget; fromVideo
         </div>
       )}
       {uploadInput}
+      <PermissionSheet
+        kind="microphone"
+        open={askMic}
+        body="To record sound with your clip."
+        onContinue={() => {
+          updatePhone({ micAsked: true });
+          setAskMic(false);
+          void begin(true);
+        }}
+        onNotNow={() => {
+          // Asked again next time; this visit records without sound.
+          silent.current = true;
+          setAskMic(false);
+        }}
+      />
       <CameraAskSheet
         open={phase.kind === "ask"}
         onAllow={() => void open()}

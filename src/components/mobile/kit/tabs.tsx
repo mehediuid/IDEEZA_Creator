@@ -100,7 +100,7 @@ export function MobileTabs<V extends string>({
       aria-label={label}
       onKeyDown={(e) => moveTab(e, enabled, value, onChange)}
       className={cn(
-        "flex shrink-0 border-b-[length:var(--border-width-1)] border-solid border-border-default",
+        "flex shrink-0 border-b-[length:var(--border-width-1)] border-solid border-border",
         width === "hug" && "gap-8",
         className,
       )}

@@ -1,89 +1,133 @@
 "use client";
 
 // Earn on the phone (Figma "Project Details · 2026 update" 12–17; the web's
-// /projects/[id]/earn at 375 px, its words kept): the top bar "Earn" with Back
-// to the project and, once there is something to see, Preview as others see
-// it (the web header's ghost link, in the bar's right slot); the project's
-// name with the one status pill from the commercial axis (`earnStatusOf`) and
-// the lock line once sold in full; the tabs Overview · Sell · Business plan ·
-// Money, which scroll sideways as on the web, each its own address so Back
-// and a reload keep it. The tab's body scrolls under them.
+// /projects/[id]/earn, its words kept), as a native hub, not four tabs:
+// · the hub (`/earn`): the top bar "Earn" (Back to the project; it takes the
+//   project's name once the large title scrolls away; ⋯ holds Preview as
+//   others see it and Sell copies of a product), the name once as the large
+//   title with the one status pill from the commercial axis (`earnStatusOf`)
+//   and the lock line once sold in full, then the summary, the rows Sell ·
+//   Business plan · Money and the state's one action at the foot
+//   (overview-tab.tsx);
+// · a section (`/earn/sell`, `/earn/plan`, `/earn/money`): its own screen,
+//   the top bar "‹ {Section}" (Back to the hub) with the section's ⋯, its
+//   content and its one primary at the foot.
+// A row opens its section in place: the address is pushed (pushState — no
+// fetch, works offline) and Back pops it, so the hub comes back; a link or a
+// reload opens the section's own address. A `#part` (`#copies`, `#customers`)
+// is scrolled to once the section shows.
 //
-// Owner only (`canOpenEarn`): anyone else gets "Only the owner can manage
-// earning". Bones while the stores are read; an unknown address says so.
+// Owner only (`canOpenEarn`): anyone else — a Feed sample included — gets
+// "Only the owner can manage earning". Bones while the stores are read; an
+// unknown address says the project isn't here.
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { EyeIcon, FolderSearchIcon, LockIcon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Badge } from "@/components/ideeza/badge";
-import { buttonVariants } from "@/components/ideeza/button";
+import { usePathname, useRouter } from "next/navigation";
+import { LockIcon, ShoppingBag01Icon, ViewIcon } from "@hugeicons/core-free-icons";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { StateCard } from "@/components/ideeza/state-card";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { commercialFactsOf, commercialStateOf } from "@/lib/commerce/state";
 import type { EarnSection } from "@/lib/manual/earn-route";
-import { canOpenEarn, earnStatusOf } from "@/lib/manual/earn-view";
-import { labelOf } from "@/lib/manual/journey";
+import { canOpenEarn, earnNextOf } from "@/lib/manual/earn-view";
 import { can, hasAudience } from "@/lib/manual/permissions";
-import { PHONE_EARN_TABS, phoneEarnHref, phonePreviewHref } from "@/lib/manual/phone-earn";
-import { headerText } from "@/lib/manual/project-summary";
-import { cn } from "@/lib/utils";
+import { PHONE_EARN_TABS, parsePhoneEarnSection, phoneEarnHref, phonePreviewHref } from "@/lib/manual/phone-earn";
+import { sampleProjectOf } from "@/lib/manual/phone-project";
+import { ActionSheet, type ActionSheetItem } from "../kit/sheet";
+import { EmptyState, NotFoundState } from "../kit/state";
 import { OfflineBanner } from "../kit/states";
 import { Screen } from "../screen";
-import { TopBar } from "../top-bar";
+import { MORE_ICON, TopBar, type TopBarAction } from "../top-bar";
 import type { Ready } from "../project/context";
 import { EarnProvider, type EarnCtx } from "./context";
 import { EarnMoneyTab } from "./money-tab";
-import { EarnOverviewTab } from "./overview-tab";
+import { EarnHub } from "./overview-tab";
 import { PhoneWalletScope } from "./phone-wallet";
 import { EarnPlanTab } from "./plan-tab";
 import { EarnSellTab } from "./sell-tab";
 
 export function EarnScreen({ id, section }: { id: string; section: EarnSection }) {
   const data = useProjectPageData(id, "project");
-  if (data.state === "loading") return <EarnLoading id={id} />;
-  if (data.state === "missing") return <EarnMissing />;
+  if (data.state === "loading") return <EarnLoading id={id} section={section} />;
+  if (data.state === "missing") return <EarnMissing id={id} />;
   return <EarnReady data={data} section={section} />;
 }
 
-function EarnLoading({ id }: { id: string }) {
+const LABEL: Record<EarnSection, string> = Object.fromEntries(PHONE_EARN_TABS.map((t) => [t.id, t.label])) as Record<EarnSection, string>;
+
+function EarnLoading({ id, section }: { id: string; section: EarnSection }) {
+  const hub = section === "overview";
   return (
-    <Screen top={<TopBar back={`/m/projects/${encodeURIComponent(id)}`} title="Earn" />}>
-      <div role="status" aria-label="Loading earning" className="flex flex-col gap-6 px-8 pb-8">
-        <Skeleton shape="text" size="md" />
-        <Skeleton shape="block" className="h-[40px] w-full" />
-        <Skeleton shape="block" className="h-[240px] w-full" />
-        <Skeleton shape="block" className="h-[120px] w-full" />
+    <Screen top={<TopBar back={hub ? `/m/projects/${encodeURIComponent(id)}` : phoneEarnHref(id)} title={hub ? "Earn" : LABEL[section]} />}>
+      <div role="status" aria-label="Loading earning" className="flex flex-col gap-8 px-8 pb-8 pt-2">
+        {hub && <Skeleton shape="text" size="lg" />}
+        <Skeleton shape="block" className="h-[200px] w-full" />
+        <Skeleton shape="block" className="h-[168px] w-full" />
       </div>
     </Screen>
   );
 }
 
-function EarnMissing() {
+/** Someone else's project: only its owner manages earning. */
+function OwnerOnly({ back, name }: { back: string; name: string }) {
   return (
-    <Screen top={<TopBar back="/m/projects" title="Earn" />} className="px-8 pb-8">
-      <StateCard
-        tone="empty"
-        className="w-full"
-        titleAs="h1"
-        icon={<Icon icon={FolderSearchIcon} size={32} />}
-        title="We couldn't find this project"
-        body="It may have been deleted, or it was made in another browser."
-        action={
-          <Link href="/m/projects" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-            Back to My projects
-          </Link>
-        }
-      />
+    <Screen top={<TopBar back={back} title="Earn" />} className="px-8 pb-8">
+      <EmptyState icon={LockIcon} title="Only the owner can manage earning" action={{ label: `Back to ${name}`, href: back }} />
     </Screen>
   );
 }
 
-function EarnReady({ data, section }: { data: Ready; section: EarnSection }) {
+function EarnMissing({ id }: { id: string }) {
+  // A Feed sample exists; it just isn't yours.
+  const sample = sampleProjectOf(id);
+  if (sample) return <OwnerOnly back={`/m/projects/${encodeURIComponent(id)}`} name={sample.title} />;
+  return (
+    <Screen top={<TopBar back="/m/projects" title="Earn" />} className="px-8 pb-8">
+      <NotFoundState thing="project" body="It may have been deleted, or it was made in another browser." action={{ label: "Go to My projects", href: "/m/projects" }} />
+    </Screen>
+  );
+}
+
+/** The section in the address (`…/earn` is the hub, `…/earn/<section>` the others). */
+function sectionOfPath(pathname: string): EarnSection | null {
+  const m = /\/earn(?:\/([a-z]+))?\/?$/.exec(pathname);
+  if (!m) return null;
+  return m[1] ? parsePhoneEarnSection(m[1]) : "overview";
+}
+
+/** The open section, read from the address; `open` pushes a section's address in place (no fetch). */
+function useEarnSection(projectId: string, opened: EarnSection): [EarnSection, (section: EarnSection, hash?: string) => void] {
+  const pathname = usePathname();
+  const open = React.useCallback(
+    (section: EarnSection, hash?: string) => {
+      window.history.pushState(null, "", `${phoneEarnHref(projectId, section)}${hash ? `#${hash}` : ""}`);
+    },
+    [projectId],
+  );
+  return [sectionOfPath(pathname) ?? opened, open];
+}
+
+/** The hub's large title has scrolled away (the top bar then says the project's name). Watched
+ *  again each time the hub shows, since its screen is a new one. */
+function useTitleGone(ref: React.RefObject<HTMLElement | null>, section: EarnSection): boolean {
+  const [gone, setGone] = React.useState<{ section: EarnSection; gone: boolean }>({ section, gone: false });
+  React.useEffect(() => {
+    const el = ref.current;
+    const scroller = el?.closest(".overflow-y-auto");
+    if (section !== "overview" || !el || !scroller) return;
+    const io = new IntersectionObserver(
+      ([e]) => setGone({ section, gone: !e.isIntersecting && e.boundingClientRect.top < (e.rootBounds?.top ?? 0) }),
+      { root: scroller },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, section]);
+  return gone.section === section && gone.gone;
+}
+
+function EarnReady({ data, section: opened }: { data: Ready; section: EarnSection }) {
   const { project, view, viewer, brief } = data;
   const router = useRouter();
+  const [section, openSection] = useEarnSection(project.id, opened);
   const back = `/m/projects/${encodeURIComponent(project.id)}`;
   const commercial = commercialStateOf(commercialFactsOf(project, brief, { listing: view.listing, sales: view.sales }));
   const [live, setLive] = React.useState("");
@@ -91,65 +135,57 @@ function EarnReady({ data, section }: { data: Ready; section: EarnSection }) {
     setLive("");
     window.setTimeout(() => setLive(message), 50);
   }, []);
-  const ctx = React.useMemo<EarnCtx>(() => ({ ...data, commercial, announce }), [data, commercial, announce]);
+  const [footEl, setFootEl] = React.useState<HTMLElement | null>(null);
+  const [topActions, setTopActions] = React.useState<TopBarAction[]>([]);
+  const [menu, setMenu] = React.useState(false);
+  const titleRef = React.useRef<HTMLHeadingElement>(null);
+  const titleGone = useTitleGone(titleRef, section);
+  const ctx = React.useMemo<EarnCtx>(
+    () => ({ ...data, commercial, announce, footEl, setTopActions, openSection }),
+    [data, commercial, announce, footEl, openSection],
+  );
 
-  if (!canOpenEarn(viewer)) {
-    return (
-      <Screen top={<TopBar back={back} title="Earn" />} className="px-8 pb-8">
-        <StateCard
-          tone="empty"
-          className="w-full"
-          titleAs="h1"
-          icon={<Icon icon={LockIcon} size={32} />}
-          title="Only the owner can manage earning"
-          action={
-            <Link href={back} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-              Back to {project.name}
-            </Link>
-          }
-        />
-      </Screen>
-    );
-  }
+  // A `#part` in the address is brought into view once its section shows.
+  React.useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" })));
+    return () => cancelAnimationFrame(raf);
+  }, [section]);
 
-  const status = earnStatusOf(commercial);
-  const text = headerText(view.summary, { viewer, now: { label: labelOf(view.current) } });
+  if (!canOpenEarn(viewer)) return <OwnerOnly back={back} name={project.name} />;
+
+  const hub = section === "overview";
+  const copiesOnSale = view.lock === null && view.editions.some((t) => t.listing !== null);
+  const isLive = earnNextOf(project.id, commercial, copiesOnSale).point === null;
   const preview = commercial !== "none" && can(viewer, "preview.enter") && hasAudience(view.summary.status, view.summary.showcase);
+  const hubItems: ActionSheetItem[] = [
+    ...(preview ? [{ label: "Preview as others see it", icon: ViewIcon, onSelect: () => router.push(phonePreviewHref(project.id, "buyer")) }] : []),
+    ...(isLive && commercial !== "given" ? [{ label: "Sell copies of a product", icon: ShoppingBag01Icon, onSelect: () => openSection("sell", "copies") }] : []),
+  ];
+  const actions: TopBarAction[] = hub
+    ? hubItems.length
+      ? [{ icon: MORE_ICON, label: "More earning actions", onClick: () => setMenu(true) }]
+      : []
+    : topActions;
 
   return (
     <PhoneWalletScope>
       <EarnProvider value={ctx}>
         <Screen
+          key={section}
           top={
-            <>
-              <TopBar
-                back={back}
-                title="Earn"
-                actions={preview ? [{ icon: EyeIcon, label: "Preview as others see it", onClick: () => router.push(phonePreviewHref(project.id, "buyer")) }] : []}
-              />
-              <div className="flex flex-col gap-2 px-8 pb-6">
-                <div className="flex min-w-0 items-center gap-4">
-                  <p className="min-w-0 truncate text-md font-medium leading-md text-text-primary">{project.name}</p>
-                  <Badge tone={status.tone} className="shrink-0">
-                    {status.word}
-                  </Badge>
-                </div>
-                {text.lockLine && (
-                  <p className="flex items-start gap-2 text-sm leading-sm text-text-primary">
-                    <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-                      <Icon icon={LockIcon} size={14} />
-                    </span>
-                    {text.lockLine}
-                  </p>
-                )}
-              </div>
-              <EarnTabs projectId={project.id} section={section} />
-            </>
+            hub ? (
+              <TopBar back={back} titleAs="p" title={titleGone ? project.name : "Earn"} actions={actions} />
+            ) : (
+              <TopBar back={phoneEarnHref(project.id)} title={LABEL[section]} actions={actions} />
+            )
           }
+          footer={<div ref={setFootEl} />}
         >
           <OfflineBanner />
-          <div className="px-8 pb-12 pt-8">
-            {section === "overview" && <EarnOverviewTab />}
+          <div className={hub ? "px-8 pb-12 pt-2" : "px-8 pb-12 pt-4"}>
+            {hub && <EarnHub titleRef={titleRef} />}
             {section === "sell" && <EarnSellTab />}
             {section === "plan" && <EarnPlanTab />}
             {section === "money" && <EarnMoneyTab />}
@@ -158,40 +194,8 @@ function EarnReady({ data, section }: { data: Ready; section: EarnSection }) {
             {live}
           </p>
         </Screen>
+        {hub && <ActionSheet open={menu} onClose={() => setMenu(false)} title="Earn" items={hubItems} />}
       </EarnProvider>
     </PhoneWalletScope>
-  );
-}
-
-/** M14 Tabs, Line, Width=HUG: page links that scroll sideways; the current one is brought into view. */
-function EarnTabs({ projectId, section }: { projectId: string; section: EarnSection }) {
-  const current = React.useRef<HTMLAnchorElement>(null);
-  React.useEffect(() => {
-    current.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [section]);
-  return (
-    <nav aria-label="Earn" className="border-b-[length:var(--border-width-1)] border-solid border-border-default">
-      <div className="flex overflow-x-auto pl-8 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {PHONE_EARN_TABS.map((t) => {
-          const on = t.id === section;
-          return (
-            <Link
-              key={t.id}
-              ref={on ? current : undefined}
-              href={phoneEarnHref(projectId, t.id)}
-              replace
-              scroll={false}
-              aria-current={on ? "page" : undefined}
-              className={cn(
-                "-mb-[var(--border-width-1)] flex h-[40px] shrink-0 items-center whitespace-nowrap border-b-[length:var(--border-width-2)] border-solid px-2 text-md font-medium leading-md outline-none transition-colors duration-fast focus-visible:bg-bg-subtle",
-                on ? "border-[var(--color-border-brand)] text-text-brand" : "border-transparent text-text-secondary hover:text-text-primary",
-              )}
-            >
-              {t.label}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
   );
 }

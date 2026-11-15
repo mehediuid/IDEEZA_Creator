@@ -1,9 +1,13 @@
 "use client";
 
 // AU-40 · Sign-in & security (Settings › Account), in the web's words: How
-// you sign in (Email, Password, Apple, Google, Facebook), Protection (2-step
-// sign-in, Sign in with Face ID), Your devices (also the sign-in history,
-// D-17) with Sign out of all other devices, and Delete account. AU-40b
+// you sign in (Email, Password, Google, Facebook), Protection (2-step
+// sign-in), Your devices (also the sign-in history,
+// D-17) with Sign out of all other devices, and Delete account. Drawn with
+// the Settings kit's grouped rows like every other Settings page (the mobile
+// UX pass, 2026-11-15): toggle on the right with one line, the devices as
+// rows, Sign out of all other devices an action row, Delete account the red
+// row on its own at the foot. AU-40b
 // loading, AU-40c couldn't load (the record can't be read), AU-40d offline
 // (what was read stays, changes wait). Sheets: AU-43 disconnect (neutral),
 // AU-43b can't disconnect the last way in, AU-44d turn 2-step off (password
@@ -12,15 +16,12 @@
 // the toasts the sub-screens come back with.
 
 import * as React from "react";
-import { ComputerIcon, SmartPhone01Icon, Tablet01Icon, ArrowRight01Icon, Alert02Icon } from "@hugeicons/core-free-icons";
-import Link from "next/link";
+import { ComputerIcon, Logout01Icon, SmartPhone01Icon, Tablet01Icon } from "@hugeicons/core-free-icons";
 import { useRouter } from "next/navigation";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
-import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
-import { StateCard } from "@/components/ideeza/state-card";
-import { Toggle } from "@/components/ideeza/toggle";
+import { TextInput } from "@/components/ideeza/text-input";
 import { countryOfZone, isCurrentPassword, SESSION_KEY, useAuth } from "@/lib/account/auth";
 import { countryNameOf } from "@/lib/account/countries";
 import {
@@ -30,7 +31,6 @@ import {
   linkProvider,
   phoneAccountOf,
   unlinkProvider,
-  updatePhoneAccount,
   usePhoneAccounts,
   type Provider,
 } from "@/lib/account/phone";
@@ -53,10 +53,12 @@ import { notifyStores, parseStored, useStoredKey } from "@/lib/key-store";
 import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
+import { ErrorState } from "../kit/state";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
-import { PageBones, SettingsScreen } from "./kit";
+import { PageBones, SettingsGroup, SettingsRow, SettingsScreen } from "./kit";
 import { SignOutSheet } from "./sign-out";
 
 /** What this phone is, read from the browser. */
@@ -90,98 +92,10 @@ export function useSessionAt(): number {
   return typeof v?.at === "number" ? v.at : 0;
 }
 
-function Heading({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-lg font-semibold leading-lg text-text-primary">{children}</h2>;
-}
-
-/** "Mobile / Info row": the label, its value on the right, a chevron; 44 tall. */
-function InfoRow({ label, value, onClick, href, disabled }: { label: string; value: string; onClick?: () => void; href?: string; disabled?: boolean }) {
-  const cls = cn(
-    "flex min-h-[44px] w-full items-center gap-4 rounded-md p-6 text-left outline-none transition-colors duration-fast",
-    disabled ? "cursor-not-allowed" : "hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
-  );
-  const body = (
-    <>
-      <span className={cn("flex-1 text-md leading-md", disabled ? "text-text-disabled" : "text-text-secondary")}>{label}</span>
-      <span className={cn("min-w-0 truncate text-md leading-md", disabled ? "text-text-disabled" : "text-text-primary")}>{value}</span>
-      <span className={disabled ? "text-[color:var(--color-icon-disabled)]" : "text-[color:var(--color-icon-default)]"}>
-        <Icon icon={ArrowRight01Icon} size={16} />
-      </span>
-    </>
-  );
-  if (href && !disabled)
-    return (
-      <Link href={href} className={cls}>
-        {body}
-      </Link>
-    );
-  return (
-    <button type="button" className={cls} onClick={onClick} disabled={disabled}>
-      {body}
-    </button>
-  );
-}
-
-/** A10 Toggle with its label and supporting text, the whole line one target. */
-function ToggleLine({
-  id,
-  label,
-  help,
-  checked,
-  onChange,
-  disabled,
-}: {
-  id: string;
-  label: string;
-  help: string;
-  checked: boolean;
-  onChange: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div id={id} className="flex items-start gap-8 py-2">
-      <Toggle checked={checked} onChange={onChange} disabled={disabled} aria-label={label} className="mt-1" />
-      <button type="button" disabled={disabled} onClick={onChange} className="flex flex-1 flex-col gap-2 text-left outline-none disabled:cursor-not-allowed">
-        <span className={cn("text-lg leading-lg", disabled ? "text-text-disabled" : "text-[color:var(--color-input-label)]")}>{label}</span>
-        <span className="text-sm leading-sm text-[color:var(--color-input-helper)]">{help}</span>
-      </button>
-    </div>
-  );
-}
-
 const PHONE_OS = new Set(["iOS", "Android"]);
 
 function deviceIcon(os: string) {
   return PHONE_OS.has(os) ? SmartPhone01Icon : os === "iPadOS" ? Tablet01Icon : ComputerIcon;
-}
-
-/** "Mobile / Product row": a 56 tile with the device, its name and where / when. */
-function DeviceRow({ name, line, os, demo, onClick }: { name: string; line: string; os: string; demo?: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-[80px] w-full items-center gap-6 rounded-md p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-    >
-      <span aria-hidden className="inline-flex size-[56px] shrink-0 items-center justify-center rounded-md bg-bg-subtle text-[color:var(--color-icon-default)]">
-        <Icon icon={deviceIcon(os)} size={24} />
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="flex items-center gap-4">
-          <span className="truncate text-md font-semibold leading-md text-text-primary">{name}</span>
-          {demo && (
-            <Badge tone="warning" className="shrink-0">
-              Demo
-            </Badge>
-          )}
-        </span>
-        <span className="truncate text-sm leading-sm text-text-secondary">{line}</span>
-      </span>
-      <span className="text-[color:var(--color-icon-default)]">
-        <Icon icon={ArrowRight01Icon} size={16} />
-      </span>
-    </button>
-  );
 }
 
 type Open =
@@ -223,17 +137,10 @@ export function SecuritySettings() {
   if (unreadable) {
     return (
       <SettingsScreen title="Sign-in & security" back="/m/settings/account" offlineNote={false}>
-        <StateCard
-          tone="error"
-          className="w-full"
-          icon={<Icon icon={Alert02Icon} size={32} />}
+        <ErrorState
           title="Couldn’t load Sign-in & security"
           body="Check your connection, or try again in a moment."
-          action={
-            <Button hierarchy="secondary" size="lg" onClick={notifyStores}>
-              Try again
-            </Button>
-          }
+          action={{ label: "Try again", onClick: notifyStores }}
         />
       </SettingsScreen>
     );
@@ -248,96 +155,84 @@ export function SecuritySettings() {
 
   return (
     <SettingsScreen title="Sign-in & security" back="/m/settings/account" offlineNote={false}>
-      <section className="flex flex-col gap-4" id="how-you-sign-in">
-        <Heading>How you sign in</Heading>
-        <div className="flex flex-col">
-          <InfoRow label="Email" value={email} href="/m/settings/security/email" disabled={!online} />
-          <InfoRow label="Password" value={passwordValue} href="/m/settings/security/password" disabled={!online} />
-          {PROVIDERS.map((p) => {
-            const linked = phoneAccount.providers.includes(p);
-            return (
-              <InfoRow
-                key={p}
-                label={PROVIDER_WORDS[p]}
-                value={linked ? "Connected" : "Connect"}
-                disabled={!online}
-                onClick={() =>
-                  setOpen(
-                    !linked
-                      ? { kind: "connect", provider: p }
-                      : isLastWayIn(phoneAccount, p)
-                        ? { kind: "last-way", provider: p }
-                        : { kind: "disconnect", provider: p },
-                  )
-                }
-              />
-            );
-          })}
-        </div>
-      </section>
+      <SettingsGroup id="how-you-sign-in" label="How you sign in">
+        <SettingsRow id="email" label="Email" value={email} href="/m/settings/security/email" disabled={!online} />
+        <SettingsRow id="password" label="Password" value={passwordValue} href="/m/settings/security/password" disabled={!online} />
+        {PROVIDERS.map((p) => {
+          const linked = phoneAccount.providers.includes(p);
+          return (
+            <SettingsRow
+              key={p}
+              id={p}
+              label={PROVIDER_WORDS[p]}
+              value={linked ? "Connected" : "Connect"}
+              disabled={!online}
+              onClick={() =>
+                setOpen(
+                  !linked
+                    ? { kind: "connect", provider: p }
+                    : isLastWayIn(phoneAccount, p)
+                      ? { kind: "last-way", provider: p }
+                      : { kind: "disconnect", provider: p },
+                )
+              }
+            />
+          );
+        })}
+      </SettingsGroup>
 
-      <section className="flex flex-col gap-4" id="protection">
-        <Heading>Protection</Heading>
-        <ToggleLine
+      <SettingsGroup id="protection" label="Protection">
+        {/* The full sentence ("…when you sign in on a new device") opens the setup screen. */}
+        <SettingsRow
           id="two-step"
           label="2-step sign-in"
-          help={
-            twoStepOn
-              ? `A code from an authenticator app when you sign in on a new device. ${backupLeft(security)} of 10 backup codes left.`
-              : "A code from an authenticator app when you sign in on a new device."
-          }
-          checked={twoStepOn}
-          disabled={!online}
-          onChange={() => (twoStepOn ? setOpen({ kind: "two-step-off" }) : router.push("/m/settings/security/two-step"))}
-        />
-        <ToggleLine
-          id="face-id"
-          label="Sign in with Face ID"
-          help="Also confirms withdrawals and Delete account."
-          checked={phoneAccount.faceId}
-          disabled={!online}
-          onChange={() => {
-            if (!updatePhoneAccount(email, (a) => ({ ...a, faceId: !a.faceId })).ok) failed();
+          helper={twoStepOn ? `${backupLeft(security)} of 10 backup codes left` : "A code from an authenticator app"}
+          toggle={{
+            checked: twoStepOn,
+            onChange: () => (twoStepOn ? setOpen({ kind: "two-step-off" }) : router.push("/m/settings/security/two-step")),
           }}
+          disabled={!online}
         />
-      </section>
+      </SettingsGroup>
 
-      <section className="flex flex-col gap-4" id="devices">
-        <Heading>Your devices</Heading>
-        <div className="flex flex-col">
-          <DeviceRow
-            name={`${me.name} · ${PHONE_OS.has(me.os) ? "This phone" : "This device"}`}
-            line={[me.where, "Active now"].filter(Boolean).join(" · ")}
-            os={me.os}
-            onClick={() => setOpen({ kind: "device", device: "this" })}
+      <SettingsGroup id="devices" label="Your devices">
+        <SettingsRow
+          icon={deviceIcon(me.os)}
+          label={`${me.name} · ${PHONE_OS.has(me.os) ? "This phone" : "This device"}`}
+          helper={[me.where, "Active now"].filter(Boolean).join(" · ")}
+          onClick={() => setOpen({ kind: "device", device: "this" })}
+        />
+        {others.map((d) => (
+          <SettingsRow
+            key={d.id}
+            icon={deviceIcon(d.os)}
+            label={d.name}
+            helper={[d.where.split(",")[0], `Signed in ${dates.date(d.signedInAt, { style: "day" })}`].filter(Boolean).join(" · ")}
+            badge={d.demo ? { tone: "warning", text: "Demo" } : undefined}
+            onClick={() => setOpen({ kind: "device", device: d })}
           />
-          {others.map((d) => (
-            <DeviceRow
-              key={d.id}
-              name={d.name}
-              line={[d.where.split(",")[0], `Signed in ${dates.date(d.signedInAt, { style: "day" })}`].filter(Boolean).join(" · ")}
-              os={d.os}
-              demo={d.demo}
-              onClick={() => setOpen({ kind: "device", device: d })}
-            />
-          ))}
-        </div>
-        <Button hierarchy="secondary" size="xl" className="w-full" disabled={!online || !others.length} onClick={() => setOpen({ kind: "others" })}>
-          Sign out of all other devices
-        </Button>
-        {!others.length && <p className="-mt-2 text-sm leading-sm text-text-tertiary">Only this phone is signed in.</p>}
-      </section>
+        ))}
+        <SettingsRow
+          id="sign-out-others"
+          icon={Logout01Icon}
+          label="Sign out of all other devices"
+          plain
+          onClick={() => setOpen({ kind: "others" })}
+          disabled={!online || !others.length}
+          reason={!others.length ? "Only this phone is signed in." : undefined}
+        />
+      </SettingsGroup>
 
-      <Link
-        id="delete"
-        href="/m/settings/delete"
-        aria-disabled={!online || undefined}
-        onClick={(e) => !online && e.preventDefault()}
-        className="flex flex-col gap-1 rounded-md py-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        <span className={cn("text-md leading-md", online ? "text-text-error" : "text-text-disabled")}>Delete account</span>
-        <span className="text-sm leading-sm text-text-tertiary">You have 30 days to change your mind.</span>
-      </Link>
+      <SettingsGroup>
+        <SettingsRow
+          id="delete"
+          label="Delete account"
+          helper="You have 30 days to change your mind."
+          danger
+          href="/m/settings/delete"
+          disabled={!online}
+        />
+      </SettingsGroup>
 
       <ConnectSheet
         provider={open?.kind === "connect" ? open.provider : null}
@@ -375,13 +270,10 @@ export function SecuritySettings() {
             <Button size="xl" className="w-full" onClick={() => router.push("/m/settings/security/password")}>
               Add a password
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-              Cancel
-            </Button>
           </>
         }
       >
-        <p className="text-md leading-md text-text-secondary">It’s your only way to sign in. Add a password first so you can still get in.</p>
+        <p className={T.body}>It’s your only way to sign in. Add a password first so you can still get in.</p>
       </Sheet>
       <TwoStepOffSheet
         open={open?.kind === "two-step-off"}
@@ -448,16 +340,13 @@ function ConnectSheet({
           <Button size="xl" className="w-full" onClick={() => onConnect(provider)}>
             Continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >
       <Badge tone="warning" className="self-start">
         Demo
       </Badge>
-      <p className="text-md leading-md text-text-secondary">
+      <p className={T.body}>
         Then you can sign in with {words} as <span className="text-text-primary">{email}</span>.
       </p>
     </Sheet>
@@ -527,17 +416,17 @@ function TwoStepOffSheet({
       <form id="two-step-off" noValidate onSubmit={submit}>
         <Field label={passwordless ? "Authenticator code" : "Password"} htmlFor={ids.secret.id} error={error} errorId={ids.secret.errorId}>
           {passwordless ? (
-            <input
+            <TextInput
               id={ids.secret.id}
+              size="xl"
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
               value={value}
-              onChange={(e) => {
-                setValue(e.target.value);
+              onValueChange={(v) => {
+                setValue(v);
                 setWrong(false);
               }}
-              className="h-[44px] rounded-xl border-[length:var(--border-width-1-5)] border-solid border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-6 text-lg leading-lg text-[color:var(--color-input-text)] outline-none focus-visible:border-[var(--color-input-border-focus)]"
               {...errorProps(error, ids.secret.errorId)}
             />
           ) : (
@@ -597,9 +486,6 @@ function DeviceSheet({
           <Button hierarchy="secondary" size="xl" className="w-full" disabled={!online} onClick={() => onSignOut(device)}>
             Sign out of this device
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Close
-          </Button>
         </>
       }
     >
@@ -611,8 +497,8 @@ function DeviceSheet({
       <dl className="flex flex-col">
         {rows.map(([term, value]) => (
           <div key={term} className="flex items-start justify-between gap-6 py-4">
-            <dt className="text-md leading-md text-text-secondary">{term}</dt>
-            <dd className="text-right text-md leading-md text-text-primary">{value}</dd>
+            <dt className={T.body}>{term}</dt>
+            <dd className={cn(T.body, "text-right text-text-primary")}>{value}</dd>
           </div>
         ))}
       </dl>

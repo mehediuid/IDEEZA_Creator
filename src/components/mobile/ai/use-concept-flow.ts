@@ -55,12 +55,14 @@ import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useGuards } from "@/lib/manual/use-write-guard";
 import { readSettings } from "@/lib/settings/prefs";
+import { useDates } from "@/lib/settings/use-dates";
 import { useRailModel } from "@/components/create/chat-rail";
 import { conceptLabels } from "@/components/create/chat-thread";
 import { summarizeConcept } from "@/components/create/confirm-build-dialog";
 import type { LinkChange } from "@/components/create/network-rail";
 import { useSaveMode } from "@/components/create/save-step";
 import { useBuildModel } from "@/components/create/use-build-model";
+import { useOnline } from "../kit/states";
 
 const POLL_MS = 2_500;
 /** Longer than the generator's own budget, so the server gives up first. */
@@ -154,6 +156,7 @@ export function useConceptFlow(chatId: string) {
     answerSetupTurn,
     addSetupPick,
     addSetupProduct,
+    dropSetupPick,
     setSetupLeftOut,
     startBuild,
     addBuildProduct,
@@ -165,11 +168,14 @@ export function useConceptFlow(chatId: string) {
   } = history;
   const { canAfford, charge, overCap, refund, balance, hydrated: creditsHydrated } = useCredits();
   const canRender = canAfford(CONCEPT_COST);
+  // Offline, nothing that needs the model is started: no charge, no refund, no failed card.
+  const online = useOnline();
   const chat = getChat(chatId);
 
   // The projects a single product could join: not one sold in full (the guards' lock).
   const { projects, updateProject } = useManualProjects();
   const guards = useGuards();
+  const dates = useDates();
   const addTo = React.useMemo(() => {
     const setup = chat?.turns.find((t) => t.role === "setup");
     return setup?.role === "setup" ? (setup.addTo ?? null) : null;
@@ -178,8 +184,12 @@ export function useConceptFlow(chatId: string) {
     () =>
       projects
         .filter((p) => guards.lockOf(p) === null)
-        .map((p) => ({ id: p.id, name: p.name, preselect: p.id === addTo })),
-    [projects, guards, addTo],
+        .map((p) => {
+          // Two projects can share a name, so each says what it holds and when it last changed (the web's row).
+          const n = p.products?.length || 1;
+          return { id: p.id, name: p.name, preselect: p.id === addTo, detail: `${n} product${n === 1 ? "" : "s"} · updated ${dates.date(p.updatedAt)}` };
+        }),
+    [projects, guards, addTo, dates],
   );
 
   // The latest build this chat started — derived, so a reload lands back on it.
@@ -245,16 +255,29 @@ export function useConceptFlow(chatId: string) {
       try {
         if (overCap(CONCEPT_COST)) throw new FailedRender("cap");
         if (!charge(turnId, CONCEPT_COST, "concept")) throw new FailedRender("credits");
-        const res = await fetch("/api/concept/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(readSettings().ai.volunteerPool ? input : { ...input, pool: "off" }),
-        });
-        const data = (await res.json().catch(() => ({}))) as { job?: string; reason?: ConceptFailReason };
-        if (!res.ok) throw new FailedRender(data.reason);
-        if (!data.job) throw new FailedRender();
-        setTurnJob(cid, turnId, data.job);
-        resolveAssistantTurn(cid, turnId, await pollUntilReady(data.job));
+        const draw = async (body: typeof input) => {
+          const res = await fetch("/api/concept/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(readSettings().ai.volunteerPool ? body : { ...body, pool: "off" }),
+          });
+          const data = (await res.json().catch(() => ({}))) as { job?: string; reason?: ConceptFailReason };
+          if (!res.ok) throw new FailedRender(data.reason);
+          if (!data.job) throw new FailedRender();
+          setTurnJob(cid, turnId, data.job);
+          return pollUntilReady(data.job);
+        };
+        let imageUrl: string;
+        try {
+          imageUrl = await draw(input);
+        } catch (err) {
+          // The image service's safety filter refuses ordinary product words ("shooter", "magazine")
+          // by mistake: a fresh drawing asks once more by itself, as a plain product photo, on the
+          // same charge, before the maker is handed a failure.
+          if (!(err instanceof FailedRender) || err.reason !== "filtered" || input.kind !== "fresh") throw err;
+          imageUrl = await draw({ ...input, prompt: `Studio product photo on a plain background: ${input.prompt}` });
+        }
+        resolveAssistantTurn(cid, turnId, imageUrl);
       } catch (err) {
         refund(turnId);
         failAssistantTurn(cid, turnId, err instanceof FailedRender ? err.reason : undefined);
@@ -278,7 +301,7 @@ export function useConceptFlow(chatId: string) {
   // Every pending turn is started once (or picked back up after a reload).
   const kickedOff = React.useRef<Set<string>>(new Set());
   React.useEffect(() => {
-    if (!hydrated || !chat) return;
+    if (!hydrated || !chat || !online) return;
     for (const turn of chat.turns) {
       if (turn.role !== "assistant" || turn.status !== "pending") continue;
       if (kickedOff.current.has(turn.id)) continue;
@@ -295,13 +318,13 @@ export function useConceptFlow(chatId: string) {
       void runGeneration(chat.id, turn.id, { prompt: turn.prompt, kind: turn.kind, parentImageUrl, quality: chat.quality });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs per turn list, guarded per turn id
-  }, [hydrated, chat?.id, chat?.turns]);
+  }, [hydrated, chat?.id, chat?.turns, online]);
 
   // The setup question arrives empty: what the product is and what else it
   // needs are read from the prompt alone, free, before anything is drawn.
   const classified = React.useRef<Set<string>>(new Set());
   React.useEffect(() => {
-    if (!hydrated || !chat) return;
+    if (!hydrated || !chat || !online) return;
     for (const turn of chat.turns) {
       if (turn.role !== "setup" || turn.status !== "loading") continue;
       if (classified.current.has(turn.id)) continue;
@@ -333,7 +356,7 @@ export function useConceptFlow(chatId: string) {
         });
       })();
     }
-  }, [hydrated, chat, setSetupDetails]);
+  }, [hydrated, chat, online, setSetupDetails]);
 
   // ── background reads ─────────────────────────────────────────────
   const reading = React.useRef(new Set<string>());
@@ -379,7 +402,7 @@ export function useConceptFlow(chatId: string) {
   // ── the question ─────────────────────────────────────────────────
   const answerSetup = React.useCallback(
     (answer: SetupAnswer) => {
-      if (!chat) return;
+      if (!chat || !online) return;
       const setup = chat.turns.find((t): t is SetupTurn => t.role === "setup");
       if (!setup || setup.status !== "asking") return;
       answerSetupTurn(chat.id, setup.id, answer, answer.projectName.trim() || projects.find((p) => p.id === answer.projectId)?.name);
@@ -390,7 +413,7 @@ export function useConceptFlow(chatId: string) {
         appendAssistantTurn(chat.id, { prompt: `${companion.name} for ${asPhrase(setup.prompt)}`, kind: "fresh", companionOf: companion.id });
       }
     },
-    [chat, projects, answerSetupTurn, appendAssistantTurn],
+    [chat, online, projects, answerSetupTurn, appendAssistantTurn],
   );
 
   const setupPending = !!chat?.turns.some((t) => t.role === "setup" && t.status !== "answered");
@@ -401,7 +424,7 @@ export function useConceptFlow(chatId: string) {
    *  a change to the product in focus. False when nothing was started. */
   const submit = React.useCallback(
     (text: string): boolean => {
-      if (!chat || !canRender || setupPending || held) return false;
+      if (!chat || !canRender || !online || setupPending || held) return false;
       const asked = parseProductRequest(text);
       const setup = chat.turns.find((t): t is SetupTurn => t.role === "setup" && t.status === "answered" && !!t.answer);
       if (asked && setup) {
@@ -429,13 +452,13 @@ export function useConceptFlow(chatId: string) {
       }
       return false;
     },
-    [chat, canRender, setupPending, held, target, appendUserTurn, appendAssistantTurn, addSetupProduct],
+    [chat, canRender, online, setupPending, held, target, appendUserTurn, appendAssistantTurn, addSetupProduct],
   );
 
   /** A change described in the Refine sheet, on that exact drawing. */
   const refine = React.useCallback(
     (turnId: string, text: string): boolean => {
-      if (!chat || !canRender || held) return false;
+      if (!chat || !canRender || !online || held) return false;
       const parent = chat.turns.find((x) => x.id === turnId);
       if (!parent || parent.role !== "assistant" || parent.status !== "ready" || !parent.imageUrl) return false;
       appendUserTurn(chat.id, text);
@@ -443,20 +466,20 @@ export function useConceptFlow(chatId: string) {
       setFocusedProduct(parent.companionOf ?? "primary");
       return true;
     },
-    [chat, canRender, held, appendUserTurn, appendAssistantTurn],
+    [chat, canRender, online, held, appendUserTurn, appendAssistantTurn],
   );
 
   /** A fresh take on the same product — Regenerate, and a failed card's Try again. */
   const regenerate = React.useCallback(
     (turnId: string): boolean => {
-      if (!chat || !canRender || held) return false;
+      if (!chat || !canRender || !online || held) return false;
       const source = chat.turns.find((x) => x.id === turnId);
       if (!source || source.role !== "assistant") return false;
       setFocusedProduct(source.companionOf ?? "primary");
       appendAssistantTurn(chat.id, { prompt: source.kind === "refine" ? conceptBriefOf(chat.turns, turnId) : source.prompt, kind: "fresh", companionOf: source.companionOf });
       return true;
     },
-    [chat, canRender, held, appendAssistantTurn],
+    [chat, canRender, online, held, appendAssistantTurn],
   );
 
   /** In or out of the next build — a companion only; the primary is always built. */
@@ -472,7 +495,7 @@ export function useConceptFlow(chatId: string) {
   /** A product the classifier offered and the maker passed over, drawn now. */
   const addOffered = React.useCallback(
     (companionId: string) => {
-      if (!chat || !answeredSetupId || !canRender || held) return;
+      if (!chat || !answeredSetupId || !canRender || !online || held) return;
       const setup = chat.turns.find((t): t is SetupTurn => t.id === answeredSetupId && t.role === "setup");
       const companion = setup?.companions.find((c) => c.id === companionId);
       if (!setup || !companion) return;
@@ -480,7 +503,50 @@ export function useConceptFlow(chatId: string) {
       setFocusedProduct(companionId);
       appendAssistantTurn(chat.id, { prompt: `${companion.name} for ${asPhrase(setup.prompt)}`, kind: "fresh", companionOf: companionId });
     },
-    [chat, answeredSetupId, canRender, held, addSetupPick, appendAssistantTurn],
+    [chat, answeredSetupId, canRender, online, held, addSetupPick, appendAssistantTurn],
+  );
+
+  /** Add a product by name (the web canvas's own Add a product): drawn like one asked for in
+   *  the composer. A name that was removed before comes back with its concept, free. */
+  const addProduct = React.useCallback(
+    (name: string): "added" | "restored" | null => {
+      const clean = name.trim();
+      if (!chat || !answeredSetupId || !clean || held) return null;
+      const setup = chat.turns.find((t): t is SetupTurn => t.id === answeredSetupId && t.role === "setup");
+      if (!setup) return null;
+      const id = slugFor(clean);
+      if (state.removed.some((r) => r.id === id)) {
+        addSetupPick(chat.id, setup.id, id);
+        setFocusedProduct(id);
+        return "restored";
+      }
+      if (!canRender || !online) return null;
+      const already = setup.companions.find((c) => c.id === id);
+      addSetupProduct(chat.id, setup.id, { id, name: already?.name ?? clean, why: already?.why ?? `You added ${clean.toLowerCase()}.` });
+      setFocusedProduct(id);
+      appendAssistantTurn(chat.id, { prompt: `${clean} for ${asPhrase(setup.prompt)}`, kind: "fresh", companionOf: id });
+      return "added";
+    },
+    [chat, answeredSetupId, held, state.removed, canRender, online, addSetupPick, addSetupProduct, appendAssistantTurn],
+  );
+
+  /** Out of the project (never the main product). Its concepts stay in the chat, so
+   *  putting it back draws nothing and costs nothing. */
+  const removeProduct = React.useCallback(
+    (companionId: string) => {
+      if (!chat || !answeredSetupId || held || companionId === "primary") return;
+      dropSetupPick(chat.id, answeredSetupId, companionId);
+      setFocusedProduct("primary");
+    },
+    [chat, answeredSetupId, held, dropSetupPick],
+  );
+  const restoreProduct = React.useCallback(
+    (companionId: string) => {
+      if (!chat || !answeredSetupId || held) return;
+      addSetupPick(chat.id, answeredSetupId, companionId);
+      setFocusedProduct(companionId);
+    },
+    [chat, answeredSetupId, held, addSetupPick],
   );
 
   // ── spec, quality, network ───────────────────────────────────────
@@ -554,7 +620,7 @@ export function useConceptFlow(chatId: string) {
   /** Build: every chosen product is read, one at a time, and the gate's lines
    *  worked out — or the product whose size can't be built is named. */
   const prepareBuild = React.useCallback(async (): Promise<GateResult> => {
-    if (!chat || held || preparing) return null;
+    if (!chat || held || preparing || !online) return null;
     const primary = state.products.find((t) => !t.companionOf);
     if (!primary || primary.status !== "ready" || !primary.imageUrl) return null;
     const setup = chat.turns.find((x): x is SetupTurn => x.role === "setup" && x.status === "answered" && !!x.answer);
@@ -601,12 +667,12 @@ export function useConceptFlow(chatId: string) {
     } finally {
       setPreparing(false);
     }
-  }, [chat, held, preparing, state.products, readForBuild, editsAt]);
+  }, [chat, held, preparing, online, state.products, readForBuild, editsAt]);
 
   /** Build, confirmed: one job for every chosen product. False when nothing was booked. */
   const confirmBuild = React.useCallback(
     async (gate: Gate): Promise<{ booked: boolean; blocked?: string }> => {
-      if (!chat) return { booked: false };
+      if (!chat || !online) return { booked: false };
       setSubmitting(true);
       try {
         const primaryRead = gate.read.get(gate.turnId) ?? (await summarizeConcept(gate.turnId, gate.prompt));
@@ -643,11 +709,6 @@ export function useConceptFlow(chatId: string) {
         const spec = deriveSpec(primaryRead.parts, primaryRead.hints, edits);
         const blocked = blocksBuild(spec) ? "primary" : companions.find((c) => c.spec && blocksBuild(c.spec))?.id;
         if (blocked) return { booked: false, blocked };
-        await fetch("/api/build/start", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chatId: chat.id, turnId: gate.turnId, imageUrl: gate.imageUrl, prompt: gate.prompt }),
-        }).catch(() => null);
         const answered = chat.turns.find((t): t is SetupTurn => t.role === "setup" && t.status === "answered" && !!t.answer);
         const parts = partsForBuild(primaryRead.parts, spec.battery, edits);
         startBuild({
@@ -668,12 +729,18 @@ export function useConceptFlow(chatId: string) {
             ["primary", ...companions.map((c) => c.id)].map((id) => [id, stateNow.current.picks.get(id) ?? cleanPick(undefined, chat.quality)]),
           ),
         });
+        // Booked first: the server is told without holding the sheet (a slow network can't lose the booking).
+        void fetch("/api/build/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chatId: chat.id, turnId: gate.turnId, imageUrl: gate.imageUrl, prompt: gate.prompt }),
+        }).catch(() => null);
         return { booked: true };
       } finally {
         setSubmitting(false);
       }
     },
-    [chat, labels, startBuild, editsAt, readForBuild],
+    [chat, online, labels, startBuild, editsAt, readForBuild],
   );
 
   /** The products the maker drew and then left out of this build (Build
@@ -707,7 +774,7 @@ export function useConceptFlow(chatId: string) {
   const buildLeftOut = React.useCallback(
     async (companionId: string): Promise<"booked" | "short" | { blocked: string } | null> => {
       const job = activeBuild;
-      if (!chat || !job || !answeredSetupId || preparing) return null;
+      if (!chat || !job || !answeredSetupId || preparing || !online) return null;
       const item = leftOutProducts.find((p) => p.id === companionId);
       if (!item) return null;
       if (!canAfford(item.cost)) return "short";
@@ -750,7 +817,7 @@ export function useConceptFlow(chatId: string) {
         setPreparing(false);
       }
     },
-    [chat, activeBuild, answeredSetupId, preparing, leftOutProducts, canAfford, readForBuild, editsAt, charge, addBuildProduct, setSetupLeftOut, saveInfo, updateProject],
+    [chat, activeBuild, answeredSetupId, preparing, online, leftOutProducts, canAfford, readForBuild, editsAt, charge, addBuildProduct, setSetupLeftOut, saveInfo, updateProject],
   );
 
   return {
@@ -764,6 +831,8 @@ export function useConceptFlow(chatId: string) {
     stage: rail.stage,
     balance,
     canRender,
+    online,
+    addTo,
     setupPending,
     held,
     projectName,
@@ -779,6 +848,9 @@ export function useConceptFlow(chatId: string) {
     regenerate,
     toggleInBuild,
     addOffered,
+    addProduct,
+    removeProduct,
+    restoreProduct,
     readConcept,
     rereading,
     editsFor,

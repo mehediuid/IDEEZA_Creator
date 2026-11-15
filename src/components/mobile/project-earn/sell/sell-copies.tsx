@@ -79,6 +79,7 @@ import { SheetSelect } from "../../kit/sheet-select";
 import { useEarn } from "../context";
 import { LevelCheck } from "../parts";
 import { CheckRow, SUB } from "./parts";
+import { T } from "../../type";
 
 /** Whose copies: the whole project (`PROJECT_SCOPE`), or one product. */
 export type CopyScope = { id: string; name: string; product: ProjectProduct | null };
@@ -320,7 +321,7 @@ export function SellCopiesSheet({
               {index === 0 ? "Cancel" : "Back"}
             </Button>
             {reason ? (
-              <p id={reasonId} role="alert" className="text-sm leading-sm text-text-error">
+              <p id={reasonId} role="alert" className={cn(T.meta, "text-text-error")}>
                 {reason}
               </p>
             ) : (
@@ -334,7 +335,7 @@ export function SellCopiesSheet({
         }
       >
         <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-6">
-          <p className="text-md font-medium leading-md text-text-primary">{`Step ${index + 1} of ${SELL_STEPS.length}: ${STEP_LABEL[step]}`}</p>
+          <p className={T.meta}>{`Step ${index + 1} of ${SELL_STEPS.length} · ${STEP_LABEL[step]}`}</p>
           {error && <Banner tone="error">{error}</Banner>}
           {step === "price" ? (
             <>
@@ -351,7 +352,7 @@ export function SellCopiesSheet({
                   />
                   {!err("count") && (
                     <span className={SUB}>
-                      {physical ? "List only as many as you can make and ship. A whole number from 1 to 10,000." : "Each copy is one licence. A whole number from 1 to 10,000."}
+                      {physical ? "List only as many as you can make and ship. A whole number from 1 to 10,000." : "Each copy is one license. A whole number from 1 to 10,000."}
                     </span>
                   )}
                 </Field>
@@ -394,7 +395,7 @@ export function SellCopiesSheet({
                     </span>
                   </Field>
                   <fieldset className="flex flex-col gap-2">
-                    <legend className="pb-2 text-md font-medium leading-md text-text-primary">Your promises</legend>
+                    <legend className={cn(T.label, "pb-2")}>Your promises</legend>
                     {PROMISES.map((p) => (
                       <CheckRow
                         key={p.field}
@@ -415,7 +416,7 @@ export function SellCopiesSheet({
                   type="button"
                   aria-expanded={moreOpen}
                   onClick={() => setMoreOpen((o) => !o)}
-                  className="-my-3 inline-flex min-h-[44px] items-center gap-2 self-start text-md font-medium leading-md text-text-primary outline-none focus-visible:underline"
+                  className={cn(T.rowTitle, "-my-3 inline-flex min-h-[44px] items-center gap-2 self-start outline-none focus-visible:underline")}
                 >
                   More options
                   <span aria-hidden className={cn("inline-flex transition-transform duration-normal", moreOpen && "rotate-180")}>
@@ -438,7 +439,7 @@ export function SellCopiesSheet({
                       {!err("extended") && <span className={SUB}>Left empty, it&apos;s the same as the price.</span>}
                     </Field>
                     <fieldset id={`${prefix}-use`} className="flex flex-col gap-3">
-                      <legend className="pb-3 text-md font-medium leading-md text-text-primary">Use</legend>
+                      <legend className={cn(T.label, "pb-3")}>Use</legend>
                       <div role="radiogroup" aria-label="Use" className="flex flex-col gap-3">
                         {uses.map((c) => {
                           const on = draft.use === c.use && c.open;
@@ -447,20 +448,20 @@ export function SellCopiesSheet({
                               key={c.use}
                               className={cn(
                                 "relative flex min-h-[44px] items-center gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid px-6 py-3",
-                                !c.open ? "cursor-not-allowed border-border-default bg-bg-surface-raised" : on ? "cursor-pointer border-border-brand bg-bg-brand-subtle" : "cursor-pointer border-border-default",
+                                !c.open ? "cursor-not-allowed border-border bg-bg-surface-raised" : on ? "cursor-pointer border-border-brand bg-bg-brand-subtle" : "cursor-pointer border-border",
                               )}
                             >
                               <input type="radio" name={`${prefix}-use`} className="sr-only" checked={on} disabled={!c.open} onChange={() => change({ use: c.use })} />
                               <Radio checked={on} disabled={!c.open} decorative />
                               <span className="flex flex-col">
-                                <span className={cn("text-md font-medium leading-md", c.open ? "text-text-primary" : "text-text-secondary")}>{USE_LABEL[c.use]}</span>
+                                <span className={cn(T.rowTitle, c.open ? "text-text-primary" : "text-text-secondary")}>{USE_LABEL[c.use]}</span>
                                 {!c.open && <span className={SUB}>{ALREADY_ON_SALE}</span>}
                               </span>
                             </label>
                           );
                         })}
                       </div>
-                      {err("use") && <p className="text-sm leading-sm text-text-error">{err("use")}</p>}
+                      {err("use") && <p className={cn(T.meta, "text-text-error")}>{err("use")}</p>}
                     </fieldset>
                     <Field label="Royalties (%)" htmlFor={`${prefix}-royalties`} error={err("royalties")} errorId={`${prefix}-royalties-err`}>
                       <TextInput
@@ -481,16 +482,16 @@ export function SellCopiesSheet({
             </>
           ) : (
             <>
-              <dl className="flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border-default">
+              <dl className="flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border">
                 {reviewSummaryOf({
                   draft,
                   what,
                   count: state.kind === "new" ? (wholeNumberOf(draft.count) ?? 0) : state.track.supply.total,
                   networkLabel: networkLabelOf(chain.network),
                 }).map((r) => (
-                  <div key={r.label} className="flex flex-col gap-1 border-b-[length:var(--border-width-1)] border-solid border-border-subtle px-6 py-4 last:border-b-0">
+                  <div key={r.label} className="flex flex-col gap-1 border-b-[length:var(--border-width-1)] border-solid border-border px-6 py-4 last:border-b-0">
                     <dt className={SUB}>{r.label}</dt>
-                    <dd className="break-words text-md font-medium leading-md text-text-primary">{r.value}</dd>
+                    <dd className={cn(T.rowTitle, "break-words")}>{r.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -503,7 +504,7 @@ export function SellCopiesSheet({
                         <Icon icon={c.ok ? CheckmarkCircle02Icon : CircleIcon} size={20} />
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="break-words text-md font-medium leading-md text-text-primary">
+                        <span className={cn(T.rowTitle, "break-words")}>
                           {c.title}
                           <span className="sr-only">{c.ok ? ", ready" : ", not ready yet"}</span>
                         </span>
@@ -529,7 +530,7 @@ export function SellCopiesSheet({
                   I understand each copy is minted only when it&apos;s bought, so nothing is charged now.
                 </CheckRow>
               </div>
-              <p className="text-md leading-md text-text-secondary">{NO_INCOME_LINE}</p>
+              <p className={T.body}>{NO_INCOME_LINE}</p>
             </>
           )}
         </div>

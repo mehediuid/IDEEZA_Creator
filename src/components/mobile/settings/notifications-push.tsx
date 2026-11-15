@@ -6,9 +6,9 @@
 // · Allowed: on. Only the phone can take it back, so the switch says where.
 // · Not asked yet: off; turning it on shows the kit's pre-prompt (PM-04) and
 //   Continue asks the browser.
-// · Blocked: "Off · Blocked in your phone's settings" and "Open phone
-//   settings", a sheet with the way to allow it; it closes by itself once the
-//   phone allows it.
+// · Blocked: "Off · Blocked in your phone's settings"; the row opens
+//   "Allow notifications" (ST-20b's Open phone settings), a sheet with the way
+//   to allow it; it closes by itself once the phone allows it.
 // · No support (iOS Safari in a tab): off, with the reason.
 
 import * as React from "react";
@@ -17,6 +17,8 @@ import { Button } from "@/components/ideeza/button";
 import type { PopupMode } from "@/lib/notifications/filter";
 import type { PopupPermission } from "@/lib/notifications/popups";
 import { Sheet } from "../kit/sheet";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useToast } from "../kit/toast";
 import { SettingsRow } from "./kit";
 
@@ -78,22 +80,6 @@ export function PushRow({
   return <SettingsRow id="browser-popups" label={label} toggle={{ checked: false, onChange: onAsk }} disabled={disabled || permission === null} />;
 }
 
-/** ST-20b: the A03 link under the card while push is blocked. */
-export function PhoneSettingsLink({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
-  return (
-    <div className="-mt-2 flex">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className="inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline disabled:cursor-not-allowed disabled:text-text-disabled disabled:no-underline"
-      >
-        Open phone settings
-      </button>
-    </div>
-  );
-}
-
 /** ST-20c, kit PM-04: asked before the browser's own prompt, which only comes once. */
 export function PushPrompt({ open, onClose }: { open: boolean; onClose: () => void }) {
   const toast = useToast();
@@ -115,13 +101,10 @@ export function PushPrompt({ open, onClose }: { open: boolean; onClose: () => vo
           <Button size="xl" className="w-full" loading={asking} onClick={ask}>
             Continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" disabled={asking} onClick={onClose}>
-            Not now
-          </Button>
         </>
       }
     >
-      <p className="text-md leading-md text-text-secondary">We’ll also tell you about messages and sales. Change it in Settings › Notifications.</p>
+      <p className={T.body}>We’ll also tell you about messages and sales. Change it in Settings › Notifications.</p>
     </Sheet>
   );
 }
@@ -138,7 +121,7 @@ export function PushBlockedSheet({ open, onClose, permission }: { open: boolean;
   }, [open, permission, onClose, toast]);
   return (
     <Sheet open={open} onClose={onClose} title="Allow notifications" description="Blocked in this browser. To allow them:">
-      <ol className="flex list-decimal flex-col gap-4 pl-8 text-md leading-md text-text-primary">
+      <ol className={cn(T.body, "flex list-decimal flex-col gap-4 pl-8 text-text-primary")}>
         <li>Open the site settings beside the address bar (in an installed app, your phone’s Settings › Apps › IDEEZA).</li>
         <li>Choose Notifications, then Allow.</li>
         <li>Come back to IDEEZA: Push notifications reads On.</li>

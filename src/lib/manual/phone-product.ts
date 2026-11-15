@@ -18,7 +18,7 @@
 // Pure. Value imports are relative, so node:test loads the compiled module.
 
 import type { BuildItem, BuildItemKind } from "../create/history";
-import { creditsLabel, isLeftOut, pieceCost, pieceSeconds, pieceTimeLabel } from "../create/pieces";
+import { PIECES, creditsLabel, isLeftOut, pieceCost, pieceSeconds } from "../create/pieces";
 import type { PriceSnapshot } from "./journey";
 
 const enc = encodeURIComponent;
@@ -126,15 +126,18 @@ function stateOf(item: BuildItem): PieceState | null {
 /**
  * The Build list's rows, in the build's order. A piece the build never had shows nowhere; one the
  * maker left out is "Not built" (the owner can add it). `firmware` false leaves Code out — the web's
- * O12: no firmware source before a purchase (10y).
+ * O12: no firmware source before a purchase (10y). `leftOut` false leaves the Not built rows out:
+ * they are the maker's to add, so only an owner who can still build reads them (the web's
+ * product-tabs `leftOut: owner`).
  */
-export function pieceRowsOf(items: readonly BuildItem[], opts: { firmware: boolean }): PieceRow[] {
+export function pieceRowsOf(items: readonly BuildItem[], opts: { firmware: boolean; leftOut?: boolean }): PieceRow[] {
   const out: PieceRow[] = [];
   for (const kind of PIECE_ORDER) {
     if (kind === "code" && !opts.firmware) continue;
     const item = items.find((i) => i.kind === kind);
     if (!item) continue;
     const state = stateOf(item);
+    if (state === "notBuilt" && opts.leftOut === false) continue;
     if (state) out.push({ kind, state, progress: Math.round(item.progress) });
   }
   return out;
@@ -179,9 +182,44 @@ export function pieceLineOf(row: PieceRow, facts: PieceFacts, opts: { chat: bool
 
 const PLAIN = { quality: "medium" as const, optimize: false };
 
+/** "about 30 s", "about 1 min 15 s" — one piece's time, in the Figma's word (10p, 33a). */
+export function aboutPieceTime(seconds: number): string {
+  if (seconds < 60) return `about ${seconds} s`;
+  const m = Math.floor(seconds / 60);
+  const r = seconds % 60;
+  return `about ${m} min${r ? ` ${r} s` : ""}`;
+}
+
 /** 33a: "1 credit · about 30 s at Medium" — a left-out piece's price and time (NotBuiltPanel). */
 export function notBuiltCostLine(kind: BuildItemKind): string {
-  return `${creditsLabel(pieceCost(kind, PLAIN))} · ${pieceTimeLabel(pieceSeconds(kind, PLAIN))} at Medium`;
+  return `${creditsLabel(pieceCost(kind, PLAIN))} · ${aboutPieceTime(pieceSeconds(kind, PLAIN))} at Medium`;
+}
+
+/** 33a's title: "3D Module isn't built yet". */
+export function notBuiltTitle(kind: BuildItemKind): string {
+  return `${PIECES[kind].name} isn’t built yet`;
+}
+
+/** 10p's "It has a PCB, code, wiring and parts.": the pieces that are ready, in the sentence's
+ *  own lower-case words (PCB and 3D keep their capitals). "" when none is ready yet. */
+export function hasPiecesLine(items: readonly BuildItem[]): string {
+  const word: Record<BuildItemKind, string> = { pcb: "PCB", code: "code", "3d": "3D module", assembly: "assembly", wiring: "wiring", parts: "parts" };
+  const ready = PIECE_ORDER.filter((k) => items.some((i) => i.kind === k && i.status === "ready")).map((k) => word[k]);
+  if (!ready.length) return "";
+  const list = ready.length < 2 ? ready[0] : `${ready.slice(0, -1).join(", ")} and ${ready[ready.length - 1]}`;
+  // "parts" is the one plural: "It has a PCB…", "It has parts."
+  return `It has ${ready[0] === "parts" ? "" : "a "}${list}.`;
+}
+
+/**
+ * A product typed by hand (the project page's Add a product › Build manually): its row has no build
+ * source and a new-style id (`prd_…`; a legacy build row is `p<n>`). On a project a build created,
+ * the web's read calls such a row "unmatched" ("Its build can't be matched to this name."), which
+ * isn't true of it — the phone says "Made by hand…" (10t).
+ */
+export function madeByHand(state: string, row: { id: string; source?: unknown } | null | undefined): boolean {
+  if (state === "hand") return true;
+  return state === "unmatched" && !!row && !row.source && row.id.startsWith("prd_");
 }
 
 /** The header's "2 of 6 pieces ready" (web: productPiecesOf), or "All 6 pieces ready". */

@@ -21,8 +21,10 @@ import { CATEGORIES, summarize, type CategoryId } from "@/lib/data/export";
 import { createInformationZip, downloadBlob, type ExportProgress } from "@/lib/data/export-browser";
 import { subscribeStores } from "@/lib/key-store";
 import { BottomBar } from "../kit/bottom-bar";
+import { cn } from "@/lib/utils";
+import { T } from "../type";
 import { useToast } from "../kit/toast";
-import { SettingsGroup, SettingsNote, SettingsRow, SettingsScreen } from "./kit";
+import { SettingsGroup, SettingsRow, SettingsScreen } from "./kit";
 import { onPhone, useRunning } from "./data-parts";
 
 export type Made = { name: string; files: number; bytes: number };
@@ -77,9 +79,9 @@ function Making({ busy }: { busy: ExportProgress }) {
   const counted = busy.total > 1;
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-md leading-md text-text-primary">Making your file…</p>
+      <p className={cn(T.body, "text-text-primary")}>Making your file…</p>
       <ProgressBar value={counted ? (busy.done / busy.total) * 100 : 100} label="Making your file" className={counted ? undefined : "motion-safe:animate-pulse"} />
-      <p className="text-sm leading-sm text-text-secondary">
+      <p className={T.meta}>
         {busy.label}
         {counted ? ` (${Math.min(busy.done + 1, busy.total)} of ${busy.total})` : ""}
       </p>
@@ -93,13 +95,13 @@ export function DownloadStatus({ dl }: { dl: Download }) {
     <div aria-live="polite" className="flex flex-col gap-4 empty:hidden">
       {dl.busy && <Making busy={dl.busy} />}
       {dl.made && (
-        <p className="text-sm leading-sm text-text-secondary">
+        <p className={T.meta}>
           {dl.made.name} is downloading ({sizeOf(dl.made.bytes)}, {dl.made.files} {dl.made.files === 1 ? "file" : "files"}). It holds your private
           details, so keep it somewhere safe.
         </p>
       )}
       {dl.error && (
-        <p role="alert" className="text-sm leading-sm text-text-error">
+        <p role="alert" className={cn(T.meta, "text-text-error")}>
           {dl.error.title}. {dl.error.body}
         </p>
       )}
@@ -157,16 +159,20 @@ export function DownloadSettings() {
           {dl.error.body}
         </Banner>
       )}
-      <p className="text-md leading-md text-text-primary">
-        One .zip of everything IDEEZA keeps on this phone: pages you can open in any browser, your project files, your photos and videos, and a backup
-        you can restore here or on another device. It’s made here; nothing is sent anywhere.
-      </p>
-      <SettingsGroup label="The file holds">
+      {/* One line on top; the full description is the list's ⓘ, the care line its footer. */}
+      <p className={cn(T.body, "text-text-primary")}>One .zip of everything IDEEZA keeps on this phone. It’s made here; nothing is sent anywhere.</p>
+      <SettingsGroup
+        label="The file holds"
+        info={{
+          title: "Download your information",
+          body: "One .zip of everything IDEEZA keeps on this phone: pages you can open in any browser, your project files, your photos and videos, and a backup you can restore here or on another device. It’s made here; nothing is sent anywhere.",
+        }}
+        footer="Making the file can take a minute. It holds your private details, so keep it somewhere safe; it’s also your backup."
+      >
         {CATEGORIES.map((c) => (
           <SettingsRow key={c.id} label={c.label} helper={holds ? onPhone(holds[c.id]) : "Reading…"} />
         ))}
       </SettingsGroup>
-      <SettingsNote>Making the file can take a minute. It holds your private details, so keep it somewhere safe; it’s also your backup.</SettingsNote>
       {dl.busy && <Making busy={dl.busy} />}
     </SettingsScreen>
   );

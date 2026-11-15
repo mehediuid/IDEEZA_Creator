@@ -2563,7 +2563,7 @@ export function samplePostOf(project: Project): InnovationPost {
     creator: personOf(project.creator.id),
     minted: project.minted,
     license: project.minted ? seed.license ?? "Commercial use" : null,
-    chain: project.minted ? "Polygon" : null,
+    chain: project.minted ? "Base Sepolia (Testnet)" : null,
     network: seed.network ?? null,
     media: mediaOf(products, cover),
     products,

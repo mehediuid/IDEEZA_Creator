@@ -2,9 +2,11 @@
 
 // Earn › Money › Splits on the phone (Figma 17, 17b, 17c, 17f, 17g, 17j; the
 // web's EarnSplits, contributors-tab.tsx and contributor-dialog.tsx, their
-// rules and words): Ownership "You · 80%" and who holds the rest; the
-// over-100 % banner; the roster as rows (Mobile / Info row) — a contributor
-// opens its sheet, a buyer's share from a sale reads only; Add contributor.
+// rules and words), one grouped list under "Splits ⓘ": the over-100 % banner
+// above it; Ownership "You · 80%" with who holds the rest as its first row;
+// the roster as rows (Mobile / Info row) — a contributor opens its sheet, a
+// buyer's share from a sale reads only; Add contributor as its last row (its
+// line: "No contributors yet." or, at 50, why it's off).
 // The sheet (Add / Edit {name}) is the web's dialog: Name, Role as cards with
 // their lines, Share (%) for a co-owner with "Up to N%.", the majority note,
 // checked on submit and again on each change after it; the store's own
@@ -14,8 +16,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PlusSignIcon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Banner } from "@/components/ideeza/banner";
 import { Button, buttonVariants } from "@/components/ideeza/button";
@@ -48,10 +48,11 @@ import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
-import { Chevron, LIST_ROW, ListCard } from "../../project/parts";
+import { Chevron, ListCard } from "../../kit/list";
 import { useEarn } from "../context";
-import { EARN_CARD, EARN_LEAD, EARN_NOTE } from "../parts";
-import { MoneySection, ROW_BUTTON } from "./parts";
+import { EARN_NOTE } from "../parts";
+import { AddRow, MoneySection, ROW_BUTTON } from "./parts";
+import { T } from "../../type";
 
 const ROLE_ORDER: readonly ContributorRole[] = ["viewer", "editor", "coOwner"];
 
@@ -73,89 +74,70 @@ export function Splits() {
   const canInvite = can(viewer, "people.invite", view.canCtx);
   const canManage = can(viewer, "people.manage", view.canCtx);
   const [open, setOpen] = React.useState<Open>(null);
-  const limitId = React.useId();
   const atLimit = contributors.length >= CONTRIBUTORS_MAX;
   const rows = rosterOf({ createdAt: project.createdAt, contributors, ownership: view.ownership, viewer }).filter((r) => r.kind !== "maker");
   const editing = open?.mode === "edit" ? (contributors.find((c) => c.id === open.id) ?? null) : null;
-
-  const add = canInvite && (
-    <div className="flex flex-col items-start gap-2">
-      <Button
-        hierarchy="secondary"
-        size="xl"
-        iconLeading={<Icon icon={PlusSignIcon} size={20} />}
-        aria-disabled={atLimit || undefined}
-        aria-describedby={atLimit ? limitId : undefined}
-        className={cn(atLimit && "cursor-not-allowed opacity-60")}
-        onClick={() => {
-          if (!atLimit) setOpen({ mode: "add" });
-        }}
-      >
-        Add contributor
-      </Button>
-      {atLimit && (
-        <p id={limitId} className={EARN_NOTE}>
-          A project can have up to 50 contributors.
-        </p>
-      )}
-    </div>
-  );
+  const empty = contributors.length === 0;
+  const listed = !empty && rows.length > 0;
 
   return (
     <MoneySection id="splits" title="Splits" lead="Who owns what share of the project. Co-owners get their share of every sale.">
-      {own && (
-        <dl className="flex flex-col gap-1">
-          <dt className="text-sm font-medium leading-sm text-text-secondary">{own.label}</dt>
-          <dd className="text-lg font-semibold leading-lg text-text-primary">{own.value}</dd>
-          {own.note && <dd className="text-sm leading-sm text-text-secondary">{own.note}</dd>}
-        </dl>
-      )}
       {view.ownership.overAllocated && (
         <Banner tone="error">{`Shares add up to ${view.ownership.total}% — more than 100%. Lower a co-owner's share to fix it.`}</Banner>
       )}
-      {contributors.length === 0 ? (
-        <div className={EARN_CARD}>
-          <p className={EARN_LEAD}>No contributors yet.</p>
-          {add}
-        </div>
-      ) : (
-        <>
-          {rows.length > 0 && (
-            <ListCard label={`People on ${project.name} and their shares`}>
-              {rows.map((row) => {
-                const value = row.share.text === "—" ? row.role : `${row.role} · ${row.share.text}`;
-                const body = (
-                  <>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-md leading-md text-text-primary">{row.name}</span>
-                      {row.sub && <span className="text-sm leading-sm text-text-secondary">{row.sub}</span>}
-                    </span>
-                    <span className="shrink-0 text-md leading-md text-text-primary">{value}</span>
-                  </>
-                );
-                return (
-                  <li key={row.key} className={LIST_ROW}>
-                    {row.contributorId && canManage ? (
-                      <button type="button" aria-label={`Edit ${row.name}, ${value}`} className={ROW_BUTTON} onClick={() => setOpen({ mode: "edit", id: row.contributorId! })}>
-                        {body}
-                        <Chevron />
-                      </button>
-                    ) : row.contributorId && can(viewer, "preview.enter", view.canCtx) ? (
-                      <Link href={phonePreviewHref(project.id, { contributor: row.contributorId })} aria-label={`Preview as ${row.name}`} className={ROW_BUTTON}>
-                        {body}
-                        <Chevron />
-                      </Link>
-                    ) : (
-                      <div className={cn(ROW_BUTTON, "hover:bg-transparent")}>{body}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ListCard>
+      {(own || listed || canInvite) && (
+        <ListCard label={`People on ${project.name} and their shares`}>
+          {own && (
+            // Ownership leads the list: your share, and who holds the rest.
+            <li className={cn(ROW_BUTTON, "hover:bg-transparent active:bg-transparent")}>
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={cn(T.body, "text-text-primary")}>{own.label}</span>
+                {own.note && <span className={T.meta}>{own.note}</span>}
+              </span>
+              <span className={cn(T.rowTitle, "shrink-0 tabular-nums")}>{own.value}</span>
+            </li>
           )}
-          {add}
-        </>
+          {listed &&
+            rows.map((row) => {
+              const value = row.share.text === "—" ? row.role : `${row.role} · ${row.share.text}`;
+              const body = (
+                <>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className={cn(T.body, "truncate text-text-primary")}>{row.name}</span>
+                    {row.sub && <span className={T.meta}>{row.sub}</span>}
+                  </span>
+                  <span className={cn(T.body, "shrink-0 text-text-primary")}>{value}</span>
+                </>
+              );
+              return (
+                <li key={row.key}>
+                  {row.contributorId && canManage ? (
+                    <button type="button" aria-label={`Edit ${row.name}, ${value}`} className={ROW_BUTTON} onClick={() => setOpen({ mode: "edit", id: row.contributorId! })}>
+                      {body}
+                      <Chevron />
+                    </button>
+                  ) : row.contributorId && can(viewer, "preview.enter", view.canCtx) ? (
+                    <Link href={phonePreviewHref(project.id, { contributor: row.contributorId })} aria-label={`Preview as ${row.name}`} className={ROW_BUTTON}>
+                      {body}
+                      <Chevron />
+                    </Link>
+                  ) : (
+                    <div className={cn(ROW_BUTTON, "hover:bg-transparent active:bg-transparent")}>{body}</div>
+                  )}
+                </li>
+              );
+            })}
+          {canInvite && (
+            <AddRow
+              label="Add contributor"
+              line={atLimit ? "A project can have up to 50 contributors." : empty ? "No contributors yet." : null}
+              disabled={atLimit}
+              onClick={() => setOpen({ mode: "add" })}
+            />
+          )}
+        </ListCard>
       )}
+      {empty && !canInvite && <p className={EARN_NOTE}>No contributors yet.</p>}
       {open?.mode === "add" && <ContributorSheet key="add" editing={null} onClose={() => setOpen(null)} />}
       {editing && <ContributorSheet key={editing.id} editing={editing} onClose={() => setOpen(null)} />}
     </MoneySection>
@@ -271,9 +253,6 @@ function ContributorSheet({ editing, onClose }: { editing: Contributor | null; o
             <Button size="xl" className="w-full" loading={write.saving} onClick={submit}>
               {write.saving ? "Saving…" : editing ? "Save changes" : "Add contributor"}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" disabled={write.saving} onClick={cancel}>
-              Cancel
-            </Button>
           </>
         }
       >
@@ -295,7 +274,7 @@ function ContributorSheet({ editing, onClose }: { editing: Contributor | null; o
           />
         </Field>
         <div className="flex flex-col gap-3">
-          <span id={`${roleId}-label`} className="text-md font-medium leading-md text-text-primary">
+          <span id={`${roleId}-label`} className={T.rowTitle}>
             Role
           </span>
           <div
@@ -326,16 +305,16 @@ function ContributorSheet({ editing, onClose }: { editing: Contributor | null; o
                 >
                   <Radio checked={checked} disabled={off} decorative className="shrink-0" />
                   <span className="flex min-w-0 flex-col gap-1">
-                    <span className="text-md font-medium leading-md text-text-primary">{ROLE_WORD[role]}</span>
-                    <span className="text-sm leading-sm text-text-secondary">{ROLE_INFO[role]}</span>
-                    {off && <span className="text-sm leading-sm text-text-secondary">You have no share left to give.</span>}
+                    <span className={T.rowTitle}>{ROLE_WORD[role]}</span>
+                    <span className={T.meta}>{ROLE_INFO[role]}</span>
+                    {off && <span className={T.meta}>You have no share left to give.</span>}
                   </span>
                 </button>
               );
             })}
           </div>
           {errors.role && (
-            <p id={roleErrId} className="text-sm leading-sm text-text-error">
+            <p id={roleErrId} className={cn(T.meta, "text-text-error")}>
               {errors.role}
             </p>
           )}

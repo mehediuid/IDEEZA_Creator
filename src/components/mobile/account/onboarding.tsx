@@ -2,8 +2,8 @@
 
 // Onboarding (the owner's design, 2026-11-09): four screens between the
 // Splash and Welcome, the first time the app opens signed out. Each is an
-// illustration, a title and one line, with dots, Continue and Skip; swipe
-// works too. Skip, or Continue on the last, marks the phone as onboarded and
+// illustration, a title and one line, with dots, Next (Continue on the last)
+// and Skip; swipe works too. Skip, or Continue on the last, marks the phone as onboarded and
 // opens Welcome (the ways in), carrying where the person was going. On the
 // brand's night like the Splash, whatever the phone's theme; the
 // illustrations are drawn from DS tokens and stand still under reduced
@@ -127,7 +127,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           ))}
         </div>
         <Button size="xl" className="w-full" onClick={next}>
-          Continue
+          {last ? "Continue" : "Next"}
         </Button>
       </div>
       <HomeIndicator tone="media" />

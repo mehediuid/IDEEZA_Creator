@@ -398,48 +398,16 @@ export async function createAccount(input: SignUpInput, utmSource: string, now: 
   return writeStoredKey(VERIFY_KEY, { v: 1, email, next: safeNext(next) }).ok ? "ok" : "refused";
 }
 
-/** The phone's Create account (mobile Figma AU-10): only the email and a
- *  password checked by the phone's own rules (`problem`); the name comes after
- *  the email is verified, and the consent line carries the minimum age. Like
- *  `createAccount`, the account waits for its email and nobody is signed in. */
-export async function createPhoneAccount(
-  email: string,
-  password: string,
-  problem: (password: string) => string,
-  now: number,
-  next = "",
-): Promise<CreateResult> {
-  if (!isEmail(email) || problem(password)) return "invalid";
-  const e = normalizeEmail(email);
-  if (accountOf(readAccounts(), e)) return "exists";
-  const salt = newSalt();
-  const saved = saveAccount({
-    v: 1,
-    firstName: "",
-    lastName: "",
-    email: e,
-    passwordHash: await hashPassword(password, salt),
-    salt,
-    birthDate: "",
-    consentAt: now,
-    createdAt: now,
-    verifiedAt: null,
-    source: "",
-    sourceVia: "",
-    sourceOther: "",
-    sourceSkipped: false,
-    nudgeClosed: false,
-    country: "",
-  });
-  if (!saved.ok) return "refused";
-  return writeStoredKey(VERIFY_KEY, { v: 1, email: e, next: safeNext(next) }).ok ? "ok" : "refused";
-}
-
-/** Apple, Google or Facebook vouched for this email (the mobile prototype's
+/** Google or Facebook vouched for this email (the mobile prototype's
  *  demo provider sheet stands in for theirs): its account is signed in, and
  *  an account that has none is made, verified — the provider proved the email —
  *  with a password nobody knows, until one is added in Sign-in & security. */
-export async function providerSignIn(email: string, name: { first: string; last: string }, now: number): Promise<"in" | "new" | "refused"> {
+export async function providerSignIn(
+  email: string,
+  name: { first: string; last: string },
+  now: number,
+  utmSource = "",
+): Promise<"in" | "new" | "refused"> {
   const e = normalizeEmail(email);
   if (!isEmail(e)) return "refused";
   const found = accountOf(readAccounts(), e);
@@ -449,6 +417,7 @@ export async function providerSignIn(email: string, name: { first: string; last:
     return startSession(e, now).ok ? "in" : "refused";
   }
   const salt = newSalt();
+  const source = sourceFromUtm(utmSource);
   const saved = saveAccount({
     v: 1,
     firstName: str(name.first, NAME_PART_MAX),
@@ -460,8 +429,8 @@ export async function providerSignIn(email: string, name: { first: string; last:
     consentAt: now,
     createdAt: now,
     verifiedAt: now,
-    source: "",
-    sourceVia: "",
+    source,
+    sourceVia: source ? "link" : "",
     sourceOther: "",
     sourceSkipped: false,
     nudgeClosed: false,
@@ -525,13 +494,6 @@ export function removeAccount(email: string): WriteResult {
   return theirs ? writeStoredKey(SESSION_KEY, null) : { ok: true };
 }
 
-/** The signed-in account's name, as the phone's Name and handle step sets it. */
-export function saveAccountName(first: string, last: string): WriteResult {
-  const account = readCurrent();
-  if (!account) return { ok: false };
-  return saveAccount({ ...account, firstName: str(first, NAME_PART_MAX), lastName: str(last, NAME_PART_MAX) });
-}
-
 /** The verify link: marks the waiting account verified, signs it in (a new
  *  account with nothing yet), and fills your profile's name and country where
  *  they are still empty. Reload the page after it. */
@@ -588,7 +550,7 @@ export async function signOut(): Promise<WriteResult> {
 
 /** The reset link: a new password for that email's account, and you're signed
  *  in. Opening the link proves the email, so it counts as verified. `problem`
- *  is the rules the password is held to (the phone has its own four). */
+ *  is the rules the password is held to. */
 export async function resetPassword(
   email: string,
   password: string,

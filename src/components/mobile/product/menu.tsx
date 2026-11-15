@@ -1,20 +1,23 @@
 "use client";
 
-// The product's ⋯ (Product Details 10c), the owner's only, as a sheet of
-// rows: Rename product (10d) and Open chat "…" — where it was built, the one
-// place a build is changed (D3) — the web's ProductMenu. The previews and the
-// marketplace view have no entry on the Figma's ⋯, so they live here, after
-// the web's two, in the web's words: Preview as others see it (31a),
-// Preview as a contributor (31b, with the team), and — while one of its
-// copies is on sale — See it on the marketplace (10h, as a demo buyer).
+// The product's ⋯ (Product Details 10c), the owner's only: the kit's M12
+// action sheet, as on the project page — Rename product (10d) and Open chat
+// "…" — where it was built, the one place a build is changed (D3) — the web's
+// ProductMenu. The previews and the marketplace view have no entry on the
+// Figma's ⋯, so they live here, after the web's two, in the web's words:
+// Preview as others see it (31a), Preview as a contributor (31b, with the
+// team: a pick-one sheet of who), and — while one of its copies is on sale —
+// See it on the marketplace (10h, as a demo buyer; that page says it is a
+// Testnet demo). Open chat opens the chat itself (`/m/ai/chat/<id>`).
 // Rename goes through the write gate: a live Buy-now listing asks to pause
-// first (the project page's 21), an auction keeps the field off with the
-// reason (27a); an empty name says "Give the product a name." (27b).
+// first (the project page's 21) — Rename steps aside so only that question
+// shows, and the new name is saved once it is answered — an auction keeps the
+// field off with the reason (27a); an empty name says "Give the product a
+// name." (27b).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight01Icon, BubbleChatIcon, PencilEdit01Icon, Store01Icon, UserMultipleIcon, ViewIcon } from "@hugeicons/core-free-icons";
-import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { BubbleChatIcon, PencilEdit01Icon, Store01Icon, UserMultipleIcon, ViewIcon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ideeza/button";
 import { TextInput } from "@/components/ideeza/text-input";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
@@ -24,14 +27,13 @@ import { productRowsOf } from "@/lib/manual/project-read";
 import { PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
 import { MARKET_VIEW, phoneProductPath } from "@/lib/manual/phone-product";
 import { cn } from "@/lib/utils";
-import { Sheet } from "../kit/sheet";
+import { PickSheet } from "../kit/pick-list";
+import { ActionSheet, Sheet, type ActionSheetItem } from "../kit/sheet";
 import { useToast } from "../kit/toast";
-import { LIST_ROW } from "../project/parts";
+import { T } from "../type";
 import type { PhoneWriteGate } from "../project/write-gate";
 import { useListedCopies } from "./overview";
 import { useProduct } from "./use-product";
-
-type Row = { label: string; sub?: string; icon: IconValue; run: () => void };
 
 export function ProductMenu({ open, onClose, onRename }: { open: boolean; onClose: () => void; onRename: () => void }) {
   const { project, product, name, chat, canEdit } = useProduct();
@@ -40,66 +42,27 @@ export function ProductMenu({ open, onClose, onRename }: { open: boolean; onClos
   const [picking, setPicking] = React.useState(false);
   const team = project.contributors ?? [];
   const base = phoneProductPath(project.id, product.id);
-  const go = (href: string) => {
-    onClose();
-    router.push(href);
-  };
-  const rows: Row[] = [
-    ...(canEdit ? [{ label: "Rename product", icon: PencilEdit01Icon, run: onRename }] : []),
-    ...(chat ? [{ label: `Open chat “${chat.title}”`, sub: "Where it was built — change it there", icon: BubbleChatIcon, run: () => go(`/m/ai?chat=${encodeURIComponent(chat.id)}`) }] : []),
-    { label: "Preview as others see it", sub: "Your page without your editing controls", icon: ViewIcon, run: () => go(`${base}?view=buyer`) },
-    ...(team.length ? [{ label: "Preview as a contributor", sub: "The page each role shows", icon: UserMultipleIcon, run: () => setPicking(true) }] : []),
-    ...(listed ? [{ label: "See it on the marketplace", sub: "As a demo creator shopping — Testnet demo", icon: Store01Icon, run: () => go(`${base}?view=${MARKET_VIEW}`) }] : []),
+  const items: ActionSheetItem[] = [
+    ...(canEdit ? [{ label: "Rename product", icon: PencilEdit01Icon, onSelect: onRename }] : []),
+    ...(chat ? [{ label: `Open chat “${chat.title}”`, icon: BubbleChatIcon, onSelect: () => router.push(`/m/ai/chat/${encodeURIComponent(chat.id)}`) }] : []),
+    { label: "Preview as others see it", icon: ViewIcon, onSelect: () => router.push(`${base}?view=buyer`) },
+    ...(team.length ? [{ label: "Preview as a contributor", icon: UserMultipleIcon, onSelect: () => setPicking(true) }] : []),
+    ...(listed ? [{ label: "See it on the marketplace", icon: Store01Icon, onSelect: () => router.push(`${base}?view=${MARKET_VIEW}`) }] : []),
   ];
   return (
     <>
-      <Sheet open={open && !picking} onClose={onClose} title={name}>
-        <ul aria-label="Product actions" className="-mx-8 flex flex-col pb-8">
-          {rows.map((r) => (
-            <li key={r.label} className={LIST_ROW}>
-              <button
-                type="button"
-                onClick={r.run}
-                className="flex min-h-[56px] w-full items-center gap-6 rounded-md px-8 py-4 text-left outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle"
-              >
-                <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
-                  <Icon icon={r.icon} size={20} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="break-words text-md font-medium leading-md text-text-primary">{r.label}</span>
-                  {r.sub && <span className="text-sm leading-sm text-text-secondary">{r.sub}</span>}
-                </span>
-                <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
-                  <Icon icon={ArrowRight01Icon} size={20} />
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Sheet>
-      <Sheet open={open && picking} onClose={() => setPicking(false)} title="Preview as a contributor">
-        <ul role="listbox" aria-label="Preview as" className="-mx-8 flex flex-col pb-8">
-          {team.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={false}
-                onClick={() => {
-                  setPicking(false);
-                  go(`${base}?view=contributor&as=${encodeURIComponent(c.id)}`);
-                }}
-                className="flex min-h-[44px] w-full items-center justify-between gap-4 rounded-md px-8 text-left text-lg leading-lg text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                {c.name}
-                <span className="text-sm leading-sm text-text-secondary">
-                  {ROLE_WORD[c.role]} · {c.share}%
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Sheet>
+      <ActionSheet open={open} onClose={onClose} title={name} items={items} />
+      <PickSheet
+        open={picking}
+        onClose={() => setPicking(false)}
+        title="Preview as a contributor"
+        value={null}
+        options={team.map((c) => ({ value: c.id, label: c.name, helper: `${ROLE_WORD[c.role]} · ${c.share}%` }))}
+        onPick={(cid) => {
+          setPicking(false);
+          router.push(`${base}?view=contributor&as=${encodeURIComponent(cid)}`);
+        }}
+      />
     </>
   );
 }
@@ -138,6 +101,8 @@ export function RenameSheet({ open, onClose, gate }: { open: boolean; onClose: (
       onClose();
     });
     if (out.kind === "refused") setRefused(out.reason);
+    // The pause question is a sheet of its own: one sheet at a time, so Rename steps aside.
+    else if (out.kind === "confirming") onClose();
   };
 
   return (
@@ -150,9 +115,6 @@ export function RenameSheet({ open, onClose, gate }: { open: boolean; onClose: (
         <>
           <Button size="xl" className="w-full" type="submit" form="m-rename-product" disabled={blocked !== null}>
             Save
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
           </Button>
         </>
       }
@@ -170,10 +132,10 @@ export function RenameSheet({ open, onClose, gate }: { open: boolean; onClose: (
             {...errorProps(shown, ids.name.errorId)}
           />
         </Field>
-        <span className={cn("text-right text-sm leading-sm", tooLong ? "text-text-error" : "text-text-secondary")}>
+        <span className={cn(T.caption, "text-right", tooLong && "text-text-error")}>
           {lengthOf(name)}/{PROJECT_NAME_MAX}
         </span>
-        {reason && <p className="text-md leading-md text-text-secondary">{reason}</p>}
+        {reason && <p className={T.body}>{reason}</p>}
       </form>
     </Sheet>
   );

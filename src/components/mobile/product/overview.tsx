@@ -1,19 +1,22 @@
 "use client";
 
-// The Overview tab (Product Details 10, 10e, 10u, 10x, 29a, 31b) — the web
-// rail's blocks in one column:
-// · Activity (the owner's; everyone else reads it in the header);
-// · Marketplace (the buyer's side, 10x): Physical NFT · Virtual NFT, the
-//   collection and chain, each listed copy's use, NFTs sold, This version /
-//   With future updates and Royalties — the web's EditionBlock, buyers'
-//   words. One buy path: the sticky bar;
-// · Specs: the booked facts (`productFacts`), "Worked out from the parts."
-//   for a build that predates the spec, and the owner's part changes (29a);
-// · Build check: the web's chip and line (`checkWordsOf`), See why opening
-//   the grouped checks in a sheet (10q, 29b) with the web's credit note.
+// The buyer's Overview tab (Product Details 10, 10e, 10u, 10x, 29a, 31b) and
+// the blocks the owner's object page shares with it:
+// · Marketplace (the buyer's side, 10x): its copies on sale as one list —
+//   a Physical or Virtual mark, "Physical NFT · Private use", Regular price ·
+//   Extended price · Royalties and the sold line (the web's EditionBlock in its
+//   buyer's words); the collection and chain as one line; what each kind of
+//   NFT is in the ⓘ (owner 2026-11-15: no tab strip inside the page's tabs).
+//   One buy path: the sticky bar;
+// · Specs: the booked facts (`productFacts`) as a grouped list, with "Worked
+//   out from the parts." for a build that predates the spec and the owner's
+//   part changes (29a) as its footer lines;
+// · Build check: one row — the web's line, its chip at the end — that opens
+//   See why (the grouped checks in a sheet, 10q, 29b, with the web's credit
+//   note) while the build is a Draft.
 
 import * as React from "react";
-import { InformationCircleIcon } from "@hugeicons/core-free-icons";
+import { CubeIcon, InformationCircleIcon, PackageIcon, Shield01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
 import { buttonVariants } from "@/components/ideeza/button";
@@ -21,7 +24,6 @@ import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { GROUP_LABEL, GROUP_ORDER } from "@/components/create/confidence-badge";
 import { checkWordsOf } from "@/components/projects/product/product-facts";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
-import { TIER_WORD } from "@/components/marketplace/purchase-dialog";
 import { bookedSpec, specOfSource } from "@/lib/create/build-artifacts";
 import {
   DRAFT_CREDIT_NOTE,
@@ -31,49 +33,50 @@ import {
   type ProductConfidence,
 } from "@/lib/create/confidence";
 import { productFacts } from "@/lib/manual/products-tab-view";
-import { editionChainOf, KIND_WORD, trackCardOf, tracksOf } from "@/lib/market/editions";
-import { USE_LABEL } from "@/lib/market/sell-flow";
+import { editionChainOf, KIND_WORD, trackCardOf, tracksOf, USE_WORD } from "@/lib/market/editions";
 import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { Chevron, LIST_ROW, ListCard } from "../kit/list";
 import { Sheet } from "../kit/sheet";
-import { InfoRow, LIST_CARD, ListCard, SectionHeading } from "../project/parts";
-import { ActivitySection } from "./activity";
+import { T } from "../type";
+import { CARD, FactCard, InfoButton, ListFooter, SectionHead } from "./parts";
 import { useProduct } from "./use-product";
 
+/** The buyer's Overview (the owner's page lays these out itself). */
 export function OverviewTab() {
-  const { mode, buyer, bp, confidence } = useProduct();
+  const { buyer, bp, confidence } = useProduct();
   return (
     <div className="flex flex-col gap-12">
-      {mode === "owner" && <ActivitySection />}
       {buyer && <MarketplaceBlock />}
       {bp && <SpecsSection />}
-      {confidence && <BuildCheckSection confidence={confidence} />}
+      {confidence && (
+        <section aria-labelledby="pd-check" className="flex flex-col gap-4">
+          <SectionHead id="pd-check" title="Build check" />
+          <ListCard label="Build check">
+            <BuildCheckRow confidence={confidence} />
+          </ListCard>
+        </section>
+      )}
     </div>
   );
 }
 
 // ─────────────────────────── Specs (10, 29a) ───────────────────────────
 
-function SpecsSection() {
+export function SpecsSection() {
   const { bp, partChanges } = useProduct();
   if (!bp) return null;
   const facts = productFacts(specOfSource(bp), bp.parts);
   if (!facts.length && !partChanges) return null;
   return (
     <section aria-labelledby="pd-specs" className="flex flex-col gap-4">
-      <SectionHeading id="pd-specs" title="Specs" />
-      {facts.length > 0 && (
-        <ListCard label="Specs">
-          {facts.map((f) => (
-            <InfoRow key={f.label} label={f.label} value={f.value} />
-          ))}
-        </ListCard>
-      )}
-      {!bookedSpec(bp) && facts.length > 0 && <p className="text-sm leading-sm text-text-secondary">Worked out from the parts.</p>}
-      {partChanges && <p className="text-md leading-md text-text-secondary">Built with your part changes: {partChanges}</p>}
+      <SectionHead id="pd-specs" title="Specs" />
+      {facts.length > 0 && <FactCard label="Specs" inset="row" rows={facts.map((f) => [f.label, f.value])} />}
+      {!bookedSpec(bp) && facts.length > 0 && <ListFooter>Worked out from the parts.</ListFooter>}
+      {partChanges && <ListFooter>Built with your part changes: {partChanges}</ListFooter>}
     </section>
   );
 }
@@ -82,32 +85,39 @@ function SpecsSection() {
 
 const CHIP_TONE: Record<"ok" | "warn" | "quiet", BadgeTone> = { ok: "success", warn: "warning", quiet: "neutral" };
 
-function BuildCheckSection({ confidence }: { confidence: ProductConfidence }) {
+/** Build check as a row of a list card: the web's line under "Build check", its chip at the end;
+ *  a Draft's row opens See why. */
+export function BuildCheckRow({ confidence }: { confidence: ProductConfidence }) {
   const [open, setOpen] = React.useState(false);
   const words = checkWordsOf(confidence);
+  const draft = confidence.tier === "draft";
+  const body = (
+    <>
+      <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+        <Icon icon={Shield01Icon} size={24} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className={cn(T.body, "text-text-primary")}>Build check</span>
+        <span className={T.meta}>{words.line}</span>
+      </span>
+      <Badge tone={CHIP_TONE[words.tone]} className="shrink-0">
+        {words.chip}
+      </Badge>
+      {draft && <Chevron />}
+    </>
+  );
   return (
-    <section aria-labelledby="pd-check" className="flex flex-col gap-4">
-      <SectionHeading id="pd-check" title="Build check" />
-      <div className={cn(LIST_CARD, "gap-4 p-8")}>
-        <div>
-          <Badge tone={CHIP_TONE[words.tone]}>{words.chip}</Badge>
-        </div>
-        <p className="text-md leading-md text-text-primary">{words.line}</p>
-        {confidence.tier === "draft" && (
-          <div>
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              onClick={() => setOpen(true)}
-              className="-my-6 inline-flex min-h-[44px] items-center text-md font-medium leading-md text-text-brand outline-none hover:underline focus-visible:underline"
-            >
-              See why
-            </button>
-          </div>
-        )}
-      </div>
-      <SeeWhySheet open={open} onClose={() => setOpen(false)} confidence={confidence} />
-    </section>
+    <li>
+      {draft ? (
+        <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={LIST_ROW}>
+          {body}
+          <span className="sr-only">See why</span>
+        </button>
+      ) : (
+        <div className={cn(LIST_ROW, "hover:bg-transparent")}>{body}</div>
+      )}
+      {draft && <SeeWhySheet open={open} onClose={() => setOpen(false)} confidence={confidence} />}
+    </li>
   );
 }
 
@@ -137,7 +147,7 @@ export function SeeWhySheet({ open, onClose, confidence }: { open: boolean; onCl
       title="Build check"
       actions={
         chat ? (
-          <Link href={`/m/ai?chat=${encodeURIComponent(chat.id)}`} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full")}>
+          <Link href={`/m/ai/chat/${encodeURIComponent(chat.id)}`} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
             Open chat
           </Link>
         ) : undefined
@@ -148,24 +158,24 @@ export function SeeWhySheet({ open, onClose, confidence }: { open: boolean; onCl
           <div>
             <Badge tone={CHIP_TONE[words.tone]}>{words.chip}</Badge>
           </div>
-          <p className="text-md leading-md text-text-primary">{meaning}</p>
+          <p className={cn(T.body, "text-text-primary")}>{meaning}</p>
         </div>
         {groups.map((g) => (
           <section key={g.group} className="flex flex-col gap-4">
-            <h3 className="text-md font-semibold leading-md text-text-primary">{GROUP_LABEL[g.group]}</h3>
+            <h3 className={T.name}>{GROUP_LABEL[g.group]}</h3>
             <ul className="flex flex-col gap-4">
               {g.rows.map((r) => (
                 <li key={r.text} className="flex items-start gap-4">
                   <Badge tone={ROW_TONE[r.tone]} className="mt-1 shrink-0">
                     {r.tone === "notRun" ? "Not run" : r.tone === "found" ? "Found" : "Passed"}
                   </Badge>
-                  <span className="min-w-0 text-md leading-md text-text-secondary">{r.text}</span>
+                  <span className={cn(T.body, "min-w-0")}>{r.text}</span>
                 </li>
               ))}
             </ul>
           </section>
         ))}
-        <p className="flex items-start gap-3 border-t-[length:var(--border-width-1)] border-solid border-border-subtle pt-6 text-sm leading-sm text-text-secondary">
+        <p className={cn(T.meta, "flex items-start gap-3 border-t-[length:var(--border-width-1)] border-solid border-border pt-6")}>
           <span aria-hidden className="mt-[2px] shrink-0 text-[color:var(--color-icon-secondary)]">
             <Icon icon={InformationCircleIcon} size={14} />
           </span>
@@ -195,72 +205,73 @@ export function useListedCopies(): Listed[] {
 function MarketplaceBlock() {
   const { view, name } = useProduct();
   const tracks = useListedCopies();
-  const firstKind = KINDS.find((k) => tracks.some((t) => t.kind === k)) ?? "physical";
-  const [kind, setKind] = React.useState<EditionKind>(firstKind);
   if (!tracks.length) return null;
   const main = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, null);
-  const ofKind = tracks.filter((t) => t.kind === kind).sort((a, b) => USES.indexOf(a.use) - USES.indexOf(b.use));
   return (
-    <section aria-labelledby="pd-market" className="flex flex-col gap-6">
-      <div className="flex items-center gap-2">
-        <h2 id="pd-market" className="text-lg font-semibold leading-lg text-text-primary">
-          Marketplace
-        </h2>
-        <span className="text-md leading-md text-text-secondary">· {tracks.length} on sale</span>
-        <span className="flex-1" />
+    <section aria-labelledby="pd-market" className="flex flex-col gap-4">
+      <SectionHead
+        id="pd-market"
+        title="Marketplace"
+        info={
+          <InfoButton label="What these NFTs are" title="Marketplace">
+            {KINDS.map((k) => (
+              <p key={k}>
+                <span className={T.rowTitle}>{KIND_WORD[k]} NFT · </span>
+                {helperLineOf(k, name)}
+              </p>
+            ))}
+          </InfoButton>
+        }
+        value={`${tracks.length} on sale`}
+      />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {chain && (
+          <p className={cn(T.meta, "min-w-0 flex-1")}>
+            Collection {chain.collection} · {networkLabelOf(chain.network)}
+          </p>
+        )}
         <TestnetDemoBadge />
       </div>
-      <div role="tablist" aria-label="NFT editions" className="flex border-b-[length:var(--border-width-1)] border-solid border-border">
-        {KINDS.map((k) => {
-          const on = k === kind;
-          return (
-            <button
-              key={k}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              onClick={() => setKind(k)}
-              className={cn(
-                "-mb-[var(--border-width-1)] flex h-[44px] flex-1 items-center justify-center border-b-[length:var(--border-width-2)] border-solid text-md font-medium leading-md outline-none focus-visible:bg-bg-subtle",
-                on ? "border-[var(--color-border-brand)] text-text-brand" : "border-transparent text-text-secondary",
-              )}
-            >
-              {KIND_WORD[k]} NFT
-            </button>
-          );
-        })}
-      </div>
-      <div role="tabpanel" className="flex flex-col gap-6">
-        <p className="text-md leading-md text-text-secondary">{helperLineOf(kind, name)}</p>
-        {chain && (
-          <ListCard label="Collection">
-            <InfoRow label="Collection" value={chain.collection} />
-            <InfoRow label="Blockchain" value={networkLabelOf(chain.network)} />
-          </ListCard>
-        )}
-        {ofKind.length ? (
-          ofKind.map((t) => {
+      <ul aria-label="NFT editions" className={CARD}>
+        {KINDS.flatMap((kind) => {
+          const ofKind = tracks.filter((t) => t.kind === kind).sort((a, b) => USES.indexOf(a.use) - USES.indexOf(b.use));
+          if (!ofKind.length) {
+            return [
+              <li key={kind} className={cn(LIST_ROW, "hover:bg-transparent")}>
+                <KindMark kind={kind} />
+                <span className={cn(T.body, "min-w-0 flex-1")}>{`No ${KIND_WORD[kind]} NFTs of ${name} are on sale.`}</span>
+              </li>,
+            ];
+          }
+          return ofKind.map((t) => {
             const card = trackCardOf(t, view.sales);
             return (
-              <section key={t.id} aria-label={`${KIND_WORD[t.kind]} NFT · ${USE_LABEL[t.use]}`} className="flex flex-col gap-3">
-                <div className="flex items-center gap-4">
-                  <span className="text-md font-semibold leading-md text-text-primary">{USE_LABEL[t.use]}</span>
-                  <span className="flex-1" />
-                  <span className={cn("text-sm leading-sm", card.soldOut ? "text-text-success" : "text-text-secondary")}>{card.soldLine}</span>
-                </div>
-                <ListCard label={`${USE_LABEL[t.use]} prices`}>
-                  <InfoRow label={TIER_WORD.regular} value={formatAmount(t.listing.regular, t.listing.token)} />
-                  <InfoRow label={TIER_WORD.extended} value={formatAmount(t.listing.extended, t.listing.token)} />
-                  <InfoRow label="Royalties" value={`${t.listing.royaltyPct}% on resales`} />
-                </ListCard>
-              </section>
+              <li key={t.id} aria-label={`${KIND_WORD[t.kind]} NFT · ${USE_WORD[t.use]}`} className={cn(LIST_ROW, "items-start hover:bg-transparent")}>
+                <KindMark kind={t.kind} />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className={T.rowTitle}>
+                    {KIND_WORD[t.kind]} NFT · {USE_WORD[t.use]}
+                  </span>
+                  <span className={T.meta}>
+                    Regular price {formatAmount(t.listing.regular, t.listing.token)} · Extended price{" "}
+                    {formatAmount(t.listing.extended, t.listing.token)} · Royalties {t.listing.royaltyPct}% on resales
+                  </span>
+                </span>
+                <span className={cn(T.meta, "shrink-0 text-right", card.soldOut && "text-text-success")}>{card.soldLine}</span>
+              </li>
             );
-          })
-        ) : (
-          <p className="text-md leading-md text-text-secondary">{`No ${KIND_WORD[kind]} NFTs of ${name} are on sale.`}</p>
-        )}
-      </div>
+          });
+        })}
+      </ul>
     </section>
+  );
+}
+
+function KindMark({ kind }: { kind: EditionKind }) {
+  return (
+    <span aria-hidden className="mt-[2px] shrink-0 text-[color:var(--color-icon-default)]">
+      <Icon icon={kind === "physical" ? PackageIcon : CubeIcon} size={24} />
+    </span>
   );
 }

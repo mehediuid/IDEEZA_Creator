@@ -38,6 +38,7 @@ export const FAQS: readonly FaqItem[] = [
     id: "change-plan",
     q: "Can I change or cancel my plan?",
     a: "Yes. An upgrade starts now, and the unused time of your current plan comes off its price. A smaller plan, monthly billing or a cancel starts when your period ends. Nothing you made is deleted.",
+    link: { label: "Open Billing", href: "/m/plans?tab=billing" },
   },
   {
     id: "pay",

@@ -62,8 +62,7 @@ const MOBILE_PAGES: Record<string, string> = {
   "signing-in": "Signing you in",
   "add-email": "Add your email",
   link: "Link accounts",
-  handle: "Name and handle",
-  setup: "Your profile",
+  source: "Where did you hear about IDEEZA?",
   "welcome-map": "Welcome map",
 };
 

@@ -11,6 +11,7 @@ import * as React from "react";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { Radio } from "@/components/ideeza/checkbox";
+import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { creditsLine, orderOf } from "@/components/credits/buy-credits";
 import { useDefaultToken } from "@/lib/account/payment";
 import { CREDIT_PACKS, VALIDITY_MONTHS, coinAmount, packCovering, usd, type PackId } from "@/lib/create/credit-pricing";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useWalletSheet } from "../earn-coin/wallet-sheet";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { T } from "../type";
 
 const newOrderId = () => `order_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -91,12 +93,12 @@ export function BuyCreditsSheet({ open, need, onClose }: { open: boolean; need: 
             <Button size="xl" className="w-full" onClick={pay}>
               {`Pay ${usd(order.price.final)}`}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-              Cancel
-            </Button>
           </>
         }
       >
+        <div className="flex">
+          <TestnetDemoBadge />
+        </div>
         <ul role="radiogroup" aria-label="Credit packs" className="flex flex-col gap-4 pb-4">
           {CREDIT_PACKS.map((p) => {
             const on = p.id === packId;
@@ -113,18 +115,18 @@ export function BuyCreditsSheet({ open, need, onClose }: { open: boolean; need: 
                   <Radio checked={on} decorative className="mt-1" />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="flex items-center gap-4">
-                      <span className="text-md font-semibold leading-md text-text-primary">{p.name}</span>
+                      <span className={T.name}>{p.name}</span>
                       {p.popular && <Badge tone="brand">Popular</Badge>}
                     </span>
-                    <span className="text-sm leading-sm text-text-secondary">{creditsLine(p.base, p.bonus)}</span>
+                    <span className={T.meta}>{creditsLine(p.base, p.bonus)}</span>
                   </span>
-                  <span className="text-md font-semibold leading-md text-text-primary">{usd(o.price.final)}</span>
+                  <span className={T.rowTitle}>{usd(o.price.final)}</span>
                 </label>
               </li>
             );
           })}
         </ul>
-        {error && <p role="alert" className="pb-4 text-md leading-md text-text-error">{error}</p>}
+        {error && <p role="alert" className={cn(T.body, "pb-4 text-text-error")}>{error}</p>}
       </Sheet>
       {wallet.sheet}
     </>

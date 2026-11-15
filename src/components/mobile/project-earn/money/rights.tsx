@@ -2,17 +2,16 @@
 
 // Earn › Money › Rights on the phone (Figma 17, 17b, 17d, 17h, 17i; the
 // web's EarnRights and rail-legal.tsx, `checkRight` and its words): each
-// Patent, Copyright or Trademark as a row (the kind, its number or words),
-// "As stated by you — not verified.", Add a right (or the 20-rights line);
-// then the License row. A right's sheet: Type (A06 as a pick-one sheet; the
+// Patent, Copyright or Trademark as a row (the kind, its number or words) in
+// one list under "Rights ⓘ", Add a right as its last row (its line: "No
+// rights added yet." or, at 20, why it's off), "As stated by you — not
+// verified."; then the License row. A right's sheet: Type (A06 as a pick-one sheet; the
 // web's segmented control), the kind's own field, Attorney name (optional)
 // for a trademark, Link (optional), checked on Save; editing adds Remove,
 // which asks first. The License row opens the Choose a license sheet (the
 // web's dialog, `LicenseSheet`). Sold in full, the rights read only.
 
 import * as React from "react";
-import { PlusSignIcon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Button } from "@/components/ideeza/button";
 import { TextInput } from "@/components/ideeza/text-input";
@@ -29,10 +28,11 @@ import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { Sheet } from "../../kit/sheet";
 import { SheetSelect } from "../../kit/sheet-select";
 import { useToast } from "../../kit/toast";
-import { Chevron, LIST_ROW, ListCard } from "../../project/parts";
+import { Chevron, ListCard } from "../../kit/list";
 import { useEarn } from "../context";
-import { EARN_LEAD, EARN_NOTE, LicenseSheet } from "../parts";
-import { MoneySection, ROW_BUTTON } from "./parts";
+import { EARN_NOTE, LicenseSheet } from "../parts";
+import { AddRow, MoneySection, ROW_BUTTON } from "./parts";
+import { T } from "../../type";
 
 const FOOTNOTE = "As stated by you — not verified.";
 const KIND_OPTIONS = RIGHT_KINDS.map((k) => ({ value: k, label: RIGHT_LABEL[k] }));
@@ -62,16 +62,16 @@ export function Rights() {
       title="Rights"
       lead="The patents, copyrights and trademarks anyone buying it should know about, as you state them. Add as many as you have."
     >
-      {rows.length > 0 && (
+      {(rows.length > 0 || editable) && (
         <div className="flex flex-col gap-4">
           <ListCard label="Rights">
             {rows.map((row) => {
               const body = (
                 <>
-                  <span className="shrink-0 text-md leading-md text-text-secondary">{row.label}</span>
+                  <span className={cn(T.body, "shrink-0")}>{row.label}</span>
                   <span className="flex min-w-0 flex-1 flex-col items-end text-right">
                     {row.lines.map((line, i) => (
-                      <span key={i} className={cn("max-w-full truncate", i === 0 ? "text-md leading-md text-text-primary" : "text-sm leading-sm text-text-secondary")}>
+                      <span key={i} className={cn("max-w-full truncate", i === 0 ? cn(T.body, "text-text-primary") : T.meta)}>
                         {line}
                       </span>
                     ))}
@@ -79,7 +79,7 @@ export function Rights() {
                 </>
               );
               return (
-                <li key={row.id} className={LIST_ROW}>
+                <li key={row.id}>
                   {editable ? (
                     <button
                       type="button"
@@ -95,38 +95,44 @@ export function Rights() {
                       <Chevron />
                     </button>
                   ) : (
-                    <div className={cn(ROW_BUTTON, "hover:bg-transparent")}>{body}</div>
+                    <div className={cn(ROW_BUTTON, "hover:bg-transparent active:bg-transparent")}>{body}</div>
                   )}
                 </li>
               );
             })}
+            {editable && (
+              <AddRow
+                label="Add a right"
+                line={
+                  full
+                    ? `That's ${RIGHTS_MAX} rights, the most a project holds. Edit or remove one to add another.`
+                    : rows.length === 0
+                      ? "No rights added yet."
+                      : null
+                }
+                disabled={full}
+                onClick={() => setOpen({ kind: "new" })}
+              />
+            )}
           </ListCard>
-          <p className="text-sm leading-sm text-text-tertiary">{FOOTNOTE}</p>
+          {rows.length > 0 && <p className={cn(T.meta, "text-text-tertiary")}>{FOOTNOTE}</p>}
         </div>
       )}
-      {!editable && rows.length === 0 && !license && <p className={EARN_LEAD}>No rights were added before it sold in full.</p>}
-      {editable &&
-        (full ? (
-          <p className={EARN_LEAD}>{`That's ${RIGHTS_MAX} rights, the most a project holds. Edit or remove one to add another.`}</p>
-        ) : (
-          <Button hierarchy="secondary" size="xl" className="self-start" iconLeading={<Icon icon={PlusSignIcon} size={20} />} onClick={() => setOpen({ kind: "new" })}>
-            Add a right
-          </Button>
-        ))}
+      {!editable && rows.length === 0 && !license && <p className={EARN_NOTE}>No rights were added before it sold in full.</p>}
       {showLicense && (
         <div className="flex flex-col gap-2">
           <ListCard label="License">
-            <li className={LIST_ROW}>
+            <li>
               {editable ? (
                 <button type="button" aria-haspopup="dialog" className={ROW_BUTTON} onClick={() => setOpen({ kind: "license" })}>
-                  <span className="shrink-0 text-md leading-md text-text-secondary">License</span>
-                  <span className="min-w-0 flex-1 truncate text-right text-md leading-md text-text-primary">{license?.label ?? "Choose a license"}</span>
+                  <span className={cn(T.body, "shrink-0")}>License</span>
+                  <span className={cn(T.body, "min-w-0 flex-1 truncate text-right text-text-primary")}>{license?.label ?? "Choose a license"}</span>
                   <Chevron />
                 </button>
               ) : (
-                <div className={cn(ROW_BUTTON, "hover:bg-transparent")}>
-                  <span className="shrink-0 text-md leading-md text-text-secondary">License</span>
-                  <span className="min-w-0 flex-1 truncate text-right text-md leading-md text-text-primary">{license?.label ?? "—"}</span>
+                <div className={cn(ROW_BUTTON, "hover:bg-transparent active:bg-transparent")}>
+                  <span className={cn(T.body, "shrink-0")}>License</span>
+                  <span className={cn(T.body, "min-w-0 flex-1 truncate text-right text-text-primary")}>{license?.label ?? "—"}</span>
                 </div>
               )}
             </li>
@@ -204,10 +210,7 @@ function RightSheet({ right, onClose, onDone }: { right: LegalRight | null; onCl
             <Button size="xl" className="w-full" loading={write.saving} onClick={save}>
               {write.saving ? "Saving…" : "Save"}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" disabled={write.saving} onClick={onClose}>
-              Cancel
-            </Button>
-            {write.failed && <p className="text-sm leading-sm text-text-error">{WRITE_FAILED}</p>}
+            {write.failed && <p className={cn(T.meta, "text-text-error")}>{WRITE_FAILED}</p>}
           </>
         }
       >
@@ -241,7 +244,7 @@ function RightSheet({ right, onClose, onDone }: { right: LegalRight | null; onCl
             {...errorProps(errors.url, ids.url.errorId)}
           />
         </Field>
-        <p className="text-sm leading-sm text-text-tertiary">{FOOTNOTE}</p>
+        <p className={cn(T.meta, "text-text-tertiary")}>{FOOTNOTE}</p>
         {right && (
           <Button hierarchy="danger" size="xl" className="w-full" disabled={write.saving} onClick={() => setRemoving(true)}>
             Remove

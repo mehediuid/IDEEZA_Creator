@@ -2,28 +2,33 @@
 
 // My projects (master page "My project" section, Shared kit KIT-EM-01): every
 // project this account keeps, as the web's /projects lists them — the tabs
-// All · Draft · Minted · Listed · Sold with their counts, search over
-// project and product names and descriptions, Shared only and the sort (one
-// filter sheet), the count line, and one card per project: the cover, the
-// title with its status chip, "{n} products · Saved {date}" and the next-step
-// hint. A card has no button: the whole card opens the project (owner,
-// 2026-10-11). Twelve at a time, Show more for the rest. The view lives in the
-// address (`?tab=&q=&sort=&showcase=1`), so Back returns to it.
+// All · Draft · Minted · Listed · Sold with their counts (the kit's
+// MobileTabs), search over project and product names and descriptions, Shared
+// only and the sort (one filter sheet), the count line, and one card per
+// project: the cover, the title with its status chip, "{n} products · Saved
+// {date}" and the next-step hint. A card has no button and no ⋮: the whole
+// card opens the project (owner, 2026-10-11; the master page's card ⋮ and its
+// view / like counts are not built — web rule, and no invented figures).
+// "New project" (+) in the top bar starts one on the AI tab. Twelve at a
+// time, Show more for the rest. The view lives in the address
+// (`?tab=&q=&sort=&showcase=1`); what was shown and where the list was
+// scrolled come back when Back returns from a project. Back goes to the
+// Profile hub. A write the browser refused says so under the top bar.
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { ArrowRight02Icon, CpuIcon, File01Icon, FilterHorizontalIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Add01Icon, ArrowRight01Icon, CpuIcon, File01Icon, FilterHorizontalIcon, ImageNotFound01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button, buttonVariants } from "@/components/ideeza/button";
-import { Checkbox, Radio } from "@/components/ideeza/checkbox";
+import { Button } from "@/components/ideeza/button";
+import { Checkbox } from "@/components/ideeza/checkbox";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { StateCard } from "@/components/ideeza/state-card";
 import { useMinuteClock } from "@/components/create/build-status";
-import { ICONS, StatusChip } from "@/components/projects/status-chip";
+import { ICONS } from "@/components/projects/status-chip";
+import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
-import { readBriefDraft } from "@/lib/brief/project-brief";
+import { readBriefDraft, showcaseBackfillOf } from "@/lib/brief/project-brief";
 import { briefDraftKey } from "@/lib/brief/types";
 import { useCreateHistory } from "@/lib/create/history";
 import {
@@ -41,10 +46,16 @@ import { useManualProjects } from "@/lib/manual/projects";
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { useMarket } from "@/lib/market/market-store";
 import { cn } from "@/lib/utils";
+import { LIST_CARD } from "../kit/list";
+import { PickList } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
+import { EmptyState } from "../kit/state";
 import { OfflineBanner } from "../kit/states";
-import { Screen } from "../screen";
+import { MobileTabs } from "../kit/tabs";
+import { SCROLL_ATTR, Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { T } from "../type";
+import { LINK_MD, PhoneStatusChip } from "./parts";
 
 const DRAFT_PREFIX = briefDraftKey("");
 let draftsVersion = 0;
@@ -72,18 +83,44 @@ const EMPTY_TAB: Record<Exclude<ListTab, "all">, { title: string; body?: string;
   sold: { title: "Nothing sold yet", icon: "badge-check" },
 };
 
+// What the list showed when a card was opened: Back puts it back (the web's rememberScroll).
+const KEPT_KEY = "ideeza:m:projects:kept";
+type Kept = { query: string; shown: number; top: number };
+
+function readKept(query: string): Kept | null {
+  try {
+    const raw = sessionStorage.getItem(KEPT_KEY);
+    const v = raw ? (JSON.parse(raw) as Partial<Kept>) : null;
+    return v && v.query === query && typeof v.shown === "number" && typeof v.top === "number" ? (v as Kept) : null;
+  } catch {
+    return null;
+  }
+}
+
+function keep(kept: Kept | null): void {
+  try {
+    if (kept) sessionStorage.setItem(KEPT_KEY, JSON.stringify(kept));
+    else sessionStorage.removeItem(KEPT_KEY);
+  } catch {
+    // Storage refused: Back opens the list at its top.
+  }
+}
+
 export function MyProjectsScreen() {
-  const { hydrated, projects } = useManualProjects();
+  const { hydrated, projects, backfillShowcase } = useManualProjects();
   const { hydrated: buildsHydrated, builds } = useCreateHistory();
   const { hydrated: jobsHydrated, jobs } = useVideoJobs();
   const { hydrated: marketHydrated, data: market } = useMarket();
   const params = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
   const now = useMinuteClock();
   const query = React.useMemo(() => parseListQuery(params), [params]);
   const [view, setView] = React.useState<ListQuery>(query);
-  const [shown, setShown] = React.useState(PAGE_SIZE);
+  const [kept] = React.useState(() => (typeof window === "undefined" ? null : readKept(listQueryString({ ...query, page: 1 }))));
+  const [shown, setShown] = React.useState(kept?.shown ?? PAGE_SIZE);
   const [filtering, setFiltering] = React.useState(false);
+  const listRef = React.useRef<HTMLDivElement>(null);
 
   const change = (patch: Partial<ListQuery>) => {
     const next = { ...view, ...patch, page: 1 };
@@ -94,6 +131,17 @@ export function MyProjectsScreen() {
 
   const tick = React.useSyncExternalStore(subscribeDrafts, () => draftsVersion, () => -1);
   const ready = hydrated && buildsHydrated && jobsHydrated && marketHydrated && tick >= 0;
+
+  // A project minted with sharing before the flag existed gets its shared date on first read,
+  // as the web's list does (COR-105), so Shared only finds it here too.
+  React.useEffect(() => {
+    if (!ready) return;
+    for (const p of projects) {
+      const at = showcaseBackfillOf(p, readBriefDraft(p.id));
+      if (at !== null) backfillShowcase(p.id, at);
+    }
+  }, [ready, projects, backfillShowcase, tick]);
+
   const items = React.useMemo<ListItem[] | null>(
     () =>
       ready
@@ -113,82 +161,94 @@ export function MyProjectsScreen() {
     return Array.from({ length: result.pageCount }, (_, i) => (i === 0 ? result.rows : filterProjects(items, { ...view, page: i + 1 }).rows)).flat();
   }, [items, result, view]);
 
+  // Back from a project: the list is where it was left, once its cards are there.
+  const scroller = () => listRef.current?.closest<HTMLElement>(`[${SCROLL_ATTR}]`) ?? null;
+  const restored = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (!result || restored.current) return;
+    restored.current = true;
+    const el = scroller();
+    if (kept && el) el.scrollTop = kept.top;
+    keep(null);
+  }, [result, kept]);
+  const onOpenCard = () => keep({ query: listQueryString({ ...view, page: 1 }), shown, top: scroller()?.scrollTop ?? 0 });
+
   const noProjects = result !== null && result.total === 0;
   const tabLabel = LIST_TABS.find((t) => t.id === view.tab)?.label ?? "All";
+  const narrowed = view.tab !== "all" || view.showcase;
+  const filtered = view.showcase || view.sort !== "updated";
 
   return (
-    <Screen top={<TopBar back title="My projects" />} className="pb-12">
+    <Screen
+      top={
+        <TopBar
+          back="/m/profile"
+          title="My projects"
+          actions={noProjects || result === null ? [] : [{ icon: Add01Icon, label: "New project", onClick: () => router.push("/m/ai") }]}
+        />
+      }
+      className="pb-12"
+    >
       <OfflineBanner />
+      <StorageErrorBanner className="mx-8 mb-6" />
       {noProjects ? (
         <div className="px-8 pt-8">
-          <StateCard
-            tone="empty"
-            className="w-full"
-            icon={<Icon icon={File01Icon} size={32} />}
+          <EmptyState
+            icon={File01Icon}
             title="No projects yet"
             body="Describe a device and IDEEZA builds its PCB, code, 3D model and more."
-            action={
-              <Link href="/m/ai" className={cn(buttonVariants({ hierarchy: "primary", size: "xl" }))}>
-                Create a project
-              </Link>
-            }
+            action={{ label: "Create a project", href: "/m/ai" }}
           />
         </div>
       ) : (
         <>
-          <div role="tablist" aria-label="Projects" className="flex overflow-x-auto border-b-[length:var(--border-width-1)] border-solid border-border px-4 [scrollbar-width:none]">
-            {LIST_TABS.map((t) => {
-              const on = view.tab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => change({ tab: t.id })}
-                  className={cn(
-                    "-mb-[var(--border-width-1)] flex h-[44px] shrink-0 items-center gap-2 border-b-[length:var(--border-width-2)] border-solid px-6 text-md font-medium leading-md outline-none focus-visible:bg-bg-subtle",
-                    on ? "border-[var(--color-border-brand)] text-text-brand" : "border-transparent text-text-secondary",
-                  )}
-                >
-                  {t.label}
-                  <span className={cn("text-xs leading-xs", on ? "text-text-brand" : "text-text-tertiary")}>{result ? result.counts[t.id] : "—"}</span>
-                </button>
-              );
-            })}
+          <div className="overflow-x-auto [scrollbar-width:none]">
+            <MobileTabs
+              label="Projects"
+              width="hug"
+              className="min-w-max px-8 max-[359px]:gap-3 max-[359px]:px-4"
+              tabs={LIST_TABS.map((t) => ({
+                value: t.id,
+                label: t.label,
+                count: result ? result.counts[t.id] : undefined,
+                countLabel: result ? `, ${result.counts[t.id]} ${result.counts[t.id] === 1 ? "project" : "projects"}` : undefined,
+              }))}
+              value={view.tab}
+              onChange={(tab) => change({ tab })}
+            />
           </div>
-          <div className="flex flex-col gap-6 px-8 pt-8">
+          <div ref={listRef} className="flex flex-col gap-6 px-8 pt-8">
             <div className="flex items-center gap-4">
               <form role="search" onSubmit={(e) => e.preventDefault()} className="min-w-0 flex-1">
                 <SearchInput
+                  size="xl"
                   value={view.q}
                   onValueChange={(q) => change({ q })}
                   placeholder="Search projects and products"
                   aria-label="Search projects and products"
                   enterKeyHint="search"
-                  containerClassName="min-h-[44px]"
                 />
               </form>
               <Button
                 hierarchy="secondary"
                 size="xl"
                 iconOnly
-                aria-label={view.showcase || view.sort !== "updated" ? "Filter and sort, on" : "Filter and sort"}
+                aria-label={filtered ? "Filter and sort, on" : "Filter and sort"}
                 aria-haspopup="dialog"
                 onClick={() => setFiltering(true)}
-                className={view.showcase || view.sort !== "updated" ? "border-[var(--color-border-brand)]" : undefined}
+                className={filtered ? "border-[var(--color-border-brand)]" : undefined}
               >
                 <Icon icon={FilterHorizontalIcon} size={20} />
               </Button>
             </div>
-            <p aria-live="polite" className="text-md font-medium leading-md text-text-primary">
+            <p aria-live="polite" className={T.rowTitle}>
               {result ? countLine(result) : "—"}
             </p>
             {!result ? (
               <ul aria-label="Loading" className="flex flex-col gap-6">
                 {[0, 1, 2].map((i) => (
-                  <li key={i} className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-4">
-                    <Skeleton shape="block" className="aspect-[16/10] h-auto w-full" />
+                  <li key={i} className={cn(LIST_CARD, "gap-4 p-4")}>
+                    <Skeleton shape="block" className="aspect-video h-auto w-full" />
                     <Skeleton shape="text" size="lg" />
                     <Skeleton shape="text" size="md" />
                   </li>
@@ -196,35 +256,34 @@ export function MyProjectsScreen() {
               </ul>
             ) : matches.length === 0 ? (
               view.tab !== "all" && result.counts[view.tab] === 0 ? (
-                <StateCard
-                  tone="empty"
-                  className="w-full"
-                  icon={<Icon icon={ICONS[EMPTY_TAB[view.tab].icon]} size={32} />}
-                  title={EMPTY_TAB[view.tab].title}
-                  body={EMPTY_TAB[view.tab].body}
-                />
+                <EmptyState icon={ICONS[EMPTY_TAB[view.tab].icon]} title={EMPTY_TAB[view.tab].title} body={EMPTY_TAB[view.tab].body} />
               ) : view.q.trim() ? (
-                <StateCard
-                  tone="empty"
-                  className="w-full"
-                  icon={<Icon icon={Search01Icon} size={32} />}
-                  title={`No matches for "${view.q}"`}
-                  body={`Nothing in ${view.showcase ? `${tabLabel} (Shared only)` : tabLabel} has that in a project or product name or description.`}
-                  action={
-                    <Button hierarchy="secondary" size="xl" onClick={() => change({ q: "" })}>
+                <>
+                  <EmptyState
+                    icon={Search01Icon}
+                    title={`No matches for "${view.q}"`}
+                    body={`Nothing in ${view.showcase ? `${tabLabel} (Shared only)` : tabLabel} has that in a project or product name or description.`}
+                    action={
+                      narrowed
+                        ? { label: "Search all projects", onClick: () => change({ tab: "all", showcase: false }) }
+                        : { label: "Clear search", onClick: () => change({ q: "" }) }
+                    }
+                  />
+                  {narrowed && (
+                    <button type="button" onClick={() => change({ q: "" })} className={cn(LINK_MD, "min-h-[44px] self-center")}>
                       Clear search
-                    </Button>
-                  }
-                />
+                    </button>
+                  )}
+                </>
               ) : (
-                <StateCard tone="empty" className="w-full" icon={<Icon icon={ICONS.eye} size={32} />} title={`Nothing shared in ${tabLabel}`} />
+                <EmptyState icon={ICONS.eye} title={result.showcased === 0 ? "Nothing shared to Feed yet" : `Nothing shared in ${tabLabel}`} />
               )
             ) : (
               <>
                 <ul aria-label={`${tabLabel} projects`} className="flex flex-col gap-6">
                   {matches.slice(0, shown).map((row) => (
                     <li key={row.summary.id}>
-                      <ProjectCard summary={row.summary} via={row.via} now={now} />
+                      <ProjectCard summary={row.summary} via={row.via} now={now} onOpen={onOpenCard} />
                     </li>
                   ))}
                 </ul>
@@ -240,58 +299,60 @@ export function MyProjectsScreen() {
       )}
 
       <Sheet open={filtering} onClose={() => setFiltering(false)} title="Filter and sort">
-        <div className="flex flex-col gap-6 pb-8">
-          <label className="relative flex min-h-[44px] cursor-pointer items-center gap-4 text-lg leading-lg text-text-primary">
+        <div className="flex flex-col gap-4 pb-8">
+          <label className={cn(T.bodyLg, "relative flex min-h-[44px] cursor-pointer items-center gap-4")}>
             <input type="checkbox" className="sr-only" checked={view.showcase} onChange={() => change({ showcase: !view.showcase })} />
             <Checkbox checked={view.showcase} decorative />
             Shared only
           </label>
-          <div role="radiogroup" aria-label="Sort" className="flex flex-col">
-            <p className="pb-2 text-md font-medium leading-md text-text-secondary">Sort</p>
-            {SORT_OPTIONS.map((o) => (
-              <label key={o.value} className="relative flex min-h-[44px] cursor-pointer items-center gap-4 text-lg leading-lg text-text-primary">
-                <input type="radio" name="m-projects-sort" className="sr-only" checked={view.sort === o.value} onChange={() => change({ sort: o.value })} />
-                <Radio checked={view.sort === o.value} decorative />
-                {o.label}
-              </label>
-            ))}
-          </div>
+          <p className={cn(T.rowTitle, "text-text-secondary")}>Sort</p>
+          <PickList
+            label="Sort"
+            options={SORT_OPTIONS}
+            value={view.sort}
+            onPick={(sort) => {
+              change({ sort });
+              setFiltering(false);
+            }}
+          />
         </div>
       </Sheet>
     </Screen>
   );
 }
 
-function ProjectCard({ summary, via, now }: { summary: ProjectSummary; via?: string; now: number }) {
+function ProjectCard({ summary, via, now, onOpen }: { summary: ProjectSummary; via?: string; now: number; onOpen: () => void }) {
   const [failed, setFailed] = React.useState(false);
   const text = cardText(summary, now);
   return (
     <Link
       href={phoneProjectHref(summary.id)}
-      className="flex flex-col gap-4 overflow-hidden rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-4 outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
+      onClick={onOpen}
+      className={cn(LIST_CARD, "gap-4 p-4 outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus")}
     >
-      <span className="relative block aspect-[16/10] w-full overflow-hidden rounded-md bg-bg-surface-raised">
+      <span className="relative block aspect-video w-full overflow-hidden rounded-md bg-bg-surface-raised">
         {summary.cover && !failed ? (
           // eslint-disable-next-line @next/next/no-img-element -- the project's cover from the build store
           <img src={summary.cover} alt="" loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
         ) : (
-          <span className="absolute inset-0 flex items-center justify-center text-[color:var(--color-icon-secondary)]">
-            <Icon icon={CpuIcon} size={24} />
+          <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[color:var(--color-icon-secondary)]">
+            <Icon icon={summary.cover ? ImageNotFound01Icon : CpuIcon} size={24} />
+            {summary.cover && <span className={cn(T.meta, "text-text-tertiary")}>Image didn’t load</span>}
           </span>
         )}
       </span>
       <span className="flex flex-col gap-2 px-2 pb-2">
         <span className="flex items-start justify-between gap-4">
-          <span className="line-clamp-2 min-w-0 text-lg font-semibold leading-lg text-text-primary">{summary.name}</span>
-          <StatusChip status={summary.status} word={text.chip.word} showcased={text.chip.badge !== null} />
+          <span className={cn(T.section, "line-clamp-2 min-w-0 break-words")}>{summary.name}</span>
+          <PhoneStatusChip status={summary.status} word={text.chip.word} shared={text.chip.badge !== null} />
         </span>
-        <span className="truncate text-md leading-md text-text-secondary">
+        <span className={cn(T.body, "truncate")}>
           {text.count} · <time dateTime={text.time.dateTime}>{text.time.text}</time>
           {via ? ` · matches ${via}` : ""}
         </span>
-        <span className="flex items-center gap-2 text-md font-medium leading-md text-text-secondary">
+        <span className={cn(T.rowTitle, "flex items-center gap-2 text-text-secondary")}>
           <span className="truncate">{text.hint}</span>
-          <Icon icon={ArrowRight02Icon} size={14} className="shrink-0" />
+          <Icon icon={ArrowRight01Icon} size={16} className="shrink-0" />
         </span>
       </span>
     </Link>

@@ -7,15 +7,20 @@
 //   are shared, minted NFTs, live listings, IDZ, plan and credits, messages);
 //   AU-61b: blocked while money is moving (a withdrawal not complete yet, a
 //   bid on a live auction);
-// 3 keep a copy (Download your information, made at once on the phone);
-// 4 confirm it's you (the password; Apple, Google or Facebook once more for
+// 3 keep a copy (Download your information is the primary button, made at
+//   once on the phone; "Continue without a copy" is the quiet way on; once a
+//   copy is made, Continue and Download again);
+// 4 confirm it's you (the password; Google or Facebook once more for
 //   an account with no password) — wrong, deleting, couldn't (offline).
+// The furthest step reached is kept for the tab (sessionStorage), so a
+// reload stays on its step. Facts are grouped rows, the ways out (Take a
+// break, Withdraw IDZ) rows with a chevron, every button in the bottom bar.
 // Then AU-64: deletion scheduled for 30 days; live listings come down now;
 // Done signs out to Welcome. Signing in before the date offers Restore
 // (AU-65, restore.tsx).
 
 import * as React from "react";
-import Link from "next/link";
+import { Coins01Icon, CreditCardIcon, Diamond01Icon, Download04Icon, Folder01Icon, Message01Icon, PauseIcon, Tag01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { useMakerIdz } from "@/components/balance/use-maker-idz";
@@ -39,14 +44,35 @@ import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
 import { ACCOUNT_CONTENT, AccountAlert, AccountHeading } from "../account/parts";
 import { WayButton } from "../account/ways-in";
-import { BottomBar, TEXT_LINK } from "../kit/bottom-bar";
+import { BottomBar } from "../kit/bottom-bar";
+import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 import { useOnline } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { DownloadStatus, useDownload } from "./data-download";
 import { useSessionAt } from "./security";
+import { SettingsGroup, SettingsRow } from "./kit";
 import { signOutToWelcome } from "./sign-out";
+
+/** The furthest step this tab reached, so a reload stays on its step. */
+const REACHED_KEY = "ideeza:m:delete-reached";
+const readReached = () => {
+  try {
+    return Math.max(1, Math.min(4, Number(window.sessionStorage.getItem(REACHED_KEY)) || 1));
+  } catch {
+    return 1;
+  }
+};
+const noSubscribe = () => () => {};
+const writeReached = (n: number) => {
+  try {
+    if (n > 1) window.sessionStorage.setItem(REACHED_KEY, String(n));
+    else window.sessionStorage.removeItem(REACHED_KEY);
+  } catch {
+    // Private mode: the step just isn't kept across a reload.
+  }
+};
 
 const STEPS = ["Why you’re leaving", "What you’ll lose", "Keep a copy", "Confirm it’s you"] as const;
 const OPEN = new Set<Listing["status"]>(["live", "paused"]);
@@ -109,10 +135,15 @@ export function DeleteAccount() {
   const dl = useDownload();
   const ids = useFieldIds(["note", "password"] as const);
   // Each step is its own address, so Back goes to the step before; a step not reached yet opens step 1.
-  const [reached, setReached] = React.useState(1);
+  const [went, setWent] = React.useState(1);
+  // After a reload the tab remembers how far it got (the server can't know: 1 there).
+  const kept = React.useSyncExternalStore(noSubscribe, readReached, () => 1);
+  const reached = Math.max(went, kept);
   const step = Math.min(reached, Math.max(1, Math.min(4, Number(params.get("step")) || 1)));
   const go = (n: number) => {
-    setReached((r) => Math.max(r, n));
+    const far = Math.max(reached, n);
+    setWent(far);
+    writeReached(far);
     router.push(`/m/settings/delete?step=${n}`);
   };
   const [reason, setReason] = React.useState("");
@@ -147,16 +178,13 @@ export function DeleteAccount() {
       >
         <div className={`${ACCOUNT_CONTENT} pt-12`}>
           <AccountHeading title={`Your account will be deleted on ${until}`}>
-            Signing in as {email} before then restores it.
+            Signing in before then restores it. We’ve sent the details to {email}.
           </AccountHeading>
-          <dl className="flex flex-col">
+          <SettingsGroup>
             {rows.map(([term, value]) => (
-              <div key={term} className="flex items-center justify-between gap-6 px-6 py-6">
-                <dt className="text-md leading-md text-text-secondary">{term}</dt>
-                <dd className="text-right text-md leading-md text-text-primary">{value}</dd>
-              </div>
+              <SettingsRow key={term} label={term} value={value} />
             ))}
-          </dl>
+          </SettingsGroup>
         </div>
       </Screen>
     );
@@ -179,28 +207,51 @@ export function DeleteAccount() {
       return setFailed(true);
     }
     takeDownListings(lose.listings.map((l) => l.id));
+    writeReached(1);
     setBusy(false);
   };
 
+  const keep = () => {
+    writeReached(1);
+    router.replace("/m/settings/security");
+  };
   const footer =
     step === 4 ? (
       <BottomBar>
         <Button hierarchy="danger" size="xl" className="w-full" loading={busy} disabled={!confirmable} onClick={remove}>
           Delete account
         </Button>
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => router.replace("/m/settings/security")}>
+        <Button hierarchy="ghost" size="xl" className="w-full" onClick={keep}>
           Keep my account
         </Button>
       </BottomBar>
+    ) : step === 3 ? (
+      <BottomBar>
+        {/* AU-62: the copy is the primary; going on without one is the quiet way. */}
+        {dl.made ? (
+          <>
+            <Button size="xl" className="w-full" disabled={!!dl.busy} onClick={() => go(4)}>
+              Continue
+            </Button>
+            <Button hierarchy="secondary" size="xl" className="w-full" loading={!!dl.busy} onClick={() => void dl.start()}>
+              Download again
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button size="xl" className="w-full" loading={!!dl.busy} onClick={() => void dl.start()}>
+              Download your information
+            </Button>
+            <Button hierarchy="secondary" size="xl" className="w-full" disabled={!!dl.busy} onClick={() => go(4)}>
+              Continue without a copy
+            </Button>
+          </>
+        )}
+      </BottomBar>
     ) : (
       <BottomBar>
-        <Button
-          size="xl"
-          className="w-full"
-          disabled={(step === 2 && (!lose.ready || lose.moving.length > 0)) || (step === 3 && !!dl.busy)}
-          onClick={() => go(step + 1)}
-        >
-          {step === 3 && !dl.made ? "Continue without a copy" : "Continue"}
+        <Button size="xl" className="w-full" disabled={step === 2 && (!lose.ready || lose.moving.length > 0)} onClick={() => go(step + 1)}>
+          Continue
         </Button>
       </BottomBar>
     );
@@ -209,7 +260,7 @@ export function DeleteAccount() {
     <Screen top={<TopBar back={step === 1 ? "/m/settings/security" : true} title="Delete account" />} footer={footer}>
       <div className={ACCOUNT_CONTENT}>
         <div className="flex flex-col gap-2">
-          <p className="text-sm leading-sm text-text-secondary">
+          <p className={T.meta}>
             Step {step} of 4 · {STEPS[step - 1]}
           </p>
           <div className="flex gap-2">
@@ -227,7 +278,7 @@ export function DeleteAccount() {
                 <label key={r.id} className="relative flex min-h-[44px] cursor-pointer items-center gap-8 rounded-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus">
                   <input type="radio" name="leave" className="sr-only" checked={reason === r.id} onChange={() => setReason(r.id)} />
                   <Radio checked={reason === r.id} decorative />
-                  <span className="text-lg leading-lg text-text-primary">{r.label}</span>
+                  <span className={T.bodyLg}>{r.label}</span>
                 </label>
               ))}
             </div>
@@ -243,13 +294,13 @@ export function DeleteAccount() {
                 placeholder="Tell us more (optional)"
                 maxLength={LEAVE_NOTE_MAX}
               />
-              <p className="text-sm leading-sm text-text-tertiary tabular-nums">
+              <p className={cn(T.meta, "text-text-tertiary tabular-nums")}>
                 {note.length}/{LEAVE_NOTE_MAX}
               </p>
             </div>
-            <Link href="/m/settings/privacy#take-a-break" className={`${TEXT_LINK} self-start`}>
-              Need a pause? Take a break instead
-            </Link>
+            <SettingsGroup>
+              <SettingsRow icon={PauseIcon} label="Need a pause? Take a break instead" href="/m/settings/privacy?open=break" />
+            </SettingsGroup>
           </>
         )}
 
@@ -259,39 +310,33 @@ export function DeleteAccount() {
             {lose.moving.length > 0 && (
               <div className="flex flex-col gap-4">
                 <AccountAlert alert={{ tone: "error", title: "Finish these first", body: "Money that’s still moving has to settle before you can delete." }} />
-                <dl className="flex flex-col">
+                <SettingsGroup>
                   {lose.moving.map((m, i) => (
-                    <div key={i} className="flex items-center justify-between gap-6 px-6 py-6">
-                      <dt className="text-md leading-md text-text-secondary">{m.label}</dt>
-                      <dd className="text-right text-md font-medium leading-md text-text-primary">{m.value}</dd>
-                    </div>
+                    <SettingsRow key={i} label={m.label} value={<span className="text-text-primary">{m.value}</span>} />
                   ))}
-                </dl>
+                </SettingsGroup>
               </div>
             )}
             {lose.ready && (
-              <dl className="flex flex-col">
+              <SettingsGroup>
                 {(
                   [
-                    ["Projects", `${lose.projects} · ${lose.shared} shared`],
-                    ["Minted NFTs", `${lose.minted} · stay with holders`],
-                    ["Live listings", lose.listings.length ? `${lose.listings.length} · taken down today` : "None"],
-                    ["IDZ balance", lose.idz === null ? "Wallet not connected" : `${lose.idz.toLocaleString("en-US")} IDZ`],
-                    ["Plan & credits", `${lose.paid ? `${lose.plan} ends` : lose.plan} · ${lose.credits} credits`],
-                    ["Messages", "Stay with the people you sent them to"],
+                    [Folder01Icon, "Projects", `${lose.projects} · ${lose.shared} shared`],
+                    [Diamond01Icon, "Minted NFTs", `${lose.minted} · stay with holders`],
+                    [Tag01Icon, "Live listings", lose.listings.length ? `${lose.listings.length} · taken down today` : "None"],
+                    [Coins01Icon, "IDZ balance", lose.idz === null ? "Wallet not connected" : `${lose.idz.toLocaleString("en-US")} IDZ`],
+                    [CreditCardIcon, "Plan & credits", `${lose.paid ? `${lose.plan} ends` : lose.plan} · ${lose.credits} credits`],
+                    [Message01Icon, "Messages", "Stay with the people you sent them to"],
                   ] as const
-                ).map(([term, value]) => (
-                  <div key={term} className="flex items-center justify-between gap-6 px-6 py-6">
-                    <dt className="shrink-0 text-md leading-md text-text-secondary">{term}</dt>
-                    <dd className="text-right text-md leading-md text-text-primary">{value}</dd>
-                  </div>
+                ).map(([icon, term, value]) => (
+                  <SettingsRow key={term} icon={icon} label={term} value={value} />
                 ))}
-              </dl>
+              </SettingsGroup>
             )}
             {lose.idz !== null && lose.idz > 0 && (
-              <Link href="/m/settings/payments" className={`${TEXT_LINK} self-start`}>
-                Withdraw IDZ in Get paid first
-              </Link>
+              <SettingsGroup>
+                <SettingsRow icon={Wallet01Icon} label="Withdraw IDZ in Get paid first" href="/m/settings/idz-pay" />
+              </SettingsGroup>
             )}
           </>
         )}
@@ -299,23 +344,24 @@ export function DeleteAccount() {
         {step === 3 && (
           <>
             <AccountHeading title="Keep a copy">Download your projects, files and activity before you go.</AccountHeading>
-            <div className="flex flex-col gap-6 rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
-              <div className="flex flex-col gap-1">
-                <p className="text-md font-semibold leading-md text-text-primary">Download your information</p>
-                <p className="text-sm leading-sm text-text-secondary">A .zip of your projects, files, messages and activity, made on this phone now.</p>
-              </div>
-              <DownloadStatus dl={dl} />
-              <Button hierarchy="secondary" size="xl" className="w-full" loading={!!dl.busy} onClick={() => void dl.start()}>
-                {dl.made ? "Download again" : "Download your information"}
-              </Button>
-            </div>
+            {/* What the file is, then its progress; the buttons are the bottom bar's. */}
+            <SettingsGroup>
+              <SettingsRow
+                icon={Download04Icon}
+                label="Download your information"
+                helper="A .zip of your projects, files, messages and activity, made on this phone now."
+              />
+            </SettingsGroup>
+            <DownloadStatus dl={dl} />
           </>
         )}
 
         {step === 4 && (
           <>
             <AccountHeading title="Confirm it’s you">
-              {provider ? `Sign in with ${PROVIDER_WORDS[provider]} once more to delete your account.` : "Enter your password to delete your account."}
+              {provider
+                ? `Sign in with ${PROVIDER_WORDS[provider]} once more to delete your account.`
+                : "Enter your password to delete your account."}
             </AccountHeading>
             <AccountAlert
               alert={
@@ -335,7 +381,7 @@ export function DeleteAccount() {
             />
             {provider ? (
               vouched ? (
-                <p className="text-md leading-md text-text-success">{PROVIDER_WORDS[provider]} confirmed it’s you.</p>
+                <p className={cn(T.body, "text-text-success")}>{PROVIDER_WORDS[provider]} confirmed it’s you.</p>
               ) : (
                 <WayButton way={provider} onClick={() => setReauth(true)} />
               )
@@ -353,10 +399,9 @@ export function DeleteAccount() {
                 />
               </Field>
             )}
-            <div className={cn("flex flex-col gap-1 rounded-md bg-bg-subtle p-6")}>
-              <p className="text-md font-semibold leading-md text-text-primary">Deleted on {until}</p>
-              <p className="text-sm leading-sm text-text-secondary">Until then your account is hidden. Sign in before then to restore it.</p>
-            </div>
+            <AccountAlert
+              alert={{ tone: "info", title: `Deleted on ${until}`, body: "Until then your account is hidden. Sign in before then to restore it." }}
+            />
           </>
         )}
       </div>
@@ -396,14 +441,11 @@ function ReauthSheet({
       open={open}
       onClose={onClose}
       title={`Continue with ${words}`}
-      description={`On a phone, ${words} asks you to confirm with Face ID or your ${words} password. This demo asks you to confirm.`}
+      description={`On a phone, ${words} asks you to confirm with your ${words} password. This demo asks you to confirm.`}
       actions={
         <>
           <Button size="xl" className="w-full" onClick={onDone}>
             Confirm as {email}
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
           </Button>
         </>
       }

@@ -48,8 +48,8 @@ export function DeleteChatSheet({ chat, onClose, onDeleted }: { chat: ChatSessio
         <>
           Its prompts and concept images are removed from this browser
           {n ? `, and so ${n === 1 ? "is the build" : `are the ${n} builds`} started from it` : ""}.
-          {kept ? ` ${kept === 1 ? "The build a project holds stays" : `The ${kept} builds projects hold stay`} with ${kept === 1 ? "that project" : "those projects"}.` : ""} IDEEZA&apos;s server keeps a
-          copy of each concept image with its prompt, and there&apos;s no way to delete those yet.
+          {kept ? ` ${kept === 1 ? "The build a project holds stays" : `The ${kept} builds projects hold stay`} with ${kept === 1 ? "that project" : "those projects"}.` : ""}
+          {" "}IDEEZA&apos;s server keeps a copy of each concept image with its prompt, and there&apos;s no way to delete those yet.
         </>
       }
       onConfirm={() => {
