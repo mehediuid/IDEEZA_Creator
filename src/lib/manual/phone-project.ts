@@ -20,7 +20,8 @@ import type { Role } from "../network/types";
 
 export type PhoneTab = "overview" | "products" | "media" | "activity";
 
-/** M1: Overview first and the default; the tabs pin under the top bar while scrolling (01b). */
+/** The project's places, at `?tab=`: the Overview is the page itself; Products, Media and Activity
+ *  are screens of their own under it (mobile UX pass 2026-11-15: a hub, not four tabs). */
 export const PHONE_TABS: readonly { id: PhoneTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "products", label: "Products" },

@@ -14,7 +14,7 @@
 // attached (07g pattern), since the files picked here are dropped on leaving.
 
 import * as React from "react";
-import { ArrowDown01Icon, Cancel01Icon, CloudUploadIcon, Doc01Icon, Image01Icon, Pdf01Icon, Video01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Cancel01Icon, CloudUploadIcon, Doc01Icon, Image01Icon, InformationCircleIcon, Pdf01Icon, Video01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { FIELD_LABEL, Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Banner } from "@/components/ideeza/banner";
@@ -162,6 +162,7 @@ function ActivityForm({
   const ids = useFieldIds(["type", "name", "description", "media"] as const);
   const [type, setType] = React.useState(entry?.type ?? "");
   const [picking, setPicking] = React.useState(false);
+  const [rules, setRules] = React.useState(false);
   const [customName, setCustomName] = React.useState(entry?.customName ?? "");
   const [description, setDescription] = React.useState(entry?.description ?? "");
   const [urls, setUrls] = React.useState<string[]>(entry?.urls ?? []);
@@ -310,7 +311,14 @@ function ActivityForm({
   const leave = (go: () => void) => (dirty && !saving ? setLeaving(() => go) : go());
   return (
     <Screen
-      top={<TopBar back={back} onBack={leave} title={mode === "add" ? "Add new activity" : "Edit activity"} />}
+      top={
+        <TopBar
+          back={back}
+          onBack={leave}
+          title={mode === "add" ? "Add new activity" : "Edit activity"}
+          actions={[{ icon: InformationCircleIcon, label: "What this needs", onClick: () => setRules(true) }]}
+        />
+      }
       footer={
         <BottomBar className="flex-row gap-6 pt-8">
           <Button hierarchy="secondary" size="xl" className="flex-1" onClick={() => leave(goBack)}>
@@ -324,11 +332,6 @@ function ActivityForm({
     >
       <form id="m-activity-form" onSubmit={submit} noValidate className="flex flex-col gap-8 px-8 pb-12">
         {forName && <p className={T.body}>For {forName}. Its NFTs get their own activity in Earn › Sell.</p>}
-        <p className={T.body}>
-          {mode === "add"
-            ? "Add at least one photo, video, PDF or document as proof — people who buy it see it in the journey. Everything is required unless it says optional."
-            : "Changes update this entry in the journey. It keeps at least one file."}
-        </p>
 
         <Field label="Activity type" htmlFor={ids.type.id} error={typeError} errorId={ids.type.errorId}>
           <button
@@ -518,6 +521,14 @@ function ActivityForm({
           go?.();
         }}
       />
+      {/* The form's rules (lens 1: off the form, one tap away). */}
+      <Sheet open={rules} onClose={() => setRules(false)} title={mode === "add" ? "Add new activity" : "Edit activity"}>
+        <p className={cn(T.body, "pb-8")}>
+          {mode === "add"
+            ? "Add at least one photo, video, PDF or document as proof — people who buy it see it in the journey. Everything is required unless it says optional."
+            : "Changes update this entry in the journey. It keeps at least one file."}
+        </p>
+      </Sheet>
     </Screen>
   );
 }

@@ -1,10 +1,10 @@
 "use client";
 
-// 04 · Activity tab (M3; 04, 04d, 04g, 04h, 04i, 04m, 04n, 04t): the web's
-// Activity History drawer as a tab, the project's own journey, newest first
-// (`historyOf`, the synthesized Planning last). "+ Add new activity" (A01
-// Tonal: the bar's Publish is the screen's one primary) opens the full-screen
-// form. Each entry: its type and the ? help (a sheet, the phone has no hover),
+// 04 · Activity (M3; 04, 04d, 04g, 04h, 04i, 04m, 04n, 04t): the web's
+// Activity History drawer as a screen of its own (`?tab=activity`, the page's
+// Activity row), the project's own journey, newest first (`historyOf`, the
+// synthesized Planning last). "+ Add new activity" is the screen's bar (its
+// one primary, in the thumb zone) and opens the full-screen form. Each entry: its type and the ? help (a sheet, the phone has no hover),
 // the date, the description, the price snapshot taken while it was listed
 // (04i; a tap opens the prices), its proof — photo, video and file tiles that
 // open the proof viewer (04n: the kit's full-screen viewer, "Prototype · proof
@@ -37,6 +37,7 @@ import { formatDate } from "@/lib/manual/project-summary";
 import { formatAmount } from "@/lib/manual/rail-copy";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
+import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { ImageViewer } from "../kit/image-viewer";
 import { MEDIA_INK } from "../kit/media";
@@ -45,6 +46,20 @@ import { useToast } from "../kit/toast";
 import { T } from "../type";
 import { useProject } from "./context";
 import { LIST_CARD, LIST_ROW } from "./parts";
+
+/** The Activity screen's one primary: Add new activity, in the thumb zone. */
+export function ActivityBar() {
+  const { project, view, viewer } = useProject();
+  if (!can(viewer, "activity.write", view.canCtx)) return null;
+  return (
+    <BottomBar className="pt-8">
+      <Link href={phoneProjectPath(project.id, "activity/new")} className={cn(buttonVariants({ size: "xl" }), "w-full")}>
+        <Icon icon={Add01Icon} size={20} />
+        Add new activity
+      </Link>
+    </BottomBar>
+  );
+}
 
 export function ActivityTab() {
   const { project, view, viewer } = useProject();
@@ -72,12 +87,6 @@ export function ActivityTab() {
           </>
         )}
       </p>
-      {canWrite && (
-        <Link href={phoneProjectPath(project.id, "activity/new")} className={cn(buttonVariants({ hierarchy: "tonal", size: "xl" }), "w-full")}>
-          <Icon icon={Add01Icon} size={20} />
-          Add new activity
-        </Link>
-      )}
       <ul aria-label="Activity" className={LIST_CARD}>
         {entries.map((e) => (
           <li key={e.id} className={cn(LIST_ROW, "flex flex-col gap-4 p-8")}>

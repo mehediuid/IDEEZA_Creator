@@ -8,8 +8,10 @@
 // the model, then Generate project video — rendered in this browser by the
 // web's video jobs (it keeps going if you leave). A render in progress shows
 // its progress with Cancel render. A finished take nobody chose yet comes
-// first (`?review=` or the status's own): Use this video · Make another take
-// (the same scenes) · Change scenes · Decide later. While it can't be made
+// first (`?review=` or the status's own): Use this video in the bar (the note
+// above it while another take is in use), then Make another take (the same
+// scenes) · Change scenes · Decide later as rows, as the product video's
+// review draws them (project-earn/video/review.tsx). While it can't be made
 // yet (11q, blocked), each product is listed with its video's state and the
 // web's action (Generate AI video…), so the screen is never a dead end.
 
@@ -36,6 +38,7 @@ import { PROJECT_VIDEO_KEY, VIDEO_QUALITY, qualityOpen, type JoinPlan, type OnSc
 import { HIGH_LOCKED_NOTE, LINE_MAX, PROJECT_HONESTY, RENDER_KEEPS_RUNNING } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
+import { ChoiceList, UseBar } from "../project-earn/video/review";
 import { useToast } from "../kit/toast";
 import { useGoBack } from "../nav-trail";
 import { Screen } from "../screen";
@@ -175,28 +178,23 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
           {reviewTake.clip ? ` · ${secs(reviewTake.clip.durationMs)}` : ""}
         </p>
         <h2 className={T.section}>Is this the video you want?</h2>
-        {status.video.state === "ready" && status.video.take.id !== reviewTake.id && (
-          <p className={T.body}>Take {status.video.take.n} stays in use until you choose.</p>
-        )}
+        {/* One primary in the bar; the other answers are rows (the product video's review). */}
+        <ChoiceList
+          label="Other choices"
+          choices={[
+            ...(fresh ? [{ title: "Make another take", text: "The same scenes, a new render", onClick: anotherTake }] : []),
+            { title: "Change scenes", text: "The intro, the order, the labels", onClick: changeScenes },
+            { title: "Decide later", text: "Keep it to review from the row", onClick: goBack },
+          ]}
+        />
       </div>
     );
     footer = (
-      <>
-        <Button size="xl" className="w-full" onClick={useIt}>
-          Use this video
-        </Button>
-        {fresh && (
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={anotherTake}>
-            Make another take
-          </Button>
-        )}
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={changeScenes}>
-          Change scenes
-        </Button>
-        <Button hierarchy="ghost" size="xl" className="w-full" onClick={goBack}>
-          Decide later
-        </Button>
-      </>
+      <UseBar
+        label="Use this video"
+        note={status.video.state === "ready" && status.video.take.id !== reviewTake.id ? `Take ${status.video.take.n} stays in use until you choose.` : null}
+        onUse={useIt}
+      />
     );
   } else if (renderingTake && !editing) {
     const p = renderingJob ? progressOf(renderingJob, now) : null;

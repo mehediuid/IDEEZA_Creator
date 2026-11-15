@@ -27,6 +27,7 @@ import { SHOWCASE_BADGE, STATUS_ICON, type ProjectStatus } from "@/lib/manual/pr
 import { phoneWords } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
 import { Chevron as KitChevron, LIST_CARD as KIT_LIST_CARD } from "../kit/list";
+import { PRESSED } from "../kit/press";
 import { T } from "../type";
 
 /** A03 Link MD Brand (Body/SM Medium). */
@@ -114,7 +115,7 @@ export function Thumb({
   );
 }
 
-const ROW = "flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle";
+const ROW = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
 
 export function ProductRow({
   href,

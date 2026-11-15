@@ -1,82 +1,88 @@
 "use client";
 
 // The phone's project page (Figma "Project Details · 2026 update" 01–01b,
-// 20a–20d; owner decisions M1–M6). The same project as the web's
-// /projects/[id], read through the web's one derivation
-// (`useProjectPageData`), placed for a phone:
-// · the top bar: Back to My projects and ⋯ (07); the project's name comes into
-//   the bar once the header scrolls away (01b);
-// · the header: the name and its status chip, the stage line with its version
-//   (opens Versions), the meta line, the lock line once sold in full, the
-//   description clamped to 3 lines (Show more), or Add a description; the
-//   description coachmark (07o); a newer version's notice (05b / 05c);
-// · the tabs Overview · Products · Media · Activity (the kit's MobileTabs),
-//   pinned under the top bar while the page scrolls; a tab is client state kept
-//   in `?tab=` (no navigation), so Back and a reload keep it. The web's
-//   `?tab=team|network|versions` opens that screen of its own instead;
-// · the Bottom action bar fixed to the foot (M4): Publish + Earn while there is
-//   a way to publish, else Earn alone with its live fact (20b).
-// Loading shows bones under the bar with no ⋯ (20c); an address that matches no
-// project says so, with Back to My projects (20d, the kit's not-found state),
-// on this page and on every screen under it. A write the browser refused
-// (storage full) says so under the top bar, as the web does.
+// 20a–20d; owner decisions M1–M6), laid out as a native object page (mobile UX
+// pass, 2026-11-15). The same project as the web's /projects/[id], read
+// through the web's one derivation (`useProjectPageData`), placed for a phone:
+// · the top bar: Back to My projects and ⋯ Project actions (07); the name comes
+//   into the bar once the large title scrolls away (01b);
+// · media first: the project video in use, else the cover (the buyer page's
+//   MediaHero); a tap on the cover opens the build images (Use as cover);
+// · one header: the name once, one line with the status chip (the Shared eye
+//   inside it) and the stage words, the description clamped to 3 lines (Show
+//   more) or Add a description, the lock line as a row to the sale, a newer
+//   version's notice with Review version n (05b / 05c);
+// · Products, the main content: the rows, Add a product, All n products;
+// · the description tip (07o), slim, after the products;
+// · a hub of rows that push: Activity, Media, Versions, Team, Network; About;
+//   Recent once the project has gone out (overview.tsx);
+// · the Bottom action bar in the thumb zone (M4): Publish + Earn while there is
+//   a way to publish, else the live fact beside Earn (20b).
+// Products, Media and Activity are screens of their own at the old tab
+// addresses (`?tab=products|media|activity`), so every link to a tab lands on
+// its screen, with Back to the page; the web's `?tab=team|network|versions`
+// opens that screen instead. Loading shows bones under the bar with no ⋯
+// (20c); an address that matches no project says so, with Back to My projects
+// (20d, the kit's not-found state), on this page and on every screen under it.
+// A write the browser refused (storage full) says so under the top bar.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowRight01Icon,
-  Coins01Icon,
-  InformationCircleIcon,
-  PencilEdit01Icon,
-  Rocket01Icon,
-} from "@hugeicons/core-free-icons";
+import { AiMagicIcon, Cancel01Icon, Coins01Icon, Image02Icon, InformationCircleIcon, PencilEdit01Icon, Rocket01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { earnSourceOf, useEarnFacts } from "@/components/projects/earn/ladder/use-earn-facts";
 import { coachmarkDue, COACHMARK_TEXT } from "@/components/projects/details/description-coachmark";
+import { mediaTilesOf } from "@/components/projects/details/media-tab";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
-import { postIdOfProject } from "@/lib/innovations/slug";
+import { useClipUrl } from "@/components/video-jobs/video-player";
+import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { earnHref, publishOptionsOf } from "@/lib/manual/earn-route";
 import { earnButtonOf } from "@/lib/manual/earn-view";
-import { labelOf } from "@/lib/manual/journey";
 import { can } from "@/lib/manual/permissions";
-import { engineeringMetaOf, pendingNoticesOf, stageLineOf } from "@/lib/manual/project-header";
+import { pendingNoticesOf, stageLineOf } from "@/lib/manual/project-header";
 import { headerText } from "@/lib/manual/project-summary";
-import { productRowsOf } from "@/lib/manual/project-read";
+import { coverOf, productRowsOf } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
 import {
   PHONE_TABS,
   phoneBarOf,
   phoneHrefOf,
+  phoneProjectHref,
   phoneProjectPath,
   phoneSubScreenOf,
   sampleProjectOf,
-  type PhoneTab,
 } from "@/lib/manual/phone-project";
+import { projectVideoStatusOf } from "@/lib/video/project-video";
+import { useProjectVideos } from "@/lib/video/store";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
+import { Chevron, LIST_CARD } from "../kit/list";
+import { MEDIA_CHIP, MEDIA_GROUND } from "../kit/media";
 import { NotFoundState } from "../kit/state";
 import { OfflineBanner } from "../kit/states";
-import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
 import { Screen } from "../screen";
 import { MORE_ICON, TopBar } from "../top-bar";
+import { PRESSED, PRESSED_DIM } from "../kit/press";
 import { T } from "../type";
-import { ActivityTab } from "./activity-tab";
+import { ActivityBar, ActivityTab } from "./activity-tab";
 import { ProjectProvider, useProject, type ProjectSheet, type Ready } from "./context";
-import { MediaTab } from "./media-tab";
-import { OverviewTab } from "./overview";
-import { LINK_SM, PhoneStatusChip, SharedChip, TapLink } from "./parts";
-import { ProductsTab } from "./products-tab";
-import { SampleProject } from "./sample-project";
+import { BuildImagesViewer, MediaBar, MediaTab } from "./media-tab";
+import { ProjectAbout, ProjectHub, ProjectRecent } from "./overview";
+import { LINK_SM, PhoneStatusChip, TapLink } from "./parts";
+import { ProductsBar, ProductsSection, ProductsTab } from "./products-tab";
+import { MediaHero, SampleProject } from "./sample-project";
 import { ProjectSheets } from "./sheets";
 import { usePhoneWriteGate } from "./write-gate";
 
-const TAB_IDS = PHONE_TABS.map((t) => t.id);
-const TABS = PHONE_TABS.map((t) => ({ value: t.id, label: t.label }));
+/** The screens under the page at the old tab addresses. */
+type SubView = "products" | "media" | "activity";
+const SUB_VIEWS: readonly SubView[] = ["products", "media", "activity"];
+const SUB_TITLE = Object.fromEntries(PHONE_TABS.map((t) => [t.id, t.label])) as Record<SubView, string>;
 
 export function ProjectScreen({ id }: { id: string }) {
   const data = useProjectPageData(id, "project");
@@ -96,16 +102,14 @@ export function ProjectScreen({ id }: { id: string }) {
   return <ProjectReady data={data} />;
 }
 
-/** 20c · Loading project: the bar and the header's shape, no ⋯ yet. */
+/** 20c · Loading project: the bar and the page's shape (media, title, rows), no ⋯ yet. */
 export function ProjectLoading() {
   return (
     <Screen top={<TopBar back="/m/projects" />}>
       <div role="status" aria-label="Loading project" className="flex flex-col gap-6 px-8 pb-8">
+        <Skeleton shape="block" className="aspect-video h-auto w-full" />
         <Skeleton shape="text" size="lg" />
         <Skeleton shape="text" size="md" />
-        <Skeleton shape="text" size="md" />
-        <Skeleton shape="block" className="h-[60px] w-full" />
-        <Skeleton shape="block" className="h-[40px] w-full" />
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} shape="block" className="h-[80px] w-full" />
         ))}
@@ -134,71 +138,88 @@ export function ProjectMissing({
 }
 
 function ProjectReady({ data }: { data: Ready }) {
-  const router = useRouter();
   const { project } = data;
-  const [tab, setTab] = useTabParam<PhoneTab>("tab", TAB_IDS, "overview");
+  const params = useSearchParams();
+  const raw = params.get("tab");
+  const view = (SUB_VIEWS as readonly string[]).includes(raw ?? "") ? (raw as SubView) : null;
   const gate = usePhoneWriteGate(project.id);
   const [sheet, setSheet] = React.useState<ProjectSheet | null>(null);
-  const scrollRef = React.useRef<HTMLDivElement>(null);
-  const tabsRef = React.useRef<HTMLDivElement>(null);
-  const titleRef = React.useRef<HTMLHeadingElement>(null);
-  const titleGone = useScrolledPast(titleRef, scrollRef);
-
-  // A new tab starts at its top, under the pinned tabs, when the page was scrolled past the header.
-  const goTab = (t: PhoneTab) => {
-    const scroller = scrollRef.current;
-    const tabs = tabsRef.current;
-    if (scroller && tabs && scroller.scrollTop > tabs.offsetTop) scroller.scrollTop = tabs.offsetTop;
-    setTab(t);
-  };
-
-  // An in-page link to a tab ("See all" → Products, the Activity card) switches it in place too.
-  const onTabLink = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    const a = (e.target as HTMLElement).closest("a");
-    if (!a) return;
-    const url = new URL(a.href, window.location.href);
-    if (url.pathname !== window.location.pathname) return;
-    const next = url.searchParams.get("tab") ?? "overview";
-    if (!(TAB_IDS as readonly string[]).includes(next)) return;
-    e.preventDefault();
-    goTab(next as PhoneTab);
-  };
-
   const ctx = { ...data, gate, open: setSheet };
-  const viewPost = () => router.push(`/m/clip/${encodeURIComponent(postIdOfProject(project.id))}`);
-  const owner = can(data.viewer, "facts.seeOwnerOnly");
   return (
     <ProjectProvider value={ctx}>
-      <Screen
-        top={
-          <TopBar
-            back="/m/projects"
-            title={titleGone ? project.name : undefined}
-            titleAs="p"
-            actions={owner ? [{ icon: MORE_ICON, label: "Project actions", onClick: () => setSheet({ kind: "menu" }) }] : []}
-          />
-        }
-        footer={<ProjectBar />}
-      >
-        <ScrollHost scrollRef={scrollRef}>
-          <OfflineBanner />
-          <StorageErrorBanner className="mx-8 mb-6" />
-          <ProjectHeader titleRef={titleRef} onViewPost={viewPost} />
-          <div ref={tabsRef} className="sticky top-0 z-10 bg-bg-page">
-            <MobileTabs label="Project" idBase="project" tabs={TABS} value={tab} onChange={goTab} />
-          </div>
-          <div {...tabPanelProps("project", tab)} onClick={onTabLink} className="px-8 pb-12 pt-8 outline-none">
-            {tab === "overview" && <OverviewTab />}
-            {tab === "products" && <ProductsTab />}
-            {tab === "media" && <MediaTab />}
-            {tab === "activity" && <ActivityTab />}
-          </div>
-        </ScrollHost>
-      </Screen>
+      {/* Keyed, so a screen and the page never share one scroller (each opens at its own top). */}
+      {view ? <ProjectSubScreen key={view} view={view} /> : <ProjectPage key="page" />}
       <ProjectSheets sheet={sheet} onSheet={setSheet} />
       {gate.sheet}
     </ProjectProvider>
+  );
+}
+
+// Where the page was scrolled when a row opened a screen under it: Back puts it back.
+const pageTop = new Map<string, number>();
+
+function ProjectPage() {
+  const { project, viewer, open } = useProject();
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const titleRef = React.useRef<HTMLHeadingElement>(null);
+  const titleGone = useScrolledPast(titleRef, scrollRef);
+  const owner = can(viewer, "facts.seeOwnerOnly");
+
+  React.useLayoutEffect(() => {
+    const top = pageTop.get(project.id);
+    pageTop.delete(project.id);
+    if (top && scrollRef.current) scrollRef.current.scrollTop = top;
+  }, [project.id]);
+  // A link on the page (a product, a hub row) is about to open a screen: keep the place.
+  const keepPlace = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("a") && scrollRef.current) pageTop.set(project.id, scrollRef.current.scrollTop);
+  };
+
+  return (
+    <Screen
+      top={
+        <TopBar
+          back="/m/projects"
+          title={titleGone ? project.name : undefined}
+          titleAs="p"
+          actions={owner ? [{ icon: MORE_ICON, label: "Project actions", onClick: () => open({ kind: "menu" }) }] : []}
+        />
+      }
+      footer={<ProjectBar />}
+    >
+      <ScrollHost scrollRef={scrollRef}>
+        <div onClickCapture={keepPlace} className="flex flex-col pb-12">
+          <OfflineBanner />
+          <StorageErrorBanner className="mx-8 mb-6" />
+          <ProjectHero />
+          <ProjectHeader titleRef={titleRef} />
+          <div className="flex flex-col gap-12 px-8">
+            <ProductsSection />
+            <DescriptionTip />
+            <ProjectHub />
+            <ProjectAbout />
+            <ProjectRecent key={project.id} />
+          </div>
+        </div>
+      </ScrollHost>
+    </Screen>
+  );
+}
+
+/** Products, Media or Activity on a screen of its own, Back to the page. */
+function ProjectSubScreen({ view }: { view: SubView }) {
+  const { project } = useProject();
+  const footer = view === "products" ? <ProductsBar /> : view === "media" ? <MediaBar /> : <ActivityBar />;
+  return (
+    <Screen top={<TopBar back={phoneProjectHref(project.id)} title={SUB_TITLE[view]} />} footer={footer}>
+      <OfflineBanner />
+      <StorageErrorBanner className="mx-8 mb-6" />
+      <div className="px-8 pb-12 pt-2">
+        {view === "products" && <ProductsTab />}
+        {view === "media" && <MediaTab />}
+        {view === "activity" && <ActivityTab />}
+      </div>
+    </Screen>
   );
 }
 
@@ -228,94 +249,107 @@ function useScrolledPast(target: React.RefObject<HTMLElement | null>, root: Reac
   return gone;
 }
 
+// ─────────────────────────── media first ───────────────────────────
+
+/** The project video in use, playing as the Feed plays it (the buyer page's MediaHero); else the
+ *  cover, whose tap opens the build images full size (Use as cover lives there). Nothing when the
+ *  project has no picture at all (hand-made products only). */
+function ProjectHero() {
+  const { project, view } = useProject();
+  const { record } = useProjectVideos(project.id);
+  const { jobs, now } = useVideoJobs();
+  const status = projectVideoStatusOf({ products: view.products, videos: record, jobs, now });
+  const take = status.video.state === "ready" ? status.video.take : null;
+  const clip = useClipUrl(take?.id ?? null);
+  const cover = coverOf(project, view.refs);
+  const tiles = React.useMemo(() => mediaTilesOf(view.refs), [view.refs]);
+  const [viewing, setViewing] = React.useState(false);
+
+  if (take && clip.state === "ready" && clip.url) {
+    return <MediaHero video={{ src: clip.url, alt: `${project.name} project video` }} picture={clip.posterUrl ?? cover} name={project.name} />;
+  }
+  if (!cover) return null;
+  const frame = cn(MEDIA_GROUND, "relative block aspect-video w-full overflow-hidden rounded-xl");
+  // eslint-disable-next-line @next/next/no-img-element -- the cover from the build store
+  const img = <img src={cover} alt="" className="absolute inset-0 size-full object-cover" />;
+  return (
+    <div className="px-8 pb-6">
+      {tiles.length > 0 ? (
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-label={`${project.name}, the cover. Open the images`}
+          onClick={() => setViewing(true)}
+          className={cn(frame, PRESSED_DIM, "outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+        >
+          {img}
+          {tiles.length > 1 && (
+            <span aria-hidden className={cn(MEDIA_CHIP, "absolute bottom-4 right-4 min-h-[24px] px-3")}>
+              <Icon icon={Image02Icon} size={12} />
+              {Math.max(0, tiles.findIndex((t) => t.url === cover)) + 1} / {tiles.length}
+            </span>
+          )}
+        </button>
+      ) : (
+        <div role="img" aria-label={`${project.name}, the cover`} className={frame}>
+          {img}
+        </div>
+      )}
+      {viewing && <BuildImagesViewer startUrl={cover} onClose={() => setViewing(false)} />}
+    </div>
+  );
+}
+
 // ─────────────────────────── the header ───────────────────────────
 
-function ProjectHeader({ titleRef, onViewPost }: { titleRef: React.RefObject<HTMLHeadingElement | null>; onViewPost: () => void }) {
-  const { project, view, viewer, open } = useProject();
-  const { setDescriptionHint } = useManualProjects();
+/** What the header and the tip both read: the header's words and what waits for the owner. */
+function usePending() {
+  const { view, viewer } = useProject();
   const { summary, canCtx } = view;
   const text = headerText(summary, { viewer, now: null, context: "project" });
   const owner = can(viewer, "facts.seeOwnerOnly");
-  const canDescribe = owner && can(viewer, "project.editDescription", canCtx);
-
-  const stage = stageLineOf(view.engineering, summary).split(" · ");
-  const version = view.engineering.state === "empty" ? null : stage.pop() ?? null;
-  const meta = engineeringMetaOf(summary, { label: labelOf(view.current) })
-    .map((m) => (m.kind === "time" ? m.time.text : m.text))
-    .join(" · ");
-
   const review = text.pair.first?.kind === "review-version" && can(viewer, "product.add", canCtx) ? text.pair.first : null;
   const notices = owner ? pendingNoticesOf(view.pending, view.lineages, review ? (summary.pendingVersion?.buildId ?? null) : null) : [];
+  return { text, owner, review, notices, canDescribe: owner && can(viewer, "project.editDescription", canCtx) };
+}
+
+function ProjectHeader({ titleRef }: { titleRef: React.RefObject<HTMLHeadingElement | null> }) {
+  const { project, view, open } = useProject();
+  const { text, review, notices, canDescribe } = usePending();
+  const { summary } = view;
+  // One line under the name: the stage words and the count ("Built · 3 products"); the version
+  // and the saved time are the Versions row's, "Now: …" the Activity row's.
+  const stage = stageLineOf(view.engineering, summary).split(" · ");
+  if (view.engineering.state !== "empty") stage.pop();
 
   return (
-    <header className="flex flex-col gap-6 px-8 pb-8">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <h1 ref={titleRef} className={cn(T.title, "min-w-0 break-words")}>
-              {project.name}
-            </h1>
-            <PhoneStatusChip status={summary.status} word={text.chip.word} />
-          </div>
-          {text.chip.badge && (
-            <div className="flex">
-              <SharedChip onOpen={owner ? onViewPost : undefined} />
-            </div>
-          )}
-          <p className={cn(T.meta, "flex flex-wrap items-center gap-2")}>
-            <span>
-              {stage.join(" · ")}
-              {version ? " ·" : ""}
-            </span>
-            {version && (
-              <Link
-                href={phoneProjectPath(project.id, "versions")}
-                aria-label={`${version}, open Versions`}
-                className={LINK_SM}
-              >
-                {version}
-                <Icon icon={ArrowRight01Icon} size={14} />
-              </Link>
-            )}
-          </p>
+    <header className="flex flex-col gap-6 px-8 pb-12">
+      <div className="flex flex-col gap-3">
+        <h1 ref={titleRef} className={cn(T.title, "break-words")}>
+          {project.name}
+        </h1>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <PhoneStatusChip status={summary.status} word={text.chip.word} shared={text.chip.badge !== null} />
+          <p className={T.meta}>{stage.join(" · ")}</p>
         </div>
-        <p className={T.meta}>{meta}</p>
       </div>
-
-      {text.lockLine && (
-        <div className="flex flex-col gap-2">
-          <p className={cn(T.body, "flex items-start gap-2 text-text-primary")}>
-            <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-              <Icon icon={InformationCircleIcon} size={14} />
-            </span>
-            {text.lockLine}
-          </p>
-          <div className="pl-8">
-            <TapLink href={phoneHrefOf(earnHref(project.id, "customers")) ?? "/m/projects"}>See the sale</TapLink>
-          </div>
-        </div>
-      )}
 
       <Description text={project.description} onAdd={canDescribe ? () => open({ kind: "edit" }) : undefined} />
 
-      {/* One thing at a time above the tabs: a version to review comes first, the description
-          hint once that is handled (05b before 07o). */}
-      {canDescribe && coachmarkDue(project) && !review && notices.length === 0 && (
-        <div className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-brand bg-bg-brand-subtle p-6">
-          <p className={cn(T.body, "text-text-primary")}>{COACHMARK_TEXT}</p>
-          <div className="flex gap-4">
-            <Button hierarchy="secondary" size="lg" onClick={() => open({ kind: "edit", ai: true })}>
-              Update description
-            </Button>
-            <Button
-              hierarchy="ghost"
-              size="lg"
-              onClick={() => setDescriptionHint(project.id, { dismissedAt: Date.now(), productCount: productRowsOf(project).length })}
-            >
-              Not now
-            </Button>
-          </div>
-        </div>
+      {text.lockLine && (
+        <Link
+          href={phoneHrefOf(earnHref(project.id, "customers")) ?? "/m/projects"}
+          className={cn(LIST_CARD, "flex-row items-center gap-4 px-8 py-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED)}
+        >
+          <span aria-hidden className="shrink-0 text-[color:var(--color-icon-secondary)]">
+            <Icon icon={InformationCircleIcon} size={20} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className={cn(T.body, "text-text-primary")}>{text.lockLine}</span>
+            <span className={T.meta}>See the sale</span>
+          </span>
+          <Chevron />
+        </Link>
       )}
 
       {notices.map((n) => {
@@ -332,6 +366,41 @@ function ProjectHeader({ titleRef, onViewPost }: { titleRef: React.RefObject<HTM
         </Link>
       )}
     </header>
+  );
+}
+
+/** 07o · the description tip, slim and after the products (one tip a screen, never first): a tap
+ *  writes the description with AI, ✕ is Not now. It waits while a version is to review (05b). */
+function DescriptionTip() {
+  const { project, open } = useProject();
+  const { setDescriptionHint } = useManualProjects();
+  const { review, notices, canDescribe } = usePending();
+  if (!canDescribe || !coachmarkDue(project) || review || notices.length > 0) return null;
+  return (
+    <div className="flex items-start gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border-brand bg-bg-brand-subtle">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => open({ kind: "edit", ai: true })}
+        className={cn("flex min-w-0 flex-1 items-start gap-4 rounded-xl py-6 pl-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus", PRESSED)}
+      >
+        <span aria-hidden className="mt-[2px] shrink-0 text-[color:var(--color-icon-brand)]">
+          <Icon icon={AiMagicIcon} size={20} />
+        </span>
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className={cn(T.body, "text-text-primary")}>{COACHMARK_TEXT}</span>
+          <span className={cn(T.rowTitle, "text-text-brand")}>Update description</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label="Not now"
+        onClick={() => setDescriptionHint(project.id, { dismissedAt: Date.now(), productCount: productRowsOf(project).length })}
+        className={cn("inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus", PRESSED)}
+      >
+        <Icon icon={Cancel01Icon} size={20} />
+      </button>
+    </div>
   );
 }
 
@@ -399,37 +468,37 @@ function ProjectBar() {
   const bar = phoneBarOf({ publishOptions, earn, reviewPending });
   if (!bar) return null;
   const earnHrefPhone = phoneHrefOf(earn.href) ?? `/m/projects/${project.id}/earn`;
-  const earnLink = (
-    <Link
-      href={earnHrefPhone}
-      className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full min-w-0 flex-1")}
-    >
-      <Icon icon={Coins01Icon} size={20} />
-      Earn
-    </Link>
-  );
+  if (bar.kind === "pair") {
+    return (
+      <BottomBar className="flex-row gap-6 pt-8">
+        <Button
+          hierarchy={bar.publishPrimary ? "primary" : "secondary"}
+          size="xl"
+          className="min-w-0 flex-1"
+          iconLeading={<Icon icon={Rocket01Icon} size={20} />}
+          onClick={() => open({ kind: "publish" })}
+        >
+          Publish
+        </Button>
+        <Link href={earnHrefPhone} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "min-w-0 flex-1")}>
+          <Icon icon={Coins01Icon} size={20} />
+          Earn
+        </Link>
+      </BottomBar>
+    );
+  }
+  // Gone out: the live fact ("Listed", "Sold 40%") beside Earn, the screen's one primary — quiet
+  // while a newer version waits for review, whose button is then the primary.
   return (
-    <BottomBar className={bar.kind === "pair" ? "flex-row gap-6 pt-8" : "gap-2 pt-8"}>
-      {bar.kind === "pair" ? (
-        <>
-          <Button
-            hierarchy={bar.publishPrimary ? "primary" : "secondary"}
-            size="xl"
-            className="min-w-0 flex-1"
-            iconLeading={<Icon icon={Rocket01Icon} size={20} />}
-            onClick={() => open({ kind: "publish" })}
-          >
-            Publish
-          </Button>
-          {earnLink}
-        </>
-      ) : (
-        <>
-          {earnLink}
-          {bar.fact && <p className={T.meta}>{bar.fact}</p>}
-        </>
-      )}
+    <BottomBar className="flex-row items-center gap-6 pt-8">
+      {bar.fact && <p className={cn(T.bodyStrong, "min-w-0 flex-1 break-words")}>{bar.fact}</p>}
+      <Link
+        href={earnHrefPhone}
+        className={cn(buttonVariants({ hierarchy: reviewPending ? "secondary" : "primary", size: "xl" }), bar.fact ? "min-w-0 flex-1" : "w-full")}
+      >
+        <Icon icon={Coins01Icon} size={20} />
+        Earn
+      </Link>
     </BottomBar>
   );
 }
-

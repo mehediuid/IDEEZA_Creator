@@ -1,15 +1,15 @@
 "use client";
 
-// 06 · Team (About › Team) and 06i (only you). The web's Team tab on its own
-// screen (M2): "Team conversation" (the project's one group conversation),
-// You as the owner, then each person with their role (Viewer / Editor /
-// Co-owner) and Message; "Add people or change shares in Splits". With nobody
-// else: "Just you so far" + Open Splits. Shares are Splits' (Earn), so no row
-// shows a percentage here.
+// 06 · Team (the page's Team row) and 06i (only you). The web's Team tab on
+// its own screen (M2): "Team conversation" (the project's one group
+// conversation) as a row, You as the owner, then each person with their role
+// (Viewer / Editor / Co-owner) and a 44 px Message button; "Add people or
+// change shares in Splits" as a row. With nobody else: "Just you so far" +
+// Open Splits. Shares are Splits' (Earn), so no row shows a percentage here.
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight01Icon, UserGroupIcon } from "@hugeicons/core-free-icons";
+import { Message01Icon, UserAdd01Icon, UserGroupIcon, UserMultiple02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
@@ -20,11 +20,13 @@ import { phoneHrefOf, phoneProjectHref } from "@/lib/manual/phone-project";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
 import { cn } from "@/lib/utils";
+import { ListCard as KitListCard, ListRow } from "../kit/list";
 import { EmptyState } from "../kit/state";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
+import { PRESSED } from "../kit/press";
 import { T } from "../type";
-import { LINK_MD, LIST_ROW, ListCard } from "./parts";
+import { LIST_ROW, ListCard } from "./parts";
 import { ProjectLoading, ProjectMissing } from "./project-screen";
 
 /** The phone's Messages tab holds the web's Messages routes under /m. */
@@ -42,15 +44,8 @@ export function TeamScreen({ projectId }: { projectId: string }) {
 
   return (
     <Screen top={<TopBar back={phoneProjectHref(project.id)} title="Team" />} className="px-8 pb-12">
-      <div className="flex flex-col gap-6">
-        <div className="flex min-h-[44px] items-center justify-between gap-4">
-          <p className={cn(T.meta, "min-w-0 truncate")}>{project.name}</p>
-          {owner && team.length > 0 && (
-            <Link href={phoneMessages(startHref({ kind: "team", projectId: project.id }, ME))} className={LINK_MD}>
-              Team conversation
-            </Link>
-          )}
-        </div>
+      <div className="flex flex-col gap-8">
+        <p className={cn(T.meta, "min-w-0 truncate")}>{project.name}</p>
         {team.length === 0 ? (
           <EmptyState
             icon={UserGroupIcon}
@@ -60,6 +55,11 @@ export function TeamScreen({ projectId }: { projectId: string }) {
           />
         ) : (
           <>
+            {owner && (
+              <KitListCard label="Conversation">
+                <ListRow href={phoneMessages(startHref({ kind: "team", projectId: project.id }, ME))} icon={UserMultiple02Icon} title="Team conversation" />
+              </KitListCard>
+            )}
             <ListCard label="Team">
               <li className={`${LIST_ROW} flex items-center gap-6 p-6`}>
                 <Avatar size="lg" initials="ME" />
@@ -79,19 +79,18 @@ export function TeamScreen({ projectId }: { projectId: string }) {
                     <Link
                       href={phoneMessages(startHref({ kind: "direct", to: t.id, projectId: project.id, about: { kind: "team" } }, ME))}
                       aria-label={`Message ${t.name}`}
-                      className={`${LINK_MD} -my-6 inline-flex min-h-[44px] items-center`}
+                      className={cn("-my-4 -mr-2 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus", PRESSED)}
                     >
-                      Message
+                      <Icon icon={Message01Icon} size={22} />
                     </Link>
                   )}
                 </li>
               ))}
             </ListCard>
             {manages && (
-              <Link href={splits} className={cn(T.rowTitle, "-my-6 inline-flex min-h-[44px] items-center gap-2 self-start outline-none hover:underline focus-visible:underline")}>
-                Add people or change shares in Splits
-                <Icon icon={ArrowRight01Icon} size={16} />
-              </Link>
+              <KitListCard label="Splits">
+                <ListRow href={splits} icon={UserAdd01Icon} title="Add people or change shares in Splits" />
+              </KitListCard>
             )}
           </>
         )}

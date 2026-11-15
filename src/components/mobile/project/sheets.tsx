@@ -68,9 +68,10 @@ import { ConfirmSheet } from "../kit/confirm-sheet";
 import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
 import { ActionSheet, Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { PRESSED } from "../kit/press";
 import { T } from "../type";
 import { useProject, type ProjectSheet, type Ready } from "./context";
-import { LIST_ROW, ListCard, Thumb } from "./parts";
+import { Chevron, LIST_ROW, ListCard, Thumb } from "./parts";
 import { AddProductSheet } from "./products-tab";
 
 /** The time a press is stamped with, read when it is pressed. */
@@ -517,8 +518,11 @@ function useLiveReadiness(purpose: ReadinessPurpose) {
   return useReadinessOf(project, view, brief, purpose);
 }
 
-/** Each product with its video's state and the web's action (Generate AI video…), then the
- *  project video's row. `projectVideo={false}` leaves that row out (the Project video screen). */
+const READY_ROW = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
+
+/** Each product with its video's state and the web's action (Generate AI video…) as one row tap,
+ *  then the project video's row. `projectVideo={false}` leaves that row out (the Project video
+ *  screen). */
 export function ReadinessRows({
   readiness,
   projectId,
@@ -545,8 +549,8 @@ export function ReadinessRows({
           const copy = statusCopy(p.video);
           const label = actionLabel(copy.action);
           const ready = p.video.state === "ready";
-          return (
-            <li key={p.productId} className={cn(LIST_ROW, "flex items-start gap-6 p-6")}>
+          const body = (
+            <>
               <Thumb url={p.thumb}>
                 {ready && (
                   <span aria-hidden className={cn(MEDIA_GROUND, MEDIA_INK, "absolute inline-flex size-[28px] items-center justify-center rounded-full")}>
@@ -554,15 +558,24 @@ export function ReadinessRows({
                   </span>
                 )}
               </Thumb>
-              <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className={cn(T.rowTitle, "truncate")}>{p.name}</span>
                 <span className={cn(T.meta, ready && "text-text-success")}>{copy.text}</span>
-                {label && (
-                  <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(productHref(p.productId))}>
-                    {label}
-                  </Button>
-                )}
+                {label && <span className={cn(T.rowTitle, "text-text-brand")}>{label}</span>}
               </span>
+              {label && <Chevron />}
+            </>
+          );
+          // A product whose video is still to make is one whole-row tap to its page, where it is made.
+          return (
+            <li key={p.productId} className={LIST_ROW}>
+              {label ? (
+                <button type="button" onClick={() => router.push(productHref(p.productId))} className={READY_ROW}>
+                  {body}
+                </button>
+              ) : (
+                <div className={cn(READY_ROW, "hover:bg-transparent")}>{body}</div>
+              )}
             </li>
           );
         })}

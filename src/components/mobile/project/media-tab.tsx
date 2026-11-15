@@ -1,21 +1,23 @@
 "use client";
 
-// 03 · Media tab (03, 03b, 03c, 03f–03h): the web's Media tab in its order —
+// 03 · Media (03, 03b, 03c, 03f–03h): the web's Media tab on a screen of its
+// own (`?tab=media`, the page's Media row), in its order —
 // · Project video: while there is none (or it is out of date, rendering,
-//   failed) its row says why, with the web's action (Make project video,
-//   Update, Try again, Review → the Project video screen, 03d / 03e); once
-//   ready, the player, "Take n · 480p · 19 s · Made {date}", What's in this
-//   video (the scenes), Regenerate and Takes (n): In use, Use this, delete
-//   (03f, the take's file goes);
-// · Product videos: one compact row per current product (the web shows a
+//   failed) its card says why; the web's action (Make project video, Update,
+//   Try again, Review → the Project video screen, 03d / 03e) is the screen's
+//   bar. Once ready, the player, "Take n · 480p · 19 s · Made {date}", then
+//   rows: What's in this video (the scenes, a sheet), Takes (n) (a sheet: In
+//   use, Use this, delete — the take's file goes, 03f) and Regenerate;
+// · Product videos: one whole-row tap per current product (the web shows a
 //   tile): a ready one plays in a sheet, the others say their state with the
-//   web's action, which opens the product page where its video is made;
+//   web's action word and open the product page, where its video is made;
 // · Assembly snapshots (owner): the pictures Product Preview's Snapshot kept,
 //   as the web's Media tab lists them; a tap opens the viewer, where Remove
 //   asks first;
 // · From your builds: the concept images in a 3-column grid, the Cover chip
 //   on the cover; a tap opens the image viewer (03b), where "Use as cover"
-//   lives (03g "This image is the cover", 03h the toast).
+//   lives (03g "This image is the cover", 03h the toast). The page's cover
+//   opens the same viewer (`BuildImagesViewer`).
 // Every picture opens in the kit's one full-screen viewer (kit/image-viewer:
 // dark in both themes, white text, ✕, "n of N", the caption, ← action →).
 
@@ -26,9 +28,12 @@ import {
   Bookmark02Icon,
   CheckmarkCircle02Icon,
   Delete02Icon,
+  Film01Icon,
+  ListViewIcon,
   LockIcon,
   PlayCircleIcon,
   PlayIcon,
+  RepeatIcon,
   Tick02Icon,
   VideoOffIcon,
 } from "@hugeicons/core-free-icons";
@@ -61,11 +66,14 @@ import {
   videosGroupMeta,
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { ImageViewer } from "../kit/image-viewer";
+import { Chevron, ListCard as KitListCard, ListRow } from "../kit/list";
 import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { PRESSED } from "../kit/press";
 import { T } from "../type";
 import { useProject } from "./context";
 import { LIST_CARD, LIST_ROW, ListCard, SectionHeading, Thumb } from "./parts";
@@ -111,36 +119,58 @@ function SectionMeta({ title, meta }: { title: string; meta: string | null }) {
 
 // ─────────────────────────── Project video (03, 03c, 03f) ───────────────────────────
 
-function ProjectVideoSection() {
+/** The project video's state, its takes and its one action (Make project video, Update, Try
+ *  again, Review → the Project video screen), read by the section and the screen's bar. */
+function useProjectVideoState() {
   const { project, view, viewer } = useProject();
   const owner = can(viewer, "video.generate", view.canCtx);
   const { record } = useProjectVideos(project.id);
-  const { jobs, now, pickTake, deleteTake } = useVideoJobs();
-  const toast = useToast();
-  const [showTakes, setShowTakes] = React.useState(false);
-  const [playingId, setPlayingId] = React.useState<string | null>(null);
-  const [deleting, setDeleting] = React.useState<VideoTake | null>(null);
+  const { jobs, now } = useVideoJobs();
   const current = currentProductsOf(view.products);
-  if (current.length === 0) return null;
-
   const status = projectVideoStatusOf({ products: view.products, videos: record, jobs, now });
   const copy = projectRowCopy(status);
   const v = status.video;
   const inUse = v.state === "ready" ? v.take : null;
   const takes = record?.products[PROJECT_VIDEO_KEY]?.takes ?? [];
-  const playing = (playingId && takes.find((t) => t.id === playingId && t.readyAt && !t.failure)) || inUse;
   const videoHref = phoneProjectPath(project.id, "video");
-  const actionHref = copy.action === "review" && (status.review ?? (v.state === "review" ? v.take : null))
-    ? `${videoHref}?review=${encodeURIComponent((status.review ?? (v.state === "review" ? v.take : null))!.id)}`
-    : videoHref;
-  const actionText = projectActionLabel(copy.action);
+  const toReview = copy.action === "review" ? (status.review ?? (v.state === "review" ? v.take : null)) : null;
+  const actionHref = toReview ? `${videoHref}?review=${encodeURIComponent(toReview.id)}` : videoHref;
+  return { owner, current, status, copy, v, inUse, takes, videoHref, actionHref, actionText: projectActionLabel(copy.action) };
+}
+
+/** The Media screen's one primary: the project video's action, when it has one. */
+export function MediaBar() {
+  const { owner, current, actionText, actionHref } = useProjectVideoState();
+  if (!owner || current.length === 0 || !actionText) return null;
+  return (
+    <BottomBar className="pt-8">
+      <Link href={actionHref} className={cn(buttonVariants({ size: "xl" }), "w-full")}>
+        {actionText}
+      </Link>
+    </BottomBar>
+  );
+}
+
+function ProjectVideoSection() {
+  const { project } = useProject();
+  const { owner, current, status, copy, v, inUse, takes, videoHref } = useProjectVideoState();
+  const { pickTake, deleteTake } = useVideoJobs();
+  const toast = useToast();
+  const [sheet, setSheet] = React.useState<"takes" | "scenes" | null>(null);
+  const [playingId, setPlayingId] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState<VideoTake | null>(null);
+  if (current.length === 0) return null;
+
+  const playing = (playingId && takes.find((t) => t.id === playingId && t.readyAt && !t.failure)) || inUse;
   const showRow = !inUse || status.state !== "ready" || copy.action !== null;
+  const canRegenerate = copy.action === null && status.state === "ready" && !(v.state === "ready" && v.next);
 
   if (!owner && !inUse) return null;
   return (
     <section aria-label={PROJECT_VIDEO_TITLE} className="flex flex-col gap-4">
       <SectionMeta title={PROJECT_VIDEO_TITLE} meta={owner ? PROJECT_GROUP_META : null} />
       {owner && showRow && (
+        // Its state; its action is the screen's bar.
         <div className={cn(LIST_CARD, !inUse && "border-dashed", "flex-row items-start gap-6 p-6")}>
           <span className="grid size-[56px] shrink-0 grid-cols-2 grid-rows-2 gap-[1px] overflow-hidden rounded-md bg-bg-surface-raised">
             {current.slice(0, 4).map((p) => (
@@ -157,11 +187,6 @@ function ProjectVideoSection() {
             </span>
             {copy.sub && <span className={T.meta}>{copy.sub}</span>}
             {copy.progress !== null && <ProgressBar value={copy.progress} label="Project video render" />}
-            {actionText && (
-              <Link href={actionHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "self-start")}>
-                {actionText}
-              </Link>
-            )}
           </span>
         </div>
       )}
@@ -178,91 +203,88 @@ function ProjectVideoSection() {
               .filter(Boolean)
               .join(" · ")}
           </p>
-          {playing.join && (
-            <details className="group">
-              <summary className={cn(T.rowTitle, "-my-6 flex min-h-[44px] cursor-pointer list-none items-center gap-2")}>
-                What&apos;s in this video
-              </summary>
-              <ul className={cn(T.meta, "mt-4 flex flex-col gap-2")}>
-                {describeJoin(playing.join).map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-          {owner && (
-            <div className="flex flex-wrap gap-4">
-              {copy.action === null && status.state === "ready" && !(v.state === "ready" && v.next) && (
-                <Link href={videoHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }))}>
-                  Regenerate
-                </Link>
-              )}
-              <Button hierarchy="secondary" size="xl" aria-expanded={showTakes} onClick={() => setShowTakes((x) => !x)}>
-                Takes ({takes.length})
-              </Button>
-            </div>
-          )}
-          {owner && showTakes && (
-            <ListCard label="Takes">
-              {[...takes].reverse().map((t) => {
-                const ready = !!t.readyAt && !t.failure;
-                const using = inUse?.id === t.id;
-                return (
-                  <li key={t.id} className={cn(LIST_ROW, "flex items-center gap-4 p-6")}>
-                    <button
-                      type="button"
-                      disabled={!ready}
-                      aria-label={`Play take ${t.n}`}
-                      onClick={() => setPlayingId(t.id)}
-                      className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:text-text-disabled"
-                    >
-                      <Icon icon={PlayCircleIcon} size={20} />
-                    </button>
-                    <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className={T.rowTitle}>Take {t.n}</span>
-                      <span className={T.meta}>
-                        {[resolutionOf(t.quality), t.clip ? `${Math.round(t.clip.durationMs / 1000)} s` : null, formatDate(t.createdAt), t.failure ? "Failed" : !t.readyAt ? "Rendering" : null]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </span>
-                    {using ? (
-                      <Badge tone="success">In use</Badge>
-                    ) : (
-                      <>
-                        {ready && (
-                          <Button
-                            hierarchy="ghost"
-                            size="lg"
-                            onClick={() => {
-                              if (pickTake(project.id, PROJECT_VIDEO_KEY, t.id).ok) {
-                                setPlayingId(t.id);
-                                toast({ title: `Take ${t.n} is now the project video.` });
-                              } else toast({ title: "That take couldn't be put in use. Try again.", lead: "error" });
-                            }}
-                          >
-                            Use this
-                          </Button>
-                        )}
-                        <Button
-                          hierarchy="secondary"
-                          size="xl"
-                          iconOnly
-                          aria-label={`Delete take ${t.n}`}
-                          disabled={!t.readyAt && !t.failure}
-                          onClick={() => setDeleting(t)}
-                        >
-                          <Icon icon={Delete02Icon} size={20} />
-                        </Button>
-                      </>
-                    )}
-                  </li>
-                );
-              })}
-            </ListCard>
+          {(playing.join || owner) && (
+            <KitListCard label="Project video">
+              {playing.join && <ListRow icon={ListViewIcon} title="What’s in this video" onClick={() => setSheet("scenes")} />}
+              {owner && <ListRow icon={Film01Icon} title="Takes" value={String(takes.length)} onClick={() => setSheet("takes")} />}
+              {owner && canRegenerate && <ListRow icon={RepeatIcon} title="Regenerate" href={videoHref} />}
+            </KitListCard>
           )}
         </div>
       )}
+      <Sheet open={sheet === "scenes" && !!playing?.join} onClose={() => setSheet(null)} title="What’s in this video">
+        {playing?.join && (
+          <ul className={cn(T.body, "flex flex-col gap-2 pb-8")}>
+            {describeJoin(playing.join).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
+      </Sheet>
+      <Sheet open={sheet === "takes"} onClose={() => setSheet(null)} title={`Takes (${takes.length})`}>
+        <div className="pb-8">
+          <ListCard label="Takes">
+            {[...takes].reverse().map((t) => {
+              const ready = !!t.readyAt && !t.failure;
+              const using = inUse?.id === t.id;
+              return (
+                <li key={t.id} className={cn(LIST_ROW, "flex items-center gap-4 p-6")}>
+                  <button
+                    type="button"
+                    disabled={!ready}
+                    aria-label={`Play take ${t.n}`}
+                    onClick={() => {
+                      setPlayingId(t.id);
+                      setSheet(null);
+                    }}
+                    className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:text-text-disabled"
+                  >
+                    <Icon icon={PlayCircleIcon} size={20} />
+                  </button>
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={T.rowTitle}>Take {t.n}</span>
+                    <span className={T.meta}>
+                      {[resolutionOf(t.quality), t.clip ? `${Math.round(t.clip.durationMs / 1000)} s` : null, formatDate(t.createdAt), t.failure ? "Failed" : !t.readyAt ? "Rendering" : null]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                  {using ? (
+                    <Badge tone="success">In use</Badge>
+                  ) : (
+                    <>
+                      {ready && (
+                        <Button
+                          hierarchy="ghost"
+                          size="lg"
+                          onClick={() => {
+                            if (pickTake(project.id, PROJECT_VIDEO_KEY, t.id).ok) {
+                              setPlayingId(t.id);
+                              toast({ title: `Take ${t.n} is now the project video.` });
+                            } else toast({ title: "That take couldn't be put in use. Try again.", lead: "error" });
+                          }}
+                        >
+                          Use this
+                        </Button>
+                      )}
+                      <Button
+                        hierarchy="secondary"
+                        size="xl"
+                        iconOnly
+                        aria-label={`Delete take ${t.n}`}
+                        disabled={!t.readyAt && !t.failure}
+                        onClick={() => setDeleting(t)}
+                      >
+                        <Icon icon={Delete02Icon} size={20} />
+                      </Button>
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ListCard>
+        </div>
+      </Sheet>
       <ConfirmSheet
         open={deleting !== null}
         onClose={() => setDeleting(null)}
@@ -285,6 +307,10 @@ function ProjectVideoSection() {
 
 // ─────────────────────────── Product videos ───────────────────────────
 
+const ROW_TAP = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
+
+/** Each current product's video as one whole-row tap: a ready one plays in a sheet; the others
+ *  open the product page, where its video is made, the web's action word as the row's last line. */
 function ProductVideosSection() {
   const { project, view, viewer } = useProject();
   const owner = can(viewer, "video.generate", view.canCtx);
@@ -304,54 +330,43 @@ function ProductVideosSection() {
         {shown.map(({ product, name, status }) => {
           const copy = statusCopy(status);
           const take = status.state === "ready" ? status.take : null;
-          const label = actionLabel(copy.action);
+          const label = owner ? actionLabel(copy.action) : null;
           const href = phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(product.id)}`) ?? "#";
-          const thumb = (
-            <Thumb url={product.built?.product.conceptImageUrl}>
-              {take && (
-                <span aria-hidden className={cn(MEDIA_GROUND, MEDIA_INK, "absolute inline-flex size-[28px] items-center justify-center rounded-full")}>
-                  <Icon icon={PlayIcon} size={16} />
+          const body = (
+            <>
+              <Thumb url={product.built?.product.conceptImageUrl}>
+                {take && (
+                  <span aria-hidden className={cn(MEDIA_GROUND, MEDIA_INK, "absolute inline-flex size-[28px] items-center justify-center rounded-full")}>
+                    <Icon icon={PlayIcon} size={16} />
+                  </span>
+                )}
+              </Thumb>
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={cn(T.name, "truncate")}>{name}</span>
+                <span className={cn(T.meta, "flex items-center gap-2", TONE_INK[copy.tone])}>
+                  <Icon icon={TONE_ICON[copy.icon] ?? VideoOffIcon} size={14} />
+                  <span className="text-text-secondary">
+                    {take ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ") : copy.text}
+                  </span>
                 </span>
-              )}
-            </Thumb>
-          );
-          const text = (
-            <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className={cn(T.name, "truncate")}>{name}</span>
-              <span className={cn(T.meta, "flex items-center gap-2", TONE_INK[copy.tone])}>
-                <Icon icon={TONE_ICON[copy.icon] ?? VideoOffIcon} size={14} />
-                <span className="text-text-secondary">
-                  {take ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ") : copy.text}
-                </span>
+                {copy.progress !== null && <ProgressBar value={copy.progress} label={`${name} video render`} />}
+                {!take && label && <span className={cn(T.rowTitle, "text-text-brand")}>{label}</span>}
               </span>
-              {copy.progress !== null && <ProgressBar value={copy.progress} label={`${name} video render`} />}
-            </span>
+              {!take && owner && <Chevron />}
+            </>
           );
           return (
             <li key={product.id} className={LIST_ROW}>
               {take ? (
-                <button
-                  type="button"
-                  aria-haspopup="dialog"
-                  aria-label={`Play ${name} video`}
-                  onClick={() => setWatching({ take, name })}
-                  className="flex w-full items-center gap-6 p-6 text-left outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle"
-                >
-                  {thumb}
-                  {text}
+                <button type="button" aria-haspopup="dialog" aria-label={`Play ${name} video`} onClick={() => setWatching({ take, name })} className={ROW_TAP}>
+                  {body}
                 </button>
+              ) : owner ? (
+                <Link href={href} className={ROW_TAP}>
+                  {body}
+                </Link>
               ) : (
-                <div className="flex w-full items-start gap-6 p-6">
-                  {thumb}
-                  <span className="flex min-w-0 flex-1 flex-col gap-4">
-                    {text}
-                    {owner && label && (
-                      <Link href={href} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "self-start")}>
-                        {label}
-                      </Link>
-                    )}
-                  </span>
-                </div>
+                <div className={cn(ROW_TAP, "hover:bg-transparent")}>{body}</div>
               )}
             </li>
           );
@@ -429,6 +444,26 @@ function BuildImagesSection() {
 }
 
 type Tile = ReturnType<typeof mediaTilesOf>[number];
+
+/** The build images full size, opened at `startUrl` (the page's cover): Use as cover lives here. */
+export function BuildImagesViewer({ startUrl, onClose }: { startUrl: string | null; onClose: () => void }) {
+  const { project, view, viewer, gate } = useProject();
+  const tiles = React.useMemo(() => mediaTilesOf(view.refs), [view.refs]);
+  const [at, setAt] = React.useState(() => Math.max(0, tiles.findIndex((t) => t.url === startUrl)));
+  if (tiles.length === 0) return null;
+  return (
+    <BuildImageViewer
+      tiles={tiles}
+      index={Math.min(at, tiles.length - 1)}
+      coverUrl={coverOf(project, view.refs)}
+      canCover={can(viewer, "product.edit", view.canCtx)}
+      gate={gate}
+      projectId={project.id}
+      onIndex={setAt}
+      onClose={onClose}
+    />
+  );
+}
 
 // ─────────────────────────── Assembly snapshots (the web's SnapshotsGroup) ───────────────────────────
 

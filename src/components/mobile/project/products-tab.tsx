@@ -1,11 +1,14 @@
 "use client";
 
-// 02 · Products tab and Add a product (02b–02h). The web's Products tab as
-// one list: the count and pieces line and the Build check, Search + Sort once
+// 02 · Products and Add a product (02b–02h). On the project page, the
+// Products section is the page's main content: the count and pieces line, the
+// Build check, the rows (all up to 5, else the first 3 and "All n products"),
+// a product a chat is building for this project (02f: it opens that chat), and
+// "Add a product" as the last row. The Products screen (`?tab=products`, the
+// old tab's address) is the web's Products tab as one list: Search + Sort once
 // a project has 6 or more products (kept in `?pq=&psort=`, so a reload and
-// Back keep them), then "Add a product" first (the web's first tile), a
-// product a chat is building for this project (02f: it opens that chat), and
-// every product as a compact row (M5).
+// Back keep them), every product as a compact row (M5), and Add a product as
+// the bar's one primary.
 //
 // Add a product is the web's dialog as one sheet with three steps:
 // · Choose (02b): Build with AI · Build manually;
@@ -18,8 +21,9 @@
 //   (D3), so the phone adds it here and says so with a toast.
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Add01Icon, AiMagicIcon, ArrowRight01Icon, PencilEdit01Icon, SortingDownIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, AiMagicIcon, ArrowRight01Icon, PackageIcon, PencilEdit01Icon, SortingDownIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { CreditBadge } from "@/components/credits/credit-badge";
@@ -31,12 +35,15 @@ import { productsOf, statusOf, useCreateHistory } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { piecesOf } from "@/lib/manual/project-read";
 import { PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
-import { PRODUCT_SORTS, PRODUCT_TOOLS_FROM, filterProductRows, parseProductSort, type ProductSort } from "@/lib/manual/phone-project";
+import { PRODUCT_SORTS, PRODUCT_TOOLS_FROM, filterProductRows, parseProductSort, phoneProjectHref, type ProductSort } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
 import { PromptBox } from "../ai/prompt-box";
+import { BottomBar } from "../kit/bottom-bar";
 import { PickSheet } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
+import { EmptyState } from "../kit/state";
 import { useToast } from "../kit/toast";
+import { PRESSED } from "../kit/press";
 import { T } from "../type";
 import { useProject } from "./context";
 import { BuildCheckLine, useProductRows } from "./product-rows";
@@ -73,14 +80,99 @@ function useAddingRows(projectId: string): { key: string; name: string; thumb: s
   }, [chats, builds, projectId]);
 }
 
+/** Add a product, from the page's row or the Products screen's bar: the edit gate's reason when
+ *  it can't (a live listing, a sold project), else the Add a product sheet. */
+function useAddProduct() {
+  const { view, viewer, gate, open } = useProject();
+  const canAdd = can(viewer, "product.add", view.canCtx);
+  const reason = canAdd ? gate.reasonOf("addProduct") : null;
+  const [refused, setRefused] = React.useState<string | null>(null);
+  return {
+    canAdd,
+    reason,
+    refused,
+    tryAdd: () => {
+      if (reason) return setRefused(reason);
+      open({ kind: "add-product" });
+    },
+  };
+}
+
+const ROW = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
+
+/** The page shows every product up to this many; past it, the first 3 and All n products. */
+const PAGE_ROWS = 5;
+
+/** The project page's Products (its main content): the count and pieces line, the Build check,
+ *  the rows (all up to 5, else the first 3 and "All n products" → the Products screen), a product
+ *  a chat is building for it, and Add a product as the last row. */
+export function ProductsSection() {
+  const { project } = useProject();
+  const { rows, line, headline } = useProductRows();
+  const adding = useAddingRows(project.id);
+  const add = useAddProduct();
+  const cut = rows.length > PAGE_ROWS;
+  const shown = cut ? rows.slice(0, 3) : rows;
+  return (
+    <section aria-labelledby="pj-products" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 id="pj-products" className={T.section}>
+          Products
+        </h2>
+        <SubLine>{line}</SubLine>
+      </div>
+      <BuildCheckLine headline={headline} />
+      {rows.length === 0 && adding.length === 0 && !add.canAdd ? (
+        <SubLine>No products yet.</SubLine>
+      ) : (
+        <ListCard label="Products">
+          {add.canAdd &&
+            adding.map((a) => (
+              <ProductRow key={a.key} href={a.href} thumb={a.thumb} name={a.name} stage={{ short: a.chip, ariaLabel: a.chip }} meta="New product from the chat" facts={a.line} />
+            ))}
+          {shown.map((r) => (
+            <ProductRow key={r.id} href={r.href} thumb={r.thumb} name={r.name} stage={r.stage} meta={r.meta} facts={r.facts} />
+          ))}
+          {cut && (
+            <li className={LIST_ROW}>
+              <Link href={phoneProjectHref(project.id, "products")} className={ROW}>
+                <span className={cn(T.rowTitle, "min-w-0 flex-1")}>All {rows.length} products</span>
+                <Chevron />
+              </Link>
+            </li>
+          )}
+          {add.canAdd && (
+            <li className={LIST_ROW}>
+              <button type="button" aria-haspopup="dialog" aria-disabled={add.reason ? true : undefined} onClick={add.tryAdd} className={ROW}>
+                <span aria-hidden className="flex size-[56px] shrink-0 items-center justify-center rounded-md bg-bg-surface-raised text-[color:var(--color-icon-default)]">
+                  <Icon icon={Add01Icon} size={24} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className={T.name}>Add a product</span>
+                  <span className={cn(T.meta, "line-clamp-2")}>Build it with AI or by hand. It joins {project.name}.</span>
+                  {add.refused && <span className={cn(T.meta, "text-text-primary")}>{add.refused}</span>}
+                </span>
+                <Chevron />
+              </button>
+            </li>
+          )}
+        </ListCard>
+      )}
+    </section>
+  );
+}
+
+/** The Products screen (`?tab=products`): the line and the Build check, Search + Sort from 6
+ *  products, a product a chat is building, every product; Add a product is the bar's. */
 export function ProductsTab() {
-  const { project, view, viewer, gate, open } = useProject();
+  const { project } = useProject();
   const { rows, line, headline } = useProductRows();
   const params = useSearchParams();
   const [query, setQueryState] = React.useState(() => params.get("pq") ?? "");
   const [sort, setSortState] = React.useState<ProductSort>(() => parseProductSort(params.get("psort")));
   const [sorting, setSorting] = React.useState(false);
   const adding = useAddingRows(project.id);
+  const { canAdd } = useAddProduct();
   // The search and the sort live in the address (`?pq=&psort=`), written in place: no navigation.
   const write = (q: string, s: ProductSort) => {
     const next = new URLSearchParams(window.location.search);
@@ -99,11 +191,9 @@ export function ProductsTab() {
     setSortState(s);
     write(query, s);
   };
-  const [refused, setRefused] = React.useState<string | null>(null);
   const tools = rows.length >= PRODUCT_TOOLS_FROM;
   const shown = tools ? filterProductRows(rows, query, sort) : rows;
-  const canAdd = can(viewer, "product.add", view.canCtx);
-  const reason = canAdd ? gate.reasonOf("addProduct") : null;
+  const inChat = canAdd && !query ? adding : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -133,44 +223,40 @@ export function ProductsTab() {
           </Button>
         </div>
       )}
-      <ListCard label="Products">
-        {canAdd && !query && (
-          <li className={LIST_ROW}>
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              aria-disabled={reason ? true : undefined}
-              onClick={() => {
-                if (reason) return setRefused(reason);
-                open({ kind: "add-product" });
-              }}
-              className="flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle"
-            >
-              <span aria-hidden className="flex size-[56px] shrink-0 items-center justify-center rounded-md bg-bg-surface-raised text-[color:var(--color-icon-default)]">
-                <Icon icon={Add01Icon} size={24} />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className={T.name}>Add a product</span>
-                <span className={T.meta}>Build it with AI or by hand. It joins {project.name}.</span>
-                {refused && <span className={cn(T.meta, "text-text-primary")}>{refused}</span>}
-              </span>
-              <Chevron />
-            </button>
-          </li>
-        )}
-        {canAdd &&
-          !query &&
-          adding.map((a) => (
+      {rows.length === 0 && inChat.length === 0 ? (
+        <EmptyState icon={PackageIcon} title="No products yet" />
+      ) : (
+        <ListCard label="Products">
+          {inChat.map((a) => (
             <ProductRow key={a.key} href={a.href} thumb={a.thumb} name={a.name} stage={{ short: a.chip, ariaLabel: a.chip }} meta="New product from the chat" facts={a.line} />
           ))}
-        {shown.map((r) => (
-          <ProductRow key={r.id} href={r.href} thumb={r.thumb} name={r.name} stage={r.stage} meta={r.meta} facts={r.facts} />
-        ))}
-        {tools && shown.length === 0 && <li className={cn(T.body, "p-6")}>No product matches “{query.trim()}”.</li>}
-      </ListCard>
+          {shown.map((r) => (
+            <ProductRow key={r.id} href={r.href} thumb={r.thumb} name={r.name} stage={r.stage} meta={r.meta} facts={r.facts} />
+          ))}
+          {tools && shown.length === 0 && <li className={cn(T.body, "p-6")}>No product matches “{query.trim()}”.</li>}
+        </ListCard>
+      )}
       {/* The kit's one pick-one sheet: a pick applies and closes it, as My projects' sort does. */}
       <PickSheet open={sorting} onClose={() => setSorting(false)} title="Sort" options={PRODUCT_SORTS} value={sort} onPick={setSort} />
     </div>
+  );
+}
+
+/** The Products screen's one primary: Add a product, the gate's reason above it when it can't. */
+export function ProductsBar() {
+  const add = useAddProduct();
+  if (!add.canAdd) return null;
+  return (
+    <BottomBar className="gap-4 pt-8">
+      {add.refused && (
+        <p role="alert" className={cn(T.meta, "text-text-primary")}>
+          {add.refused}
+        </p>
+      )}
+      <Button size="xl" className="w-full" aria-haspopup="dialog" iconLeading={<Icon icon={Add01Icon} size={20} />} onClick={add.tryAdd}>
+        Add a product
+      </Button>
+    </BottomBar>
   );
 }
 

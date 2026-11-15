@@ -248,7 +248,7 @@ export function MyProjectsScreen() {
               <ul aria-label="Loading" className="flex flex-col gap-6">
                 {[0, 1, 2].map((i) => (
                   <li key={i} className={cn(LIST_CARD, "gap-4 p-4")}>
-                    <Skeleton shape="block" className="aspect-[16/10] h-auto w-full" />
+                    <Skeleton shape="block" className="aspect-video h-auto w-full" />
                     <Skeleton shape="text" size="lg" />
                     <Skeleton shape="text" size="md" />
                   </li>
@@ -330,7 +330,7 @@ function ProjectCard({ summary, via, now, onOpen }: { summary: ProjectSummary; v
       onClick={onOpen}
       className={cn(LIST_CARD, "gap-4 p-4 outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus")}
     >
-      <span className="relative block aspect-[16/10] w-full overflow-hidden rounded-md bg-bg-surface-raised">
+      <span className="relative block aspect-video w-full overflow-hidden rounded-md bg-bg-surface-raised">
         {summary.cover && !failed ? (
           // eslint-disable-next-line @next/next/no-img-element -- the project's cover from the build store
           <img src={summary.cover} alt="" loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
