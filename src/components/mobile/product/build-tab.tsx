@@ -1,24 +1,26 @@
 "use client";
 
-// The Build tab (Product Details 10b, 10n, 10y, 23d) and Add pieces (10p,
-// 10pa, 10pb; decision D2: adding pieces is an AI build, not editing, so it
-// works on a phone):
-// - the seed caption (the web Editor block's "Opens with version {n}'s …")
-//   and "View only on a phone." (D3);
+// The pieces (Product Details 10b, 10n, 10y, 23d) and Add pieces (10p, 10pa,
+// 10pb; decision D2: adding pieces is an AI build, not editing, so it works on
+// a phone). The owner's object page lays the pieces out in its Build section
+// (owner-page.tsx); a buyer reads them in the Build tab:
 // - a buyer who owns a copy: Your copy (type and serial, use, tier, paid,
 //   transaction) and Get creator support, which opens the conversation about
 //   that purchase in Messages;
-// - one row per piece, in the build's order and state — Ready, Failed,
-//   Building with its progress, Waiting, and for the owner who can still
-//   build, Not built with + Add (nobody else reads the maker's left-out
-//   pieces) — each opening its own view-only screen;
-// - Downloads: the firmware, the parts list and the netlist, made from this
-//   product's parts in this browser, for whoever may take them away; for
-//   anyone else "Firmware and downloads come with a purchase." (O12).
+// - one row per piece, in the build's order and state — the piece's icon (the
+//   create flow's), Ready, Failed, Building with its progress, Waiting, and for
+//   the owner who can still build, Not built with + Add (nobody else reads the
+//   maker's left-out pieces) — each a whole-row tap to its view-only screen;
+// - Downloads as rows: the firmware, the parts list and the netlist, made from
+//   this product's parts in this browser, for whoever may take them away; for
+//   anyone else "Firmware and downloads come with a purchase." (O12). The
+//   owner's page opens them in a sheet (`DownloadsSheet`);
+// - the seed caption (the web Editor block's "Opens with version {n}'s …"),
+//   which the owner's page keeps in its Build ⓘ (`useSeedCaption`).
 
 import * as React from "react";
 import Link from "next/link";
-import { Add01Icon, ArrowRight01Icon, Download04Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Download04Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
@@ -60,11 +62,12 @@ import { shortAddress } from "@/lib/wallet/demo-wallet";
 import { formatAmount } from "@/lib/wallet/money";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "../kit/eyebrow";
-import { LIST_DIVIDERS, ListCard } from "../kit/list";
+import { Chevron, LIST_DIVIDERS, LIST_ROW, ListCard } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import { T } from "../type";
 import { SectionHeading } from "../project/parts";
+import { PIECE_ICON } from "../ai/build";
 import { BuyCreditsSheet } from "./credits-sheet";
 import { BANNER_LINK, CARD } from "./parts";
 import { useProduct } from "./use-product";
@@ -94,10 +97,10 @@ export function filesOf(bp: BuildProduct): DownloadFile[] {
   return out;
 }
 
-export function BuildTab() {
-  const { project, product, version, bp, chat, canEdit, downloads, mode, copies, path } = useProduct();
-  const [adding, setAdding] = React.useState<BuildItemKind[] | null>(null);
-  const caption = React.useMemo(() => {
+/** The web Editor block's caption for the version on screen (the owner's only), or null. */
+export function useSeedCaption(): string | null {
+  const { project, product, version, bp, mode } = useProduct();
+  return React.useMemo(() => {
     if (mode !== "owner" || !bp || !version) return null;
     let record = null;
     try {
@@ -105,60 +108,94 @@ export function BuildTab() {
     } catch {
       record = null;
     }
-    return seedCaptionOf(product.state, record, product.built?.ref.version ?? version.shown, seedPiecesOf(bp));
+    return seedCaptionOf(product.state, record, product.built?.ref.version ?? version.shown, seedPiecesOf(bp))?.lines.join(" ") ?? null;
   }, [mode, bp, version, project.id, product]);
-  if (!bp) return null;
+}
+
+/** The pieces as list rows, each opening its screen; Not built rows carry + Add (the owner who can build). */
+export function PieceRows({ bp, onAdd }: { bp: BuildProduct; onAdd: (k: BuildItemKind) => void }) {
+  const { chat, canEdit, downloads, path } = useProduct();
   const rows = pieceRowsOf(bp.items, { firmware: downloads, leftOut: canEdit });
   const facts = pieceFactsOf(bp);
+  return (
+    <>
+      {rows.map((r) => (
+        <PieceListRow
+          key={r.kind}
+          row={r}
+          line={pieceLineOf(r, facts, { chat: chat !== null })}
+          href={path(`build/${r.kind}`)}
+          onAdd={r.state === "notBuilt" && canEdit ? () => onAdd(r.kind) : undefined}
+        />
+      ))}
+    </>
+  );
+}
+
+/** The buyer's Build tab. */
+export function BuildTab() {
+  const { bp, downloads, copies } = useProduct();
+  const [adding, setAdding] = React.useState<BuildItemKind[] | null>(null);
+  if (!bp) return null;
   const files = filesOf(bp);
 
   return (
     <div className="flex flex-col gap-12">
-      {caption && <p className={T.meta}>{caption.lines.join(" ")} View only on a phone.</p>}
       {copies.length > 0 && <YourCopy />}
       <ListCard label="Pieces">
-        {rows.map((r) => (
-          <PieceListRow
-            key={r.kind}
-            row={r}
-            line={pieceLineOf(r, facts, { chat: chat !== null })}
-            href={path(`build/${r.kind}`)}
-            onAdd={r.state === "notBuilt" && canEdit ? () => setAdding([r.kind]) : undefined}
-          />
-        ))}
+        <PieceRows bp={bp} onAdd={(k) => setAdding([k])} />
       </ListCard>
       <section aria-labelledby="pd-downloads" className="flex flex-col gap-4">
         <SectionHeading id="pd-downloads" title="Downloads" />
-        {downloads ? (
-          files.length ? (
-            <div className="flex flex-col gap-4">
-              {files.map((f) => (
-                <Button key={f.filename} hierarchy="secondary" size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} onClick={() => save(f)}>
-                  {f.label}
-                </Button>
-              ))}
-            </div>
-          ) : (
-            <p className={T.body}>Nothing to download yet — the files come once their pieces are ready.</p>
-          )
-        ) : (
-          <p className={T.body}>Firmware and downloads come with a purchase.</p>
-        )}
+        {downloads ? <FileRows files={files} /> : <p className={T.body}>Firmware and downloads come with a purchase.</p>}
       </section>
       {adding && <AddPiecesSheet bp={bp} preselect={adding} onClose={() => setAdding(null)} />}
     </div>
   );
 }
 
+/** Each file as a row with its download mark; a tap saves it. */
+function FileRows({ files }: { files: DownloadFile[] }) {
+  if (!files.length) return <p className={T.body}>Nothing to download yet — the files come once their pieces are ready.</p>;
+  return (
+    <ListCard label="Downloads">
+      {files.map((f) => (
+        <li key={f.filename}>
+          <button type="button" onClick={() => save(f)} className={LIST_ROW}>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={cn(T.body, "text-text-primary")}>{f.label}</span>
+              {!f.label.includes(f.filename) && <span className={cn(T.meta, "break-all")}>{f.filename}</span>}
+            </span>
+            <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+              <Icon icon={Download04Icon} size={24} />
+            </span>
+          </button>
+        </li>
+      ))}
+    </ListCard>
+  );
+}
+
+/** The owner's Downloads, from the Build section's row. */
+export function DownloadsSheet({ open, onClose, bp }: { open: boolean; onClose: () => void; bp: BuildProduct }) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Downloads">
+      <div className="pb-8">
+        <FileRows files={filesOf(bp)} />
+      </div>
+    </Sheet>
+  );
+}
+
 function PieceListRow({ row, line, href, onAdd }: { row: PieceRow; line: string; href: string; onAdd?: () => void }) {
   return (
     <li className="flex items-center">
-      <Link
-        href={href}
-        className="flex min-w-0 flex-1 items-center gap-4 p-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle"
-      >
+      <Link href={href} className={cn(LIST_ROW, "min-w-0 flex-1")}>
+        <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+          <Icon icon={PIECE_ICON[row.kind]} size={24} />
+        </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className={T.name}>{ITEM_LABELS[row.kind]}</span>
+          <span className={cn(T.body, "text-text-primary")}>{ITEM_LABELS[row.kind]}</span>
           <span className={T.meta}>{line}</span>
           {row.state === "building" && <ProgressBar value={row.progress} label={`${ITEM_LABELS[row.kind]} build`} className="mt-2" />}
         </span>
@@ -168,14 +205,12 @@ function PieceListRow({ row, line, href, onAdd }: { row: PieceRow; line: string;
             <Badge tone={BADGE_TONE[row.state]} className="shrink-0">
               {PIECE_BADGE[row.state]}
             </Badge>
-            <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
-              <Icon icon={ArrowRight01Icon} size={24} />
-            </span>
+            <Chevron />
           </>
         )}
       </Link>
       {onAdd && (
-        <div className="shrink-0 pr-6">
+        <div className="shrink-0 pr-8">
           <Button hierarchy="secondary" size="xl" aria-label={`Add ${ITEM_LABELS[row.kind]}`} iconLeading={<Icon icon={Add01Icon} size={20} />} onClick={onAdd}>
             Add
           </Button>

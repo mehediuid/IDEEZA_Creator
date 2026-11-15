@@ -2,11 +2,11 @@
 
 // The product's own Activity (Product Details 10, 10h, 10r, 10s, 26a–26d;
 // decision D3: the project's Activity screens, scoped to this product):
-// - `ActivitySection` — the owner's Overview block: the heading with + Add,
-//   the newest entry (a tap opens the history), and the web rail's footer
-//   line: History (n) and, once the product has an NFT, "NFT activity:
-//   Earn › Sell" (its Physical and Virtual NFTs keep their own activity
-//   there);
+// - `ActivitySection` — the object page's section (the owner's, and a
+//   contributor preview's read-only): + as an icon button beside the heading,
+//   then rows — the newest entry (a tap opens the history), History (n), and
+//   once the product has an NFT, NFT activity in Earn › Sell (its Physical and
+//   Virtual NFTs keep their own activity there) with how many are on sale;
 // - `HeaderActivity` — what everyone else reads in the header (10h, 10x,
 //   31b): "{product} activity", Now with its type, the description, its proof,
 //   and Earlier (n) opening the rest in place (Hide earlier);
@@ -14,13 +14,16 @@
 //   Activity · Delete Activity · Open link (26d; Planning is made
 //   automatically, so it has none), the prices an entry was added at (26a, a
 //   tap opens 26b / 26c; one Testnet demo badge for the screen), the proof
-//   viewer and links that ask first. "Add New Activity" opens the project's
-//   form for this product (10s). Back is the top bar's: it never pushes.
+//   viewer and links that ask first. One line under the bar ("{product} ·
+//   newest first" and the Testnet demo badge), NFT activity as a row, and
+//   "Add New Activity" in the Bottom action bar opening the project's form for
+//   this product (10s). Back is the top bar's: it never pushes.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Activity01Icon,
   Add01Icon,
   ArrowRight01Icon,
   Delete02Icon,
@@ -28,10 +31,13 @@ import {
   Link01Icon,
   MoreVerticalIcon,
   PencilEdit01Icon,
+  Store01Icon,
+  WorkHistoryIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { buttonVariants } from "@/components/ideeza/button";
+import { iconButtonVariants } from "@/components/ideeza/icon-button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { earnHref } from "@/lib/manual/earn-route";
 import { activitiesOf, helpOf, historyOf, labelOf, shortOf, type JourneyEntry, type MediaRef, type ProjectJourney } from "@/lib/manual/journey";
@@ -50,11 +56,13 @@ import { ActionSheet, Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
-import { LIST_CARD } from "../kit/list";
+import { BottomBar } from "../kit/bottom-bar";
+import { Chevron, LIST_CARD, LIST_ROW, ListCard, ListRow } from "../kit/list";
+import { PRESSED_SECONDARY } from "../kit/press";
 import { T } from "../type";
 import { ProofTile, ProofViewer } from "../project/activity-tab";
-import { SectionHeading } from "../project/parts";
-import { CARD, LINK, LinkButton } from "./parts";
+import { useListedCopies } from "./overview";
+import { CARD, LinkButton, SectionHead } from "./parts";
 import { ProductProvider, useProduct, useProductData } from "./use-product";
 import { ProductLoading, ProductMissing, ProjectMissing } from "./states";
 
@@ -79,55 +87,53 @@ function useNftLine(): string | null {
   return hasNft ? (phoneHrefOf(earnHref(project.id, "copies")) ?? null) : null;
 }
 
-// ─────────────────────────── the owner's Overview block (10) ───────────────────────────
+// ─────────────────────────── the object page's Activity section (10) ───────────────────────────
 
+/** The owner's (and a contributor preview's) Activity: + as a 44 px icon button beside the heading,
+ *  then rows — the newest entry (a whole-row tap opens the history), History (n), and once the
+ *  product has an NFT, NFT activity in Earn › Sell with how many of its copies are on sale. */
 export function ActivitySection() {
   const { project, view, viewer, product, path } = useProduct();
   const { record } = useJourney(project.id);
   const entries = useProductHistory();
   const nft = useNftLine();
+  const onSale = useListedCopies().length;
   const now = entries[0];
   const stored = activitiesOf(record, { kind: "product", productId: product.id }).length;
   const canAdd = can(viewer, "activity.write", view.canCtx);
   if (!now) return null;
   return (
     <section aria-labelledby="pd-activity" className="flex flex-col gap-4">
-      <SectionHeading
+      <SectionHead
         id="pd-activity"
         title="Activity"
         action={
           canAdd ? (
-            <Link href={path("activity/new")} aria-label="Add activity" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "border-solid")}>
-              <Icon icon={Add01Icon} size={20} />
-              Add
+            <Link href={path("activity/new")} aria-label="Add activity" className={cn(iconButtonVariants({ hierarchy: "secondary", size: "xl" }), PRESSED_SECONDARY, "-my-4")}>
+              <Icon icon={Add01Icon} size={22} />
             </Link>
           ) : undefined
         }
       />
-      <Link
-        href={path("activity")}
-        className={cn(LIST_CARD, "gap-3 px-8 py-6 outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle")}
-      >
-        <span className="flex items-center gap-4">
-          <Badge tone="brand-outline">{shortOf(now)}</Badge>
-          <span className={T.meta}>{formatDate(now.createdAt)}</span>
-        </span>
-        <span className={cn(T.body, "line-clamp-2 text-text-primary")}>{now.description}</span>
-      </Link>
-      {(stored > 0 || nft) && (
-        <div className="flex flex-wrap items-center gap-x-6">
-          {stored > 0 && (
-            <Link href={path("activity")} className={LINK}>
-              History ({stored + 1})
-            </Link>
-          )}
-          {nft && (
-            <Link href={nft} className={LINK}>
-              NFT activity: Earn › Sell
-            </Link>
-          )}
-        </div>
-      )}
+      <ListCard label="Activity">
+        <li>
+          <Link href={path("activity")} className={cn(LIST_ROW, "items-start")}>
+            <span aria-hidden className="mt-1 shrink-0 text-[color:var(--color-icon-default)]">
+              <Icon icon={Activity01Icon} size={24} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <Badge tone="brand-outline">{shortOf(now)}</Badge>
+                <span className={T.meta}>{formatDate(now.createdAt)}</span>
+              </span>
+              <span className={cn(T.body, "line-clamp-2 text-text-primary")}>{now.description}</span>
+            </span>
+            <Chevron className="self-center" />
+          </Link>
+        </li>
+        {stored > 0 && <ListRow href={path("activity")} icon={WorkHistoryIcon} title="History" value={String(stored + 1)} />}
+        {nft && <ListRow href={nft} icon={Store01Icon} title="NFT activity" meta="Earn › Sell" value={onSale > 0 ? `${onSale} on sale` : undefined} />}
+      </ListCard>
     </section>
   );
 }
@@ -228,28 +234,25 @@ function ActivityHistory() {
   const priced = entries.some((e) => e.pricing && productPricesOf(e.pricing, product.id).length > 0);
 
   return (
-    <Screen top={<TopBar back={path("")} title="Activity" />}>
+    <Screen
+      top={<TopBar back={path("")} title="Activity" />}
+      footer={
+        canWrite ? (
+          <BottomBar>
+            <Link href={path("activity/new")} className={cn(buttonVariants({ size: "xl" }), "w-full")}>
+              <Icon icon={Add01Icon} size={20} />
+              Add New Activity
+            </Link>
+          </BottomBar>
+        ) : undefined
+      }
+    >
       <div className="flex flex-col gap-6 px-8 pb-12">
-        <p className={T.meta}>
-          {name} · newest first.
-          {canWrite && entries.some((e) => !e.isDefault) && (
-            <>
-              {" "}Use <Icon icon={MoreVerticalIcon} size={14} className="inline align-[-2px]" />
-              <span className="sr-only">⋮</span> to edit a stage.
-            </>
-          )}
-        </p>
-        {priced && (
-          <div className="flex">
-            <TestnetDemoBadge />
-          </div>
-        )}
-        {canWrite && (
-          <Link href={path("activity/new")} className={cn(buttonVariants({ hierarchy: "tonal", size: "xl" }), "w-full")}>
-            <Icon icon={Add01Icon} size={20} />
-            Add New Activity
-          </Link>
-        )}
+        {/* One line under the bar: whose history, its order, and the demo prices' badge beside it. */}
+        <div className="flex min-h-[28px] items-center gap-4">
+          <p className={cn(T.meta, "min-w-0 flex-1")}>{name} · newest first</p>
+          {priced && <TestnetDemoBadge />}
+        </div>
         <ul aria-label="Activity" className={CARD}>
           {entries.map((e) => {
             const pills = productPricesOf(e.pricing, product.id);
@@ -336,11 +339,9 @@ function ActivityHistory() {
           })}
         </ul>
         {nft && (
-          <div>
-            <Link href={nft} className={LINK}>
-              NFT activity: Earn › Sell
-            </Link>
-          </div>
+          <ListCard label="NFT activity">
+            <ListRow href={nft} icon={Store01Icon} title="NFT activity" meta="Earn › Sell" />
+          </ListCard>
         )}
       </div>
 

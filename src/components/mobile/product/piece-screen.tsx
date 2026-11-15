@@ -2,27 +2,29 @@
 
 // One piece of the product, full screen and view only (Product Details 10g,
 // 10i–10m, 10o, 10ya, 33a–33c; D3: nothing is edited on a phone):
-// `/m/projects/<id>/products/<productId>/build/<piece>`. Under the bar,
-// "{product} · version {n} · view only on a phone" (a buyer without a copy:
-// "files come with a copy"); then the piece in its state —
+// `/m/projects/<id>/products/<productId>/build/<piece>`. Under the bar, one
+// line: "{product} · version {n} · view only on a phone" (a buyer without a
+// copy: "files come with a copy"); then the piece in its state —
 // · ready: the web review's own previews (the board and the wiring map, with
-//   pinch to zoom), the firmware read-only with line numbers (it scrolls
-//   sideways), the parts list with its Summary, the 3D Module and Assembly
-//   in the phone's 3D viewer;
-// · failed (10o): "This piece failed in this build", Rebuild this piece (the
-//   review's free retry) and Open chat;
-// · waiting (33b) and still being built (33c) with its progress;
-// · not built (33a): what it adds, its price and time, Add pieces (D2);
-// then "What this covers" (`coversFor`, the web's words), and the piece's
-// file in a sticky footer — or, for a buyer, "Buy a copy to download" (off
-// in a preview, with the reason). A piece the build doesn't have is a state
-// card with Back to Build; a buyer without a copy who opens the firmware is
-// told it comes with a copy. Back is the top bar's (back, or replace to the
-// Build tab): it never pushes, so Back can't loop.
-// A Feed sample opens its parts list and says it has no 3D file.
+//   pinch to zoom; the wiring's Pin to pin as rows, net over from → to), the
+//   firmware read-only with line numbers (it scrolls sideways), the parts list
+//   (its Summary first as a facts grid, then each part as a row: name, "U1 ·
+//   Microcontroller", ×qty), the 3D Module and Assembly in the phone's 3D
+//   viewer;
+// · failed (10o), waiting (33b), still being built (33c, with its bar) and
+//   not built (33a: what it adds, its price and time) as the kit's clean
+//   states, their one action in the Bottom action bar — Rebuild this piece
+//   (the review's free retry) with Open chat, or Add pieces (D2);
+// then "What this covers" (`coversFor`, the web's words) as a grouped list,
+// and the ready piece's file as the bar's primary — or, for a buyer, "Buy a
+// copy to download" (off in a preview, with the reason). A piece the build
+// doesn't have is a state card with Back to Build; a buyer without a copy who
+// opens the firmware is told it comes with a copy. Back is the top bar's
+// (back, or replace to the product's Build section): it never pushes, so Back
+// can't loop. A Feed sample opens its parts list and says it has no 3D file.
 
 import * as React from "react";
-import { Download04Icon, SquareLock02Icon } from "@hugeicons/core-free-icons";
+import { Clock01Icon, Download04Icon, Loading03Icon, SquareLock02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button, buttonVariants } from "@/components/ideeza/button";
@@ -31,7 +33,7 @@ import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { coversFor, PcbPreview, WiringPreview } from "@/components/create/deliverable-previews";
 import { fileFor, save } from "@/components/projects/product/product-deliverables";
 import { bomFor, firmwareFor, isSampleModel, netsFor } from "@/lib/create/build-artifacts";
-import { ITEM_LABELS, useCreateHistory, type BuildItemKind, type BuildProduct } from "@/lib/create/history";
+import { ITEM_LABELS, useCreateHistory, type BuildItem, type BuildItemKind, type BuildProduct } from "@/lib/create/history";
 import { PIECES, isLeftOut } from "@/lib/create/pieces";
 import { sampleProjectOf } from "@/lib/manual/phone-project";
 import { copiesFromOf, notBuiltCostLine, notBuiltTitle, parsePiece, phoneProductPath } from "@/lib/manual/phone-product";
@@ -41,7 +43,8 @@ import type { PostProduct } from "@/lib/innovations/types";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
-import { LIST_CARD } from "../kit/list";
+import { LIST_CARD, ListCard, ListRow } from "../kit/list";
+import { EmptyState, ErrorState } from "../kit/state";
 import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
@@ -50,7 +53,8 @@ import { AddPiecesSheet } from "./build-tab";
 import { BuyCopy, PREVIEW_BUY_OFF } from "./buy";
 import { ModelPiece } from "./model-view";
 import { useListedCopies } from "./overview";
-import { FactCard } from "./parts";
+import { PIECE_ICON } from "../ai/build";
+import { CARD, FactGrid } from "./parts";
 import { PieceMissing, ProductLoading, ProductMissing, ProjectMissing } from "./states";
 import { ProductProvider, useProduct, useProductData } from "./use-product";
 
@@ -102,25 +106,36 @@ function PieceView({ kind }: { kind: BuildItemKind | null }) {
   const ready = state === "ready";
   const sub = `${name} · version ${version?.shown ?? 1} · ${downloads ? "view only on a phone" : "files come with a copy"}`;
   return (
-    <Screen top={<TopBar back={back} title={ITEM_LABELS[kind]} />} footer={<PieceFooter kind={kind} bp={bp} ready={ready} />}>
+    <Screen top={<TopBar back={back} title={ITEM_LABELS[kind]} />} footer={<PieceFooter kind={kind} bp={bp} state={state} />}>
       <div className="flex flex-col gap-8 px-8 pb-12">
         <p className={T.meta}>{sub}</p>
         {state === "notBuilt" ? (
-          <NotBuilt kind={kind} bp={bp} />
+          <div className="flex flex-col items-center">
+            <EmptyState icon={PIECE_ICON[kind]} title={notBuiltTitle(kind)} body={PIECES[kind].addsLater} className="pb-4" />
+            <p className={cn(T.meta, "text-center")}>{notBuiltCostLine(kind)}</p>
+          </div>
         ) : state === "failed" ? (
-          <Failed kind={kind} />
+          <ErrorState
+            title="This piece failed in this build"
+            body={
+              job.failure === "system"
+                ? "The whole build stopped on our side — try it again from the chat."
+                : "Rebuild it, or ask in the chat what went wrong. The other pieces are unaffected, and retrying costs no extra credits."
+            }
+          />
         ) : state === "building" ? (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col items-center gap-4">
             {/* 33c: the Build row's own sentence, then that the screen may be left. */}
-            <Banner tone="info" title="Still being built">
-              {`This piece is still being built — ${Math.round(shown.progress)}%. You can leave this screen.`}
-            </Banner>
-            <ProgressBar value={shown.progress} label={`${ITEM_LABELS[kind]} build`} />
+            <EmptyState
+              icon={Loading03Icon}
+              title="Still being built"
+              body={`This piece is still being built — ${Math.round(shown.progress)}%. You can leave this screen.`}
+              className="pb-0"
+            />
+            <ProgressBar value={shown.progress} label={`${ITEM_LABELS[kind]} build`} className="w-full" />
           </div>
         ) : state === "pending" ? (
-          <Banner tone="info" title="Waiting to be built">
-            {`This piece is waiting to be built. ${waitingLine(kind, bp)}`}
-          </Banner>
+          <EmptyState icon={Clock01Icon} title="Waiting to be built" body={`This piece is waiting to be built. ${waitingLine(kind, bp)}`} />
         ) : (
           <ReadyPiece kind={kind} bp={bp} />
         )}
@@ -140,69 +155,16 @@ function Covers({ kind, bp }: { kind: BuildItemKind; bp: BuildProduct }) {
   const { job } = useProduct();
   const lines = coversFor(kind, bp, isSampleModel(job?.modelGlbUrl), bp.id !== "primary");
   return (
-    <section aria-labelledby="pc-covers" className="flex flex-col gap-3">
+    <section aria-labelledby="pc-covers" className="flex flex-col gap-4">
       <h2 id="pc-covers" className={T.section}>
         What this covers
       </h2>
-      <ul className={cn(T.body, "flex list-disc flex-col gap-2 pl-8")}>
+      <ListCard label="What this covers">
         {lines.map((l) => (
-          <li key={l}>{l}</li>
+          <ListRow key={l} title={l} />
         ))}
-      </ul>
+      </ListCard>
     </section>
-  );
-}
-
-// ─────────────────────────── the states ───────────────────────────
-
-function NotBuilt({ kind, bp }: { kind: BuildItemKind; bp: BuildProduct }) {
-  const { canEdit } = useProduct();
-  const [adding, setAdding] = React.useState(false);
-  return (
-    <div className={cn(LIST_CARD, "gap-4 border-dashed p-8")}>
-      <p className={T.name}>{notBuiltTitle(kind)}</p>
-      <p className={T.body}>{PIECES[kind].addsLater}</p>
-      <p className={T.meta}>{notBuiltCostLine(kind)}</p>
-      {canEdit && (
-        <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => setAdding(true)}>
-          Add pieces
-        </Button>
-      )}
-      {adding && <AddPiecesSheet bp={bp} preselect={[kind]} onClose={() => setAdding(false)} />}
-    </div>
-  );
-}
-
-function Failed({ kind }: { kind: BuildItemKind }) {
-  const { job, bp, chat, canEdit } = useProduct();
-  const { retryBuildItem } = useCreateHistory();
-  const toast = useToast();
-  const system = job?.failure === "system";
-  return (
-    <div className="flex flex-col gap-6">
-      <Banner tone="error" title="This piece failed in this build">
-        {system
-          ? "The whole build stopped on our side — try it again from the chat."
-          : "Rebuild it, or ask in the chat what went wrong. The other pieces are unaffected, and retrying costs no extra credits."}
-      </Banner>
-      {canEdit && !system && job && bp && (
-        <Button
-          size="xl"
-          className="w-full"
-          onClick={() => {
-            retryBuildItem(job.id, kind, bp.id);
-            toast({ title: `Rebuilding ${ITEM_LABELS[kind]}` });
-          }}
-        >
-          Rebuild this piece
-        </Button>
-      )}
-      {chat && (
-        <Link href={`/m/ai/chat/${encodeURIComponent(chat.id)}`} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
-          Open chat
-        </Link>
-      )}
-    </div>
   );
 }
 
@@ -317,32 +279,21 @@ function PinTable({ bp }: { bp: BuildProduct }) {
     return label && label !== ref ? `${ref} · ${label}` : ref;
   };
   return (
-    <section aria-labelledby="pc-pins" className="flex flex-col gap-3">
+    <section aria-labelledby="pc-pins" className="flex flex-col gap-4">
       <h2 id="pc-pins" className={T.section}>
         Pin to pin
       </h2>
-      <div className="overflow-x-auto rounded-xl border-[length:var(--border-width-1)] border-solid border-border">
-        <table className="w-full min-w-[420px] border-collapse text-left">
-          <thead>
-            <tr className="bg-bg-subtle">
-              {["Net", "From", "To"].map((h) => (
-                <th key={h} scope="col" className={cn(T.label, "px-6 py-4 text-text-secondary")}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {nets.wires.map((w, i) => (
-              <tr key={`${w.label}-${i}`} className="border-t-[length:var(--border-width-1)] border-solid border-border">
-                <td className={cn(T.meta, "px-6 py-4 font-mono text-text-primary")}>{w.label}</td>
-                <td className={cn(T.meta, "px-6 py-4")}>{short(w.from)}</td>
-                <td className={cn(T.meta, "px-6 py-4")}>{short(w.to)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Each wire a row: its net, then from → to (the web table's Net · From · To). */}
+      <ul aria-label="Pin to pin: net, from, to" className={CARD}>
+        {nets.wires.map((w, i) => (
+          <li key={`${w.label}-${i}`} className="flex flex-col gap-1 px-8 py-6">
+            <span className={cn(T.rowTitle, "font-mono")}>{w.label}</span>
+            <span className={cn(T.meta, "break-words")}>
+              {short(w.from)} → {short(w.to)}
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -382,43 +333,41 @@ function CodeView({ bp }: { bp: BuildProduct }) {
 
 function PartsTable({ bp }: { bp: BuildProduct }) {
   const bom = bomFor(bp);
-  const summary: [string, number][] = [
-    ["Unique parts", bom.unique],
-    ["Total units", bom.units],
-    ["Active devices", bom.active],
-    ["Passives", bom.passives],
-    ["Connectors & mech", bom.connectors],
+  const summary = [
+    { label: "Unique parts", value: String(bom.unique) },
+    { label: "Total units", value: String(bom.units) },
+    { label: "Active devices", value: String(bom.active) },
+    { label: "Passives", value: String(bom.passives) },
+    { label: "Connectors & mech", value: String(bom.connectors) },
   ];
   return (
     <div className="flex flex-col gap-8">
-      <div role="region" aria-label="Parts list, scrollable" tabIndex={0} className="overflow-x-auto rounded-xl border-[length:var(--border-width-1)] border-solid border-border outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-        <table className="w-full border-collapse text-left">
-          <thead>
-            <tr className="bg-bg-subtle">
-              {["Ref", "Part", "Category", "Qty"].map((h) => (
-                <th key={h} scope="col" className={cn(T.label, "px-6 py-4 text-text-secondary")}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {bom.rows.map((r) => (
-              <tr key={r.ref} className="border-t-[length:var(--border-width-1)] border-solid border-border align-top">
-                <td className={cn(T.meta, "whitespace-nowrap py-4 pl-6 pr-3 font-mono")}>{r.ref}</td>
-                <td className={cn(T.meta, "px-3 py-4 text-text-primary")}>{r.name}</td>
-                <td className={cn(T.meta, "px-3 py-4")}>{r.category}</td>
-                <td className={cn(T.meta, "py-4 pl-3 pr-6 text-right")}>{r.qty}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <section aria-labelledby="pc-summary" className="flex flex-col gap-3">
+      <section aria-labelledby="pc-summary" className="flex flex-col gap-4">
         <h2 id="pc-summary" className={T.section}>
           Summary
         </h2>
-        <FactCard label="Summary" rows={summary.map(([k, v]) => [k, String(v)])} />
+        <FactGrid label="Summary" facts={summary} />
+      </section>
+      <section aria-labelledby="pc-parts" className="flex flex-col gap-4">
+        <h2 id="pc-parts" className={T.section}>
+          Parts
+        </h2>
+        {/* Each part a row (the web table's Ref · Part · Category · Qty). */}
+        <ul aria-label="Parts list" className={CARD}>
+          {bom.rows.map((r) => (
+            <li key={r.ref} className="flex items-center gap-6 px-8 py-6">
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={cn(T.body, "break-words text-text-primary")}>{r.name}</span>
+                <span className={T.meta}>
+                  <span className="font-mono">{r.ref}</span> · {r.category}
+                </span>
+              </span>
+              <span className={cn(T.rowTitle, "shrink-0 tabular-nums")} aria-label={`Quantity ${r.qty}`}>
+                ×{r.qty}
+              </span>
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   );
@@ -426,15 +375,56 @@ function PartsTable({ bp }: { bp: BuildProduct }) {
 
 // ─────────────────────────── the footer ───────────────────────────
 
-function PieceFooter({ kind, bp, ready }: { kind: BuildItemKind; bp: BuildProduct; ready: boolean }) {
-  const { downloads } = useProduct();
-  if (!ready) return null;
+/** The screen's one action, in the thumb zone: the ready piece's file (or Buy a copy to download),
+ *  Rebuild this piece with Open chat for a failed one, Add pieces for one that isn't built. */
+function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduct; state: BuildItem["status"] | "notBuilt" }) {
+  const { downloads, job, chat, canEdit } = useProduct();
+  const { retryBuildItem } = useCreateHistory();
+  const toast = useToast();
+  const [adding, setAdding] = React.useState(false);
+  if (state === "failed") {
+    const rebuild = canEdit && job?.failure !== "system" && job;
+    if (!rebuild && !chat) return null;
+    return (
+      <BottomBar>
+        {rebuild && (
+          <Button
+            size="xl"
+            className="w-full"
+            onClick={() => {
+              retryBuildItem(job.id, kind, bp.id);
+              toast({ title: `Rebuilding ${ITEM_LABELS[kind]}` });
+            }}
+          >
+            Rebuild this piece
+          </Button>
+        )}
+        {chat && (
+          <Link href={`/m/ai/chat/${encodeURIComponent(chat.id)}`} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
+            Open chat
+          </Link>
+        )}
+      </BottomBar>
+    );
+  }
+  if (state === "notBuilt") {
+    if (!canEdit) return null;
+    return (
+      <BottomBar>
+        <Button size="xl" className="w-full" onClick={() => setAdding(true)}>
+          Add pieces
+        </Button>
+        {adding && <AddPiecesSheet bp={bp} preselect={[kind]} onClose={() => setAdding(false)} />}
+      </BottomBar>
+    );
+  }
+  if (state !== "ready") return null;
   const file = fileFor(kind, bp);
   if (!file) return null;
   if (downloads) {
     return (
       <BottomBar>
-        <Button hierarchy="secondary" size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} onClick={() => save(file)}>
+        <Button size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} onClick={() => save(file)}>
           {file.label}
         </Button>
       </BottomBar>

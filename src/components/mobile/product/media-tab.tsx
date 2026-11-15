@@ -1,16 +1,19 @@
 "use client";
 
-// The Media tab (Product Details 10f, 10h, 10t, 25a–25d) — the web's product
-// Media panel in its words (product-media.tsx):
-// - Video, for the owner: "No video yet" and why, with Generate AI video
-//   (10t); else Regenerate beside the heading; a finished take waiting for
+// The product's Media (Product Details 10f, 10h, 10t, 25a–25d) — the web's
+// product Media panel in its words (product-media.tsx). The owner reads it on
+// its own screen (`…/media`, from the object page's Media row; owner
+// 2026-11-15: the page leads with the video or image itself, the takes are
+// one tap away); a buyer in the Media tab:
+// - Video, for the owner: "No video yet" and why; a finished take waiting for
 //   review ("Video ready · Take 2 to review" + Review, 25a); the player, or
 //   the render's state in its box (rendering with its progress and time left,
 //   25c; failed with its reason and Try again, 25d; Ready to review); the meta
-//   line, "Made from version {n}", What's in this video, the honesty line;
-//   Takes — play one, Use this take, In use, delete (25b asks first).
-//   Generating and reviewing are the product video screens (`…/video`, the
-//   Earn agent's), which every action here opens;
+//   line, "Made from version {n}", What's in this video (a row), the honesty
+//   line; Takes — play one, Use this take, In use, delete (25b asks first).
+//   The screen's one primary sits in the Bottom action bar: Generate AI video,
+//   or Regenerate. Generating and reviewing are the product video screens
+//   (`…/video`, the Earn agent's), which every action here opens;
 // - a buyer sees the video in use, or no section;
 // - Images: this product's concept images across its versions (a buyer's
 //   only the version on offer), "Tap an image to see it full size." — the
@@ -18,13 +21,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertCircleIcon, CheckmarkCircle02Icon, Delete02Icon, Image02Icon, PlayCircleIcon, Tick02Icon, Video01Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, CheckmarkCircle02Icon, Delete02Icon, Image02Icon, InformationCircleIcon, PlayCircleIcon, Tick02Icon, Video01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { Spinner } from "@/components/ideeza/spinner";
-import { productImageTiles } from "@/components/projects/product/product-media";
 import { useClipUrl } from "@/components/video-jobs/video-player";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { can } from "@/lib/manual/permissions";
@@ -34,37 +36,100 @@ import { describeClip } from "@/lib/video/frames";
 import { etaLabel, progressOf } from "@/lib/video/jobs";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
-import type { VideoTake } from "@/lib/video/types";
+import type { ProductVideoStatus, VideoTake } from "@/lib/video/types";
 import { FAILURE_COPY, clipMetaLine, honestyLine, statusCopy, takeLabel } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { ListCard, ListRow } from "../kit/list";
 import { ImageViewer } from "../kit/image-viewer";
 import { Sheet } from "../kit/sheet";
 import { EmptyState } from "../kit/state";
 import { useToast } from "../kit/toast";
+import { Screen } from "../screen";
+import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { SectionHeading } from "../project/parts";
 import { PhoneVideo } from "../project/video";
-import { CARD, LinkButton } from "./parts";
-import { useProduct } from "./use-product";
+import { useProductImages, useVideoStatus } from "./hero";
+import { CARD } from "./parts";
+import { ProductLoading, ProductMissing, ProjectMissing } from "./states";
+import { ProductProvider, useProduct, useProductData } from "./use-product";
 
 const BOX = "flex aspect-video w-full flex-col items-center justify-center gap-4 rounded-md border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface-raised px-8 text-center";
 
-/** `oneHeading`: the page of a product no build stands behind has no tab strip, so "Media" heads
- *  the panel and the two empty cards sit under it without a heading each (10t). */
-export function MediaTab({ oneHeading = false }: { oneHeading?: boolean }) {
+/** `oneHeading`: "Media" heads the panel and the two empty cards sit under it without a heading
+ *  each (10t). `screen`: the owner's Media screen, whose Bottom action bar holds Generate /
+ *  Regenerate, so the panel doesn't repeat them. */
+export function MediaTab({ oneHeading = false, screen = false }: { oneHeading?: boolean; screen?: boolean }) {
   return (
     <div className={cn("flex flex-col", oneHeading ? "gap-6" : "gap-12")}>
       {oneHeading && <SectionHeading title="Media" />}
-      <VideoSection bare={oneHeading} />
+      <VideoSection bare={oneHeading} screen={screen} />
       <ImagesSection bare={oneHeading} />
     </div>
   );
 }
 
+/** The video's state in a few words, for the object page's Media row. */
+export function videoLine(status: ProductVideoStatus | null): string {
+  if (!status) return "Video";
+  switch (status.state) {
+    case "none":
+      return "No video yet — needed to share or sell";
+    case "ready":
+      return status.review ? `Video ready · Take ${status.review.n} to review` : `Take ${status.take.n} in use`;
+    default:
+      return statusCopy(status).text;
+  }
+}
+
+/** `…/media`: the owner's Media on its own screen. */
+export function ProductMediaScreen({ id, productId }: { id: string; productId: string }) {
+  const data = useProductData(id, productId);
+  if (data.state === "loading") return <ProductLoading />;
+  if (data.state === "missing") return <ProjectMissing />;
+  if (data.state === "no-product") return <ProductMissing projectName={data.projectName} back={`/m/projects/${encodeURIComponent(data.projectId)}?tab=products`} />;
+  return (
+    <ProductProvider value={data.ctx}>
+      <MediaScreen />
+    </ProductProvider>
+  );
+}
+
+function MediaScreen() {
+  const { project, view, product, viewer, path } = useProduct();
+  const owner = can(viewer, "video.generate", view.canCtx);
+  const status = useVideoStatus();
+  const { record } = useProjectVideos(project.id);
+  const takes = record?.products[product.id]?.takes ?? [];
+  const from = (status?.state === "ready" ? status.take : null) ?? takes[takes.length - 1] ?? null;
+  const footer =
+    owner && status ? (
+      <BottomBar>
+        {status.state === "none" ? (
+          <Link href={path("video")} className={cn(buttonVariants({ size: "xl" }), "w-full")}>
+            Generate AI video
+          </Link>
+        ) : (
+          <Link href={path("video", from ? { from: from.id } : {})} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
+            Regenerate
+          </Link>
+        )}
+      </BottomBar>
+    ) : undefined;
+  return (
+    <Screen top={<TopBar back={path("")} title="Media" />} footer={footer}>
+      <div className="px-8 pb-12 pt-2">
+        <MediaTab screen />
+      </div>
+    </Screen>
+  );
+}
+
 // ─────────────────────────── Video ───────────────────────────
 
-function VideoSection({ bare }: { bare: boolean }) {
+function VideoSection({ bare, screen }: { bare: boolean; screen: boolean }) {
   const { project, view, product, version, viewer, name, path } = useProduct();
   const owner = can(viewer, "video.generate", view.canCtx);
   const { record, hydrated } = useProjectVideos(project.id);
@@ -125,7 +190,7 @@ function VideoSection({ bare }: { bare: boolean }) {
           icon={Video01Icon}
           title="No video yet"
           body="Every product needs one before you can share or sell the project."
-          action={{ label: "Generate AI video", href: videoHref }}
+          action={screen ? undefined : { label: "Generate AI video", href: videoHref }}
         />
       </section>
     );
@@ -137,9 +202,11 @@ function VideoSection({ bare }: { bare: boolean }) {
         id="pd-video"
         title="Video"
         action={
-          <Link href={path("video", (inUse ?? latest) ? { from: (inUse ?? latest)!.id } : {})} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "border-solid")}>
-            Regenerate
-          </Link>
+          screen ? undefined : (
+            <Link href={path("video", (inUse ?? latest) ? { from: (inUse ?? latest)!.id } : {})} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "border-solid")}>
+              Regenerate
+            </Link>
+          )
         }
       />
       <>
@@ -238,11 +305,9 @@ function Player({ take, onWhat, madeFrom = null }: { take: VideoTake; onWhat: ()
       <PhoneVideo takeId={take.id} label={`${name} video`} />
       <p className={T.meta}>{clipMetaLine(take, formatDate(take.readyAt ?? take.createdAt))}</p>
       {madeFrom !== null && <p className={T.meta}>Made from version {madeFrom}</p>}
-      <div>
-        <LinkButton aria-haspopup="dialog" onClick={onWhat}>
-          What&apos;s in this video
-        </LinkButton>
-      </div>
+      <ListCard label="About this video">
+        <ListRow icon={InformationCircleIcon} title="What’s in this video" onClick={onWhat} />
+      </ListCard>
       <p className={T.meta}>{honestyLine(name)}</p>
     </div>
   );
@@ -339,17 +404,8 @@ function TakePoster({ take, playing, onPlay }: { take: VideoTake; playing: boole
 // ─────────────────────────── Images ───────────────────────────
 
 function ImagesSection({ bare }: { bare: boolean }) {
-  const { view, product, version, viewer, name } = useProduct();
-  const tiles = React.useMemo(
-    () =>
-      productImageTiles({
-        view,
-        product,
-        version: version ?? { options: [], latest: 0, home: 0, shown: 0, build: { buildId: "", job: null }, productId: null, notice: null },
-        viewer,
-      }),
-    [view, product, version, viewer],
-  );
+  const { name } = useProduct();
+  const tiles = useProductImages();
   const [at, setAt] = React.useState<number | null>(null);
   const shown = at !== null ? (tiles[at] ?? null) : null;
   if (tiles.length === 0) {
