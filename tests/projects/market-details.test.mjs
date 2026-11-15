@@ -2,9 +2,10 @@
 // first, the creator named (never "you"), the buy box with the price and the
 // button first and the facts small, the creator's block, a link to the
 // Innovations story (never a copy of it), the owner's way back only in the
-// prototype banner, viewer words under every clip, and a product without
-// copies of its own pointing to its project's offers. These read the sources
-// (like page-frames.test.mjs); the behaviour is checked headless.
+// prototype banner, viewer words under every clip, one Marketplace box with
+// Main NFT / Physical NFT / Virtual NFT tabs, and a product page selling only
+// its own copies. These read the sources (like page-frames.test.mjs); the
+// behaviour is checked headless.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -35,17 +36,44 @@ test("the Testnet demo banner holds the one way back to the owner's page, on a l
   assert.match(read(MARKET + "market-slots.tsx"), /<DemoBuyerBanner className="mb-10" projectId=\{project\.id\} \/>/);
 });
 
-test("the buy box: overline and price, the button, the wallet, then the facts small", () => {
+test("the Main NFT tab: overline and price, the button, the wallet, the legal line, then the facts folded", () => {
   const rail = read(MARKET + "buyer-rail.tsx");
-  assert.doesNotMatch(rail, /ListingFacts/, "the eight stacked rows are gone");
+  assert.doesNotMatch(rail, /ListingFacts|EditionOffers/, "the stacked rows and the copies under the Main NFT are gone");
   const buyNow = rail.slice(rail.indexOf('listing.type === "buyNow" ? ('));
-  const order = ["<OfferTop", "Buy now", "<WalletLine", "<DealFacts"].map((s) => buyNow.indexOf(s));
+  const order = ["<OfferTop", "Buy now", "<WalletLine", "<LegalLine", "<MainFacts"].map((s) => buyNow.indexOf(s));
   assert.ok(order.every((i, n) => i > -1 && (n === 0 || i > order[n - 1])), `order ${order}`);
   assert.match(rail, /facts=\{<AuctionTop listing=\{listing\} auction=\{auction\} \/>\}/);
-  assert.match(rail, /details=\{<DealFacts listing=\{listing\} view=\{view\} \/>\}/);
   assert.doesNotMatch(rail, /\{ask\}/, "Ask the creator is the Creator block's");
   const parts = read(MARKET + "offer-parts.tsx");
   assert.match(parts, /grid grid-cols-3/);
+  // The facts and the activity fold under NFT details.
+  assert.match(parts, /aria-expanded=\{open\}/);
+  assert.match(rail, /<MoreFacts>\s*<DealFacts listing=\{listing\} view=\{view\} \/>\s*<ActivityNow/);
+});
+
+test("one Marketplace box: Main NFT / Physical NFT / Virtual NFT tabs, one panel at a time, the project's own copies only", () => {
+  const rail = read(MARKET + "buyer-rail.tsx");
+  assert.match(rail, /const kinds = listedKindsOf\(view, PROJECT_SCOPE\);/, "the whole project's copies, never a product's");
+  assert.match(rail, /const tabs: OfferTab\[\] = listing \? \["main", \.\.\.kinds\] : kinds;/);
+  assert.match(rail, /<OfferTabs tabs=\{tabs\} active=\{tab\} onSelect=\{setPicked\}>/);
+  assert.match(rail, /scopeId=\{PROJECT_SCOPE\}/);
+  const parts = read(MARKET + "offer-parts.tsx");
+  assert.match(parts, /main: "Main NFT",\s*physical: "Physical NFT",\s*virtual: "Virtual NFT",/);
+  assert.match(parts, /role="tablist"/);
+  assert.match(parts, /if \(tabs\.length < 2\)/, "a lone tab is a chip");
+});
+
+test("a copy tab is the same buy box: Use and Version as choices with their counts and prices, one Buy now", () => {
+  const panel = read(MARKET + "copy-panel.tsx");
+  assert.match(panel, /helperLineOf\(kind, scopeName\)/);
+  assert.match(panel, /\{offers\.length > 1 && \(\s*<Choice\s+legend="Use"/, "a choice only when both uses are on sale");
+  assert.match(panel, /\{!oneTier && \(\s*<Choice\s+legend="Version"/, "a choice only when the prices differ");
+  assert.match(panel, /aside: priceOf\(t\)/, "each version shows its price before Buy");
+  assert.match(panel, /<OfferTop/);
+  assert.match(panel, /hierarchy="primary"/);
+  assert.match(panel, />\s*Buy now\s*</);
+  assert.doesNotMatch(panel, /ModalFrame/, "no popup before the wallet: the price is chosen on the page");
+  assert.match(panel, /<MoreFacts>/);
 });
 
 test("Creator and On Innovations are the buyer view's own rail blocks", () => {
@@ -74,35 +102,17 @@ test("viewer words under a clip never speak of 'your' prompt or videos", () => {
   }
 });
 
-test("a market product page names its project and creator, and points to the project's offers", () => {
+test("a market product page names its project and creator, and sells only its own copies", () => {
   const page = read("components/projects/product/product-page.tsx");
   assert.match(page, /const meta: React\.ReactNode = market \?/);
   assert.match(page, /Part of\{" "\}/);
-  const offer = read(MARKET + "whole-project-offer.tsx");
-  assert.match(offer, /viewer\.kind !== "demo-buyer" \|\| view\.lock !== null/);
-  assert.match(offer, /tracksOf\(product\.id, view\.editions\)\.some\(\(t\) => t\.listing !== null\)/);
-  assert.match(offer, /href=\{`\/marketplace\/\$\{project\.id\}`\}/);
-});
-
-test("copies: Physical / Virtual tabs of compact rows, the version asked after Buy, never a card per offer", () => {
-  const src = read(MARKET + "edition-offers.tsx");
-  // Tabs with each kind's lowest price; a kind alone is a plain heading; a holder opens on what they own.
-  assert.match(src, /role="tablist"/);
-  assert.match(src, /fromLine\(lowest\(k\)\)/);
-  assert.match(src, /held \?\? kinds\[0\]/);
-  // What the kind gets you, said once, in the product page's words.
-  assert.match(src, /helperLineOf\(kind, project\.name\)/);
-  // One row per offer with a small secondary Buy; the page itself has no radio and no copy "Buy now".
-  assert.match(src, /function CopyRow\(/);
-  assert.match(src, /hierarchy="secondary"\s+size="md"/);
-  const page = src.slice(0, src.indexOf("<ModalFrame"));
-  assert.doesNotMatch(page, /role="radiogroup"|type="radio"/);
-  assert.doesNotMatch(page.replace(/\/\/.*$/gm, ""), />\s*Buy now\s*</);
-  // Two prices: the one popup style asks first, on the picked price; one price goes straight to the wallet.
-  assert.match(src, /if \(oneTier\) void go\("extended"\);\s*else setChoosing\(true\);/);
-  assert.match(src, /initialFocus=\{pickedRef\}/);
-  // Many rows fold each product into one line.
-  assert.match(src, /export const ROWS_OPEN = 6;/);
-  assert.match(src, /folded=\{fold && !isProjectScope\(g\.productId\)\}/);
-  assert.doesNotMatch(src, /BuyableOffer|OfferFrame/, "the old card per offer is gone");
+  const slots = read("components/projects/product/product-slots.tsx");
+  assert.doesNotMatch(slots, /WholeProjectOffer/, "never the project's offers on a product page");
+  assert.match(slots, /return <EditionBlock \{\.\.\.props\} \/>;/);
+  const block = read("components/projects/editions/edition-block.tsx");
+  assert.match(block, /<OfferTabs tabs=\{kinds\} active=\{kind\} onSelect=\{setPicked\}>/);
+  assert.match(block, /scopeId=\{product\.id\}/);
+  // The project's Products tab says where a product's own copies are.
+  assert.match(read(MARKET + "market-slots.tsx"), /sale: saleLineOf\(view, p\.id\)/);
+  assert.match(read("components/projects/details/products-tab.tsx"), /\{card\.sale && </);
 });

@@ -119,9 +119,9 @@ test("the product strip reads PRODUCT_SLOTS for its people tab and Media, with t
 test("P0: the product page is engineering for the owner — its Sales tab aside (2026-11-15), and Editions only on the buyer's side", () => {
   const slots = read(PRODUCT + "product-slots.tsx");
   assert.match(slots, /customers: CustomersSlot,/);
-  // The buyer's side only: the product's own copies, else (Explore marketplace) its project's offers (2026-11-15).
+  // The buyer's side only, and only the product's own copies (2026-11-15: never its project's offers).
   assert.match(slots, /if \(!buyerSide\(props\.viewer\)\) return null;/);
-  assert.match(slots, /<EditionBlock \{\.\.\.props\} \/>\s*<WholeProjectOffer \{\.\.\.props\} \/>/);
+  assert.match(slots, /return <EditionBlock \{\.\.\.props\} \/>;/);
   const page = read(PRODUCT + "product-page.tsx");
   assert.match(page, /<VersionSelect/);
   assert.match(page, /<ProductRail\s+slot=\{slot\}\s+built=\{bp\}\s+confidence=\{confidence\}\s+partChanges=\{partChanges\}/, "Specs and Build check are the rail's");
