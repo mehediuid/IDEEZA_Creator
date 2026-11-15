@@ -240,12 +240,12 @@ function ImproveBlock({
           Couldn&apos;t rewrite this section. Try again in a moment.
         </p>
       )}
-      <div className="flex flex-col gap-4">
-        <Button hierarchy="secondary" size="xl" className="w-full" loading={busy} onClick={run}>
-          Improve
-        </Button>
-        <Button hierarchy="ghost" size="xl" className="w-full" disabled={busy} onClick={() => setOpen(false)}>
+      <div className="flex gap-4">
+        <Button hierarchy="ghost" size="xl" className="min-w-0 flex-1" disabled={busy} onClick={() => setOpen(false)}>
           Cancel
+        </Button>
+        <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" loading={busy} onClick={run}>
+          Improve
         </Button>
       </div>
     </div>
@@ -314,9 +314,6 @@ export function SectionEditSheet({
               onClick={save}
             >
               Save changes
-            </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={leave}>
-              Cancel
             </Button>
             {saveBlocked && (
               <p id={blockedId} role="status" className={EARN_NOTE}>

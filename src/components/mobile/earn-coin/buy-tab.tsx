@@ -308,11 +308,7 @@ function PurchaseSheet({ p, now, busy, onClaim, onClose }: { p: Purchase; now: n
           <Button size="xl" className="w-full" disabled aria-describedby={lockId}>
             Claim
           </Button>
-        ) : (
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Done
-          </Button>
-        )
+        ) : undefined
       }
     >
       <DetailRows

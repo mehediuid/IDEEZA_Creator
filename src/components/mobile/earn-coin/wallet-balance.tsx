@@ -176,11 +176,6 @@ function LedgerSheet({ r, now, onClose }: { r: IdzRow; now: number; onClose: () 
       onClose={onClose}
       title={r.title}
       description={r.network ? networkLabelOf(r.network) : "Every network"}
-      actions={
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-          Done
-        </Button>
-      }
     >
       <DetailRows
         rows={[

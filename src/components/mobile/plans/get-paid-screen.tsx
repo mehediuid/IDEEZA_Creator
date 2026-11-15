@@ -471,9 +471,6 @@ function AddMethodSheet({ open, onClose, onCrypto }: { open: boolean; onClose: (
           >
             Continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >

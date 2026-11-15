@@ -323,3 +323,11 @@ Owner: "the mobile app must work the way mobile UX works, not the web made respo
   - each link is a row (both ends' pictures, ends, how it connects or what's wrong, what travels) that opens Change link;
   - Remove network is the card's last row;
   - Change link is three rows (Protocol, Direction, What travels) with Save link, and Back to suggested for a changed link.
+
+### Sheet footers (owner 2026-11-15)
+
+- A sheet's footer holds **one primary**. The ✕, a swipe down and the scrim close it, so no Cancel / Close / Done / Not now button sits under it when that button only closes. A reason or helper line (`<p>` in `actions`) is drawn above the button.
+- A confirm (`ConfirmSheet`) puts the way back and the action **in one row**, the action on the right; labels too long for half a row stack.
+- The footer is tighter (less padding above and below the button), and a sheet's body never squeezes a card: it scrolls.
+- What a sheet needs is said once: "every product needs an AI video" is the sheet's description, not a banner plus a footer line.
+

@@ -134,9 +134,6 @@ function PromptHelp({
           >
             Use this prompt
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >

@@ -203,7 +203,10 @@ export function Sheet({
   onClose: () => void;
   title: string;
   description?: React.ReactNode;
-  /** _Modal actions: XL buttons, stacked, the action first. Left out on pick-one sheets. */
+  /** _Modal actions: the one primary (XL). The ✕, a swipe down and the scrim close the sheet, so
+   *  no Cancel button under it (owner 2026-11-15: stacked buttons wasted the thumb zone). A
+   *  reason or helper line (`<p>`) sits above the button, whatever its order here. Left out on
+   *  pick-one sheets. */
   actions?: React.ReactNode;
   /** No ✕: a step that can't be left (a submitted transaction confirming). */
   hideClose?: boolean;
@@ -296,8 +299,8 @@ function SheetPanel({
         </div>
       )}
       {actions && (
-        <div {...{ [FOOT_ATTR]: "" }} className="shrink-0 pb-5 pt-4">
-          <div className="flex flex-col gap-6 border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-16 pb-16 pt-8">
+        <div {...{ [FOOT_ATTR]: "" }} className="shrink-0 pt-4">
+          <div className="flex flex-col gap-4 border-t-[length:var(--border-width-1)] border-solid border-border-subtle px-16 pb-6 pt-6 [&>p]:order-first">
             {actions}
           </div>
         </div>

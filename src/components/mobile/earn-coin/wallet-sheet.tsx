@@ -539,9 +539,6 @@ function RequestSheet({
             <Button size="xl" className={xl} loading={phase === "connecting"} onClick={actions.connect}>
               {phase === "connecting" ? "Connecting…" : "Connect demo wallet"}
             </Button>
-            <Button hierarchy="secondary" size="xl" className={xl} onClick={onClose}>
-              Cancel
-            </Button>
           </>
         }
       />
@@ -560,9 +557,6 @@ function RequestSheet({
           <>
             <Button size="xl" className={xl} loading={phase === "switching"} onClick={actions.switchNetwork}>
               {phase === "switching" ? "Switching…" : `Switch to ${target}`}
-            </Button>
-            <Button hierarchy="secondary" size="xl" className={xl} onClick={onClose}>
-              Cancel
             </Button>
           </>
         }

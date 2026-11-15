@@ -270,9 +270,6 @@ export function SecuritySettings() {
             <Button size="xl" className="w-full" onClick={() => router.push("/m/settings/security/password")}>
               Add a password
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-              Cancel
-            </Button>
           </>
         }
       >
@@ -342,9 +339,6 @@ function ConnectSheet({
         <>
           <Button size="xl" className="w-full" onClick={() => onConnect(provider)}>
             Continue
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
           </Button>
         </>
       }
@@ -491,9 +485,6 @@ function DeviceSheet({
         <>
           <Button hierarchy="secondary" size="xl" className="w-full" disabled={!online} onClick={() => onSignOut(device)}>
             Sign out of this device
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Close
           </Button>
         </>
       }

@@ -500,9 +500,6 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
             <Button size="xl" className="w-full" onClick={() => sent && router.replace(`/m/settings/idz-pay/history?tx=${sent.id}`)}>
               See it in history
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => router.replace("/m/settings/idz-pay")}>
-              Close
-            </Button>
           </>
         }
       >

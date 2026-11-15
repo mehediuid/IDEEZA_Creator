@@ -375,9 +375,6 @@ export function ChoiceSheet<T extends string>({
           <Button size="xl" className="w-full" onClick={done}>
             Done
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >

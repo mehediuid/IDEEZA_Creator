@@ -7,7 +7,6 @@
 
 import * as React from "react";
 import { Badge } from "@/components/ideeza/badge";
-import { Button } from "@/components/ideeza/button";
 import { Segmented } from "@/components/ideeza/segmented";
 import { STAKE_CONTRACTS, contractStatusOf, withContractStatus, type ContractStatus } from "@/lib/wallet/staking";
 import { readStakeAdmin, useStakeAdmin, writeStakeAdmin } from "@/lib/wallet/use-earn-stores";
@@ -34,11 +33,6 @@ export function StakeAdminSheet({ open, onClose }: { open: boolean; onClose: () 
       onClose={onClose}
       title="Demo: contract states"
       description="Prototype only. Stands in for IDEEZA’s admin, who can pause or block a staking contract."
-      actions={
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-          Done
-        </Button>
-      }
     >
       <Badge tone="warning" className="self-start">
         Demo

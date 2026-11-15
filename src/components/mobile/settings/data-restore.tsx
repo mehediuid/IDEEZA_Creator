@@ -141,9 +141,6 @@ export function RestoreSettings() {
             <Button hierarchy="danger" size="xl" className="w-full" disabled={!!dl.busy} onClick={() => void restore()}>
               Replace with this backup
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setRead(null)}>
-              Cancel
-            </Button>
           </>
         }
       >

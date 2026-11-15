@@ -336,9 +336,6 @@ export function AddPiecesSheet({ bp, preselect, onClose }: { bp: BuildProduct; p
             <Button size="xl" className="w-full" disabled={!chosen.length || short} onClick={build}>
               {chosen.length === 1 ? "Build 1 piece" : chosen.length ? `Build ${chosen.length} pieces` : "Build"}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-              Cancel
-            </Button>
           </>
         }
       >

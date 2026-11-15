@@ -167,9 +167,6 @@ function ReportSheet({ row, open, onClose }: { row: ReportRow | null; open: bool
               {OPEN_LABEL[row.kind]}
             </Button>
           )}
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Close
-          </Button>
         </>
       }
     >

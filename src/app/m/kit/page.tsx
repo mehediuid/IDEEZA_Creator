@@ -344,9 +344,6 @@ export default function SharedKitPage() {
             <Button size="xl" className="w-full" onClick={() => router.push("/m/earn")}>
               Go to Earn › Sell
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-              Cancel
-            </Button>
           </>
         }
       >

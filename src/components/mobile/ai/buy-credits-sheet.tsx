@@ -114,9 +114,6 @@ function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
           <Button size="xl" className="w-full" loading={paying} onClick={pay}>
             Pay {usd(order.price.final)}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose} disabled={paying}>
-            Cancel
-          </Button>
         </>
       }
     >

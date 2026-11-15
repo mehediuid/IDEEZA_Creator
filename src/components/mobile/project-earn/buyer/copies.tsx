@@ -220,9 +220,6 @@ function BuyCopy({
               <Button size="xl" className="w-full" onClick={() => void go(tier)}>
                 {`Buy now · ${price(tier)}`}
               </Button>
-              <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setChoosing(false)}>
-                Cancel
-              </Button>
             </>
           }
         >

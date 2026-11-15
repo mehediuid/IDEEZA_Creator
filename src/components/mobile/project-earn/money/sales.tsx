@@ -21,7 +21,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Copy01Icon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button, buttonVariants } from "@/components/ideeza/button";
+import { buttonVariants } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { earningsOf, formatUsd, type Earning } from "@/lib/account/payout";
@@ -221,9 +221,6 @@ function SaleSheet({ row, onClose }: { row: CustomerRow; onClose: () => void }) 
           >
             {`Message ${buyerName}`}
           </Link>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Close
-          </Button>
         </>
       }
     >

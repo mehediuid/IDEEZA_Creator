@@ -141,9 +141,6 @@ function LegalNameSheet({ open, onClose, initial }: { open: boolean; onClose: ()
           <Button type="submit" form="legal-name-form" size="xl" className="w-full">
             Save
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >
@@ -238,9 +235,6 @@ function WalletRow() {
                 }}
               >
                 Connect a wallet
-              </Button>
-              <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setOpen(false)}>
-                Not now
               </Button>
             </>
           )

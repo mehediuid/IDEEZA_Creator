@@ -126,9 +126,6 @@ export function BuildConfirmSheet({
               <Button size="xl" className="w-full" onClick={() => setBuying(true)}>
                 Buy credits
               </Button>
-              <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-                Cancel
-              </Button>
             </>
           ) : (
             <>
@@ -140,9 +137,6 @@ export function BuildConfirmSheet({
                   {OFFLINE_REASON}
                 </p>
               )}
-              <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose} disabled={flow.submitting}>
-                Cancel
-              </Button>
             </>
           )
         }

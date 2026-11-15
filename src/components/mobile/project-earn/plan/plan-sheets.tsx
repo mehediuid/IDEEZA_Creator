@@ -70,9 +70,6 @@ export function GenerateSheet({
           <Button size="xl" className="w-full" disabled={tooShort} onClick={() => onGenerate(trimmed.slice(0, MAX))}>
             Generate plan
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >

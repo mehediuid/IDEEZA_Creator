@@ -447,9 +447,6 @@ function ReauthSheet({
           <Button size="xl" className="w-full" onClick={onDone}>
             Confirm as {email}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >

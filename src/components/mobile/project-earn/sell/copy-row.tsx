@@ -378,9 +378,6 @@ function EditCopiesSheet({
           <Button size="xl" className="w-full" loading={busy} onClick={() => void submit()}>
             {busy ? "Updating…" : "Update"}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
           {problem && (
             <p role="alert" className={cn(T.meta, "text-text-error")}>
               {problem.message}
@@ -500,9 +497,6 @@ function AddCopiesSheet({
         <>
           <Button size="xl" className="w-full" loading={busy} onClick={() => void submit()}>
             {busy ? "Adding…" : "Add NFTs"}
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" disabled={busy} onClick={onClose}>
-            Cancel
           </Button>
           {boxProblem && (
             <p id={`${prefix}-reason`} role="alert" className={cn(T.meta, "text-text-error")}>

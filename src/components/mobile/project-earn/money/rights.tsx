@@ -210,9 +210,6 @@ function RightSheet({ right, onClose, onDone }: { right: LegalRight | null; onCl
             <Button size="xl" className="w-full" loading={write.saving} onClick={save}>
               {write.saving ? "Saving…" : "Save"}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" disabled={write.saving} onClick={onClose}>
-              Cancel
-            </Button>
             {write.failed && <p className={cn(T.meta, "text-text-error")}>{WRITE_FAILED}</p>}
           </>
         }

@@ -31,9 +31,6 @@ export function CameraAskSheet({ open, onAllow, onClose }: { open: boolean; onAl
           <Button size="xl" className="w-full" onClick={onAllow}>
             Allow camera
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Not now
-          </Button>
         </>
       }
     >

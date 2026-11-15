@@ -402,11 +402,6 @@ function ReferralSheet({ r, onClose }: { r: ReferralRow; onClose: () => void }) 
       onClose={onClose}
       title={r.name}
       description={r.campaignName}
-      actions={
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-          Done
-        </Button>
-      }
     >
       <DetailRows
         rows={[
@@ -503,9 +498,6 @@ function DemoReferralSheet({ open, onClose, identity, percent }: { open: boolean
         <>
           <Button size="xl" className="w-full" onClick={add}>
             Add referral
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
           </Button>
         </>
       }

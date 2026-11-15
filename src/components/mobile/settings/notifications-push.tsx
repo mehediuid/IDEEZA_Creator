@@ -101,9 +101,6 @@ export function PushPrompt({ open, onClose }: { open: boolean; onClose: () => vo
           <Button size="xl" className="w-full" loading={asking} onClick={ask}>
             Continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" disabled={asking} onClick={onClose}>
-            Not now
-          </Button>
         </>
       }
     >

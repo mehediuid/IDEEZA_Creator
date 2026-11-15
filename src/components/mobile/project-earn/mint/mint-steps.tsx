@@ -894,9 +894,6 @@ export function MintShare() {
             <Button size="xl" className="w-full" disabled={!!blocker} onClick={share}>
               Share
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
             {blocker && <p className={NOTE}>{blocker}</p>}
           </>
         }

@@ -133,9 +133,6 @@ function DemoProviderSheet({
           <Button size="xl" className="w-full" onClick={go}>
             Continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
-          </Button>
         </>
       }
     >

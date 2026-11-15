@@ -662,9 +662,6 @@ function DemoProviderSheet({ open, onClose, title, liveness, onSubmit }: { open:
             <Button size="xl" className="w-full" onClick={() => setStep("demo")}>
               Continue
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-              Not now
-            </Button>
           </>
         }
       />
@@ -686,9 +683,6 @@ function DemoProviderSheet({ open, onClose, title, liveness, onSubmit }: { open:
             }}
           >
             Submit for review
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
           </Button>
         </>
       }

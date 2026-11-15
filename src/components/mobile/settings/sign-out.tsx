@@ -41,9 +41,6 @@ export function SignOutSheet({ open, onClose }: { open: boolean; onClose: () => 
           <Button size="xl" className="w-full" loading={busy} onClick={go}>
             {online ? "Sign out" : "Sign out anyway"}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            {online ? "Cancel" : "Stay signed in"}
-          </Button>
         </>
       }
     >

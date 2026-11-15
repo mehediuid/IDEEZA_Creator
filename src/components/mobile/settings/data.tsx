@@ -201,9 +201,6 @@ function KeepRow({ disabled }: { disabled: boolean }) {
               >
                 Ask
               </Button>
-              <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setOpen(false)}>
-                Close
-              </Button>
             </>
           ) : undefined
         }

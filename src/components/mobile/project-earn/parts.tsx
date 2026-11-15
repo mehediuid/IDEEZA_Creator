@@ -360,9 +360,6 @@ export function LicenseSheet({
           <Button size="xl" className="w-full" onClick={save}>
             Save license
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >

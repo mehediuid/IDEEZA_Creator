@@ -320,11 +320,9 @@ function ActivityForm({
         />
       }
       footer={
-        <BottomBar className="flex-row gap-6 pt-8">
-          <Button hierarchy="secondary" size="xl" className="flex-1" onClick={() => leave(goBack)}>
-            Cancel
-          </Button>
-          <Button size="xl" className="flex-1" type="submit" form="m-activity-form" loading={busy}>
+        // Back (with its Discard changes? ask) is the way out, so the bar holds the one primary.
+        <BottomBar className="pt-8">
+          <Button size="xl" className="w-full" type="submit" form="m-activity-form" loading={busy}>
             {mode === "add" ? "Add now" : "Update"}
           </Button>
         </BottomBar>

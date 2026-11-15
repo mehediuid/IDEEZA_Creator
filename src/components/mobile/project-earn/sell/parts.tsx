@@ -31,7 +31,6 @@ import {
   PlayIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
-import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { IconButton } from "@/components/ideeza/icon-button";
@@ -472,19 +471,16 @@ export function ReadinessSheet({
       open
       onClose={onClose}
       title={copy.title}
+      description={copy.info}
       actions={
         <>
           <Button size="xl" className="w-full" disabled={blocker !== null} onClick={onPass}>
             {copy.cta}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
           {blocker && <p className={SUB}>{blocker}</p>}
         </>
       }
     >
-      <Banner tone="info">{copy.info}</Banner>
       <ReadinessRows readiness={readiness} />
       {extra}
     </Sheet>
@@ -501,11 +497,6 @@ export function MakeVideosSheet({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       title="Make videos"
       description="Each product needs its own video before the project can be sold."
-      actions={
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-          Close
-        </Button>
-      }
     >
       <ReadinessRows readiness={readiness} />
     </Sheet>

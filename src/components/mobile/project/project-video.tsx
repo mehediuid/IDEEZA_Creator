@@ -334,14 +334,9 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
       </div>
     );
     footer = (
-      <>
-        <Button size="xl" className="w-full" onClick={generate}>
-          Generate project video
-        </Button>
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={goBack}>
-          Cancel
-        </Button>
-      </>
+      <Button size="xl" className="w-full" onClick={generate}>
+        Generate project video
+      </Button>
     );
   }
 

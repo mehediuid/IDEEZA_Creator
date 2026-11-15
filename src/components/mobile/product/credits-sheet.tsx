@@ -93,9 +93,6 @@ export function BuyCreditsSheet({ open, need, onClose }: { open: boolean; need: 
             <Button size="xl" className="w-full" onClick={pay}>
               {`Pay ${usd(order.price.final)}`}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-              Cancel
-            </Button>
           </>
         }
       >

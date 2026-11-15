@@ -253,9 +253,6 @@ function ContributorSheet({ editing, onClose }: { editing: Contributor | null; o
             <Button size="xl" className="w-full" loading={write.saving} onClick={submit}>
               {write.saving ? "Saving…" : editing ? "Save changes" : "Add contributor"}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" disabled={write.saving} onClick={cancel}>
-              Cancel
-            </Button>
           </>
         }
       >

@@ -681,9 +681,6 @@ export function ConnectSheet({
           <Button size="xl" className="w-full" loading={busy} onClick={connect}>
             {busy ? "Connecting…" : "Connect demo wallet"}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
-          </Button>
         </>
       }
     >
@@ -727,9 +724,6 @@ export function DemoWalletSheet({ open, onClose }: { open: boolean; onClose: () 
               Connect demo wallet
             </Button>
           )}
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Done
-          </Button>
         </>
       }
     >

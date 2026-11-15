@@ -203,9 +203,6 @@ function SavePanel({ job, info: infoProp, onClose }: { job: BuildJob; info: Save
             <Button size="xl" className="w-full" loading={saving} onClick={submit} disabled={!!blocked}>
               {kind === "new" ? "Save project" : kind === "version" ? title : `Add to ${target?.name ?? "project"}`}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose} disabled={saving}>
-              Cancel
-            </Button>
           </>
         }
       >

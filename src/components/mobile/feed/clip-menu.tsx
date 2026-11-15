@@ -323,9 +323,6 @@ function OwnerSheets({ clip, sheet, onClose }: { clip: FeedClip; sheet: string |
             >
               Save
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-              Cancel
-            </Button>
           </>
         }
       >

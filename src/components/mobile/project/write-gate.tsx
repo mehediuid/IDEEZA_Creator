@@ -115,9 +115,6 @@ function PauseSheet({ open, error, onCancel, onConfirm }: { open: boolean; error
           >
             Pause and continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
-          </Button>
           {!ticked && <p className={cn(T.meta, "text-right")}>Tick the box to continue.</p>}
         </>
       }

@@ -116,9 +116,6 @@ export function RenameSheet({ open, onClose, gate }: { open: boolean; onClose: (
           <Button size="xl" className="w-full" type="submit" form="m-rename-product" disabled={blocked !== null}>
             Save
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >

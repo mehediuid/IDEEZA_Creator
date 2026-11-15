@@ -24,16 +24,12 @@ import { useToast } from "../kit/toast";
 const SAVE_FAILED = "Couldn’t save. Nothing changed.";
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-function SheetActions({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+/** One primary; the sheet's ✕ (or a swipe down) is the way out without saving. */
+function SheetActions({ onDone }: { onDone: () => void }) {
   return (
-    <>
-      <Button size="xl" className="w-full" onClick={onDone}>
-        Done
-      </Button>
-      <Button hierarchy="secondary" size="xl" className="w-full" onClick={onCancel}>
-        Cancel
-      </Button>
-    </>
+    <Button size="xl" className="w-full" onClick={onDone}>
+      Done
+    </Button>
   );
 }
 
@@ -105,7 +101,7 @@ export function QuietHoursSheet({
     toast({ title: "Saved" });
   };
   return (
-    <Sheet open={open} onClose={onClose} title="Quiet hours" actions={<SheetActions onDone={done} onCancel={onClose} />}>
+    <Sheet open={open} onClose={onClose} title="Quiet hours" actions={<SheetActions onDone={done} />}>
       <div className={cn(LIST_CARD, LIST_DIVIDERS, "rounded-lg")}>
         <TimeRow label="Starts" value={draft.from} onChange={(v) => setDraft((d) => ({ ...d, from: v }))} />
         <TimeRow label="Ends" value={draft.to} onChange={(v) => setDraft((d) => ({ ...d, to: v }))} />
@@ -180,7 +176,7 @@ export function BidsSheet({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Bids to hear about" actions={<SheetActions onDone={done} onCancel={onClose} />}>
+    <Sheet open={open} onClose={onClose} title="Bids to hear about" actions={<SheetActions onDone={done} />}>
       <div role="radiogroup" aria-label="Bids to hear about" className="flex flex-col gap-4">
         {BID_OPTIONS.map((o) => (
           <label

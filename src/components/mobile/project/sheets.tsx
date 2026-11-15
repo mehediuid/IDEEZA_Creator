@@ -159,9 +159,6 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
             <Button size="xl" className="w-full" onClick={() => router.push(sellHref)}>
               Go to Sell
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setListFirst(false)}>
-              Cancel
-            </Button>
           </>
         }
       />
@@ -174,9 +171,6 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
           <>
             <Button size="xl" className="w-full" onClick={() => router.push(phoneHrefOf(earnMintHref(project.id, "save")) ?? "/m/projects")}>
               Go to mint
-            </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setMintFirst(false)}>
-              Cancel
             </Button>
           </>
         }
@@ -275,9 +269,6 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
           <>
             <Button size="xl" className="w-full" loading={write.saving || ai.running} onClick={save}>
               {write.failed ? "Try again" : "Save"}
-            </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={requestClose}>
-              Cancel
             </Button>
           </>
         }
@@ -448,9 +439,6 @@ function DeleteSheet({ onClose }: { onClose: () => void }) {
         <>
           <Button hierarchy="danger" size="xl" className="w-full" disabled={!matched} loading={pending} onClick={confirm}>
             {pending ? "Deleting…" : "Delete project"}
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" disabled={pending} onClick={onClose}>
-            Cancel
           </Button>
         </>
       }
@@ -631,9 +619,6 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
           <Button size="xl" className="w-full" disabled={blocker !== null} onClick={share}>
             Share to Feed
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
           {reason && <p className={T.meta}>{reason}</p>}
         </>
       }
@@ -704,9 +689,6 @@ function EditPostSheet({ onClose }: { onClose: () => void }) {
         <>
           <Button size="xl" className="w-full" onClick={save}>
             Save
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
           </Button>
         </>
       }
@@ -792,9 +774,6 @@ function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () =
           <Button size="xl" className="w-full" disabled={!pick} onClick={go}>
             Continue
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
-          </Button>
           {!pick && <p className={T.meta}>Pick how it goes out.</p>}
         </>
       }
@@ -841,6 +820,7 @@ function ReadinessSheet({ purpose, then, onClose }: { purpose: ReadinessPurpose;
       open
       onClose={onClose}
       title={copy.title}
+      description={copy.info}
       actions={
         <>
           <Button
@@ -854,14 +834,10 @@ function ReadinessSheet({ purpose, then, onClose }: { purpose: ReadinessPurpose;
           >
             {copy.cta}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
           {blocker && <p className={T.meta}>{blocker}</p>}
         </>
       }
     >
-      <Banner tone="info">{copy.info}</Banner>
       <ReadinessRows readiness={readiness} projectId={project.id} />
     </Sheet>
   );

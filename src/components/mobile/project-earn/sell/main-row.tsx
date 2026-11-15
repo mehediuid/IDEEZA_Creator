@@ -519,11 +519,6 @@ function BidsSheet({ listing, onClose }: { listing: Listing; onClose: () => void
       open
       onClose={onClose}
       title="Bidding History"
-      actions={
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-          Close
-        </Button>
-      }
     >
       <TestnetDemoBadge className="self-start" />
       {rows.length === 0 ? (
@@ -651,9 +646,6 @@ function CloseAuctionSheet({ listing, now, onClose, onDone }: { listing: Listing
               {copy.confirm}
             </Button>
           )}
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Cancel
-          </Button>
         </>
       }
     >
@@ -765,11 +757,6 @@ function MintDetailsSheet({ onClose }: { onClose: () => void }) {
       open
       onClose={onClose}
       title="Mint details"
-      actions={
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-          Close
-        </Button>
-      }
     >
       <MintRows />
     </Sheet>

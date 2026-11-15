@@ -160,9 +160,6 @@ export function ReportSheet({
           <Button size="xl" className="w-full" disabled={!reason || !online || sending} onClick={send}>
             {sending ? "Sending…" : phase === "failed" ? "Try again" : "Send report"}
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-            Cancel
-          </Button>
         </>
       }
     >

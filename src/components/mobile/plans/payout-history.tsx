@@ -320,9 +320,6 @@ function StatementSheet({ open, onClose, years }: { open: boolean; onClose: () =
             >
               Open
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-              Close
-            </Button>
           </>
         }
       >

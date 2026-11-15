@@ -100,9 +100,6 @@ export function ClipShare({
             <Button size="xl" className="w-full" disabled={!!problem} onClick={share}>
               {failed ? "Try again" : "Share now"}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" onClick={close}>
-              Cancel
-            </Button>
           </>
         }
       >
