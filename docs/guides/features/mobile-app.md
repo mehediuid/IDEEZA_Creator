@@ -188,3 +188,138 @@ A 21-reviewer pass (UX, QA, typography, visual) found about 550 issues across `/
 - **Wallet signing sheet:** wallet card, every charge, Total to pay now, Balance after, Reject.
 - **Account:** Reset signs out other devices, Add your email checks a code, Where did you hear about IDEEZA, the welcome offer and the phone tour.
 - **Feed:** your shared projects and Share to your Feed show in the Feed, Search and Saved; every notification opens its own screen.
+
+## Mobile UX pass (2026-11-15)
+
+Owner: "the mobile app must work the way mobile UX works, not the web made responsive." A 12-designer team reworked every area against one lens (`_review/MOBILE-UX-BRIEF.md`): summaries before tables, explanations behind ⓘ, hub rows instead of 4+ tabs, rows instead of text links, one primary in the bottom bar, media first on object pages, one header. Every requirement stays; what moved where is in `_review/ux-moves.md`. The approved designs (way in, create flow, Feed clip, tour, buyer pages) were not restyled.
+
+### Shell and kit
+
+- A running build shows as a slim bar docked under the tab screen's header (`Screen`'s top dock slot); the render tray docks above the screen's foot. Neither ever covers content.
+- `kit/dock.tsx`: `<DockSlot edge="top|foot" />` for screens that don't use `Screen` (the Feed); floaters portal into the newest slot.
+- Every tappable row, menu row, ✕, top-bar button and tab shows a pressed state (`kit/press.ts`: the DS state layer, only on enabled buttons and links).
+- Empty, error and not-found states are clean mobile states: no card edge, centred, one action.
+- A hairline marks the header's edge once a screen or a sheet scrolls (`kit/scroll-edge.tsx`), skipped under a tab strip.
+- A toast never sits on a field being typed in: it stands 8 px above it.
+
+### Projects
+
+- **Project page** (`/m/projects/<id>`), a native object page: the project video in use (else the cover, which opens the build images with Use as cover) on top; the name once, then one line with the status chip (the Shared eye inside it) and the stage words; the description (3 lines, Show more) or Add a description; the lock line as a row to the sale; a newer version's notice with Review version n.
+- **Products** is the page's main content: the line, the Build check, every product up to 5 (else 3 + All n products), a chat's product in progress, Add a product last. Then the description tip (slim, ✕ Not now), the hub rows Activity (Now: …) · Media (the project video's state) · Versions (version · saved) · Team · Network, About (Created, Parts, Stored) and Recent.
+- **Screens at the old tab addresses:** `?tab=products` (Search + Sort from 6, Add a product in the bar), `?tab=media` (the project video's action in the bar; Takes and What's in this video as sheets; product videos as whole-row taps), `?tab=activity` (Add new activity in the bar); each has Back to the page, which comes back where it was scrolled.
+- **Bottom bar:** Publish + Earn while the project can be published; once it's out, the live fact ("Listed", "Sold 40%") beside Earn as the primary.
+- **Team, Versions, reviews:** Team conversation, Splits and each chat are rows; Message is a 44 px icon button; the project video review keeps one primary (Use this video) with Make another take · Change scenes · Decide later as rows.
+
+### Earn: hub, Money, Business plan, video
+
+- **Earn** (`/m/projects/<id>/earn`) is a hub, not tabs: the top bar "Earn" (it takes the project's name once the large title scrolls away; ⋯ = Preview as others see it, Sell copies of a product), the name with the status pill and the lock line, then the summary, the rows Sell · Business plan · Money (each with its live line) and the state's one action in the bottom bar.
+- A row pushes its section in place (`/earn/sell`, `/earn/plan`, `/earn/money`, pushState: no fetch, Back returns to the hub); a link or reload opens that address directly with Back to the hub; `#copies`, `#splits`, `#customers`, `#rights` are scrolled to.
+- Overview summary: once live, "You're selling / Given away / Sold", the state with ⓘ, Earned large, Price · Copies sold · Bought by; the finished checklist folds into one row. Before that, the checklist is the summary; the step's action waits in the bottom bar with "Unlocks when the steps above are done." and a press brings the next fix into view.
+- Business plan: kit empty / error states, the run row (tap = Show progress), the Version row, Jump to section, ⋯ in the top bar; the foot holds Generate business plan / Try again / Stop writing / Continue writing + Start over / Print or save as PDF.
+- Money: Your earnings first (coins large, dollars at demo rates, Withdraw in Get paid row), then Splits, Sales and Rights as grouped lists with ⓘ; adding is each list's last row.
+- Product video: the review's and Your clip's primary sit in the bottom bar; "What's in this video" opens a sheet; Back is the form's Cancel.
+
+### Earn: Sell, listing, mint
+
+- **Sell** (`/earn/sell`):
+  - "Whole project" with ⓘ What you can sell, then the Main NFT, Physical and Virtual rows, each with its live state (green while on sale). Then "One product at a time" (`#copies`), one group per product. Before the mint, the copies fold into one line.
+  - A row opens what's next: the mint (not minted), the item's screen, or the Sell copies sheet (nothing made yet).
+- **Main NFT screen** (tap the row once minted):
+  - the summary (the price large, 3 facts, All details, "Selling the Main NFT sells the project."), and "Before you can list" as a state card;
+  - rows: Activity, Bidding History, Mint details (a sheet), View on marketplace, then Edit listing and Remove listing;
+  - one BottomBar primary: Sell, Close auction or Relist.
+- **Copies screen**:
+  - one card per use: On the marketplace, the price, the price with future updates, Copies sold, Royalties; ⋯ opens Edit, Add copies and Remove listing;
+  - Activity;
+  - one BottomBar primary: Add to marketplace or Sell … copies too.
+- **Listing terms** (Add to marketplace, Edit listing, mint Details):
+  - what the mint fixed is one read-only list ("Set when it was minted.");
+  - the price sits with its Token;
+  - More options holds Minting type, Royalties and Holder benefits, and opens itself on an error;
+  - the submit is the BottomBar's one primary.
+- **Mint**:
+  - the web's four steps, never more;
+  - a step bar, "Step n of m · step", and the title with ⓘ;
+  - one full-width primary with "… · Saved as you go"; Back is the top bar's;
+  - Review leads with a summary card;
+  - Done shows the ownership proof as a receipt card, then rows.
+- **NFT activity**: an Activity row on each NFT screen. The history's primary is Add activity, and none yet is the kit's empty state.
+
+### Product
+
+- **Product page (owner)** is one scroll, media first: the take in use (muted, looping, Pause/Play) or the concept image of the version on screen (full-screen viewer); one header (name, "{project} · AI build · {date}", lock line, description); then Build, Media, Activity and Specs as list cards. The name moves into the top bar once the title scrolls away; ⋯ is the M12 action sheet (Rename, Open chat, Preview as others see it, Preview as a contributor, See it on the marketplace).
+- **Build section:** "n of N pieces ready" beside the heading and its ⓘ (the seed caption, "View only on a phone", the computer note); the piece rows (create flow icons, Ready · Failed · Building with its bar · Waiting · Not built with + Add) and Add the rest; Build check (See why while a Draft), Version (more than one), Downloads (sheet).
+- **Media** is a row (video status, image count) opening `…/media`: the review strip, the player or render state, What's in this video, Takes, Images, and Generate AI video / Regenerate in the Bottom bar. Buyers keep Media as a tab.
+- **Activity:** + beside the heading, the newest entry, History (n), NFT activity (Earn › Sell, n on sale). The history screen has one line under the bar and Add New Activity in the Bottom bar.
+- **Piece screens:** failed, waiting, building and not built are the kit's clean states with their one action in the Bottom bar (Rebuild this piece + Open chat; Add pieces); a ready piece's file is the bar's primary. Parts lead with the Summary grid and list each part as a row; Pin to pin is a row per wire.
+- **Buyer side** (`?view=market` / previews): the same hero and header, the Testnet banner under the header, tabs Media · Overview · Build · Contributors; the Marketplace block lists each copy as a row (no inner tab strip).
+
+### Feed screens
+
+- Search starts with Recent searches, then Browse (a row per kind that lists all of it) and a Search history row (On / Off → Settings › Data › Search history); typing puts "See all results for …" first.
+- Search results: All plus the eight kind chips; people are rows with Follow at the end, posts a two-column grid of covers (♥ · comments · views on the picture, ⋯ the clip's menu), projects, parts, blogs, settings and help list rows, marketplace items product rows with the price and Buy now / View Auction; each group's heading has View all.
+- Notifications are rows: the whole row opens the notice and marks it read; the kind's icon (a dot while unread), "tag · time", the title, two lines of body, the notice's small button(s), ⋮.
+- Saved: Saved · Appreciated tabs with counts, no heading over the list. Marketplace activity: 7 / 30 / 90 day tabs, the week's average price and volume as two figures, compact sale rows that open a sale sheet (ID, from, to, quantity, View project / View sale).
+- Comments composer is one growing line with Link · Image · @ and Post inside the box; Share to your Feed shows the clip being shared; the ⋯ rows show the current speed and quality.
+- AR/VR mode: a slim ⓘ line over the stage says why there is nothing to place (its sheet has the detail), View in AR at the foot; the blog reader leads with the cover. The build bar and render tray dock under the Feed's top nav.
+
+### Messages and account
+
+- **Messages** rows read as a chat app's: the name with its relation badge and the time on one line, the subject, then the last line with the unread count (the time and the last line stand out while unread); rows run edge to edge with an inset line and darken while pressed.
+- **Requests**: quiet mode ("You're taking a break until …", opens the break setting) and hidden words (Show / Hide again, Hidden words) are rows under the list.
+- **A thread**: the top bar shows the avatar, the name and how they stand to it (a team: "Team" over its size; tap for the profile or Members); the subject is pinned under it as one bar (cover, name, how it started, chevron), folding to the name while you read back; the safety line is a centred system note.
+- **Request bar**: one sentence with ⓘ (what Replying and Accept do), then Block · Delete · Accept.
+- **Where did you hear about IDEEZA?** is one header over six full-width rows; **Welcome map** shows the free credits as a fact tile and the five stages as a timeline.
+
+### Profile
+
+- **Profile hub**: a tab root (no Back) laid out as grouped inset lists: your card (photo, name, headline, @handle · View profile, level and XP, chevron), then Wallet · Refer and Earn · Plan & pricing, then Projects · Saved Items, then Settings opening in place inside its own card, then Sign out as a row. Every row that opens something has a chevron. General and Others are the same kind of list.
+- **A creator's profile**: the top bar takes the name once the large name scrolls away; one meta line (where · local time; with no location, since when); Open to and the tie as chips; the counts centred; "Building on IDEEZA since …" sits under the More about sheet's title. Your own: "Only you see this" is a small grouped list (public projects, private ones, You follow n, locked), and Edit profile is the bar's primary.
+- **Edit profile**: the picture block (cover, photo over its foot, Add/Change on each), then grouped rows (label over value) that open focused sheet editors: Name (with the English-letters name), Headline (Suggest from my work), About, Location, Open to, the skills sheets, one row per link (Remove link inside, Add link at the foot) and one per social account. Editors write the draft as you type; a link or account is checked when its sheet closes (Done stays open on an error); Save checks everything and reopens the first bad field; Back closes an open editor first; Discard changes? as before.
+- **Profile search**: See all / Show less is a row at the foot of Recent searches; "nothing yet" and "no results" are the kit's empty state (Clear search as its action).
+
+### Settings
+
+- Every Settings page, Sign-in & security included, is the kit's grouped rows: toggle on the right with one line of help, the value and chevron on rows that open something, destructive rows red and last.
+- Words that don't fit on a row sit behind an ⓘ (`InfoButton`, `SettingsGroup info`, `SettingsRow info` in `settings/kit.tsx`): What each notification covers, This phone / IDEEZA's server, the AI switches, Download, Restore, Blocked people, Blog reuse, Hidden words (top bar).
+- Account: the public profile is one row to Edit profile; Handle opens its editor, which also copies the profile link.
+- Sign-in & security: Sign out of all other devices is an action row in Your devices; Delete account the red row at the foot.
+- Notifications: "Set the low mark" is a row under Credits and plan; while push is blocked the Push row opens Allow notifications.
+- AI & your data: Keep this phone from clearing it opens a sheet with Ask.
+
+### Plans, Get paid, KYC, Help
+
+- Money screens lead with their figure (`plans/parts.tsx` `Hero`): Get paid's balance, Withdraw's amount, the credit balance, an invoice's total; explanations sit behind ⓘ (`InfoButton`, `InfoLine`) and the one primary is in the Bottom action bar.
+- Plan & pricing: plans and credit packs are pick-one lists (`RadioCard`); the picked plan's button (by relation) or "Purchase now · $x" sits in the tab's bar (`PlanFoot` portal); Compare plans and Pricing FAQs open in tall sheets; Billing is a hub of rows (Auto renewal, Benefits, AI credits, Payment method, Billing details, Downgrade, Cancel).
+- Get paid: balance (rates in ⓘ), one identity row, By project, Withdrawal methods (row → ⋮), Get paid in (row → pick sheet), tax as an info line; Withdraw money in the bar (Go to your projects before anything sells).
+- Checkout: the total and Connect wallet / Pay $x in the bar; Card and PayPal are an info line.
+- Payment method is one screen (no tabs): your Demo wallet with Pay with / Manage / Remove rows, then Card, PayPal and the real wallets as "Not available yet" rows.
+- KYC levels are one list; Level 2/3's Start KYC verification is in the bar. Contact support's mic replaces Send while the box is empty. Tutorials list categories as rows.
+
+### Earn Coin
+
+- **Earn Coin home** opens with the Current Balance. It shows the Available figure with its dollars and the Testnet demo badge, then Available · Staked · Ready to claim · Pending. When presale IDZ is ready, a claim line with Go to claim appears, and a Wallet balance row sits under them. Below that, "Ways to earn" holds four rows (Buy $IDZ Coin, Stake IDZ, Refer and Earn Coin, Watch and earn IDZ), each with a live line and a Ready badge. The full sentences are behind ⓘ.
+- **The three tabs** each open with a compact balance strip that leads to Wallet balance. Filters sit in one row of chips. Each tab's primary action is in the BottomBar: Buy $IDZ Coin, Stake IDZ, and on Refer & Earn, Generate Link → Claim all points (with why it's off) → Join the next campaign. Import IDZ token and the Demo controls are in ⋯.
+- **Records are rows; details are a tap away.** Tapping a purchase, referral or IDZ movement opens a sheet with every field. Each stake card leads to Stake detail, which shows the stake first, then All details, and has Withdraw and Claim All in the BottomBar.
+- **Presale**: the round comes first (badge, countdown, next price, total raised, end), then the form. Available + Max sit in the You pay box. Buy $IDZ, or Buy With Crypto + Don't have a wallet?, is in the BottomBar. Connect Wallet lists the wallets as rows.
+- **Wallet Balance**: the hero has the network chip, the claim line, the token address and the tiles Buy IDZ · Stake IDZ · Import IDZ. "About IDZ" is two rows (Buy credits with IDZ, My projects). The ledger is shown as rows.
+- **One testnet mark per screen**: the hero's badge, or a single test-tube line at the end of the screen.
+
+### AI tab
+
+- **Start**:
+  - the hero has one line ("Describe a device in plain words.") over the five piece chips;
+  - Start from an idea shows two-line chips (picture or sparkle, title, parts) right above the pinned Prompt Box, three at a time with Shuffle;
+  - out of credits, a slim row above the box says "Not enough credits for a concept." with Buy credits;
+  - every composer control is a 44 px target.
+- **The question**:
+  - the reading card folds once the question is asked;
+  - What should we build? is one grouped list (whole-row ticks, trash, "Always included"), with the web's note behind ⓘ and Continue / Start drawing in a foot that sticks to the screen's foot;
+  - Which project…? lists "+ Start a new project" (its name field under it) and the existing projects as pick rows in the sheet, with the decided products as a row back to the question.
+- **History**:
+  - each tab is one grouped list: thumb, title with its time, one line of prompt or pieces, then project and build count;
+  - a failed build has a "Steps · k of n ready" row (each failed step with Retry) and Try again.
+- **Network**:
+  - each link is a row (both ends' pictures, ends, how it connects or what's wrong, what travels) that opens Change link;
+  - Remove network is the card's last row;
+  - Change link is three rows (Protocol, Direction, What travels) with Save link, and Back to suggested for a changed link.
