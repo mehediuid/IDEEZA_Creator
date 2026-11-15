@@ -63,12 +63,15 @@ test("one Marketplace box: Main NFT / Physical NFT / Virtual NFT tabs, one panel
   assert.match(parts, /if \(tabs\.length < 2\)/, "a lone tab is a chip");
 });
 
-test("a copy tab is the same buy box: Use and Version as choices with their counts and prices, one Buy now", () => {
+test("a copy tab is the same buy box: Use as a choice with its counts, one price, no Version, one Buy now", () => {
   const panel = read(MARKET + "copy-panel.tsx");
   assert.match(panel, /helperLineOf\(kind, scopeName\)/);
   assert.match(panel, /\{offers\.length > 1 && \(\s*<Choice\s+legend="Use"/, "a choice only when both uses are on sale");
-  assert.match(panel, /\{!oneTier && \(\s*<Choice\s+legend="Version"/, "a choice only when the prices differ");
-  assert.match(panel, /aside: priceOf\(t\)/, "each version shows its price before Buy");
+  // Owner, 2026-11-15: "this won't be there" — no Version choice; the copy sells at its listing's Price.
+  assert.doesNotMatch(panel, /legend="Version"/);
+  assert.doesNotMatch(panel, /TIER_WORD|TIER_HELP/, "no version word anywhere in the tab");
+  assert.match(panel, /const price = formatAmount\(track\.listing\.regular, track\.listing\.token\);/);
+  assert.match(panel, /useEditionPurchase\(\{ project, view, buyerId, versionless: true \}\)/, "the wallet and the done line name no version");
   assert.match(panel, /<OfferTop/);
   assert.match(panel, /hierarchy="primary"/);
   assert.match(panel, />\s*Buy now\s*</);

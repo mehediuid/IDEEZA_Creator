@@ -11,8 +11,8 @@
 // - what this kind gets you, said once (helperLineOf, the product page's line);
 // - Use (Personal use / Business use), a choice only when both are on sale,
 //   each with its sold count — a sold-out use stays, marked, and can't be bought;
-// - Version (This version / With future updates), each with its price, a
-//   choice only when the two prices differ, the picked one's meaning under it;
+// - no Version choice (owner, 2026-11-15: "this won't be there"): the copy
+//   sells at its listing's Price, the one price the Sell flow asks for;
 // - the picked offer as the overline, its price large, the sold count under it;
 // - one Buy now (the tab's one violet — one tab shows at a time), then the
 //   wallet line; while every unit left is in another tab's checkout, Buy waits,
@@ -32,7 +32,7 @@ import type { ProjectView } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import { checkoutBlocks, IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
 import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
-import { editionChainOf, TIER_HELP, trackCardOf, tracksOf } from "@/lib/market/editions";
+import { editionChainOf, trackCardOf, tracksOf } from "@/lib/market/editions";
 import { KIND_LABEL, USE_LABEL } from "@/lib/market/sell-flow";
 import type { EditionKind, EditionTrack, EditionUse, Listing, Sale } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
@@ -41,11 +41,10 @@ import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
 import { FactGrid, MoreFacts, OfferTop, WalletLine } from "./offer-parts";
-import { TIER_WORD, useEditionPurchase, type EditionTier } from "./purchase-dialog";
+import { useEditionPurchase, type EditionTier } from "./purchase-dialog";
 
 const KINDS: EditionKind[] = ["physical", "virtual"];
 const USES: EditionUse[] = ["private", "commercial"];
-const TIERS: EditionTier[] = ["regular", "extended"];
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
 
@@ -96,15 +95,15 @@ export function CopyPanel({
   const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
   const firstOpen = offers.find((t) => !trackCardOf(t, view.sales).soldOut) ?? offers[0];
   const [pickedUse, setPickedUse] = React.useState<string | null>(null);
-  const [pickedTier, setPickedTier] = React.useState<EditionTier>("regular");
   const main: Listing | null = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, null);
   if (!firstOpen || !chain) return null;
   const track = offers.find((t) => t.id === pickedUse) ?? firstOpen;
   const card = trackCardOf(track, view.sales);
-  const oneTier = track.listing.regular === track.listing.extended;
-  const tier: EditionTier = oneTier ? "extended" : pickedTier;
-  const priceOf = (t: EditionTier) => formatAmount(t === "regular" ? track.listing.regular : track.listing.extended, track.listing.token);
+  // The listing's Price. Where the Sell flow's "Price with future updates" was left empty (the same
+  // price), the updates come with it, as before.
+  const tier: EditionTier = track.listing.regular === track.listing.extended ? "extended" : "regular";
+  const price = formatAmount(track.listing.regular, track.listing.token);
   const owned = buyerId ? view.sales.filter((s) => s.buyerId === buyerId && s.item.nft !== "main" && s.item.trackId === track.id).length : 0;
   const name = `${KIND_LABEL[kind]} · ${USE_LABEL[track.use]}`;
 
@@ -126,19 +125,9 @@ export function CopyPanel({
         />
       )}
 
-      {!oneTier && (
-        <Choice
-          legend="Version"
-          value={tier}
-          onChange={(v) => setPickedTier(v as EditionTier)}
-          options={TIERS.map((t) => ({ value: t, label: TIER_WORD[t], aside: priceOf(t) }))}
-          note={TIER_HELP[tier]}
-        />
-      )}
-
       <OfferTop
-        overline={oneTier ? name : `${name} · ${TIER_WORD[tier]}`}
-        price={priceOf(tier)}
+        overline={name}
+        price={price}
         sub={
           <span className="tabular-nums">
             {soldLineOf(card.sold, card.total)}
@@ -155,7 +144,7 @@ export function CopyPanel({
           buyerId={buyerId}
           track={track}
           tier={tier}
-          label={`Buy now: ${name}${oneTier ? "" : `, ${TIER_WORD[tier]}`}, ${priceOf(tier)}`}
+          label={`Buy now: ${name}, ${price}`}
           available={card.total - card.sold}
           announce={announce}
         />
@@ -181,19 +170,17 @@ export function CopyPanel({
   );
 }
 
-/** A choice as radio rows: each with its word and what stands beside it (a sold count, a price). */
+/** A choice as radio rows: each with its word and what stands beside it (a sold count). */
 function Choice({
   legend,
   value,
   onChange,
   options,
-  note,
 }: {
   legend: string;
   value: string;
   onChange: (value: string) => void;
   options: { value: string; label: string; aside: string }[];
-  note?: string;
 }) {
   const group = React.useId();
   return (
@@ -216,12 +203,11 @@ function Choice({
           </label>
         );
       })}
-      {note && <p className="m-0 text-sm text-text-tertiary">{note}</p>}
     </fieldset>
   );
 }
 
-/** The tab's one Buy now: the picked offer at the picked price, straight to the wallet. */
+/** The tab's one Buy now: the picked offer at its price, straight to the wallet. */
 function BuyCopy({
   project,
   view,
@@ -243,7 +229,7 @@ function BuyCopy({
   available: number;
   announce: (m: string) => void;
 }) {
-  const { busyId, buy } = useEditionPurchase({ project, view, buyerId });
+  const { busyId, buy } = useEditionPurchase({ project, view, buyerId, versionless: true });
   const holds = useCheckoutHolds();
   const heldId = React.useId();
   if (!can(viewer, "listing.buy", { ...view.canCtx, listingLive: true })) return null;

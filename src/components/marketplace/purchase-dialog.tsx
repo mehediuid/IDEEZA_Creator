@@ -254,12 +254,16 @@ export function useEditionPurchase({
   view,
   buyerId,
   request: askWallet,
+  versionless = false,
 }: {
   project: ManualProject;
   view: ProjectView;
   buyerId: DemoBuyerId;
   /** Another wallet surface's request (the phone's bottom sheet); the Demo wallet dialog's otherwise. */
   request?: WalletRequestApi["request"];
+  /** The buyer never picked a version (the web's Marketplace box, owner 2026-11-15): the wallet and the
+   *  done line don't name one. */
+  versionless?: boolean;
 }): { busyId: string | null; buy: (track: EditionTrack, tier: EditionTier) => Promise<string | null> } {
   const dialog = useWalletRequest();
   const request = askWallet ?? dialog.request;
@@ -283,7 +287,7 @@ export function useEditionPurchase({
       const productName = whole ? project.name : displayProductName(view.products.find((p) => p.id === track.productId)?.name ?? "");
       const what = `${USE_WORD[track.use]} ${KIND_WORD[track.kind]} NFT`;
       const serialNow = nextSerialOf(track.id, view.sales);
-      const doneLine = `${productName} · ${what} (${TIER_WORD[tier]}) was minted to ${name}'s demo wallet.`;
+      const doneLine = `${productName} · ${what}${versionless ? "" : ` (${TIER_WORD[tier]})`} was minted to ${name}'s demo wallet.`;
 
       const req: WalletRequest = {
         kind: "transaction",
@@ -294,7 +298,7 @@ export function useEditionPurchase({
         summary: [
           whole ? { label: "Project", value: `${project.name} · a copy, not the project` } : { label: "Product", value: `${productName} · ${project.name}` },
           { label: "NFT", value: `${KIND_WORD[track.kind]} NFT · ${USE_WORD[track.use]} · #${serialNow} of ${track.supply.total}` },
-          { label: "Tier", value: TIER_LINE[tier] },
+          ...(versionless ? [] : [{ label: "Tier", value: TIER_LINE[tier] }]),
           { label: "Token", value: "Minted on this sale (lazy mint)" },
           { label: "Paying from", value: `${name}'s demo wallet · ${shortAddress(buyerAddress)}` },
         ],
@@ -363,7 +367,7 @@ export function useEditionPurchase({
         setBusyId(null);
       }
     },
-    [request, appendSale, project, view, buyerId],
+    [request, appendSale, project, view, buyerId, versionless],
   );
 
   return { busyId, buy };
