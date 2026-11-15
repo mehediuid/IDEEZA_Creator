@@ -15,8 +15,10 @@
 //   Generate video · Regenerate storyboard (asks first once a scene was
 //   edited, 11z).
 // · render (11g): "Take n · Stage i of 5 · …", the progress, Notify me when
-//   it's ready; Close (it keeps rendering, the tray follows you) · Cancel
-//   render (asks first, 11y).
+//   it's ready; Cancel render (asks first, 11y) · Close in one row. Close
+//   (and Back) go back to where the maker came from, which opens what it
+//   had open (nav-trail useBackState: the Sell gate, a sheet); the render
+//   keeps going and the tray follows.
 // · review (11b, `?review=<takeId>`): Use this video at the foot, the web's
 //   other choices as rows; a clip this phone recorded or uploaded reviews as
 //   11d (Use this clip at the foot).
@@ -393,15 +395,16 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
         <p className={cn(T.meta, "text-text-tertiary")}>{honestyLine(target.productName)}</p>
       </div>
     );
+    // One row (owner 2026-11-15): Close goes back to where the maker came from, the render goes on.
     footer = (
-      <>
-        <Button size="xl" className="w-full" onClick={leave}>
-          Close
-        </Button>
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setConfirmCancel(true)}>
+      <div className="flex gap-4">
+        <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" onClick={() => setConfirmCancel(true)}>
           Cancel render
         </Button>
-      </>
+        <Button size="xl" className="min-w-0 flex-1" onClick={leave}>
+          Close
+        </Button>
+      </div>
     );
   } else if (view === "review" && take) {
     title = "Review the video";
@@ -453,14 +456,14 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     const kind = take?.failure?.kind ?? "interrupted";
     body = <Banner tone="error">{FAILURE_COPY[kind]}</Banner>;
     footer = (
-      <>
-        <Button size="xl" className="w-full" onClick={() => toForm(take)}>
-          Try again
-        </Button>
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={leave}>
+      <div className="flex gap-4">
+        <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" onClick={leave}>
           Close
         </Button>
-      </>
+        <Button size="xl" className="min-w-0 flex-1" onClick={() => toForm(take)}>
+          Try again
+        </Button>
+      </div>
     );
   }
 

@@ -38,7 +38,11 @@ function write(trail: string[]): void {
 const here = () => window.location.pathname + window.location.search;
 const inApp = (path: string) => path === "/m" || path.startsWith("/m/") || path.startsWith("/m?");
 
+/** How this screen was reached: Back (or Forward) restores what it had open; anything else starts clean. */
+let lastMove: "load" | "push" | "pop" = "load";
+
 function pushed(path: string) {
+  lastMove = "push";
   const t = read();
   if (t[t.length - 1] !== path) write([...t, path]);
 }
@@ -49,6 +53,7 @@ function replaced(path: string) {
 }
 
 function popped(path: string) {
+  lastMove = "pop";
   const t = read();
   if (t[t.length - 2] === path) return write(t.slice(0, -1));
   const at = t.lastIndexOf(path);
@@ -90,8 +95,54 @@ export function useNavTrail(): void {
     window.addEventListener("popstate", () => {
       if (inApp(here())) popped(here());
     });
+    // The Navigation API says what kind of move it is before the router reacts (popstate can come
+    // after the new screen has mounted), so a screen reached by Back knows it at once.
+    const nav = (window as Window & { navigation?: EventTarget }).navigation;
+    nav?.addEventListener("navigate", (e) => {
+      const kind = (e as Event & { navigationType?: string }).navigationType;
+      if (kind === "traverse") lastMove = "pop";
+      else if (kind === "push") lastMove = "push";
+    });
     // Installed for the life of the page: Next.js wraps these too, and unwrapping would drop its layer.
   }, []);
+}
+
+const UI_KEY = "ideeza:m:open:";
+
+/**
+ * What a screen has open (a layer, a sheet), kept across a trip away and back, as a phone app
+ * keeps its stack (owner 2026-11-15: Close on Generate video lost the Add to marketplace sheet the
+ * maker came from). Starts at `initial`; once the screen mounts it takes back what it had open if
+ * it was reached by Back, and forgets it otherwise. Remembered per path, in this tab only. `key`
+ * is unique within the screen; the value is plain data (JSON).
+ */
+export function useBackState<T>(key: string, initial: T): [T, (value: T) => void] {
+  const [value, setValue] = React.useState<T>(initial);
+  const store = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const id = `${UI_KEY}${window.location.pathname}:${key}`;
+    store.current = id;
+    try {
+      const raw = sessionStorage.getItem(id);
+      // Restoring what this screen had open when it was left: a one-time sync from storage.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (lastMove === "pop" && raw !== null) setValue(JSON.parse(raw) as T);
+      else sessionStorage.removeItem(id);
+    } catch {
+      // Storage refused: the screen opens clean, as before.
+    }
+  }, [key]);
+  const set = React.useCallback((next: T) => {
+    setValue(next);
+    const id = store.current;
+    if (!id) return;
+    try {
+      sessionStorage.setItem(id, JSON.stringify(next));
+    } catch {
+      // Storage refused: nothing to restore on the way back.
+    }
+  }, []);
+  return [value, set];
 }
 
 /** True when the previous history entry is a screen of this app. */

@@ -68,6 +68,7 @@ import { OfflineBanner } from "../kit/states";
 import { Screen } from "../screen";
 import { MORE_ICON, TopBar } from "../top-bar";
 import { PRESSED, PRESSED_DIM } from "../kit/press";
+import { useBackState } from "../nav-trail";
 import { T } from "../type";
 import { ActivityBar, ActivityTab } from "./activity-tab";
 import { ProjectProvider, useProject, type ProjectSheet, type Ready } from "./context";
@@ -143,7 +144,8 @@ function ProjectReady({ data }: { data: Ready }) {
   const raw = params.get("tab");
   const view = (SUB_VIEWS as readonly string[]).includes(raw ?? "") ? (raw as SubView) : null;
   const gate = usePhoneWriteGate(project.id);
-  const [sheet, setSheet] = React.useState<ProjectSheet | null>(null);
+  // A sheet that sent the maker away (Publish's video readiness → a product) is open again on Back.
+  const [sheet, setSheet] = useBackState<ProjectSheet | null>("project-sheet", null);
   const ctx = { ...data, gate, open: setSheet };
   return (
     <ProjectProvider value={ctx}>

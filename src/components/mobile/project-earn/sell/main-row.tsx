@@ -95,6 +95,7 @@ import {
   SummaryCard,
   type SummaryFact,
 } from "./parts";
+import { useBackState } from "../../nav-trail";
 import { T } from "../../type";
 
 const LIST_HANDLED = ["videos", "ownership"] as const;
@@ -152,8 +153,10 @@ export function MainRow() {
   const main = useMainState();
   const { state, add, ready, steps, minted, blocked } = main;
   const firstStep = React.useCallback((): Open => (dialogBlockerOf(view.videos.readiness.sell) ? "gate" : "form"), [view.videos.readiness.sell]);
-  const [open, setOpen] = React.useState<Open>(() => (state.action === "list" && !blocked && search.get("list") === "1" ? firstStep() : null));
-  const [screen, setScreen] = React.useState(false);
+  // What was open (the Main NFT screen, the videos gate) comes back after a trip to a product's
+  // video and Back / Close (useBackState).
+  const [open, setOpen] = useBackState<Open>("sell-main-open", state.action === "list" && !blocked && search.get("list") === "1" ? firstStep() : null);
+  const [screen, setScreen] = useBackState("sell-main-screen", false);
   // A listing just written opens its screen.
   const [seen, setSeen] = React.useState(view.listing.kind);
   if (seen !== view.listing.kind) {
@@ -366,7 +369,7 @@ function useRelist(listing: Listing | null) {
   }, [projects, jobs]);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [gate, setGate] = React.useState(false);
+  const [gate, setGate] = useBackState("sell-relist-gate", false);
   const changed = view.listing.kind === "paused" ? view.listing.changed : [];
   const items = relistChecklist(view.videos.readiness.relist, changed);
   const ready = items.every((i) => i.ok);

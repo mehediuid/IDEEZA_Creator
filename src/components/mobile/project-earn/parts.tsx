@@ -45,6 +45,7 @@ import { LIST_CARD, LIST_ROW, ListCard } from "../kit/list";
 import type { TopBarAction } from "../top-bar";
 import { useEarn } from "./context";
 import { MakeVideosSheet } from "./sell/parts";
+import { useBackState } from "../nav-trail";
 import { T } from "../type";
 
 export const EARN_CARD = cn(LIST_CARD, "gap-6 p-8");
@@ -198,7 +199,7 @@ export function StepFix({ step, projectId, license, announce, describedBy }: Fix
   const { setOwnerConfirmed } = useManualProjects();
   const toast = useToast();
   const pathname = usePathname();
-  const [sheet, setSheet] = React.useState<"license" | "videos" | null>(null);
+  const [sheet, setSheet] = useBackState<"license" | "videos" | null>(`stepfix-${step.fix.kind}`, null);
   const label = step.fix.label;
   const said = (m: string) => {
     toast({ title: m });

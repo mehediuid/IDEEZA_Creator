@@ -331,3 +331,8 @@ Owner: "the mobile app must work the way mobile UX works, not the web made respo
 - The footer is tighter (less padding above and below the button), and a sheet's body never squeezes a card: it scrolls.
 - What a sheet needs is said once: "every product needs an AI video" is the sheet's description, not a banner plus a footer line.
 
+### Back keeps what was open (owner 2026-11-15)
+
+- A screen that sends you away from a layer or a sheet (Sell's Main NFT screen and its "Add to marketplace" videos sheet, a Copies screen, a step's Make videos sheet, the project page's Publish readiness) opens it again when you come back with Back or Close (`useBackState` in `nav-trail.ts`, remembered per path in this tab). Arriving any other way opens the screen clean.
+- Generate video's render view: Cancel render · Close in one row; Close goes back to where you came from while the render goes on. A failed take: Close · Try again in one row.
+

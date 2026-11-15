@@ -57,6 +57,7 @@ import { NftActivityRow } from "./nft-activity";
 import { CheckRow, FullLayer, KIND_ICON, PrimaryBar, ROWS_CARD, SellListRow, SUB, SummaryCard } from "./parts";
 import { SellCopiesSheet, type CopyScope } from "./sell-copies";
 import { cn } from "@/lib/utils";
+import { useBackState } from "../../nav-trail";
 import { T } from "../../type";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
@@ -65,8 +66,8 @@ type Dialog = { kind: "edit"; track: Listed } | { kind: "add"; track: EditionTra
 export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }) {
   const { project, view, viewer, brief, announce } = useEarn();
   const toast = useToast();
-  const [sell, setSell] = React.useState<{ use: EditionUse | null } | null>(null);
-  const [screen, setScreen] = React.useState(false);
+  const [sell, setSell] = useBackState<{ use: EditionUse | null } | null>(`copies-sell-${scope.id}-${kind}`, null);
+  const [screen, setScreen] = useBackState(`copies-screen-${scope.id}-${kind}`, false);
   const main = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, view.mint.status === "legacy" && brief ? brief.state : null);
   const status = view.summary.status;
