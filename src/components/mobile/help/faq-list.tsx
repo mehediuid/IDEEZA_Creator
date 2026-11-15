@@ -46,7 +46,7 @@ export function FaqList<F extends FaqEntry>({
                 aria-expanded={on}
                 aria-controls={panel}
                 onClick={() => onToggle(f.id)}
-                className="flex min-h-[56px] w-full items-center gap-5 px-8 py-5 text-left outline-none focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+                className="flex min-h-[56px] w-full items-center gap-5 px-8 py-5 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus active:bg-bg-subtle"
               >
                 {numbered && (
                   <span aria-hidden className={cn(T.micro, "inline-flex h-[24px] min-w-[28px] shrink-0 items-center justify-center rounded-full bg-bg-subtle tabular-nums")}>

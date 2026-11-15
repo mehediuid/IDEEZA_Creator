@@ -32,8 +32,8 @@ import {
   Shield01Icon,
   ShieldUserIcon,
   UserIdVerificationIcon,
-  ArrowRight01Icon,
   Camera01Icon,
+  RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
@@ -54,6 +54,7 @@ import { cn } from "@/lib/utils";
 import { CodeCells } from "../kit/code-cells";
 import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { ActionSheet, Sheet } from "../kit/sheet";
 import { NotFoundState } from "../kit/state";
 import { OfflineBanner, useOnline } from "../kit/states";
@@ -63,7 +64,7 @@ import { Screen } from "../screen";
 import { T } from "../type";
 import { DIAL_CODES, flagOf } from "./dial-codes";
 import { LEVEL_NEEDS, SAVE_FAILED } from "./get-paid-screen";
-import { BulletList, CARD, OFFLINE_REASON, SearchSelectField, dateOf, n } from "./parts";
+import { BulletList, OFFLINE_REASON, SearchSelectField, dateOf, n } from "./parts";
 
 const STATUS_BADGE: Record<LevelStatus, { tone: "neutral" | "warning" | "error" | "success"; label: string }> = {
   none: { tone: "neutral", label: "Not submitted" },
@@ -102,42 +103,40 @@ export function KycScreen() {
       ) : (
         <div className="flex flex-col gap-8">
           <OfflineBanner />
-          {LEVELS.map((l) => {
-            const status: LevelStatus = l.n === 1 ? (kyc ? "approved" : "none") : levelStatusOf(levels, levelOf(l.n));
-            const block = l.n === 1 ? null : startBlockOf(levels, levelOf(l.n), !!kyc);
-            const locked = l.n > 1 && status === "none" && !!block;
-            const badge = STATUS_BADGE[status];
-            return (
-              <section key={l.n} aria-labelledby={`level-${l.n}`} className="flex flex-col gap-4">
-                <h2 id={`level-${l.n}`} className={T.section}>
-                  Verification level {l.n}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => router.push(`/m/settings/kyc/${l.n}`)}
-                  aria-describedby={locked ? `level-${l.n}-why` : undefined}
-                  className={cn(CARD, "flex w-full items-start gap-5 p-7 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
-                >
-                  <LevelMark icon={l.icon} />
-                  <span className="flex min-w-0 flex-1 flex-col gap-2">
-                    <span className="flex items-start justify-between gap-4">
-                      <span className={T.rowTitle}>{l.title}</span>
-                      <Badge tone={badge.tone}>{badge.label}</Badge>
-                    </span>
-                    <span className={T.meta}>{l.line}</span>
-                    {locked && (
-                      <span id={`level-${l.n}-why`} className={cn(T.meta, "text-text-tertiary")}>
-                        {block}
+          <ul aria-label="Verification levels" className={cn(LIST_CARD, LIST_DIVIDERS)}>
+            {LEVELS.map((l) => {
+              const status: LevelStatus = l.n === 1 ? (kyc ? "approved" : "none") : levelStatusOf(levels, levelOf(l.n));
+              const block = l.n === 1 ? null : startBlockOf(levels, levelOf(l.n), !!kyc);
+              const locked = l.n > 1 && status === "none" && !!block;
+              const badge = STATUS_BADGE[status];
+              return (
+                <li key={l.n}>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/m/settings/kyc/${l.n}`)}
+                    aria-describedby={locked ? `level-${l.n}-why` : undefined}
+                    className={cn(LIST_ROW, "items-start active:bg-bg-subtle")}
+                  >
+                    <LevelMark icon={l.icon} />
+                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className={T.meta}>Verification level {l.n}</span>
+                      <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span className={T.rowTitle}>{l.title}</span>
+                        <Badge tone={badge.tone}>{badge.label}</Badge>
                       </span>
-                    )}
-                  </span>
-                  <span aria-hidden className="self-center text-[color:var(--color-icon-default)]">
-                    <Icon icon={ArrowRight01Icon} size={24} />
-                  </span>
-                </button>
-              </section>
-            );
-          })}
+                      <span className={T.meta}>{l.line}</span>
+                      {locked && (
+                        <span id={`level-${l.n}-why`} className={cn(T.meta, "text-text-tertiary")}>
+                          {block}
+                        </span>
+                      )}
+                    </span>
+                    <Chevron className="self-center" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
           <p className={cn(T.meta, "flex flex-wrap items-center gap-3")}>
             <TestnetDemoBadge />
             Nothing is checked, sent or limited in this demo.
@@ -207,20 +206,20 @@ function LevelOne() {
   if (kyc)
     return (
       <Screen top={<TopBar back="/m/settings/kyc" title="KYC verification" />} className="px-8 pb-12 pt-4">
-        <div className="flex flex-col gap-8">
-          <div className={cn(CARD, "flex items-start gap-5 p-7")}>
-            <LevelMark icon={UserIdVerificationIcon} />
-            <span className="flex flex-1 flex-col gap-2">
-              <span className="flex items-start justify-between gap-4">
-                <span className={T.rowTitle}>Verify your identity</span>
-                <Badge tone="success">Approved</Badge>
-              </span>
-              <span className={T.meta}>Verified on {dateOf(kyc.at)} (Testnet demo). The check keeps only that you verified, and when.</span>
+        <div className="flex flex-col gap-10">
+          <section aria-label="Verify your identity" className="flex flex-col items-center gap-4 pt-6 text-center">
+            <span aria-hidden className="inline-flex size-[64px] items-center justify-center rounded-full bg-bg-success-subtle text-text-success">
+              <Icon icon={CheckmarkCircle02Icon} size={32} />
             </span>
-          </div>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => setResetting(true)}>
-            Reset verification
-          </Button>
+            <span className="flex flex-wrap items-center justify-center gap-4">
+              <h2 className={T.title}>Verify your identity</h2>
+              <Badge tone="success">Approved</Badge>
+            </span>
+            <p className={T.body}>Verified on {dateOf(kyc.at)} (Testnet demo). The check keeps only that you verified, and when.</p>
+          </section>
+          <ListCard label="Verification">
+            <ListRow icon={RefreshIcon} title="Reset verification" meta="Your next withdrawal asks you to verify again." danger onClick={() => setResetting(true)} />
+          </ListCard>
         </div>
         <ConfirmSheet
           open={resetting}
@@ -447,17 +446,13 @@ function LevelOneForm() {
     >
       <div className="flex flex-col gap-8">
         <OfflineBanner />
-        <div className={cn(CARD, "flex items-start gap-5 p-7")}>
-          <LevelMark icon={UserIdVerificationIcon} />
-          <span className="flex flex-1 flex-col gap-2">
-            <span className="flex items-start justify-between gap-4">
-              <span className={T.rowTitle}>Verify your identity</span>
-              <Badge tone="neutral">Not submitted</Badge>
-            </span>
-            <span className={T.meta}>Complete the required steps to withdraw and to sell physical copies.</span>
+        <header className="flex flex-col gap-2">
+          <span className="flex flex-wrap items-center gap-4">
+            <h2 className={T.title}>Verify your identity</h2>
+            <Badge tone="neutral">Not submitted</Badge>
           </span>
-        </div>
-        <h2 className={T.section}>Identity verification</h2>
+          <p className={T.body}>Complete the required steps to withdraw and to sell physical copies.</p>
+        </header>
         <Field label="Full legal name" htmlFor={ids.name.id} error={show("name")} errorId={ids.name.errorId}>
           <TextInput id={ids.name.id} size="xl" value={name} maxLength={KYC_NAME_MAX} onValueChange={setTyped} autoComplete="name" spellCheck={false} placeholder="Enter your full legal name" {...errorProps(show("name"), ids.name.errorId)} />
         </Field>
@@ -540,22 +535,35 @@ function HigherLevelScreen({ k }: { k: 2 | 3 }) {
         />
       }
       className="px-8 pb-12 pt-4"
+      footer={
+        status === "none" || status === "rejected" ? (
+          <BottomBar>
+            {(block || !online) && (
+              <p id="start-why" className={T.caption}>
+                {block ?? OFFLINE_REASON}
+              </p>
+            )}
+            <Button size="xl" className="w-full" disabled={!canStart || !online} aria-describedby={block || !online ? "start-why" : undefined} onClick={() => setDemo(true)}>
+              Start KYC verification
+              <Icon icon={LinkSquare02Icon} size={18} />
+            </Button>
+          </BottomBar>
+        ) : undefined
+      }
     >
       <div className="flex flex-col gap-8">
         <OfflineBanner />
-        <div className={cn(CARD, "flex items-start gap-5 p-7")}>
-          <LevelMark icon={meta.icon} />
-          <span className="flex flex-1 flex-col gap-2">
-            <span className="flex items-start justify-between gap-4">
-              <span className={T.rowTitle}>{title}</span>
-              <Badge tone={badge.tone}>{badge.label}</Badge>
-            </span>
-            <span className={T.meta}>
-              {meta.line}
-              {status === "approved" ? "" : k === 3 ? " Removes every transaction limit." : " Verification required to continue."}
-            </span>
+        <header className="flex flex-col gap-2">
+          <span className={T.meta}>Verification level {k}</span>
+          <span className="flex flex-wrap items-center gap-4">
+            <h2 className={T.title}>{title}</h2>
+            <Badge tone={badge.tone}>{badge.label}</Badge>
           </span>
-        </div>
+          <p className={T.body}>
+            {meta.line}
+            {status === "approved" ? "" : k === 3 ? " Removes every transaction limit." : " Verification required to continue."}
+          </p>
+        </header>
 
         {status === "review" && (
           <StatusBox tone="warning" icon={Clock01Icon} title="Verification under review">
@@ -578,17 +586,6 @@ function HigherLevelScreen({ k }: { k: 2 | 3 }) {
             <div className="flex flex-col gap-4">
               <p className={T.rowTitle}>What you’ll need:</p>
               <BulletList items={LEVEL_NEEDS[level]} />
-            </div>
-            <div className="flex flex-col gap-3">
-              <Button size="xl" className="w-full" disabled={!canStart || !online} aria-describedby={block || !online ? "start-why" : undefined} onClick={() => setDemo(true)}>
-                Start KYC verification
-                <Icon icon={LinkSquare02Icon} size={18} />
-              </Button>
-              {(block || !online) && (
-                <p id="start-why" className={T.caption}>
-                  {block ?? OFFLINE_REASON}
-                </p>
-              )}
             </div>
           </>
         )}

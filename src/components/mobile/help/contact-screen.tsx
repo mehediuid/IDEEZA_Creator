@@ -8,8 +8,9 @@
 // this browser). A message that didn't arrive says so and can be sent again;
 // after a reload its screenshots are gone (they are never stored), and it
 // says so before sending the words alone. The Figma's composer is kept:
-// the emoji button opens a sheet that types at the cursor, and the mic is
-// there but off with its reason, since the app sends no audio anywhere.
+// the emoji button opens a sheet that types at the cursor, and the mic sits
+// where Send is while the box is empty (as a phone's chat apps do), off: a
+// tap says why in a toast, since the app sends no audio anywhere.
 
 import * as React from "react";
 import { Cancel01Icon, Image01Icon, Mic01Icon, SentIcon, SmileIcon, Tick02Icon, TickDouble02Icon, Alert02Icon } from "@hugeicons/core-free-icons";
@@ -55,7 +56,6 @@ export function ContactScreen() {
   const [shots, setShots] = React.useState<Shot[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [emoji, setEmoji] = React.useState(false);
-  const [micWhy, setMicWhy] = React.useState(false);
   const boxRef = React.useRef<HTMLTextAreaElement>(null);
   const pending = React.useRef(new Map<string, Shot[]>());
   // The ids whose screenshots this page still holds (state, so render never reads the ref).
@@ -215,30 +215,27 @@ export function ContactScreen() {
                 }
               }}
             />
-            <button
-              type="button"
-              aria-label="Send"
-              disabled={busy || (!text.trim() && !shots.length)}
-              onClick={send}
-              className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-full bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:bg-bg-subtle disabled:text-text-disabled"
-            >
-              <Icon icon={SentIcon} size={20} />
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              aria-label="Record a voice message"
-              aria-disabled
-              aria-describedby="mic-why"
-              onClick={() => setMicWhy(true)}
-              className={cn(ICON_BTN, "text-[color:var(--color-icon-disabled)] hover:bg-transparent")}
-            >
-              <Icon icon={Mic01Icon} size={22} />
-            </button>
-            <p id="mic-why" className={cn(T.caption, "text-text-tertiary", micWhy && "text-text-secondary")}>
-              Voice messages aren’t available yet. Type or add a screenshot.
-            </p>
+            {!text.trim() && !shots.length ? (
+              <button
+                type="button"
+                aria-label="Record a voice message"
+                aria-disabled
+                onClick={() => toast({ title: "Voice messages aren’t available yet. Type or add a screenshot." })}
+                className={cn(ICON_BTN, "text-[color:var(--color-icon-disabled)] hover:bg-transparent")}
+              >
+                <Icon icon={Mic01Icon} size={22} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-label="Send"
+                disabled={busy}
+                onClick={send}
+                className="inline-flex size-[44px] shrink-0 items-center justify-center rounded-full bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] outline-none focus-visible:ring-2 focus-visible:ring-border-focus active:opacity-90 disabled:bg-bg-subtle disabled:text-text-disabled"
+              >
+                <Icon icon={SentIcon} size={20} />
+              </button>
+            )}
           </div>
         </div>
       }

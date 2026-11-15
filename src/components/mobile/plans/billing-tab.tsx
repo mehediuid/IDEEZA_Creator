@@ -1,18 +1,21 @@
 "use client";
 
-// Plan & pricing › Billing (mobile Figma "v2 · Billing History"): the
-// current plan (price, renewal or end, AI credits, how it is paid; the web's
-// Plan details — Auto renewal and the plan's benefits with what you use
-// against them; Downgrade plan and Cancel, or Keep when a change is waiting),
-// every payment as an invoice row (lib/account/invoices.ts: plan payments,
-// renewals marked Not charged, credit purchases; the web's search by order
-// ID and year), each opening its invoice, and the web's Billing details that
-// every invoice prints under "Billed to" (edited on /m/settings/billing).
+// Plan & pricing › Billing (mobile Figma "v2 · Billing History"), as a
+// hub: the current plan in one line (name, status, price and renewal or
+// end), then rows — Auto renewal, the web's Plan details (Benefits, with
+// what you use against them, in a sheet), AI credits, Payment method,
+// Billing details (what every invoice prints under "Billed to", edited on
+// /m/settings/billing), Downgrade plan or Switch to monthly, Cancel
+// subscription — or, while a change waits, Keep as the card's one button;
+// on Free, Upgrade now. Then every payment as an invoice row
+// (lib/account/invoices.ts: plan payments, renewals marked Not charged,
+// credit purchases; the web's search by order ID and year), each opening
+// its invoice.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckmarkCircle02Icon, Invoice03Icon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, ArrowDown02Icon, Cancel01Icon, CheckmarkCircle02Icon, CrownIcon, Invoice03Icon, RepeatIcon, Wallet02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
@@ -30,14 +33,15 @@ import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { PLANS, planOf, priceOf } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
-import { Chevron } from "../kit/list";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard, ListRow } from "../kit/list";
+import { Sheet } from "../kit/sheet";
 import { SheetSelect } from "../kit/sheet-select";
 import { EmptyState } from "../kit/state";
 import { ListBones } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { T } from "../type";
 import { CancelSheet } from "./cancel-sheet";
-import { CARD, HAIRLINE, LINK, Row, dateOf, downgradePath, invoicePath, n } from "./parts";
+import { CARD, dateOf, downgradePath, invoicePath, n } from "./parts";
 
 const PER_PAGE = 10;
 const ALL = "all";
@@ -105,13 +109,13 @@ export function BillingTab() {
                 action={{ label: "Clear filters", onClick: clear }}
               />
             ) : (
-              <ul className="flex flex-col gap-4">
+              <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
                 {shown.slice(0, count).map((inv) => (
                   <li key={inv.id}>
                     <Link
                       href={invoicePath(inv.id)}
                       aria-label={`${inv.item}, ${dateOf(inv.ts)}, ${usd(inv.total)}, ${inv.status}, ${inv.paidWith}. Open the invoice`}
-                      className={cn(CARD, "flex items-center justify-between gap-6 px-7 py-6 outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+                      className={cn(LIST_ROW, "justify-between active:bg-bg-subtle")}
                     >
                       <span className="flex min-w-0 flex-col gap-1">
                         <span className={cn(T.rowTitle, "truncate")}>{inv.item}</span>
@@ -124,6 +128,7 @@ export function BillingTab() {
                         <span className={cn(T.rowTitle, "tabular-nums")}>{usd(inv.total)}</span>
                         <Badge tone={inv.status === "Paid" ? "success" : "neutral"}>{inv.status}</Badge>
                       </span>
+                      <Chevron />
                     </Link>
                   </li>
                 ))}
@@ -137,39 +142,7 @@ export function BillingTab() {
           </>
         )}
       </section>
-      <BillingDetails />
     </div>
-  );
-}
-
-/** The web's Billing details: what every invoice prints under "Billed to". */
-function BillingDetails() {
-  const d = useBillingDetails();
-  const rows = [
-    { label: "Name or company", value: d.name },
-    { label: "Tax ID (VAT / GST / EIN)", value: d.taxId },
-    { label: "Address", value: d.address },
-    { label: "Billing email", value: d.email },
-  ];
-  return (
-    <section id="billing-details" aria-labelledby="billing-details-title" className={cn(CARD, "flex scroll-mt-8 flex-col gap-4 p-8")}>
-      <div className="flex items-start justify-between gap-6">
-        <h2 id="billing-details-title" className={T.section}>
-          Billing details
-        </h2>
-        <Link href="/m/settings/billing" aria-label="Edit billing details" className={cn(LINK, "-my-4 inline-flex min-h-[44px] items-center")}>
-          Edit
-        </Link>
-      </div>
-      <p className={T.meta}>Printed under “Billed to” on every invoice. Without a name here, invoices use your legal name from Settings › Account, else your profile name.</p>
-      <dl className="flex flex-col">
-        {rows.map((r) => (
-          <Row key={r.label} label={r.label}>
-            {r.value ? <span className="whitespace-pre-line">{r.value}</span> : <span className="text-text-tertiary">Not set</span>}
-          </Row>
-        ))}
-      </dl>
-    </section>
   );
 }
 
@@ -179,20 +152,16 @@ function CurrentPlan() {
   const usage = usePlanUsage();
   const wallet = useWalletStatus();
   const token = useDefaultToken();
+  const details = useBillingDetails();
   const toast = useToast();
   const [cancelling, setCancelling] = React.useState(false);
+  const [benefitsOpen, setBenefitsOpen] = React.useState(false);
   const paid = sub.renewsAt !== null;
   const per = priceOf(sub.tier, sub.cycle);
   const when = sub.renewsAt ? dateOf(sub.renewsAt) : "";
   const pending = sub.pending;
   const cancelled = pending?.tier === "free";
-  const status = !paid
-    ? { tone: "success" as const, label: "Active" }
-    : !pending
-      ? { tone: "success" as const, label: "Active" }
-      : pending.tier === "free"
-        ? { tone: "warning" as const, label: `Ends ${when}` }
-        : { tone: "warning" as const, label: `Changes ${when}` };
+  const status = !paid || !pending ? { tone: "success" as const, label: "Active" } : pending.tier === "free" ? { tone: "warning" as const, label: `Ends ${when}` } : { tone: "warning" as const, label: `Changes ${when}` };
   const smaller = PLANS.filter((p) => p.monthly > 0 && p.monthly < plan.monthly);
   const down = smaller[smaller.length - 1] ?? null;
   const benefits: { label: string; meter?: { used: number; amount: number; verb: string } }[] = [
@@ -203,57 +172,97 @@ function CurrentPlan() {
     { label: `Add ${n(plan.contributors)} contributors to a project`, meter: { used: usage.mostContributors, amount: plan.contributors, verb: "added" } },
     { label: "Mint, list and buy on the marketplace" },
   ];
+  const priceLine = paid ? `${usd(per.period)} / ${sub.cycle === "yearly" ? "year" : "month"}` : "$0.00 · for lifetime";
+  const dateLine = paid ? `${pending ? (pending.tier === "free" ? "Ends on" : "Changes on") : "Renews on"} ${when}` : null;
+  const billedTo = details.name || details.email;
   return (
-    <section aria-label="Current plan" className={cn(CARD, "flex flex-col gap-4 p-8")}>
-      <div className={cn(HAIRLINE, "flex items-start justify-between gap-4 border-b-[length:var(--border-width-1)] pb-6")}>
-        <div className="flex flex-col gap-1">
-          <span className={T.meta}>Current plan</span>
-          <span className={T.title}>{plan.tier === "free" ? "Free" : `${plan.name} · ${sub.cycle === "yearly" ? "Annual" : "Monthly"}`}</span>
+    <section aria-label="Current plan" className="flex flex-col gap-6">
+      <div className={cn(CARD, "flex flex-col gap-4 p-8")}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className={T.meta}>Current plan</span>
+            <span className={T.title}>{plan.tier === "free" ? "Free" : `${plan.name} · ${sub.cycle === "yearly" ? "Annual" : "Monthly"}`}</span>
+          </div>
+          <Badge tone={status.tone}>{status.label}</Badge>
         </div>
-        <Badge tone={status.tone}>{status.label}</Badge>
-      </div>
-      <dl className="flex flex-col">
-        <Row label="Price">
-          <span className="inline-flex flex-wrap items-center justify-end gap-3">
+        <div className="flex flex-col gap-1">
+          <p className={cn(T.body, "flex flex-wrap items-center gap-x-3 gap-y-2 tabular-nums text-text-primary")}>
             <TestnetDemoBadge />
-            {paid ? `${usd(per.period)} / ${sub.cycle === "yearly" ? "year" : "month"}` : "$0.00 · for lifetime"}
-          </span>
-        </Row>
-        {paid && <Row label={pending ? (pending.tier === "free" ? "Ends on" : "Changes on") : "Renews on"}>{when}</Row>}
+            {priceLine}
+          </p>
+          {dateLine && <p className={T.meta}>{dateLine}</p>}
+        </div>
         {pending && pending.tier !== "free" && (
-          <Row label="Then">
-            {planOf(pending.tier).name} · {pending.cycle === "yearly" ? "Annual" : "Monthly"}
-          </Row>
+          <p className={T.meta}>
+            Then {planOf(pending.tier).name} · {pending.cycle === "yearly" ? "Annual" : "Monthly"}
+          </p>
         )}
-        <Row label="AI credits">{n(plan.credits)} / month</Row>
-        <Row label="Payment">{wallet.connected ? `Demo wallet ${wallet.short} · ${token}` : "No wallet connected"}</Row>
-      </dl>
-      {paid && (
-        <label className={cn(HAIRLINE, "flex cursor-pointer items-center justify-between gap-6 border-t-[length:var(--border-width-1)] pt-6")}>
-          <span className="flex flex-col gap-1">
-            <span className={T.rowTitle}>Auto renewal</span>
-            <span className={T.meta}>{cancelled ? `Off. ${plan.name} ends on ${when}, then you’re on Free.` : `On. It renews on ${when}.`}</span>
-          </span>
-          <Toggle
-            checked={!cancelled}
-            aria-label="Auto renewal"
-            onChange={() => {
-              if (cancelled) {
-                keep();
-                toast({ title: `You’re keeping ${plan.name}` });
-              } else {
-                cancel();
-                toast({ title: `${plan.name} ends on ${when}` });
-              }
+        {pending && (
+          <Button
+            size="xl"
+            className="w-full"
+            onClick={() => {
+              keep();
+              toast({ title: `You’re keeping ${plan.name}` });
             }}
-          />
-        </label>
-      )}
-      {/* The web's Plan details: a paid plan's benefits against what you use. */}
-      {paid && (
-      <div className={cn(HAIRLINE, "flex flex-col gap-4 border-t-[length:var(--border-width-1)] pt-6")}>
-        <h3 className={T.rowTitle}>Benefits</h3>
-        <ul className="flex flex-col gap-5">
+          >
+            Keep {plan.name}
+          </Button>
+        )}
+      </div>
+      <ListCard label="Plan details">
+        {paid && (
+          <li>
+            <label className={cn(LIST_ROW, "cursor-pointer hover:bg-transparent")}>
+              <span className="shrink-0 text-[color:var(--color-icon-default)]">
+                <Icon icon={RepeatIcon} size={24} />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={cn(T.body, "text-text-primary")}>Auto renewal</span>
+                <span className={T.meta}>{cancelled ? `Off. ${plan.name} ends on ${when}, then you’re on Free.` : `On. It renews on ${when}.`}</span>
+              </span>
+              <Toggle
+                checked={!cancelled}
+                aria-label="Auto renewal"
+                onChange={() => {
+                  if (cancelled) {
+                    keep();
+                    toast({ title: `You’re keeping ${plan.name}` });
+                  } else {
+                    cancel();
+                    toast({ title: `${plan.name} ends on ${when}` });
+                  }
+                }}
+              />
+            </label>
+          </li>
+        )}
+        {paid && <ListRow icon={CheckmarkCircle02Icon} title="Benefits" meta={`${n(usage.projects)}/${n(plan.projects)} projects created`} onClick={() => setBenefitsOpen(true)} />}
+        <ListRow icon={AiMagicIcon} title="AI credits" value={`${n(plan.credits)} / month`} />
+        <ListRow icon={Wallet02Icon} title="Payment method" meta={wallet.connected ? `Demo wallet ${wallet.short} · ${token}` : "No wallet connected"} href="/m/settings/payments" />
+        <li id="billing-details" className="scroll-mt-8">
+          <ListCardRowLink href="/m/settings/billing" icon={Invoice03Icon} title="Billing details" meta={billedTo ? billedTo : "Not set"} />
+        </li>
+      </ListCard>
+      {!paid ? (
+        <ListCard label="Upgrade">
+          <ListRow icon={CrownIcon} title="Upgrade now" meta={`${plan.name} · ${n(plan.credits)} AI credits a month`} onClick={() => router.push("/m/plans")} />
+        </ListCard>
+      ) : !pending ? (
+        <ListCard label="Change plan">
+          {(down || sub.cycle === "yearly") && (
+            <ListRow
+              icon={ArrowDown02Icon}
+              title={down ? "Downgrade plan" : "Switch to monthly"}
+              meta={down ? `To ${down.name}, from ${when}` : `From ${when}`}
+              href={down ? downgradePath(down.tier, sub.cycle) : downgradePath(sub.tier, "monthly")}
+            />
+          )}
+          <ListRow icon={Cancel01Icon} title="Cancel subscription" meta={`You keep ${plan.name} until ${when}`} danger onClick={() => setCancelling(true)} />
+        </ListCard>
+      ) : null}
+      <Sheet open={benefitsOpen} onClose={() => setBenefitsOpen(false)} title="Benefits" description={`${plan.name} · ${sub.cycle === "yearly" ? "Annual" : "Monthly"}`}>
+        <ul className="flex flex-col gap-5 pb-4">
           {benefits.map((b) => (
             <li key={b.label} className="flex flex-col gap-2">
               <span className={cn(T.body, "flex items-start gap-4 text-text-primary")}>
@@ -273,49 +282,25 @@ function CurrentPlan() {
             </li>
           ))}
         </ul>
-        <p className={cn(T.meta, "text-text-tertiary")}>A plan sets these amounts. It never locks or removes a project, and every plan can mint, list and buy.</p>
-      </div>
-      )}
-      {!paid ? (
-        <Button size="xl" className="w-full" onClick={() => router.push("/m/plans")}>
-          Upgrade now
-        </Button>
-      ) : pending ? (
-        <Button
-          hierarchy="secondary"
-          size="xl"
-          className="w-full"
-          onClick={() => {
-            keep();
-            toast({ title: `You’re keeping ${plan.name}` });
-          }}
-        >
-          Keep {plan.name}
-        </Button>
-      ) : (
-        <div className="flex items-center gap-4">
-          {(down || sub.cycle === "yearly") && (
-            <Button
-              hierarchy="secondary"
-              size="xl"
-              className="flex-1"
-              onClick={() => router.push(down ? downgradePath(down.tier, sub.cycle) : downgradePath(sub.tier, "monthly"))}
-            >
-              {down ? "Downgrade plan" : "Switch to monthly"}
-            </Button>
-          )}
-          <Button hierarchy="ghost" size="xl" className="flex-1" onClick={() => setCancelling(true)}>
-            Cancel
-          </Button>
-        </div>
-      )}
-      {paid && !pending && (
-        <Link href="/m/settings/payments" className={cn(T.body, "inline-flex min-h-[44px] items-center justify-between text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
-          Payment method
-          <Chevron />
-        </Link>
-      )}
+        <p className={cn(T.meta, "pb-8 text-text-tertiary")}>A plan sets these amounts. It never locks or removes a project, and every plan can mint, list and buy.</p>
+      </Sheet>
       <CancelSheet open={cancelling} onClose={() => setCancelling(false)} />
     </section>
+  );
+}
+
+/** A ListRow's link without its own <li> (the Billing details row carries the anchor). */
+function ListCardRowLink({ href, icon, title, meta }: { href: string; icon: typeof Invoice03Icon; title: string; meta: string }) {
+  return (
+    <Link href={href} className={LIST_ROW}>
+      <span className="shrink-0 text-[color:var(--color-icon-default)]">
+        <Icon icon={icon} size={24} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className={cn(T.body, "text-text-primary")}>{title}</span>
+        <span className={cn(T.meta, "truncate")}>{meta}</span>
+      </span>
+      <Chevron />
+    </Link>
   );
 }

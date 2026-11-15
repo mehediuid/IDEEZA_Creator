@@ -15,14 +15,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowDown01Icon, ArrowLeft01Icon, ArrowRight01Icon, ArrowUp01Icon, Clock01Icon, Menu01Icon, PlayIcon, Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ArrowLeft01Icon, ArrowRight01Icon, ArrowUp01Icon, Clock01Icon, InformationCircleIcon, Menu01Icon, Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
-import { Banner } from "@/components/ideeza/banner";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { SearchInput } from "@/components/ideeza/search-input";
-import { Tag } from "@/components/ideeza/tag";
 import { persistWallet } from "@/components/wallet/wallet-provider";
 import { TUTORIAL_CATEGORIES } from "@/lib/tutorials/content";
 import { anchorsOf, countLabel, findPage, formatIdz, isAvailable, isGroup, isZero, pagesOf, statsOf, type PageMatch } from "@/lib/tutorials/catalog";
@@ -43,6 +41,7 @@ import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
+import { InfoLine } from "../plans/parts";
 
 const POSTER = "/tutorials/video-poster.jpg";
 export const tutorialHref = (category: string, page: string) => `/m/tutorials/${category}/${page}`;
@@ -54,6 +53,7 @@ const ON_A_COMPUTER = new Set(["parts-vs-agile-modules", "code-tech"]);
 export function TutorialsScreen() {
   const progress = useTutorialProgress();
   const [query, setQuery] = React.useState("");
+  const [about, setAbout] = React.useState(false);
   const q = query.trim().toLowerCase();
   const hits = q
     ? TUTORIAL_CATEGORIES.flatMap((c) =>
@@ -63,11 +63,11 @@ export function TutorialsScreen() {
       )
     : [];
   return (
-    <Screen top={<TopBar back="/m/help" title="Tutorial categories" />} className="px-8 pb-12 pt-4">
+    <Screen
+      top={<TopBar back="/m/help" title="Tutorial categories" actions={[{ icon: InformationCircleIcon, label: "About tutorials", onClick: () => setAbout(true) }]} />}
+      className="px-8 pb-12 pt-4"
+    >
       <div className="flex flex-col gap-8">
-        <p className={T.body}>
-          Let’s learn about the IDEEZA platform and how it will revolutionise hardware designing. Take a look at all our categories for more tutorials.
-        </p>
         <SearchInput size="xl" aria-label="Search tutorials" placeholder="Search tutorials" value={query} onValueChange={setQuery} onClear={() => setQuery("")} />
         {q ? (
           hits.length === 0 ? (
@@ -91,60 +91,50 @@ export function TutorialsScreen() {
             </ul>
           )
         ) : (
-          <ul className="flex flex-col gap-8">
+          <ul aria-label="Tutorial categories" className={cn(LIST_CARD, LIST_DIVIDERS)}>
             {TUTORIAL_CATEGORIES.map((c) => (
               <li key={c.slug}>
-                <CategoryCard category={c} progress={progress} />
+                <CategoryRow category={c} progress={progress} />
               </li>
             ))}
           </ul>
         )}
       </div>
+      <Sheet open={about} onClose={() => setAbout(false)} title="Tutorials">
+        <p className={cn(T.body, "pb-8")}>Let’s learn about the IDEEZA platform and how it will revolutionise hardware designing. Take a look at all our categories for more tutorials.</p>
+      </Sheet>
     </Screen>
   );
 }
 
-function CategoryCard({ category, progress }: { category: TutorialCategory; progress: TutorialProgress | undefined }) {
+/** A category as a row: its cover, title, two lines of what it covers, counts, what it pays and your progress. */
+function CategoryRow({ category, progress }: { category: TutorialCategory; progress: TutorialProgress | undefined }) {
   const stats = statsOf(category);
   const slug = progress ? resumeSlugOf(progress, category) : pagesOf(category)[0]?.page.slug;
   const done = progress ? pagesOf(category).filter((e) => isPageDone(progress, category.slug, e.page)).length : 0;
   const earned = progress ? earnedIn(progress, category) : "0";
   const line = [done ? `${done} of ${countLabel(stats.topics, "topic", "topics")} done` : null, isZero(earned) ? null : `${formatIdz(earned)} IDZ earned`].filter(Boolean);
+  const counts = [countLabel(stats.topics, "Topic", "Topics"), stats.videos > 0 ? countLabel(stats.videos, "Video", "Videos") : stats.comingSoon > 0 ? "Videos coming soon" : null].filter(Boolean);
   return (
-    <article className="relative flex flex-col gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-6">
+    <Link href={slug ? tutorialHref(category.slug, slug) : "/m/tutorials"} className={cn(LIST_ROW, "items-start active:bg-bg-subtle")}>
       {/* eslint-disable-next-line @next/next/no-img-element -- a static cover from public/ */}
-      <img src={category.cover.src} alt={category.cover.alt} decoding="async" className="aspect-[8/5] w-full rounded-lg bg-bg-subtle object-cover" />
-      <div className="flex items-start gap-4">
-        <h2 className={cn(T.section, "min-w-0 flex-1")}>
-          <Link
-            href={slug ? tutorialHref(category.slug, slug) : "/m/tutorials"}
-            className="outline-none before:absolute before:inset-0 before:rounded-xl before:content-[''] focus-visible:before:ring-2 focus-visible:before:ring-border-focus"
-          >
-            {category.title}
-          </Link>
-        </h2>
-        {!isZero(stats.idz) && (
-          <p className={cn(T.rowTitle, "shrink-0 text-text-brand")}>
-            <span className="sr-only">Earn up to </span>
-            {formatIdz(stats.idz)} IDZ
-          </p>
-        )}
-      </div>
-      <p className={cn(T.body, "line-clamp-3")}>{category.description}</p>
-      <div className="flex flex-wrap items-center gap-4">
-        <Tag size="sm">{countLabel(stats.topics, "Topic", "Topics")}</Tag>
-        {stats.videos > 0 ? (
-          <Tag size="sm" icon={<Icon icon={PlayIcon} size={14} />}>
-            {countLabel(stats.videos, "Video", "Videos")}
-          </Tag>
-        ) : stats.comingSoon > 0 ? (
-          <Tag size="sm" icon={<Icon icon={Clock01Icon} size={14} />}>
-            Videos coming soon
-          </Tag>
-        ) : null}
-      </div>
-      {line.length > 0 && <p className={cn(T.meta, "text-text-success")}>{line.join(" · ")}</p>}
-    </article>
+      <img src={category.cover.src} alt="" decoding="async" className="aspect-square w-[72px] shrink-0 rounded-lg bg-bg-subtle object-cover" />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex items-start gap-4">
+          <span className={cn(T.rowTitle, "min-w-0 flex-1")}>{category.title}</span>
+          {!isZero(stats.idz) && (
+            <span className={cn(T.rowTitle, "shrink-0 text-text-brand")}>
+              <span className="sr-only">Earn up to </span>
+              {formatIdz(stats.idz)} IDZ
+            </span>
+          )}
+        </span>
+        <span className={cn(T.meta, "line-clamp-2")}>{category.description}</span>
+        <span className={cn(T.meta, "text-text-tertiary")}>{counts.join(" · ")}</span>
+        {line.length > 0 && <span className={cn(T.meta, "text-text-success")}>{line.join(" · ")}</span>}
+      </span>
+      <Chevron className="self-center" />
+    </Link>
   );
 }
 
@@ -221,9 +211,12 @@ function TopicPage({ match }: { match: PageMatch }) {
         <h2 className={T.display}>{page.title}</h2>
         {page.summary && <p className={cn(T.bodyLg, "text-text-secondary")}>{page.summary}</p>}
         {ON_A_COMPUTER.has(category.slug) && (
-          <Banner tone="info" title="These steps are done on a computer">
-            The editors and the parts library open on a computer. On the phone you can look at every piece and ask for changes in words.
-          </Banner>
+          <InfoLine
+            infoTitle="These steps are done on a computer"
+            info={<p className={T.body}>The editors and the parts library open on a computer. On the phone you can look at every piece and ask for changes in words.</p>}
+          >
+            These steps are done on a computer.
+          </InfoLine>
         )}
         {blocks.map((b, i) => (
           <Block key={i} block={b} anchor={anchors.get(i)} progress={progress} />

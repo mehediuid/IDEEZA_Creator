@@ -7,10 +7,12 @@
 // scale (`T`, ../type.ts); the cards wear the kit's border/default edge.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
-import { ArrowDown01Icon, Cancel01Icon, CheckmarkCircle02Icon, CancelCircleIcon, Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Cancel01Icon, CheckmarkCircle02Icon, CancelCircleIcon, InformationCircleIcon, Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
+import { Radio } from "@/components/ideeza/checkbox";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { coinAmount } from "@/lib/create/credit-pricing";
 import type { Network } from "@/lib/brief/types";
@@ -100,6 +102,161 @@ export function PillSwitch<V extends string>({
         );
       })}
     </div>
+  );
+}
+
+// ── the phone's money screens: hero, ⓘ, section heads, radio cards ─────
+
+/** Plan & pricing's foot: where the open tab puts its one primary (the Bottom action bar). */
+export const PlanFootContext = React.createContext<HTMLElement | null>(null);
+
+/** Renders `children` (a BottomBar) into the Plan & pricing screen's foot. */
+export function PlanFoot({ children }: { children: React.ReactNode }) {
+  const el = React.useContext(PlanFootContext);
+  return el ? createPortal(children, el) : null;
+}
+
+/** ⓘ beside a heading or a figure (lens 1): a 44 px icon button whose sheet holds the full
+ *  explanation, so the words stay without being printed inline. */
+export function InfoButton({ title, label, children }: { title: string; label?: string; children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={label ?? `About ${title.charAt(0).toLowerCase()}${title.slice(1)}`}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        className="-my-6 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus active:bg-bg-subtle"
+      >
+        <Icon icon={InformationCircleIcon} size={20} />
+      </button>
+      <Sheet open={open} onClose={() => setOpen(false)} title={title}>
+        <div className="flex flex-col gap-6 pb-8">{children}</div>
+      </Sheet>
+    </>
+  );
+}
+
+/** A section's heading (T.section) with its ⓘ right after the words, and an optional end slot. */
+export function SectionHead({
+  id,
+  children,
+  info,
+  infoTitle,
+  end,
+  as: Tag = "h2",
+}: {
+  id?: string;
+  children: React.ReactNode;
+  info?: React.ReactNode;
+  infoTitle?: string;
+  end?: React.ReactNode;
+  as?: "h2" | "h3";
+}) {
+  return (
+    <div className="flex min-h-[24px] items-center justify-between gap-4">
+      <span className="flex min-w-0 items-center gap-1">
+        <Tag id={id} className={T.section}>
+          {children}
+        </Tag>
+        {info && <InfoButton title={infoTitle ?? (typeof children === "string" ? children : "More about this")}>{info}</InfoButton>}
+      </span>
+      {end}
+    </div>
+  );
+}
+
+/** The one figure a money screen is about (lens 14): its label (with ⓘ), the figure, one meta line. */
+export function Hero({ label, info, infoTitle, meta, children }: { label: string; info?: React.ReactNode; infoTitle?: string; meta?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section aria-label={label} className="flex flex-col items-center gap-2 pb-2 pt-6 text-center">
+      <span className="flex items-center gap-1">
+        <span className={T.body}>{label}</span>
+        {info && <InfoButton title={infoTitle ?? label}>{info}</InfoButton>}
+      </span>
+      {children}
+      {meta && <span className={cn(T.meta, "flex flex-wrap items-center justify-center gap-x-3 gap-y-2")}>{meta}</span>}
+    </section>
+  );
+}
+
+/** A short note with an info glyph (what used to be greyed rows or a paragraph). With `info`, the whole
+ *  line is a 44 px button that opens the full words in a sheet. */
+export function InfoLine({ children, info, infoTitle }: { children: React.ReactNode; info?: React.ReactNode; infoTitle?: string }) {
+  const [open, setOpen] = React.useState(false);
+  const glyph = (
+    <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+      <Icon icon={InformationCircleIcon} size={16} />
+    </span>
+  );
+  if (!info)
+    return (
+      <p className={cn(T.meta, "flex items-center gap-3")}>
+        {glyph}
+        <span className="min-w-0 flex-1">{children}</span>
+      </p>
+    );
+  return (
+    <>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        className={cn(T.meta, "-mx-2 flex min-h-[44px] items-center gap-3 rounded-lg px-2 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus active:bg-bg-subtle")}
+      >
+        {glyph}
+        <span className="min-w-0 flex-1">{children}</span>
+        <span className={cn(T.rowTitle, "shrink-0 text-text-brand")}>More</span>
+      </button>
+      <Sheet open={open} onClose={() => setOpen(false)} title={infoTitle ?? "More about this"}>
+        <div className="flex flex-col gap-6 pb-8">{info}</div>
+      </Sheet>
+    </>
+  );
+}
+
+/** A choice card in a radiogroup (a plan, a pack, an amount): the whole head is the radio,
+ *  `below` (a field, a feature list) sits under it inside the same card. */
+export function RadioCard({
+  checked,
+  onSelect,
+  label,
+  children,
+  below,
+  disabled,
+}: {
+  checked: boolean;
+  onSelect: () => void;
+  label?: string;
+  children: React.ReactNode;
+  below?: React.ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <li
+      className={cn(
+        "flex flex-col overflow-hidden rounded-xl border-[length:var(--border-width-1-5)] border-solid transition-colors duration-fast",
+        checked ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface",
+      )}
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={onSelect}
+        className={cn(
+          "flex w-full items-start gap-6 p-8 text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus disabled:cursor-not-allowed",
+          !checked && "hover:bg-bg-subtle active:bg-bg-subtle",
+        )}
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-2">{children}</span>
+        <Radio checked={checked} decorative className="mt-1 shrink-0" />
+      </button>
+      {below && <div className="flex flex-col gap-6 px-8 pb-8">{below}</div>}
+    </li>
   );
 }
 

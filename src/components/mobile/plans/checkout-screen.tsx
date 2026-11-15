@@ -8,18 +8,20 @@
 // welcome offer halves a first plan payment; a plan takes a coupon code
 // (lib/create/coupons.ts: off what is left today, each code once, and one
 // discount per order — the bigger of the offer and the coupon); the plan's
-// discount comes off credits. Card and PayPal aren't available yet (web), so
-// the method is Crypto from the Demo wallet, USDT or IDZ, signed in the kit's
-// wallet sheet (KIT-WS) — the plan or the credits land in the same commit as
-// the debit. A token the wallet can't pay with is off and says what you
-// have. Offline, Pay is off with its reason and nothing is bought. Then the
+// discount comes off credits. Card and PayPal aren't available yet (web: an
+// info line in the wallet row), so the method is Crypto from the Demo wallet,
+// USDT or IDZ, signed in the kit's wallet sheet (KIT-WS) — the plan or the
+// credits land in the same commit as the debit. A token the wallet can't pay
+// with is off and says what you have. The total and the one button sit in
+// the Bottom action bar: Connect wallet while none is connected, then Pay
+// $x. Offline, Pay is off with its reason and nothing is bought. Then the
 // full-screen result: Upgrade completed / Credits added (kept in the address
 // as `?done=<order>`, so a reload shows the result, not the form again), or
 // Payment failed with the wallet's own reason.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Cancel01Icon, CheckmarkCircle02Icon, CreditCardIcon, InformationCircleIcon, PaypalIcon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, CheckmarkCircle02Icon, DiscountTag01Icon, InformationCircleIcon, PlusSignIcon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
@@ -49,12 +51,13 @@ import { ConnectSheet } from "../earn-coin/parts";
 import { useWalletSheet } from "../earn-coin/wallet-sheet";
 import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
 import { EmptyState } from "../kit/state";
 import { ListBones, OfflineBanner, useOnline } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { CARD, HAIRLINE, LINK, OFFLINE_REASON, ResultView, Row, dateOf, invoicePath, n, newOrderId, pct, usePayBalances } from "./parts";
+import { CARD, HAIRLINE, InfoLine, OFFLINE_REASON, ResultView, Row, SectionHead, dateOf, invoicePath, n, newOrderId, pct, usePayBalances } from "./parts";
 
 const cents = (v: number) => Math.round(v * 100) / 100;
 /** The time a code is checked at (outside render, so the component stays pure). */
@@ -391,50 +394,70 @@ function Checkout({ order }: { order: CheckoutOrder }) {
       className="px-8 pb-8 pt-4"
       footer={
         <BottomBar>
-          {reason && (
+          <p className={cn(T.section, "flex items-center justify-between")}>
+            Total <span className="tabular-nums">{usd(due)}</span>
+          </p>
+          {(reason || note) && (
             <p id="pay-why" role="status" className={T.caption}>
-              {reason}
+              {reason ?? note}
             </p>
           )}
-          <Button size="xl" className="w-full" loading={paying} disabled={noWallet || !!reason} aria-describedby={reason ? "pay-why" : undefined} onClick={() => pay()}>
-            {noWallet ? "Connect your wallet to pay" : ctaLabel}
-          </Button>
+          {noWallet ? (
+            <Button size="xl" className="w-full" disabled={!online} aria-describedby={reason ? "pay-why" : undefined} onClick={() => setConnecting(true)}>
+              Connect wallet
+            </Button>
+          ) : (
+            <Button size="xl" className="w-full" loading={paying} disabled={!!reason} aria-describedby={reason || note ? "pay-why" : undefined} onClick={() => pay()}>
+              {ctaLabel}
+            </Button>
+          )}
         </BottomBar>
       }
     >
       <div className="flex flex-col gap-8">
         <OfflineBanner />
-        <section aria-label="What you’re buying" className={cn(CARD, "flex flex-col gap-3 p-8")}>
-          <div className="flex items-center justify-between gap-4">
-            <h2 className={cn(T.section, "min-w-0")}>{isPlan ? `${target!.name} plan` : credits!.pack ? `${credits!.pack} pack` : "Custom AI credits"}</h2>
-            <Badge tone="brand">{isPlan ? (cycle === "yearly" ? "Annual" : "Monthly") : `${VALIDITY_MONTHS} months`}</Badge>
-          </div>
-          <p className="flex items-baseline justify-between gap-4">
-            <span className={cn(T.body, "min-w-0")}>{isPlan ? (cycle === "yearly" ? "Billed annually" : "Billed monthly") : creditsLine(credits!.base, credits!.bonus)}</span>
-            <span className={cn(T.body, "shrink-0 whitespace-nowrap tabular-nums text-text-primary")}>
-              {isPlan ? `${usd(per!.period)} / ${cycle === "yearly" ? "yr" : "mo"}` : usd(credits!.price.base)}
+        <section aria-label="What you’re buying" className={LIST_CARD}>
+          <button
+            type="button"
+            onClick={() => router.push(isPlan ? "/m/plans" : "/m/plans?tab=credits")}
+            aria-label={`${isPlan ? `${target!.name} plan` : credits!.pack ? `${credits!.pack} pack` : "Custom AI credits"}. ${isPlan ? "Change plan" : "Change pack"}`}
+            className={cn(LIST_ROW, "items-start active:bg-bg-subtle")}
+          >
+            <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <span className="flex flex-wrap items-center gap-3">
+                <span className={T.section}>{isPlan ? `${target!.name} plan` : credits!.pack ? `${credits!.pack} pack` : "Custom AI credits"}</span>
+                <Badge tone="brand">{isPlan ? (cycle === "yearly" ? "Annual" : "Monthly") : `${VALIDITY_MONTHS} months`}</Badge>
+              </span>
+              <span className={cn(T.body, "flex flex-wrap items-center gap-x-3 gap-y-1")}>
+                {isPlan ? (cycle === "yearly" ? "Billed annually" : "Billed monthly") : creditsLine(credits!.base, credits!.bonus)}
+                <span className="tabular-nums text-text-primary">· {isPlan ? `${usd(per!.period)} / ${cycle === "yearly" ? "yr" : "mo"}` : usd(credits!.price.base)}</span>
+              </span>
+              <span className="flex flex-wrap items-center gap-3">
+                <span className={cn(T.rowTitle, "text-text-brand")}>{isPlan ? "Change plan" : "Change pack"}</span>
+                <TestnetDemoBadge />
+              </span>
             </span>
-          </p>
-          <div className="flex items-center justify-between gap-4">
-            <button type="button" onClick={() => router.push(isPlan ? "/m/plans" : "/m/plans?tab=credits")} className={LINK}>
-              {isPlan ? "Change plan" : "Change pack"}
-            </button>
-            <TestnetDemoBadge />
-          </div>
+            <Chevron className="self-center" />
+          </button>
         </section>
 
         {fromPaid && (
           <section aria-labelledby="confirm-upgrade" className="flex flex-col gap-4">
-            <h2 id="confirm-upgrade" className={T.section}>
+            <SectionHead
+              id="confirm-upgrade"
+              info={
+                <p className={T.body}>
+                  Your plan becomes {target!.name} now. The unused time on {current.name} comes off today’s price, and the next billing is on {dateOf(quote!.renewsAt)}. Cancel any time.
+                </p>
+              }
+            >
               Confirm your upgrade
-            </h2>
+            </SectionHead>
             <div className="grid grid-cols-2 gap-4">
               <PlanTile label="From" name={current.name} line={`${usd(priceOf(sub.tier, sub.cycle).perMonth)} / month`} />
               <PlanTile label="Upgrading to" name={target!.name} line={`${usd(per!.perMonth)} / month`} brand />
             </div>
-            <p className={cn(T.body, "rounded-xl bg-bg-subtle p-6")}>
-              Your plan becomes {target!.name} now. The unused time on {current.name} comes off today’s price, and the next billing is on {dateOf(quote!.renewsAt)}. Cancel any time.
-            </p>
+            <p className={T.meta}>Starts now · next billing {dateOf(quote!.renewsAt)}</p>
           </section>
         )}
 
@@ -449,6 +472,75 @@ function Checkout({ order }: { order: CheckoutOrder }) {
             </span>
           </p>
         )}
+
+        {due > 0 && (
+          <section aria-labelledby="pay-method" className="flex flex-col gap-4">
+            <h2 id="pay-method" className={T.section}>
+              Pay with crypto
+            </h2>
+            <div className={cn(LIST_CARD, LIST_DIVIDERS)}>
+              <div className="flex flex-col gap-4 px-8 py-6">
+                <p className={T.meta}>Choose a token and connect your wallet to pay.</p>
+                <div role="radiogroup" aria-label="Token" className="flex gap-4">
+                  {COINS.map((c) => {
+                    const on = coin === c;
+                    const off = short(c);
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        disabled={off}
+                        onClick={() => setPicked(c)}
+                        className={cn(
+                          "flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-4 py-3 outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed",
+                          on ? "border-border-brand bg-bg-brand-subtle" : "border-border active:bg-bg-subtle",
+                        )}
+                      >
+                        <span className={cn(T.rowTitle, "inline-flex items-center gap-3", on && "text-text-brand", off && "text-text-disabled")}>
+                          <span aria-hidden className={cn("size-[10px] rounded-full border-[length:var(--border-width-2)] border-solid", on ? "border-border-brand bg-bg-brand" : "border-border")} />
+                          {c}
+                        </span>
+                        {balances && (
+                          <span className={cn(T.micro, "tabular-nums", off && "text-text-error")}>
+                            {off ? "Not enough: you have " : "You have "}
+                            {formatAmount(balances[c], c)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <dl className="flex flex-col px-8 py-3">
+                <Row label="Amount due">
+                  ≈ {coinAmount(due, coin).toLocaleString("en-US")} {coin}
+                </Row>
+                <Row label="Network">{networkLabelOf(NETWORK)}</Row>
+              </dl>
+              <div className={cn(LIST_ROW, "hover:bg-transparent")}>
+                <span className="shrink-0 text-[color:var(--color-icon-default)]">
+                  <Icon icon={Wallet01Icon} size={24} />
+                </span>
+                <span className={cn(T.body, "flex-1 text-text-primary")}>Demo wallet</span>
+                {wallet.connected ? (
+                  <span className={cn(T.caption, "inline-flex shrink-0 items-center gap-2 text-text-success")}>
+                    <Icon icon={CheckmarkCircle02Icon} size={16} />
+                    Wallet connected · {wallet.short}
+                  </span>
+                ) : (
+                  <span className={cn(T.caption, "shrink-0")}>Not connected</span>
+                )}
+              </div>
+            </div>
+            <InfoLine>Card and PayPal aren’t available yet.</InfoLine>
+          </section>
+        )}
+        {due === 0 && isPlan && (
+          <p className={T.body}>{quote!.due > 0 ? "Your coupon covers this upgrade." : `The unused time on ${current.name} covers this upgrade.`} Nothing to pay today.</p>
+        )}
+
         {/* Nothing to pay today (the unused time covers it): no code can help, so no field. */}
         {isPlan && quote!.due > 0 && (
           <CouponRow
@@ -466,78 +558,8 @@ function Checkout({ order }: { order: CheckoutOrder }) {
         )}
         {couponApplied && offer && <p className={T.meta}>Your coupon saves more than the welcome offer, so the offer isn’t used.</p>}
 
-        {due > 0 && (
-          <section aria-labelledby="pay-method" className="flex flex-col gap-6">
-            <h2 id="pay-method" className={T.section}>
-              Payment method
-            </h2>
-            <div role="radiogroup" aria-label="Payment method" className="flex flex-wrap gap-4">
-              <MethodChip icon={CreditCardIcon} label="Card" off />
-              <MethodChip icon={PaypalIcon} label="PayPal" off />
-              <MethodChip icon={Wallet01Icon} label="Crypto" />
-            </div>
-            <p className={cn(T.meta, "text-text-tertiary")}>Card and PayPal aren’t available yet.</p>
-            <div className={cn(CARD, "flex flex-col gap-6 p-8")}>
-              <div className="flex flex-col gap-2">
-                <h3 className={T.rowTitle}>Pay with crypto</h3>
-                <p className={T.meta}>Choose a token and connect your wallet to pay.</p>
-              </div>
-              <div role="radiogroup" aria-label="Token" className="flex gap-4">
-                {COINS.map((c) => {
-                  const on = coin === c;
-                  const off = short(c);
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      disabled={off}
-                      onClick={() => setPicked(c)}
-                      className={cn(
-                        "flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed",
-                        on ? "border-border-brand bg-bg-brand-subtle" : "border-border",
-                      )}
-                    >
-                      <span className={cn(T.rowTitle, "inline-flex items-center gap-3", on && "text-text-brand", off && "text-text-disabled")}>
-                        <span aria-hidden className={cn("size-[10px] rounded-full border-[length:var(--border-width-2)] border-solid", on ? "border-border-brand bg-bg-brand" : "border-border")} />
-                        {c}
-                      </span>
-                      {balances && (
-                        <span className={cn(T.micro, "tabular-nums", off && "text-text-error")}>
-                          {off ? "Not enough: you have " : "You have "}
-                          {formatAmount(balances[c], c)}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              <dl className="flex flex-col">
-                <Row label="Amount due">
-                  ≈ {coinAmount(due, coin).toLocaleString("en-US")} {coin}
-                </Row>
-                <Row label="Network">{networkLabelOf(NETWORK)}</Row>
-              </dl>
-              {wallet.connected ? (
-                <p className={cn(T.body, "flex items-center gap-3 text-text-success")}>
-                  <Icon icon={CheckmarkCircle02Icon} size={16} />
-                  Wallet connected · {wallet.short}
-                </p>
-              ) : (
-                <Button size="xl" className="w-full" onClick={() => setConnecting(true)}>
-                  Connect wallet
-                </Button>
-              )}
-            </div>
-          </section>
-        )}
-        {due === 0 && isPlan && (
-          <p className={T.body}>{quote!.due > 0 ? "Your coupon covers this upgrade." : `The unused time on ${current.name} covers this upgrade.`} Nothing to pay today.</p>
-        )}
-
         {isPlan && (
-          <label className={cn(CARD, "flex cursor-pointer items-center justify-between gap-6 p-8")}>
+          <label className={cn(LIST_CARD, "cursor-pointer flex-row items-center justify-between gap-6 px-8 py-6")}>
             <span className="flex flex-col gap-1">
               <span className={T.rowTitle}>Auto-renew subscription</span>
               <span className={T.meta}>{autoRenew ? `Renews on ${dateOf(quote!.renewsAt)}. You can cancel any time.` : `Ends on ${dateOf(quote!.renewsAt)}, then you’re on Free.`}</span>
@@ -591,11 +613,6 @@ function Checkout({ order }: { order: CheckoutOrder }) {
           <p className={cn(T.section, HAIRLINE, "mt-3 flex items-center justify-between border-t-[length:var(--border-width-1)] pt-6")}>
             Total <span className="tabular-nums">{usd(due)}</span>
           </p>
-          {note && (
-            <p role="status" className={cn(T.meta, "pt-4")}>
-              {note}
-            </p>
-          )}
         </section>
       </div>
       <ConnectSheet open={connecting} onClose={() => setConnecting(false)} description="You pay from it. This is the testnet demo wallet — test funds only, nothing is written to a real blockchain." />
@@ -652,9 +669,15 @@ function CouponRow({
           setOpened(true);
           requestAnimationFrame(() => inputRef.current?.focus());
         }}
-        className={cn(LINK, "min-h-[44px] self-start")}
+        className={cn(LIST_CARD, LIST_ROW, "flex-row active:bg-bg-subtle")}
       >
-        Have a coupon?
+        <span className="shrink-0 text-[color:var(--color-icon-default)]">
+          <Icon icon={DiscountTag01Icon} size={24} />
+        </span>
+        <span className={cn(T.body, "flex-1 text-text-primary")}>Have a coupon?</span>
+        <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+          <Icon icon={PlusSignIcon} size={20} />
+        </span>
       </button>
     );
 
@@ -717,27 +740,6 @@ function CouponRow({
         </form>
       )}
     </div>
-  );
-}
-
-function MethodChip({ icon, label, off }: { icon: typeof Wallet01Icon; label: string; off?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={!off}
-      disabled={off}
-      title={off ? "Not available yet" : undefined}
-      className={cn(
-        off ? T.body : T.rowTitle,
-        "inline-flex min-h-[44px] items-center gap-3 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
-        off ? "cursor-not-allowed border-border text-text-disabled" : "border-border-brand bg-bg-brand-subtle text-text-brand",
-      )}
-    >
-      <Icon icon={icon} size={16} />
-      {label}
-      {off && <span className={cn(T.micro, "text-text-disabled")}>Soon</span>}
-    </button>
   );
 }
 

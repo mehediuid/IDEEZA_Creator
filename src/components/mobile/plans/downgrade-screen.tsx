@@ -11,7 +11,6 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowDown02Icon, InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { usePlanUsage } from "@/components/credits/plans-panel";
@@ -20,6 +19,7 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { PLANS, lossesOf, planOf, priceOf, relationOf, type PlanTier } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
+import { LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
 import { EmptyState } from "../kit/state";
 import { ListBones, OfflineBanner } from "../kit/states";
 import { useToast } from "../kit/toast";
@@ -96,9 +96,12 @@ export function DowngradeScreen() {
     >
       <div className="flex flex-col gap-8">
         <OfflineBanner />
-        <Banner tone="attention" title={same ? "You’re about to switch to monthly billing" : "You’re about to downgrade"}>
-          You keep {current.name} until {when}. The change starts then; nothing is charged now.
-        </Banner>
+        <header className="flex flex-col gap-2">
+          <h2 className={T.title}>{same ? "You’re about to switch to monthly billing" : "You’re about to downgrade"}</h2>
+          <p className={T.body}>
+            You keep {current.name} until {when}. The change starts then; nothing is charged now.
+          </p>
+        </header>
         <section aria-label="From and to" className={cn(CARD, "flex flex-col gap-4 p-8")}>
           <div className="flex items-start justify-between gap-4">
             <span className="flex flex-col gap-1">
@@ -124,42 +127,39 @@ export function DowngradeScreen() {
             </span>
             <span className={cn(T.body, "shrink-0 tabular-nums text-text-primary")}>{usd(per.perMonth)}/mo</span>
           </div>
+          <p className={cn(T.meta, HAIRLINE, "border-t-[length:var(--border-width-1)] pt-4")}>
+            {current.name} stays active until {when}. {target.name}
+            {same ? " billed monthly" : ""} starts after that at {usd(per.period)} a {cycle === "yearly" ? "year" : "month"}. Due today: {usd(0)}.
+          </p>
         </section>
-        <section aria-labelledby="what-changes" className={cn(CARD, "flex flex-col gap-4 p-8")}>
+        <section aria-labelledby="what-changes" className="flex flex-col gap-4">
           <h2 id="what-changes" className={T.section}>
             What changes
           </h2>
-          {losses.length === 0 ? (
-            <p className={T.body}>Only how you’re billed: monthly instead of yearly.</p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {losses.map((l) => {
+          <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
+            {losses.length === 0 ? (
+              <li className={cn(LIST_ROW, T.body, "hover:bg-transparent")}>Only how you’re billed: monthly instead of yearly.</li>
+            ) : (
+              losses.map((l) => {
                 const [label, change] = l.split(": ");
                 return (
-                  <li key={l} className={cn(T.body, "flex items-start justify-between gap-6")}>
-                    <span>{label}</span>
+                  <li key={l} className={cn(LIST_ROW, T.body, "justify-between hover:bg-transparent")}>
+                    <span className="text-text-primary">{label}</span>
                     <span className="text-right text-text-error">{change}</span>
                   </li>
                 );
-              })}
-            </ul>
-          )}
-          {!same && (
-            <ul className={cn(HAIRLINE, "flex flex-col gap-3 border-t-[length:var(--border-width-1)] pt-4")}>
-              {rows.map((r) => (
-                <li key={r.label} className="flex flex-col gap-1">
+              })
+            )}
+            {!same &&
+              rows.map((r) => (
+                <li key={r.label} className={cn(LIST_ROW, "flex-col items-start gap-1 hover:bg-transparent")}>
                   <span className={T.rowTitle}>{r.label}</span>
-                  <span className={cn(T.body, r.over && "text-text-error")}>{r.line}</span>
+                  <span className={cn(T.meta, r.over && "text-text-error")}>{r.line}</span>
                 </li>
               ))}
-              <li className={cn(T.body, "text-text-primary")}>Nothing is removed. Every project and contributor you have stays as it is.</li>
-            </ul>
-          )}
+          </ul>
+          {!same && <p className={T.meta}>Nothing is removed. Every project and contributor you have stays as it is.</p>}
         </section>
-        <p className={cn(T.meta, "rounded-xl bg-bg-brand-subtle px-8 py-6 text-text-brand")}>
-          {current.name} stays active until {when}. {target.name}
-          {same ? " billed monthly" : ""} starts after that at {usd(per.period)} a {cycle === "yearly" ? "year" : "month"}. Due today: {usd(0)}.
-        </p>
       </div>
     </Screen>
   );

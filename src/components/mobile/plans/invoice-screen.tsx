@@ -29,7 +29,7 @@ import { ListBones, OfflineBanner } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { CARD, HAIRLINE, Row, dateOf } from "./parts";
+import { CARD, HAIRLINE, Hero, Row, dateOf } from "./parts";
 
 export function InvoiceScreen({ orderId }: { orderId: string }) {
   const { hydrated: creditsReady, ledger } = useCredits();
@@ -65,6 +65,23 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
           action={{ label: "See your invoices", href: "/m/plans?tab=billing" }}
         />
       ) : (
+        <div className="flex flex-col gap-8">
+        <div className="print:hidden">
+          <Hero
+            label={invoice.status === "Paid" ? "Total paid" : "Total"}
+            meta={
+              <>
+                <Badge tone={invoice.status === "Paid" ? "success" : "neutral"}>{invoice.status}</Badge>
+                <span>
+                  {invoice.lines[0]?.description ? `${invoice.lines[0].description} · ` : ""}
+                  {dateOf(invoice.ts)}
+                </span>
+              </>
+            }
+          >
+            <span className={T.amountHero}>{usd(invoice.status === "Paid" ? invoice.paid : invoice.total)}</span>
+          </Hero>
+        </div>
         <article aria-labelledby="invoice-title" className={cn(CARD, "flex flex-col gap-6 p-8")}>
           <div className="print:hidden">
             <OfflineBanner />
@@ -129,6 +146,7 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
           </dl>
           <p className={cn(T.meta, "text-text-tertiary")}>Testnet demo: no real money moved. Questions? Contact support@ideeza.com.</p>
         </article>
+        </div>
       )}
     </Screen>
   );

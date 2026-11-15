@@ -11,7 +11,6 @@
 // once, then shown as a document (/m/settings/idz-pay/statement).
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Download04Icon, Invoice03Icon, Tick02Icon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
@@ -27,6 +26,7 @@ import { STATUS_WORD, WITHDRAWAL_STATUSES, formatUsd, statementCsv, statementFil
 import { shortAddress } from "@/lib/wallet/demo-wallet";
 import { cn } from "@/lib/utils";
 import { FilterButton, useCopy, whenOf } from "../earn-coin/parts";
+import { LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { EmptyState } from "../kit/state";
 import { OfflineBanner } from "../kit/states";
@@ -36,7 +36,7 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { useGetPaid } from "./get-paid-screen";
-import { CARD, LINK, Row, RowsCard, n, payoutLine } from "./parts";
+import { CARD, Row, RowsCard, n, payoutLine } from "./parts";
 
 const PER_PAGE = 10;
 const STATUS_TONE: Record<WithdrawalStatus, "success" | "brand-outline" | "warning"> = { complete: "success", "in-progress": "brand-outline", pending: "warning" };
@@ -81,18 +81,20 @@ export function WithdrawalHistoryScreen() {
       ) : (
         <div className="flex flex-col gap-8">
           <OfflineBanner />
-          <div className="grid grid-cols-3 gap-4">
-            {WITHDRAWAL_STATUSES.map((s, i) => (
-              <div key={s} className="flex min-w-0 flex-col gap-1 rounded-xl bg-bg-brand-subtle px-5 py-5">
-                <span className={cn(T.section, "truncate tabular-nums")}>{formatUsd(totals[s])}</span>
-                <span className={cn(T.meta, "flex items-center gap-2")}>
-                  {STATUS_WORD[s]}
-                  {i === 0 && <span className="sr-only">(testnet demo)</span>}
-                </span>
-              </div>
-            ))}
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-3 gap-4">
+              {WITHDRAWAL_STATUSES.map((s, i) => (
+                <div key={s} className="flex min-w-0 flex-col gap-1 rounded-xl bg-bg-brand-subtle px-5 py-5">
+                  <span className={cn(T.section, "truncate tabular-nums")}>{formatUsd(totals[s])}</span>
+                  <span className={cn(T.meta, "flex items-center gap-2")}>
+                    {STATUS_WORD[s]}
+                    {i === 0 && <span className="sr-only">(testnet demo)</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <TestnetDemoBadge className="self-start" />
           </div>
-          <TestnetDemoBadge className="self-start" />
           <SearchInput
             size="xl"
             aria-label="Search transactions"
@@ -142,13 +144,13 @@ export function WithdrawalHistoryScreen() {
             />
           ) : (
             <>
-              <ul className="flex flex-col gap-4">
+              <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
                 {shown.slice(0, count).map((w) => (
                   <li key={w.id}>
                     <button
                       type="button"
                       onClick={() => router.replace(`/m/settings/idz-pay/history?tx=${w.id}`)}
-                      className={cn(CARD, "flex w-full flex-col gap-2 px-7 py-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+                      className={cn(LIST_ROW, "flex-col items-stretch gap-2 active:bg-bg-subtle")}
                     >
                       <span className="flex items-center justify-between gap-4">
                         <span className={cn(T.section, "tabular-nums")}>{formatUsd(w.amount)}</span>
@@ -437,9 +439,11 @@ export function StatementScreen() {
           <p className={cn(T.micro, "text-center text-text-tertiary")}>Made by IDEEZA from this browser’s records. Dollars at demo rates.</p>
         </article>
       )}
-      <Link href="/m/settings/idz-pay" className={cn(LINK, "mt-8 flex min-h-[44px] items-center justify-center")}>
-        Back to Get paid
-      </Link>
+      <div className="mt-8">
+        <ListCard label="Get paid">
+          <ListRow title="Back to Get paid" href="/m/settings/idz-pay" />
+        </ListCard>
+      </div>
     </Screen>
   );
 }

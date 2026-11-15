@@ -7,8 +7,9 @@
 //   (the web's MethodDialog: addMethod, methodRequest). The Figma's bank
 //   screens ask for account and ID numbers, which the app doesn't take.
 // · Withdraw money (/m/settings/idz-pay/withdraw): the available balance,
-//   the method, Full balance or Other amount, the fee ($0.00) and the total,
-//   then the wallet's signature — the web's "confirm it's you", in place of
+//   the method, Full balance or Other amount, the fee ($0.00) and the total
+//   (the amount you withdraw is the screen's figure; Withdraw $x sits in the
+//   Bottom action bar, the top bar's Back cancels), then the wallet's signature — the web's "confirm it's you", in place of
 //   the Figma's emailed code — and "Withdrawal recorded" with the way to the
 //   history. A withdrawal in IDZ pays out at the app's one IDZ price.
 //   Offline, Withdraw and Add wait with their reason. Identity (Level 1) comes first, as the web asks it at the first
@@ -16,7 +17,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckmarkCircle02Icon, PencilEdit02Icon, UserIdVerificationIcon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, PencilEdit02Icon, UserIdVerificationIcon, Wallet02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Radio } from "@/components/ideeza/checkbox";
@@ -29,22 +30,24 @@ import { networkName } from "@/components/settings/get-paid/parts";
 import { randomId } from "@/lib/market/sales";
 import { METHOD_LABEL_MAX, addMethod, centsFloor, formatUsd, recordWithdrawal, subtractWithdrawn, withdrawAmountProblem, type PayoutStore, type Withdrawal } from "@/lib/account/payout";
 import { readPayoutNow, updatePayout } from "@/lib/account/use-payout";
+import { shortAddress } from "@/lib/wallet/demo-wallet";
 import type { Amount } from "@/lib/wallet/types";
 import { compareAmounts, normalizeAmount } from "@/lib/wallet/money";
 import { cn } from "@/lib/utils";
 import { useWalletSheet } from "../earn-coin/wallet-sheet";
 import { BottomBar } from "../kit/bottom-bar";
+import { LIST_ROW, ListCard, ListRow } from "../kit/list";
+import { PickSheet } from "../kit/pick-list";
 import { EmptyState } from "../kit/state";
 import { OfflineBanner, useOnline } from "../kit/states";
 import { Sheet } from "../kit/sheet";
 import { SheetSelect } from "../kit/sheet-select";
 import { useToast } from "../kit/toast";
-import { useGoBack } from "../nav-trail";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { IDZ_RATE_LINE, SAVE_FAILED, useGetPaid } from "./get-paid-screen";
-import { BulletList, CARD, OFFLINE_REASON, Row, RowsCard, payoutLine } from "./parts";
+import { BulletList, Hero, OFFLINE_REASON, Row, RowsCard, payoutLine } from "./parts";
 
 const PAYOUT_NETWORK = "baseSepolia" as const;
 const PROBLEM: Record<"address" | "duplicate" | "full", string> = {
@@ -305,7 +308,6 @@ function NeedsIdentity() {
 function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount }) {
   const router = useRouter();
   const online = useOnline();
-  const cancel = useGoBack("/m/settings/idz-pay");
   const { request, sheet } = useWalletSheet();
   const [methodId, setMethodId] = React.useState<string>(store.defaultMethodId ?? store.methods[0].id);
   const [mode, setMode] = React.useState<"full" | "other">("full");
@@ -314,6 +316,7 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
   const [busy, setBusy] = React.useState(false);
   const [failure, setFailure] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState<Withdrawal | null>(null);
+  const [picking, setPicking] = React.useState(false);
   const otherRef = React.useRef<HTMLInputElement>(null);
 
   const available = centsFloor(subtractWithdrawn(earned, store.withdrawals));
@@ -378,53 +381,40 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
     else if (result.reason !== "rejected") setFailure(result.message ?? "The wallet didn’t confirm it. Nothing was withdrawn; try again.");
   };
 
-  const radio = (on: boolean) => cn("flex min-h-[52px] cursor-pointer items-center gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6", on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface");
+  const radio = (on: boolean) => cn("flex min-h-[52px] cursor-pointer items-center gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 transition-colors duration-fast", on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface active:bg-bg-subtle");
+  const total = amount ? formatUsd(amount) : "$0.00";
+  const why = nothing ? "Nothing to withdraw right now. Your share of each sale lands here." : !online ? OFFLINE_REASON : null;
 
   return (
     <Screen
       top={<TopBar back="/m/settings/idz-pay" title="Withdraw money" />}
-      className="px-8 pb-8 pt-4"
+      className="px-8 pb-8"
       footer={
         <BottomBar>
-          {!online && !nothing && (
-            <p id="withdraw-why" role="status" className={T.caption}>
-              {OFFLINE_REASON}
+          {(why || failure) && (
+            <p id="withdraw-why" role={failure ? "alert" : "status"} className={cn(T.caption, failure && "text-text-error")}>
+              {failure ?? why}
             </p>
           )}
-          <div className="flex gap-4">
-            <Button hierarchy="secondary" size="xl" className="flex-1" onClick={cancel} disabled={busy}>
-              Cancel
-            </Button>
-            <Button size="xl" className="flex-1" loading={busy} disabled={nothing || !online} aria-describedby={!online && !nothing ? "withdraw-why" : undefined} onClick={withdraw}>
-              Withdraw
-            </Button>
-          </div>
+          <Button size="xl" className="w-full" loading={busy} disabled={nothing || !online} aria-describedby={why || failure ? "withdraw-why" : undefined} onClick={withdraw}>
+            {amount && !nothing ? `Withdraw ${total}` : "Withdraw"}
+          </Button>
         </BottomBar>
       }
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-10">
         <OfflineBanner />
-        <RowsCard>
-          <Row label="Available balance">
-            <span className="inline-flex items-center gap-3">
+        <Hero
+          label="You withdraw"
+          meta={
+            <>
               <TestnetDemoBadge />
-              {formatUsd(available)}
-            </span>
-          </Row>
-          <Row label="Withdrawal method">
-            {store.methods.length > 1 ? (
-              <SheetSelect
-                title="Withdrawal method"
-                value={method.id}
-                onChange={setMethodId}
-                options={store.methods.map((m) => ({ value: m.id, label: `${m.label}${m.id === store.defaultMethodId ? " (default)" : ""}` }))}
-                className="h-[36px] min-w-[160px]"
-              />
-            ) : (
-              method.label
-            )}
-          </Row>
-        </RowsCard>
+              <span>Available balance {formatUsd(available)}</span>
+            </>
+          }
+        >
+          <span className={cn(T.amountHero, "text-text-brand")}>{total}</span>
+        </Hero>
         <section aria-labelledby="amount" className="flex flex-col gap-4">
           <h2 id="amount" className={T.section}>
             Amount
@@ -432,8 +422,8 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
           <label className={radio(mode === "full")}>
             <input type="radio" name="amount" checked={mode === "full"} onChange={() => setMode("full")} className="sr-only" />
             <Radio checked={mode === "full"} decorative />
-            <span className={cn(T.body, "flex-1 tabular-nums text-text-primary")}>{formatUsd(available)}</span>
-            <span className={T.meta}>Full balance</span>
+            <span className={cn(T.body, "flex-1 text-text-primary")}>Full balance</span>
+            <span className={cn(T.body, "tabular-nums")}>{formatUsd(available)}</span>
           </label>
           <div className={cn(radio(mode === "other"), "flex-col items-stretch gap-4 py-5")}>
             <label className="flex cursor-pointer items-center gap-5">
@@ -475,28 +465,32 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
             )}
           </div>
         </section>
-        <div className={cn(CARD, "flex items-start justify-between gap-4 p-6")}>
-          <span className="flex flex-col gap-1">
-            <span className={cn(T.body, "text-text-primary")}>
-              Withdrawal fee <span className="text-text-secondary">(per withdrawal)</span>
-            </span>
-            <span className={T.meta}>
-              You receive {amount ? payoutLine(amount, token) : `— ${token}`}
-              {token === "IDZ" ? ` at the demo rate ${IDZ_RATE_LINE}` : ""}.
-            </span>
-          </span>
-          <span className={cn(T.body, "shrink-0 tabular-nums text-text-primary")}>−$0.00</span>
-        </div>
-        <p className={cn(T.section, "flex items-center justify-between rounded-xl bg-bg-brand-subtle px-6 py-5")}>
-          Total amount <span className="tabular-nums">{amount ? formatUsd(amount) : "$0.00"}</span>
-        </p>
-        {nothing && <p className={T.caption}>Nothing to withdraw right now. Your share of each sale lands here.</p>}
-        {failure && (
-          <p role="alert" className={cn(T.caption, "text-text-error")}>
-            {failure}
-          </p>
-        )}
+        <ListCard label="Withdrawal">
+          {store.methods.length > 1 ? (
+            <ListRow icon={Wallet02Icon} title="Withdrawal method" meta={`${shortAddress(method.address)} · ${networkName(method.network)}`} value={method.label} onClick={() => setPicking(true)} />
+          ) : (
+            <ListRow icon={Wallet02Icon} title="Withdrawal method" meta={`${shortAddress(method.address)} · ${networkName(method.network)}`} value={method.label} />
+          )}
+          <ListRow
+            title="You receive"
+            meta={token === "IDZ" ? `At the demo rate ${IDZ_RATE_LINE}` : undefined}
+            value={<span className="tabular-nums text-text-primary">{amount ? payoutLine(amount, token) : `— ${token}`}</span>}
+          />
+          <ListRow title="Withdrawal fee" meta="Per withdrawal" value={<span className="tabular-nums text-text-primary">−$0.00</span>} />
+          <li className={cn(LIST_ROW, "hover:bg-transparent")}>
+            <span className={cn(T.section, "flex-1")}>Total amount</span>
+            <span className={cn(T.section, "tabular-nums")}>{total}</span>
+          </li>
+        </ListCard>
       </div>
+      <PickSheet
+        open={picking}
+        onClose={() => setPicking(false)}
+        title="Withdrawal method"
+        value={method.id}
+        options={store.methods.map((m) => ({ value: m.id, label: `${m.label}${m.id === store.defaultMethodId ? " (default)" : ""}`, helper: `${shortAddress(m.address)} · ${networkName(m.network)}` }))}
+        onPick={setMethodId}
+      />
       <Sheet
         open={sent !== null}
         onClose={() => router.replace("/m/settings/idz-pay")}
