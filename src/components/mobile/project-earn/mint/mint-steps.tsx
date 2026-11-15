@@ -1,9 +1,11 @@
 "use client";
 
 // The mint's steps on the phone (Figma 13, 13b, 13d, 13e, 13f–13l, 08d), each
-// the web step's words and rules (components/brief/step-*.tsx):
-// · MintIntro — the step's title and line, "Step n of m · Details · Review and
-//   sign · Done";
+// the web step's words and rules (components/brief/step-*.tsx); mobile UX pass
+// 2026-11-15: the same four steps as the web (Choose · Details · Review and
+// sign · Done), never more, laid out as phone screens:
+// · MintIntro — a segmented progress bar, "Step n of m · {step}", the step's
+//   title with ⓘ (its line in a sheet);
 // · MintChoose — Keep private · Give to the community · Sell;
 // · MintDetails — Sell: the shared listing terms, the license, Share to Feed
 //   and its story; Give: the chain, the collection, Minting type, the license
@@ -12,16 +14,20 @@
 //   sale (owner 2026-11-12), and a gift or a private mint lists nothing. Messages show once a field is left, at once for a typed amount,
 //   all of them once Continue was pressed (13h). An instant mint the wallet
 //   can't pay says so under Minting type (13g);
-// · MintReview — What is minted, Product videos (the gate's), Shared as, the
-//   cost, the wallet's line, Each sale, and the ladder's missing steps; a
-//   reject or a failure leads the screen (13l);
+// · MintReview — a reject or a failure first (13l); What is minted as a summary
+//   card (shared as, the name, its products, the price, share and royalties
+//   large for a Sell); Terms; Product videos (the gate's) with their fixes as
+//   rows; one card with the cost, the wallet's line and Each sale; the
+//   ladder's missing steps as a state card;
 // · MintDone — Mint complete (13d) / Given to the community (08d): the
-//   ownership proof, the listing or what others can do, the videos;
+//   success head with its date, the ownership proof as a receipt (All details
+//   closed), the listing or what others can do, the videos, then View on
+//   marketplace and Open Earn as rows;
 // · MintShare — Share to Feed from Done, after a Sell (the flow mounts it then).
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckmarkCircle01Icon, CircleIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, CheckmarkCircle01Icon, Coins01Icon, CircleIcon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field, useFieldIds } from "@/components/auth/auth-parts";
 import { INTENTS } from "@/components/brief/step-choose";
@@ -71,10 +77,13 @@ import { SheetSelect } from "../../kit/sheet-select";
 import { Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
 import { ListCard } from "../../kit/list";
+import { useRouter } from "next/navigation";
 import { useEarn } from "../context";
 import { ListingFields, MintTypeCards } from "../listing-fields";
-import { FactRows, LevelCheck } from "../parts";
-import { useLiveReadiness } from "../sell/parts";
+import { FactRows } from "../parts";
+import { InfoButton, StepsCard, SummaryCard, useLiveReadiness } from "../sell/parts";
+import { LIST_CARD, LIST_ROW, Chevron } from "../../kit/list";
+import { PRESSED } from "../../kit/press";
 import { T } from "../../type";
 
 export type MintGate = {
@@ -110,6 +119,8 @@ export function stepLineOf(step: MintStepId, skipChoose: boolean): string {
 
 export function MintIntro({ step, intent, skipChoose }: { step: MintStepId; intent: Intent | null; skipChoose: boolean }) {
   const i = intent ?? "sell";
+  const steps = skipChoose ? MINT_STEPS.filter((s) => s !== "choose") : MINT_STEPS;
+  const at = steps.indexOf(step);
   const [title, line] =
     step === "choose"
       ? ["Mint your project", "Minting records that you made it first. Choose how it goes out — you can still list a private project later."]
@@ -117,12 +128,21 @@ export function MintIntro({ step, intent, skipChoose }: { step: MintStepId; inte
         ? [DETAILS_TITLE[i], DETAILS_LINE[i]]
         : ["Review and sign", REVIEW_LINE[i]];
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <h2 className={T.section}>{title}</h2>
-        <p className={T.body}>{line}</p>
+    <div className="flex flex-col gap-4 pt-2">
+      <div className="flex flex-col gap-3">
+        <div aria-hidden className="flex gap-2">
+          {steps.map((s, n) => (
+            <span key={s} className={cn("h-[4px] flex-1 rounded-full", n <= at ? "bg-bg-brand" : "bg-bg-subtle")} />
+          ))}
+        </div>
+        <p className={T.meta} title={stepLineOf(step, skipChoose)}>{`Step ${at + 1} of ${steps.length} · ${MINT_STEP_LABEL[step]}`}</p>
       </div>
-      <p className={T.meta}>{stepLineOf(step, skipChoose)}</p>
+      <div className="flex min-h-[44px] items-center gap-2">
+        <h2 className={cn(T.title, "min-w-0 break-words")}>{title}</h2>
+        <InfoButton label={`About this step: ${title}`} title={title}>
+          <p className={T.body}>{line}</p>
+        </InfoButton>
+      </div>
     </div>
   );
 }
@@ -286,9 +306,13 @@ export function MintDetails({
           now={now}
           newBenefitId={() => randomId("ben_")}
           collectionField={collectionField}
+          beforeConfirm={
+            <>
+              {lowFunds}
+              {license}
+            </>
+          }
         />
-        {lowFunds}
-        {license}
         {share}
         {story}
       </div>
@@ -484,6 +508,9 @@ function termsOf(s: MintState, intent: Intent, type: MintType, input: ListingInp
   return rows;
 }
 
+/** The terms a Sell's summary card shows large; the Terms list keeps the rest (and Shared as is its overline). */
+const SUMMARY_TERMS = new Set(["Shared as", "Buy now", "Auction", "Selling", "Royalties"]);
+
 export function MintReview({
   state,
   project,
@@ -516,49 +543,56 @@ export function MintReview({
   const detail = `${names.length} ${names.length === 1 ? "product" : "products"}${names.length ? ` · ${names.join(", ")}` : ""}`;
   const priced = (toMicros(input.price.trim()) ?? BigInt(0)) > BigInt(0);
   const eachSale = input.type === "buyNow" && !priced ? [{ label: FEE_LABEL, value: "taken from the price of each sale" }] : listingSummaryRows(input, ctx);
+  const terms = termsOf(state, intent, type, input);
+  const summary = selling ? terms.filter((r) => SUMMARY_TERMS.has(r.label) && r.label !== "Shared as") : [];
+  const rest = terms.filter((r) => r.label !== "Shared as" && !(selling && SUMMARY_TERMS.has(r.label)));
 
   return (
     <div className="flex flex-col gap-8">
       {mintError && <Banner tone="error">{mintError}</Banner>}
 
+      <SummaryCard
+        label="What is minted"
+        overline={SHARED_AS[intent]}
+        headline={project.name}
+        amount={false}
+        sub={detail}
+        facts={summary.map((r) => ({ label: r.label, value: r.label === "Selling" ? r.value.replace(" of the project", "") : r.value }))}
+      >
+        <p className={cn(T.meta, "line-clamp-3")}>{project.description.trim() || "No description yet."}</p>
+      </SummaryCard>
+
       <section className="flex flex-col gap-4">
-        <h3 className={H3}>What is minted</h3>
-        <div className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
-          <p className={T.name}>{project.name}</p>
-          <p className={cn(T.meta, "line-clamp-3")}>{project.description.trim() || "No description yet."}</p>
-          <p className={NOTE}>{detail}</p>
-        </div>
+        <h3 className={H3}>Terms</h3>
+        <FactRows rows={rest} label="Terms" />
+        {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
       </section>
 
       <VideosBlock projectId={project.id} readiness={gate.readiness} gated={gate.gated} />
 
-      <section className="flex flex-col gap-4">
-        <h3 className={H3}>Terms</h3>
-        <FactRows rows={termsOf(state, intent, type, input)} label="Terms" />
-        {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
+      <section aria-label="Cost" className={cn(LIST_CARD, "gap-6 p-8")}>
+        {intent !== "save" && <CostCard type={type} network={state.network} intent={intent} listing={selling ? listingCostRow(input) : undefined} />}
+        <WalletLine type={type} network={state.network} badge={intent === "save"} ruled={intent !== "save"} />
+        {selling && (
+          <div aria-label="Each sale" className="flex flex-col gap-2 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
+            <h3 className={H3}>Each sale</h3>
+            {eachSale.map((r, i) => (
+              <p key={i} className={NOTE}>
+                {r.label ? `${r.label} · ${r.value}` : r.value}
+              </p>
+            ))}
+          </div>
+        )}
       </section>
 
-      {intent !== "save" && <CostCard type={type} network={state.network} intent={intent} listing={selling ? listingCostRow(input) : undefined} />}
-      <WalletLine type={type} network={state.network} badge={intent === "save"} />
-
-      {selling && (
-        <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
-          <h3 className={H3}>Each sale</h3>
-          {eachSale.map((r, i) => (
-            <p key={i} className={NOTE}>
-              {r.label ? `${r.label} · ${r.value}` : r.value}
-            </p>
-          ))}
-        </section>
-      )}
-
-      <LevelCheck check={ladder} what={selling ? "mint and list" : "mint"} projectId={project.id} license={state.license} />
+      <StepsCard check={ladder} what={selling ? "mint and list" : "mint"} projectId={project.id} license={state.license} />
     </div>
   );
 }
 
 /** Product videos (and the project video) as the gate reads them; what's missing opens where it's made. */
 function VideosBlock({ projectId, readiness, gated }: { projectId: string; readiness: Readiness; gated: boolean }) {
+  const router = useRouter();
   const blocker = videosBlockerOf(readiness);
   const line = !gated ? VIDEOS_OPTIONAL : (blocker ?? VIDEOS_READY);
   const ok = gated && !blocker;
@@ -587,31 +621,44 @@ function VideosBlock({ projectId, readiness, gated }: { projectId: string; readi
               const copy = statusCopy(p.video);
               const label = actionLabel(copy.action);
               return (
-                <li key={p.productId} className="flex flex-col gap-3 p-6">
-                  <span className={T.rowTitle}>{displayProductName(p.name)}</span>
-                  <span className={NOTE}>{copy.text}</span>
-                  {label && (
-                    <Link href={phoneProductVideoHref(projectId, p.productId)} className={cn(T.rowTitle, "self-start hover:underline text-text-brand")}>
-                      {label}
-                    </Link>
-                  )}
-                </li>
+                <VideoFixRow
+                  key={p.productId}
+                  title={displayProductName(p.name)}
+                  line={copy.text}
+                  action={label}
+                  onOpen={() => router.push(phoneProductVideoHref(projectId, p.productId))}
+                />
               );
             })}
-          {pv && pvCopy && !pv.ok && (
-            <li className="flex flex-col gap-3 p-6">
-              <span className={T.rowTitle}>Project video</span>
-              <span className={NOTE}>{pvCopy.text}</span>
-              {pvAction && (
-                <Link href={phoneProjectPath(projectId, "video")} className={cn(T.rowTitle, "self-start hover:underline text-text-brand")}>
-                  {pvAction}
-                </Link>
-              )}
-            </li>
-          )}
+          {pv && pvCopy && !pv.ok && <VideoFixRow title="Project video" line={pvCopy.text} action={pvAction} onOpen={() => router.push(phoneProjectPath(projectId, "video"))} />}
         </ListCard>
       )}
     </section>
+  );
+}
+
+/** A missing video as a row: what, its state, and its action as the row's value; the row opens its maker. */
+function VideoFixRow({ title, line, action, onOpen }: { title: string; line: string; action: string | null; onOpen: () => void }) {
+  if (!action)
+    return (
+      <li className={cn(LIST_ROW, "hover:bg-transparent")}>
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className={T.rowTitle}>{title}</span>
+          <span className={NOTE}>{line}</span>
+        </span>
+      </li>
+    );
+  return (
+    <li>
+      <button type="button" onClick={onOpen} className={cn(LIST_ROW, PRESSED)} aria-label={`${title}: ${line}. ${action}`}>
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className={T.rowTitle}>{title}</span>
+          <span className={NOTE}>{line}</span>
+        </span>
+        <span className={cn(T.rowTitle, "shrink-0 text-text-brand")}>{action}</span>
+        <Chevron />
+      </button>
+    </li>
   );
 }
 
@@ -620,10 +667,10 @@ const ESTIMATE_NOTE =
   "Estimate at fixed reference rates — live network pricing isn't wired yet. IDZ is IDEEZA's token, paid from your wallet; it is separate from the credits a build uses.";
 
 /** The web's Cost box (MintCostRows) on the phone. */
-function CostCard({ type, network, intent, listing }: { type: MintType; network: Network; intent: Intent; listing?: { label: string; amount: string } }) {
+export function CostCard({ type, network, intent, listing }: { type: MintType; network: Network; intent: Intent; listing?: { label: string; amount: string } }) {
   const rows = mintCostRows(type, network, intent === "sell" ? listing : undefined);
   return (
-    <section aria-label="Cost" className="flex flex-col gap-3 rounded-xl bg-bg-surface-raised p-8">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
         <h3 className={H3}>Cost</h3>
         <TestnetDemoBadge />
@@ -650,28 +697,33 @@ function CostCard({ type, network, intent, listing }: { type: MintType; network:
         ),
       )}
       {type === "instant" && <p className={NOTE}>{ESTIMATE_NOTE}</p>}
-    </section>
+    </div>
   );
 }
 
-/** The web's wallet line (WalletFactLine): who signs, and whether it can pay. */
-function WalletLine({ type, network, badge }: { type: MintType; network: Network; badge: boolean }) {
+/** The web's wallet line (WalletFactLine): who signs, and whether it can pay — inside the Cost card. */
+export function WalletLine({ type, network, badge, ruled }: { type: MintType; network: Network; badge: boolean; ruled: boolean }) {
   const wallet = useDemoWallet();
   const { data: market } = useMarket();
   const clock = useMinuteClock();
   const fact = walletFactLineOf(wallet, { type, network }, { market, now: clock });
+  const warn = fact.tone === "warning";
   return (
-    <Banner tone={fact.tone === "warning" ? "attention" : "info"} title={fact.heading}>
-      <span className="flex flex-col gap-2">
-        {wallet && <span>{fact.line}</span>}
-        <span>{COPY_NOTE}</span>
-        {badge && (
-          <span>
-            <TestnetDemoBadge />
-          </span>
-        )}
-      </span>
-    </Banner>
+    <div className={cn("flex flex-col gap-2", ruled && "border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6")}>
+      <p className={cn(T.rowTitle, "flex items-start gap-3", warn && "text-text-warning")}>
+        <span aria-hidden className={cn("mt-[2px] shrink-0", warn ? "text-[color:var(--color-icon-warning)]" : "text-[color:var(--color-icon-secondary)]")}>
+          <Icon icon={warn ? AlertCircleIcon : Wallet01Icon} size={16} />
+        </span>
+        {fact.heading}
+      </p>
+      {wallet && <p className={NOTE}>{fact.line}</p>}
+      <p className={NOTE}>{COPY_NOTE}</p>
+      {badge && (
+        <span>
+          <TestnetDemoBadge />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -709,56 +761,49 @@ export function MintDone({
   const subline = live ? (intent === "sell" ? LISTED_LINE : liveSubline(intent, ready > 0 || own.state === "ready")) : pendingSubline();
   const licenseLabel = LICENSES.find((l) => l.value === state.license)?.label;
 
+  const proof = project.mint ? mintProofRows(project.mint, { owner: true }, intent) : [];
+  const valueOf = (r: (typeof proof)[number]) => r.value.map((v) => (v.kind === "text" ? v.text : v.time.text)).join(" · ");
+  const mintRow = proof.find((r) => r.key === "mint") ?? null;
+  const allVideos = ready === products.length && products.length > 0;
+
   return (
     <div className="flex flex-col gap-8">
       {warning && <Banner tone="attention">{warning}</Banner>}
-      <div className="flex flex-col items-center gap-4 pt-4 text-center">
+      <div className="flex flex-col items-center gap-3 pt-4 text-center">
         <span aria-hidden className="inline-flex size-[56px] items-center justify-center rounded-full bg-bg-success-subtle text-text-success">
           <Icon icon={Tick02Icon} size={28} />
         </span>
-        <h2 className={T.section}>{title}</h2>
+        <h2 className={T.title}>{title}</h2>
         {badge && <Badge tone="success">{badge}</Badge>}
         <p className={NOTE}>{subline}</p>
+        {state.mintedAt && <p className={T.meta}>{`Done · ${formatDate(state.mintedAt)}`}</p>}
       </div>
-      {state.mintedAt && <p className={T.meta}>{`Done · ${formatDate(state.mintedAt)}`}</p>}
 
-      {project.mint && (
-        <section className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <h3 className={H3}>Ownership proof</h3>
-            <TestnetDemoBadge />
-          </div>
-          <FactRows
-            label="Ownership proof"
-            rows={mintProofRows(project.mint, { owner: true }, intent).map((r) => ({
-              label: r.label,
-              value: r.value.map((v) => (v.kind === "text" ? v.text : v.time.text)).join(" · "),
-            }))}
-          />
-        </section>
+      {project.mint && mintRow && (
+        <SummaryCard
+          label="Ownership proof"
+          overline="Ownership proof"
+          chip={<TestnetDemoBadge />}
+          headline={valueOf(mintRow)}
+          amount={false}
+          sub={mintRow.note}
+          facts={proof.filter((r) => r.key === "token").map((r) => ({ label: r.label, value: valueOf(r) }))}
+          details={proof.map((r) => ({ label: r.label, value: valueOf(r) }))}
+        />
       )}
 
       {listed && (
-        <section className="flex flex-col gap-4">
-          <h3 className={H3}>Listing</h3>
-          <FactRows
-            label="Listing"
-            rows={[
-              { label: "Listing type", value: listed.type === "auction" ? "Auction" : "Buy now" },
-              listed.type === "auction"
-                ? { label: "Minimum bid", value: formatAmount(listed.minBid ?? "0", listed.token) }
-                : { label: "Price", value: formatAmount(listed.price ?? "0", listed.token) },
-              { label: "Selling", value: `${listed.percentSelling}%` },
-              { label: "Royalties", value: `${listed.royaltiesPct}%` },
-            ]}
-          />
-          <p className={NOTE}>Change the price or remove the listing in Earn › Sell.</p>
-          {onMarket && (
-            <Link href={phoneMarketHref(project.id)} className={cn(T.rowTitle, "self-start hover:underline text-text-brand")}>
-              View on marketplace
-            </Link>
-          )}
-        </section>
+        <SummaryCard
+          label="Listing"
+          overline={listed.type === "auction" ? "Auction" : "Buy now"}
+          headline={listed.type === "auction" ? formatAmount(listed.minBid ?? "0", listed.token) : formatAmount(listed.price ?? "0", listed.token)}
+          sub={listed.type === "auction" ? "Minimum bid" : "Price"}
+          facts={[
+            { label: "Selling", value: `${listed.percentSelling}%` },
+            { label: "Royalties", value: `${listed.royaltiesPct}%` },
+          ]}
+          note="Change the price or remove the listing in Earn › Sell."
+        />
       )}
 
       {intent === "give" && (
@@ -778,19 +823,34 @@ export function MintDone({
 
       {!live && <Banner tone="info">{pendingCardLine(rendering)}</Banner>}
 
-      <section className="flex flex-col gap-4">
-        <h3 className={H3}>Videos</h3>
-        <p className={cn(T.body, "flex items-start gap-4 text-text-primary")}>
-          <span aria-hidden className={ready === products.length && products.length > 0 ? "text-text-success" : "text-[color:var(--color-icon-secondary)]"}>
-            <Icon icon={ready === products.length && products.length > 0 ? CheckmarkCircle01Icon : CircleIcon} size={20} />
+      <ul aria-label="Next" className={cn(LIST_CARD, "[&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border")}>
+        <li className={cn(LIST_ROW, "hover:bg-transparent")}>
+          <span aria-hidden className={allVideos ? "text-text-success" : "text-[color:var(--color-icon-secondary)]"}>
+            <Icon icon={allVideos ? CheckmarkCircle01Icon : CircleIcon} size={24} />
           </span>
-          {ready === products.length && products.length > 0 ? VIDEOS_READY : `${ready} of ${products.length} product videos ready.`}
-        </p>
-      </section>
-      <Link href={phoneEarnHref(project.id)} className={cn(T.rowTitle, "self-start hover:underline text-text-brand")}>
-        Open Earn
-      </Link>
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className={cn(T.body, "text-text-primary")}>Videos</span>
+            <span className={NOTE}>{allVideos ? VIDEOS_READY : `${ready} of ${products.length} product videos ready.`}</span>
+          </span>
+        </li>
+        {onMarket && <DoneRow href={phoneMarketHref(project.id)} icon={Store01Icon} title="View on marketplace" />}
+        <DoneRow href={phoneEarnHref(project.id)} icon={Coins01Icon} title="Open Earn" />
+      </ul>
     </div>
+  );
+}
+
+function DoneRow({ href, icon, title }: { href: string; icon: typeof Store01Icon; title: string }) {
+  return (
+    <li>
+      <Link href={href} className={cn(LIST_ROW, PRESSED)}>
+        <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+          <Icon icon={icon} size={24} />
+        </span>
+        <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>{title}</span>
+        <Chevron />
+      </Link>
+    </li>
   );
 }
 

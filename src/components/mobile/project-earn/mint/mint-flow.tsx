@@ -14,7 +14,8 @@
 // The draft is saved as you go (`ideeza:brief:draft:<id>`, the web's own), so
 // the web and the phone carry on each other's mint. Review is its own address
 // (`&step=review`), so the top bar's Back and the footer's Back both return to
-// Details. The commit is the web's, step for step: ONE wallet request (the
+// Details (mobile UX pass 2026-11-15: the foot carries the one primary; Back
+// is the top bar's). The commit is the web's, step for step: ONE wallet request (the
 // phone's sheet), and inside it the MintRecord, then — for a Sell — the
 // listing, then the draft's `mintedAt` and the project's writes; a refused
 // write puts back what came before it. A reject or a failure writes nothing
@@ -326,7 +327,7 @@ export function MintFlow({ projectId }: { projectId: string }) {
 
   return (
     <Screen
-      top={<TopBar back={step === "success" ? projectHref : true} title={title} />}
+      top={<TopBar back={step === "success" ? projectHref : true} onBack={step === "success" ? undefined : () => back()} title={title} />}
       footer={
         <MintFooter
           step={step}
@@ -337,7 +338,6 @@ export function MintFlow({ projectId }: { projectId: string }) {
           reviewReason={reviewReason}
           tried={tried}
           onTry={() => setTried(true)}
-          onBack={back}
           onChoose={() => setBase("details")}
           onReview={toReview}
           onSign={() => void commit()}
@@ -346,7 +346,7 @@ export function MintFlow({ projectId }: { projectId: string }) {
       }
     >
       <OfflineBanner />
-      <div ref={topRef} className="flex flex-col gap-8 px-8 pb-12">
+      <div ref={topRef} className="flex flex-col gap-8 px-8 pb-12 pt-2">
         {step !== "success" && <MintIntro step={step} intent={state.intent} skipChoose={asked !== null} />}
         {step === "choose" && <MintChoose intent={state.intent} onPick={(i) => patch({ intent: i })} />}
         {step === "details" && (
@@ -393,7 +393,6 @@ function MintFooter({
   reviewReason,
   tried,
   onTry,
-  onBack,
   onChoose,
   onReview,
   onSign,
@@ -407,7 +406,6 @@ function MintFooter({
   reviewReason: string | null;
   tried: boolean;
   onTry: () => void;
-  onBack: () => void;
   onChoose: () => void;
   onReview: () => void;
   onSign: () => void;
@@ -427,13 +425,13 @@ function MintFooter({
   const reason = step === "choose" ? (state.intent ? null : "Pick how it goes out.") : step === "details" ? detailsReason : reviewReason;
   const primary =
     step === "choose" ? (
-      <Button size="xl" className="flex-[2_0_auto]" disabled={!state.intent} onClick={onChoose}>
+      <Button size="xl" className="w-full" disabled={!state.intent} onClick={onChoose}>
         Continue
       </Button>
     ) : step === "details" ? (
       <Button
         size="xl"
-        className="flex-[2_0_auto]"
+        className="w-full"
         disabled={tried && !!detailsReason}
         aria-describedby={detailsReason ? reasonId : undefined}
         onClick={() => {
@@ -448,19 +446,14 @@ function MintFooter({
         Continue to review
       </Button>
     ) : (
-      <Button size="xl" className="flex-[2_0_auto]" disabled={!!reviewReason || minting} loading={minting} aria-describedby={reviewReason ? reasonId : undefined} onClick={onSign}>
+      <Button size="xl" className="w-full" disabled={!!reviewReason || minting} loading={minting} aria-describedby={reviewReason ? reasonId : undefined} onClick={onSign}>
         {minting ? "Waiting for your wallet…" : ctaOf(state, type)}
       </Button>
     );
+  // One primary, full width; Back is the top bar's (the same step back).
   return (
-    <BottomBar className="pt-8">
-      {/* Side by side while both fit; a long primary takes its own line over Back (320 px). */}
-      <div className="flex flex-wrap-reverse gap-x-6 gap-y-4">
-        <Button hierarchy="secondary" size="xl" className="flex-[1_0_96px]" disabled={minting} onClick={onBack}>
-          Back
-        </Button>
-        {primary}
-      </div>
+    <BottomBar>
+      <div className="flex">{primary}</div>
       <p id={reasonId} className={T.meta}>
         {reason ? `${reason} · ` : ""}Saved as you go
       </p>

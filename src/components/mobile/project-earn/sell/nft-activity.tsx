@@ -1,13 +1,15 @@
 "use client";
 
 // Earn › Sell's NFT activity (the web's nft-activity.tsx; Figma 14b's
-// "Activity + Add · latest ›" line, 14h / 14i, 04j–04l). On every Sell row that
-// exists — the Main NFT once minted, a Physical / Virtual scope once it has
-// copies — one line: "Activity", + Add, and the latest entry (its type, its
-// date, how many) opening the history. The history is a pushed screen:
-// "{project} · {NFT} · newest first. Buyers see these on the listing.", Add
-// activity, each entry with its type's help (?) and ⋮ Edit · Delete (asks
-// first); none yet says what to add. Add / Edit is the full-screen form with
+// "Activity + Add · latest ›" line, 14h / 14i, 04j–04l). On the screen of every
+// NFT that exists — the Main NFT once minted, a Physical / Virtual scope once
+// it has copies — one Activity row: the latest entry (its type, its date) and
+// how many, opening the history (mobile UX pass 2026-11-15: the row, not the
+// inline "+ Add" and "latest ›" links). The history is a pushed screen:
+// "{project} · {NFT} · newest first. Buyers see these on the listing.", each
+// entry with its type's help (?) and ⋮ Edit · Delete (asks first), Add activity
+// as its one primary; none yet is the kit's empty state. Add / Edit is the
+// full-screen form with
 // the NFT's own type list (Main: IP / Patent · Partnership · Sales report ·
 // Milestone · Roadmap · Others; Physical; Virtual), the web's rules
 // (`checkActivity`) and words; files are saved to this browser before Add
@@ -15,6 +17,7 @@
 
 import * as React from "react";
 import {
+  Activity01Icon,
   Add01Icon,
   ArrowDown01Icon,
   Cancel01Icon,
@@ -23,6 +26,7 @@ import {
   Doc01Icon,
   HelpCircleIcon,
   Image01Icon,
+  InformationCircleIcon,
   MoreVerticalIcon,
   PencilEdit01Icon,
   Pdf01Icon,
@@ -59,8 +63,9 @@ import { ActionSheet, Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
 import { useMediaUrl } from "../../project/activity-tab";
 import { LIST_CARD, LIST_DIVIDERS } from "../../kit/list";
+import { EmptyState } from "../../kit/state";
 import { useEarn } from "../context";
-import { FullLayer, LINK_SM } from "./parts";
+import { ActionRow, FullLayer, LINK_SM } from "./parts";
 import { T } from "../../type";
 
 const NAME_MAX = 40;
@@ -106,11 +111,11 @@ function listingFactsOf(view: ReturnType<typeof useEarn>["view"]): LiveListingFa
   return { main, editions };
 }
 
-/** "Activity [+ Add] Milestone · Oct 28, 2026 · 1 ›" inside a Sell row. */
-export function NftActivityLine({ target }: { target: NftTarget }) {
+/** The NFT screen's Activity row: the latest entry and how many, opening the history (Add is there). */
+export function NftActivityRow({ target }: { target: NftTarget }) {
   const { project, view, viewer } = useEarn();
   const { hydrated, record } = useJourney(project.id);
-  const [open, setOpen] = React.useState<"list" | "add" | null>(null);
+  const [open, setOpen] = React.useState(false);
   if (!hydrated) return null;
   const canWrite = can(viewer, "activity.write", view.canCtx);
   const stored = activitiesOf(record, target);
@@ -118,30 +123,17 @@ export function NftActivityLine({ target }: { target: NftTarget }) {
   if (!latest && !canWrite) return null;
   const name = nameOf(target, project.name, view.products);
   return (
-    <div className="flex flex-col gap-1">
-      <p className={cn(T.meta, "flex flex-wrap items-center gap-x-4")}>
-        <span className="text-text-secondary">Activity</span>
-        {canWrite && (
-          <button type="button" onClick={() => setOpen("add")} aria-label={`Add activity for ${name}`} className={cn(LINK_SM, "-my-6 inline-flex min-h-[44px] items-center gap-1")}>
-            <Icon icon={Add01Icon} size={12} />
-            Add
-          </button>
-        )}
-        {!latest && <span className="text-text-secondary">None yet</span>}
-      </p>
-      {latest && (
-        <button
-          type="button"
-          onClick={() => setOpen("list")}
-          aria-label={`${name} activity: ${labelOf(latest)}, ${formatDate(latest.createdAt)}. History, ${stored.length}`}
-          className={cn(LINK_SM, "-my-5 inline-flex min-h-[44px] items-center self-start text-left")}
-        >
-          {`${labelOf(latest)} · ${formatDate(latest.createdAt)} · ${stored.length} ›`}
-        </button>
-      )}
-      {open === "list" && <NftHistory target={target} onClose={() => setOpen(null)} />}
-      {open === "add" && <NftActivityForm target={target} entry={null} onClose={() => setOpen(null)} />}
-    </div>
+    <>
+      <ActionRow
+        icon={Activity01Icon}
+        title="Activity"
+        meta={latest ? `${labelOf(latest)} · ${formatDate(latest.createdAt)}` : "None yet"}
+        value={stored.length > 0 ? String(stored.length) : undefined}
+        label={latest ? `${name} activity: ${labelOf(latest)}, ${formatDate(latest.createdAt)}. History, ${stored.length}` : `${name} activity: none yet`}
+        onClick={() => setOpen(true)}
+      />
+      {open && <NftHistory target={target} onClose={() => setOpen(false)} />}
+    </>
   );
 }
 
@@ -166,18 +158,23 @@ function NftHistory({ target, onClose }: { target: NftTarget; onClose: () => voi
   const name = nameOf(target, project.name, view.products);
   return (
     <>
-      <FullLayer title={`${NFT_WORD[target.kind]} activity`} onBack={onClose}>
-        <div className="flex flex-col gap-8 px-8 pb-12 pt-8">
+      <FullLayer
+        title={`${NFT_WORD[target.kind]} activity`}
+        onBack={onClose}
+        footer={
+          canWrite ? (
+            <BottomBar>
+              <Button size="xl" className="w-full" iconLeading={<Icon icon={Add01Icon} size={20} />} onClick={() => setForm({ entry: null })}>
+                Add activity
+              </Button>
+            </BottomBar>
+          ) : undefined
+        }
+      >
+        <div className="flex flex-col gap-8 px-8 pb-12 pt-4">
           <p className={T.meta}>{`${project.name} · ${name} · newest first. Buyers see these on the listing.`}</p>
-          {canWrite && (
-            <Button hierarchy="tonal" size="xl" className="w-full" iconLeading={<Icon icon={Add01Icon} size={20} />} onClick={() => setForm({ entry: null })}>
-              Add activity
-            </Button>
-          )}
           {entries.length === 0 ? (
-            <p className={T.meta}>
-              No activity yet. Add what buyers should know — an award, a deal, a sales report or what’s next.
-            </p>
+            <EmptyState icon={Activity01Icon} title="No activity yet" body="Add what buyers should know — an award, a deal, a sales report or what’s next." />
           ) : (
             <ul aria-label={`${NFT_WORD[target.kind]} activity`} className={cn(LIST_CARD, LIST_DIVIDERS)}>
               {entries.map((e) => (
@@ -309,6 +306,7 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
   const ids = useFieldIds(["type", "name", "description", "media"] as const);
   const [type, setType] = React.useState(entry?.type ?? "");
   const [picking, setPicking] = React.useState(false);
+  const [info, setInfo] = React.useState(false);
   const [customName, setCustomName] = React.useState(entry?.customName ?? "");
   const [description, setDescription] = React.useState(entry?.description ?? "");
   const [urls, setUrls] = React.useState<string[]>(entry?.urls ?? []);
@@ -448,23 +446,16 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
       <FullLayer
         title={mode === "add" ? "Add new activity" : "Edit activity"}
         onBack={onClose}
+        actions={[{ icon: InformationCircleIcon, label: "About activity", onClick: () => setInfo(true) }]}
         footer={
-          <BottomBar className="flex-row gap-6 pt-8">
-            <Button hierarchy="secondary" size="xl" className="flex-1" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button size="xl" className="flex-1" type="submit" form={formId} loading={busy}>
+          <BottomBar>
+            <Button size="xl" className="w-full" type="submit" form={formId} loading={busy}>
               {mode === "add" ? "Add now" : "Update"}
             </Button>
           </BottomBar>
         }
       >
-        <form id={formId} onSubmit={submit} noValidate className="flex flex-col gap-8 px-8 pb-12">
-          <p className={T.body}>
-            {mode === "add"
-              ? "Add at least one photo, video, PDF or document as proof — people who buy it see it in the journey. Everything is required unless it says optional."
-              : "Changes update this entry in the journey. It keeps at least one file."}
-          </p>
+        <form id={formId} onSubmit={submit} noValidate className="flex flex-col gap-8 px-8 pb-12 pt-4">
           <Field label="Activity type" htmlFor={ids.type.id} error={typeError} errorId={ids.type.errorId}>
             <button
               id={ids.type.id}
@@ -527,9 +518,14 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
             </div>
           </div>
           <div className="flex flex-col gap-3">
-            <p id={ids.media.id} className={T.rowTitle}>
-              Attach media
-            </p>
+            <div className="flex flex-col gap-1">
+              <p id={ids.media.id} className={T.rowTitle}>
+                Attach media
+              </p>
+              <p className={T.meta}>
+                {mode === "add" ? "Add at least one photo, video, PDF or document as proof." : "It keeps at least one file."}
+              </p>
+            </div>
             <button
               type="button"
               aria-describedby={mediaError ? ids.media.errorId : undefined}
@@ -606,6 +602,13 @@ function NftActivityForm({ target, entry, onClose }: { target: NftTarget; entry:
           </div>
         </form>
       </FullLayer>
+      <Sheet open={info} onClose={() => setInfo(false)} title={mode === "add" ? "Add new activity" : "Edit activity"}>
+        <p className={cn(T.body, "pb-8")}>
+          {mode === "add"
+            ? "Add at least one photo, video, PDF or document as proof — people who buy it see it in the journey. Everything is required unless it says optional."
+            : "Changes update this entry in the journey. It keeps at least one file."}
+        </p>
+      </Sheet>
       <Sheet open={picking} onClose={() => setPicking(false)} title={`${NFT_WORD[target.kind]} activity type`}>
         <ul role="radiogroup" aria-label={`${NFT_WORD[target.kind]} activity type`} className="-mx-2 flex flex-col pb-8">
           {types.map((t) => (

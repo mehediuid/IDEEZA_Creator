@@ -2,19 +2,25 @@
 
 // The listing terms on the phone (Figma 13, 13f, 13h, 13i, 14j): the web's
 // ONE listing form (components/projects/listing/listing-fields.tsx) with the
-// same props, order, words and rules (`listingProblems`; the caller decides
-// which messages show), laid out as the Figma draws it at 375 px: every field
-// full width; selects are A06 pick-one sheets; Listing type is the A15 Button
-// Group; Minting type is two radio cards (`mintTypeOptions`); Token above
-// Price; Selling percentage a select (13i); the share-sale note as a warning
-// alert; Holder benefits with Add benefit; the ownership box. Edit locks the
-// first four (Blockchain, Collection, Listing type, Minting type).
+// same props, words and rules (`listingProblems`; the caller decides which
+// messages show), laid out as a phone form (mobile UX pass 2026-11-15):
+// · what the mint already fixed (Blockchain, Collection; Edit adds Listing
+//   type and Minting type) as one read-only list, "Set when it was minted."
+//   once; on a Brief, Blockchain and the collection picker;
+// · Listing type (the A15 Button Group) and its one line;
+// · the price with its Token beside it (Auction: Minimum bid, Buy now price,
+//   Auction ends);
+// · Selling percentage (13i) with its line and the share-sale note as one
+//   slim note (no banner);
+// · More options, closed, opening itself when a field inside it is wrong:
+//   Minting type (two radio cards, `mintTypeOptions`), Royalties, Holder
+//   benefits with Add benefit; its line says what is set;
+// · the ownership box.
 
 import * as React from "react";
-import { Calendar03Icon, Cancel01Icon, LockIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Calendar03Icon, Cancel01Icon, InformationCircleIcon, LockIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field } from "@/components/auth/auth-parts";
-import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { ButtonGroup } from "@/components/ideeza/button-group";
 import { Checkbox, Radio } from "@/components/ideeza/checkbox";
@@ -29,6 +35,7 @@ import { BENEFIT_DURATIONS, BENEFIT_NAME_MAX, BENEFITS_MAX, LOCKED_HELP, duratio
 import type { UtilityBenefit } from "@/lib/market/types";
 import { mintTypeOptions } from "@/lib/wallet/mint";
 import { cn } from "@/lib/utils";
+import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
 import { SheetSelect } from "../kit/sheet-select";
 import { T } from "../type";
 
@@ -63,17 +70,29 @@ function Hint({ id, text, error }: { id: string; text?: string; error?: string }
   ) : null;
 }
 
-/** A fact of the minted NFT: read-only, a lock, "Set when it was minted." */
-function LockedField({ label, value }: { label: string; value: string }) {
-  const id = React.useId();
+/** What the mint already fixed, as one read-only list with its lock and "Set when it was minted." once. */
+function LockedFacts({ rows }: { rows: readonly { label: string; value: string; note?: string }[] }) {
   const help = React.useId();
   return (
-    <Field label={label} htmlFor={id}>
-      <TextInput id={id} size="xl" value={value} readOnly aria-describedby={help} containerClassName="bg-bg-surface-raised" suffix={<Icon icon={LockIcon} size={16} />} />
-      <span id={help} className={HINT}>
+    <div className="flex flex-col gap-3">
+      <ul aria-label="Set when it was minted" aria-describedby={help} className={cn(LIST_CARD, LIST_DIVIDERS, "bg-bg-surface-raised")}>
+        {rows.map((r) => (
+          <li key={r.label} className="flex min-h-[44px] items-start justify-between gap-6 px-8 py-5">
+            <span className={cn(T.body, "shrink-0")}>{r.label}</span>
+            <span className="flex min-w-0 flex-col items-end gap-1 text-right">
+              <span className={cn(T.body, "break-words text-text-primary")}>{r.value}</span>
+              {r.note && <span className={cn(T.meta, "break-words")}>{r.note}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p id={help} className={cn(HINT, "flex items-center gap-2")}>
+        <span aria-hidden className="text-[color:var(--color-icon-secondary)]">
+          <Icon icon={LockIcon} size={14} />
+        </span>
         {LOCKED_HELP}
-      </span>
-    </Field>
+      </p>
+    </div>
   );
 }
 
@@ -92,7 +111,11 @@ export function ListingFields({
   now,
   newBenefitId,
   collectionField,
-}: ListingFieldsProps) {
+  beforeConfirm,
+}: ListingFieldsProps & {
+  /** The Brief's own fields that go before the ownership box (the license). */
+  beforeConfirm?: React.ReactNode;
+}) {
   const ids = {
     network: React.useId(),
     type: React.useId(),
@@ -107,6 +130,7 @@ export function ListingFields({
     err: React.useId(),
     benefits: React.useId(),
     confirm: React.useId(),
+    more: React.useId(),
   };
   const errId = (k: string) => `${ids.err}-${k}`;
   const endsRef = React.useRef<HTMLInputElement>(null);
@@ -135,28 +159,59 @@ export function ListingFields({
     </Field>
   );
 
+  // Minting type: locked once listed (Edit) or once on chain; a fact of the mint then.
+  const mintOpts = network ? mintTypeOptions({ intent: "sell", current: mintStatus, network, locked: editing, address: mintAddress }) : null;
+  const mintLocked = mintOpts?.locked ? (mintStatus === "onChain" ? (mintOpts.lockedText?.title ?? "Minted on chain") : (mintOpts.options.find((o) => o.type === value.mintingType)?.title ?? mintOpts.lockedText?.title ?? "")) : null;
+  const mintPicked = mintOpts && !mintOpts.locked ? (mintOpts.options.find((o) => o.type === value.mintingType)?.title ?? null) : null;
+  const locked = [
+    ...(mode === "brief" ? [] : [{ label: "Blockchain", value: networkLabel }, { label: "Collection", value: value.collection || "Not known" }]),
+    ...(editing ? [{ label: "Listing type", value: typeLabel }] : []),
+    ...(mintLocked !== null ? [{ label: "Minting type", value: mintLocked, note: mintOpts?.lockedText?.note }] : []),
+  ];
+  // More options opens itself when a message inside it shows.
+  const [more, setMore] = React.useState(false);
+  const moreShown = more || !!errors.royalties || !!errors.benefits;
+  const named = value.benefits.length;
+  const moreLine = [
+    mintPicked,
+    value.royalties.trim() ? `Royalties ${value.royalties.trim()}%` : null,
+    named ? `${named} holder ${named === 1 ? "benefit" : "benefits"}` : "No holder benefits",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const tokenField = (
+    <Field label="Token" htmlFor={ids.token}>
+      <SheetSelect id={ids.token} title="Token" placeholder="Token" value={value.token ?? ""} options={tokens} onChange={(t) => onChange({ token: t as Token })} />
+    </Field>
+  );
+  /** An amount with its Token beside it (one row: the price and its unit). */
+  const withToken = (field: React.ReactNode) => (
+    <div className="grid grid-cols-[minmax(0,1fr)_112px] items-start gap-4">
+      {field}
+      {tokenField}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-8">
-      {mode === "brief" ? (
-        <Field label="Blockchain" htmlFor={ids.network}>
-          <SheetSelect
-            id={ids.network}
-            title="Blockchain"
-            placeholder="Select a blockchain"
-            value={network ?? ""}
-            options={NETWORK_OPTIONS}
-            onChange={(n) => onChange({ network: n as Network, token: TOKENS_BY_NETWORK[n as Network][0], collection: "" })}
-          />
-        </Field>
-      ) : (
-        <LockedField label="Blockchain" value={networkLabel} />
+      {mode === "brief" && (
+        <>
+          <Field label="Blockchain" htmlFor={ids.network}>
+            <SheetSelect
+              id={ids.network}
+              title="Blockchain"
+              placeholder="Select a blockchain"
+              value={network ?? ""}
+              options={NETWORK_OPTIONS}
+              onChange={(n) => onChange({ network: n as Network, token: TOKENS_BY_NETWORK[n as Network][0], collection: "" })}
+            />
+          </Field>
+          {collectionField}
+        </>
       )}
+      {locked.length > 0 && <LockedFacts rows={locked} />}
 
-      {mode === "brief" ? collectionField : <LockedField label="Collection" value={value.collection || "Not known"} />}
-
-      {editing ? (
-        <LockedField label="Listing type" value={typeLabel} />
-      ) : (
+      {!editing && (
         <div className="flex flex-col gap-3">
           <span id={ids.type} className={T.label}>
             Listing type
@@ -172,14 +227,9 @@ export function ListingFields({
         </div>
       )}
 
-      {network && <MintTypeCards value={value.mintingType} onChange={(mintingType) => onChange({ mintingType })} network={network} current={mintStatus} locked={editing} address={mintAddress} />}
-
-      <Field label="Token" htmlFor={ids.token}>
-        <SheetSelect id={ids.token} title="Token" placeholder="Token" value={value.token ?? ""} options={tokens} onChange={(t) => onChange({ token: t as Token })} />
-      </Field>
       {auction ? (
         <>
-          {amount("minBid", ids.minBid, "Minimum bid", "e.g. 0.001")}
+          {withToken(amount("minBid", ids.minBid, "Minimum bid", "e.g. 0.001"))}
           {amount("auctionBuyNow", ids.buyNow, "Buy now price (optional)", "e.g. 0.5")}
           <Field label="Auction ends" htmlFor={ids.ends} error={errors.endsAt} errorId={errId("endsAt")}>
             <div className="flex items-center gap-4">
@@ -213,7 +263,7 @@ export function ListingFields({
           </Field>
         </>
       ) : (
-        amount("price", ids.price, "Price", "e.g. 0.001")
+        withToken(amount("price", ids.price, "Price", "e.g. 0.001"))
       )}
 
       <Field label="Selling percentage" htmlFor={ids.percent} error={errors.percentSelling} errorId={errId("percentSelling")}>
@@ -230,68 +280,99 @@ export function ListingFields({
           }}
         />
         <Hint id={`${ids.hint}-pct`} text="How much of the project's ownership this sale passes to whoever buys it." error={errors.percentSelling} />
-      </Field>
-
-      <Banner tone="attention">{SHARE_SALE_NOTE}</Banner>
-
-      <Field label="Royalties (%)" htmlFor={ids.royalties} error={errors.royalties} errorId={errId("royalties")}>
-        <TextInput
-          id={ids.royalties}
-          size="xl"
-          value={value.royalties}
-          onValueChange={(v) => onChange({ royalties: percent(v) })}
-          onBlur={() => onLeave("royalties")}
-          inputMode="decimal"
-          placeholder="Suggested: 2%, 2.5%, 5% Maximum is 10%"
-          invalid={!!errors.royalties}
-          aria-invalid={!!errors.royalties || undefined}
-          aria-describedby={errors.royalties ? errId("royalties") : `${ids.hint}-roy`}
-        />
-        <Hint id={`${ids.hint}-roy`} text={`${ROYALTY_MEANING} Between 2 and 10%, one decimal place.`} error={errors.royalties} />
-      </Field>
-
-      <section aria-labelledby={ids.benefits} className="flex flex-col gap-3">
-        <h3 id={ids.benefits} className={T.label}>
-          Holder benefits (optional)
-        </h3>
-        <p className={HINT}>
-          Perks people get while they hold this NFT, like a private group or a subscription.
-          {editing && " Changes apply to future sales only."}
+        <p className={cn(HINT, "flex items-start gap-2")}>
+          <span aria-hidden className="mt-[2px] shrink-0 text-[color:var(--color-icon-secondary)]">
+            <Icon icon={InformationCircleIcon} size={14} />
+          </span>
+          <span className="min-w-0 flex-1">{SHARE_SALE_NOTE}</span>
         </p>
-        {value.benefits.length > 0 && (
-          <ul className="flex flex-col gap-6">
-            {value.benefits.map((b, i) => (
-              <BenefitRow
-                key={b.id}
-                benefit={b}
-                n={i + 1}
-                error={errors.benefits && !b.name.trim() ? errors.benefits : undefined}
-                onName={(name) => setBenefit(b.id, { name })}
-                onDuration={(key) => setBenefit(b.id, { duration: durationOf(key) })}
-                onLeave={() => onLeave("benefits")}
-                onRemove={() => onChange({ benefits: value.benefits.filter((x) => x.id !== b.id) })}
-              />
-            ))}
-          </ul>
-        )}
-        {value.benefits.length < BENEFITS_MAX ? (
-          <div>
-            <Button
-              hierarchy="secondary"
+      </Field>
+
+      <section aria-labelledby={ids.more} className="flex flex-col gap-6">
+        <button
+          type="button"
+          aria-expanded={moreShown}
+          aria-controls={`${ids.more}-panel`}
+          onClick={() => setMore((o) => !o)}
+          className="-my-3 flex min-h-[44px] w-full items-center gap-4 text-left outline-none focus-visible:underline"
+        >
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span id={ids.more} className={T.rowTitle}>
+              More options
+            </span>
+            {!moreShown && <span className={cn(HINT, "break-words")}>{moreLine}</span>}
+          </span>
+          <span aria-hidden className={cn("inline-flex shrink-0 text-[color:var(--color-icon-default)] transition-transform duration-fast motion-reduce:transition-none", moreShown && "rotate-180")}>
+            <Icon icon={ArrowDown01Icon} size={20} />
+          </span>
+        </button>
+        <div id={`${ids.more}-panel`} hidden={!moreShown} className={cn("flex-col gap-8", moreShown ? "flex" : "hidden")}>
+          {network && mintLocked === null && (
+            <MintTypeCards value={value.mintingType} onChange={(mintingType) => onChange({ mintingType })} network={network} current={mintStatus} locked={editing} address={mintAddress} />
+          )}
+
+          <Field label="Royalties (%)" htmlFor={ids.royalties} error={errors.royalties} errorId={errId("royalties")}>
+            <TextInput
+              id={ids.royalties}
               size="xl"
-              iconLeading={<Icon icon={PlusSignIcon} size={20} />}
-              onClick={() => onChange({ benefits: [...value.benefits, { id: newBenefitId(), name: "", duration: { months: 12 } }] })}
-            >
-              Add benefit
-            </Button>
-          </div>
-        ) : (
-          <p className={HINT}>Up to 5 benefits.</p>
-        )}
+              value={value.royalties}
+              onValueChange={(v) => onChange({ royalties: percent(v) })}
+              onBlur={() => onLeave("royalties")}
+              inputMode="decimal"
+              placeholder="Suggested: 2%, 2.5%, 5% Maximum is 10%"
+              invalid={!!errors.royalties}
+              aria-invalid={!!errors.royalties || undefined}
+              aria-describedby={errors.royalties ? errId("royalties") : `${ids.hint}-roy`}
+            />
+            <Hint id={`${ids.hint}-roy`} text={`${ROYALTY_MEANING} Between 2 and 10%, one decimal place.`} error={errors.royalties} />
+          </Field>
+
+          <section aria-labelledby={ids.benefits} className="flex flex-col gap-3">
+            <h3 id={ids.benefits} className={T.label}>
+              Holder benefits (optional)
+            </h3>
+            <p className={HINT}>
+              Perks people get while they hold this NFT, like a private group or a subscription.
+              {editing && " Changes apply to future sales only."}
+            </p>
+            {value.benefits.length > 0 && (
+              <ul className="flex flex-col gap-6">
+                {value.benefits.map((b, i) => (
+                  <BenefitRow
+                    key={b.id}
+                    benefit={b}
+                    n={i + 1}
+                    error={errors.benefits && !b.name.trim() ? errors.benefits : undefined}
+                    onName={(name) => setBenefit(b.id, { name })}
+                    onDuration={(key) => setBenefit(b.id, { duration: durationOf(key) })}
+                    onLeave={() => onLeave("benefits")}
+                    onRemove={() => onChange({ benefits: value.benefits.filter((x) => x.id !== b.id) })}
+                  />
+                ))}
+              </ul>
+            )}
+            {value.benefits.length < BENEFITS_MAX ? (
+              <div>
+                <Button
+                  hierarchy="secondary"
+                  size="xl"
+                  iconLeading={<Icon icon={PlusSignIcon} size={20} />}
+                  onClick={() => onChange({ benefits: [...value.benefits, { id: newBenefitId(), name: "", duration: { months: 12 } }] })}
+                >
+                  Add benefit
+                </Button>
+              </div>
+            ) : (
+              <p className={HINT}>Up to 5 benefits.</p>
+            )}
+          </section>
+        </div>
       </section>
 
+      {beforeConfirm}
+
       <div className="flex flex-col gap-2">
-        <label className="relative flex cursor-pointer items-start gap-6">
+        <label className="relative flex min-h-[44px] cursor-pointer items-start gap-6 py-2">
           <input
             type="checkbox"
             className="sr-only"
@@ -304,7 +385,7 @@ export function ListingFields({
             }}
           />
           <Checkbox checked={value.confirmOwner} decorative className="mt-1" />
-          <span className={cn(T.meta, "text-text-primary")}>
+          <span className={cn(T.body, "text-text-primary")}>
             I confirm I&apos;m the rightful owner of this project, virtually and physically, and I take responsibility for any legal or
             intellectual-property issue it raises.
           </span>

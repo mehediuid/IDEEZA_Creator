@@ -1,11 +1,13 @@
 "use client";
 
 // Add to marketplace and Edit listing (Figma 13's terms on the Sell tab, 14j;
-// the web's listing-dialog.tsx), as a pushed full screen: the Testnet demo
-// line, the videos-ready line (Add), the shared listing terms (Edit locks the
-// first four), the cost and the wallet's line, "Each sale", then Cancel ·
-// Add to marketplace / Update in the bottom bar with the first missing thing
-// under it. One wallet request through the phone's sheet:
+// the web's listing-dialog.tsx), as a pushed full screen (mobile UX pass
+// 2026-11-15): what is listed with the Testnet demo chip, the videos-ready
+// line (Add), the shared listing terms (what the mint fixed as one read-only
+// list; Edit adds the listing type and minting type), then one summary card —
+// the cost, the wallet's line and "Each sale" — and Add to marketplace /
+// Update as the bottom bar's one primary with the first missing thing under
+// it (Back closes). One wallet request through the phone's sheet:
 // · Add — the mint's request when the project still needs one (lazy or
 //   instant), else a free signature; at confirm the record, then the listing,
 //   are written; a refused listing write puts the record back.
@@ -19,7 +21,7 @@ import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import type { ListingField } from "@/components/projects/listing/listing-fields";
 import { makerShareNow, refusedCopy, sellRecheckOf } from "@/components/projects/listing/listing-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
-import { MintCostRows, WalletFactLine, useMintShortfall } from "@/components/wallet/mint-cost";
+import { useMintShortfall } from "@/components/wallet/mint-cost";
 import { useMint } from "@/components/wallet/use-mint";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { estimateGas } from "@/lib/brief/gas";
@@ -50,7 +52,9 @@ import type { RequestResult } from "@/lib/wallet/types";
 import { BottomBar } from "../../kit/bottom-bar";
 import { useEarn } from "../context";
 import { ListingFields } from "../listing-fields";
+import { CostCard, WalletLine } from "../mint/mint-steps";
 import { FullLayer, SUB } from "./parts";
+import { LIST_CARD } from "../../kit/list";
 import { cn } from "@/lib/utils";
 import { T } from "../../type";
 
@@ -215,14 +219,11 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
       title={editing ? "Edit listing" : "Add to marketplace"}
       onBack={close}
       footer={
-        <BottomBar className="pt-8">
-          <div className="flex gap-6">
-            <Button hierarchy="secondary" size="xl" className="flex-1" disabled={busy} onClick={close}>
-              Cancel
-            </Button>
+        <BottomBar>
+          <div className="flex">
             <Button
               size="xl"
-              className="flex-1"
+              className="w-full"
               loading={busy}
               aria-disabled={firstReason ? true : undefined}
               aria-describedby={firstReason ? reasonId : undefined}
@@ -239,14 +240,15 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
         </BottomBar>
       }
     >
-      <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-8 px-8 pb-12">
-        <p className={T.meta}>{`Main NFT · ${project.name}`}</p>
-        <p className={cn(T.body, "flex flex-wrap items-center gap-3")}>
-          <TestnetDemoBadge />
-          {DEMO_LINE}
-        </p>
+      <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-8 px-8 pb-12 pt-4">
+        <div className="flex flex-col gap-2">
+          <p className={cn(T.meta, "flex flex-wrap items-center gap-x-3 gap-y-1")}>
+            <span className="min-w-0 break-words">{`Main NFT · ${project.name}`}</span>
+            <TestnetDemoBadge />
+          </p>
+          {!editing && <p className={cn(T.meta, "text-text-success")}>{VIDEOS_READY_LINE}</p>}
+        </div>
         {error && <Banner tone="error">{error}</Banner>}
-        {!editing && <p className={cn(T.rowTitle, "text-text-success")}>{VIDEOS_READY_LINE}</p>}
         <ListingFields
           mode={editing ? "edit" : "add"}
           value={input}
@@ -259,45 +261,48 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
           now={now}
           newBenefitId={() => randomId("ben_")}
         />
-        {network && (
-          <div className="flex flex-col gap-6">
-            {editing ? (
-              <section className="flex flex-col gap-3 rounded-xl bg-bg-surface-raised p-8">
-                <span className={cn(T.label, "text-text-tertiary")}>Cost</span>
-                <p className={T.body}>
-                  {editing.mintingType === "instant" ? "Changing an on-chain listing costs a network fee." : "Nothing to pay — you sign the new terms."}
-                </p>
-                {editing.mintingType === "instant" && gas && (
-                  <p className={cn(T.rowTitle, "flex flex-wrap justify-between gap-x-6 text-text-secondary")}>
-                    <span>{gas.label}</span>
-                    <span className="tabular-nums">{`${gas.fee} ${gas.native} ${gas.note}`}</span>
+        <section aria-label="Cost and each sale" className={cn(LIST_CARD, "gap-6 p-8")}>
+          {network && (
+            <>
+              {editing ? (
+                <div className="flex flex-col gap-3">
+                  <h3 className={T.section}>Cost</h3>
+                  <p className={T.body}>
+                    {editing.mintingType === "instant" ? "Changing an on-chain listing costs a network fee." : "Nothing to pay — you sign the new terms."}
                   </p>
-                )}
-              </section>
-            ) : mintStatus === "onChain" ? (
-              <section className="flex flex-col gap-3 rounded-xl bg-bg-surface-raised p-8">
-                <span className={cn(T.label, "text-text-tertiary")}>Cost</span>
-                <p className={T.body}>Nothing to pay now — the token is already on chain. You sign the listing.</p>
-              </section>
-            ) : (
-              <MintCostRows type={input.mintingType} network={network} intent="sell" listing={costRow} />
-            )}
-            <WalletFactLine type={(editing ? editing.mintingType === "instant" : mints && input.mintingType === "instant") ? "instant" : "lazy"} network={network} />
-          </div>
-        )}
-        <section aria-label="Each sale" className="flex flex-col gap-2 rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-6">
-          <span className={cn(T.label, "text-text-tertiary")}>Each sale</span>
-          {summary.map((r, i) => (
-            <p key={i} className={T.body}>
-              {r.label ? (
-                <>
-                  <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>
-                </>
+                  {editing.mintingType === "instant" && gas && (
+                    <p className={cn(T.rowTitle, "flex flex-wrap justify-between gap-x-6 text-text-secondary")}>
+                      <span>{gas.label}</span>
+                      <span className="tabular-nums">{`${gas.fee} ${gas.native} ${gas.note}`}</span>
+                    </p>
+                  )}
+                </div>
+              ) : mintStatus === "onChain" ? (
+                <div className="flex flex-col gap-3">
+                  <h3 className={T.section}>Cost</h3>
+                  <p className={T.body}>Nothing to pay now — the token is already on chain. You sign the listing.</p>
+                </div>
               ) : (
-                r.value
+                <CostCard type={input.mintingType} network={network} intent="sell" listing={costRow} />
               )}
-            </p>
-          ))}
+              <WalletLine type={(editing ? editing.mintingType === "instant" : mints && input.mintingType === "instant") ? "instant" : "lazy"} network={network} badge={false} ruled />
+            </>
+          )}
+          <div className="flex flex-col gap-2 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
+            <h3 className={T.section}>Each sale</h3>
+            {summary.map((r, i) => (
+              <p key={i} className={T.body}>
+                {r.label ? (
+                  <>
+                    <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>
+                  </>
+                ) : (
+                  r.value
+                )}
+              </p>
+            ))}
+          </div>
+          <p className={T.meta}>{DEMO_LINE}</p>
         </section>
       </div>
     </FullLayer>
