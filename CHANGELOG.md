@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-011](#cl-011-redeem-a-code-for-ai-credits) | Redeem a code for AI credits | 16 Nov 2026 | Not created yet | Not started |
 | [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere) | Mobile app: native mobile UX everywhere | 15 Nov 2026 | None (owner: no ticket) | Not started |
 | [CL-009](#cl-009-mobile-app-splash-onboarding-welcome-and-log-in) | Mobile app: splash, onboarding, Welcome and Log In | 9 Nov 2026 | Not created yet | Not started |
 | [CL-008](#cl-008-mobile-app-create-flow-the-image-first-the-3d-as-the-result) | Mobile app create flow: the image first, the 3D as the result | 9 Nov 2026 | Not created yet | Not started |
@@ -38,6 +39,47 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-011 Redeem a code for AI credits
+
+**In the prototype:** 16 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Plan & pricing › Credits (`/settings/plan?tab=credits`): a new card between the three credit packs and Custom amount. Figma has no design for it; it is built from the page's own card and design system parts.
+
+### What to build
+
+- [ ] A card titled **Redeem a code**, with one line under the title: "Got a credit code from IDEEZA or an event? Enter it and its credits go straight into your balance."
+- [ ] A text field (placeholder **Enter code**) with a **Redeem** button beside it. Enter in the field redeems too. What is typed shows in capitals; spaces and letter case don't matter (" ideeza 100" is IDEEZA100).
+- [ ] A code has three things: the code, how many credits it adds, and the last day it can be redeemed (it works to the end of that day, UTC).
+- [ ] Each code works once per account.
+- [ ] A valid code adds its credits to the balance at once. The field clears, and a green line under it says: "{N} credits added from {CODE}, valid for 12 months. Your balance is now {B} credits." The **Current balance** at the top of the page shows the new total.
+- [ ] Redeemed credits are valid for 12 months from the day they are redeemed, the same as bought credits, and are spent the same way (the credits that expire first are used first).
+- [ ] **Credit history** lists the code as its own line: Type "Code {CODE}", the date, the credits, what remains, the expiry date, and Price "Free". The mobile app's credit history shows the same line.
+- [ ] When a code doesn't work, the field shows its error state and a red line under it says why. Typing again clears the line.
+  - Nothing typed: "Type a code first."
+  - Unknown code: "Sorry, this code is not valid. Check the spelling and try again."
+  - A plan coupon typed here: "{CODE} is a plan coupon. Use it when you buy a plan."
+  - Past its last day: "Sorry, this code ended on {day month year}."
+  - Already redeemed on this account: "You've already redeemed this code. Each one works once."
+- [ ] On a phone-width browser the card stacks: the title, the line, then the field and **Redeem** in one row, the message under them.
+
+Demo stand-ins (prototype only): the codes IDEEZA100 (100 credits), WELCOME50 (50), EVENT250 (250) and BETA20 (ended 31 Oct 2026).
+
+### Design
+
+- The Custom amount card's frame: radius 2xl, 1 px border, surface fill, 24 px padding.
+- Title 20 semibold; the line Body 14, secondary text.
+- DS Text Input 40 and Button Tonal 40, as in the plan checkout's coupon field.
+- The message is Support Text 12/16: the input error colour for a problem, the success text colour when credits were added.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the three packs, then Custom amount](docs/changelog/2026-11-16-redeem-code-before.png) | ![After: Redeem a code between the packs and Custom amount, after redeeming IDEEZA100](docs/changelog/2026-11-16-redeem-code-after.png) |
 
 ---
 
