@@ -62,7 +62,7 @@ export function ProductMedia({ project, className }: { project: NonNullable<Part
  * The event clock, scoreboard style: days, hours, minutes, seconds in their
  * own cells. Screen readers get one sentence, not a ticking number.
  */
-export function Clock({ to, now, label, size = "lg", onBrand }: { to: number; now: number | null; label: string; size?: "md" | "lg"; onBrand?: boolean }) {
+export function Clock({ to, now, label, size = "lg" }: { to: number; now: number | null; label: string; size?: "md" | "lg" }) {
   const t = countdownParts(to, now);
   const cells: [string, string][] = [
     [t.d, "days"],
@@ -72,7 +72,7 @@ export function Clock({ to, now, label, size = "lg", onBrand }: { to: number; no
   ];
   return (
     <div className="flex flex-col gap-4">
-      <span className={cn("text-md font-medium leading-md", onBrand ? "text-[color:color-mix(in_srgb,var(--color-white)_86%,transparent)]" : "text-[color:var(--color-text-secondary)]")}>{label}</span>
+      <span className="text-md font-medium leading-md text-[color:var(--color-text-secondary)]">{label}</span>
       <div role="timer" aria-label={`${label} ${t.d} days ${t.h} hours ${t.m} minutes`} className="flex gap-3 md:gap-4">
         {cells.map(([v, l]) => (
           <div
@@ -80,12 +80,12 @@ export function Clock({ to, now, label, size = "lg", onBrand }: { to: number; no
             aria-hidden
             className={cn(
               "flex flex-col items-center justify-center rounded-xl",
-              onBrand ? "bg-[color:color-mix(in_srgb,var(--color-black)_22%,transparent)]" : SURFACE,
+              SURFACE,
               size === "lg" ? "h-[84px] w-[76px] md:h-[96px] md:w-[88px]" : "h-[68px] w-[64px]",
             )}
           >
             <span className={cn("font-display font-semibold tabular-nums text-[color:var(--color-text-primary)]", size === "lg" ? "text-5xl leading-5xl md:text-6xl md:leading-6xl" : "text-4xl leading-4xl")}>{v}</span>
-            <span className={cn("text-xs leading-xs", onBrand ? "text-[color:color-mix(in_srgb,var(--color-white)_76%,transparent)]" : "text-[color:var(--color-text-tertiary)]")}>{l}</span>
+            <span className="text-xs leading-xs text-[color:var(--color-text-tertiary)]">{l}</span>
           </div>
         ))}
       </div>

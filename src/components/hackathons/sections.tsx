@@ -6,16 +6,16 @@
 //    bar, not three loose chips), side by side with a hairline between;
 //  - Timeline: one track across the four phases, filled up to now;
 //  - FaqAndRules: questions as a ruled list, the terms beside them;
-//  - Closing: the one brand-coloured panel — the clock and Join again.
+//  - Closing: full screen over a wall of the builds — the clock and Join again.
 
 import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { HACKATHON, type Phase } from "@/lib/hackathons/vibe-inventing";
-import { eat, useHackathon } from "./context";
+import { HACKATHON, money, prizePool, type Phase } from "@/lib/hackathons/vibe-inventing";
+import { countdownParts, eat, useHackathon, useReducedMotion } from "./context";
 import { JoinButton, VoteLink } from "./actions";
-import { Clock, Heading, Initials, SECTION } from "./parts";
+import { Heading, Initials, SECTION } from "./parts";
 
 const ANCHORS = [
   ["prizes", "Prizes"],
@@ -246,28 +246,90 @@ export function FaqAndRules() {
   );
 }
 
-/** The last word: one brand-coloured panel with the clock and Join. */
+// The wall comes in two cuts: 3 × 3 wide for screens from 768 px, 2 × 6 tall for
+// phones (the wide one, cropped to a phone, showed one giant tile).
+const WALL = {
+  wide: { video: "/hackathons/closing-wall.mp4", poster: "/hackathons/closing-wall.jpg" },
+  tall: { video: "/hackathons/closing-wall-phone.mp4", poster: "/hackathons/closing-wall-phone.jpg" },
+};
+const WIDE = "(min-width: 768px)";
+function subscribeWide(on: () => void) {
+  const q = window.matchMedia(WIDE);
+  q.addEventListener("change", on);
+  return () => q.removeEventListener("change", on);
+}
+
+/** "Building ends in 6 days · 08:04:38" — the closing line's clock, one line of caps. */
+function closingClock(phase: Phase | null, now: number | null): string {
+  if (phase === "judging" || phase === "results") return `Building has ended · winners on ${eat(HACKATHON.dates.results)}`;
+  const to = phase === "registration" || phase === "soon" ? HACKATHON.dates.start : HACKATHON.dates.end;
+  const t = countdownParts(to, now);
+  const days = Number(t.d);
+  return `Building ${phase === "registration" || phase === "soon" ? "starts" : "ends"} in ${Number.isNaN(days) ? "--" : days} ${days === 1 ? "day" : "days"} · ${t.h}:${t.m}:${t.s}`;
+}
+
+/**
+ * The last word, full screen (owner 2026-11-16: the concept from their brief,
+ * in our fonts, colours and words). Behind it, a wall of the builds — product
+ * clips in one loop (`public/hackathons/closing-wall*.mp4`: 3 × 3 wide, 2 × 6
+ * for phones, made with ffmpeg from the Innovations clips with their caption
+ * strips cropped), darkened and
+ * washed in violet so the words own the screen. On it: the promise and the
+ * prize in two short lines, the clock in one line of caps, the headline with
+ * its second line shining, and Join with an arrow that steps forward. The
+ * clip loads only when the section is near, and stays a still picture for
+ * reduced motion. It fills the screen under the site bar and section bar.
+ */
 export function Closing() {
   const { now, phase } = useHackathon();
-  const building = phase === null || phase === "registration" || phase === "live";
+  const still = useReducedMotion();
+  const wide = React.useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
+  const cut = wide ? WALL.wide : WALL.tall;
+  const ref = React.useRef<HTMLElement>(null);
+  const [near, setNear] = React.useState(false);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => e?.isIntersecting && setNear(true), { rootMargin: "600px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <section aria-labelledby="closing-title" className="mx-auto w-full max-w-[1260px] px-8 pb-32 pt-8 md:pb-40 xl:px-0">
-      <div className="relative isolate overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,var(--color-violet-600),var(--color-violet-800))] px-8 py-20 md:px-20 md:py-24">
-        <div aria-hidden className="pointer-events-none absolute right-[-160px] top-[-200px] -z-10 size-[560px] rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-violet-300)_40%,transparent),transparent)]" />
-        <div className="grid grid-cols-1 items-end gap-16 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="flex flex-col gap-8">
-            <h2 id="closing-title" className="max-w-[640px] font-display text-6xl font-bold leading-6xl tracking-snug text-[color:var(--color-white)] [text-wrap:balance] md:text-7xl md:leading-7xl">
-              Put your university on the board.
-            </h2>
-            <p className="max-w-[560px] text-xl leading-xl text-[color:color-mix(in_srgb,var(--color-white)_86%,transparent)]">
-              {HACKATHON.minProducts} products, 160 hours, {HACKATHON.prizes[0].toLocaleString("en-US")} {HACKATHON.currency} for first place. Join today and start your first product.
-            </p>
-            <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:flex-wrap">
-              <JoinButton tone="inverse" className="w-full sm:w-auto" />
-              <VoteLink className="w-full sm:w-auto" />
-            </div>
+    <section ref={ref} aria-labelledby="closing-title" className="relative isolate flex min-h-[calc(100svh-140px)] flex-col overflow-hidden">
+      <div aria-hidden className="absolute inset-0 -z-10">
+        <picture>
+          <source media={WIDE} srcSet={WALL.wide.poster} />
+          <img src={WALL.tall.poster} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        </picture>
+        {near && !still ? <video key={cut.video} src={cut.video} poster={cut.poster} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" /> : null}
+        {/* Darken, wash in violet, and fade both edges into the page. */}
+        <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--color-bg-page)_74%,transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(60%_55%_at_50%_58%,color-mix(in_srgb,var(--color-violet-700)_55%,transparent),transparent)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,var(--color-bg-page)_0%,transparent_22%,transparent_78%,var(--color-bg-page)_100%)]" />
+      </div>
+
+      <div className="mx-auto flex w-full max-w-[1260px] flex-1 flex-col px-8 pb-24 pt-20 md:pt-24 xl:px-0">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-16">
+          <p className="max-w-[440px] text-md leading-md text-[color:color-mix(in_srgb,var(--color-white)_80%,transparent)] md:text-lg md:leading-lg">
+            {HACKATHON.minProducts} products in 160 hours. No engineering background needed: describe an idea, and IDEEZA AI designs the concept, PCB, code and 3D.
+          </p>
+          <p className="text-md leading-md text-[color:color-mix(in_srgb,var(--color-white)_80%,transparent)] md:text-lg md:leading-lg lg:text-right">
+            <b className="font-semibold text-[color:var(--color-white)]">{money(prizePool)}</b> in prizes
+            <br className="hidden lg:block" /> for the top three.
+          </p>
+        </div>
+
+        <div className="flex flex-1 flex-col items-center justify-center py-24 text-center">
+          <p className="text-sm font-medium uppercase leading-sm tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_80%,transparent)] md:text-md md:leading-md">{closingClock(phase, now)}</p>
+          <h2 id="closing-title" className="mt-10 font-display text-6xl leading-6xl tracking-tighter [text-wrap:balance] md:text-8xl md:leading-8xl">
+            <span className="block font-medium text-[color:var(--color-white)]">Put your university</span>
+            <span className="ix-hack-shine block font-bold">on the board.</span>
+          </h2>
+          <div className="mt-16 flex w-full flex-col items-center gap-8 sm:w-auto sm:flex-row">
+            <JoinButton tone="inverse" arrow className="w-full sm:w-auto" />
+            <VoteLink className="w-full sm:w-auto" />
           </div>
-          {building ? <Clock to={phase === "registration" ? HACKATHON.dates.start : HACKATHON.dates.end} now={now} label={phase === "registration" ? "Building starts in" : "Building ends in"} size="md" onBrand /> : null}
         </div>
       </div>
     </section>
