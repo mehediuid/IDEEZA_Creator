@@ -6,7 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
-| [CL-011](#cl-011-redeem-a-code-for-ai-credits) | Redeem a code for AI credits | 16 Nov 2026 | Not created yet | Not started |
+| [CL-011](#cl-011-redeem-a-code-for-ai-credits) | Redeem a code for AI credits | 16 Nov 2026 | [PR-9534](https://ideeza.atlassian.net/browse/PR-9534) | To do |
 | [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere) | Mobile app: native mobile UX everywhere | 15 Nov 2026 | None (owner: no ticket) | Not started |
 | [CL-009](#cl-009-mobile-app-splash-onboarding-welcome-and-log-in) | Mobile app: splash, onboarding, Welcome and Log In | 9 Nov 2026 | Not created yet | Not started |
 | [CL-008](#cl-008-mobile-app-create-flow-the-image-first-the-3d-as-the-result) | Mobile app create flow: the image first, the 3D as the result | 9 Nov 2026 | Not created yet | Not started |
@@ -44,7 +44,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 ## CL-011 Redeem a code for AI credits
 
-**In the prototype:** 16 November 2026 · **Jira:** not created yet · **Production:** Not started
+**In the prototype:** 16 November 2026 · **Jira:** [PR-9534](https://ideeza.atlassian.net/browse/PR-9534) · **Production:** To do
 
 **Screen:** Plan & pricing › Credits (`/settings/plan?tab=credits`): a new card between the three credit packs and Custom amount. Figma has no design for it; it is built from the page's own card and design system parts.
 
