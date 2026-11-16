@@ -122,3 +122,10 @@ test("a market product page names its project and creator, and sells only its ow
   assert.match(read(MARKET + "market-slots.tsx"), /sale: saleLineOf\(view, p\.id\)/);
   assert.match(read("components/projects/details/products-tab.tsx"), /\{card\.sale && </);
 });
+
+test("a marketplace card never moves on hover: only the button's opacity and the border change", () => {
+  // Owner, 2026-11-16: the cards "jump around a lot on hover" when the picture gave up 60 px to the button.
+  const card = read(MARKET + "listing-card.tsx");
+  assert.doesNotMatch(card, /group-hover:h-|transition-\[height\]|group-hover:inline-flex|group-hover:flex/);
+  assert.match(card, /absolute inset-x-\[12px\] bottom-\[12px\][^"]*opacity-0[^"]*group-hover:opacity-100/);
+});

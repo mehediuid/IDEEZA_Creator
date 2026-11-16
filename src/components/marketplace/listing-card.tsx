@@ -17,8 +17,10 @@
 //   the token apart (Code/MD), and beside it what M25's End block holds — an
 //   auction's end, the buyer, a share. They sit at the card's foot, so a row
 //   of cards lines its prices up;
-// - on hover the picture gives up 60 px to M25's action button ("View
-//   details", "View auction"). It is a picture of a button: the title link
+// - on hover M25's action button ("View details", "View auction") fades in
+//   over the foot of the picture. Nothing moves or resizes (owner,
+//   2026-11-16: the cards "jump around a lot on hover" when the picture gave
+//   up 60 px to the button). It is a picture of a button: the title link
 //   covers the card, so the card has one control and one Tab stop.
 // The facts are `listingCardFacts`'s (market-list.ts).
 
@@ -31,8 +33,8 @@ import { formatCount } from "@/lib/feed";
 import { listingCardFacts, type MarketItem, type MarketQuery } from "@/lib/market/market-list";
 import { cn } from "@/lib/utils";
 
-/** M25's media is 372 × 233 at a 372 px content width; on hover it is 60 px shorter (16 gap + the 44 px button). */
-const MEDIA = "h-[62.63cqw] [@media(hover:hover)]:group-hover:h-[calc(62.63cqw-60px)]";
+/** M25's media, 372 × 233 at a 372 px content width; the same height on hover. */
+const MEDIA = "h-[62.63cqw]";
 
 export type CardStats = { views: number; appreciations: number };
 
@@ -69,7 +71,7 @@ export function ListingCard({
     >
       <div
         className={cn(
-          "relative w-full shrink-0 overflow-hidden rounded-[var(--radius-2xl)] bg-bg-surface-raised transition-[height] duration-normal ease-out motion-reduce:transition-none",
+          "relative w-full shrink-0 overflow-hidden rounded-[var(--radius-2xl)] bg-bg-surface-raised",
           MEDIA,
         )}
       >
@@ -92,6 +94,17 @@ export function ListingCard({
         {/* M25's status badge: dark glass and white words over any picture, in either theme. */}
         <span className="pointer-events-none absolute right-[12px] top-[12px] inline-flex h-[30px] items-center rounded-[var(--radius-2xl)] bg-[color-mix(in_srgb,var(--color-bg-overlay)_32%,transparent)] px-[12px] text-md font-medium leading-md text-[color:var(--color-white)] backdrop-blur-[40px]">
           {f.badge}
+        </span>
+        {/* M25 Hover: the action button, over the picture's foot — only its opacity changes. A picture of a
+            button: the title link already covers the card. */}
+        <span
+          aria-hidden
+          className={cn(
+            buttonVariants({ hierarchy: "primary", size: "lg" }),
+            "pointer-events-none absolute inset-x-[12px] bottom-[12px] h-[44px] opacity-0 transition-opacity duration-fast ease-out motion-reduce:transition-none [@media(hover:hover)]:group-hover:opacity-100 group-focus-within:opacity-100",
+          )}
+        >
+          {f.action}
         </span>
       </div>
 
@@ -154,13 +167,6 @@ export function ListingCard({
               </div>
             )}
           </div>
-          {/* M25 Hover: the action button. A picture of one — the title link already covers the card. */}
-          <span
-            aria-hidden
-            className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), "mt-[8px] hidden h-[44px] w-full [@media(hover:hover)]:group-hover:inline-flex")}
-          >
-            {f.action}
-          </span>
         </div>
       </div>
     </article>
