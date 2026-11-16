@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-012](#cl-012-hackathon-page-ideeza-vibe-inventing-online-hackathon) | Hackathon page: IDEEZA Vibe Inventing Online Hackathon | 16 Nov 2026 | Not created yet | Not started |
 | [CL-011](#cl-011-redeem-a-code-for-ai-credits) | Redeem a code for AI credits | 16 Nov 2026 | [PR-9534](https://ideeza.atlassian.net/browse/PR-9534) | Ready for development |
 | [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere) | Mobile app: native mobile UX everywhere | 15 Nov 2026 | None (owner: no ticket) | Not started |
 | [CL-009](#cl-009-mobile-app-splash-onboarding-welcome-and-log-in) | Mobile app: splash, onboarding, Welcome and Log In | 9 Nov 2026 | Not created yet | Not started |
@@ -39,6 +40,89 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-012 Hackathon page: IDEEZA Vibe Inventing Online Hackathon
+
+**In the prototype:** 16 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** a new public website page, `/hackathons`, open without signing in, in the website's dark look with the website's top bar and footer. The top bar gets a **Hackathons** link before Pricing. Built from the owner's *IDEEZA Hackathons* prototype (its landing view) and the owner's design briefs, in the design system.
+
+### What to build
+
+Page order, top to bottom: hero · section bar · Prizes · How to win · Who can join and how the winner is picked · Leaderboard · Vote · Dates · Questions · closing.
+
+**Hero**
+- [ ] A black sky with stars and the glowing violet rim of a planet across the top. On wide landscape screens (900 px and up) the rim is the brief's looping glow video, screen-blended so its black disappears. On phones, and until the video can play, a still painted rim.
+- [ ] A status pill: the phase (Registration opens soon / Registration is open / Live now / Building has ended · judging / Winners announced) · the event name. On phones the short name "Vibe Inventing Hackathon".
+- [ ] Headline "Invent hardware with AI. Win 100,000 birr." The first words carry a violet gradient. Then the lead: "No engineering background needed. Describe an idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D. Build 3 products in 160 hours, collect votes, and put your university on top."
+- [ ] Two buttons: **Join the hackathon** (primary) and **Vote for projects** (goes to the Vote section).
+- [ ] A facts line under them. The time left is live, e.g. "Ends in 6d 06h 01m" (before the start "Starts in …"; after the end "Winners on …"), then "Free to join", "18+, living in Ethiopia" and "Individuals".
+- [ ] Under the hero, a violet-edged panel with a light line along its top edge. Inside, a particle hologram: points of light form a light bulb (Idea), then a PCB, then a drone (Product), on a loop. Labels Idea → PCB → Product light the current step. One line: "Say the idea in plain words. IDEEZA AI builds the hardware." It turns slowly and leans toward the pointer. It pauses off screen and holds still with reduced motion.
+- [ ] Entrance: the headline wipes up line by line, then the lead, buttons and panel rise. Reduced motion shows everything at once.
+
+**Section bar**
+- [ ] A bar that sticks under the top bar, with links to Prizes, How to win, Leaderboard, Vote, Dates and FAQ, plus **Join the hackathon** (hidden on phones). The section in view is lit.
+- [ ] On phones the bar is 56 px tall and its links scroll sideways. The row fades at the right edge, and the lit link scrolls into view as the page moves.
+
+**Prizes**
+- [ ] Title "160,000 birr for the top three". Lead: "If building ended now, these three would stand here. The board's top 10 go to the judges, and the judges pick the winners."
+- [ ] A podium in 3D steps, 2nd · 1st · 3rd. First is the tallest, each step has a lit top face and its place number on the front, and first is lit violet. A trophy sits over first.
+- [ ] On each step stands whoever holds that place now: a round picture of their product (opens it), their name, and the prize as a pill (100,000 / 40,000 / 20,000 birr). On phones a long name wraps to two lines.
+- [ ] Two cards under it: "Giveaways every 2 days" (bonus AI credits and IDEEZA merch) and "Better AI for the top 50" (Medium quality instead of Low in the last 3 days).
+- [ ] The section's background is the brief's particle-ribbon video, full width with no scrim. It is graded into the site's colours, violet to blue, and its black becomes the page's deep navy. Its top and bottom edges fade into the page.
+
+**How to win**
+- [ ] Five numbered steps on one line: Join and pick your university · Build 3 or more products · Publish each one (Give to Community + the feed, no wallet or KYC) · Share your link and collect votes · The top 10 go to the judges. Then **Join the hackathon**.
+- [ ] Beside them, a points card: build a product +10, publish +5, build on a new day +2, each vote +1, a friend you invited builds +15. A worked example: "3 products built and published on 3 days, with 40 votes = 30 + 15 + 6 + 40 = 91 points."
+
+**Who can join · How the winner is picked**
+- [ ] Who can join, ticked: 18 or older, living in Ethiopia · university students, makers, engineers and anyone with a product idea · you compete on your own, for your university or the open category · one IDEEZA account per person with a verified email · judges cannot take part or vote.
+- [ ] How the winner is picked: the board freezes when building ends and the top 10 are shortlisted. One bar shows the criteria weights: Innovation 40%, Manufacturability 30%, Completeness 30%. The judges are listed.
+
+**Leaderboard**
+- [ ] Title "Which university builds best?" Beside it, builders · products · votes, summed from the board.
+- [ ] University league: each university's points (its students' points summed) as a bar against the leader, with students and products under it. Rank, name, bar and facts start on one left edge. Phones show the top 6 with "Show all 11 universities".
+- [ ] Top builders: rank, movement since the last update (▲/▼), initials (the top three show their product), name, university or Open category, products, **Qualified** (3+ products, written out with a tick), **Medium quality** when unlocked, and points.
+- [ ] The list shows **ten a page** with ‹ › and "11–20 of 64"; the page never grows. Everyone / Open category filter. Search "Find your name or university" (no match: "No one matches …"). Search and filter go back to page one.
+- [ ] No moderation flags on the public board. A note says the standings are sample data while they are.
+
+**Vote**
+- [ ] "Vote for the products you'd use": every published product as a card with its picture, name, maker and university, what it does, its votes, and **Vote**. The picture opens the project.
+- [ ] Each account has 10 votes, shown as 10 pips and "n of 10 votes left". Vote turns into Voted and can be taken back while voting is open. With none left: "You have used all 10 votes. Take one back to vote again."
+- [ ] Signed out, Vote leads to sign up or sign in and back here. Voting is open only while the hackathon is live.
+
+**Dates · Questions · closing**
+- [ ] Dates: one track across Registration, Build & vote, Judging and Winners announced. Each has its dates in EAT and Done / Now / Next, and the track fills up to now.
+- [ ] Questions: six questions that open and close: free? · never built hardware? · wallet or KYC? · how votes count · who owns my design · when are winners announced. Beside them, the terms of participation and three chips.
+- [ ] Closing, full screen: the brief's wave video behind it. Two lines on top (the promise · the prize pool), the time left in one line of capitals, "Put your university / on the board." with a shine across the second line, **Join the hackathon** (white, an arrow that steps forward on hover) and **Vote for projects**.
+
+**Join**
+- [ ] Signed out, Join goes to sign up (sign in if the browser has an account) and comes back to this page with the join step open.
+- [ ] The join step: choose a university (12 listed) or "Not at a university — open category", and tick "I am 18 or older and live in Ethiopia". Errors: "Choose your university, or the open category." / "The hackathon is open to people 18+ in Ethiopia."
+- [ ] Joined: "You're in" with a personal link to share (Copy). Every Join button then reads **Start building** and goes to Home.
+- [ ] Join is closed before registration opens and after building ends.
+
+**A project, opened**
+- [ ] A dialog with the product's video (a still with reduced motion), what it does, its maker, its place, points and products, Qualified, its votes and **Vote**.
+
+Prototype only (not to build as is): the board is 64 seeded sample builders; the judges are the prototype's sample names; the dates are fixed at 14 Nov (registration), 16 Nov 09:00 to 22 Nov 21:00 (build and vote) and 24 Nov 18:00 (winners), EAT; joining and votes are kept in the browser per account.
+
+### Design
+
+- Website dark theme; Manrope; type only from the design system scale. Main paragraphs 18 px (16 on phones), other body 16, captions 14, nothing under 14.
+- Brand violet and blue ramps for every accent; the page's deep navy as the ground; no new tokens.
+- Buttons: Button primary (Join), the website's secondary pill (Vote), Button inverse (closing Join). Dialogs, select, checkbox, search field and badges are the design system's.
+- Media: the briefs' videos (hero glow, Prizes ribbon, closing wave); product pictures as small WebP (720 px card, 192 px avatar); the hologram drawn in code.
+
+### Before → After
+
+A new page (there was no Before).
+
+| Hero | Prizes | Leaderboard |
+| --- | --- | --- |
+| ![The hero: planet rim, headline, Join and Vote, the facts line](docs/changelog/2026-11-16-hackathons-hero.png) | ![The podium over the ribbon video](docs/changelog/2026-11-16-hackathons-prizes.png) | ![University league beside Top builders](docs/changelog/2026-11-16-hackathons-leaderboard.png) |
 
 ---
 
