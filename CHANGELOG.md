@@ -112,6 +112,7 @@ Prototype only (not to build as is): the board is 64 seeded sample builders; the
 ### Design
 
 - Website dark theme; Manrope; type only from the design system scale. Main paragraphs 18 px (16 on phones), other body 16, captions 14, nothing under 14.
+- Spacing from the design system scale, one rhythm for the whole page (phones step down through the tokens): sections 96 px top and bottom (64 on phones), a section heading 64 px above its content, 20 px between a title and its lead, cards 20–24 px inside and 20–24 px apart.
 - Brand violet and blue ramps for every accent; the page's deep navy as the ground; no new tokens.
 - Buttons: Button primary (Join), the website's secondary pill (Vote), Button inverse (closing Join). Dialogs, select, checkbox, search field and badges are the design system's.
 - Media: the briefs' videos (hero glow, Prizes ribbon, closing wave); product pictures as small WebP (720 px card, 192 px avatar); the hologram drawn in code.
