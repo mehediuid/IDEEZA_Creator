@@ -14,8 +14,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ChampionIcon, GiftIcon, SparklesIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import { HACKATHON, money, prizePool } from "@/lib/hackathons/vibe-inventing";
-import { useHackathon } from "./context";
-import { Heading, Initials, SECTION, SURFACE } from "./parts";
+import { useHackathon, useReducedMotion } from "./context";
+import { HERO_MEDIA, Heading, Initials, SECTION, SURFACE } from "./parts";
 
 // Visual order on the podium: 2nd · 1st · 3rd (the list itself stays 1st → 3rd for screen readers).
 const ORDER = ["order-2", "order-1", "order-3"];
@@ -23,11 +23,43 @@ const ORDER = ["order-2", "order-1", "order-3"];
 const STEP = ["h-[176px] md:h-[300px]", "h-[124px] md:h-[216px]", "h-[96px] md:h-[164px]"];
 const PLACE = ["1st place", "2nd place", "3rd place"];
 
+/**
+ * The section's background (owner 2026-11-16: the background from their brief,
+ * nothing else on the section changes): the brief's particle-ribbon video at
+ * full strength, no scrim, the full width of the page. Only its top and bottom
+ * edges are masked into the page so the section has no seam. It loads when
+ * the section comes near; with reduced motion one frame of it holds still.
+ */
+function PrizesBackdrop() {
+  const still = useReducedMotion();
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [near, setNear] = React.useState(false);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => e?.isIntersecting && setNear(true), { rootMargin: "600px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 overflow-hidden bg-[var(--color-black)] [mask-image:linear-gradient(to_bottom,transparent,black_12%,black_88%,transparent)]">
+      {near ? (
+        still ? (
+          <video src={`${HERO_MEDIA.ribbon}#t=2`} muted playsInline preload="auto" className="h-full w-full object-cover" />
+        ) : (
+          <video src={HERO_MEDIA.ribbon} autoPlay muted loop playsInline className="h-full w-full object-cover" />
+        )
+      ) : null}
+    </div>
+  );
+}
+
 export function Prizes() {
   const { board, openProject } = useHackathon();
   return (
-    <section id="prizes" aria-labelledby="prizes-title" className={SECTION}>
-      <Heading id="prizes-title" title={`${money(prizePool)} for the top three`} lead={`If building ended now, these three would stand here. The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the winners.`} />
+    <section id="prizes" aria-labelledby="prizes-title" className={cn(SECTION, "relative isolate")}>
+      <PrizesBackdrop />
+      <Heading className="[text-shadow:0_2px_18px_rgba(0,0,0,0.85)]" id="prizes-title" title={`${money(prizePool)} for the top three`} lead={`If building ended now, these three would stand here. The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the winners.`} />
 
       <ol className="m-0 mx-auto mt-20 grid max-w-[960px] list-none grid-cols-3 items-end p-0">
         {HACKATHON.prizes.map((amount, i) => {
@@ -59,8 +91,8 @@ export function Prizes() {
                     )}
                   </button>
                 ) : null}
-                <span className="w-full truncate text-lg font-medium leading-lg text-[color:var(--color-white)] md:text-2xl md:leading-2xl">{r ? r.p.name : PLACE.at(i)}</span>
-                <span className="rounded-xl border border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--color-white)_5%,transparent)] px-3 py-1 text-md font-semibold leading-md tabular-nums text-[color:var(--color-white)] md:px-5 md:py-2 md:text-xl md:leading-xl">
+                <span className="max-w-full truncate rounded-xl bg-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] px-2 py-1 text-lg font-medium leading-lg text-[color:var(--color-white)] backdrop-blur-[8px] md:px-3 md:text-2xl md:leading-2xl">{r ? r.p.name : PLACE.at(i)}</span>
+                <span className="rounded-xl border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_62%,transparent)] px-3 py-1 backdrop-blur-[8px] text-md font-semibold leading-md tabular-nums text-[color:var(--color-white)] md:px-5 md:py-2 md:text-xl md:leading-xl">
                   {amount.toLocaleString("en-US")} <span className="font-regular text-[color:var(--color-text-secondary)]">{HACKATHON.currency}</span>
                 </span>
               </div>
