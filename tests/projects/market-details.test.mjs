@@ -32,6 +32,9 @@ test("the market header leads with the post's media stage and names the creator"
 test("the Testnet demo banner holds the one way back to the owner's page, on a listing's page only", () => {
   const banner = read(MARKET + "demo-buyer-banner.tsx");
   assert.match(banner, /\{projectId && \(/);
+  // Owner, 2026-11-16: the big banner "doesn't look good and wastes a lot of space" — one slim line.
+  assert.doesNotMatch(banner, /<Banner\b/);
+  assert.match(banner, /<TestnetDemoBadge \/>/);
   assert.match(banner, /href=\{`\/projects\/\$\{projectId\}`\}/);
   assert.match(read(MARKET + "market-slots.tsx"), /<DemoBuyerBanner className="mb-10" projectId=\{project\.id\} \/>/);
 });
