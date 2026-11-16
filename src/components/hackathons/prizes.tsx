@@ -69,14 +69,14 @@ export function Prizes() {
       <PrizesBackdrop />
       <Heading className="[text-shadow:0_2px_18px_rgba(0,0,0,0.85)]" id="prizes-title" title={`${money(prizePool)} for the top three`} lead={`If building ended now, these three would stand here. The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the winners.`} />
 
-      <ol className="m-0 mx-auto mt-20 grid max-w-[960px] list-none grid-cols-3 items-end p-0">
+      <ol className="m-0 mx-auto mt-24 grid max-w-[960px] list-none grid-cols-3 items-end p-0 md:mt-32">
         {HACKATHON.prizes.map((amount, i) => {
           const first = i === 0;
           const r = board.at(i);
           return (
             <li key={i} aria-label={`${PLACE.at(i)}: ${money(amount)}${r ? `, now ${r.p.name}` : ""}`} className={cn("relative flex min-w-0 flex-col items-center", ORDER.at(i), first && "z-[1]")}>
               {/* Who stands here now. */}
-              <div className="flex w-full min-w-0 flex-col items-center gap-3 px-1 pb-6 text-center md:gap-4 md:pb-8">
+              <div className="flex w-full min-w-0 flex-col items-center gap-4 px-1 pb-8 text-center md:gap-5 md:pb-10">
                 {first ? (
                   <HugeiconsIcon icon={ChampionIcon} size={44} strokeWidth={1.6} aria-hidden className="text-[color:var(--color-violet-300)] drop-shadow-[0_0_18px_color-mix(in_srgb,var(--color-violet-500)_80%,transparent)]" />
                 ) : null}
@@ -132,16 +132,16 @@ export function Prizes() {
         })}
       </ol>
 
-      <ul className="m-0 mx-auto mt-12 grid max-w-[960px] list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 md:gap-8">
+      <ul className="m-0 mx-auto mt-16 grid max-w-[960px] list-none grid-cols-1 gap-6 p-0 md:mt-20 md:grid-cols-2 md:gap-10">
         {[
           { icon: GiftIcon, title: "Giveaways every 2 days", text: "Bonus AI credits and IDEEZA merch, given out every 2 days while the hackathon runs." },
           { icon: SparklesIcon, title: "Better AI for the top 50", text: "In the last 3 days the top 50 build on Medium quality instead of Low." },
         ].map((x) => (
-          <li key={x.title} className={cn("flex items-start gap-6 rounded-2xl px-8 py-8", SURFACE)}>
+          <li key={x.title} className={cn("flex items-start gap-8 rounded-2xl px-10 py-10 md:px-12", SURFACE)}>
             <span className="flex size-[44px] shrink-0 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--color-violet-600)_22%,transparent)] text-[color:var(--color-violet-200)]">
               <HugeiconsIcon icon={x.icon} size={22} strokeWidth={1.8} />
             </span>
-            <span className="flex flex-col gap-2">
+            <span className="flex flex-col gap-3">
               <span className="text-xl font-semibold leading-xl text-[color:var(--color-text-primary)]">{x.title}</span>
               <span className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{x.text}</span>
             </span>

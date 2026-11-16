@@ -20,7 +20,7 @@ export const HERO_MEDIA = {
 };
 
 /** One section's frame: the page width, the sticky bars' scroll offset, the vertical rhythm. */
-export const SECTION = "mx-auto w-full max-w-[1260px] scroll-mt-[160px] px-8 py-32 md:py-40 min-[1292px]:px-0";
+export const SECTION = "mx-auto w-full max-w-[1260px] scroll-mt-[160px] px-8 py-40 md:py-48 min-[1292px]:px-0";
 
 /** A hairline that reads on the dark page without a box around everything. */
 export const HAIRLINE = "border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)]";
@@ -35,8 +35,8 @@ export const SURFACE = "border border-solid border-[color:color-mix(in_srgb,var(
  */
 export function Heading({ id, title, lead, aside, className }: { id?: string; title: React.ReactNode; lead?: React.ReactNode; aside?: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("flex flex-col gap-10 md:flex-row md:items-end md:justify-between md:gap-16", className)}>
-      <div className="flex max-w-[720px] flex-col gap-6">
+    <div className={cn("flex flex-col gap-12 md:flex-row md:items-end md:justify-between md:gap-16", className)}>
+      <div className="flex max-w-[720px] flex-col gap-8 md:gap-10">
         <h2 id={id} className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] [text-wrap:balance] md:text-6xl md:leading-6xl">
           {title}
         </h2>

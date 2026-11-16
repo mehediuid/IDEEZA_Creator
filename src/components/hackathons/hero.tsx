@@ -149,7 +149,7 @@ export function HackathonHero() {
           </span>
         </p>
 
-        <h1 id="hackathon-title" className="mt-10 font-display text-6xl font-bold leading-6xl tracking-tighter text-[color:var(--color-white)] md:text-8xl md:leading-8xl">
+        <h1 id="hackathon-title" className="mt-12 font-display text-6xl font-bold leading-6xl tracking-tighter text-[color:var(--color-white)] md:text-8xl md:leading-8xl">
           <span className="ix-hk-wipe block" style={{ animationDelay: "120ms" }}>
             <span className="bg-[linear-gradient(90deg,var(--color-violet-300),var(--color-violet-500))] bg-clip-text text-transparent [-webkit-background-clip:text]">Invent hardware</span> <span className="whitespace-nowrap">with AI.</span>
           </span>
@@ -158,15 +158,15 @@ export function HackathonHero() {
           </span>
         </h1>
 
-        <p className="ix-hk-rise mt-10 max-w-[760px] text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-2xl md:leading-2xl" style={{ animationDelay: "420ms" }}>
+        <p className="ix-hk-rise mt-12 max-w-[760px] text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-2xl md:leading-2xl" style={{ animationDelay: "420ms" }}>
           No engineering background needed. Describe an idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D. Build {HACKATHON.minProducts} products in 160 hours, collect votes, and put your university on top.
         </p>
 
-        <div className="ix-hk-rise mt-14 flex w-full flex-col items-center justify-center gap-6 sm:w-auto sm:flex-row" style={{ animationDelay: "540ms" }}>
+        <div className="ix-hk-rise mt-20 flex w-full flex-col items-center justify-center gap-6 sm:w-auto sm:flex-row md:mt-24" style={{ animationDelay: "540ms" }}>
           <JoinButton className="w-full transition-shadow duration-fast hover:shadow-[0_0_36px_color-mix(in_srgb,var(--color-violet-500)_70%,transparent)] sm:w-auto" />
           <VoteLink className="w-full sm:w-auto" />
         </div>
-        <ul className="ix-hk-rise m-0 mt-8 flex list-none flex-wrap justify-center gap-x-8 gap-y-3 p-0 text-md leading-md text-[color:var(--color-text-secondary)] md:text-lg md:leading-lg" style={{ animationDelay: "620ms" }}>
+        <ul className="ix-hk-rise m-0 mt-10 flex list-none flex-wrap justify-center gap-x-10 gap-y-4 p-0 md:mt-12 text-md leading-md text-[color:var(--color-text-secondary)] md:text-lg md:leading-lg" style={{ animationDelay: "620ms" }}>
           {facts.map((f, i) => (
             <li key={f} className={cn("flex items-center gap-2", i === 0 && "font-semibold text-[color:var(--color-white)] tabular-nums")}>
               {i === 0 ? (
@@ -180,7 +180,7 @@ export function HackathonHero() {
         </ul>
       </div>
 
-      <div className="relative mx-auto mt-20 w-full max-w-[1236px] px-4 pb-20 md:mt-24 md:px-8 xl:px-4">
+      <div className="relative mx-auto mt-24 w-full max-w-[1236px] px-4 pb-24 md:mt-32 md:px-8 md:pb-32 xl:px-4">
         <HeroShowcase />
       </div>
     </section>

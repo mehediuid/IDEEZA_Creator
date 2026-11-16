@@ -50,11 +50,11 @@ export function Leaderboard() {
         }
       />
 
-      <div className="mt-20 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="mt-24 grid grid-cols-1 gap-10 md:mt-32 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
         <UniversityLeague unis={unis} />
         <People board={board} />
       </div>
-      <p className="mt-8 text-md leading-md text-[color:var(--color-text-tertiary)]">Standings on this page are sample data.</p>
+      <p className="mt-10 text-md leading-md text-[color:var(--color-text-tertiary)]">Standings on this page are sample data.</p>
     </section>
   );
 }
@@ -66,11 +66,11 @@ function UniversityLeague({ unis }: { unis: ReturnType<typeof useHackathon>["uni
   const max = unis[0]?.pts || 1;
   const [allUnis, setAllUnis] = React.useState(false);
   return (
-    <div className={cn("self-start rounded-3xl px-8 py-10 md:px-10", SURFACE)}>
+    <div className={cn("self-start rounded-3xl px-10 py-12 md:px-12", SURFACE)}>
       <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">University league</h3>
       {/* Each row is one grid: the rank in its own column, and the name, the bar and the
           facts all starting on the same left edge; the bar runs to the points' right edge. */}
-      <ol className="m-0 mt-8 flex list-none flex-col gap-8 p-0">
+      <ol className="m-0 mt-10 flex list-none flex-col gap-10 p-0">
         {unis.map((u, i) => (
           <li key={u.name} className={cn("grid grid-cols-[28px_minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-3", i >= PHONE_UNIS && !allUnis && "max-md:hidden")}>
             <span className={cn("text-lg font-semibold leading-lg tabular-nums", i === 0 ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{i + 1}</span>
@@ -112,7 +112,7 @@ function People({ board }: { board: Row[] }) {
   const shown = found.slice(at * ROWS, at * ROWS + ROWS);
 
   return (
-    <div className={cn("flex flex-col rounded-3xl px-4 py-8 md:px-10 md:py-10", SURFACE)}>
+    <div className={cn("flex flex-col rounded-3xl px-4 py-10 md:px-12 md:py-12", SURFACE)}>
       <div className="flex flex-col gap-6 px-4 md:flex-row md:items-center md:justify-between md:px-0">
         <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">Top builders</h3>
         <div className="flex items-center gap-4">
@@ -140,15 +140,15 @@ function People({ board }: { board: Row[] }) {
           </div>
         </div>
       </div>
-      <div className="mt-6 px-4 md:px-0">
+      <div className="mt-8 px-4 md:px-0">
         <SearchInput value={q} onValueChange={(v) => { setQ(v); setPage(0); }} onClear={() => { setQ(""); setPage(0); }} placeholder="Find your name or university" aria-label="Find your name or university" containerClassName="w-full" />
       </div>
 
-      <ol className="m-0 mt-6 flex list-none flex-col p-0" aria-label="Builders by points">
+      <ol className="m-0 mt-8 flex list-none flex-col gap-1 p-0" aria-label="Builders by points">
         {shown.map((r) => {
           const podium = r.rank <= 3 && !open && !query;
           return (
-            <li key={r.p.id} className={cn("flex items-center gap-4 rounded-2xl px-4 py-4 md:gap-6", podium && "bg-[color:color-mix(in_srgb,var(--color-violet-600)_10%,transparent)]")}>
+            <li key={r.p.id} className={cn("flex items-center gap-4 rounded-2xl px-4 py-5 md:gap-6 md:py-6", podium && "bg-[color:color-mix(in_srgb,var(--color-violet-600)_10%,transparent)]")}>
               <span className={cn("w-[28px] shrink-0 text-center font-display text-lg font-semibold tabular-nums", r.rank <= 3 ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-secondary)]")}>{r.rank}</span>
               {r.p.project && r.rank <= 3 ? (
                 <button type="button" onClick={() => openProject(r)} aria-label={`Open ${r.p.project.name}`} className="size-[44px] shrink-0 overflow-hidden rounded-xl border-0 p-0">
@@ -192,7 +192,7 @@ function People({ board }: { board: Row[] }) {
         {shown.length === 0 ? <li className="px-4 py-12 text-center text-lg leading-lg text-[color:var(--color-text-tertiary)]">No one matches “{q}”.</li> : null}
       </ol>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 px-4 md:px-0">
+      <div className="mt-10 flex flex-wrap items-center justify-between gap-4 px-4 md:px-0">
         <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">
           Qualified = {HACKATHON.minProducts}+ products built.
         </span>
