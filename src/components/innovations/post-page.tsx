@@ -349,7 +349,7 @@ function AboutProject({ text }: { text: string }) {
 }
 
 /** One row per product, each to its product view. */
-function WhatsInside({ post }: { post: InnovationPost }) {
+export function WhatsInside({ post }: { post: InnovationPost }) {
   const id = React.useId();
   return (
     <section aria-labelledby={id} className="flex flex-col gap-6">

@@ -43,6 +43,8 @@ export type MarketItem = {
   name: string;
   cover: string | null;
   productCount: number;
+  /** Another creator's name, on a sample's card (sample-market.ts); absent for this browser's own. */
+  creator?: string;
   /** The Main listing; null for a project that sells only copies. */
   listing: Listing | null;
   /** Its copies on sale, beside a live Main listing or alone; null on a sold card. */

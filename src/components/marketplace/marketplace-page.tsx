@@ -6,7 +6,11 @@
 // under them, the For sale · Sold · Purchased tabs, the toolbar, the card grid
 // and the pagination.
 //
-// - Every item is real local data: the listings, sales and bids
+// - Other creators' samples are always here too (owner, 2026-11-16: the data
+//   Innovations always has): every sample post that is for sale is a card,
+//   "By {creator}", read from code with its demo purchases (sample-market.ts),
+//   so a new account never finds an empty marketplace.
+// - This browser's own items are real local data: the listings, sales and bids
 //   (`useMarket`), every project's copy tracks (`useProjectsEditions`), the
 //   projects and their builds for the name, cover and product count, and the
 //   active demo buyer. `marketItemsOf` makes one item per live listing (an
@@ -49,6 +53,8 @@ import {
   type MarketQuery,
 } from "@/lib/market/market-list";
 import { holdingOf } from "@/lib/market/sales";
+import { sampleMarketItemsOf, sampleMarketOf, sampleMatches } from "@/lib/market/sample-market";
+import { useSampleSales } from "@/components/mobile/project-earn/buyer/sample-sales-store";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
@@ -109,6 +115,7 @@ export function MarketplacePage() {
   const { hydrated, projects } = useManualProjects();
   const { hydrated: buildsHydrated, builds } = useCreateHistory();
   const market = useMarket();
+  const sampleSales = useSampleSales();
   const { buyer } = useActiveBuyer();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -163,15 +170,18 @@ export function MarketplacePage() {
       locked: s.lock !== null,
     }));
     const all = marketItemsOf(market.data.listings, like, market.data.sales, market.data.bids, buyer.id, now, editions.record);
-    return oneCardPerHolding(all, (id) => holdingOf(id, buyer.id, market.data.sales)?.sharePct ?? 0);
-  }, [summaries, market.data, buyer.id, now, editions.record]);
+    const own = oneCardPerHolding(all, (id) => holdingOf(id, buyer.id, market.data.sales)?.sharePct ?? 0);
+    return [...own, ...sampleMarketItemsOf(sampleSales, buyer.id)];
+  }, [summaries, market.data, buyer.id, now, editions.record, sampleSales]);
 
   const counts = React.useMemo(() => filterMarket(items, { ...view, q: "", page: 1 }).counts, [items, view]);
   const result = React.useMemo(() => {
     const matched = view.q
       ? items.filter((it) => {
           const row = summaries.get(it.projectId);
-          return row ? matchProject(row.summary, row.project.description, view.q).hit : false;
+          if (row) return matchProject(row.summary, row.project.description, view.q).hit;
+          const sample = sampleMarketOf(it.projectId);
+          return sample ? sampleMatches(sample, view.q) : false;
         })
       : items;
     const r = filterMarket(matched, { ...view, q: "" });

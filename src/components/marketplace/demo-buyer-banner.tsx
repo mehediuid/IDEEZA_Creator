@@ -14,6 +14,9 @@
 // - On a listing's own page (`projectId`) the body ends with "Your project
 //   page": the way back to the owner's side lives in this prototype-only
 //   banner, never in the buyer's header (owner, 2026-11-15).
+// - The grid holds other creators' samples too (sample-market.ts), and a
+//   sample's page (`sample`) is theirs, so only a listing's own page says
+//   "This listing is yours".
 
 import * as React from "react";
 import Link from "next/link";
@@ -28,7 +31,7 @@ const INLINE_LINK =
 
 const OPTIONS: SelectOption<DemoBuyerId>[] = DEMO_BUYERS.map((b) => ({ value: b.id, label: `${b.name} · demo creator` }));
 
-export function DemoBuyerBanner({ className, projectId }: { className?: string; projectId?: string }) {
+export function DemoBuyerBanner({ className, projectId, sample }: { className?: string; projectId?: string; sample?: boolean }) {
   const { buyer, setActiveBuyer } = useActiveBuyer();
   return (
     <Banner
@@ -46,8 +49,12 @@ export function DemoBuyerBanner({ className, projectId }: { className?: string; 
         />
       }
     >
-      Every listing here is yours, so a demo creator does the buying — test tokens in a test wallet. Nothing is sent to a
-      blockchain.
+      {projectId
+        ? "This listing is yours, so a demo creator does the buying"
+        : sample
+          ? "Another creator's sample: a demo creator does the buying"
+          : "Your listings and other creators' samples: a demo creator does the buying"}{" "}
+      — test tokens in a test wallet. Nothing is sent to a blockchain.
       {projectId && (
         <>
           {" "}

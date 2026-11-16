@@ -107,7 +107,9 @@ export function ListingCard({
             {/* Row mode: the chip sits beside the title. */}
             <span className="flex shrink-0 items-center [@container(min-width:560px)]:hidden">{chipEl}</span>
           </div>
-          <p className="mt-[4px] truncate text-md text-text-tertiary">By you · {productsLabel(item.productCount)}</p>
+          <p className="mt-[4px] truncate text-md text-text-tertiary">
+            By {item.creator ?? "you"} · {productsLabel(item.productCount)}
+          </p>
           <p className="mt-[8px] text-lg font-semibold tabular-nums text-text-primary">{text.price}</p>
           {text.sub && <p className="mt-[2px] text-md tabular-nums text-text-secondary">{text.sub}</p>}
           {copies && <p className="mt-[2px] text-md tabular-nums text-text-secondary">{copies}</p>}

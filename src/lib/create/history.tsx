@@ -401,7 +401,7 @@ export const BUILD_ESTIMATE_MIN = 1;
 // ─────────────────────────── storage ───────────────────────────────
 
 const CHATS_KEY = "ideeza:create:chats";
-const BUILDS_KEY = "ideeza:create:builds";
+export const BUILDS_KEY = "ideeza:create:builds";
 
 function loadJSON<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
