@@ -17,11 +17,15 @@
 //   the token apart (Code/MD), and beside it what M25's End block holds — an
 //   auction's end, the buyer, a share. They sit at the card's foot, so a row
 //   of cards lines its prices up;
-// - on hover M25's action button ("View details", "View auction") fades in
-//   over the foot of the picture. Nothing moves or resizes (owner,
-//   2026-11-16: the cards "jump around a lot on hover" when the picture gave
-//   up 60 px to the button). It is a picture of a button: the title link
-//   covers the card, so the card has one control and one Tab stop.
+// - M25 Hover: the picture gets 60 px shorter and the action button ("View
+//   details", "View auction") rises from the card's foot beneath the price.
+//   Done with transforms and a clip only (owner, 2026-11-16: the cards jumped,
+//   and a hover must touch no other card): the picture's foot is clipped off
+//   and the picture re-centred, the words slide up 60 px, the button slides up
+//   from below the card's edge, all on one clock — the card's box never
+//   changes size, so its row and its neighbours never move. The button is a
+//   picture of one: the title link covers the card, so the card has one
+//   control and one Tab stop.
 // The facts are `listingCardFacts`'s (market-list.ts).
 
 import * as React from "react";
@@ -33,8 +37,8 @@ import { formatCount } from "@/lib/feed";
 import { listingCardFacts, type MarketItem, type MarketQuery } from "@/lib/market/market-list";
 import { cn } from "@/lib/utils";
 
-/** M25's media, 372 × 233 at a 372 px content width; the same height on hover. */
-const MEDIA = "h-[62.63cqw]";
+/** One clock for every part of the hover, so the picture, the words and the button move as one. */
+const MOVE = "duration-normal ease-out motion-reduce:transition-none";
 
 export type CardStats = { views: number; appreciations: number };
 
@@ -64,15 +68,21 @@ export function ListingCard({
   return (
     <article
       className={cn(
-        "group relative flex h-full flex-col gap-[20px] rounded-[var(--radius-2xl)] border border-solid bg-bg-surface px-[12px] pb-[20px] pt-[12px] [container-type:inline-size]",
+        // overflow-hidden: the button waits below the card's edge until a hover brings it up.
+        "group relative flex h-full flex-col gap-[20px] overflow-hidden rounded-[var(--radius-2xl)] border border-solid bg-bg-surface px-[12px] pb-[20px] pt-[12px] [container-type:inline-size]",
         // M25's border is the card-glow paint style; its hover is the brand lilac.
         "border-[color-mix(in_srgb,var(--color-violet-200)_20%,transparent)] transition-colors duration-fast motion-reduce:transition-none [@media(hover:hover)]:hover:border-[color:var(--color-violet-300)]",
       )}
     >
+      {/* M25's media, 372 × 233 at a 372 px content width. Its box keeps that height; a hover clips 60 px off
+          its foot (rounded like the frame) and lifts the picture 30 px, so it re-centres as M25's does. */}
       <div
         className={cn(
-          "relative w-full shrink-0 overflow-hidden rounded-[var(--radius-2xl)] bg-bg-surface-raised",
-          MEDIA,
+          "relative h-[62.63cqw] w-full shrink-0 overflow-hidden rounded-[var(--radius-2xl)] bg-bg-surface-raised",
+          "[clip-path:inset(0_0_0_0_round_var(--radius-2xl))] transition-[clip-path]",
+          // Hover only where a pointer hovers: a tap never leaves a card half-open.
+          "[@media(hover:hover)]:group-hover:[clip-path:inset(0_0_60px_0_round_var(--radius-2xl))]",
+          MOVE,
         )}
       >
         {hasCover && imgOk ? (
@@ -83,7 +93,7 @@ export function ListingCard({
             loading="lazy"
             decoding="async"
             onError={() => setImgOk(false)}
-            className="absolute inset-0 h-full w-full object-cover"
+            className={cn("absolute inset-0 h-full w-full object-cover transition-transform", "[@media(hover:hover)]:group-hover:-translate-y-[30px]", MOVE)}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-[4px] text-text-tertiary">
@@ -95,28 +105,19 @@ export function ListingCard({
         <span className="pointer-events-none absolute right-[12px] top-[12px] inline-flex h-[30px] items-center rounded-[var(--radius-2xl)] bg-[color-mix(in_srgb,var(--color-bg-overlay)_32%,transparent)] px-[12px] text-md font-medium leading-md text-[color:var(--color-white)] backdrop-blur-[40px]">
           {f.badge}
         </span>
-        {/* M25 Hover: the action button, over the picture's foot — only its opacity changes. A picture of a
-            button: the title link already covers the card. */}
-        <span
-          aria-hidden
-          className={cn(
-            buttonVariants({ hierarchy: "primary", size: "lg" }),
-            "pointer-events-none absolute inset-x-[12px] bottom-[12px] h-[44px] opacity-0 transition-opacity duration-fast ease-out motion-reduce:transition-none [@media(hover:hover)]:group-hover:opacity-100 group-focus-within:opacity-100",
-          )}
-        >
-          {f.action}
-        </span>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col px-[8px]">
+      {/* The words: on hover they slide up the 60 px the picture gave (16 gap + the 44 px button). */}
+      <div className={cn("flex min-w-0 flex-1 flex-col px-[8px] transition-transform", "[@media(hover:hover)]:group-hover:-translate-y-[60px]", MOVE)}>
         <div className="flex flex-col gap-[16px]">
           <div className="flex flex-col gap-[8px]">
             <h3 className="truncate text-2xl font-semibold leading-2xl text-text-primary">
               <Link
                 href={`/marketplace/${item.projectId}`}
                 title={item.name}
-                // The reset colours every a:hover as a link; M25's title stays the title's ink.
-                className="rounded-sm outline-none after:absolute after:inset-0 after:rounded-[var(--radius-2xl)] hover:text-[color:var(--color-text-primary)] focus-visible:after:ring-2 focus-visible:after:ring-border-focus"
+                // The reset colours every a:hover as a link; M25's title stays the title's ink. The ring is drawn
+                // inside the card, which clips what leaves it.
+                className="rounded-sm outline-none after:absolute after:inset-0 after:rounded-[var(--radius-2xl)] hover:text-[color:var(--color-text-primary)] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-border-focus"
               >
                 {item.name}
               </Link>
@@ -169,6 +170,20 @@ export function ListingCard({
           </div>
         </div>
       </div>
+
+      {/* M25 Hover's action button, at the card's foot under the price: it waits 64 px down (its 44 px and the
+          card's 20 px edge), below the card's edge, and rises with the words. A picture of a button. */}
+      <span
+        aria-hidden
+        className={cn(
+          buttonVariants({ hierarchy: "primary", size: "lg" }),
+          "pointer-events-none absolute inset-x-[20px] bottom-[20px] h-[44px] translate-y-[64px] transition-transform",
+          "[@media(hover:hover)]:group-hover:translate-y-0",
+          MOVE,
+        )}
+      >
+        {f.action}
+      </span>
     </article>
   );
 }
