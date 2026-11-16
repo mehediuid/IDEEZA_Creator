@@ -132,4 +132,7 @@ test("a marketplace card keeps M25's hover — picture shrinks, button rises fro
   assert.match(card, /group-hover:-translate-y-\[60px\]/, "the words slide up the same 60 px");
   assert.match(card, /bottom-\[20px\] h-\[44px\] translate-y-\[64px\][\s\S]*group-hover:translate-y-0/, "the button rises from below the card's edge");
   assert.match(card, /overflow-hidden rounded-\[var\(--radius-2xl\)\] border/, "the waiting button is hidden by the card's edge");
+  // Owner, 2026-11-16: "where is the button's hover?" — a real button (A01's hover and pressed), out of the Tab order.
+  assert.match(card, /<Link\s+href=\{`\/marketplace\/\$\{item\.projectId\}`\}\s+tabIndex=\{-1\}\s+aria-hidden/);
+  assert.doesNotMatch(card, /pointer-events-none absolute inset-x-\[20px\]/);
 });

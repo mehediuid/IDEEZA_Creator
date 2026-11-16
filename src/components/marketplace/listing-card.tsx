@@ -24,8 +24,8 @@
 //   and the picture re-centred, the words slide up 60 px, the button slides up
 //   from below the card's edge, all on one clock — the card's box never
 //   changes size, so its row and its neighbours never move. The button is a
-//   picture of one: the title link covers the card, so the card has one
-//   control and one Tab stop.
+//   real one with A01's hover and pressed states, going where the card goes;
+//   the title link stays the card's one Tab stop.
 // The facts are `listingCardFacts`'s (market-list.ts).
 
 import * as React from "react";
@@ -172,18 +172,23 @@ export function ListingCard({
       </div>
 
       {/* M25 Hover's action button, at the card's foot under the price: it waits 64 px down (its 44 px and the
-          card's 20 px edge), below the card's edge, and rises with the words. A picture of a button. */}
-      <span
+          card's 20 px edge), below the card's edge, and rises with the words. A real button with A01's own hover,
+          pressed and pointer (owner, 2026-11-16: "where is the button's hover?"), going where the card goes. The
+          title link is the card's one Tab stop, so this one is out of the Tab order and hidden from a screen reader. */}
+      <Link
+        href={`/marketplace/${item.projectId}`}
+        tabIndex={-1}
         aria-hidden
         className={cn(
           buttonVariants({ hierarchy: "primary", size: "lg" }),
-          "pointer-events-none absolute inset-x-[20px] bottom-[20px] h-[44px] translate-y-[64px] transition-transform",
+          // The reset colours every a:hover as a link; the button keeps A01's ink.
+          "absolute inset-x-[20px] bottom-[20px] h-[44px] translate-y-[64px] transition-[transform,background-color] hover:text-[color:var(--color-button-primary-text)]",
           "[@media(hover:hover)]:group-hover:translate-y-0",
           MOVE,
         )}
       >
         {f.action}
-      </span>
+      </Link>
     </article>
   );
 }
