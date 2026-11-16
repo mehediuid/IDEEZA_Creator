@@ -121,14 +121,12 @@ export function sampleCopiesOf(m: SampleMarket, sales: readonly SampleSale[]): C
   const open = m.offers.filter((o) => o.kind !== "main" && !offerStateOf(o, m.feedId, sales).soldOut && !offerStateOf(o, m.feedId, sales).locked);
   if (open.length === 0) return null;
   const token = open.map((o) => o.token).sort()[0] as Token;
-  const amount = open
-    .filter((o) => o.token === token)
-    .map((o) => o.price)
-    .sort(compareAmounts)[0];
+  const cheapest = open.filter((o) => o.token === token).sort((a, b) => compareAmounts(a.price, b.price))[0];
   return {
     count: open.length,
     kinds: KINDS.filter((k) => open.some((o) => o.kind === k)),
-    from: { amount, token },
+    from: { amount: cheapest.price, token },
+    fromKind: cheapest.kind as EditionKind,
     listedAt: m.post.sharedAt,
   };
 }

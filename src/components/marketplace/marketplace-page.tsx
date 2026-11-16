@@ -58,7 +58,10 @@ import { useSampleSales } from "@/components/mobile/project-earn/buyer/sample-sa
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
-import { ListingCard, ListingCardSkeleton } from "./listing-card";
+import { ListingCard, ListingCardSkeleton, type CardStats } from "./listing-card";
+import { useCreator } from "./use-creator-name";
+import { countsOf, useReactions } from "@/lib/innovations/reactions";
+import { postIdOfProject } from "@/lib/innovations/slug";
 import { recordSearch } from "@/lib/data/activity-log";
 import { motionReduced } from "@/lib/settings/appearance";
 
@@ -85,9 +88,8 @@ const SORT_OPTIONS: SelectOption<MarketQuery["sort"]>[] = [
 
 const PANEL_ID = "market-panel";
 const tabId = (tab: Tab) => `market-tab-${tab}`;
-// As many columns as fit; the list is its own container too, so a card turns
-// into a row below a 560 px list (listing-card.tsx).
-const GRID = cn(PAGE_GRID, "[container-type:inline-size]");
+// As many columns as fit, each card the design system's Asset Card (listing-card.tsx) at every width.
+const GRID = PAGE_GRID;
 // A link dressed as the quiet button; the reset colours every a:hover as a link.
 const QUIET_LINK = cn(
   buttonVariants({ hierarchy: "secondary", size: "md" }),
@@ -116,6 +118,8 @@ export function MarketplacePage() {
   const { hydrated: buildsHydrated, builds } = useCreateHistory();
   const market = useMarket();
   const sampleSales = useSampleSales();
+  const { reactions } = useReactions();
+  const me = useCreator();
   const { buyer } = useActiveBuyer();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -201,6 +205,16 @@ export function MarketplacePage() {
   const clearSearch = () => {
     changeQuery("");
     searchRef.current?.focus();
+  };
+
+  // A card's Innovations counts (M25's stats): a sample's, or a project shared there; none otherwise.
+  const statsOf = (projectId: string): CardStats | null => {
+    const sample = sampleMarketOf(projectId);
+    if (sample) return countsOf(reactions, sample.post.id, sample.post.base);
+    const row = summaries.get(projectId);
+    return row && typeof row.project.showcasedAt === "number"
+      ? countsOf(reactions, postIdOfProject(projectId), { appreciations: 0, views: 0 })
+      : null;
   };
 
   const forSale = ready ? counts.forSale : null;
@@ -315,6 +329,8 @@ export function MarketplacePage() {
                     tab={view.tab}
                     now={now}
                     heldPct={view.tab === "forSale" ? (holdingOf(item.projectId, buyer.id, market.data.sales)?.sharePct ?? null) : null}
+                    creator={item.creator ?? me.name}
+                    stats={statsOf(item.projectId)}
                   />
                 </li>
               ))}

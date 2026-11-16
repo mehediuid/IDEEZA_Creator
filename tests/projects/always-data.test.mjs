@@ -82,7 +82,8 @@ test("the grid and the shop page read the samples; the post links to them", () =
   const page = read("components/marketplace/marketplace-page.tsx");
   assert.match(page, /\[\.\.\.own, \.\.\.sampleMarketItemsOf\(sampleSales, buyer\.id\)\]/);
   assert.match(page, /sampleMatches\(sample, view\.q\)/);
-  assert.match(read("components/marketplace/listing-card.tsx"), /By \{item\.creator \?\? "you"\}/);
+  // The card names the creator — a sample's, else this browser's by name, never "you" (M25's Creator).
+  assert.match(page, /creator=\{item\.creator \?\? me\.name\}/);
   const route = read("app/(create)/marketplace/[id]/page.tsx");
   assert.match(route, /if \(sample\) return <SampleMarketPage market=\{sample\} \/>;/);
   const box = read("components/marketplace/sample-offer-box.tsx");

@@ -9,7 +9,7 @@
 import type { Amount, DemoBuyerId } from "../wallet/types";
 import type { Token } from "../brief/types";
 import { compareAmounts, formatAmount } from "../wallet/money";
-import { auctionStateOf } from "./auction";
+import { auctionStateOf, timeLeftLabel } from "./auction";
 import { liveTracksOf } from "./editions";
 import type { AuctionState, Bid, EditionKind, EditionTrack, Listing, Sale } from "./types";
 import { formatDate, formatDateTime } from "../manual/public";
@@ -34,6 +34,8 @@ export type CopyOffer = {
   kinds: EditionKind[];
   /** The lowest price, in the first token by name (no rate between test tokens). */
   from: { amount: Amount; token: Token };
+  /** The kind that lowest price is for: the card lights its tag. */
+  fromKind: EditionKind;
   /** The newest listing among them. */
   listedAt: number;
 };
@@ -64,12 +66,12 @@ export function copyOfferOf(tracks: readonly EditionTrack[], sales: Sale[], lock
   if (!live.length) return null;
   const listings = live.map((t) => t.listing as NonNullable<EditionTrack["listing"]>);
   const token = listings.map((l) => l.token).sort()[0] as Token;
-  const amount = listings
-    .filter((l) => l.token === token)
-    .map((l) => l.regular)
-    .sort(compareAmounts)[0];
+  const cheapest = live
+    .filter((t) => t.listing?.token === token)
+    .sort((x, y) => compareAmounts((x.listing as NonNullable<EditionTrack["listing"]>).regular, (y.listing as NonNullable<EditionTrack["listing"]>).regular))[0];
+  const amount = (cheapest.listing as NonNullable<EditionTrack["listing"]>).regular;
   const kinds = (["physical", "virtual"] as EditionKind[]).filter((k) => live.some((t) => t.kind === k));
-  return { count: live.length, kinds, from: { amount, token }, listedAt: Math.max(...listings.map((l) => l.listedAt)) };
+  return { count: live.length, kinds, from: { amount, token }, fromKind: cheapest.kind, listedAt: Math.max(...listings.map((l) => l.listedAt)) };
 }
 
 /** One card per live (or ended-unclosed) listing, one per sale, and one per project whose copies
@@ -227,60 +229,94 @@ export function filterMarket(items: MarketItem[], query: MarketQuery): MarketFil
   return { counts, items: pageItems, pages };
 }
 
-export type ListingCardText = { price: string; sub: string };
-
 function buyerName(id: DemoBuyerId): string {
   const names: Record<DemoBuyerId, string> = { "buyer-mira": "Mira", "buyer-leo": "Leo", "buyer-sam": "Sam" };
-  return `${names[id]} (demo creator)`;
+  return names[id];
 }
 
-/** The card's price block (P2-MARKETPLACE-6), which depends on the tab and
- *  the listing. `tab` defaults to "forSale": a sold item the active buyer
- *  also holds reads differently on Purchased ("You own …") than on Sold
- *  ("Sold for … to …"), so callers on the Purchased tab pass it. */
-const KIND_COPIES: Record<EditionKind, string> = { physical: "Physical", virtual: "Virtual" };
+export type CardTagKind = "main" | EditionKind;
 
-/** "From 0.05 MATIC" when there's more than one offer, else the one price. */
-function copiesPriceOf(c: CopyOffer): string {
-  const price = formatAmount(c.from.amount, c.from.token);
-  return c.count > 1 ? `From ${price}` : price;
+/** The card's facts in the design system's Asset Card (M25, owner 2026-11-16: "the card's information is in
+ *  the design system"): the status badge on the picture, the NFT tags (the one the price is for lit), the price
+ *  block (label, amount, token apart), the block beside it (an auction's end, a buyer, a share) and the hover
+ *  button's words. */
+export type ListingCardFacts = {
+  badge: string;
+  tags: { kind: CardTagKind; label: string; on: boolean }[];
+  price: { label: string; amount: string; token: string };
+  side: { label: string; value: string } | null;
+  action: "View details" | "View auction";
+};
+
+export const CARD_TAG_LABEL: Record<CardTagKind, string> = { main: "Main NFT", physical: "Physical NFT", virtual: "Virtual NFT" };
+
+/** "0.05 MATIC" as its amount and its token. */
+function priceParts(amount: Amount, token: Token): { amount: string; token: string } {
+  const text = formatAmount(amount, token);
+  return { amount: text.slice(0, text.length - token.length - 1), token };
 }
 
-/** A Main card's extra line while copies are on sale too: "Copies from 0.05 MATIC". */
-export function copiesLineOf(item: MarketItem): string | null {
-  if (!item.listing || !item.copies) return null;
-  return `Copies from ${formatAmount(item.copies.from.amount, item.copies.from.token)}`;
-}
+const tagsOf = (kinds: readonly CardTagKind[], on: CardTagKind) => kinds.map((k) => ({ kind: k, label: CARD_TAG_LABEL[k], on: k === on }));
 
-export function listingCardText(item: MarketItem, now: number, tab: MarketQuery["tab"] = "forSale"): ListingCardText {
+/** The facts a card shows. `tab` matters: an item the active buyer holds reads "You own …" on Purchased and
+ *  "Sold for …" on Sold. `heldPct`: the share the active buyer already holds of a project still for sale. */
+export function listingCardFacts(
+  item: MarketItem,
+  now: number,
+  tab: MarketQuery["tab"] = "forSale",
+  heldPct: number | null = null,
+): ListingCardFacts {
   const l = item.listing;
-  if (!l) {
-    const c = item.copies as CopyOffer;
-    return { price: copiesPriceOf(c), sub: `${c.kinds.map((k) => KIND_COPIES[k]).join(" and ")} copies · not the project itself` };
-  }
+  const copyKinds = item.copies?.kinds ?? [];
   if (tab === "purchased" && item.holding) {
     return {
-      price: `You own ${item.holding.sharePct}%`,
-      sub: item.sale ? `Bought ${formatDate(item.sale.at)} for ${formatAmount(item.sale.price, l.token)}` : "",
+      badge: "Purchased",
+      tags: tagsOf(["main"], "main"),
+      price: { label: "You own", amount: `${item.holding.sharePct}%`, token: "" },
+      side: item.sale ? { label: "Bought", value: formatDate(item.sale.at) } : null,
+      action: "View details",
     };
   }
   if (item.sale) {
     const s = item.sale;
     const pct = s.item.nft === "main" ? s.item.sharePct : 0;
     return {
-      price: `Sold for ${formatAmount(s.price, s.token)} · ${pct}% · to ${buyerName(s.buyerId)}`,
-      sub: formatDate(s.at),
+      badge: "Sold",
+      tags: tagsOf(["main"], "main"),
+      price: { label: pct >= 100 ? "Sold for" : `Sold for ${pct}%`, ...priceParts(s.price, s.token) },
+      side: { label: "Bought by", value: buyerName(s.buyerId) },
+      action: "View details",
     };
   }
+  if (!l) {
+    const c = item.copies as CopyOffer;
+    return {
+      badge: "Copies",
+      tags: tagsOf(c.kinds, c.fromKind),
+      price: { label: c.count > 1 ? "From" : "Current price", ...priceParts(c.from.amount, c.from.token) },
+      side: null,
+      action: "View details",
+    };
+  }
+  const kinds: CardTagKind[] = ["main", ...copyKinds];
   if (l.type === "auction") {
     const state = item.auction ?? auctionStateOf(l, [], now);
-    const bidLine = state.top
-      ? `Current bid ${formatAmount(state.top.amount, l.token)}`
-      : `Starting bid ${formatAmount(l.minBid ?? "0", l.token)}`;
-    const endLine = state.phase === "ended" ? "Auction ended" : `Ends ${formatDateTime(l.endsAt ?? now)}`;
-    return { price: bidLine, sub: endLine };
+    const ended = state.phase === "ended";
+    return {
+      badge: ended ? "Auction ended" : `Auction · ${timeLeftLabel(state.msLeft)}`,
+      tags: tagsOf(kinds, "main"),
+      price: { label: state.top ? (ended ? "Winning bid" : "Current bid") : "Starting bid", ...priceParts(state.top?.amount ?? l.minBid ?? "0", l.token) },
+      side: { label: ended ? "Ended" : "Ends", value: formatDateTime(l.endsAt ?? now) },
+      action: "View auction",
+    };
   }
-  return { price: formatAmount(l.price ?? "0", l.token), sub: `for ${l.percentSelling}% of the project` };
+  const side =
+    l.percentSelling < 100
+      ? { label: "Share", value: `${l.percentSelling}%` }
+      : heldPct !== null && heldPct > 0
+        ? { label: "You own", value: `${heldPct}%` }
+        : null;
+  return { badge: "Buy now", tags: tagsOf(kinds, "main"), price: { label: "Current price", ...priceParts(l.price ?? "0", l.token) }, side, action: "View details" };
 }
 
 // ───────────────────────── the URL codec ─────────────────────────

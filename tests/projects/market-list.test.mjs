@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { copiesLineOf, copyOfferOf, filterMarket, listingCardText, marketItemsOf, marketQueryString, parseMarketQuery } = await import(
+const { copyOfferOf, filterMarket, listingCardFacts, marketItemsOf, marketQueryString, parseMarketQuery } = await import(
   "../../.tmp-test/lib/market/market-list.js"
 );
 
@@ -95,20 +95,33 @@ test("filterMarket: counts and tabs — Sold and Purchased read from sale and ho
   assert.deepEqual(result.items.map((i) => i.projectId), ["p_sold"]);
 });
 
-test("listingCardText: a Buy now card reads the price, then the share sold", () => {
-  const text = listingCardText(itemFixture(), 0);
-  assert.equal(text.price, "0.05 MATIC");
-  assert.equal(text.sub, "for 10% of the project");
+// The card is the design system's Asset Card, M25 (owner, 2026-11-16).
+test("listingCardFacts: a Buy now card — badge, the Main NFT tag lit, the price apart from its token, the share beside it", () => {
+  const f = listingCardFacts(itemFixture(), 0);
+  assert.equal(f.badge, "Buy now");
+  assert.deepEqual(f.tags, [{ kind: "main", label: "Main NFT", on: true }]);
+  assert.deepEqual(f.price, { label: "Current price", amount: "0.05", token: "MATIC" });
+  assert.deepEqual(f.side, { label: "Share", value: "10%" });
+  assert.equal(f.action, "View details");
+  // The whole project: nothing beside the price, unless the buyer already holds part.
+  const whole = itemFixture({ listing: listingFixture({ percentSelling: 100 }) });
+  assert.equal(listingCardFacts(whole, 0).side, null);
+  assert.deepEqual(listingCardFacts(whole, 0, "forSale", 20).side, { label: "You own", value: "20%" });
 });
 
-test("listingCardText: the Purchased tab reads 'You own …'", () => {
+test("listingCardFacts: the Purchased tab reads 'You own …' and when it was bought", () => {
   const purchased = itemFixture({
     holding: { sharePct: 10 },
     sale: { at: 5, price: "0.05", token: "MATIC", buyerId: "buyer-mira", item: { nft: "main", sharePct: 10 } },
   });
-  const text = listingCardText(purchased, 0, "purchased");
-  assert.equal(text.price, "You own 10%");
-  assert.match(text.sub, /^Bought .* for 0\.05 MATIC$/);
+  const f = listingCardFacts(purchased, 0, "purchased");
+  assert.equal(f.badge, "Purchased");
+  assert.deepEqual(f.price, { label: "You own", amount: "10%", token: "" });
+  assert.equal(f.side.label, "Bought");
+  const sold = listingCardFacts(purchased, 0, "sold");
+  assert.equal(sold.badge, "Sold");
+  assert.deepEqual(sold.price, { label: "Sold for 10%", amount: "0.05", token: "MATIC" });
+  assert.deepEqual(sold.side, { label: "Bought by", value: "Mira" });
 });
 
 test("marketItemsOf: paused and removed listings appear in no tab", () => {
@@ -153,8 +166,15 @@ test("marketItemsOf: a project with only copy listings is an item — no Main li
   assert.equal(copies.projectId, "p2");
   assert.equal(copies.listing, null);
   assert.equal(copies.status, "live");
-  assert.deepEqual(copies.copies, { count: 2, kinds: ["physical", "virtual"], from: { amount: "0.05", token: "MATIC" }, listedAt: 3000 });
-  assert.deepEqual(listingCardText(copies, 0), { price: "From 0.05 MATIC", sub: "Physical and Virtual copies · not the project itself" });
+  assert.deepEqual(copies.copies, { count: 2, kinds: ["physical", "virtual"], from: { amount: "0.05", token: "MATIC" }, fromKind: "virtual", listedAt: 3000 });
+  const f = listingCardFacts(copies, 0);
+  assert.equal(f.badge, "Copies");
+  assert.deepEqual(f.price, { label: "From", amount: "0.05", token: "MATIC" });
+  assert.deepEqual(
+    f.tags.map((t) => [t.label, t.on]),
+    [["Physical NFT", false], ["Virtual NFT", true]],
+    "the tag the price is for is lit",
+  );
   // For sale, and a Buy now, not an auction.
   assert.equal(filterMarket(items, { tab: "forSale", q: "", type: "buyNow", sort: "newest", page: 1 }).items.length, 1);
   assert.equal(filterMarket(items, { tab: "forSale", q: "", type: "auction", sort: "newest", page: 1 }).items.length, 0);
@@ -165,7 +185,11 @@ test("marketItemsOf: a live Main card carries the copies; a sold-out, unlisted o
   const items = marketItemsOf(listings, PROJECTS, [], [], null, 0, [trackFixture()]);
   assert.equal(items.length, 1);
   assert.equal(items[0].listing.id, "lst_1");
-  assert.equal(copiesLineOf(items[0]), "Copies from 0.05 MATIC");
+  assert.deepEqual(
+    listingCardFacts(items[0], 0).tags.map((t) => [t.label, t.on]),
+    [["Main NFT", true], ["Virtual NFT", false]],
+    "a Main card names its copies as tags, the Main NFT lit",
+  );
   assert.equal(copyOfferOf([trackFixture({ listing: null })], [], false), null);
   assert.equal(copyOfferOf([trackFixture({ supply: { total: 1 } })], [{ id: "s", at: 1, item: { nft: "virtual", trackId: "ed_1" } }], false), null);
   const locked = [{ ...PROJECTS[1], locked: true }];
