@@ -37,9 +37,10 @@ import { marketDocTitle } from "@/lib/manual/project-route";
 import type { SampleMarket } from "@/lib/market/sample-market";
 import { cn } from "@/lib/utils";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
+import type { OfferTab } from "./offer-parts";
 import { SampleOfferBox } from "./sample-offer-box";
 
-export function SampleMarketPage({ market }: { market: SampleMarket }) {
+export function SampleMarketPage({ market, initialTab = null }: { market: SampleMarket; initialTab?: OfferTab | null }) {
   const { post } = market;
   const { titleRef, live, announce } = usePageArrival(`market:${market.feedId}`, post.title, marketDocTitle(post.title));
   const meta = [post.category, productsLabel(post.products.length), post.partsCount > 0 ? partsLabel(post.partsCount) : null].filter(Boolean).join(" · ");
@@ -80,7 +81,7 @@ export function SampleMarketPage({ market }: { market: SampleMarket }) {
             </header>
 
             <div className={cn(NARROW_ONLY, "flex flex-col gap-8")}>
-              <SampleOfferBox market={market} announce={announce} />
+              <SampleOfferBox market={market} announce={announce} initialTab={initialTab} />
               <MakerBlock post={post} owner={false} layout="card" />
             </div>
 
@@ -98,7 +99,7 @@ export function SampleMarketPage({ market }: { market: SampleMarket }) {
 
           <aside aria-label="Buy and the creator" className={cn(WIDE_ONLY, "min-w-0 flex-col self-stretch")}>
             <div className="sticky top-[24px] flex flex-col gap-8">
-              <SampleOfferBox market={market} announce={announce} />
+              <SampleOfferBox market={market} announce={announce} initialTab={initialTab} />
               <MakerBlock post={post} owner={false} layout="card" />
               <OnInnovations post={post} />
             </div>

@@ -7,8 +7,9 @@
 // Four of the maker's own projects, one per outcome, so every tab and every
 // page has something real to open:
 // - Smart Plant Pot: Listed. Main NFT on Buy now, whole-project Physical and
-//   Virtual copies plus a Virtual copy of its product, one copy already sold,
-//   and shared on Innovations (Showcase);
+//   Virtual copies each for Personal use and Business use (owner, 2026-11-16:
+//   a buyer chooses the use), a Personal-use Virtual copy of its product, one
+//   copy already sold, and shared on Innovations (Showcase);
 // - Gesture LED Lamp: Sold. Its Main NFT bought in full by Leo;
 // - Heart Rate Band: Minted (private), nothing listed;
 // - BLE Data Logger: Draft. Built, not minted.
@@ -38,6 +39,8 @@ import type { ManualProject } from "../manual/projects";
 /** Set once this account's demo projects are planted; parked and restored with its work. */
 export const DEMO_SEED_KEY = "ideeza:demo:projects";
 export const DEMO_PROJECT_PREFIX = "proj_demo_";
+/** The seed's version: 2 added the second use of each whole-project copy (an older planting is topped up). */
+export const DEMO_SEED_VERSION = 2;
 
 const DAY = 86_400_000;
 const NETWORK: Network = "baseSepolia";
@@ -319,8 +322,10 @@ export function demoSeedOf(now: number): DemoSeed {
       seed.listings.push(listingOf(d, "0.2", listedAt));
       const physical = trackOf(d, "phys", PROJECT_SCOPE, "physical", "commercial", 20, "0.04", listedAt);
       seed.editions[project.id] = [
+        trackOf(d, "phys_private", PROJECT_SCOPE, "physical", "private", 30, "0.03", listedAt),
         physical,
         trackOf(d, "virt", PROJECT_SCOPE, "virtual", "private", 100, "0.01", listedAt),
+        trackOf(d, "virt_commercial", PROJECT_SCOPE, "virtual", "commercial", 50, "0.02", listedAt),
         trackOf(d, "prod_virt", productIdOf(d), "virtual", "private", 50, "0.005", listedAt),
       ];
       seed.sales.push(

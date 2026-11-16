@@ -12,7 +12,11 @@
 //   Innovations sample, or a project shared there); M25's plays count is left
 //   out: nothing counts plays;
 // - the NFT tags (A18 Tag, Caption/MD): Main NFT, Physical NFT, Virtual NFT,
-//   only what is on sale, the one the price is for lit (Selected);
+//   only what is on sale, the one the price is for lit (Selected). They are
+//   buttons (owner, 2026-11-16: "the tags are clickable and the price
+//   changes"): a click lights that tag and shows its lowest price, and the
+//   card's links then open the details page on that tab (?nft=). They sit
+//   above the title link's cover, so a click picks, never navigates;
 // - a hairline, then the price block: its label, the amount (Heading/H4) and
 //   the token apart (Code/MD), and beside it what M25's End block holds — an
 //   auction's end, the buyer, a share. They sit at the card's foot, so a row
@@ -34,7 +38,8 @@ import { CpuIcon, FavouriteIcon, ImageNotFound01Icon, ViewIcon } from "@hugeicon
 import { Icon } from "@/components/dashboard/icon";
 import { Tag, buttonVariants } from "@/components/ideeza";
 import { formatCount } from "@/lib/feed";
-import { listingCardFacts, type MarketItem, type MarketQuery } from "@/lib/market/market-list";
+import { listingCardFacts, type CardTagKind, type MarketItem, type MarketQuery } from "@/lib/market/market-list";
+import { NFT_PARAM } from "./offer-tab";
 import { cn } from "@/lib/utils";
 
 /** One clock for every part of the hover, so the picture, the words and the button move as one. */
@@ -62,8 +67,12 @@ export function ListingCard({
   stats: CardStats | null;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
+  const [picked, setPicked] = React.useState<CardTagKind | null>(null);
   const hasCover = Boolean(item.cover);
-  const f = listingCardFacts(item, now, tab, heldPct);
+  const f = listingCardFacts(item, now, tab, heldPct, picked);
+  // Clickable only where there is a choice: a card for sale with more than one kind on it.
+  const pickable = f.tags.length > 1 && tab === "forSale" && !item.sale;
+  const href = `/marketplace/${item.projectId}${picked ? `?${NFT_PARAM}=${picked}` : ""}`;
 
   return (
     <article
@@ -113,7 +122,7 @@ export function ListingCard({
           <div className="flex flex-col gap-[8px]">
             <h3 className="truncate text-2xl font-semibold leading-2xl text-text-primary">
               <Link
-                href={`/marketplace/${item.projectId}`}
+                href={href}
                 title={item.name}
                 // The reset colours every a:hover as a link; M25's title stays the title's ink. The ring is drawn
                 // inside the card, which clips what leaves it.
@@ -142,10 +151,17 @@ export function ListingCard({
           </div>
           <ul role="list" aria-label="On sale" className="m-0 flex list-none flex-wrap gap-[8px] p-0">
             {f.tags.map((t) => (
-              <li key={t.kind}>
-                <Tag size="md" selected={t.on}>
-                  {t.label}
-                </Tag>
+              // Above the title link's cover (its ::after), so the tag takes the click.
+              <li key={t.kind} className="relative z-[1]">
+                {pickable ? (
+                  <Tag size="md" selected={t.on} onClick={() => setPicked(t.kind)}>
+                    {t.label}
+                  </Tag>
+                ) : (
+                  <Tag size="md" selected={t.on}>
+                    {t.label}
+                  </Tag>
+                )}
               </li>
             ))}
           </ul>
@@ -176,7 +192,7 @@ export function ListingCard({
           pressed and pointer (owner, 2026-11-16: "where is the button's hover?"), going where the card goes. The
           title link is the card's one Tab stop, so this one is out of the Tab order and hidden from a screen reader. */}
       <Link
-        href={`/marketplace/${item.projectId}`}
+        href={href}
         tabIndex={-1}
         aria-hidden
         className={cn(

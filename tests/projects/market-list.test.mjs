@@ -166,7 +166,9 @@ test("marketItemsOf: a project with only copy listings is an item — no Main li
   assert.equal(copies.projectId, "p2");
   assert.equal(copies.listing, null);
   assert.equal(copies.status, "live");
-  assert.deepEqual(copies.copies, { count: 2, kinds: ["physical", "virtual"], from: { amount: "0.05", token: "MATIC" }, fromKind: "virtual", listedAt: 3000 });
+  assert.deepEqual(copies.copies, { count: 2, kinds: ["physical", "virtual"], from: { amount: "0.05", token: "MATIC" }, fromKind: "virtual", byKind: { physical: { amount: "0.4", token: "MATIC", count: 1 }, virtual: { amount: "0.05", token: "MATIC", count: 1 } }, listedAt: 3000 });
+  // A clicked tag shows its kind's own price (owner, 2026-11-16).
+  assert.deepEqual(listingCardFacts(copies, 0, "forSale", null, "physical").price, { label: "Current price", amount: "0.4", token: "MATIC" });
   const f = listingCardFacts(copies, 0);
   assert.equal(f.badge, "Copies");
   assert.deepEqual(f.price, { label: "From", amount: "0.05", token: "MATIC" });

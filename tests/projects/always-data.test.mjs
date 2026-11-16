@@ -85,7 +85,7 @@ test("the grid and the shop page read the samples; the post links to them", () =
   // The card names the creator — a sample's, else this browser's by name, never "you" (M25's Creator).
   assert.match(page, /creator=\{item\.creator \?\? me\.name\}/);
   const route = read("app/(create)/marketplace/[id]/page.tsx");
-  assert.match(route, /if \(sample\) return <SampleMarketPage market=\{sample\} \/>;/);
+  assert.match(route, /if \(sample\) return <SampleMarketPage market=\{sample\} initialTab=\{offerTabOf\(\(await searchParams\)\.nft\)\} \/>;/);
   const box = read("components/marketplace/sample-offer-box.tsx");
   assert.match(box, /<OfferTabs tabs=\{tabs\}/, "the same tab box as this browser's own listings");
   assert.match(box, /writeSampleSales\(next\.sales\)/, "one store with the phone");
@@ -120,15 +120,46 @@ test("four demo projects, one per outcome, each a finished build", () => {
   }
   const plant = seed.projects[0];
   assert.equal(typeof plant.showcasedAt, "number", "the listed one is shared on Innovations too");
-  assert.equal(seed.editions[plant.id].length, 3, "whole-project Physical and Virtual, and its product's Virtual");
+  const tracks = seed.editions[plant.id];
+  assert.deepEqual(
+    tracks.filter((t) => t.productId === "project").map((t) => `${t.kind}:${t.use}`).sort(),
+    ["physical:commercial", "physical:private", "virtual:commercial", "virtual:private"],
+    "each whole-project copy for Personal use and Business use",
+  );
+  assert.equal(tracks.filter((t) => t.productId !== "project").length, 1, "and its product's own Virtual copy");
   assert.ok(seed.sales.every((s) => s.at < NOW), "every sale is in the past");
 });
 
 test("planted once per account, before the stores read, never over an unreadable list", () => {
   const seed = read("components/projects/demo-projects-seed.tsx");
-  assert.match(seed, /if \(storage\.getItem\(DEMO_SEED_KEY\) !== null\) return false;/);
+  assert.match(seed, /if \(planted >= DEMO_SEED_VERSION\) return false;/);
+  assert.match(seed, /if \(planted > 0\) return topUp\(storage, now\);/, "an older planting only gets what a later seed added");
   assert.match(seed, /if \(!projects \|\| !builds \|\| !listings \|\| !sales\) return false;/);
   assert.match(seed, /React\.useLayoutEffect/);
   const layout = read("app/layout.tsx");
   assert.ok(layout.indexOf("<DemoProjectsSeed />") < layout.indexOf("<ThemeProvider>"), "ahead of every provider");
+});
+
+test("a sample copy is sold for Personal use and Business use, each with its own price and its own count", () => {
+  // Owner, 2026-11-16: "there is no place to choose private or commercial use when buying".
+  const m = market.SAMPLE_MARKETS.find((x) => x.offers.some((o) => o.kind === "physical"));
+  const uses = market.copyUsesOf(m, "physical");
+  assert.deepEqual(uses.map((u) => u.use), ["Personal use", "Business use"]);
+  assert.equal(uses.filter((u) => u.base).length, 1, "one of them is the post's own row");
+  const [personal, business] = uses;
+  assert.equal(Number(business.price), Number(personal.price) * 2, "Business use is twice Personal use");
+  const sale = sales.makeSampleSale({ id: "s1", projectId: m.feedId, offer: business, buyerId: "buyer-mira", buyerAddress: "0x1", serial: 1, txHash: "0x", at: NOW });
+  assert.equal(market.copyUseStateOf(business, m.feedId, [sale]).sales.length, 1);
+  assert.equal(market.copyUseStateOf(personal, m.feedId, [sale]).sales.length, 0, "a Business sale is not a Personal one");
+  const copies = market.sampleCopiesOf(m, []);
+  assert.equal(copies.byKind.physical.amount, personal.price, "the card's Physical tag shows the lowest, Personal use");
+});
+
+test("a card's tags are buttons: a click shows that kind's price, and the card's links open that tab", () => {
+  const card = read("components/marketplace/listing-card.tsx");
+  assert.match(card, /<Tag size="md" selected=\{t\.on\} onClick=\{\(\) => setPicked\(t\.kind\)\}>/);
+  assert.match(card, /<li key=\{t\.kind\} className="relative z-\[1\]">/, "above the title link's cover");
+  assert.match(card, /listingCardFacts\(item, now, tab, heldPct, picked\)/);
+  assert.match(card, /`\/marketplace\/\$\{item\.projectId\}\$\{picked \? `\?\$\{NFT_PARAM\}=\$\{picked\}` : ""\}`/);
+  assert.match(read("components/marketplace/buyer-rail.tsx"), /asked && tabs\.includes\(asked\)\s*\? asked/, "the details page opens on it");
 });

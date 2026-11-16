@@ -11,7 +11,7 @@ import type { Token } from "../brief/types";
 import { compareAmounts, formatAmount } from "../wallet/money";
 import { auctionStateOf, timeLeftLabel } from "./auction";
 import { liveTracksOf } from "./editions";
-import type { AuctionState, Bid, EditionKind, EditionTrack, Listing, Sale } from "./types";
+import { PROJECT_SCOPE, type AuctionState, type Bid, type EditionKind, type EditionTrack, type Listing, type Sale } from "./types";
 import { formatDate, formatDateTime } from "../manual/public";
 
 export const PAGE_SIZE = 12;
@@ -36,9 +36,25 @@ export type CopyOffer = {
   from: { amount: Amount; token: Token };
   /** The kind that lowest price is for: the card lights its tag. */
   fromKind: EditionKind;
+  /** Each kind's lowest price and how many offers it has: a card's tag shows it when clicked. */
+  byKind: Partial<Record<EditionKind, KindOffer>>;
   /** The newest listing among them. */
   listedAt: number;
 };
+
+/** One kind's lowest price (in its first token by name) and how many offers of it are on sale. */
+export type KindOffer = { amount: Amount; token: Token; count: number };
+
+/** The lowest of these prices, in the first token by name; null for none. */
+export function lowestOf(prices: readonly { amount: Amount; token: Token }[]): KindOffer | null {
+  if (!prices.length) return null;
+  const token = prices.map((p) => p.token).sort()[0] as Token;
+  const amount = prices
+    .filter((p) => p.token === token)
+    .map((p) => p.amount)
+    .sort(compareAmounts)[0];
+  return { amount, token, count: prices.length };
+}
 
 export type MarketItem = {
   projectId: string;
@@ -71,7 +87,16 @@ export function copyOfferOf(tracks: readonly EditionTrack[], sales: Sale[], lock
     .sort((x, y) => compareAmounts((x.listing as NonNullable<EditionTrack["listing"]>).regular, (y.listing as NonNullable<EditionTrack["listing"]>).regular))[0];
   const amount = (cheapest.listing as NonNullable<EditionTrack["listing"]>).regular;
   const kinds = (["physical", "virtual"] as EditionKind[]).filter((k) => live.some((t) => t.kind === k));
-  return { count: live.length, kinds, from: { amount, token }, fromKind: cheapest.kind, listedAt: Math.max(...listings.map((l) => l.listedAt)) };
+  // A tag's price is what the details page sells under that tab: the whole project's copies of that kind, or,
+  // with none, its products' (which their own pages sell).
+  const byKind: CopyOffer["byKind"] = {};
+  for (const k of kinds) {
+    const scoped = live.filter((t) => t.kind === k && t.productId === PROJECT_SCOPE);
+    const pool = scoped.length ? scoped : live.filter((t) => t.kind === k);
+    const of = lowestOf(pool.map((t) => ({ amount: (t.listing as NonNullable<EditionTrack["listing"]>).regular, token: (t.listing as NonNullable<EditionTrack["listing"]>).token })));
+    if (of) byKind[k] = of;
+  }
+  return { count: live.length, kinds, from: { amount, token }, fromKind: cheapest.kind, byKind, listedAt: Math.max(...listings.map((l) => l.listedAt)) };
 }
 
 /** One card per live (or ended-unclosed) listing, one per sale, and one per project whose copies
@@ -265,9 +290,23 @@ export function listingCardFacts(
   now: number,
   tab: MarketQuery["tab"] = "forSale",
   heldPct: number | null = null,
+  /** The tag the viewer clicked (owner, 2026-11-16: the tags are clickable and the price follows): a copy kind
+   *  shows that kind's lowest price; absent or "main", the card's own price. */
+  picked: CardTagKind | null = null,
 ): ListingCardFacts {
   const l = item.listing;
   const copyKinds = item.copies?.kinds ?? [];
+  const kindOffer = picked && picked !== "main" && tab !== "purchased" && !item.sale ? (item.copies?.byKind[picked] ?? null) : null;
+  if (picked && picked !== "main" && kindOffer) {
+    const base = listingCardFacts(item, now, tab, heldPct);
+    return {
+      ...base,
+      tags: base.tags.map((t) => ({ ...t, on: t.kind === picked })),
+      price: { label: kindOffer.count > 1 ? "From" : "Current price", ...priceParts(kindOffer.amount, kindOffer.token) },
+      side: null,
+      action: "View details",
+    };
+  }
   if (tab === "purchased" && item.holding) {
     return {
       badge: "Purchased",

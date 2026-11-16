@@ -38,6 +38,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
@@ -61,6 +62,7 @@ import { CopyPanel, heldKindOf, listedKindsOf } from "./copy-panel";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { usePurchase } from "./purchase-dialog";
 import { PurchasedSummary } from "./purchased-summary";
+import { NFT_PARAM, offerTabOf } from "./offer-tab";
 import { AuctionTop, DealFacts, LegalLine, MoreFacts, OfferTabs, OfferTop, soldWhatOf, WalletLine, type OfferTab } from "./offer-parts";
 
 const QUIET_LINK =
@@ -91,6 +93,8 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
   // Called on every render (hooks can't wait on the viewer): the auction card's clock, the picked tab.
   const clock = useAuctionClock(listing?.type === "auction" ? listing.endsAt : undefined, now);
   const [picked, setPicked] = React.useState<OfferTab | null>(null);
+  // A card's clicked tag opens its tab (?nft=); the page sits in a Suspense boundary (market-project-page.tsx).
+  const asked = offerTabOf(useSearchParams().get(NFT_PARAM));
   if (viewer.kind === "local-owner" || !can(viewer, "listing.seePublic", view.canCtx)) return null;
   const kinds = listedKindsOf(view, PROJECT_SCOPE);
   const tabs: OfferTab[] = listing ? ["main", ...kinds] : kinds;
@@ -98,7 +102,9 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
   const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
   const heldMain = buyerId !== null && view.sales.some((s) => s.buyerId === buyerId && s.item.nft === "main");
   const first: OfferTab =
-    listing && heldMain
+    asked && tabs.includes(asked)
+      ? asked
+      : listing && heldMain
       ? "main"
       : (heldKindOf(view, PROJECT_SCOPE, buyerId, kinds) ??
         (listing && (view.listing.kind === "live" || kinds.length === 0) ? "main" : kinds[0]));

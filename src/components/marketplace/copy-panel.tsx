@@ -9,8 +9,10 @@
 //
 // The same buy box as the Main NFT tab, so every tab reads alike:
 // - what this kind gets you, said once (helperLineOf, the product page's line);
-// - Use (Personal use / Business use), a choice only when both are on sale,
-//   each with its sold count — a sold-out use stays, marked, and can't be bought;
+// - Use: Personal use and Business use, always both (owner, 2026-11-16:
+//   "there is no place to choose private or commercial use when buying"),
+//   each with its own price; a use the creator didn't list reads "Not on
+//   sale" and a sold-out one "Sold out" — both stay, greyed, unpickable;
 // - no Version choice (owner, 2026-11-15: "this won't be there"): the copy
 //   sells at its listing's Price, the one price the Sell flow asks for;
 // - the picked offer as the overline, its price large, the sold count under it;
@@ -22,7 +24,7 @@
 // A preview reads the same choices and prices with no button and no wallet (PPL-6).
 
 import * as React from "react";
-import { Button, Radio, TestnetDemoBadge } from "@/components/ideeza";
+import { Button, TestnetDemoBadge } from "@/components/ideeza";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { historyOf, labelOf } from "@/lib/manual/journey";
@@ -40,7 +42,7 @@ import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
-import { FactGrid, MoreFacts, OfferTop, WalletLine } from "./offer-parts";
+import { ChoiceRows, FactGrid, MoreFacts, OfferTop, WalletLine } from "./offer-parts";
 import { useEditionPurchase, type EditionTier } from "./purchase-dialog";
 
 const KINDS: EditionKind[] = ["physical", "virtual"];
@@ -113,17 +115,17 @@ export function CopyPanel({
       {!buyerId && <TestnetDemoBadge className="self-start" />}
       <p className="m-0 text-sm text-text-secondary">{helperLineOf(kind, scopeName)}</p>
 
-      {offers.length > 1 && (
-        <Choice
-          legend="Use"
-          value={track.id}
-          onChange={setPickedUse}
-          options={offers.map((t) => {
-            const c = trackCardOf(t, view.sales);
-            return { value: t.id, label: USE_LABEL[t.use], aside: c.soldOut ? "Sold out" : soldLineOf(c.sold, c.total) };
-          })}
-        />
-      )}
+      <ChoiceRows
+        legend="Use"
+        value={track.id}
+        onChange={setPickedUse}
+        options={USES.map((use) => {
+          const t = offers.find((o) => o.use === use);
+          if (!t) return { value: `none:${use}`, label: USE_LABEL[use], aside: "Not on sale", disabled: true };
+          const soldOut = trackCardOf(t, view.sales).soldOut;
+          return { value: t.id, label: USE_LABEL[use], aside: soldOut ? "Sold out" : formatAmount(t.listing.regular, t.listing.token), disabled: soldOut };
+        })}
+      />
 
       <OfferTop
         overline={name}
@@ -167,43 +169,6 @@ export function CopyPanel({
         <CopyActivity project={project} track={track} sales={view.sales} />
       </MoreFacts>
     </>
-  );
-}
-
-/** A choice as radio rows: each with its word and what stands beside it (a sold count). */
-function Choice({
-  legend,
-  value,
-  onChange,
-  options,
-}: {
-  legend: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string; aside: string }[];
-}) {
-  const group = React.useId();
-  return (
-    <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
-      <legend className="mb-3 p-0 text-sm font-semibold text-text-secondary">{legend}</legend>
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <label
-            key={o.value}
-            className={cn(
-              "relative flex min-h-[44px] cursor-pointer items-center gap-4 rounded-lg border border-solid px-5 py-3 transition-colors duration-fast motion-reduce:transition-none",
-              on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface hover:bg-bg-subtle",
-            )}
-          >
-            <input type="radio" name={group} checked={on} onChange={() => onChange(o.value)} className="peer sr-only" />
-            <Radio checked={on} decorative size="sm" className="peer-focus-visible:ring-2 peer-focus-visible:ring-border-focus" />
-            <span className="min-w-0 flex-1 text-md font-semibold text-text-primary">{o.label}</span>
-            <span className="shrink-0 text-md tabular-nums text-text-secondary">{o.aside}</span>
-          </label>
-        );
-      })}
-    </fieldset>
   );
 }
 

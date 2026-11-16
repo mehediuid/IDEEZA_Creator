@@ -19,7 +19,7 @@
 import * as React from "react";
 import { ArrowDown01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, TestnetDemoBadge } from "@/components/ideeza";
+import { Badge, Radio, TestnetDemoBadge } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { Network, Token } from "@/lib/brief/types";
@@ -290,5 +290,56 @@ export function DealFacts({ listing, view }: { listing: Listing; view: ProjectVi
         {lazy ? " Lazy: the token is minted when you buy." : ""}
       </p>
     </>
+  );
+}
+
+export type ChoiceRow = { value: string; label: string; aside: string; disabled?: boolean };
+
+/** A choice as radio rows: each with its word and what stands beside it (a price, "Sold out", "Not on sale").
+ *  A row that can't be picked stays, greyed, so the buyer sees every use there is (owner, 2026-11-16). */
+export function ChoiceRows({
+  legend,
+  value,
+  onChange,
+  options,
+}: {
+  legend: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: ChoiceRow[];
+}) {
+  const group = React.useId();
+  return (
+    <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
+      <legend className="mb-3 p-0 text-sm font-semibold text-text-secondary">{legend}</legend>
+      {options.map((o) => {
+        const on = o.value === value && !o.disabled;
+        return (
+          <label
+            key={o.value}
+            className={cn(
+              "relative flex min-h-[44px] items-center gap-4 rounded-lg border border-solid px-5 py-3 transition-colors duration-fast motion-reduce:transition-none",
+              o.disabled
+                ? "cursor-not-allowed border-border bg-bg-surface opacity-60"
+                : on
+                  ? "cursor-pointer border-border-brand bg-bg-brand-subtle"
+                  : "cursor-pointer border-border bg-bg-surface hover:bg-bg-subtle",
+            )}
+          >
+            <input
+              type="radio"
+              name={group}
+              checked={on}
+              disabled={o.disabled}
+              onChange={() => onChange(o.value)}
+              className="peer sr-only"
+            />
+            <Radio checked={on} decorative size="sm" className="peer-focus-visible:ring-2 peer-focus-visible:ring-border-focus" />
+            <span className="min-w-0 flex-1 text-md font-semibold text-text-primary">{o.label}</span>
+            <span className="shrink-0 text-md tabular-nums text-text-secondary">{o.aside}</span>
+          </label>
+        );
+      })}
+    </fieldset>
   );
 }

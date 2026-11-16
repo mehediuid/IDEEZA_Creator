@@ -66,10 +66,13 @@ test("one Marketplace box: Main NFT / Physical NFT / Virtual NFT tabs, one panel
   assert.match(parts, /if \(tabs\.length < 2\)/, "a lone tab is a chip");
 });
 
-test("a copy tab is the same buy box: Use as a choice with its counts, one price, no Version, one Buy now", () => {
+test("a copy tab is the same buy box: Use always offered (both uses, each with its price), no Version, one Buy now", () => {
   const panel = read(MARKET + "copy-panel.tsx");
   assert.match(panel, /helperLineOf\(kind, scopeName\)/);
-  assert.match(panel, /\{offers\.length > 1 && \(\s*<Choice\s+legend="Use"/, "a choice only when both uses are on sale");
+  // Owner, 2026-11-16: "no place to choose private or commercial use when buying" — both uses, always.
+  assert.match(panel, /<ChoiceRows\s+legend="Use"[\s\S]*options=\{USES\.map\(/);
+  assert.match(panel, /aside: "Not on sale", disabled: true/, "a use the creator didn't list stays, greyed");
+  assert.match(panel, /aside: soldOut \? "Sold out" : formatAmount\(t\.listing\.regular, t\.listing\.token\)/, "each use shows its price");
   // Owner, 2026-11-15: "this won't be there" — no Version choice; the copy sells at its listing's Price.
   assert.doesNotMatch(panel, /legend="Version"/);
   assert.doesNotMatch(panel, /TIER_WORD|TIER_HELP/, "no version word anywhere in the tab");
@@ -133,6 +136,6 @@ test("a marketplace card keeps M25's hover — picture shrinks, button rises fro
   assert.match(card, /bottom-\[20px\] h-\[44px\] translate-y-\[64px\][\s\S]*group-hover:translate-y-0/, "the button rises from below the card's edge");
   assert.match(card, /overflow-hidden rounded-\[var\(--radius-2xl\)\] border/, "the waiting button is hidden by the card's edge");
   // Owner, 2026-11-16: "where is the button's hover?" — a real button (A01's hover and pressed), out of the Tab order.
-  assert.match(card, /<Link\s+href=\{`\/marketplace\/\$\{item\.projectId\}`\}\s+tabIndex=\{-1\}\s+aria-hidden/);
+  assert.match(card, /<Link\s+href=\{href\}\s+tabIndex=\{-1\}\s+aria-hidden/);
   assert.doesNotMatch(card, /pointer-events-none absolute inset-x-\[20px\]/);
 });

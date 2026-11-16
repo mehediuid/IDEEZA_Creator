@@ -9,7 +9,8 @@
 //
 // Once per account: DEMO_SEED_KEY is part of the account's work, parked and
 // restored with it (work-vault.ts), so a new account gets its own four and a
-// returning one keeps whatever it did with them. Nothing is written over a
+// returning one keeps whatever it did with them. A later seed version only
+// tops up what it added (copy tracks a planted project lacks). Nothing is written over a
 // store that doesn't read (an unreadable list stays as it is), and a project
 // already there is never replaced.
 
@@ -17,7 +18,7 @@ import * as React from "react";
 import { commerceKey } from "@/lib/commerce/record";
 import { BUILDS_KEY } from "@/lib/create/history";
 import { notifyStores } from "@/lib/key-store";
-import { DEMO_PROJECT_IDS, DEMO_SEED_KEY, demoSeedOf } from "@/lib/demo/demo-projects";
+import { DEMO_PROJECT_IDS, DEMO_SEED_KEY, DEMO_SEED_VERSION, demoSeedOf } from "@/lib/demo/demo-projects";
 import { PROJECTS_KEY } from "@/lib/manual/projects";
 import { EDITIONS_KEY, LISTINGS_KEY, SALES_KEY } from "@/lib/market/types";
 
@@ -40,9 +41,48 @@ function withMissing<T extends WithId>(list: unknown[], add: readonly T[]): unkn
   return [...list, ...add.filter((x) => !hasId(list, x.id))];
 }
 
-/** True when it planted them now. */
+/** The planted seed's version: 1 for a planting from before versions, 0 for none. */
+function plantedVersion(storage: Storage): number {
+  const raw = storage.getItem(DEMO_SEED_KEY);
+  if (raw === null) return 0;
+  try {
+    const v = (JSON.parse(raw) as { v?: unknown }).v;
+    return typeof v === "number" ? v : 1;
+  } catch {
+    return 1;
+  }
+}
+
+/** An older planting gets what a later seed added: copy tracks it lacks, on projects still there whose copies
+ *  read. Nothing the maker changed is replaced. True when it wrote. */
+function topUp(storage: Storage, now: number): boolean {
+  const projects = readList(storage, PROJECTS_KEY);
+  if (!projects) return false;
+  const seed = demoSeedOf(now);
+  let wrote = false;
+  try {
+    for (const [projectId, tracks] of Object.entries(seed.editions)) {
+      if (!hasId(projects, projectId)) continue;
+      const held = readList(storage, EDITIONS_KEY(projectId));
+      if (!held) continue;
+      const next = withMissing(held, tracks);
+      if (next.length !== held.length) {
+        storage.setItem(EDITIONS_KEY(projectId), JSON.stringify(next));
+        wrote = true;
+      }
+    }
+    storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
+  } catch {
+    return false;
+  }
+  return wrote;
+}
+
+/** True when it planted or topped them up now. */
 export function plantDemoProjects(storage: Storage, now: number): boolean {
-  if (storage.getItem(DEMO_SEED_KEY) !== null) return false;
+  const planted = plantedVersion(storage);
+  if (planted >= DEMO_SEED_VERSION) return false;
+  if (planted > 0) return topUp(storage, now);
   const lists = [PROJECTS_KEY, BUILDS_KEY, LISTINGS_KEY, SALES_KEY].map((k) => readList(storage, k));
   const [projects, builds, listings, sales] = lists;
   if (!projects || !builds || !listings || !sales) return false;
@@ -60,7 +100,7 @@ export function plantDemoProjects(storage: Storage, now: number): boolean {
         storage.setItem(commerceKey(p.id), JSON.stringify({ v: 1, mint: p.mint, ownerConfirmedAt: p.ownerConfirmedAt }));
       }
     }
-    storage.setItem(DEMO_SEED_KEY, JSON.stringify({ at: now, ids: DEMO_PROJECT_IDS }));
+    storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
   } catch {
     // Storage full or blocked: the account simply has no demo projects this time.
     return false;
