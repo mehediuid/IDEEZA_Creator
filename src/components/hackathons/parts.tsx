@@ -20,7 +20,7 @@ export const HERO_MEDIA = {
 };
 
 /** One section's frame: the page width, the sticky bars' scroll offset, the vertical rhythm. */
-export const SECTION = "mx-auto w-full max-w-[1260px] scroll-mt-[160px] px-8 py-32 md:py-40 xl:px-0";
+export const SECTION = "mx-auto w-full max-w-[1260px] scroll-mt-[160px] px-8 py-32 md:py-40 min-[1292px]:px-0";
 
 /** A hairline that reads on the dark page without a box around everything. */
 export const HAIRLINE = "border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)]";

@@ -53,7 +53,7 @@ export function SectionNav() {
     <div className="sticky top-[80px] z-[5] border-0 border-y border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_86%,transparent)] backdrop-blur-[24px]">
       {/* Phones: a 56 px bar (with the site bar's 80, the two took 18 % of the screen at 68);
           the anchor row fades at its right edge so the hidden ones read as "more". */}
-      <nav aria-label="On this page" className="mx-auto flex h-[56px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 md:h-[68px] xl:px-0">
+      <nav aria-label="On this page" className="mx-auto flex h-[56px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 md:h-[68px] min-[1292px]:px-0">
         <ul ref={list} className="m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0 pr-10 [scrollbar-width:none] max-md:[mask-image:linear-gradient(to_right,black_82%,transparent)] md:gap-2 md:pr-0">
           {ANCHORS.map(([id, label]) => (
             <li key={id}>
@@ -313,7 +313,7 @@ export function Closing() {
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,var(--color-bg-page)_0%,transparent_18%,transparent_82%,var(--color-bg-page)_100%)]" />
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1260px] flex-1 flex-col px-8 pb-24 pt-20 md:pt-24 xl:px-0">
+      <div className="mx-auto flex w-full max-w-[1260px] flex-1 flex-col px-8 pb-24 pt-20 md:pt-24 min-[1292px]:px-0">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-16">
           <p className="max-w-[480px] text-lg leading-lg text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-xl md:leading-xl">
             {HACKATHON.minProducts} products in 160 hours. No engineering background needed: describe an idea, and IDEEZA AI designs the concept, PCB, code and 3D.
