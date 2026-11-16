@@ -185,7 +185,10 @@ test("the Add a product tile is the owner's first tile; it opens the dialog on t
   assert.match(tab, /gate\.reasonOf\("addProduct"\)/, "a blocked project says why instead of opening");
   assert.match(tab, /\{canAddProduct && <AddProductTile/);
   const dialog = read(DETAILS + "add-product-dialog.tsx");
-  assert.match(dialog, /createChat\(prompt\.trim\(\), \{ addTo: project\.id \}\)/, "AI starts the ordinary chat, on this project");
+  assert.match(dialog, /createChat\(prompt\.trim\(\), \{ quality, addTo: project\.id \}\)/, "AI starts the ordinary chat, on this project, at its Quality");
+  // The regular AI chat box, not a bare textarea (owner, 2026-11-16).
+  assert.match(dialog, /<PromptCard\b/);
+  assert.doesNotMatch(dialog, /<textarea\b/);
   assert.match(dialog, /router\.push\(`\/chat\/\$\{chat\.id\}`\)/);
   assert.match(dialog, /gate\.guard\("addProduct"/, "a manual product passes the listing's pause first");
   assert.match(dialog, /editorHref\(project, rowId, "pcb"\)/);

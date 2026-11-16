@@ -7,9 +7,10 @@
 //
 // 1. Two ways in — Build with AI, Build manually — each a card that opens its
 //    step at once (no separate Continue).
-// 2a. Build with AI: the idea, Enhance (the Home's /api/refine), the cost, and
-//     Start. Start opens the ordinary chat for it, which History lists like
-//     any other; the chat knows its project, so it never asks for one
+// 2a. Build with AI: Home's own AI chat box (prompt-card.tsx: voice, Quality,
+//     Enhance, Generate; owner, 2026-11-16), then the cost. Generate opens the
+//     ordinary chat for it at that Quality, which History lists like any
+//     other; the chat knows its project, so it never asks for one
 //     (setup-turn.tsx answers that itself).
 // 2b. Build manually: the product's name, and Create product. The product is
 //     added to this project at once (the edit gate's pause confirm first on a
@@ -19,7 +20,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AiMagicIcon, MagicWand01Icon, PencilEdit01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, ModalFrame, TextInput } from "@/components/ideeza";
 import { useProjectEditGate } from "@/components/projects/use-edit-gate";
@@ -27,8 +28,8 @@ import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useCreateHistory } from "@/lib/create/history";
 import { editorHref } from "@/lib/manual/editor-scope";
 import { PROJECT_NAME_MAX, useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { cn } from "@/lib/utils";
 import { CreditBadge } from "@/components/credits/credit-badge";
+import { PromptCard, useLastQuality } from "@/components/dashboard/prompt-card";
 
 type Step = "choose" | "ai" | "manual";
 
@@ -54,7 +55,8 @@ export function AddProductDialog({ project, onClose }: { project: ManualProject;
         onClose={onClose}
         title={title}
         description={description}
-        size="sm"
+        // Home's chat box keeps its one toolbar row at md; 512 px wraps Enhance and Generate under it.
+        size={step === "ai" ? "md" : "sm"}
         sheet
         covered={confirming}
         initialFocus={firstRef}
@@ -97,13 +99,13 @@ function Choose({ firstRef, onPick }: { firstRef: React.RefObject<HTMLButtonElem
 }
 
 /** The step's own footer: Back on the left, the one primary on the right. */
-function StepFooter({ onBack, children }: { onBack: () => void; children: React.ReactNode }) {
+function StepFooter({ onBack, children }: { onBack: () => void; children?: React.ReactNode }) {
   return (
     <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-solid border-border pt-8">
       <Button type="button" hierarchy="ghost" size="lg" onClick={onBack}>
         Back
       </Button>
-      <div className="ml-auto flex items-center gap-4">{children}</div>
+      {children && <div className="ml-auto flex items-center gap-4">{children}</div>}
     </div>
   );
 }
@@ -113,21 +115,18 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
   const { createChat } = useCreateHistory();
   const { hydrated: creditsHydrated, balance } = useCredits();
   const [prompt, setPrompt] = React.useState("");
-  const [tried, setTried] = React.useState(false);
+  // Home's Quality, remembered across both boxes: the next idea starts at the one picked last.
+  const [quality, setQuality] = useLastQuality();
   const [refining, setRefining] = React.useState(false);
   const [starting, setStarting] = React.useState(false);
   const areaRef = React.useRef<HTMLTextAreaElement>(null);
   const fieldId = React.useId();
-  const errorId = React.useId();
-  const costId = React.useId();
 
   React.useEffect(() => {
     areaRef.current?.focus();
   }, []);
 
   const canRender = !creditsHydrated || balance >= CONCEPT_COST;
-  const empty = prompt.trim() === "";
-  const error = tried && empty ? "Describe the product first." : null;
 
   // The Home's own Enhance: the rough idea rewritten into a concrete brief, dropped back in the box.
   const refine = async () => {
@@ -152,8 +151,7 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
 
   const start = () => {
     if (starting) return;
-    if (empty) {
-      setTried(true);
+    if (prompt.trim() === "") {
       areaRef.current?.focus();
       return;
     }
@@ -161,7 +159,7 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
     // Busy until the chat page takes over: this dialog unmounts with the navigation.
     setStarting(true);
     try {
-      const chat = createChat(prompt.trim(), { addTo: project.id });
+      const chat = createChat(prompt.trim(), { quality, addTo: project.id });
       router.push(`/chat/${chat.id}`);
     } catch {
       setStarting(false);
@@ -170,68 +168,40 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
 
   return (
     <div className="flex flex-col gap-4 pt-2">
-      <label htmlFor={fieldId} className="text-md font-medium text-text-primary">
-        What should it be?
-      </label>
-      <textarea
+      <PromptCard
         ref={areaRef}
         id={fieldId}
+        label={`Describe the product to add to ${project.name}`}
         value={prompt}
-        maxLength={PROMPT_MAX}
-        rows={4}
-        onChange={(e) => setPrompt(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            start();
-          }
-        }}
+        onChange={(v) => setPrompt(v.slice(0, PROMPT_MAX))}
+        onSubmit={start}
+        submitting={starting}
         placeholder="e.g. A solar battery pack that charges this desk charger at night"
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${errorId} ${costId}` : costId}
-        className={cn(
-          "w-full resize-y rounded-lg border border-solid bg-bg-surface px-6 py-5 text-md leading-md text-text-primary outline-none placeholder:text-text-tertiary focus-visible:ring-2 focus-visible:ring-border-focus",
-          error ? "border-border-error" : "border-border",
-        )}
+        mode="ai"
+        onRefine={refine}
+        refining={refining}
+        canRender={canRender}
+        quality={quality}
+        onQuality={setQuality}
+        sendLabel={`Generate a product for ${project.name}`}
+        emptyHint="describe the product first"
       />
-      {error && (
-        <p id={errorId} className="text-sm text-text-error">
-          {error}
-        </p>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <Button
-          type="button"
-          hierarchy="ghost"
-          size="md"
-          onClick={refine}
-          disabled={empty || refining}
-          iconLeading={<Icon icon={refining ? Refresh01Icon : MagicWand01Icon} size={16} />}
-          className="max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
-        >
-          {refining ? "Enhancing…" : "Enhance"}
-        </Button>
-        <p id={costId} className="text-sm text-text-secondary">
-          {canRender ? (
-            <>
-              1 concept <CreditBadge credits={CONCEPT_COST} className="align-middle" />
-              {creditsHydrated ? ` · you have ${balance}` : ""}
-            </>
-          ) : (
-            `You need ${CONCEPT_COST} credit to start. You have ${balance}.`
-          )}
-        </p>
-      </div>
+      <p className="text-sm text-text-secondary">
+        {canRender ? (
+          <>
+            1 concept <CreditBadge credits={CONCEPT_COST} className="align-middle" />
+            {creditsHydrated ? ` · you have ${balance}` : ""}
+          </>
+        ) : (
+          `You need ${CONCEPT_COST} credit to start. You have ${balance}.`
+        )}
+      </p>
       {!canRender && (
         <a href="/settings/plan?tab=credits" className="self-start text-md font-medium text-text-brand underline underline-offset-2">
           Top up credits
         </a>
       )}
-      <StepFooter onBack={onBack}>
-        <Button type="button" hierarchy="primary" size="lg" onClick={start} aria-disabled={!canRender || undefined} disabled={starting}>
-          {starting ? "Starting…" : "Start"}
-        </Button>
-      </StepFooter>
+      <StepFooter onBack={onBack} />
     </div>
   );
 }
