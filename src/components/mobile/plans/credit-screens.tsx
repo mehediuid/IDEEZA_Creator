@@ -182,6 +182,7 @@ function lotName(e: CreditEntry | undefined): string {
   if (e.reason === "purchase") return e.pack ? `${e.pack} pack` : "Custom credit";
   if (e.reason === "seed") return "Starting balance";
   if (e.reason === "grant") return `${e.pack ?? "Plan"} plan credits`;
+  if (e.reason === "redeem") return `Code ${e.code ?? ""}`.trimEnd();
   return "Top up";
 }
 
