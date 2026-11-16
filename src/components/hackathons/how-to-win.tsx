@@ -37,11 +37,11 @@ export function HowToWin() {
     <section id="how" aria-labelledby="how-title" className={SECTION}>
       <Heading id="how-title" title="How to win" lead="Points put you on the board, and the board decides who the judges see." />
 
-      <div className="mt-20 grid grid-cols-1 gap-20 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-24">
+      <div className="mt-24 grid grid-cols-1 gap-24 md:mt-32 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-32">
         <div>
           <ol className="m-0 flex list-none flex-col p-0">
             {STEPS.map(([t, d], i) => (
-              <li key={t} className="relative flex gap-8 pb-12 last:pb-0">
+              <li key={t} className="relative flex gap-8 pb-16 last:pb-0 md:gap-10">
                 {/* The track joining the steps. */}
                 {i < STEPS.length - 1 ? <span aria-hidden className="absolute bottom-0 left-[23px] top-[52px] w-px bg-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)]" /> : null}
                 <span
@@ -53,35 +53,35 @@ export function HowToWin() {
                 >
                   {i + 1}
                 </span>
-                <div className="flex flex-col gap-3 pt-[10px]">
+                <div className="flex flex-col gap-4 pt-[10px]">
                   <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">{t}</h3>
                   <p className="max-w-[600px] text-xl leading-xl text-[color:var(--color-text-secondary)]">{d}</p>
                 </div>
               </li>
             ))}
           </ol>
-          <div className="mt-16 pl-[64px]">
+          <div className="mt-20 pl-[64px] md:pl-[68px]">
             <JoinButton size="xl" />
           </div>
         </div>
 
-        <aside aria-labelledby="points-title" className={cn("self-start rounded-3xl px-8 py-10 md:px-12 lg:sticky lg:top-[184px]", SURFACE)}>
+        <aside aria-labelledby="points-title" className={cn("self-start rounded-3xl px-10 py-12 md:px-12 md:py-16 lg:sticky lg:top-[184px]", SURFACE)}>
           <h3 id="points-title" className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">How points add up</h3>
-          <table className="mt-8 w-full border-collapse text-left">
+          <table className="mt-10 w-full border-collapse text-left">
             <caption className="sr-only">Points for each action</caption>
             <tbody>
               {TABLE.map(([what, note, pts]) => (
                 <tr key={what} className="border-0 border-t border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] first:border-t-0">
-                  <th scope="row" className="py-5 pr-6 font-regular">
+                  <th scope="row" className="py-6 pr-6 font-regular">
                     <span className="block text-xl font-medium leading-xl text-[color:var(--color-text-primary)]">{what}</span>
                     <span className="block text-md leading-md text-[color:var(--color-text-tertiary)]">{note}</span>
                   </th>
-                  <td className="py-5 text-right font-display text-3xl font-semibold leading-3xl tabular-nums text-[color:var(--color-violet-300)]">+{pts}</td>
+                  <td className="py-6 text-right font-display text-3xl font-semibold leading-3xl tabular-nums text-[color:var(--color-violet-300)]">+{pts}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-6 rounded-2xl bg-[color:color-mix(in_srgb,var(--color-violet-600)_14%,transparent)] px-6 py-5 text-lg leading-lg text-[color:var(--color-text-secondary)]">
+          <p className="mt-8 rounded-2xl bg-[color:color-mix(in_srgb,var(--color-violet-600)_14%,transparent)] px-8 py-6 text-lg leading-lg text-[color:var(--color-text-secondary)]">
             <b className="font-semibold text-[color:var(--color-text-primary)]">Example:</b> {EX.products} products built and published on {EX.days} days, with {EX.votes} votes = {EX.products * POINTS.build} + {EX.products * POINTS.publish} + {EX.days * POINTS.buildDay} + {EX.votes} ={" "}
             <b className="font-semibold text-[color:var(--color-text-primary)]">{EX_TOTAL} points</b>.
           </p>
