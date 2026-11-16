@@ -10,8 +10,8 @@ import type { Participant } from "@/lib/hackathons/vibe-inventing";
 import { useReducedMotion } from "./context";
 
 // The hero brief's media (owner's "Zapline" brief, 2026-11-16): the planet-rim
-// glow video (1460 × 624, 4 s loop) and the light strip over the dashboard's
-// top edge, from the brief's own addresses.
+// glow video (1460 × 624, 4 s loop) and the light strip over the hero
+// panel's top edge, from the brief's own addresses.
 export const HERO_MEDIA = {
   glow: "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e859f229-8ebd-43fb-a5a0-58006ba75327.mp4",
   strip: "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e0e14572-12e1-4c08-b471-a21521844945.png",

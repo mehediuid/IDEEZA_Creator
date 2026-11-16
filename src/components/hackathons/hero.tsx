@@ -6,8 +6,8 @@
 // own glow video, screen-blended so its black disappears), a big centred
 // headline under it, the lede and the two actions, and a dark violet-edged
 // panel rising from the bottom with a light line along its top edge. The
-// panel holds pictures, not an app (owner: no dashboard here): the most-voted
-// products of the hackathon (hero-showcase.tsx).
+// panel holds a futuristic invention stage, not an app or the page's product
+// photos (owner): IDEEZA's own premium renders (hero-showcase.tsx).
 //
 // Sky: the stars are drawn once on a canvas; nothing in the sky is animated
 // in code — only the video moves it. The video plays on wide landscape
@@ -16,7 +16,7 @@
 //
 // Entrance: one timeline (globals.css .ix-hk-*): the status line fades in, the
 // headline wipes up line by line, then the lede and buttons, then the panel
-// rises and its products settle in from the middle out.
+// rises with its stage.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
