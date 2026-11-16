@@ -130,7 +130,7 @@ export function HackathonHero() {
       </div>
 
       <div className="mx-auto flex w-full max-w-[1260px] flex-col items-center px-8 pt-[200px] text-center md:pt-[236px] lg:pt-[260px] xl:px-0">
-        <p className="ix-hk-fade flex items-center gap-3 rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-violet-300)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_55%,transparent)] px-5 py-2 text-sm font-medium leading-sm text-[color:color-mix(in_srgb,var(--color-white)_86%,transparent)] backdrop-blur-[6px] md:text-md md:leading-md">
+        <p className="ix-hk-fade flex items-center gap-3 rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-violet-300)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_55%,transparent)] px-5 py-2 text-md font-medium leading-md text-[color:color-mix(in_srgb,var(--color-white)_86%,transparent)] backdrop-blur-[6px] md:text-lg md:leading-lg">
           <span aria-hidden className={cn("size-[8px] shrink-0 rounded-full", phase === "live" ? "bg-[var(--color-green-400)] motion-safe:animate-pulse" : "bg-[var(--color-violet-400)]")} />
           <span>
             {phase ? STATUS[phase] : " "} · {HACKATHON.name}
@@ -146,7 +146,7 @@ export function HackathonHero() {
           </span>
         </h1>
 
-        <p className="ix-hk-rise mt-10 max-w-[720px] text-lg leading-lg text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-xl md:leading-xl" style={{ animationDelay: "420ms" }}>
+        <p className="ix-hk-rise mt-10 max-w-[760px] text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-2xl md:leading-2xl" style={{ animationDelay: "420ms" }}>
           No engineering background needed. Describe an idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D. Build {HACKATHON.minProducts} products in 160 hours, collect votes, and put your university on top.
         </p>
 

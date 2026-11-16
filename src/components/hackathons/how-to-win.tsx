@@ -55,7 +55,7 @@ export function HowToWin() {
                 </span>
                 <div className="flex flex-col gap-3 pt-[10px]">
                   <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">{t}</h3>
-                  <p className="max-w-[560px] text-lg leading-lg text-[color:var(--color-text-secondary)]">{d}</p>
+                  <p className="max-w-[600px] text-xl leading-xl text-[color:var(--color-text-secondary)]">{d}</p>
                 </div>
               </li>
             ))}
@@ -65,7 +65,7 @@ export function HowToWin() {
           </div>
         </div>
 
-        <aside aria-labelledby="points-title" className={cn("self-start rounded-3xl px-8 py-10 md:px-12 lg:sticky lg:top-[176px]", SURFACE)}>
+        <aside aria-labelledby="points-title" className={cn("self-start rounded-3xl px-8 py-10 md:px-12 lg:sticky lg:top-[184px]", SURFACE)}>
           <h3 id="points-title" className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">How points add up</h3>
           <table className="mt-8 w-full border-collapse text-left">
             <caption className="sr-only">Points for each action</caption>
@@ -73,15 +73,15 @@ export function HowToWin() {
               {TABLE.map(([what, note, pts]) => (
                 <tr key={what} className="border-0 border-t border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] first:border-t-0">
                   <th scope="row" className="py-5 pr-6 font-regular">
-                    <span className="block text-lg font-medium leading-lg text-[color:var(--color-text-primary)]">{what}</span>
-                    <span className="block text-sm leading-sm text-[color:var(--color-text-tertiary)]">{note}</span>
+                    <span className="block text-xl font-medium leading-xl text-[color:var(--color-text-primary)]">{what}</span>
+                    <span className="block text-md leading-md text-[color:var(--color-text-tertiary)]">{note}</span>
                   </th>
                   <td className="py-5 text-right font-display text-3xl font-semibold leading-3xl tabular-nums text-[color:var(--color-violet-300)]">+{pts}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-6 rounded-2xl bg-[color:color-mix(in_srgb,var(--color-violet-600)_14%,transparent)] px-6 py-5 text-md leading-md text-[color:var(--color-text-secondary)]">
+          <p className="mt-6 rounded-2xl bg-[color:color-mix(in_srgb,var(--color-violet-600)_14%,transparent)] px-6 py-5 text-lg leading-lg text-[color:var(--color-text-secondary)]">
             <b className="font-semibold text-[color:var(--color-text-primary)]">Example:</b> {EX.products} products built and published on {EX.days} days, with {EX.votes} votes = {EX.products * POINTS.build} + {EX.products * POINTS.publish} + {EX.days * POINTS.buildDay} + {EX.votes} ={" "}
             <b className="font-semibold text-[color:var(--color-text-primary)]">{EX_TOTAL} points</b>.
           </p>

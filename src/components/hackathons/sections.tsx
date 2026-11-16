@@ -36,14 +36,14 @@ export function SectionNav() {
         const seen = es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
         if (seen) setActive(seen.target.id);
       },
-      { rootMargin: "-160px 0px -55% 0px" },
+      { rootMargin: "-168px 0px -55% 0px" },
     );
     els.forEach((e) => io.observe(e));
     return () => io.disconnect();
   }, []);
   return (
     <div className="sticky top-[80px] z-[5] border-0 border-y border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_86%,transparent)] backdrop-blur-[24px]">
-      <nav aria-label="On this page" className="mx-auto flex h-[60px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 xl:px-0">
+      <nav aria-label="On this page" className="mx-auto flex h-[68px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 xl:px-0">
         <ul className="m-0 flex min-w-0 list-none gap-2 overflow-x-auto p-0 [scrollbar-width:none]">
           {ANCHORS.map(([id, label]) => (
             <li key={id}>
@@ -51,7 +51,7 @@ export function SectionNav() {
                 href={`#${id}`}
                 aria-current={active === id ? "true" : undefined}
                 className={cn(
-                  "flex h-[36px] items-center whitespace-nowrap rounded-full px-6 text-md font-medium leading-md text-[color:var(--color-text-secondary)] transition-colors duration-fast hover:text-[color:var(--color-text-primary)]",
+                  "flex h-[44px] items-center whitespace-nowrap rounded-full px-6 text-lg font-medium leading-lg text-[color:var(--color-text-secondary)] transition-colors duration-fast hover:text-[color:var(--color-text-primary)]",
                   active === id && "bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] text-[color:var(--color-text-primary)]",
                 )}
               >
@@ -60,7 +60,7 @@ export function SectionNav() {
             </li>
           ))}
         </ul>
-        <JoinButton size="md" className="hidden shrink-0 md:inline-flex" />
+        <JoinButton size="lg" className="hidden shrink-0 md:inline-flex" />
       </nav>
     </div>
   );
@@ -83,8 +83,8 @@ export function WhoAndJudging() {
           <h2 className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] md:text-6xl md:leading-6xl">Who can join</h2>
           <ul className="m-0 flex list-none flex-col gap-6 p-0">
             {who.map((w) => (
-              <li key={w} className="flex items-start gap-5 text-lg leading-lg text-[color:var(--color-text-secondary)]">
-                <span aria-hidden className="mt-[2px] flex size-[24px] shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--color-green-400)_16%,transparent)] text-[color:var(--color-green-400)]">
+              <li key={w} className="flex items-start gap-5 text-xl leading-xl text-[color:var(--color-text-secondary)]">
+                <span aria-hidden className="mt-[1px] flex size-[24px] shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--color-green-400)_16%,transparent)] text-[color:var(--color-green-400)]">
                   <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2.4} />
                 </span>
                 {w}
@@ -95,18 +95,18 @@ export function WhoAndJudging() {
 
         <div className="flex flex-col gap-10 border-0 border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] lg:border-l lg:pl-20">
           <h2 className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] md:text-6xl md:leading-6xl">How the winner is picked</h2>
-          <p className="text-lg leading-lg text-[color:var(--color-text-secondary)]">
+          <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">
             When building ends the board freezes. The <b className="font-semibold text-[color:var(--color-text-primary)]">top {HACKATHON.shortlist}</b> are shortlisted, and the judges score each one on:
           </p>
           <div>
             <div className="flex h-[48px] w-full gap-1 overflow-hidden rounded-xl" role="img" aria-label={HACKATHON.criteria.map((c) => `${c.name} ${c.weight}%`).join(", ")}>
               {HACKATHON.criteria.map((c, i) => (
-                <div key={c.name} style={{ flexGrow: c.weight }} className={cn("flex basis-0 items-center px-5 text-md font-semibold leading-md text-[color:var(--color-white)]", CRITERIA_FILL.at(i))}>
+                <div key={c.name} style={{ flexGrow: c.weight }} className={cn("flex basis-0 items-center px-5 text-lg font-semibold leading-lg text-[color:var(--color-white)]", CRITERIA_FILL.at(i))}>
                   {c.weight}%
                 </div>
               ))}
             </div>
-            <div className="mt-5 flex flex-wrap gap-x-10 gap-y-3 text-md leading-md text-[color:var(--color-text-primary)]">
+            <div className="mt-5 flex flex-wrap gap-x-10 gap-y-3 text-lg leading-lg text-[color:var(--color-text-primary)]">
               {HACKATHON.criteria.map((c, i) => (
                 <span key={c.name} className="inline-flex items-center gap-3">
                   <span aria-hidden className={cn("size-[10px] rounded-full", CRITERIA_FILL.at(i))} />
@@ -116,14 +116,14 @@ export function WhoAndJudging() {
             </div>
           </div>
           <div className="flex flex-col gap-5">
-            <span className="text-md font-medium leading-md text-[color:var(--color-text-secondary)]">The judges</span>
+            <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">The judges</span>
             <ul className="m-0 flex list-none flex-wrap gap-x-10 gap-y-6 p-0">
               {HACKATHON.judges.map((j) => (
                 <li key={j.name} className="flex items-center gap-4">
                   <Initials name={j.name} className="size-[44px] text-md" />
                   <span className="flex flex-col">
-                    <span className="text-md font-semibold leading-md text-[color:var(--color-text-primary)]">{j.name}</span>
-                    <span className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">{j.role}</span>
+                    <span className="text-lg font-semibold leading-lg text-[color:var(--color-text-primary)]">{j.name}</span>
+                    <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">{j.role}</span>
                   </span>
                 </li>
               ))}
@@ -187,9 +187,9 @@ export function Timeline() {
                   {done ? <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2.6} className="text-[color:var(--color-white)]" /> : null}
                 </span>
                 <span className="flex flex-col gap-2">
-                  <span className={cn("text-sm font-semibold leading-sm", isNow ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{isNow ? "Now" : done ? "Done" : "Next"}</span>
+                  <span className={cn("text-md font-semibold leading-md", isNow ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{isNow ? "Now" : done ? "Done" : "Next"}</span>
                   <span className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">{p.label}</span>
-                  <span className="text-md leading-md text-[color:var(--color-text-secondary)]">{p.to ? `${eat(p.from)} – ${eat(p.to)}` : eat(p.from)}</span>
+                  <span className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{p.to ? `${eat(p.from)} – ${eat(p.to)}` : eat(p.from)}</span>
                 </span>
               </li>
             );
@@ -223,19 +223,19 @@ export function FaqAndRules() {
                     +
                   </span>
                 </summary>
-                <p className="max-w-[640px] pb-8 text-lg leading-lg text-[color:var(--color-text-secondary)]">{a}</p>
+                <p className="max-w-[680px] pb-8 text-xl leading-xl text-[color:var(--color-text-secondary)]">{a}</p>
               </details>
             ))}
           </div>
         </div>
-        <aside aria-labelledby="rules-title" className="flex flex-col gap-8 self-start lg:sticky lg:top-[176px] lg:pt-[12px]">
+        <aside aria-labelledby="rules-title" className="flex flex-col gap-8 self-start lg:sticky lg:top-[184px] lg:pt-[12px]">
           <h2 id="rules-title" className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">
             Terms of participation
           </h2>
-          <p className="text-md leading-md text-[color:var(--color-text-secondary)]">{HACKATHON.rules}</p>
+          <p className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{HACKATHON.rules}</p>
           <ul className="m-0 flex list-none flex-wrap gap-3 p-0">
             {[`${HACKATHON.votesPerPerson} votes per account`, "Verified email to vote", "One account per person"].map((c) => (
-              <li key={c} className="rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] px-5 py-2 text-sm font-medium leading-sm text-[color:var(--color-text-secondary)]">
+              <li key={c} className="rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] px-5 py-2 text-md font-medium leading-md text-[color:var(--color-text-secondary)]">
                 {c}
               </li>
             ))}
@@ -305,10 +305,10 @@ export function Closing() {
 
       <div className="mx-auto flex w-full max-w-[1260px] flex-1 flex-col px-8 pb-24 pt-20 md:pt-24 xl:px-0">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-16">
-          <p className="max-w-[440px] text-md leading-md text-[color:color-mix(in_srgb,var(--color-white)_80%,transparent)] md:text-lg md:leading-lg">
+          <p className="max-w-[480px] text-lg leading-lg text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-xl md:leading-xl">
             {HACKATHON.minProducts} products in 160 hours. No engineering background needed: describe an idea, and IDEEZA AI designs the concept, PCB, code and 3D.
           </p>
-          <p className="text-md leading-md text-[color:color-mix(in_srgb,var(--color-white)_80%,transparent)] md:text-lg md:leading-lg lg:text-right">
+          <p className="text-lg leading-lg text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-xl md:leading-xl lg:text-right">
             <b className="font-semibold text-[color:var(--color-white)]">{money(prizePool)}</b> in prizes
             <br className="hidden lg:block" /> for the top three.
           </p>
@@ -317,7 +317,7 @@ export function Closing() {
         <div className="relative isolate flex flex-1 flex-col items-center justify-center py-24 text-center">
           {/* A soft shade under the words only: when the wave's bright edge passes behind them they stay readable. */}
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[90%] w-[min(1000px,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-black)_62%,transparent),transparent)]" />
-          <p className="text-sm font-medium uppercase leading-sm tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_80%,transparent)] md:text-md md:leading-md">{closingClock(phase, now)}</p>
+          <p className="text-md font-medium uppercase leading-md tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-lg md:leading-lg">{closingClock(phase, now)}</p>
           <h2 id="closing-title" className="mt-10 font-display text-6xl leading-6xl tracking-tighter [text-wrap:balance] md:text-8xl md:leading-8xl">
             <span className="block font-medium text-[color:var(--color-white)]">Put your university</span>
             <span className="ix-hack-shine block font-bold">on the board.</span>

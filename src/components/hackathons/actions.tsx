@@ -110,7 +110,7 @@ export function VoteButton({ projectId, name, className }: { projectId: string; 
         {voted ? "Voted" : "Vote"}
       </button>
       {note ? (
-        <span role="status" className="text-sm leading-sm text-[color:var(--color-text-warning)]">
+        <span role="status" className="text-md leading-md text-[color:var(--color-text-warning)]">
           {note}
         </span>
       ) : null}

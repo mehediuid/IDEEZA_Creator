@@ -18,7 +18,7 @@ export const HERO_MEDIA = {
 };
 
 /** One section's frame: the page width, the sticky bars' scroll offset, the vertical rhythm. */
-export const SECTION = "mx-auto w-full max-w-[1260px] scroll-mt-[152px] px-8 py-32 md:py-40 xl:px-0";
+export const SECTION = "mx-auto w-full max-w-[1260px] scroll-mt-[160px] px-8 py-32 md:py-40 xl:px-0";
 
 /** A hairline that reads on the dark page without a box around everything. */
 export const HAIRLINE = "border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)]";
@@ -38,7 +38,7 @@ export function Heading({ id, title, lead, aside, className }: { id?: string; ti
         <h2 id={id} className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] [text-wrap:balance] md:text-6xl md:leading-6xl">
           {title}
         </h2>
-        {lead ? <p className="text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty]">{lead}</p> : null}
+        {lead ? <p className="text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-2xl md:leading-2xl">{lead}</p> : null}
       </div>
       {aside ? <div className="shrink-0">{aside}</div> : null}
     </div>

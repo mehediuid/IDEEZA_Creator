@@ -60,7 +60,7 @@ export function HeroShowcase() {
               {i ? <span className={cn("h-px w-5 transition-colors duration-slow md:w-10", i <= step ? "bg-[var(--color-violet-300)]" : "bg-[color:color-mix(in_srgb,var(--color-white)_18%,transparent)]")} /> : null}
               <span
                 className={cn(
-                  "rounded-full border border-solid px-3 py-1 font-display text-xs font-semibold uppercase leading-xs tracking-caps transition-colors duration-slow md:px-4 md:text-sm md:leading-sm",
+                  "rounded-full border border-solid px-3 py-1 font-display text-sm font-semibold uppercase leading-sm tracking-caps transition-colors duration-slow md:px-4 md:text-md md:leading-md",
                   i === step
                     ? "border-[color:var(--color-violet-300)] bg-[color:color-mix(in_srgb,var(--color-violet-500)_30%,transparent)] text-[color:var(--color-white)] shadow-[0_0_24px_color-mix(in_srgb,var(--color-violet-500)_55%,transparent)]"
                     : "border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_45%,transparent)] text-[color:color-mix(in_srgb,var(--color-white)_60%,transparent)]",

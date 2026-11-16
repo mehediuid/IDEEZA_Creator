@@ -25,7 +25,7 @@ export function VoteShelf() {
         lead="Every vote is a point for the builder and their university. Signed-in accounts vote, and you can take a vote back while voting is open."
         aside={
           <div className="flex flex-col gap-3 md:items-end">
-            <span className="text-md font-medium leading-md text-[color:var(--color-text-secondary)]">
+            <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">
               {entry.signedIn ? `${entry.votesLeft} of ${HACKATHON.votesPerPerson} votes left` : `${HACKATHON.votesPerPerson} votes per account`}
             </span>
             <span aria-hidden className="flex gap-2">
@@ -47,20 +47,20 @@ export function VoteShelf() {
               <button type="button" onClick={() => openProject(r)} aria-label={`Open ${proj.name}`} className="group relative block aspect-[4/3] overflow-hidden border-0 bg-[var(--color-bg-subtle)] p-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={proj.image} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-slower ease-decelerate group-hover:scale-[1.04] motion-reduce:transition-none" />
-                <span className="absolute left-4 top-4 rounded-full bg-[color:color-mix(in_srgb,var(--color-black)_64%,transparent)] px-4 py-2 text-sm font-semibold leading-sm text-[color:var(--color-white)] backdrop-blur-[6px]">#{r.rank} on the board</span>
+                <span className="absolute left-4 top-4 rounded-full bg-[color:color-mix(in_srgb,var(--color-black)_64%,transparent)] px-4 py-2 text-md font-semibold leading-md text-[color:var(--color-white)] backdrop-blur-[6px]">#{r.rank} on the board</span>
               </button>
               <div className="flex flex-1 flex-col gap-4 px-8 pb-8 pt-6">
                 <div className="flex flex-col gap-1">
-                  <h3 className="text-xl font-semibold leading-xl text-[color:var(--color-text-primary)]">{proj.name}</h3>
-                  <p className="truncate text-sm leading-sm text-[color:var(--color-text-tertiary)]">
+                  <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">{proj.name}</h3>
+                  <p className="truncate text-md leading-md text-[color:var(--color-text-tertiary)]">
                     {r.p.name} · {r.p.university || "Open category"}
                   </p>
                 </div>
-                <p className="text-md leading-md text-[color:var(--color-text-secondary)]">{proj.summary}</p>
+                <p className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{proj.summary}</p>
                 <div className="mt-auto flex items-center justify-between gap-6 pt-4">
                   <span className="flex items-baseline gap-2">
                     <span className="font-display text-3xl font-semibold leading-3xl tabular-nums text-[color:var(--color-text-primary)]">{r.votes.toLocaleString("en-US")}</span>
-                    <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">votes</span>
+                    <span className="text-lg leading-lg text-[color:var(--color-text-tertiary)]">votes</span>
                   </span>
                   <VoteButton projectId={proj.id} name={proj.name} />
                 </div>

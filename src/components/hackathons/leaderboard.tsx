@@ -13,7 +13,8 @@
 
 import * as React from "react";
 import { SearchInput } from "@/components/ideeza/search-input";
-import { Badge } from "@/components/ideeza/badge";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import { HACKATHON, qualified, qualityOf, type Row } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
@@ -41,7 +42,7 @@ export function Leaderboard() {
             ].map(([v, l]) => (
               <div key={l as string} className="flex flex-col">
                 <dd className="order-1 font-display text-4xl font-semibold leading-4xl tabular-nums text-[color:var(--color-text-primary)]">{(v as number).toLocaleString("en-US")}</dd>
-                <dt className="order-2 text-md leading-md text-[color:var(--color-text-tertiary)]">{l}</dt>
+                <dt className="order-2 text-lg leading-lg text-[color:var(--color-text-tertiary)]">{l}</dt>
               </div>
             ))}
           </dl>
@@ -52,7 +53,7 @@ export function Leaderboard() {
         <UniversityLeague unis={unis} />
         <People board={board} />
       </div>
-      <p className="mt-8 text-sm leading-sm text-[color:var(--color-text-tertiary)]">Standings on this page are sample data.</p>
+      <p className="mt-8 text-md leading-md text-[color:var(--color-text-tertiary)]">Standings on this page are sample data.</p>
     </section>
   );
 }
@@ -71,19 +72,19 @@ function UniversityLeague({ unis }: { unis: ReturnType<typeof useHackathon>["uni
           <li key={u.name} className={cn("flex flex-col gap-3", i >= PHONE_UNIS && !allUnis && "max-md:hidden")}>
             <div className="flex items-baseline justify-between gap-6">
               <span className="flex min-w-0 items-baseline gap-4">
-                <span className={cn("w-[20px] shrink-0 text-md font-semibold tabular-nums", i === 0 ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{i + 1}</span>
-                <span className="truncate text-lg font-medium leading-lg text-[color:var(--color-text-primary)]">{u.name}</span>
+                <span className={cn("w-[24px] shrink-0 text-lg font-semibold tabular-nums", i === 0 ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{i + 1}</span>
+                <span className="truncate text-xl font-medium leading-xl text-[color:var(--color-text-primary)]">{u.name}</span>
               </span>
-              <span className="shrink-0 text-lg font-semibold leading-lg tabular-nums text-[color:var(--color-text-primary)]">{u.pts.toLocaleString("en-US")}</span>
+              <span className="shrink-0 text-xl font-semibold leading-xl tabular-nums text-[color:var(--color-text-primary)]">{u.pts.toLocaleString("en-US")}</span>
             </div>
-            <div className="ml-[36px] flex flex-col gap-2">
+            <div className="ml-[40px] flex flex-col gap-2">
               <div aria-hidden className="h-[8px] overflow-hidden rounded-full bg-[color:color-mix(in_srgb,var(--color-white)_6%,transparent)]">
                 <div
                   style={{ width: `${Math.max(3, (u.pts / max) * 100)}%` }}
                   className={cn("h-full rounded-full", i === 0 ? "bg-[linear-gradient(to_right,var(--color-violet-600),var(--color-violet-300))]" : "bg-[color:color-mix(in_srgb,var(--color-violet-400)_55%,transparent)]")}
                 />
               </div>
-              <span className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">
+              <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">
                 {u.people} {u.people === 1 ? "student" : "students"} · {u.products} products
               </span>
             </div>
@@ -91,7 +92,7 @@ function UniversityLeague({ unis }: { unis: ReturnType<typeof useHackathon>["uni
         ))}
       </ol>
       {unis.length > PHONE_UNIS ? (
-        <button type="button" onClick={() => setAllUnis((v) => !v)} className="mt-8 border-0 bg-transparent p-0 text-md font-semibold leading-md text-[color:var(--color-text-brand)] underline-offset-4 hover:underline md:hidden">
+        <button type="button" onClick={() => setAllUnis((v) => !v)} className="mt-8 border-0 bg-transparent p-0 text-lg font-semibold leading-lg text-[color:var(--color-text-brand)] underline-offset-4 hover:underline md:hidden">
           {allUnis ? "Show fewer" : `Show all ${unis.length} universities`}
         </button>
       ) : null}
@@ -129,7 +130,7 @@ function People({ board }: { board: Row[] }) {
                   setAll(false);
                 }}
                 className={cn(
-                  "h-[32px] whitespace-nowrap rounded-full border-0 px-5 text-sm font-medium leading-sm transition-colors duration-fast",
+                  "h-[40px] whitespace-nowrap rounded-full border-0 px-5 text-md font-medium leading-md transition-colors duration-fast",
                   open === v ? "bg-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] text-[color:var(--color-text-primary)]" : "bg-transparent text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]",
                 )}
               >
@@ -159,38 +160,44 @@ function People({ board }: { board: Row[] }) {
               )}
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="flex min-w-0 items-center gap-3">
-                  <span className="truncate text-lg font-medium leading-lg text-[color:var(--color-text-primary)]">{r.p.name}</span>
+                  <span className="truncate text-xl font-medium leading-xl text-[color:var(--color-text-primary)]">{r.p.name}</span>
                   {r.p.moved ? (
-                    <span className={cn("shrink-0 text-sm font-medium leading-sm tabular-nums", r.p.moved > 0 ? "text-[color:var(--color-green-400)]" : "text-[color:var(--color-red-400)]")} aria-label={r.p.moved > 0 ? `up ${r.p.moved} places` : `down ${-r.p.moved} places`}>
+                    <span className={cn("shrink-0 text-md font-medium leading-md tabular-nums", r.p.moved > 0 ? "text-[color:var(--color-green-400)]" : "text-[color:var(--color-red-400)]")} aria-label={r.p.moved > 0 ? `up ${r.p.moved} places` : `down ${-r.p.moved} places`}>
                       {r.p.moved > 0 ? "▲" : "▼"}
                       {Math.abs(r.p.moved)}
                     </span>
                   ) : null}
                 </span>
-                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-sm text-[color:var(--color-text-tertiary)]">
+                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-md leading-md text-[color:var(--color-text-tertiary)]">
                   <span className="truncate">{r.p.university || "Open category"}</span>
                   <span aria-hidden>·</span>
                   <span>{r.p.products} products</span>
-                  {qualified(r.p) ? <Badge tone="success">Qualified</Badge> : null}
-                  {now !== null && qualityOf(r.rank, now) === "Medium" ? <Badge tone="neutral">Medium quality</Badge> : null}
+                  {/* Written out at the row's own size (the DS badge's 11 px was too small to read here). */}
+                  {qualified(r.p) ? (
+                    <span className="inline-flex items-center gap-1 font-medium text-[color:var(--color-green-400)]">
+                      <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2.4} aria-hidden />
+                      Qualified
+                    </span>
+                  ) : null}
+                  {now !== null && qualityOf(r.rank, now) === "Medium" ? <span className="font-medium text-[color:var(--color-violet-300)]">Medium quality</span> : null}
                 </span>
               </div>
               <span className="shrink-0 text-right">
                 <span className="block font-display text-2xl font-semibold leading-2xl tabular-nums text-[color:var(--color-text-primary)]">{r.pts.toLocaleString("en-US")}</span>
-                <span className="block text-xs leading-xs text-[color:var(--color-text-tertiary)]">points</span>
+                <span className="block text-md leading-md text-[color:var(--color-text-tertiary)]">points</span>
               </span>
             </li>
           );
         })}
-        {shown.length === 0 ? <li className="px-4 py-12 text-center text-md leading-md text-[color:var(--color-text-tertiary)]">No one matches “{q}”.</li> : null}
+        {shown.length === 0 ? <li className="px-4 py-12 text-center text-lg leading-lg text-[color:var(--color-text-tertiary)]">No one matches “{q}”.</li> : null}
       </ol>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4 px-4 md:px-0">
-        <span className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">
+        <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">
           Qualified = {HACKATHON.minProducts}+ products built.
         </span>
         {!query && found.length > ROWS ? (
-          <button type="button" onClick={() => setAll((v) => !v)} className="border-0 bg-transparent p-0 text-md font-semibold leading-md text-[color:var(--color-text-brand)] underline-offset-4 hover:underline">
+          <button type="button" onClick={() => setAll((v) => !v)} className="border-0 bg-transparent p-0 text-lg font-semibold leading-lg text-[color:var(--color-text-brand)] underline-offset-4 hover:underline">
             {all ? "Show fewer" : `Show all ${found.length}`}
           </button>
         ) : null}

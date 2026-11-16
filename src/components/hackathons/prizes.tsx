@@ -59,8 +59,8 @@ export function Prizes() {
                     )}
                   </button>
                 ) : null}
-                <span className="w-full truncate text-md font-medium leading-md text-[color:var(--color-white)] md:text-xl md:leading-xl">{r ? r.p.name : PLACE.at(i)}</span>
-                <span className="rounded-xl border border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--color-white)_5%,transparent)] px-3 py-1 text-sm font-semibold leading-sm tabular-nums text-[color:var(--color-white)] md:px-5 md:py-2 md:text-lg md:leading-lg">
+                <span className="w-full truncate text-lg font-medium leading-lg text-[color:var(--color-white)] md:text-2xl md:leading-2xl">{r ? r.p.name : PLACE.at(i)}</span>
+                <span className="rounded-xl border border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--color-white)_5%,transparent)] px-3 py-1 text-md font-semibold leading-md tabular-nums text-[color:var(--color-white)] md:px-5 md:py-2 md:text-xl md:leading-xl">
                   {amount.toLocaleString("en-US")} <span className="font-regular text-[color:var(--color-text-secondary)]">{HACKATHON.currency}</span>
                 </span>
               </div>
@@ -102,8 +102,8 @@ export function Prizes() {
               <HugeiconsIcon icon={x.icon} size={22} strokeWidth={1.8} />
             </span>
             <span className="flex flex-col gap-2">
-              <span className="text-lg font-semibold leading-lg text-[color:var(--color-text-primary)]">{x.title}</span>
-              <span className="text-md leading-md text-[color:var(--color-text-secondary)]">{x.text}</span>
+              <span className="text-xl font-semibold leading-xl text-[color:var(--color-text-primary)]">{x.title}</span>
+              <span className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{x.text}</span>
             </span>
           </li>
         ))}
