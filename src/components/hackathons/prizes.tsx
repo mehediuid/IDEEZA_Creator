@@ -1,51 +1,91 @@
 "use client";
 
-// The prizes as a podium: second, first, third, with each step as tall as its
-// prize is big, so the gap between places is seen before it is read. First
-// place carries the brand colour; the extras (giveaways, the AI unlock) sit
-// under it as what everyone can win along the way.
+// The prizes as a podium (owner 2026-11-16: the reference podium's design —
+// solid 3D steps with a lit top face and the place number on the front, the
+// person standing on each, a trophy over first — in our colours). On each
+// step stands whoever holds that place on the board right now: their
+// product's picture (no people photos exist), their name, and the prize the
+// place pays. Steps: 2nd · 1st · 3rd, first the tallest, all violet-lit
+// glass, first lit the most. The extras (giveaways, the AI unlock) sit under
+// it as what everyone can win along the way.
 
 import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { GiftIcon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { ChampionIcon, GiftIcon, SparklesIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import { HACKATHON, money, prizePool } from "@/lib/hackathons/vibe-inventing";
-import { Heading, SECTION, SURFACE } from "./parts";
+import { useHackathon } from "./context";
+import { Heading, Initials, SECTION, SURFACE } from "./parts";
 
-const PLACE = ["1st place", "2nd place", "3rd place"];
 // Visual order on the podium: 2nd · 1st · 3rd (the list itself stays 1st → 3rd for screen readers).
 const ORDER = ["order-2", "order-1", "order-3"];
+// Front-face heights, phone → wide.
+const STEP = ["h-[176px] md:h-[300px]", "h-[124px] md:h-[216px]", "h-[96px] md:h-[164px]"];
+const PLACE = ["1st place", "2nd place", "3rd place"];
 
 export function Prizes() {
-  const top = HACKATHON.prizes[0];
+  const { board, openProject } = useHackathon();
   return (
     <section id="prizes" aria-labelledby="prizes-title" className={SECTION}>
-      <Heading id="prizes-title" title={`${money(prizePool)} for the top three`} lead={`The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the three winners.`} />
+      <Heading id="prizes-title" title={`${money(prizePool)} for the top three`} lead={`If building ended now, these three would stand here. The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the winners.`} />
 
-      <ol className="m-0 mx-auto mt-20 grid max-w-[960px] list-none grid-cols-3 items-end gap-4 p-0 md:gap-8">
+      <ol className="m-0 mx-auto mt-20 grid max-w-[960px] list-none grid-cols-3 items-end p-0">
         {HACKATHON.prizes.map((amount, i) => {
           const first = i === 0;
+          const r = board.at(i);
           return (
-            <li key={i} className={cn("flex flex-col", ORDER.at(i))}>
-              <div className="flex flex-col items-center gap-2 pb-8 text-center">
-                <span className="text-sm font-medium leading-sm text-[color:var(--color-text-secondary)] md:text-md md:leading-md">{PLACE.at(i)}</span>
-                <span className={cn("font-display font-bold tabular-nums text-[color:var(--color-text-primary)]", first ? "text-4xl leading-4xl md:text-7xl md:leading-7xl" : "text-3xl leading-3xl md:text-5xl md:leading-5xl")}>
-                  {amount.toLocaleString("en-US")}
+            <li key={i} aria-label={`${PLACE.at(i)}: ${money(amount)}${r ? `, now ${r.p.name}` : ""}`} className={cn("relative flex min-w-0 flex-col items-center", ORDER.at(i), first && "z-[1]")}>
+              {/* Who stands here now. */}
+              <div className="flex w-full min-w-0 flex-col items-center gap-3 px-1 pb-6 text-center md:gap-4 md:pb-8">
+                {first ? (
+                  <HugeiconsIcon icon={ChampionIcon} size={44} strokeWidth={1.6} aria-hidden className="text-[color:var(--color-violet-300)] drop-shadow-[0_0_18px_color-mix(in_srgb,var(--color-violet-500)_80%,transparent)]" />
+                ) : null}
+                {r ? (
+                  <button
+                    type="button"
+                    disabled={!r.p.project}
+                    onClick={() => openProject(r)}
+                    aria-label={r.p.project ? `Open ${r.p.project.name}, by ${r.p.name}` : r.p.name}
+                    className={cn(
+                      "relative shrink-0 overflow-hidden rounded-full border-0 p-0 ring-2 ring-offset-4 ring-offset-[var(--color-bg-page)] focus-visible:outline-none focus-visible:shadow-focus-brand disabled:cursor-default",
+                      first ? "size-[72px] ring-[color:var(--color-violet-400)] md:size-[104px]" : "size-[60px] ring-[color:color-mix(in_srgb,var(--color-violet-300)_45%,transparent)] md:size-[88px]",
+                    )}
+                  >
+                    {r.p.project ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={r.p.project.image} alt="" className="h-full w-full bg-[var(--color-bg-subtle)] object-cover" />
+                    ) : (
+                      <Initials name={r.p.name} className="h-full w-full text-xl" />
+                    )}
+                  </button>
+                ) : null}
+                <span className="w-full truncate text-md font-medium leading-md text-[color:var(--color-white)] md:text-xl md:leading-xl">{r ? r.p.name : PLACE.at(i)}</span>
+                <span className="rounded-xl border border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--color-white)_5%,transparent)] px-3 py-1 text-sm font-semibold leading-sm tabular-nums text-[color:var(--color-white)] md:px-5 md:py-2 md:text-lg md:leading-lg">
+                  {amount.toLocaleString("en-US")} <span className="font-regular text-[color:var(--color-text-secondary)]">{HACKATHON.currency}</span>
                 </span>
-                <span className="text-sm leading-sm text-[color:var(--color-text-tertiary)] md:text-lg md:leading-lg">{HACKATHON.currency}</span>
               </div>
-              {/* The step: its height follows the prize. */}
-              <div
-                aria-hidden
-                style={{ height: `${Math.round(90 + (amount / top) * 200)}px` }}
-                className={cn(
-                  "relative flex items-start justify-center overflow-hidden rounded-t-3xl pt-8",
-                  first
-                    ? "bg-[linear-gradient(to_bottom,var(--color-violet-500),var(--color-violet-800))] shadow-[0_-24px_80px_color-mix(in_srgb,var(--color-violet-600)_40%,transparent)]"
-                    : "bg-[linear-gradient(to_bottom,color-mix(in_srgb,var(--color-white)_12%,transparent),color-mix(in_srgb,var(--color-white)_3%,transparent))]",
-                )}
-              >
-                <span className={cn("font-display text-7xl font-bold leading-7xl md:text-8xl md:leading-8xl", first ? "text-[color:color-mix(in_srgb,var(--color-white)_92%,transparent)]" : "text-[color:color-mix(in_srgb,var(--color-white)_40%,transparent)]")}>{i + 1}</span>
+
+              {/* The step: a lit top face, then the front with the place number, fading into the page at its foot. */}
+              <div aria-hidden className="w-full [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+                <div
+                  className={cn(
+                    "h-[18px] w-full [clip-path:polygon(7%_0,93%_0,100%_100%,0_100%)] md:h-[30px]",
+                    first
+                      ? "bg-[linear-gradient(to_bottom,color-mix(in_srgb,var(--color-violet-200)_60%,transparent),color-mix(in_srgb,var(--color-violet-400)_45%,transparent))]"
+                      : "bg-[linear-gradient(to_bottom,color-mix(in_srgb,var(--color-white)_30%,transparent),color-mix(in_srgb,var(--color-violet-300)_18%,transparent))]",
+                  )}
+                />
+                <div
+                  className={cn(
+                    "flex w-full items-start justify-center pt-6 md:pt-12",
+                    STEP.at(i),
+                    first
+                      ? "bg-[linear-gradient(to_bottom,color-mix(in_srgb,var(--color-violet-500)_42%,transparent),color-mix(in_srgb,var(--color-violet-800)_18%,transparent))] shadow-[0_-30px_90px_-10px_color-mix(in_srgb,var(--color-violet-600)_45%,transparent)]"
+                      : "bg-[linear-gradient(to_bottom,color-mix(in_srgb,var(--color-violet-300)_16%,transparent),color-mix(in_srgb,var(--color-violet-900)_8%,transparent))]",
+                  )}
+                >
+                  <span className="bg-[linear-gradient(to_bottom,var(--color-white),color-mix(in_srgb,var(--color-violet-200)_45%,transparent))] bg-clip-text font-display text-7xl font-semibold leading-7xl text-transparent [-webkit-background-clip:text] md:text-8xl md:leading-8xl">{i + 1}</span>
+                </div>
               </div>
             </li>
           );

@@ -221,6 +221,54 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
   animation: ix-hack-shine 3s linear infinite;
 }
 
+/* The hackathon hero's entrance (components/hackathons/hero.tsx, owner's
+ * "Zapline" brief): one timeline. The headline wipes up line by line, then the
+ * lede and buttons rise, then the dashboard rises and its parts settle in a
+ * stagger (each element sets its own animation-delay). Reduced motion gets
+ * the end state at once (reset.css ends animations), so nothing waits on it. */
+@keyframes ix-hk-wipe {
+  from {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(40%);
+  }
+  to {
+    clip-path: inset(0 0 -20% 0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes ix-hk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ix-hk-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ix-hk-wipe {
+  animation: ix-hk-wipe 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ix-hk-rise {
+  animation: ix-hk-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ix-hk-fade {
+  animation: ix-hk-fade 1.2s ease-out both;
+}
+
 /* The mobile splash (components/mobile/account/parts.tsx): the light behind
  * the logo breathes, and the three steps light up in turn. Both run only
  * under motion-safe; at rest the splash stands still, every step lit. */

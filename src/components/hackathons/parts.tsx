@@ -2,12 +2,20 @@
 
 // Small pieces the hackathon sections share: the section frame and heading,
 // a product's own media (its video, or its picture when motion is unwelcome),
-// and the event clock.
+// initials, and the hero brief's media addresses.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import type { Participant } from "@/lib/hackathons/vibe-inventing";
-import { countdownParts, useReducedMotion } from "./context";
+import { useReducedMotion } from "./context";
+
+// The hero brief's media (owner's "Zapline" brief, 2026-11-16): the planet-rim
+// glow video (1460 × 624, 4 s loop) and the light strip over the dashboard's
+// top edge, from the brief's own addresses.
+export const HERO_MEDIA = {
+  glow: "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e859f229-8ebd-43fb-a5a0-58006ba75327.mp4",
+  strip: "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e0e14572-12e1-4c08-b471-a21521844945.png",
+};
 
 /** One section's frame: the page width, the sticky bars' scroll offset, the vertical rhythm. */
 export const SECTION = "mx-auto w-full max-w-[1260px] scroll-mt-[152px] px-8 py-32 md:py-40 xl:px-0";
@@ -54,41 +62,6 @@ export function ProductMedia({ project, className }: { project: NonNullable<Part
       ) : (
         <video src={project.video} poster={project.image} autoPlay muted loop playsInline preload="metadata" aria-hidden className={media} />
       )}
-    </div>
-  );
-}
-
-/**
- * The event clock, scoreboard style: days, hours, minutes, seconds in their
- * own cells. Screen readers get one sentence, not a ticking number.
- */
-export function Clock({ to, now, label, size = "lg" }: { to: number; now: number | null; label: string; size?: "md" | "lg" }) {
-  const t = countdownParts(to, now);
-  const cells: [string, string][] = [
-    [t.d, "days"],
-    [t.h, "hours"],
-    [t.m, "min"],
-    [t.s, "sec"],
-  ];
-  return (
-    <div className="flex flex-col gap-4">
-      <span className="text-md font-medium leading-md text-[color:var(--color-text-secondary)]">{label}</span>
-      <div role="timer" aria-label={`${label} ${t.d} days ${t.h} hours ${t.m} minutes`} className="flex gap-3 md:gap-4">
-        {cells.map(([v, l]) => (
-          <div
-            key={l}
-            aria-hidden
-            className={cn(
-              "flex flex-col items-center justify-center rounded-xl",
-              SURFACE,
-              size === "lg" ? "h-[84px] w-[76px] md:h-[96px] md:w-[88px]" : "h-[68px] w-[64px]",
-            )}
-          >
-            <span className={cn("font-display font-semibold tabular-nums text-[color:var(--color-text-primary)]", size === "lg" ? "text-5xl leading-5xl md:text-6xl md:leading-6xl" : "text-4xl leading-4xl")}>{v}</span>
-            <span className="text-xs leading-xs text-[color:var(--color-text-tertiary)]">{l}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
