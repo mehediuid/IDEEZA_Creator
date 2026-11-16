@@ -21,7 +21,7 @@ export type Participant = {
   /** Places moved since the last hourly update (+ up, − down). */
   moved: number;
   /** The participant's showcased product, when they have one. */
-  project?: { id: string; name: string; image: string; video: string; summary: string };
+  project?: { id: string; name: string; image: string; thumb: string; video: string; summary: string };
 };
 
 export const HACKATHON = {
@@ -152,7 +152,12 @@ export const PARTICIPANTS: Participant[] = (() => {
     const proj = PROJECTS.at(i);
     if (!proj || p.published === 0) return p;
     const { clip, ...rest } = proj;
-    return { ...p, project: { ...rest, image: `/innovations/${proj.id}.png`, video: `/innovations/videos/${proj.id}--${clip}.mp4` } };
+    // Pictures are small WebP copies of the Innovations PNGs (720 px card, 192 px avatar):
+    // the 1024 px PNGs weighed 1–1.5 MB each, about 10 MB for the page.
+    return {
+      ...p,
+      project: { ...rest, image: `/hackathons/products/${proj.id}.webp`, thumb: `/hackathons/products/${proj.id}-thumb.webp`, video: `/innovations/videos/${proj.id}--${clip}.mp4` },
+    };
   });
 })();
 

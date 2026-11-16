@@ -9,12 +9,13 @@
 //    points; the top three carry their product's picture. Search finds a name,
 //    "Open category" filters, "Show all" opens the rest.
 // The public board shows no moderation flags ("Under review" stays with the
-// organizer). All numbers come from the one board in the page context.
+// organizer). All numbers come from the one board in the page context. The
+// builders list pages ten at a time (no "Show all": 64 rows ran the page long).
 
 import * as React from "react";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, ArrowRight01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import { HACKATHON, qualified, qualityOf, type Row } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
@@ -100,12 +101,15 @@ function People({ board }: { board: Row[] }) {
   const { now, openProject } = useHackathon();
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
-  const [all, setAll] = React.useState(false);
+  // Ten builders a page (owner: "Show all" ran the page 54 rows longer); the list keeps its height.
+  const [page, setPage] = React.useState(0);
 
   const pool = open ? board.filter((r) => !r.p.university) : board;
   const query = q.trim().toLowerCase();
   const found = query ? pool.filter((r) => `${r.p.name} ${r.p.university}`.toLowerCase().includes(query)) : pool;
-  const shown = all || query ? found : found.slice(0, ROWS);
+  const pages = Math.max(1, Math.ceil(found.length / ROWS));
+  const at = Math.min(page, pages - 1);
+  const shown = found.slice(at * ROWS, at * ROWS + ROWS);
 
   return (
     <div className={cn("flex flex-col rounded-3xl px-4 py-8 md:px-10 md:py-10", SURFACE)}>
@@ -123,7 +127,7 @@ function People({ board }: { board: Row[] }) {
                 aria-pressed={open === v}
                 onClick={() => {
                   setOpen(v as boolean);
-                  setAll(false);
+                  setPage(0);
                 }}
                 className={cn(
                   "h-[40px] whitespace-nowrap rounded-full border-0 px-5 text-md font-medium leading-md transition-colors duration-fast",
@@ -137,7 +141,7 @@ function People({ board }: { board: Row[] }) {
         </div>
       </div>
       <div className="mt-6 px-4 md:px-0">
-        <SearchInput value={q} onValueChange={setQ} onClear={() => setQ("")} placeholder="Find your name or university" aria-label="Find your name or university" containerClassName="w-full" />
+        <SearchInput value={q} onValueChange={(v) => { setQ(v); setPage(0); }} onClear={() => { setQ(""); setPage(0); }} placeholder="Find your name or university" aria-label="Find your name or university" containerClassName="w-full" />
       </div>
 
       <ol className="m-0 mt-6 flex list-none flex-col p-0" aria-label="Builders by points">
@@ -149,7 +153,7 @@ function People({ board }: { board: Row[] }) {
               {r.p.project && r.rank <= 3 ? (
                 <button type="button" onClick={() => openProject(r)} aria-label={`Open ${r.p.project.name}`} className="size-[44px] shrink-0 overflow-hidden rounded-xl border-0 p-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={r.p.project.image} alt="" className="h-full w-full object-cover" />
+                  <img src={r.p.project.thumb} alt="" className="h-full w-full object-cover" />
                 </button>
               ) : (
                 <Initials name={r.p.name} className="size-[44px] text-md" />
@@ -192,10 +196,27 @@ function People({ board }: { board: Row[] }) {
         <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">
           Qualified = {HACKATHON.minProducts}+ products built.
         </span>
-        {!query && found.length > ROWS ? (
-          <button type="button" onClick={() => setAll((v) => !v)} className="border-0 bg-transparent p-0 text-lg font-semibold leading-lg text-[color:var(--color-text-brand)] underline-offset-4 hover:underline">
-            {all ? "Show fewer" : `Show all ${found.length}`}
-          </button>
+        {pages > 1 ? (
+          <nav aria-label="Builder pages" className="flex items-center gap-3">
+            <span className="text-md leading-md tabular-nums text-[color:var(--color-text-secondary)]" aria-live="polite">
+              {at * ROWS + 1}–{Math.min(found.length, at * ROWS + ROWS)} of {found.length}
+            </span>
+            {[
+              [ArrowLeft01Icon, "Previous ten", at - 1],
+              [ArrowRight01Icon, "Next ten", at + 1],
+            ].map(([icon, label, to]) => (
+              <button
+                key={label as string}
+                type="button"
+                aria-label={label as string}
+                disabled={(to as number) < 0 || (to as number) >= pages}
+                onClick={() => setPage(to as number)}
+                className="flex size-[40px] items-center justify-center rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] bg-transparent text-[color:var(--color-text-primary)] transition-colors duration-fast hover:bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent"
+              >
+                <HugeiconsIcon icon={icon as typeof ArrowLeft01Icon} size={18} strokeWidth={2} aria-hidden />
+              </button>
+            ))}
+          </nav>
         ) : null}
       </div>
     </div>

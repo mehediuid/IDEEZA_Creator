@@ -22,7 +22,9 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { HACKATHON, money, type Phase } from "@/lib/hackathons/vibe-inventing";
-import { useHackathon, useReducedMotion } from "./context";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Tick02Icon } from "@hugeicons/core-free-icons";
+import { countdownParts, eat, useHackathon, useReducedMotion } from "./context";
 import { JoinButton, VoteLink } from "./actions";
 import { HeroShowcase } from "./hero-showcase";
 import { HERO_MEDIA } from "./parts";
@@ -117,7 +119,15 @@ function Planet() {
 }
 
 export function HackathonHero() {
-  const { phase } = useHackathon();
+  const { phase, now } = useHackathon();
+  // The two facts a visitor needs beside Join (the brief's hero left them to the bottom of
+  // the page): how long is left, and whether they can enter.
+  const left = countdownParts(phase === "registration" || phase === "soon" ? HACKATHON.dates.start : HACKATHON.dates.end, now);
+  const deadline =
+    phase === "judging" || phase === "results"
+      ? `Winners on ${eat(HACKATHON.dates.results)}`
+      : `${phase === "registration" || phase === "soon" ? "Starts" : "Ends"} in ${Number.isNaN(Number(left.d)) ? "--" : Number(left.d)}d ${left.h}h ${left.m}m`;
+  const facts = [deadline, "Free to join", `${HACKATHON.minAge}+, living in ${HACKATHON.where}`, "Individuals"];
   return (
     <section aria-labelledby="hackathon-title" className="relative isolate overflow-hidden bg-[var(--color-black)]">
       <div aria-hidden className="absolute inset-0 -z-10">
@@ -133,7 +143,9 @@ export function HackathonHero() {
         <p className="ix-hk-fade flex items-center gap-3 rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-violet-300)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_55%,transparent)] px-5 py-2 text-md font-medium leading-md text-[color:color-mix(in_srgb,var(--color-white)_86%,transparent)] backdrop-blur-[6px] md:text-lg md:leading-lg">
           <span aria-hidden className={cn("size-[8px] shrink-0 rounded-full", phase === "live" ? "bg-[var(--color-green-400)] motion-safe:animate-pulse" : "bg-[var(--color-violet-400)]")} />
           <span>
-            {phase ? STATUS[phase] : " "} · {HACKATHON.name}
+            {phase ? STATUS[phase] : " "} · {/* phones: the short name, so the pill stays one line */}
+            <span className="max-sm:hidden">{HACKATHON.name}</span>
+            <span className="sm:hidden">Vibe Inventing Hackathon</span>
           </span>
         </p>
 
@@ -154,6 +166,18 @@ export function HackathonHero() {
           <JoinButton className="w-full transition-shadow duration-fast hover:shadow-[0_0_36px_color-mix(in_srgb,var(--color-violet-500)_70%,transparent)] sm:w-auto" />
           <VoteLink className="w-full sm:w-auto" />
         </div>
+        <ul className="ix-hk-rise m-0 mt-8 flex list-none flex-wrap justify-center gap-x-8 gap-y-3 p-0 text-md leading-md text-[color:var(--color-text-secondary)] md:text-lg md:leading-lg" style={{ animationDelay: "620ms" }}>
+          {facts.map((f, i) => (
+            <li key={f} className={cn("flex items-center gap-2", i === 0 && "font-semibold text-[color:var(--color-white)] tabular-nums")}>
+              {i === 0 ? (
+                <span aria-hidden className={cn("size-[8px] rounded-full", phase === "live" ? "bg-[var(--color-green-400)]" : "bg-[var(--color-violet-400)]")} />
+              ) : (
+                <HugeiconsIcon icon={Tick02Icon} size={16} strokeWidth={2.2} aria-hidden className="text-[color:var(--color-green-400)]" />
+              )}
+              {f}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="relative mx-auto mt-20 w-full max-w-[1236px] px-4 pb-20 md:mt-24 md:px-8 xl:px-4">

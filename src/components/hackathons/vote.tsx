@@ -47,7 +47,6 @@ export function VoteShelf() {
               <button type="button" onClick={() => openProject(r)} aria-label={`Open ${proj.name}`} className="group relative block aspect-[4/3] overflow-hidden border-0 bg-[var(--color-bg-subtle)] p-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={proj.image} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-slower ease-decelerate group-hover:scale-[1.04] motion-reduce:transition-none" />
-                <span className="absolute left-4 top-4 rounded-full bg-[color:color-mix(in_srgb,var(--color-black)_64%,transparent)] px-4 py-2 text-md font-semibold leading-md text-[color:var(--color-white)] backdrop-blur-[6px]">#{r.rank} on the board</span>
               </button>
               <div className="flex flex-1 flex-col gap-4 px-8 pb-8 pt-6">
                 <div className="flex flex-col gap-1">

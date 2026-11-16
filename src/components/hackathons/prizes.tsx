@@ -93,7 +93,7 @@ export function Prizes() {
                   >
                     {r.p.project ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.p.project.image} alt="" className="h-full w-full bg-[var(--color-bg-subtle)] object-cover" />
+                      <img src={r.p.project.thumb} alt="" className="h-full w-full bg-[var(--color-bg-subtle)] object-cover" />
                     ) : (
                       <Initials name={r.p.name} className="h-full w-full text-xl" />
                     )}

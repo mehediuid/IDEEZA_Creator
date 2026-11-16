@@ -29,6 +29,14 @@ const ANCHORS = [
 /** The page's own bar, under the site's: its sections and Join. */
 export function SectionNav() {
   const [active, setActive] = React.useState<string>("");
+  const list = React.useRef<HTMLUListElement>(null);
+  // On a phone the anchors scroll sideways: keep the lit one in view as the page moves on.
+  React.useEffect(() => {
+    const ul = list.current;
+    const a = active ? ul?.querySelector<HTMLElement>(`a[href="#${active}"]`) : null;
+    if (!ul || !a || ul.scrollWidth <= ul.clientWidth) return;
+    ul.scrollTo({ left: a.offsetLeft - (ul.clientWidth - a.offsetWidth) / 2, behavior: "smooth" });
+  }, [active]);
   React.useEffect(() => {
     const els = ANCHORS.map(([id]) => document.getElementById(id)).filter((e): e is HTMLElement => !!e);
     const io = new IntersectionObserver(
@@ -43,15 +51,17 @@ export function SectionNav() {
   }, []);
   return (
     <div className="sticky top-[80px] z-[5] border-0 border-y border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_86%,transparent)] backdrop-blur-[24px]">
-      <nav aria-label="On this page" className="mx-auto flex h-[68px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 xl:px-0">
-        <ul className="m-0 flex min-w-0 list-none gap-2 overflow-x-auto p-0 [scrollbar-width:none]">
+      {/* Phones: a 56 px bar (with the site bar's 80, the two took 18 % of the screen at 68);
+          the anchor row fades at its right edge so the hidden ones read as "more". */}
+      <nav aria-label="On this page" className="mx-auto flex h-[56px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 md:h-[68px] xl:px-0">
+        <ul ref={list} className="m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0 pr-10 [scrollbar-width:none] max-md:[mask-image:linear-gradient(to_right,black_82%,transparent)] md:gap-2 md:pr-0">
           {ANCHORS.map(([id, label]) => (
             <li key={id}>
               <a
                 href={`#${id}`}
                 aria-current={active === id ? "true" : undefined}
                 className={cn(
-                  "flex h-[44px] items-center whitespace-nowrap rounded-full px-6 text-lg font-medium leading-lg text-[color:var(--color-text-secondary)] transition-colors duration-fast hover:text-[color:var(--color-text-primary)]",
+                  "flex h-[40px] items-center whitespace-nowrap rounded-full px-5 text-lg font-medium leading-lg md:h-[44px] md:px-6 text-[color:var(--color-text-secondary)] transition-colors duration-fast hover:text-[color:var(--color-text-primary)]",
                   active === id && "bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] text-[color:var(--color-text-primary)]",
                 )}
               >

@@ -23,9 +23,10 @@ export const metadata: Metadata = {
 //
 // The order follows the visitor's questions (owner 2026-11-16: design for the
 // page's purpose): what is it and what do I win (hero) → how much exactly
-// (podium) → what do I do and how is it scored (how to win) → who is winning
-// (university league + builders) → vote (the voter's job) → can I join and
-// how is the winner picked → when → questions → Join.
+// (podium) → what do I do and how is it scored (how to win)
+// → can I join and how is the winner picked (beside the rules of the game, not
+// after the board) → who is winning (university league + builders) → vote →
+// when → questions → Join.
 export default function HackathonsPage() {
   return (
     <div data-theme="dark" className="min-h-screen overflow-x-clip bg-[var(--color-bg-page)] font-display text-[color:var(--color-text-primary)]">
@@ -37,9 +38,9 @@ export default function HackathonsPage() {
             <SectionNav />
             <Prizes />
             <HowToWin />
+            <WhoAndJudging />
             <Leaderboard />
             <VoteShelf />
-            <WhoAndJudging />
             <Timeline />
             <FaqAndRules />
             <Closing />
