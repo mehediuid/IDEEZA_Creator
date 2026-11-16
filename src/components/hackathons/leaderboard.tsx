@@ -67,27 +67,23 @@ function UniversityLeague({ unis }: { unis: ReturnType<typeof useHackathon>["uni
   return (
     <div className={cn("self-start rounded-3xl px-8 py-10 md:px-10", SURFACE)}>
       <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">University league</h3>
-      <ol className="m-0 mt-8 flex list-none flex-col gap-6 p-0">
+      {/* Each row is one grid: the rank in its own column, and the name, the bar and the
+          facts all starting on the same left edge; the bar runs to the points' right edge. */}
+      <ol className="m-0 mt-8 flex list-none flex-col gap-8 p-0">
         {unis.map((u, i) => (
-          <li key={u.name} className={cn("flex flex-col gap-3", i >= PHONE_UNIS && !allUnis && "max-md:hidden")}>
-            <div className="flex items-baseline justify-between gap-6">
-              <span className="flex min-w-0 items-baseline gap-4">
-                <span className={cn("w-[24px] shrink-0 text-lg font-semibold tabular-nums", i === 0 ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{i + 1}</span>
-                <span className="truncate text-xl font-medium leading-xl text-[color:var(--color-text-primary)]">{u.name}</span>
-              </span>
-              <span className="shrink-0 text-xl font-semibold leading-xl tabular-nums text-[color:var(--color-text-primary)]">{u.pts.toLocaleString("en-US")}</span>
+          <li key={u.name} className={cn("grid grid-cols-[28px_minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-3", i >= PHONE_UNIS && !allUnis && "max-md:hidden")}>
+            <span className={cn("text-lg font-semibold leading-lg tabular-nums", i === 0 ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{i + 1}</span>
+            <span className="truncate text-xl font-medium leading-xl text-[color:var(--color-text-primary)]">{u.name}</span>
+            <span className="text-right text-xl font-semibold leading-xl tabular-nums text-[color:var(--color-text-primary)]">{u.pts.toLocaleString("en-US")}</span>
+            <div aria-hidden className="col-start-2 col-end-4 h-[6px] self-start overflow-hidden rounded-full bg-[color:color-mix(in_srgb,var(--color-white)_7%,transparent)]">
+              <div
+                style={{ width: `${Math.max(3, (u.pts / max) * 100)}%` }}
+                className={cn("h-full rounded-full", i === 0 ? "bg-[linear-gradient(to_right,var(--color-violet-600),var(--color-violet-300))]" : "bg-[color:color-mix(in_srgb,var(--color-violet-400)_60%,transparent)]")}
+              />
             </div>
-            <div className="ml-[40px] flex flex-col gap-2">
-              <div aria-hidden className="h-[8px] overflow-hidden rounded-full bg-[color:color-mix(in_srgb,var(--color-white)_6%,transparent)]">
-                <div
-                  style={{ width: `${Math.max(3, (u.pts / max) * 100)}%` }}
-                  className={cn("h-full rounded-full", i === 0 ? "bg-[linear-gradient(to_right,var(--color-violet-600),var(--color-violet-300))]" : "bg-[color:color-mix(in_srgb,var(--color-violet-400)_55%,transparent)]")}
-                />
-              </div>
-              <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">
-                {u.people} {u.people === 1 ? "student" : "students"} · {u.products} products
-              </span>
-            </div>
+            <span className="col-start-2 col-end-4 text-md leading-md text-[color:var(--color-text-tertiary)]">
+              {u.people} {u.people === 1 ? "student" : "students"} · {u.products} products
+            </span>
           </li>
         ))}
       </ol>
