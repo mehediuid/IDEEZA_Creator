@@ -6,7 +6,7 @@
 //    bar, not three loose chips), side by side with a hairline between;
 //  - Timeline: one track across the four phases, filled up to now;
 //  - FaqAndRules: questions as a ruled list, the terms beside them;
-//  - Closing: full screen over a wall of the builds — the clock and Join again.
+//  - Closing: full screen over the owner's wave video — the clock and Join again.
 
 import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -246,18 +246,10 @@ export function FaqAndRules() {
   );
 }
 
-// The wall comes in two cuts: 3 × 3 wide for screens from 768 px, 2 × 6 tall for
-// phones (the wide one, cropped to a phone, showed one giant tile).
-const WALL = {
-  wide: { video: "/hackathons/closing-wall.mp4", poster: "/hackathons/closing-wall.jpg" },
-  tall: { video: "/hackathons/closing-wall-phone.mp4", poster: "/hackathons/closing-wall-phone.jpg" },
-};
-const WIDE = "(min-width: 768px)";
-function subscribeWide(on: () => void) {
-  const q = window.matchMedia(WIDE);
-  q.addEventListener("change", on);
-  return () => q.removeEventListener("change", on);
-}
+// The owner's wave: the looping violet-and-blue light from their brief, played
+// from the brief's own address. With reduced motion the `#t=1` fragment holds
+// one frame of it instead of playing.
+const WAVE = "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4";
 
 /** "Building ends in 6 days · 08:04:38" — the closing line's clock, one line of caps. */
 function closingClock(phase: Phase | null, now: number | null): string {
@@ -270,21 +262,17 @@ function closingClock(phase: Phase | null, now: number | null): string {
 
 /**
  * The last word, full screen (owner 2026-11-16: the concept from their brief,
- * in our fonts, colours and words). Behind it, a wall of the builds — product
- * clips in one loop (`public/hackathons/closing-wall*.mp4`: 3 × 3 wide, 2 × 6
- * for phones, made with ffmpeg from the Innovations clips with their caption
- * strips cropped), darkened and
- * washed in violet so the words own the screen. On it: the promise and the
- * prize in two short lines, the clock in one line of caps, the headline with
- * its second line shining, and Join with an arrow that steps forward. The
- * clip loads only when the section is near, and stays a still picture for
- * reduced motion. It fills the screen under the site bar and section bar.
+ * in our fonts, colours and words). Behind it, the brief's wave video — a
+ * slow violet-and-blue light on black, already in the brand's colours — with
+ * only its top and bottom edges faded into the page so the light stays the
+ * picture. On it: the promise and the prize in two short lines, the clock in
+ * one line of caps, the headline with its second line shining, and Join with
+ * an arrow that steps forward. The video loads only when the section is near.
+ * It fills the screen under the site bar and section bar.
  */
 export function Closing() {
   const { now, phase } = useHackathon();
   const still = useReducedMotion();
-  const wide = React.useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
-  const cut = wide ? WALL.wide : WALL.tall;
   const ref = React.useRef<HTMLElement>(null);
   const [near, setNear] = React.useState(false);
   React.useEffect(() => {
@@ -297,16 +285,17 @@ export function Closing() {
 
   return (
     <section ref={ref} aria-labelledby="closing-title" className="relative isolate flex min-h-[calc(100svh-140px)] flex-col overflow-hidden">
-      <div aria-hidden className="absolute inset-0 -z-10">
-        <picture>
-          <source media={WIDE} srcSet={WALL.wide.poster} />
-          <img src={WALL.tall.poster} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        </picture>
-        {near && !still ? <video key={cut.video} src={cut.video} poster={cut.poster} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" /> : null}
-        {/* Darken, wash in violet, and fade both edges into the page. */}
-        <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--color-bg-page)_74%,transparent)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(60%_55%_at_50%_58%,color-mix(in_srgb,var(--color-violet-700)_55%,transparent),transparent)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,var(--color-bg-page)_0%,transparent_22%,transparent_78%,var(--color-bg-page)_100%)]" />
+      <div aria-hidden className="absolute inset-0 -z-10 bg-[var(--color-black)]">
+        {near ? (
+          still ? (
+            <video src={`${WAVE}#t=1`} muted playsInline preload="auto" className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <video src={WAVE} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
+          )
+        ) : null}
+        {/* Only the edges meet the page; a light veil keeps the small type readable where the light is brightest. */}
+        <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--color-black)_18%,transparent)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,var(--color-bg-page)_0%,transparent_18%,transparent_82%,var(--color-bg-page)_100%)]" />
       </div>
 
       <div className="mx-auto flex w-full max-w-[1260px] flex-1 flex-col px-8 pb-24 pt-20 md:pt-24 xl:px-0">
@@ -320,7 +309,9 @@ export function Closing() {
           </p>
         </div>
 
-        <div className="flex flex-1 flex-col items-center justify-center py-24 text-center">
+        <div className="relative isolate flex flex-1 flex-col items-center justify-center py-24 text-center">
+          {/* A soft shade under the words only: when the wave's bright edge passes behind them they stay readable. */}
+          <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[90%] w-[min(1000px,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-black)_62%,transparent),transparent)]" />
           <p className="text-sm font-medium uppercase leading-sm tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_80%,transparent)] md:text-md md:leading-md">{closingClock(phase, now)}</p>
           <h2 id="closing-title" className="mt-10 font-display text-6xl leading-6xl tracking-tighter [text-wrap:balance] md:text-8xl md:leading-8xl">
             <span className="block font-medium text-[color:var(--color-white)]">Put your university</span>
