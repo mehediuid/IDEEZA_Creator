@@ -246,10 +246,17 @@ export function FaqAndRules() {
   );
 }
 
-// The owner's wave: the looping violet-and-blue light from their brief, played
-// from the brief's own address. With reduced motion the `#t=1` fragment holds
-// one frame of it instead of playing.
-const WAVE = "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_105406_16f4600d-7a92-4292-b96e-b19156c7830a.mp4";
+// The owner's wave: the looping violet-and-blue light from their brief, kept in
+// the project (owner 2026-11-16: "store it") and re-encoded from the 7.4 MB
+// original — 1080p for screens from 768 px (1.2 MB), 720p for phones (0.6 MB).
+// The poster is one frame of it, shown first and kept still for reduced motion.
+const WAVE = { wide: "/hackathons/closing-wave.mp4", phone: "/hackathons/closing-wave-720.mp4", poster: "/hackathons/closing-wave.jpg" };
+const WIDE = "(min-width: 768px)";
+function subscribeWide(on: () => void) {
+  const q = window.matchMedia(WIDE);
+  q.addEventListener("change", on);
+  return () => q.removeEventListener("change", on);
+}
 
 /** "Building ends in 6 days · 08:04:38" — the closing line's clock, one line of caps. */
 function closingClock(phase: Phase | null, now: number | null): string {
@@ -262,8 +269,9 @@ function closingClock(phase: Phase | null, now: number | null): string {
 
 /**
  * The last word, full screen (owner 2026-11-16: the concept from their brief,
- * in our fonts, colours and words). Behind it, the brief's wave video — a
- * slow violet-and-blue light on black, already in the brand's colours — with
+ * in our fonts, colours and words). Behind it, the brief's wave video (kept in
+ * public/hackathons) — a slow violet-and-blue light on black, already in the
+ * brand's colours — with
  * only its top and bottom edges faded into the page so the light stays the
  * picture. On it: the promise and the prize in two short lines, the clock in
  * one line of caps, the headline with its second line shining, and Join with
@@ -273,6 +281,7 @@ function closingClock(phase: Phase | null, now: number | null): string {
 export function Closing() {
   const { now, phase } = useHackathon();
   const still = useReducedMotion();
+  const wide = React.useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
   const ref = React.useRef<HTMLElement>(null);
   const [near, setNear] = React.useState(false);
   React.useEffect(() => {
@@ -286,13 +295,9 @@ export function Closing() {
   return (
     <section ref={ref} aria-labelledby="closing-title" className="relative isolate flex min-h-[calc(100svh-140px)] flex-col overflow-hidden">
       <div aria-hidden className="absolute inset-0 -z-10 bg-[var(--color-black)]">
-        {near ? (
-          still ? (
-            <video src={`${WAVE}#t=1`} muted playsInline preload="auto" className="absolute inset-0 h-full w-full object-cover" />
-          ) : (
-            <video src={WAVE} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
-          )
-        ) : null}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={WAVE.poster} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        {near && !still ? <video key={wide ? "wide" : "phone"} src={wide ? WAVE.wide : WAVE.phone} poster={WAVE.poster} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" /> : null}
         {/* Only the edges meet the page; a light veil keeps the small type readable where the light is brightest. */}
         <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--color-black)_18%,transparent)]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,var(--color-bg-page)_0%,transparent_18%,transparent_82%,var(--color-bg-page)_100%)]" />
