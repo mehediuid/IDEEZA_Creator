@@ -4,8 +4,11 @@ import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 import { HackathonProvider } from "@/components/hackathons/context";
 import { HackathonHero } from "@/components/hackathons/hero";
+import { Prizes } from "@/components/hackathons/prizes";
+import { HowToWin } from "@/components/hackathons/how-to-win";
 import { Leaderboard } from "@/components/hackathons/leaderboard";
-import { Closing, FaqAndRules, HowItWorks, Prizes, SectionNav, Timeline, WhoAndJudging } from "@/components/hackathons/sections";
+import { VoteShelf } from "@/components/hackathons/vote";
+import { Closing, FaqAndRules, SectionNav, Timeline, WhoAndJudging } from "@/components/hackathons/sections";
 import { HACKATHON } from "@/lib/hackathons/vibe-inventing";
 
 export const metadata: Metadata = {
@@ -17,6 +20,12 @@ export const metadata: Metadata = {
 // prototype's landing page joins the website, in our design system). Like the
 // landing page it sits outside the app shell, is open without signing in and
 // pins the DS dark mode; the site's top bar and footer frame it.
+//
+// The order follows the visitor's questions (owner 2026-11-16: design for the
+// page's purpose): what is it and what do I win (hero) → how much exactly
+// (podium) → what do I do and how is it scored (how to win) → who is winning
+// (university league + builders) → vote (the voter's job) → can I join and
+// how is the winner picked → when → questions → Join.
 export default function HackathonsPage() {
   return (
     <div data-theme="dark" className="min-h-screen overflow-x-clip bg-[var(--color-bg-page)] font-display text-[color:var(--color-text-primary)]">
@@ -27,8 +36,9 @@ export default function HackathonsPage() {
             <HackathonHero />
             <SectionNav />
             <Prizes />
+            <HowToWin />
             <Leaderboard />
-            <HowItWorks />
+            <VoteShelf />
             <WhoAndJudging />
             <Timeline />
             <FaqAndRules />

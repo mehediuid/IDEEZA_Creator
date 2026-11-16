@@ -1,233 +1,200 @@
 "use client";
 
-// Live standings — three views of one board (Top participants · Universities ·
-// Open category), the top three as cards with their project, the rest as one
-// table with search and "Show all". Fixes over the prototype:
-//  - the public board shows no moderation flags ("Under review" stays with the
-//    organizer), and ▲/▼ movement sits in its own column, not inside the rank;
-//  - "Medium Mode" reads "Medium quality", the app's own word for AI levels,
-//    and the board says what "Qualified" means;
-//  - every number on a row is the row's own (points summed from its actions).
+// The standings as a race. The hackathon is university vs university, so the
+// universities' league sits beside the people's ranking (not behind a tab):
+// a student sees in one look where their campus stands and who to beat.
+//  - University league: points as bars against the leader, people and
+//    products under each name.
+//  - People: rank, movement since the last update, name and campus, products,
+//    points; the top three carry their product's picture. Search finds a name,
+//    "Open category" filters, "Show all" opens the rest.
+// The public board shows no moderation flags ("Under review" stays with the
+// organizer). All numbers come from the one board in the page context.
 
 import * as React from "react";
-import { Segmented } from "@/components/ideeza/segmented";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { Badge } from "@/components/ideeza/badge";
-import { buttonVariants } from "@/components/ideeza/button";
-import { LandingSectionHeader } from "@/components/landing/section-header";
 import { cn } from "@/lib/utils";
-import { HACKATHON, PARTICIPANTS, money, pointsOf, qualified, qualityOf, type Participant } from "@/lib/hackathons/vibe-inventing";
+import { HACKATHON, qualified, qualityOf, type Row } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
-import { VoteButton } from "./actions";
-import { GLASS, SECTION } from "./sections";
-
-type Tab = "people" | "universities" | "open";
+import { Heading, Initials, SECTION, SURFACE } from "./parts";
 
 const ROWS = 10;
 
 export function Leaderboard() {
-  const { now, entry, openProject } = useHackathon();
-  const [tab, setTab] = React.useState<Tab>("people");
-  const [q, setQ] = React.useState("");
-  const [all, setAll] = React.useState(false);
-
-  const extra = (p: Participant) => (p.project && entry.votes.includes(p.project.id) ? 1 : 0);
-  const board = React.useMemo(
-    () =>
-      PARTICIPANTS.map((p) => ({ p, pts: pointsOf(p, extra(p)) }))
-        .sort((a, b) => b.pts - a.pts || b.p.products - a.p.products)
-        .map((r, i) => ({ ...r, rank: i + 1 })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entry.votes],
-  );
-
-  const top = board.slice(0, 3);
-  const rest = board.slice(3);
-  const rows = tab === "open" ? board.filter((r) => !r.p.university) : rest;
-  const query = q.trim().toLowerCase();
-  const found = query ? rows.filter((r) => `${r.p.name} ${r.p.university}`.toLowerCase().includes(query)) : rows;
-  const shown = all || query ? found : found.slice(0, ROWS);
-
-  const unis = React.useMemo(() => {
-    const m = new Map<string, { name: string; people: number; builders: number; pts: number }>();
-    board.forEach((r) => {
-      if (!r.p.university) return;
-      const g = m.get(r.p.university) ?? { name: r.p.university, people: 0, builders: 0, pts: 0 };
-      g.people += 1;
-      if (r.p.products > 0) g.builders += 1;
-      g.pts += r.pts;
-      m.set(r.p.university, g);
-    });
-    return [...m.values()].sort((a, b) => b.pts - a.pts);
-  }, [board]);
+  const { board, unis } = useHackathon();
+  const products = board.reduce((s, r) => s + r.p.products, 0);
+  const votes = board.reduce((s, r) => s + r.votes, 0);
 
   return (
     <section id="leaderboard" aria-labelledby="leaderboard-title" className={SECTION}>
-      <LandingSectionHeader id="leaderboard-title" eyebrow="Live standings" title="Leaderboard" lead={`Ranked by points, updated every hour. ${entry.signedIn ? `You have ${entry.votesLeft} of ${HACKATHON.votesPerPerson} votes left.` : `Every account has ${HACKATHON.votesPerPerson} votes.`}`} />
+      <Heading
+        id="leaderboard-title"
+        title="Which university builds best?"
+        lead={`Every point a student earns counts for their university. Updated every hour; the top ${HACKATHON.shortlist} people go to the judges.`}
+        aside={
+          <dl className="grid grid-cols-3 gap-8 md:gap-12">
+            {[
+              [board.length, "builders"],
+              [products, "products"],
+              [votes, "votes"],
+            ].map(([v, l]) => (
+              <div key={l as string} className="flex flex-col">
+                <dd className="order-1 font-display text-4xl font-semibold leading-4xl tabular-nums text-[color:var(--color-text-primary)]">{(v as number).toLocaleString("en-US")}</dd>
+                <dt className="order-2 text-md leading-md text-[color:var(--color-text-tertiary)]">{l}</dt>
+              </div>
+            ))}
+          </dl>
+        }
+      />
 
-      <div className="mt-16 flex justify-center">
-        <Segmented
-          label="Standings"
-          value={tab}
-          onChange={(v) => {
-            setTab(v);
-            setQ("");
-            setAll(false);
-          }}
-          options={[
-            { value: "people", label: "Top participants" },
-            { value: "universities", label: "Universities" },
-            { value: "open", label: "Open category" },
-          ]}
-        />
+      <div className="mt-20 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <UniversityLeague unis={unis} />
+        <People board={board} />
+      </div>
+      <p className="mt-8 text-sm leading-sm text-[color:var(--color-text-tertiary)]">Standings on this page are sample data.</p>
+    </section>
+  );
+}
+
+// A phone shows the league's top six first (the full list would push the builders a screen away).
+const PHONE_UNIS = 6;
+
+function UniversityLeague({ unis }: { unis: ReturnType<typeof useHackathon>["unis"] }) {
+  const max = unis[0]?.pts || 1;
+  const [allUnis, setAllUnis] = React.useState(false);
+  return (
+    <div className={cn("self-start rounded-3xl px-8 py-10 md:px-10", SURFACE)}>
+      <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">University league</h3>
+      <ol className="m-0 mt-8 flex list-none flex-col gap-6 p-0">
+        {unis.map((u, i) => (
+          <li key={u.name} className={cn("flex flex-col gap-3", i >= PHONE_UNIS && !allUnis && "max-md:hidden")}>
+            <div className="flex items-baseline justify-between gap-6">
+              <span className="flex min-w-0 items-baseline gap-4">
+                <span className={cn("w-[20px] shrink-0 text-md font-semibold tabular-nums", i === 0 ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{i + 1}</span>
+                <span className="truncate text-lg font-medium leading-lg text-[color:var(--color-text-primary)]">{u.name}</span>
+              </span>
+              <span className="shrink-0 text-lg font-semibold leading-lg tabular-nums text-[color:var(--color-text-primary)]">{u.pts.toLocaleString("en-US")}</span>
+            </div>
+            <div className="ml-[36px] flex flex-col gap-2">
+              <div aria-hidden className="h-[8px] overflow-hidden rounded-full bg-[color:color-mix(in_srgb,var(--color-white)_6%,transparent)]">
+                <div
+                  style={{ width: `${Math.max(3, (u.pts / max) * 100)}%` }}
+                  className={cn("h-full rounded-full", i === 0 ? "bg-[linear-gradient(to_right,var(--color-violet-600),var(--color-violet-300))]" : "bg-[color:color-mix(in_srgb,var(--color-violet-400)_55%,transparent)]")}
+                />
+              </div>
+              <span className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">
+                {u.people} {u.people === 1 ? "student" : "students"} · {u.products} products
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+      {unis.length > PHONE_UNIS ? (
+        <button type="button" onClick={() => setAllUnis((v) => !v)} className="mt-8 border-0 bg-transparent p-0 text-md font-semibold leading-md text-[color:var(--color-text-brand)] underline-offset-4 hover:underline md:hidden">
+          {allUnis ? "Show fewer" : `Show all ${unis.length} universities`}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function People({ board }: { board: Row[] }) {
+  const { now, openProject } = useHackathon();
+  const [open, setOpen] = React.useState(false);
+  const [q, setQ] = React.useState("");
+  const [all, setAll] = React.useState(false);
+
+  const pool = open ? board.filter((r) => !r.p.university) : board;
+  const query = q.trim().toLowerCase();
+  const found = query ? pool.filter((r) => `${r.p.name} ${r.p.university}`.toLowerCase().includes(query)) : pool;
+  const shown = all || query ? found : found.slice(0, ROWS);
+
+  return (
+    <div className={cn("flex flex-col rounded-3xl px-4 py-8 md:px-10 md:py-10", SURFACE)}>
+      <div className="flex flex-col gap-6 px-4 md:flex-row md:items-center md:justify-between md:px-0">
+        <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">Top builders</h3>
+        <div className="flex items-center gap-4">
+          <div role="group" aria-label="Show" className="flex rounded-full bg-[color:color-mix(in_srgb,var(--color-white)_6%,transparent)] p-1">
+            {[
+              [false, "Everyone"],
+              [true, "Open category"],
+            ].map(([v, l]) => (
+              <button
+                key={l as string}
+                type="button"
+                aria-pressed={open === v}
+                onClick={() => {
+                  setOpen(v as boolean);
+                  setAll(false);
+                }}
+                className={cn(
+                  "h-[32px] whitespace-nowrap rounded-full border-0 px-5 text-sm font-medium leading-sm transition-colors duration-fast",
+                  open === v ? "bg-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] text-[color:var(--color-text-primary)]" : "bg-transparent text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]",
+                )}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="mt-6 px-4 md:px-0">
+        <SearchInput value={q} onValueChange={setQ} onClear={() => setQ("")} placeholder="Find your name or university" aria-label="Find your name or university" containerClassName="w-full" />
       </div>
 
-      {tab === "people" ? (
-        <ol className="m-0 mt-16 grid list-none grid-cols-1 gap-8 p-0 md:grid-cols-3">
-          {top.map((r) => (
-            <li key={r.p.id} className={cn("flex flex-col overflow-hidden rounded-2xl", GLASS, r.rank === 1 && "border-[color:color-mix(in_srgb,var(--color-violet-400)_60%,transparent)] shadow-[0_0_48px_color-mix(in_srgb,var(--color-violet-600)_30%,transparent)]")}>
-              <div className="relative aspect-[16/10] bg-[var(--color-bg-subtle)]">
-                {r.p.project ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={r.p.project.image} alt={r.p.project.name} className="absolute inset-0 h-full w-full object-cover" />
-                ) : null}
-              </div>
-              <div className="flex flex-1 flex-col gap-6 px-8 pb-8 pt-6">
-                <div className="flex items-center gap-4">
-                  <span className="flex size-[28px] items-center justify-center rounded-full bg-[var(--color-button-primary-bg)] text-sm font-semibold text-[color:var(--color-white)]">{r.rank}</span>
-                  <Badge tone="brand">{`${["1st", "2nd", "3rd"].at(r.rank - 1)} place · ${money(HACKATHON.prizes.at(r.rank - 1) ?? 0)}`}</Badge>
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">{r.p.name}</p>
-                  <p className="text-md leading-md text-[color:var(--color-text-tertiary)]">{r.p.university || "Open category"}</p>
-                </div>
-                <dl className="grid grid-cols-3 gap-4">
-                  {[
-                    [r.pts, "points"],
-                    [r.p.products, "products"],
-                    [r.p.votes + extra(r.p), "votes"],
-                  ].map(([v, l]) => (
-                    <div key={l as string}>
-                      <dd className="font-display text-3xl font-semibold leading-3xl tabular-nums text-[color:var(--color-text-primary)]">{(v as number).toLocaleString("en-US")}</dd>
-                      <dt className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">{l}</dt>
-                    </div>
-                  ))}
-                </dl>
-                <div className="flex flex-wrap gap-3">
+      <ol className="m-0 mt-6 flex list-none flex-col p-0" aria-label="Builders by points">
+        {shown.map((r) => {
+          const podium = r.rank <= 3 && !open && !query;
+          return (
+            <li key={r.p.id} className={cn("flex items-center gap-4 rounded-2xl px-4 py-4 md:gap-6", podium && "bg-[color:color-mix(in_srgb,var(--color-violet-600)_10%,transparent)]")}>
+              <span className={cn("w-[28px] shrink-0 text-center font-display text-lg font-semibold tabular-nums", r.rank <= 3 ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-secondary)]")}>{r.rank}</span>
+              {r.p.project && r.rank <= 3 ? (
+                <button type="button" onClick={() => openProject(r)} aria-label={`Open ${r.p.project.name}`} className="size-[44px] shrink-0 overflow-hidden rounded-xl border-0 p-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={r.p.project.image} alt="" className="h-full w-full object-cover" />
+                </button>
+              ) : (
+                <Initials name={r.p.name} className="size-[44px] text-md" />
+              )}
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="truncate text-lg font-medium leading-lg text-[color:var(--color-text-primary)]">{r.p.name}</span>
+                  {r.p.moved ? (
+                    <span className={cn("shrink-0 text-sm font-medium leading-sm tabular-nums", r.p.moved > 0 ? "text-[color:var(--color-green-400)]" : "text-[color:var(--color-red-400)]")} aria-label={r.p.moved > 0 ? `up ${r.p.moved} places` : `down ${-r.p.moved} places`}>
+                      {r.p.moved > 0 ? "▲" : "▼"}
+                      {Math.abs(r.p.moved)}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-sm text-[color:var(--color-text-tertiary)]">
+                  <span className="truncate">{r.p.university || "Open category"}</span>
+                  <span aria-hidden>·</span>
+                  <span>{r.p.products} products</span>
                   {qualified(r.p) ? <Badge tone="success">Qualified</Badge> : null}
                   {now !== null && qualityOf(r.rank, now) === "Medium" ? <Badge tone="neutral">Medium quality</Badge> : null}
-                </div>
-                {r.p.project ? (
-                  <div className="mt-auto flex items-center gap-4 pt-2">
-                    <button type="button" onClick={() => openProject(r.p, r.rank)} className={cn(buttonVariants({ hierarchy: "secondary", size: "md" }), "min-w-0 flex-1 rounded-full")}>
-                      <span className="truncate">View {r.p.project.name}</span>
-                    </button>
-                    <VoteButton projectId={r.p.project.id} name={r.p.project.name} />
-                  </div>
-                ) : null}
+                </span>
               </div>
+              <span className="shrink-0 text-right">
+                <span className="block font-display text-2xl font-semibold leading-2xl tabular-nums text-[color:var(--color-text-primary)]">{r.pts.toLocaleString("en-US")}</span>
+                <span className="block text-xs leading-xs text-[color:var(--color-text-tertiary)]">points</span>
+              </span>
             </li>
-          ))}
-        </ol>
-      ) : null}
+          );
+        })}
+        {shown.length === 0 ? <li className="px-4 py-12 text-center text-md leading-md text-[color:var(--color-text-tertiary)]">No one matches “{q}”.</li> : null}
+      </ol>
 
-      {tab === "universities" ? (
-        <div className={cn("mt-16 overflow-hidden rounded-2xl", GLASS)}>
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">
-                <th className="px-8 py-6 font-medium">Rank</th>
-                <th className="px-8 py-6 font-medium">University</th>
-                <th className="px-8 py-6 text-right font-medium">Participants</th>
-                <th className="hidden px-8 py-6 text-right font-medium md:table-cell">Building</th>
-                <th className="px-8 py-6 text-right font-medium">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {unis.map((g, i) => (
-                <tr key={g.name} className="border-0 border-t border-solid border-[var(--color-border-default)] text-md leading-md text-[color:var(--color-text-primary)]">
-                  <td className="px-8 py-6 tabular-nums text-[color:var(--color-text-secondary)]">{i + 1}</td>
-                  <td className="px-8 py-6 font-medium">{g.name}</td>
-                  <td className="px-8 py-6 text-right tabular-nums">{g.people}</td>
-                  <td className="hidden px-8 py-6 text-right tabular-nums md:table-cell">{g.builders}</td>
-                  <td className="px-8 py-6 text-right font-semibold tabular-nums">{g.pts.toLocaleString("en-US")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="mt-16 flex flex-col gap-8">
-          <div className="flex flex-wrap items-center justify-between gap-6">
-            <SearchInput value={q} onValueChange={setQ} onClear={() => setQ("")} placeholder="Find your name or university" aria-label="Find your name or university" containerClassName="w-full md:w-[340px]" />
-            <p className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">
-              Qualified = {HACKATHON.minProducts}+ products built. The top {HACKATHON.shortlist} go to the judges.
-            </p>
-          </div>
-          <div className={cn("overflow-hidden rounded-2xl", GLASS)}>
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">
-                  <th className="w-[72px] px-8 py-6 font-medium">Rank</th>
-                  <th className="px-8 py-6 font-medium">Participant</th>
-                  <th className="hidden px-8 py-6 text-right font-medium md:table-cell">Products</th>
-                  <th className="px-8 py-6 text-right font-medium">Points</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((r) => (
-                  <tr key={r.p.id} className="border-0 border-t border-solid border-[var(--color-border-default)] align-middle text-md leading-md text-[color:var(--color-text-primary)]">
-                    <td className="px-8 py-6">
-                      <span className="flex items-center gap-3 tabular-nums">
-                        <span className="font-semibold">{r.rank}</span>
-                        {r.p.moved ? (
-                          <span className={cn("text-sm leading-sm", r.p.moved > 0 ? "text-[color:var(--color-green-400)]" : "text-[color:var(--color-red-400)]")} aria-label={r.p.moved > 0 ? `Up ${r.p.moved}` : `Down ${-r.p.moved}`}>
-                            {r.p.moved > 0 ? "▲" : "▼"}
-                            {Math.abs(r.p.moved)}
-                          </span>
-                        ) : null}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-6">
-                        <div className="min-w-0">
-                          <p className="font-medium">{r.p.name}</p>
-                          <p className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">{r.p.university || "Open category"}</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          {qualified(r.p) ? <Badge tone="success">Qualified</Badge> : null}
-                          {now !== null && qualityOf(r.rank, now) === "Medium" ? <Badge tone="neutral">Medium quality</Badge> : null}
-                          {r.p.project ? (
-                            <button type="button" onClick={() => openProject(r.p, r.rank)} className="border-0 bg-transparent p-0 text-sm font-medium leading-sm text-[color:var(--color-text-brand)] underline-offset-4 hover:underline">
-                              View project
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="hidden px-8 py-6 text-right tabular-nums md:table-cell">{r.p.products}</td>
-                    <td className="px-8 py-6 text-right font-semibold tabular-nums">{r.pts.toLocaleString("en-US")}</td>
-                  </tr>
-                ))}
-                {shown.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-8 py-12 text-center text-md leading-md text-[color:var(--color-text-tertiary)]">
-                      No one matches “{q}”.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-          {!query && found.length > ROWS ? (
-            <div className="flex justify-center">
-              <button type="button" onClick={() => setAll((v) => !v)} className={cn(buttonVariants({ hierarchy: "secondary", size: "lg" }), "rounded-full")}>
-                {all ? "Show fewer" : `Show all ${found.length}`}
-              </button>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </section>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 px-4 md:px-0">
+        <span className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">
+          Qualified = {HACKATHON.minProducts}+ products built.
+        </span>
+        {!query && found.length > ROWS ? (
+          <button type="button" onClick={() => setAll((v) => !v)} className="border-0 bg-transparent p-0 text-md font-semibold leading-md text-[color:var(--color-text-brand)] underline-offset-4 hover:underline">
+            {all ? "Show fewer" : `Show all ${found.length}`}
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }

@@ -4,7 +4,8 @@
 // primary on the page) and Vote. Join follows the account: signed out it is the
 // way in (Sign up, or Sign in once this browser has an account) and comes back
 // to join; signed in it opens the join step; joined it reads "Start building"
-// and goes to Home. Vote is open only while the hackathon is live.
+// and goes to Home. Vote is open only while the hackathon is live. On the
+// closing brand panel Join wears the DS inverse fill (violet on violet would vanish).
 
 import * as React from "react";
 import Link from "next/link";
@@ -19,40 +20,41 @@ type Size = "md" | "lg" | "xl" | "2xl";
 export const PRIMARY = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "primary", size }), "rounded-full");
 export const SECONDARY = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "secondary", size }), LANDING_SECONDARY);
 
-export function JoinButton({ size = "2xl", className }: { size?: Size; className?: string }) {
+export function JoinButton({ size = "2xl", tone = "default", className }: { size?: Size; tone?: "default" | "inverse"; className?: string }) {
   const { phase, entry, joinHref, openJoin } = useHackathon();
+  const look = tone === "inverse" ? cn(buttonVariants({ hierarchy: "inverse", size }), "rounded-full") : PRIMARY(size);
   if (entry.joined) {
     return (
-      <Link href="/" className={cn(PRIMARY(size), className)}>
+      <Link href="/" className={cn(look, className)}>
         Start building
       </Link>
     );
   }
   if (phase !== null && !canJoin(phase)) {
     return (
-      <span aria-disabled="true" className={cn(PRIMARY(size), "pointer-events-none opacity-50", className)}>
+      <span aria-disabled="true" className={cn(look, "pointer-events-none opacity-50", className)}>
         {phase === "soon" ? "Registration opens soon" : "Joining has closed"}
       </span>
     );
   }
   if (!entry.signedIn) {
     return (
-      <Link href={joinHref} className={cn(PRIMARY(size), className)}>
+      <Link href={joinHref} className={cn(look, className)}>
         Join the hackathon
       </Link>
     );
   }
   return (
-    <button type="button" onClick={openJoin} className={cn(PRIMARY(size), className)}>
+    <button type="button" onClick={openJoin} className={cn(look, className)}>
       Join the hackathon
     </button>
   );
 }
 
-/** Goes to the standings, where the votes are cast. */
+/** Goes to the shelf of products, where the votes are cast. */
 export function VoteLink({ size = "2xl", className }: { size?: Size; className?: string }) {
   return (
-    <a href="#leaderboard" className={cn(SECONDARY(size), className)}>
+    <a href="#vote" className={cn(SECONDARY(size), className)}>
       Vote for projects
     </a>
   );

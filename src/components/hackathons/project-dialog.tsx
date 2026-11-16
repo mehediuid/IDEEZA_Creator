@@ -1,21 +1,20 @@
 "use client";
 
-// A showcased project, opened from the standings: its picture, what it is, who
-// built it and where they stand, and the vote.
+// A showcased project, opened from the hero wall, the board or the vote
+// shelf: the product playing, what it is, who built it and where they stand,
+// and the vote. It reads the live row, so a vote cast here moves its numbers.
 
 import * as React from "react";
 import { ModalFrame } from "@/components/ideeza/dialog";
 import { Badge } from "@/components/ideeza/badge";
-import { HACKATHON, pointsOf, qualified, type Participant } from "@/lib/hackathons/vibe-inventing";
-import { useHackathon } from "./context";
+import { HACKATHON, qualified, type Row } from "@/lib/hackathons/vibe-inventing";
 import { VoteButton } from "./actions";
+import { ProductMedia } from "./parts";
 
-export function ProjectDialog({ item, onClose, container }: { item: { p: Participant; rank: number } | null; onClose: () => void; container: Element | null }) {
-  const { entry } = useHackathon();
-  const p = item?.p;
-  const proj = p?.project;
-  if (!p || !proj) return null;
-  const mine = entry.votes.includes(proj.id) ? 1 : 0;
+export function ProjectDialog({ row, onClose, container }: { row: Row | null; onClose: () => void; container: Element | null }) {
+  const proj = row?.p.project;
+  if (!row || !proj) return null;
+  const { p } = row;
   return (
     <ModalFrame
       open
@@ -27,25 +26,22 @@ export function ProjectDialog({ item, onClose, container }: { item: { p: Partici
       footer={
         <div className="flex w-full items-center justify-between gap-8">
           <span className="text-md leading-md text-[color:var(--color-text-secondary)]">
-            <b className="font-semibold text-[color:var(--color-text-primary)]">{(p.votes + mine).toLocaleString("en-US")}</b> votes
+            <b className="font-semibold text-[color:var(--color-text-primary)]">{row.votes.toLocaleString("en-US")}</b> votes
           </span>
           <VoteButton projectId={proj.id} name={proj.name} />
         </div>
       }
     >
       <div className="flex flex-col gap-8">
-        <div className="overflow-hidden rounded-2xl border border-solid border-[var(--color-border-default)] bg-[var(--color-bg-subtle)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={proj.image} alt={proj.name} className="block aspect-[4/3] w-full object-cover" />
-        </div>
+        <ProductMedia project={proj} className="relative aspect-[16/10] rounded-2xl border border-solid border-[var(--color-border-default)]" />
         <p className="text-lg leading-lg text-[color:var(--color-text-primary)]">{proj.summary}</p>
         <div className="flex flex-wrap gap-4">
-          <Badge tone="brand">#{item.rank} on the leaderboard</Badge>
-          <Badge tone="neutral">{pointsOf(p, mine).toLocaleString("en-US")} points</Badge>
+          <Badge tone="brand">#{row.rank} on the board</Badge>
+          <Badge tone="neutral">{row.pts.toLocaleString("en-US")} points</Badge>
           <Badge tone="neutral">{p.products} products</Badge>
           {qualified(p) ? <Badge tone="success">Qualified</Badge> : null}
         </div>
-        <p className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">Built with IDEEZA AI · Concept · PCB · Code · 3D. Sample project for {HACKATHON.name}.</p>
+        <p className="text-sm leading-sm text-[color:var(--color-text-tertiary)]">Built with IDEEZA AI: concept, PCB, code and 3D. Sample project for {HACKATHON.name}.</p>
       </div>
     </ModalFrame>
   );

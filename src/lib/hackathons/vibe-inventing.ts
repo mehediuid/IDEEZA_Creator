@@ -21,7 +21,7 @@ export type Participant = {
   /** Places moved since the last hourly update (+ up, − down). */
   moved: number;
   /** The participant's showcased product, when they have one. */
-  project?: { id: string; name: string; image: string; summary: string };
+  project?: { id: string; name: string; image: string; video: string; summary: string };
 };
 
 export const HACKATHON = {
@@ -85,16 +85,17 @@ const FIRST = ["Abel", "Bethlehem", "Dawit", "Eden", "Fikir", "Hanna", "Kaleb", 
 const LAST = ["Abebe", "Bekele", "Girma", "Haile", "Kebede", "Lemma", "Mekonnen", "Tadesse", "Tesfaye", "Worku", "Alemu", "Desta", "Gebre", "Assefa", "Mulugeta", "Negash"];
 
 // Showcased products: the platform's own sample products, so each has a real picture.
+// `clip` names the product's own video in /innovations/videos (<id>--<clip>.mp4).
 const PROJECTS = [
-  { id: "lora-weather-station", name: "LoRa weather station", summary: "A solar weather station that reports over LoRa from rooftops and farms." },
-  { id: "air-quality-room-sensor", name: "Air quality room sensor", summary: "Tells a classroom when to open a window, from CO2 and humidity." },
-  { id: "smart-plant-watering-hub", name: "Smart plant watering hub", summary: "Waters each pot by what its soil needs, not by a timer." },
-  { id: "solar-mppt-controller", name: "Solar MPPT controller", summary: "Gets more charge from a small panel into a battery." },
-  { id: "soil-moisture-mesh-network", name: "Soil moisture mesh network", summary: "Sensors across a field that pass readings to one gateway." },
-  { id: "line-following-micro-rover", name: "Line-following micro rover", summary: "A small rover that follows a taped line, built for teaching." },
-  { id: "self-balancing-two-wheeler", name: "Self-balancing two-wheeler", summary: "A two-wheeled robot that stays upright on its own." },
-  { id: "heart-rate-fitness-band", name: "Heart-rate fitness band", summary: "A band that reads heart rate and steps, and syncs to a phone." },
-  { id: "gesture-control-glove", name: "Gesture control glove", summary: "A glove that turns hand movements into commands." },
+  { id: "lora-weather-station", clip: "station", name: "LoRa weather station", summary: "A solar weather station that reports over LoRa from rooftops and farms." },
+  { id: "air-quality-room-sensor", clip: "sensor", name: "Air quality room sensor", summary: "Tells a classroom when to open a window, from CO2 and humidity." },
+  { id: "smart-plant-watering-hub", clip: "hub", name: "Smart plant watering hub", summary: "Waters each pot by what its soil needs, not by a timer." },
+  { id: "solar-mppt-controller", clip: "controller", name: "Solar MPPT controller", summary: "Gets more charge from a small panel into a battery." },
+  { id: "soil-moisture-mesh-network", clip: "gateway", name: "Soil moisture mesh network", summary: "Sensors across a field that pass readings to one gateway." },
+  { id: "line-following-micro-rover", clip: "rover", name: "Line-following micro rover", summary: "A small rover that follows a taped line, built for teaching." },
+  { id: "self-balancing-two-wheeler", clip: "robot", name: "Self-balancing two-wheeler", summary: "A two-wheeled robot that stays upright on its own." },
+  { id: "heart-rate-fitness-band", clip: "band", name: "Heart-rate fitness band", summary: "A band that reads heart rate and steps, and syncs to a phone." },
+  { id: "gesture-control-glove", clip: "glove", name: "Gesture control glove", summary: "A glove that turns hand movements into commands." },
 ] as const;
 
 function seeded(seed: number) {
@@ -149,9 +150,40 @@ export const PARTICIPANTS: Participant[] = (() => {
   const ps = makeParticipants(64).sort((a, b) => pointsOf(b) - pointsOf(a) || b.products - a.products);
   return ps.map((p, i) => {
     const proj = PROJECTS.at(i);
-    return proj && p.published > 0 ? { ...p, project: { ...proj, image: `/innovations/${proj.id}.png` } } : p;
+    if (!proj || p.published === 0) return p;
+    const { clip, ...rest } = proj;
+    return { ...p, project: { ...rest, image: `/innovations/${proj.id}.png`, video: `/innovations/videos/${proj.id}--${clip}.mp4` } };
   });
 })();
+
+/** One row of the standings, with this account's votes counted in. */
+export type Row = { p: Participant; pts: number; votes: number; rank: number };
+
+/** The standings, best first, counting `myVotes` (the project ids this account voted for). */
+export function standings(myVotes: readonly string[]): Row[] {
+  return PARTICIPANTS.map((p) => {
+    const extra = p.project && myVotes.includes(p.project.id) ? 1 : 0;
+    return { p, pts: pointsOf(p, extra), votes: p.votes + extra };
+  })
+    .sort((a, b) => b.pts - a.pts || b.p.products - a.p.products)
+    .map((r, i) => ({ ...r, rank: i + 1 }));
+}
+
+export type UniversityRow = { name: string; people: number; products: number; pts: number; leader: string };
+
+/** University vs university: each university's points are its participants' points summed. */
+export function universityStandings(rows: readonly Row[]): UniversityRow[] {
+  const m = new Map<string, UniversityRow>();
+  for (const r of rows) {
+    if (!r.p.university) continue;
+    const g = m.get(r.p.university) ?? { name: r.p.university, people: 0, products: 0, pts: 0, leader: r.p.name };
+    g.people += 1;
+    g.products += r.p.products;
+    g.pts += r.pts;
+    m.set(r.p.university, g);
+  }
+  return [...m.values()].sort((a, b) => b.pts - a.pts);
+}
 
 /** Qualified = built the hackathon's minimum number of products. */
 export const qualified = (p: Participant) => p.products >= HACKATHON.minProducts;
