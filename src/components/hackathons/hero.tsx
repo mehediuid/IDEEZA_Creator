@@ -6,8 +6,9 @@
 // own glow video, screen-blended so its black disappears), a big centred
 // headline under it, the lede and the two actions, and a dark violet-edged
 // panel rising from the bottom with a light line along its top edge. The
-// panel holds a futuristic invention stage, not an app or the page's product
-// photos (owner): IDEEZA's own premium renders (hero-showcase.tsx).
+// panel holds the page's own particle hologram — an idea becoming a PCB
+// becoming a product (hero-showcase.tsx), not an app, not the page's product
+// photos, not art the landing page already shows (owner).
 //
 // Sky: the stars are drawn once on a canvas; nothing in the sky is animated
 // in code — only the video moves it. The video plays on wide landscape

@@ -224,9 +224,7 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
 /* The hackathon hero's entrance (components/hackathons/hero.tsx, owner's
  * "Zapline" brief): one timeline. The headline wipes up line by line, then the
  * lede and buttons rise, then the dashboard rises and its parts settle in a
- * stagger (each element sets its own animation-delay). The hero's invention
- * stage floats its pieces (.ix-hk-float, each with its own duration, delay
- * and --tilt). Reduced motion gets
+ * stagger (each element sets its own animation-delay). Reduced motion gets
  * the end state at once (reset.css ends animations), so nothing waits on it. */
 @keyframes ix-hk-wipe {
   from {
@@ -257,20 +255,6 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
   to {
     opacity: 1;
   }
-}
-
-@keyframes ix-hk-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(var(--tilt, 0deg));
-  }
-  50% {
-    transform: translateY(-14px) rotate(var(--tilt, 0deg));
-  }
-}
-
-.ix-hk-float {
-  animation: ix-hk-float 6s ease-in-out infinite;
 }
 
 .ix-hk-wipe {
