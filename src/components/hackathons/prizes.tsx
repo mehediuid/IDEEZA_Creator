@@ -26,7 +26,8 @@ const PLACE = ["1st place", "2nd place", "3rd place"];
 /**
  * The section's background (owner 2026-11-16: the background from their brief,
  * nothing else on the section changes): the brief's particle-ribbon video at
- * full strength, no scrim, the full width of the page. Only its top and bottom
+ * full strength, no scrim, the full width of the page, graded into the site's
+ * violet-to-blue on its deep navy. Only its top and bottom
  * edges are masked into the page so the section has no seam. It loads when
  * the section comes near; with reduced motion one frame of it holds still.
  */
@@ -42,13 +43,20 @@ function PrizesBackdrop() {
     return () => io.disconnect();
   }, []);
   return (
-    <div ref={ref} aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 overflow-hidden bg-[var(--color-black)] [mask-image:linear-gradient(to_bottom,transparent,black_12%,black_88%,transparent)]">
+    <div ref={ref} aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -z-10 w-screen -translate-x-1/2 overflow-hidden bg-[var(--color-bg-page)] [mask-image:linear-gradient(to_bottom,transparent,black_12%,black_88%,transparent)]">
+      {/* Graded into the site's colours (owner: the white ribbon on pure black did not match the
+          rest of the site): inside the group, a violet-to-blue multiply layer tints the white
+          ribbon and leaves its black black; the group is screen-blended onto the page's own
+          deep navy, so that black becomes the page colour. No scrim — the light stays at full strength. */}
       {near ? (
-        still ? (
-          <video src={`${HERO_MEDIA.ribbon}#t=2`} muted playsInline preload="auto" className="h-full w-full object-cover" />
-        ) : (
-          <video src={HERO_MEDIA.ribbon} autoPlay muted loop playsInline className="h-full w-full object-cover" />
-        )
+        <div className="absolute inset-0 isolate mix-blend-screen">
+          {still ? (
+            <video src={`${HERO_MEDIA.ribbon}#t=2`} muted playsInline preload="auto" className="h-full w-full object-cover" />
+          ) : (
+            <video src={HERO_MEDIA.ribbon} autoPlay muted loop playsInline className="h-full w-full object-cover" />
+          )}
+          <div className="absolute inset-0 bg-[linear-gradient(100deg,var(--color-violet-500)_0%,var(--color-violet-400)_35%,var(--color-violet-300)_60%,var(--color-blue-400)_100%)] mix-blend-multiply" />
+        </div>
       ) : null}
     </div>
   );
@@ -91,7 +99,7 @@ export function Prizes() {
                     )}
                   </button>
                 ) : null}
-                <span className="max-w-full truncate rounded-xl bg-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] px-2 py-1 text-lg font-medium leading-lg text-[color:var(--color-white)] backdrop-blur-[8px] md:px-3 md:text-2xl md:leading-2xl">{r ? r.p.name : PLACE.at(i)}</span>
+                <span className="max-w-full truncate rounded-xl bg-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] px-2 py-1 text-lg max-md:whitespace-normal max-md:[overflow-wrap:anywhere] font-medium leading-lg text-[color:var(--color-white)] backdrop-blur-[8px] md:px-3 md:text-2xl md:leading-2xl">{r ? r.p.name : PLACE.at(i)}</span>
                 <span className="rounded-xl border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_62%,transparent)] px-3 py-1 backdrop-blur-[8px] text-md font-semibold leading-md tabular-nums text-[color:var(--color-white)] md:px-5 md:py-2 md:text-xl md:leading-xl">
                   {amount.toLocaleString("en-US")} <span className="font-regular text-[color:var(--color-text-secondary)]">{HACKATHON.currency}</span>
                 </span>
