@@ -28,6 +28,7 @@ const LINKS: NavLink[] = [
   { label: "Airdrop" },
   { label: "NFT Marketplace", href: "/marketplace" },
   { label: "I'm Manufacturer" },
+  { label: "Hackathons", href: "/hackathons" },
   { label: "Pricing", href: "/settings/plan" },
   { label: "ICO", href: "/balance/buy" },
   { label: "About Us" },

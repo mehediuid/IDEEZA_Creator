@@ -63,6 +63,7 @@ ideeza-creator-panel/
    │  │                      sign in), the 3D stage beside them, the Demo email, AuthGate +
    │  │                      useSignOut, Home's SourceNudge
    │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), hero-glow (its wash, shared with sign-in), deliverable-icon, command-palette (⌘K)
+   │  ├─ hackathons/         the public hackathon page /hackathons (data: lib/hackathons/)
    │  ├─ landing/            the public landing page /landing: nav, section-header, one file per section (art: public/landing/); events/ = /events + /events/[slug] (photos: public/events/)
    │  ├─ mobile/             the /m mobile prototype: phone frame, status bar, top bar, tab bar,
    │  │                      screen; kit/ = the Shared kit (sheets, menus, confirms, report, toasts, states);
