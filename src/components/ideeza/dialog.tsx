@@ -80,6 +80,9 @@ export interface ModalFrameProps {
   /** A full-bleed band in place of the header (an offer's art, on the brand stage): it holds the
    *  heading `labelledBy` names, and ✕ sits over it in white. */
   hero?: React.ReactNode;
+  /** Where the dialog mounts (default document.body) — a page that pins its own
+   *  data-theme on a wrapper mounts it inside, so the dialog takes that theme. */
+  container?: Element | null;
 }
 
 export function ModalFrame({
@@ -101,6 +104,7 @@ export function ModalFrame({
   icon,
   bodyContinuesHeader = false,
   hero,
+  container,
 }: ModalFrameProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
@@ -197,7 +201,7 @@ export function ModalFrame({
         )}
       </div>
     </div>,
-    document.body,
+    container ?? document.body,
   );
 }
 
