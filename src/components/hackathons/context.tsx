@@ -1,20 +1,27 @@
 "use client";
 
-// One provider for the hackathon page: the clock (ticks each second on the
-// client, null under SSR so nothing mismatches), the phase it puts the event
-// in, the account's entry (joined / votes), the standings with this account's
-// votes counted in (one board for every section, so no two numbers disagree),
-// and the two dialogs every section can open — Join and a showcased project.
+// One provider for a hackathon's page: the hackathon itself (its campaign,
+// picked by the page's link — every section reads its words and numbers from
+// it), the clock (ticks each second on the client, null under SSR so nothing
+// mismatches), the phase it puts the event in, the account's entry in this
+// hackathon (joined / votes), the standings with this account's votes counted
+// in (one board for every section, so no two numbers disagree), and the two
+// dialogs every section can open — Join and a showcased project.
 
 import * as React from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEntry } from "@/components/auth/use-entry";
 import { useHackathonEntry } from "@/lib/hackathons/entry";
-import { HACKATHON, groupStandings, phaseAt, standings, type GroupRow, type Phase, type Row, type Unit } from "@/lib/hackathons/vibe-inventing";
+import { hackathonBySlug } from "@/lib/hackathons/campaigns";
+import { VIBE_INVENTING, campaignOf, groupStandings, type Campaign, type GroupRow, type Phase, type Row, type Unit } from "@/lib/hackathons/vibe-inventing";
 import { JoinDialog } from "./join-dialog";
 import { ProjectDialog } from "./project-dialog";
 
 type Ctx = {
+  /** The hackathon this page shows, and everything derived from its record. */
+  c: Campaign;
+  /** Its page: /hackathons/<slug>. */
+  path: string;
   now: number | null;
   phase: Phase | null;
   entry: ReturnType<typeof useHackathonEntry>;
@@ -22,8 +29,10 @@ type Ctx = {
   joinHref: string;
   /** Signed out: the way in that comes back to the products to vote. */
   voteHref: string;
-  /** Every participant, best first. */
+  /** Every participant, best first (none before building starts). */
   board: Row[];
+  /** The Vote shelf is shown: products to vote for, outside 1 vs 1 (there the matches take the votes). */
+  shelf: boolean;
   /** The group ranking (empty when the hackathon has no groups). */
   groups: GroupRow[];
   /** The style shown: the campaign's own, or the one picked on the prototype switch. */
@@ -48,15 +57,21 @@ export function useHackathon(): Ctx {
   return c;
 }
 
-export function HackathonProvider({ children }: { children: React.ReactNode }) {
+/** The hackathon this page shows (its record as HACKATHON, its words, board and dates). */
+export const useCampaign = (): Campaign => useHackathon().c;
+
+export function HackathonProvider({ slug, children }: { slug: string; children: React.ReactNode }) {
+  const c = campaignOf(hackathonBySlug(slug) ?? VIBE_INVENTING);
+  const path = `/hackathons/${c.HACKATHON.slug}`;
   const now = React.useSyncExternalStore(subscribeClock, clockNow, () => null);
-  const phase = now === null ? null : phaseAt(now);
-  const entry = useHackathonEntry();
+  const phase = now === null ? null : c.phaseAt(now);
+  const entry = useHackathonEntry(c.HACKATHON);
   const { into } = useEntry();
   const [joinOpen, setJoinOpen] = React.useState(false);
   const [projectId, setProjectId] = React.useState<string | null>(null);
-  const [unit, setUnit] = React.useState<Unit>(HACKATHON.unit);
-  const board = React.useMemo(() => standings(entry.votes), [entry.votes]);
+  const [unit, setUnit] = React.useState<Unit>(c.HACKATHON.unit);
+  const board = React.useMemo(() => c.standings(entry.votes), [c, entry.votes]);
+  const shelf = unit !== "duel" && board.some((r) => r.p.project);
   const groups = React.useMemo(() => groupStandings(board), [board]);
   // The open project is read from the board, so its votes and rank follow a vote cast in the dialog.
   const project = projectId ? (board.find((r) => r.p.id === projectId) ?? null) : null;
@@ -71,16 +86,19 @@ export function HackathonProvider({ children }: { children: React.ReactNode }) {
   const autoJoin = backToJoin && entry.ready && entry.signedIn && !entry.joined;
   const closeJoin = () => {
     setJoinOpen(false);
-    if (backToJoin) router.replace("/hackathons", { scroll: false });
+    if (backToJoin) router.replace(path, { scroll: false });
   };
 
   const value: Ctx = {
+    c,
+    path,
     now,
     phase,
     entry,
-    joinHref: into("/hackathons?join=1"),
-    voteHref: into(unit === "duel" ? "/hackathons#leaderboard" : "/hackathons#vote"),
+    joinHref: into(`${path}?join=1`),
+    voteHref: into(`${path}${shelf ? "#vote" : "#leaderboard"}`),
     board,
+    shelf,
     groups,
     unit,
     setUnit,
@@ -119,9 +137,4 @@ function subscribeMotion(on: () => void) {
 }
 export function useReducedMotion(): boolean {
   return React.useSyncExternalStore(subscribeMotion, () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => true);
-}
-
-/** "16 Nov, 09:00" in the hackathon's own time zone. */
-export function eat(ms: number): string {
-  return new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: HACKATHON.timeZone });
 }

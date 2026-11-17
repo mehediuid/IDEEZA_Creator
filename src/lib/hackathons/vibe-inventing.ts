@@ -1,12 +1,14 @@
-// The public hackathon page's data — one campaign (client 2026-11-17: "think
-// about it like a campaign page: the style and the layout look exactly the
-// same, but the data inside the page comes from the exact campaign"). The
-// organizer designs the hackathon in the "IDEEZA Hackathons" prototype's setup;
-// every word and number the page shows that depends on that setup is read from
-// the record below, never typed in a section. The record is the prototype's
-// Ethiopia launch (the running hackathon). The standings are SAMPLE data, made
-// here from a seeded walk so every visit draws the same board, and every
-// figure on the page is derived from these rows, never typed beside them.
+// A hackathon's data — one campaign record (client 2026-11-17: "think about it
+// like a campaign page: the style and the layout look exactly the same, but
+// the data inside the page comes from the exact campaign"). The organizer
+// designs the hackathon in the "IDEEZA Hackathons" prototype's setup; every
+// word and number a hackathon's page shows that depends on that setup is read
+// from its record, never typed in a section. campaignOf(record) gives a page
+// everything it derives from one record (its groups' words, its board, its
+// dates in its own time zone…); the list of hackathons is in campaigns.ts.
+// The standings are SAMPLE data, made from a seeded walk so every visit draws
+// the same board, and every figure is derived from these rows, never typed
+// beside them.
 
 export type Phase = "soon" | "registration" | "live" | "judging" | "results";
 
@@ -19,6 +21,12 @@ export type WinBy = "score" | "shortlist" | "points";
 
 export type Hackathon = {
   id: string;
+  /** Its page's address: /hackathons/<slug>. */
+  slug: string;
+  /** A prototype sample (not a real campaign): the list and its page say so. */
+  sample: boolean;
+  /** The picture on its card in the list (one of the hackathon pages' own media). */
+  cover: string;
   name: string;
   /** The name where the full one would not fit on a phone's line. */
   shortName: string;
@@ -63,6 +71,12 @@ export type Hackathon = {
   criteria: { name: string; weight: number }[];
   judges: { name: string; role: string }[];
   rules: string;
+  /**
+   * The prototype's sample board: how many participants, the seed of the draw,
+   * and which sample product the leader shows (0 = the first). Before building
+   * starts a board has no entries (0).
+   */
+  board: { entrants: number; seed: number; firstProduct: number };
 };
 
 export type Participant = {
@@ -81,8 +95,12 @@ export type Participant = {
   project?: { id: string; name: string; image: string; thumb: string; video: string; summary: string };
 };
 
-export const HACKATHON: Hackathon = {
+/** The running hackathon: the prototype's Ethiopia launch. */
+export const VIBE_INVENTING: Hackathon = {
   id: "vibe-inventing-2026",
+  slug: "vibe-inventing-ethiopia",
+  sample: false,
+  cover: "/hackathons/covers/vibe-inventing-ethiopia.webp",
   name: "IDEEZA Vibe Inventing Online Hackathon",
   shortName: "Vibe Inventing Hackathon",
   lead: "A 160-hour online hackathon. Build products with IDEEZA AI, publish them to Give to Community, collect votes and climb the leaderboard.",
@@ -144,39 +162,19 @@ export const HACKATHON: Hackathon = {
   ],
   rules:
     "Open to participants in Ethiopia aged 18 or over. Only products published to Give to Community after joining, while the hackathon is live, count as entries. One account per person. Suspicious votes and referrals are reviewed and can be removed. Winners agree to the use of their name and photo.",
+  board: { entrants: 64, seed: 7, firstProduct: 0 },
 };
 
-export const POINTS = HACKATHON.points;
+/** The words for a hackathon's groups (null when it has none). */
+const GROUP_WORDS = {
+  none: null,
+  university: { one: "university", many: "universities", title: "University", member: "student", members: "students", outside: "Not at a university" },
+  country: { one: "country", many: "countries", title: "Country", member: "participant", members: "participants", outside: "Not from these countries" },
+  custom: { one: "group", many: "groups", title: "Group", member: "member", members: "members", outside: "Not in a group" },
+} as const;
 
-/** The words the page uses for the hackathon's groups (null when there are none). */
-export const GROUP = (
-  {
-    none: null,
-    university: { one: "university", many: "universities", title: "University", member: "student", members: "students", outside: "Not at a university" },
-    country: { one: "country", many: "countries", title: "Country", member: "participant", members: "participants", outside: "Not from these countries" },
-    custom: { one: "group", many: "groups", title: "Group", member: "member", members: "members", outside: "Not in a group" },
-  } as const
-)[HACKATHON.groupBy];
-
-// The style can be switched on the page (owner 2026-11-17: the prototype must show
-// every style), so the words that follow it take the style being shown.
-
-/** The words for who competes: one person, or one team. */
+/** The words for who competes: one person, or one team (the style can be switched on the page). */
 export const entrantOf = (unit: Unit) => (unit === "team" ? { one: "team", many: "teams", title: "Team" } : { one: "builder", many: "builders", title: "Builder" });
-
-/** "Individuals", "Teams of 2–5", "1 vs 1" — the prototype's format names. */
-export const unitLabel = (unit: Unit) => (unit === "team" ? `Teams of ${HACKATHON.teamMin}–${HACKATHON.teamMax}` : unit === "duel" ? "1 vs 1" : "Individuals");
-
-/** How you compete, in the prototype's words. */
-export const competeLine = (unit: Unit) =>
-  unit === "team"
-    ? `You compete as a team of ${HACKATHON.teamMin} to ${HACKATHON.teamMax} people`
-    : unit === "duel"
-      ? "You compete head-to-head: one opponent per round, and the winner advances"
-      : "You compete as an individual";
-
-/** Where a participant competes, as a line: their group, the open category, or nothing without groups. */
-export const groupOf = (p: Participant) => (GROUP ? p.group || "Open category" : "");
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 /** 3 → "three" (up to ten; then the figure). */
@@ -209,8 +207,8 @@ function seeded(seed: number) {
   };
 }
 
-function makeParticipants(n: number): Participant[] {
-  const r = seeded(7);
+function makeParticipants(h: Hackathon, n: number): Participant[] {
+  const r = seeded(h.board.seed);
   const out: Participant[] = [];
   const used = new Set<string>();
   for (let i = 0; i < n; i++) {
@@ -225,7 +223,7 @@ function makeParticipants(n: number): Participant[] {
       id: `p${i + 1}`,
       name,
       // The same draws whatever the groups (so the board stays the same); "" without groups.
-      group: r() < 0.2 ? "" : (HACKATHON.groups.at(Math.floor(r() * r() * HACKATHON.groups.length)) ?? ""),
+      group: r() < 0.2 ? "" : (h.groups.at(Math.floor(r() * r() * h.groups.length)) ?? ""),
       products,
       published,
       votes: published ? Math.round(q * q * 320 * (0.5 + r())) : 0,
@@ -237,44 +235,8 @@ function makeParticipants(n: number): Participant[] {
   return out;
 }
 
-export function pointsOf(p: Participant, extraVotes = 0): number {
-  return (
-    p.products * POINTS.build +
-    p.published * POINTS.publish +
-    (p.votes + extraVotes) * POINTS.vote +
-    p.referrals * POINTS.referral +
-    p.buildDays * POINTS.buildDay
-  );
-}
-
-/** The board, best first, with the showcased products given to the leaders. */
-export const PARTICIPANTS: Participant[] = (() => {
-  const ps = makeParticipants(64).sort((a, b) => pointsOf(b) - pointsOf(a) || b.products - a.products);
-  return ps.map((p, i) => {
-    const proj = PROJECTS.at(i);
-    if (!proj || p.published === 0) return p;
-    const { clip, ...rest } = proj;
-    // Pictures are small WebP copies of the Innovations PNGs (720 px card, 192 px avatar):
-    // the 1024 px PNGs weighed 1–1.5 MB each, about 10 MB for the page.
-    return {
-      ...p,
-      project: { ...rest, image: `/hackathons/products/${proj.id}.webp`, thumb: `/hackathons/products/${proj.id}-thumb.webp`, video: `/innovations/videos/${proj.id}--${clip}.mp4` },
-    };
-  });
-})();
-
 /** One row of the standings, with this account's votes counted in. */
 export type Row = { p: Participant; pts: number; votes: number; rank: number };
-
-/** The standings, best first, counting `myVotes` (the project ids this account voted for). */
-export function standings(myVotes: readonly string[]): Row[] {
-  return PARTICIPANTS.map((p) => {
-    const extra = p.project && myVotes.includes(p.project.id) ? 1 : 0;
-    return { p, pts: pointsOf(p, extra), votes: p.votes + extra };
-  })
-    .sort((a, b) => b.pts - a.pts || b.p.products - a.p.products)
-    .map((r, i) => ({ ...r, rank: i + 1 }));
-}
 
 export type GroupRow = { name: string; people: number; products: number; pts: number; leader: string };
 
@@ -309,17 +271,8 @@ export function matchesOf(rows: readonly Row[]): Match[] {
   return out;
 }
 
-/** Qualified = built the hackathon's minimum number of products. */
-export const qualified = (p: Participant) => p.products >= HACKATHON.minProducts;
-
-/** The AI quality a rank builds with (the top move up near the end, when the hackathon has that unlock). */
-export function qualityOf(rank: number, now: number): string {
-  const u = HACKATHON.aiUnlock;
-  return u && rank <= u.top && HACKATHON.dates.end - now <= u.lastDays * 86_400_000 ? u.quality : HACKATHON.baseQuality;
-}
-
-export function phaseAt(now: number): Phase {
-  const d = HACKATHON.dates;
+function phaseOf(h: Hackathon, now: number): Phase {
+  const d = h.dates;
   if (now < d.registration) return "soon";
   if (now < d.start) return "registration";
   if (now < d.end) return "live";
@@ -327,6 +280,80 @@ export function phaseAt(now: number): Phase {
   return "results";
 }
 
-export const prizePool = HACKATHON.prizes.reduce((s, x) => s + x, 0);
+const campaigns = new Map<string, ReturnType<typeof makeCampaign>>();
 
-export const money = (n: number) => `${n.toLocaleString("en-US")} ${HACKATHON.currency}`;
+/** Everything a page derives from one hackathon's record (made once per hackathon). */
+export function campaignOf(h: Hackathon) {
+  const known = campaigns.get(h.id);
+  if (known) return known;
+  const c = makeCampaign(h);
+  campaigns.set(h.id, c);
+  return c;
+}
+export type Campaign = ReturnType<typeof campaignOf>;
+
+function makeCampaign(h: Hackathon) {
+  const POINTS = h.points;
+  const GROUP = GROUP_WORDS[h.groupBy];
+
+  const pointsOf = (p: Participant, extraVotes = 0): number =>
+    p.products * POINTS.build + p.published * POINTS.publish + (p.votes + extraVotes) * POINTS.vote + p.referrals * POINTS.referral + p.buildDays * POINTS.buildDay;
+
+  /** The board, best first, with the showcased products given to the leaders. */
+  const PARTICIPANTS: Participant[] = makeParticipants(h, h.board.entrants)
+    .sort((a, b) => pointsOf(b) - pointsOf(a) || b.products - a.products)
+    .map((p, i) => {
+      const proj = i < PROJECTS.length ? PROJECTS.at((i + h.board.firstProduct) % PROJECTS.length) : undefined;
+      if (!proj || p.published === 0) return p;
+      const { clip, ...rest } = proj;
+      // Pictures are small WebP copies of the Innovations PNGs (720 px card, 192 px avatar):
+      // the 1024 px PNGs weighed 1–1.5 MB each, about 10 MB for the page.
+      return {
+        ...p,
+        project: { ...rest, image: `/hackathons/products/${proj.id}.webp`, thumb: `/hackathons/products/${proj.id}-thumb.webp`, video: `/innovations/videos/${proj.id}--${clip}.mp4` },
+      };
+    });
+
+  return {
+    HACKATHON: h,
+    POINTS,
+    /** The words the page uses for the hackathon's groups (null when there are none). */
+    GROUP,
+    /** "Individuals", "Teams of 2–5", "1 vs 1" — the prototype's format names. */
+    unitLabel: (unit: Unit) => (unit === "team" ? `Teams of ${h.teamMin}–${h.teamMax}` : unit === "duel" ? "1 vs 1" : "Individuals"),
+    /** How you compete, in the prototype's words. */
+    competeLine: (unit: Unit) =>
+      unit === "team"
+        ? `You compete as a team of ${h.teamMin} to ${h.teamMax} people`
+        : unit === "duel"
+          ? "You compete head-to-head: one opponent per round, and the winner advances"
+          : "You compete as an individual",
+    /** Where a participant competes, as a line: their group, the open category, or nothing without groups. */
+    groupOf: (p: Participant) => (GROUP ? p.group || "Open category" : ""),
+    pointsOf,
+    PARTICIPANTS,
+    /** The standings, best first, counting `myVotes` (the project ids this account voted for). */
+    standings: (myVotes: readonly string[]): Row[] =>
+      PARTICIPANTS.map((p) => {
+        const extra = p.project && myVotes.includes(p.project.id) ? 1 : 0;
+        return { p, pts: pointsOf(p, extra), votes: p.votes + extra };
+      })
+        .sort((a, b) => b.pts - a.pts || b.p.products - a.p.products)
+        .map((r, i) => ({ ...r, rank: i + 1 })),
+    /** Qualified = built the hackathon's minimum number of products. */
+    qualified: (p: Participant) => p.products >= h.minProducts,
+    /** The AI quality a rank builds with (the top move up near the end, when the hackathon has that unlock). */
+    qualityOf: (rank: number, now: number): string => {
+      const u = h.aiUnlock;
+      return u && rank <= u.top && h.dates.end - now <= u.lastDays * 86_400_000 ? u.quality : h.baseQuality;
+    },
+    phaseAt: (now: number) => phaseOf(h, now),
+    prizePool: h.prizes.reduce((s, x) => s + x, 0),
+    money: (n: number) => `${n.toLocaleString("en-US")} ${h.currency}`,
+    /** "16 Nov, 09:00" in the hackathon's own time zone. */
+    eat: (ms: number) => new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: h.timeZone }),
+  };
+}
+
+/** A hackathon's phase at `now` (the list reads it without making the whole campaign). */
+export const phaseAt = phaseOf;

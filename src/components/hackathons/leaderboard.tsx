@@ -10,6 +10,8 @@
 //    the ranking has the width to itself.
 //  - Group league: points as bars against the leader, people and products
 //    under each name.
+//  - Before building starts the board has no entries: one state card in its
+//    place (when it starts, and Join), not empty tables.
 //  - People: rank, movement since the last update, name and campus, products,
 //    points; the top three carry their product's picture. Search finds a name,
 //    "Open category" filters, "Show all" opens the rest.
@@ -22,25 +24,29 @@ import { SearchInput } from "@/components/ideeza/search-input";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, ArrowRight01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { GROUP, HACKATHON, entrantOf, groupOf, matchesOf, qualified, qualityOf, type Row, type Unit } from "@/lib/hackathons/vibe-inventing";
-import { useHackathon } from "./context";
-import { VoteButton } from "./actions";
+import { entrantOf, matchesOf, type Campaign, type Row, type Unit } from "@/lib/hackathons/vibe-inventing";
+import { useCampaign, useHackathon } from "./context";
+import { JoinButton, VoteButton } from "./actions";
 import { VotesLeft } from "./vote";
 import { Heading, Initials, SECTION, SURFACE } from "./parts";
 
 const ROWS = 10;
 
 /** The section's title and lead for the style shown. */
-function headingFor(unit: Unit): [string, string] {
+function headingFor({ HACKATHON, GROUP }: Campaign, unit: Unit, ended: boolean): [string, string] {
   if (unit === "duel") return ["Head-to-head matches", "Two products a match, decided by votes. The winner goes to the next round."];
+  // Once building has ended the board is final, no longer updated.
+  const when = ended ? "Final standings" : "Updated every hour";
   const toJudges = HACKATHON.winBy === "shortlist" ? `; the top ${HACKATHON.shortlist} ${unit === "team" ? "teams" : "people"} go to the judges` : "";
-  if (GROUP) return [`Which ${GROUP.one} builds best?`, `Every point a ${GROUP.member} earns counts for their ${GROUP.one}. Updated every hour${toJudges}.`];
-  return ["Leaderboard", `${entrantOf(unit).title}s ranked by points. Updated every hour${toJudges}.`];
+  if (GROUP) return [`Which ${GROUP.one} builds best?`, `Every point a ${GROUP.member} earns counts for their ${GROUP.one}. ${when}${toJudges}.`];
+  return ["Leaderboard", `${entrantOf(unit).title}s ranked by points. ${when}${toJudges}.`];
 }
 
 export function Leaderboard() {
-  const { board, groups, unit } = useHackathon();
-  const [title, lead] = headingFor(unit);
+  const { c, board, groups, phase, unit } = useHackathon();
+  const { GROUP } = c;
+  const [title, lead] = headingFor(c, unit, phase === "judging" || phase === "results");
+  const empty = board.length === 0;
   const entrant = entrantOf(unit);
   const products = board.reduce((s, r) => s + r.p.products, 0);
   const votes = board.reduce((s, r) => s + r.votes, 0);
@@ -52,7 +58,7 @@ export function Leaderboard() {
         title={title}
         lead={lead}
         aside={
-          // 1 vs 1: the votes are cast here, so the voter's count sits here.
+          empty ? null : // 1 vs 1: the votes are cast here, so the voter's count sits here.
           unit === "duel" ? (
             <VotesLeft />
           ) : (
@@ -72,7 +78,9 @@ export function Leaderboard() {
         }
       />
 
-      {unit === "duel" ? (
+      {empty ? (
+        <NoEntries />
+      ) : unit === "duel" ? (
         <Matches board={board} />
       ) : (
         <div className={cn("mt-24 grid grid-cols-1 gap-10 md:mt-32 lg:gap-12", GROUP && "lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]")}>
@@ -80,8 +88,24 @@ export function Leaderboard() {
           <People board={board} />
         </div>
       )}
-      <p className="mt-10 text-md leading-md text-[color:var(--color-text-tertiary)]">Standings on this page are sample data.</p>
+      {empty ? null : <p className="mt-10 text-md leading-md text-[color:var(--color-text-tertiary)]">Standings on this page are sample data.</p>}
     </section>
+  );
+}
+
+/** Before building starts: nobody has built yet, so the board is one state card — when it fills, and Join. */
+function NoEntries() {
+  const { c, unit } = useHackathon();
+  return (
+    <div className={cn("mt-24 flex flex-col items-start gap-8 rounded-3xl px-10 py-16 md:mt-32 md:px-16 md:py-20", SURFACE)}>
+      <div className="flex flex-col gap-4">
+        <h3 className="text-3xl font-semibold leading-3xl text-[color:var(--color-text-primary)]">No entries yet</h3>
+        <p className="max-w-[640px] text-xl leading-xl text-[color:var(--color-text-secondary)]">
+          {unit === "duel" ? "The first matches appear" : "The board fills"} once building starts on {c.eat(c.HACKATHON.dates.start)} ({c.HACKATHON.tzShort}). Join now and you build from the first hour.
+        </p>
+      </div>
+      <JoinButton size="xl" />
+    </div>
   );
 }
 
@@ -117,7 +141,8 @@ function Matches({ board }: { board: Row[] }) {
 }
 
 function MatchSide({ r, leads, end }: { r: Row; leads: boolean; end?: boolean }) {
-  const { openProject } = useHackathon();
+  const { c, openProject } = useHackathon();
+  const { groupOf } = c;
   const proj = r.p.project;
   if (!proj) return null;
   return (
@@ -144,6 +169,7 @@ function MatchSide({ r, leads, end }: { r: Row; leads: boolean; end?: boolean })
 const PHONE_GROUPS = 6;
 
 function GroupLeague({ groups }: { groups: ReturnType<typeof useHackathon>["groups"] }) {
+  const { GROUP } = useCampaign();
   const max = groups[0]?.pts || 1;
   const [all, setAll] = React.useState(false);
   if (!GROUP) return null;
@@ -181,7 +207,8 @@ function GroupLeague({ groups }: { groups: ReturnType<typeof useHackathon>["grou
 }
 
 function People({ board }: { board: Row[] }) {
-  const { now, openProject, unit } = useHackathon();
+  const { c, now, openProject, unit } = useHackathon();
+  const { HACKATHON, GROUP, groupOf, qualified, qualityOf } = c;
   const entrant = entrantOf(unit);
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");

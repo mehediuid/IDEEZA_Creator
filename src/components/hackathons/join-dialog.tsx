@@ -12,13 +12,13 @@ import { Select } from "@/components/ideeza/select";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { buttonVariants } from "@/components/ideeza/button";
 import { cn } from "@/lib/utils";
-import { GROUP, HACKATHON, competeLine } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
 
 const OPEN = "__open";
 
 export function JoinDialog({ open, onClose, container }: { open: boolean; onClose: () => void; container: Element | null }) {
-  const { entry, unit } = useHackathon();
+  const { c, entry, path, unit } = useHackathon();
+  const { HACKATHON, GROUP, competeLine } = c;
   const [group, setGroup] = React.useState("");
   const [eligible, setEligible] = React.useState(false);
   const [tried, setTried] = React.useState(false);
@@ -27,7 +27,7 @@ export function JoinDialog({ open, onClose, container }: { open: boolean; onClos
   const link =
     typeof window === "undefined" || !entry.joined
       ? ""
-      : `${window.location.origin}/hackathons?ref=${encodeURIComponent(entry.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}`;
+      : `${window.location.origin}${path}?ref=${encodeURIComponent(entry.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}`;
 
   const close = () => {
     setTried(false);

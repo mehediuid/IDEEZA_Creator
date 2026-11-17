@@ -9,12 +9,13 @@
 //  - Closing: full screen over the owner's wave video — the clock and Join again.
 
 import * as React from "react";
+import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { GROUP, HACKATHON, competeLine, inWords, money, prizePool, type Phase } from "@/lib/hackathons/vibe-inventing";
-import { countdownParts, eat, useHackathon, useReducedMotion } from "./context";
-import { JoinButton, VoteLink } from "./actions";
+import { inWords, type Campaign, type Phase } from "@/lib/hackathons/vibe-inventing";
+import { countdownParts, useHackathon, useReducedMotion } from "./context";
+import { INVERSE, JoinButton, VoteLink } from "./actions";
 import { Heading, Initials, SECTION } from "./parts";
 
 const ANCHORS = [
@@ -28,7 +29,7 @@ const ANCHORS = [
 
 /** The page's own bar, under the site's: its sections and Join. */
 export function SectionNav() {
-  const { unit } = useHackathon();
+  const { shelf, unit } = useHackathon();
   const [active, setActive] = React.useState<string>("");
   const list = React.useRef<HTMLUListElement>(null);
   // On a phone the anchors scroll sideways: keep the lit one in view as the page moves on.
@@ -50,15 +51,15 @@ export function SectionNav() {
     );
     els.forEach((e) => io.observe(e));
     return () => io.disconnect();
-  }, [unit]);
+  }, [unit, shelf]);
   return (
     <div className="sticky top-[80px] z-[5] border-0 border-y border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_86%,transparent)] backdrop-blur-[24px]">
       {/* Phones: a 56 px bar (with the site bar's 80, the two took 18 % of the screen at 68);
           the anchor row fades at its right edge so the hidden ones read as "more". */}
       <nav aria-label="On this page" className="mx-auto flex h-[56px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 md:h-[68px] min-[1292px]:px-0">
         <ul ref={list} className="m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0 pr-10 [scrollbar-width:none] max-md:[mask-image:linear-gradient(to_right,black_82%,transparent)] md:gap-2 md:pr-0">
-          {/* 1 vs 1 has no Vote section: the votes are cast in the matches. */}
-          {ANCHORS.filter(([id]) => !(id === "vote" && unit === "duel")).map(([id, label]) => (
+          {/* No Vote section in 1 vs 1 (the votes are cast in the matches) or before there is a product. */}
+          {ANCHORS.filter(([id]) => id !== "vote" || shelf).map(([id, label]) => (
             <li key={id}>
               <a
                 href={`#${id}`}
@@ -82,7 +83,8 @@ export function SectionNav() {
 const CRITERIA_FILL = ["bg-[var(--color-violet-600)]", "bg-[var(--color-violet-400)]", "bg-[var(--color-blue-400)]"];
 
 export function WhoAndJudging() {
-  const { unit } = useHackathon();
+  const { c, unit } = useHackathon();
+  const { HACKATHON, GROUP, competeLine } = c;
   const judged = HACKATHON.winBy !== "points";
   const who = [
     `${HACKATHON.minAge} or older, living in ${HACKATHON.where}`,
@@ -178,7 +180,7 @@ export function WhoAndJudging() {
   );
 }
 
-const PHASES: { key: Phase; label: string; from: number; to: number | null }[] = [
+const phasesOf = ({ HACKATHON }: Campaign): { key: Phase; label: string; from: number; to: number | null }[] => [
   { key: "registration", label: "Registration", from: HACKATHON.dates.registration, to: HACKATHON.dates.start },
   { key: "live", label: "Build & vote", from: HACKATHON.dates.start, to: HACKATHON.dates.end },
   { key: "judging", label: "Judging", from: HACKATHON.dates.end, to: HACKATHON.dates.results },
@@ -191,7 +193,9 @@ const PHASES: { key: Phase; label: string; from: number; to: number | null }[] =
  * has gone, so "where are we" is read from the line itself.
  */
 export function Timeline() {
-  const { now, phase } = useHackathon();
+  const { c, now, phase } = useHackathon();
+  const { HACKATHON, eat } = c;
+  const PHASES = phasesOf(c);
   const at = PHASES.findIndex((p) => p.key === phase);
   const part = (() => {
     if (now === null || at < 0) return 0;
@@ -244,7 +248,8 @@ export function Timeline() {
 }
 
 export function FaqAndRules() {
-  const { unit } = useHackathon();
+  const { c, unit } = useHackathon();
+  const { HACKATHON, eat } = c;
   const faq: [string, string][] = [
     ["Is it free to take part?", `Yes. Joining is free, and every participant builds with IDEEZA AI on ${HACKATHON.baseQuality} quality.`],
     ["I have never built hardware. Can I still take part?", "Yes. No engineering background is needed: you describe the idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D."],
@@ -303,8 +308,9 @@ function subscribeWide(on: () => void) {
 }
 
 /** "Building ends in 6 days · 08:04:38" — the closing line's clock, one line of caps. */
-function closingClock(phase: Phase | null, now: number | null): string {
-  if (phase === "judging" || phase === "results") return `Building has ended · winners on ${eat(HACKATHON.dates.results)}`;
+function closingClock({ HACKATHON, eat }: Campaign, phase: Phase | null, now: number | null): string {
+  if (phase === "results") return `Building has ended · winners announced ${eat(HACKATHON.dates.results)}`;
+  if (phase === "judging") return `Building has ended · winners on ${eat(HACKATHON.dates.results)}`;
   const to = phase === "registration" || phase === "soon" ? HACKATHON.dates.start : HACKATHON.dates.end;
   const t = countdownParts(to, now);
   const days = Number(t.d);
@@ -323,7 +329,9 @@ function closingClock(phase: Phase | null, now: number | null): string {
  * It fills the screen under the site bar and section bar.
  */
 export function Closing() {
-  const { now, phase, unit } = useHackathon();
+  const { c, now, phase, unit } = useHackathon();
+  const { HACKATHON, GROUP, money, prizePool } = c;
+  const ended = phase === "judging" || phase === "results";
   const still = useReducedMotion();
   const wide = React.useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
   const ref = React.useRef<HTMLElement>(null);
@@ -361,13 +369,20 @@ export function Closing() {
         <div className="relative isolate flex flex-1 flex-col items-center justify-center py-24 text-center">
           {/* A soft shade under the words only: when the wave's bright edge passes behind them they stay readable. */}
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[90%] w-[min(1000px,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-black)_62%,transparent),transparent)]" />
-          <p className="text-md font-medium uppercase leading-md tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-lg md:leading-lg">{closingClock(phase, now)}</p>
+          <p className="text-md font-medium uppercase leading-md tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-lg md:leading-lg">{closingClock(c, phase, now)}</p>
+          {/* Once building has ended there is nothing to join here: the call is the next hackathon. */}
           <h2 id="closing-title" className="mt-12 font-display text-6xl leading-6xl tracking-tighter [text-wrap:balance] md:text-8xl md:leading-8xl">
-            <span className="block font-medium text-[color:var(--color-white)]">Put your {GROUP ? GROUP.one : unit === "team" ? "team" : "name"}</span>
-            <span className="ix-hack-shine block font-bold">on the board.</span>
+            <span className="block font-medium text-[color:var(--color-white)]">{ended ? "This one has ended." : `Put your ${GROUP ? GROUP.one : unit === "team" ? "team" : "name"}`}</span>
+            <span className="ix-hack-shine block font-bold">{ended ? "Join the next one." : "on the board."}</span>
           </h2>
           <div className="mt-20 flex w-full flex-col items-center gap-8 sm:w-auto sm:flex-row">
-            <JoinButton tone="inverse" arrow className="w-full sm:w-auto" />
+            {ended ? (
+              <Link href="/hackathons" className={cn(INVERSE(), "w-full sm:w-auto")}>
+                See all hackathons
+              </Link>
+            ) : (
+              <JoinButton tone="inverse" arrow className="w-full sm:w-auto" />
+            )}
             <VoteLink className="w-full sm:w-auto" />
           </div>
         </div>

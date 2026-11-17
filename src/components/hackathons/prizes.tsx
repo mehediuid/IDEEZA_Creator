@@ -13,7 +13,7 @@ import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ChampionIcon, GiftIcon, SparklesIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { HACKATHON, inWords, money, prizePool } from "@/lib/hackathons/vibe-inventing";
+import { inWords, type Campaign } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon, useReducedMotion } from "./context";
 import { HERO_MEDIA, Heading, Initials, SECTION, SURFACE } from "./parts";
 
@@ -63,7 +63,7 @@ function PrizesBackdrop() {
 }
 
 // How the winner is decided, in one sentence under the heading (the campaign's Winner setting).
-const DECIDED =
+const decidedOf = ({ HACKATHON }: Campaign) =>
   HACKATHON.winBy === "shortlist"
     ? `The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the winners.`
     : HACKATHON.winBy === "score"
@@ -71,7 +71,7 @@ const DECIDED =
       : "The most points win.";
 
 // What everyone can win along the way, when the campaign has it.
-const EXTRAS = [
+const extrasOf = ({ HACKATHON }: Campaign) => [
   HACKATHON.giveaways && {
     icon: GiftIcon,
     title: `Giveaways every ${HACKATHON.giveaways.everyDays} days`,
@@ -85,12 +85,21 @@ const EXTRAS = [
 ].filter((x) => !!x);
 
 export function Prizes() {
-  const { board, openProject } = useHackathon();
+  const { c, board, openProject, phase } = useHackathon();
+  const { HACKATHON, money, prizePool } = c;
   const places = inWords(HACKATHON.prizes.length);
+  const DECIDED = decidedOf(c);
+  const EXTRAS = extrasOf(c);
+  // Who stands on the steps: nobody before building starts; the final standings once it has ended.
+  const lead = !board.length
+    ? DECIDED
+    : phase === "judging" || phase === "results"
+      ? `Building has ended: these ${places} finished on top. ${DECIDED}`
+      : `If building ended now, these ${places} would stand here. ${DECIDED}`;
   return (
     <section id="prizes" aria-labelledby="prizes-title" className={cn(SECTION, "relative isolate")}>
       <PrizesBackdrop />
-      <Heading className="[text-shadow:0_2px_18px_rgba(0,0,0,0.85)]" id="prizes-title" title={`${money(prizePool)} for the top ${places}`} lead={`If building ended now, these ${places} would stand here. ${DECIDED}`} />
+      <Heading className="[text-shadow:0_2px_18px_rgba(0,0,0,0.85)]" id="prizes-title" title={`${money(prizePool)} for the top ${places}`} lead={lead} />
 
       <ol className="m-0 mx-auto mt-24 grid max-w-[960px] list-none grid-cols-3 items-end p-0 md:mt-32">
         {HACKATHON.prizes.map((amount, i) => {

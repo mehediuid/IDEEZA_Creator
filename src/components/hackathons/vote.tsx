@@ -10,14 +10,15 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { GROUP, HACKATHON, entrantOf, groupOf } from "@/lib/hackathons/vibe-inventing";
+import { entrantOf } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
 import { VoteButton } from "./actions";
 import { Heading, SECTION, SURFACE } from "./parts";
 
 /** "n of 10 votes left" over ten pips — the voter's count, beside the place they vote. */
 export function VotesLeft() {
-  const { entry } = useHackathon();
+  const { c, entry } = useHackathon();
+  const { HACKATHON } = c;
   const used = HACKATHON.votesPerPerson - entry.votesLeft;
   return (
     <div className="flex flex-col gap-3 md:items-end">
@@ -34,9 +35,11 @@ export function VotesLeft() {
 }
 
 export function VoteShelf() {
-  const { board, entry, openProject, unit } = useHackathon();
+  const { c, board, entry, openProject, shelf, unit } = useHackathon();
+  const { GROUP, groupOf } = c;
   const items = board.filter((r) => r.p.project).sort((a, b) => b.votes - a.votes);
-  if (unit === "duel") return null;
+  // No shelf in 1 vs 1, and none before there is a product to vote for.
+  if (!shelf) return null;
 
   return (
     <section id="vote" aria-labelledby="vote-title" className={SECTION}>
