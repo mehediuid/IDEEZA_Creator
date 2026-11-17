@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-013](#cl-013-hackathon-page-the-hackathons-own-data-1-vs-1-matches-and-a-style-switch) | Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch | 17 Nov 2026 | Not created yet | Not started |
 | [CL-012](#cl-012-hackathon-page-ideeza-vibe-inventing-online-hackathon) | Hackathon page: IDEEZA Vibe Inventing Online Hackathon | 16 Nov 2026 | Not created yet | Not started |
 | [CL-011](#cl-011-redeem-a-code-for-ai-credits) | Redeem a code for AI credits | 16 Nov 2026 | [PR-9534](https://ideeza.atlassian.net/browse/PR-9534) | Ready for development |
 | [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere) | Mobile app: native mobile UX everywhere | 15 Nov 2026 | None (owner: no ticket) | Not started |
@@ -40,6 +41,53 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-013 Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch
+
+**In the prototype:** 17 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** the Hackathon page, `/hackathons` (CL-012). The client's ask: the page is a campaign page. The organizer designs the hackathon in the *IDEEZA Hackathons* prototype's setup, and the page keeps one layout and one look while everything inside it comes from that hackathon.
+
+### What to build
+
+**One layout, the hackathon's data**
+- [ ] Every word and number that depends on the hackathon's setup comes from that hackathon: name, prizes and currency, dates and time zone, how long building runs, products needed to qualify, votes per account, rules text, judges, criteria, the AI quality and its unlock for the top, giveaways. A giveaway or AI-unlock card shows only when the hackathon has one.
+- [ ] Sections, order and look stay the same for every hackathon.
+
+**Who competes (setup: Individuals / Teams / 1 vs 1)**
+- [ ] The hero's facts line says "Individuals", "Teams of 2–5" (the setup's sizes) or "1 vs 1".
+- [ ] Who can join says "You compete as an individual" / "You compete as a team of 2 to 5 people" / "You compete head-to-head: one opponent per round, and the winner advances".
+- [ ] Teams: Join reads **Register your team**, How to win step 1 adds "Then invite your teammates.", the terms show a "Teams of 2 to 5" chip, and the board counts teams ("Top teams").
+- [ ] **1 vs 1:** the standings become **Head-to-head matches**, lead "Two products a match, decided by votes. The winner goes to the next round." The section bar link reads **Matches**.
+  - Products are paired by votes: 1st against 2nd, 3rd against 4th, and so on; an odd one out waits.
+  - Each match is a card: "Match 1 · the winner goes to the next round", then the two products side by side with "vs" between them. Each side: the product picture (opens the product), its name, maker · university, votes, **Leads** on the one ahead, and **Vote**. Under them, one bar split by each side's share of the votes (violet · blue).
+  - Two cards a row on wide screens, one on phones. With fewer than two products: "Not enough entries for a match yet."
+
+**Group ranking (setup: university / country / custom groups / none)**
+- [ ] With groups, the words follow the group: "{University / Country / Group} league", "Which {university / country / group} builds best?", Join's picker ("Choose your university"), the search ("Find your name or university"), and the closing "Put your {university / country / group} on the board."
+- [ ] The open category (Everyone / Open category filter, "Not at a university — open category" in Join, "Not at a university? Join the open category." in How to win) shows only when the setup has one.
+- [ ] No groups: no league (the builders' list takes the full width), no filter, no group in the rows, no picker in Join. The section is titled "Leaderboard" with "Builders ranked by points. Updated every hour…"; the closing says "Put your name on the board." ("your team" for teams).
+- [ ] Who can join gives the group its own line: "You compete for your university, or in the open category."
+
+**How the winner is decided (setup: the board's top to the judges / judges + audience / points only)**
+- [ ] The board's top to the judges: as in CL-012.
+- [ ] Judges + audience: "The judges' scores and the audience's votes are combined into one final score." One bar shows **Judges 70% · Audience 30%** (the setup's split), then "The judges score each product on:" with the criteria bar and the judges. The Prizes lead and How to win's last step ("The judges and the votes decide") give the same split.
+- [ ] Points only: "When building ends the board freezes. The participants with the most points win." No criteria, no judges, and no "Judges cannot take part or vote". Prizes lead: "The most points win."
+
+Prototype only (nothing to build): a small **Prototype** pill floats at the bottom-left corner with **Individuals | 1 vs 1**. It flips the page between the two styles so the page can be reviewed both ways. In production the style comes from the hackathon's setup, and there is no switch. The running hackathon is still the Ethiopia one (Individuals, university vs university, the board's top 10 to the judges).
+
+### Design
+
+- No new look: the match card is the page's own card surface (hairline border, the cards' radius, 16–24 px padding) with the page's type sizes (product name 18, meta 14, votes 20). The vote-share bar and the judges/audience bar use the brand violet and blue, drawn like the criteria bar.
+- The prototype pill reuses the board's two-way pill (Everyone / Open category): 40 px buttons, 14 px text.
+
+### Before → After
+
+| Before (one style) | After: Individuals | After: 1 vs 1 |
+| --- | --- | --- |
+| ![The board before: the university league and Top builders](docs/changelog/2026-11-16-hackathons-leaderboard.png) | ![The same board, with the Prototype pill at the bottom-left set to Individuals](docs/changelog/2026-11-17-hackathons-individuals-after.png) | ![Head-to-head matches: two products per card, votes, Leads and Vote](docs/changelog/2026-11-17-hackathons-1v1-after.png) |
 
 ---
 
