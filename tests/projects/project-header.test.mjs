@@ -258,7 +258,7 @@ test("P0 · the Earn button: an active listing, a partial sale or a gift is quie
 test("P0 · the Earn button: sold in full is quiet and opens Earn read-only", () => {
   const b = earnOf({ commercial: "soldOut", soldSharePct: 100, facts: ALL, reviewPending: false });
   assert.deepEqual(pick(b), ["soldInFull", "Sold in full", false]);
-  assert.equal(b.href, "/projects/proj_car/earn/sell", "Earn opens on Sell (owner, 2026-10-12)");
+  assert.equal(b.href, "/projects/proj_car/earn", "Earn opens on its Overview (owner, 2026-11-17)");
 });
 
 function pick(b) {
