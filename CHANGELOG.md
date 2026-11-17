@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-014](#cl-014-hackathons-a-list-and-a-page-for-each-hackathon) | Hackathons: a list, and a page for each hackathon | 17 Nov 2026 | Not created yet | Not started |
 | [CL-013](#cl-013-hackathon-page-the-hackathons-own-data-1-vs-1-matches-and-a-style-switch) | Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch | 17 Nov 2026 | Not created yet | Not started |
 | [CL-012](#cl-012-hackathon-page-ideeza-vibe-inventing-online-hackathon) | Hackathon page: IDEEZA Vibe Inventing Online Hackathon | 16 Nov 2026 | Not created yet | Not started |
 | [CL-011](#cl-011-redeem-a-code-for-ai-credits) | Redeem a code for AI credits | 16 Nov 2026 | [PR-9534](https://ideeza.atlassian.net/browse/PR-9534) | Ready for development |
@@ -41,6 +42,55 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-014 Hackathons: a list, and a page for each hackathon
+
+**In the prototype:** 17 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** the site menu's **Hackathons** now opens a list of hackathons, `/hackathons`. Each hackathon has its own page and link, `/hackathons/<hackathon>`: the Hackathon page of CL-012 and CL-013, in the same layout, with that hackathon's own data. Several hackathons can run at once.
+
+### What to build
+
+**The list (`/hackathons`)**
+- [ ] Header as on the Events list: the eyebrow **Hackathons**, the title "Invent hardware with AI. Win prizes.", and the lead "Build products with IDEEZA AI, publish them and collect votes. Join a hackathon that is open, vote in one that is running, or see who won."
+- [ ] Order: running hackathons first, then the ones starting soon (soonest first), then the ones being judged, then the ended ones (latest first). The first hackathon is the wide card; the others are rows (the words on the left, the picture card on the right), as on the Events list.
+- [ ] Each hackathon shows:
+  - a status chip: **Live now** (green dot), **Starting soon**, **Judging** (violet dot) or **Ended** (grey dot);
+  - beside it, the date that matters now: "Registration opens {date}", "Registration open · building starts {date}", "Building ends {date}", "Winners on {date}" or "Winners announced {date}";
+  - its name;
+  - the wide card: "{where} · {format} · {building dates}" (e.g. "Ethiopia · Individuals · 16–22 Nov 2026") and, on the right, the prize pool (e.g. "160,000 birr") over "in prizes for the top three";
+  - a row: its lead, then four facts: **Prizes** ("8,000 USD for the top three"), **Building** ("1–6 Dec 2026"), **Format** ("Individuals", "Teams of 2–5" or "1 vs 1"), **Who can join** ("18+, living in East Africa").
+- [ ] The whole picture card is the link, with **View hackathon** and the site's glass arrow pill. An ended hackathon reads **See the winners**.
+- [ ] Each hackathon has its own card picture, set by the organizer.
+- [ ] Phones: one column; the wide card's lower part darkens so its words read over the picture.
+
+**Each hackathon's page (`/hackathons/<hackathon>`)**
+- [ ] Same layout for every hackathon; every setup word and number comes from that hackathon (CL-013).
+- [ ] Join and votes count per hackathon: joining one does not join the others, and each has its own 10 votes.
+- [ ] The personal link to share, and the way back after signing up or signing in, lead to that hackathon's page.
+- [ ] Before building starts nobody has built anything yet, so the standings section shows one card in place of the board: **No entries yet** — "The board fills once building starts on {date, time} ({time zone}). Join now and you build from the first hour." (1 vs 1: "The first matches appear once…") — with **Join the hackathon**. The Vote section and its link are not shown until there is a product, and the Prizes podium shows the places without names.
+- [ ] Once building has ended:
+  - the hero's facts drop "Free to join";
+  - the board's lead says "Final standings" instead of "Updated every hour";
+  - the podium's lead reads "Building has ended: these three finished on top. …";
+  - **Vote for projects** reads **See the projects**;
+  - the closing reads "This one has ended. **Join the next one.**" with **See all hackathons** (to the list) in place of Join;
+  - after the results are out, the hero reads "Winners announced {date}".
+
+Prototype only (nothing to build): two sample hackathons fill the list so it shows each status: **IDEEZA East Africa 1 vs 1 Cup** (starting soon) and **IDEEZA Smart Home Sprint** (ended). Both are marked "Prototype sample" on the list, and "Prototype · sample hackathon" in the page's prototype pill. They also use other setups (1 vs 1 with countries and judges + votes; individuals with no groups and points only), so the same layout can be seen with other data. The real hackathon is still the Ethiopia one, now at `/hackathons/vibe-inventing-ethiopia`.
+
+### Design
+
+- The list reuses the Events list's frame: the 20-radius card with the lilac ring, the picture at radius 14 faded into the page, the glass arrow pill, and the same header sizes. The status chip is the hackathon page's hero pill. Text: titles Display, facts 16, labels 14.
+- The **No entries yet** card is the page's own card surface with one primary button.
+
+### Before → After
+
+| Before | After: the list | After: starting soon and ended | After: before building starts |
+| --- | --- | --- | --- |
+| ![Before: the menu's Hackathons opened the one hackathon page](docs/changelog/2026-11-16-hackathons-hero.png) | ![The list: the running hackathon as the wide card — Live now, Building ends 22 Nov, Ethiopia · Individuals · 16–22 Nov 2026, 160,000 birr, View hackathon](docs/changelog/2026-11-17-hackathons-list-after.png) | ![A row: Starting soon, Registration open · building starts 1 Dec, Prototype sample, name, lead, Prizes, Building, Format, Who can join, and the picture card](docs/changelog/2026-11-17-hackathons-list-rows-after.png) | ![A hackathon that has not started: Head-to-head matches with the No entries yet card and Join the hackathon](docs/changelog/2026-11-17-hackathons-no-entries-after.png) |
 
 ---
 
