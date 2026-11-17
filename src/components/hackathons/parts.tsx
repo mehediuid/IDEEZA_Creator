@@ -11,12 +11,13 @@ import { useReducedMotion } from "./context";
 
 // The briefs' media (owner, 2026-11-16) — the "Zapline" hero brief: the planet-rim
 // glow video (1460 × 624, 4 s loop) and the light strip over the hero
-// panel's top edge, from the brief's own addresses.
+// panel's top edge. Stored with the site (2026-11-17), not on the briefs' CDN.
 export const HERO_MEDIA = {
-  glow: "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e859f229-8ebd-43fb-a5a0-58006ba75327.mp4",
-  strip: "https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e0e14572-12e1-4c08-b471-a21521844945.png",
-  // The Prizes section's background (owner's "Vesper" brief): a white particle ribbon on black, 1920 × 1080, 10 s.
-  ribbon: "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260818_072341_50851634-bbc3-4c33-9acc-7647d4db44aa.mp4",
+  glow: "/hackathons/hero-glow.mp4",
+  strip: "/hackathons/hero-strip.png",
+  // The Prizes section's background (owner's "Vesper" brief): a white particle ribbon on black,
+  // 1920 × 1080, 10 s, H.264 so every browser plays it (the brief's file was 10-bit HEVC).
+  ribbon: "/hackathons/prizes-ribbon.mp4",
 };
 
 /** One section's frame: the page width, the sticky bars' scroll offset, the vertical rhythm. */
