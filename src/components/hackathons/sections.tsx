@@ -26,6 +26,7 @@ import { useHackathon, useReducedMotion } from "./context";
 import { JoinButton, VoteLink } from "./actions";
 import { Heading, Initials, SECTION } from "./parts";
 import { Prizes } from "./prizes";
+import { SECTION_BAR_ID, useSiteBarHidden } from "./site-bar";
 import { HowToWin } from "./how-to-win";
 import { Leaderboard } from "./leaderboard";
 
@@ -74,6 +75,8 @@ export function SectionNav() {
   const [active, setActive] = React.useState<string>("");
   const list = React.useRef<HTMLUListElement>(null);
   const ended = phase === "judging" || phase === "results";
+  // While the site's bar is away, this bar takes the very top.
+  const alone = useSiteBarHidden();
   const anchors: [string, string][] = [
     ...orderOf(phase)
       .filter((k) => k !== "who")
@@ -111,7 +114,10 @@ export function SectionNav() {
     return () => io.disconnect();
   }, [ids, unit]);
   return (
-    <div className="sticky top-[80px] z-[5] border-0 border-y border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_86%,transparent)] backdrop-blur-[24px]">
+    <div
+      id={SECTION_BAR_ID}
+      className={cn("sticky top-[80px] z-[5] transition-transform duration-slow ease-standard", alone && "-translate-y-[80px]", "border-0 border-y border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_86%,transparent)] backdrop-blur-[24px]")}
+    >
       {/* Phones: a 56 px bar (with the site bar's 80, the two took 18 % of the screen at 68);
           the anchor row fades at its right edge so the hidden ones read as "more". */}
       <nav aria-label="On this page" className="mx-auto flex h-[56px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 md:h-[68px] min-[1292px]:px-0">
