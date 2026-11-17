@@ -24,7 +24,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ChampionIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { countdownParts, useHackathon, useReducedMotion } from "./context";
 import { JoinButton, VoteLink } from "./actions";
 import { HeroShowcase } from "./hero-showcase";
@@ -122,67 +122,157 @@ function titleLines(name: string): [string, string] {
 }
 
 /**
- * What a visitor must see first, right over Join (owner 2026-11-17): how much
- * there is to win, large, and the clock as a countdown — days, hours, minutes,
- * seconds in their own tiles. One violet-edged glass panel, the prize on the
- * left and the clock on the right (stacked on a phone). Once there is nothing
- * left to count, the clock's half says where the hackathon stands.
+ * What a visitor must see first, right over Join (owner 2026-11-17: the
+ * prize and the clock, premium — never a plain box). One stage in the hero's
+ * own language: a hairline frame lit violet along its top edge (as the
+ * hologram panel below), a soft violet bloom behind it, and no boxes inside.
+ * Left, the prize: a small ruled "Prize pool" caption, the total in large
+ * display numerals that count up when the page opens and catch a slow violet
+ * light, and the three places' prizes under it. Right, the clock: open
+ * numerals like an event countdown, each digit dropping into place as it
+ * changes, the units in small caps under them; while it runs, a line of
+ * light along the frame's foot shows how much of it has gone. A fine rule with a glowing
+ * node between the two (a horizontal one on a phone, where they stack).
+ * Once there is nothing to count, the clock's half says where the hackathon
+ * stands. Reduced motion: no count-up, no drop, no light.
  */
+function Ruled({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="flex items-center justify-center gap-4 text-md font-semibold uppercase leading-md tracking-caps text-[color:var(--color-violet-200)]">
+      <span aria-hidden className="h-px w-8 bg-[linear-gradient(to_right,transparent,color-mix(in_srgb,var(--color-violet-300)_70%,transparent))]" />
+      {children}
+      <span aria-hidden className="h-px w-8 bg-[linear-gradient(to_left,transparent,color-mix(in_srgb,var(--color-violet-300)_70%,transparent))]" />
+    </span>
+  );
+}
+
+/** The prize total, counting up from 0 once when the hero opens (written straight to the text, no re-render). */
+function CountUp({ value }: { value: number }) {
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const still = useReducedMotion();
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || still) return;
+    const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
+    el.textContent = fmt(0);
+    let raf = 0;
+    let start = 0;
+    // After the panel's own entrance (it rises at 480 ms), 1.6 s, easing out.
+    const delay = window.setTimeout(() => {
+      const step = (t: number) => {
+        if (!start) start = t;
+        const k = Math.min(1, (t - start) / 1600);
+        el.textContent = fmt(value * (1 - Math.pow(1 - k, 4)));
+        if (k < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    }, 650);
+    return () => {
+      window.clearTimeout(delay);
+      cancelAnimationFrame(raf);
+      el.textContent = fmt(value);
+    };
+  }, [value, still]);
+  return <span ref={ref}>{value.toLocaleString("en-US")}</span>;
+}
+
+/** Two digits; each one that changes drops into place (keyed by its value). */
+function Digits({ v }: { v: string }) {
+  return (
+    <span className="flex">
+      {v.split("").map((d, i) => (
+        <span key={i} className="relative inline-block w-[0.62em] overflow-hidden text-center">
+          <span key={d} className="ix-hk-drop inline-block bg-[linear-gradient(180deg,var(--color-white)_30%,color-mix(in_srgb,var(--color-violet-200)_80%,var(--color-white)))] bg-clip-text text-transparent [-webkit-background-clip:text]">
+            {d}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function PrizeAndClock() {
   const { c, phase, now } = useHackathon();
-  const { HACKATHON, money, prizePool, clockOf } = c;
+  const { HACKATHON, prizePool, clockOf } = c;
   const clock = phase ? clockOf(phase) : null;
   const t = countdownParts(clock?.to ?? 0, now);
-  const cells: [string, string][] = [
-    [t.d, "days"],
-    [t.h, "hours"],
-    [t.m, "min"],
-    [t.s, "sec"],
+  const counting = clock === null || clock.to !== null;
+  const units: [string, string][] = [
+    [t.d, "Days"],
+    [t.h, "Hours"],
+    [t.m, "Minutes"],
+    [t.s, "Seconds"],
   ];
-  const [amount, currency] = [prizePool.toLocaleString("en-US"), HACKATHON.currency];
+  const PLACES = ["1st", "2nd", "3rd"];
+  // While it runs, how much of the hackathon has gone, as a line of light along the frame's foot.
+  const gone = phase === "live" && now !== null ? Math.min(1, Math.max(0, (now - HACKATHON.dates.start) / (HACKATHON.dates.end - HACKATHON.dates.start))) : null;
   return (
-    <div
-      className="ix-hk-rise mt-16 flex w-full max-w-[880px] flex-col items-stretch overflow-hidden rounded-3xl border border-solid border-[color:color-mix(in_srgb,var(--color-violet-300)_32%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_55%,transparent)] shadow-[0_0_60px_-12px_color-mix(in_srgb,var(--color-violet-500)_55%,transparent)] backdrop-blur-[10px] md:mt-20 md:flex-row"
-      style={{ animationDelay: "480ms" }}
-    >
-      {/* The prize: the total, large, with the trophy. */}
-      <div className="flex flex-1 items-center justify-center gap-6 px-8 py-8 md:justify-start md:px-10 md:py-10">
-        <span aria-hidden className="flex size-[56px] shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--color-violet-400),var(--color-violet-700))] text-[color:var(--color-white)] shadow-[0_0_28px_color-mix(in_srgb,var(--color-violet-500)_70%,transparent)] md:size-[64px]">
-          <HugeiconsIcon icon={ChampionIcon} size={30} strokeWidth={1.7} />
-        </span>
-        <span className="flex flex-col items-start text-left">
-          <span className="text-md font-medium uppercase leading-md tracking-caps text-[color:var(--color-violet-200)]">Prize pool</span>
-          <span className="font-display text-5xl font-bold leading-5xl tracking-tight tabular-nums text-[color:var(--color-white)] [text-shadow:0_0_32px_color-mix(in_srgb,var(--color-violet-400)_70%,transparent)] md:text-6xl md:leading-6xl">
-            {amount} <span className="text-3xl font-semibold leading-3xl text-[color:var(--color-violet-200)] md:text-4xl md:leading-4xl">{currency}</span>
-          </span>
-          <span className="text-md leading-md text-[color:var(--color-text-secondary)] md:text-lg md:leading-lg">
-            1st place wins {money(HACKATHON.prizes[0] ?? 0)}
-          </span>
-        </span>
-      </div>
-
-      <div aria-hidden className="mx-8 h-px bg-[color:color-mix(in_srgb,var(--color-white)_12%,transparent)] md:mx-0 md:my-8 md:h-auto md:w-px" />
-
-      {/* The clock. */}
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-8 md:px-10 md:py-10">
-        <span className="flex items-center gap-2 text-md font-medium leading-md text-[color:var(--color-text-secondary)] md:text-lg md:leading-lg">
-          <span aria-hidden className={cn("size-[8px] rounded-full", phase === "live" ? "bg-[var(--color-green-400)] motion-safe:animate-pulse" : "bg-[var(--color-violet-400)]")} />
-          {clock ? clock.label : " "}
-        </span>
-        {clock?.to !== null ? (
-          <div role="timer" aria-label={`${clock?.label ?? ""} ${t.d} days ${t.h} hours ${t.m} minutes`} className="flex gap-3">
-            {cells.map(([v, l]) => (
-              <div
-                key={l}
-                aria-hidden
-                className="flex h-[76px] w-[68px] flex-col items-center justify-center rounded-xl border border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--color-white)_6%,transparent)] md:h-[88px] md:w-[80px]"
-              >
-                <span className="font-display text-4xl font-semibold leading-4xl tabular-nums text-[color:var(--color-white)] md:text-5xl md:leading-5xl">{v}</span>
-                <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">{l}</span>
+    <div className="ix-hk-rise relative mt-16 w-full max-w-[960px] md:mt-20" style={{ animationDelay: "480ms" }}>
+      {/* The bloom behind the stage. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-[8%] -inset-y-6 -z-10 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-violet-600)_42%,transparent),transparent)] blur-2xl" />
+      {/* A hairline frame, brightest along the top edge, with the light line the hologram panel has. */}
+      <div className="rounded-[28px] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-violet-300)_70%,transparent),color-mix(in_srgb,var(--color-white)_8%,transparent)_38%,color-mix(in_srgb,var(--color-white)_5%,transparent)_70%,color-mix(in_srgb,var(--color-violet-500)_40%,transparent))] p-px">
+        <div className="relative isolate grid grid-cols-1 overflow-hidden rounded-[27px] bg-[radial-gradient(90%_120%_at_50%_-20%,color-mix(in_srgb,var(--color-violet-700)_38%,transparent),transparent_62%),linear-gradient(180deg,color-mix(in_srgb,var(--color-black)_62%,transparent),color-mix(in_srgb,var(--color-black)_82%,transparent))] backdrop-blur-[14px] md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+          <div aria-hidden className="pointer-events-none absolute inset-x-[14%] top-0 h-px bg-[linear-gradient(90deg,transparent,var(--color-violet-200),transparent)] shadow-[0_0_18px_2px_color-mix(in_srgb,var(--color-violet-400)_80%,transparent)]" />
+          {gone !== null ? (
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-[color:color-mix(in_srgb,var(--color-white)_6%,transparent)]">
+              <div style={{ width: `${gone * 100}%` }} className="relative h-full bg-[linear-gradient(90deg,transparent,var(--color-violet-500)_30%,var(--color-violet-300))]">
+                <span className="absolute right-0 top-1/2 size-[6px] -translate-y-1/2 translate-x-1/2 rounded-full bg-[var(--color-white)] shadow-[0_0_12px_3px_color-mix(in_srgb,var(--color-violet-400)_90%,transparent)]" />
               </div>
-            ))}
+            </div>
+          ) : null}
+
+          {/* The prize. */}
+          <div className="flex flex-col items-center gap-4 px-6 pb-8 pt-10 md:px-10 md:py-12">
+            <Ruled>Prize pool</Ruled>
+            <p className="m-0 flex items-baseline gap-3 font-display font-bold tabular-nums tracking-tight [text-shadow:0_0_40px_color-mix(in_srgb,var(--color-violet-500)_45%,transparent)]">
+              <span className="ix-hk-gleam text-6xl leading-6xl md:text-7xl md:leading-7xl">
+                <CountUp value={prizePool} />
+              </span>
+              <span className="text-2xl font-semibold leading-2xl text-[color:var(--color-violet-200)] md:text-3xl md:leading-3xl">{HACKATHON.currency}</span>
+            </p>
+            <ul aria-label="Prizes by place" className="m-0 flex list-none flex-wrap items-center justify-center gap-x-5 gap-y-2 p-0 text-md leading-md text-[color:var(--color-text-secondary)] md:text-lg md:leading-lg">
+              {HACKATHON.prizes.slice(0, 3).map((a, i) => (
+                <li key={i} className="flex items-center gap-2 whitespace-nowrap">
+                  <span className={cn("font-semibold", i === 0 ? "text-[color:var(--color-white)]" : "text-[color:var(--color-text-secondary)]")}>{PLACES[i]}</span>
+                  <span className="tabular-nums">{a.toLocaleString("en-US")}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-        ) : null}
+
+          {/* The rule between, with its node. */}
+          <div aria-hidden className="relative mx-10 h-px bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--color-violet-300)_45%,transparent),transparent)] md:mx-0 md:my-10 md:h-auto md:w-px md:bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--color-violet-300)_45%,transparent),transparent)]">
+            <span className="absolute left-1/2 top-1/2 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--color-violet-200)] shadow-[0_0_14px_3px_color-mix(in_srgb,var(--color-violet-400)_85%,transparent)]" />
+          </div>
+
+          {/* The clock. */}
+          <div className="flex flex-col items-center justify-center gap-4 px-4 pb-10 pt-8 md:px-10 md:py-12">
+            <Ruled>
+              <span aria-hidden className={cn("size-[7px] rounded-full", phase === "live" ? "bg-[var(--color-green-400)] motion-safe:animate-pulse" : "bg-[var(--color-violet-300)]")} />
+              {clock ? clock.label : " "}
+            </Ruled>
+            {counting ? (
+              <div role="timer" aria-label={`${clock?.label ?? ""} ${t.d} days ${t.h} hours ${t.m} minutes`} className="flex items-start">
+                {units.map(([v, l], i) => (
+                  <React.Fragment key={l}>
+                    {i ? (
+                      <span aria-hidden className="px-1 font-display text-4xl font-light leading-4xl text-[color:color-mix(in_srgb,var(--color-violet-300)_55%,transparent)] sm:text-5xl sm:leading-5xl md:px-2 md:text-6xl md:leading-6xl">
+                        :
+                      </span>
+                    ) : null}
+                    <span aria-hidden className="flex flex-col items-center gap-1">
+                      <span className="font-display text-4xl font-semibold leading-4xl tabular-nums sm:text-5xl sm:leading-5xl md:text-6xl md:leading-6xl">
+                        <Digits v={v} />
+                      </span>
+                      <span className="text-md font-medium uppercase leading-md tracking-caps text-[color:var(--color-text-tertiary)]">{l}</span>
+                    </span>
+                  </React.Fragment>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   );

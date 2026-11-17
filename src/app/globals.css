@@ -269,6 +269,49 @@ html[data-sidebar="collapsed"] aside[data-collapsed="false"] {
   animation: ix-hk-fade 1.2s ease-out both;
 }
 
+/* The hackathon hero's prize and countdown (components/hackathons/hero.tsx,
+ * owner 2026-11-17: premium, seen at once). Each countdown digit that changes
+ * drops into place; the prize total catches a slow violet light every few
+ * seconds. Reduced motion: reset.css ends animations, so the digits stand
+ * still and the total stays white. */
+@keyframes ix-hk-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-48%);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.ix-hk-drop {
+  animation: ix-hk-drop 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ix-hk-gleam {
+  0%,
+  55% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+.ix-hk-gleam {
+  background-image: linear-gradient(100deg, var(--color-white) 0%, var(--color-white) 42%, var(--color-violet-300) 50%, var(--color-white) 58%, var(--color-white) 100%);
+  background-size: 300% 100%;
+  background-position: 0% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: ix-hk-gleam 6s ease-in-out infinite;
+}
+
 /* The mobile splash (components/mobile/account/parts.tsx): the light behind
  * the logo breathes, and the three steps light up in turn. Both run only
  * under motion-safe; at rest the splash stands still, every step lit. */
