@@ -8,16 +8,38 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { HACKATHON, POINTS } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, POINTS, inWords, type Unit } from "@/lib/hackathons/vibe-inventing";
+import { useHackathon } from "./context";
 import { JoinButton } from "./actions";
 import { Heading, SECTION, SURFACE } from "./parts";
 
-const STEPS: [string, string][] = [
-  ["Join and pick your university", "Or the open category if you are not at one. You get a personal link to share. You need an IDEEZA account with a verified email."],
-  [`Build ${HACKATHON.minProducts} or more products`, "Describe each idea in plain words. IDEEZA AI makes the concept, PCB, code and 3D, on Low quality, free. A product counts when every stage is done."],
+// The steps follow the campaign: the style shown and its groups (step 1), its
+// AI quality (step 2) and how the winner is decided (the last step).
+function joinStep(unit: Unit): [string, string] {
+  const team = unit === "team";
+  return [
+    `${team ? "Register your team" : GROUP ? "Join" : "Join the hackathon"}${GROUP ? ` and pick your ${GROUP.one}` : ""}`,
+    `${GROUP && HACKATHON.openCategory ? `${GROUP.outside}? Join the open category. ` : ""}${team ? "Then invite your teammates. " : ""}You get a personal link to share. You need an IDEEZA account with a verified email.`,
+  ];
+}
+const WIN_STEP: [string, string] =
+  HACKATHON.winBy === "shortlist"
+    ? [`The top ${HACKATHON.shortlist} go to the judges`, `When building ends the board freezes. The judges score the shortlist and pick the ${inWords(HACKATHON.prizes.length)} winners.`]
+    : HACKATHON.winBy === "score"
+      ? ["The judges and the votes decide", `The judges' scores count for ${HACKATHON.judgesWeight}% and the audience's votes for ${100 - HACKATHON.judgesWeight}%.`]
+      : ["The most points win", "When building ends the board freezes. The participants with the most points win."];
+const LEAD =
+  HACKATHON.winBy === "shortlist"
+    ? "Points put you on the board, and the board decides who the judges see."
+    : HACKATHON.winBy === "score"
+      ? "Points put you on the board; the judges' scores and the votes pick the winners."
+      : "Points put you on the board, and the board picks the winners.";
+
+const AFTER_JOIN: [string, string][] = [
+  [`Build ${HACKATHON.minProducts} or more products`, `Describe each idea in plain words. IDEEZA AI makes the concept, PCB, code and 3D, on ${HACKATHON.baseQuality} quality, free. A product counts when every stage is done.`],
   ["Publish each one", "To Give to Community on the marketplace, and to the feed. No wallet or KYC needed."],
   ["Share your link and collect votes", `Every vote adds a point, and a friend who builds a product through your link adds ${POINTS.referral}.`],
-  [`The top ${HACKATHON.shortlist} go to the judges`, "When building ends the board freezes. The judges score the shortlist and pick the three winners."],
+  WIN_STEP,
 ];
 
 const TABLE: [string, string, number][] = [
@@ -33,9 +55,11 @@ const EX = { products: 3, days: 3, votes: 40 };
 const EX_TOTAL = EX.products * POINTS.build + EX.products * POINTS.publish + EX.days * POINTS.buildDay + EX.votes * POINTS.vote;
 
 export function HowToWin() {
+  const { unit } = useHackathon();
+  const STEPS = [joinStep(unit), ...AFTER_JOIN];
   return (
     <section id="how" aria-labelledby="how-title" className={SECTION}>
-      <Heading id="how-title" title="How to win" lead="Points put you on the board, and the board decides who the judges see." />
+      <Heading id="how-title" title="How to win" lead={LEAD} />
 
       <div className="mt-24 grid grid-cols-1 gap-24 md:mt-32 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-32">
         <div>

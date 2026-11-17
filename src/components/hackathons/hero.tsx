@@ -21,7 +21,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { HACKATHON, money, type Phase } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, money, unitLabel, type Phase } from "@/lib/hackathons/vibe-inventing";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { countdownParts, eat, useHackathon, useReducedMotion } from "./context";
@@ -119,7 +119,7 @@ function Planet() {
 }
 
 export function HackathonHero() {
-  const { phase, now } = useHackathon();
+  const { phase, now, unit } = useHackathon();
   // The two facts a visitor needs beside Join (the brief's hero left them to the bottom of
   // the page): how long is left, and whether they can enter.
   const left = countdownParts(phase === "registration" || phase === "soon" ? HACKATHON.dates.start : HACKATHON.dates.end, now);
@@ -127,7 +127,7 @@ export function HackathonHero() {
     phase === "judging" || phase === "results"
       ? `Winners on ${eat(HACKATHON.dates.results)}`
       : `${phase === "registration" || phase === "soon" ? "Starts" : "Ends"} in ${Number.isNaN(Number(left.d)) ? "--" : Number(left.d)}d ${left.h}h ${left.m}m`;
-  const facts = [deadline, "Free to join", `${HACKATHON.minAge}+, living in ${HACKATHON.where}`, "Individuals"];
+  const facts = [deadline, "Free to join", `${HACKATHON.minAge}+, living in ${HACKATHON.where}`, unitLabel(unit)];
   return (
     <section aria-labelledby="hackathon-title" className="relative isolate overflow-hidden bg-[var(--color-black)]">
       <div aria-hidden className="absolute inset-0 -z-10">
@@ -145,7 +145,7 @@ export function HackathonHero() {
           <span>
             {phase ? STATUS[phase] : " "} · {/* phones: the short name, so the pill stays one line */}
             <span className="max-sm:hidden">{HACKATHON.name}</span>
-            <span className="sm:hidden">Vibe Inventing Hackathon</span>
+            <span className="sm:hidden">{HACKATHON.shortName}</span>
           </span>
         </p>
 
@@ -159,7 +159,7 @@ export function HackathonHero() {
         </h1>
 
         <p className="ix-hk-rise mt-12 max-w-[760px] text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-2xl md:leading-2xl" style={{ animationDelay: "420ms" }}>
-          No engineering background needed. Describe an idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D. Build {HACKATHON.minProducts} products in 160 hours, collect votes, and put your university on top.
+          No engineering background needed. Describe an idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D. Build {HACKATHON.minProducts} products in {HACKATHON.hours} hours{GROUP ? `, collect votes, and put your ${GROUP.one} on top.` : " and collect votes."}
         </p>
 
         <div className="ix-hk-rise mt-20 flex w-full flex-col items-center justify-center gap-6 sm:w-auto sm:flex-row md:mt-24" style={{ animationDelay: "540ms" }}>

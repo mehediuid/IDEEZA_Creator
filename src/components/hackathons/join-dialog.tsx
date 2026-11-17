@@ -1,9 +1,10 @@
 "use client";
 
 // Join the hackathon — the prototype's step 02 "Join from this page and pick
-// your university. You get a personal referral link." One choice (university,
-// or the open category) and the eligibility the rules set (18+, in Ethiopia),
-// then a "You're in" state with the personal link to share.
+// your group. You get a personal referral link." The group choice (when the
+// hackathon has groups: university, country…, or the open category) and the
+// eligibility the rules set (age, where), then a "You're in" state with the
+// personal link to share. Every word follows the campaign's record.
 
 import * as React from "react";
 import { ModalFrame } from "@/components/ideeza/dialog";
@@ -11,14 +12,14 @@ import { Select } from "@/components/ideeza/select";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { buttonVariants } from "@/components/ideeza/button";
 import { cn } from "@/lib/utils";
-import { HACKATHON, UNIVERSITIES } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, competeLine } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
 
 const OPEN = "__open";
 
 export function JoinDialog({ open, onClose, container }: { open: boolean; onClose: () => void; container: Element | null }) {
-  const { entry } = useHackathon();
-  const [university, setUniversity] = React.useState("");
+  const { entry, unit } = useHackathon();
+  const [group, setGroup] = React.useState("");
   const [eligible, setEligible] = React.useState(false);
   const [tried, setTried] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
@@ -36,8 +37,8 @@ export function JoinDialog({ open, onClose, container }: { open: boolean; onClos
 
   const submit = () => {
     setTried(true);
-    if (!university || !eligible) return;
-    entry.join(university === OPEN ? "" : university);
+    if ((GROUP && !group) || !eligible) return;
+    entry.join(group === OPEN ? "" : group);
   };
 
   const joined = entry.joined;
@@ -51,8 +52,8 @@ export function JoinDialog({ open, onClose, container }: { open: boolean; onClos
       title={joined ? "You're in" : "Join the hackathon"}
       description={
         joined
-          ? `${joined.university || "Open category"} · ${HACKATHON.name}`
-          : "Pick your university. You compete as an individual and get a personal link to share."
+          ? [GROUP ? joined.group || "Open category" : "", HACKATHON.name].filter(Boolean).join(" · ")
+          : `${GROUP ? `Pick your ${GROUP.one}. ` : ""}${competeLine(unit)} and get a personal link to share.`
       }
       footer={
         joined ? (
@@ -89,17 +90,27 @@ export function JoinDialog({ open, onClose, container }: { open: boolean; onClos
         </div>
       ) : (
         <div className="flex flex-col gap-8">
-          <label className="flex flex-col gap-3">
-            <span className="text-sm font-medium leading-sm text-[color:var(--color-text-primary)]">University</span>
-            <Select
-              size="lg"
-              value={university}
-              placeholder="Choose your university"
-              onChange={setUniversity}
-              options={[...UNIVERSITIES.map((u) => ({ label: u, value: u })), { label: "Not at a university — open category", value: OPEN }]}
-            />
-            {tried && !university ? <span className="text-sm leading-sm text-[color:var(--color-text-error)]">Choose your university, or the open category.</span> : null}
-          </label>
+          {GROUP ? (
+            <label className="flex flex-col gap-3">
+              <span className="text-sm font-medium leading-sm text-[color:var(--color-text-primary)]">{GROUP.title}</span>
+              <Select
+                size="lg"
+                value={group}
+                placeholder={`Choose your ${GROUP.one}`}
+                onChange={setGroup}
+                options={[
+                  ...HACKATHON.groups.map((u) => ({ label: u, value: u })),
+                  ...(HACKATHON.openCategory ? [{ label: `${GROUP.outside} — open category`, value: OPEN }] : []),
+                ]}
+              />
+              {tried && !group ? (
+                <span className="text-sm leading-sm text-[color:var(--color-text-error)]">
+                  Choose your {GROUP.one}
+                  {HACKATHON.openCategory ? ", or the open category" : ""}.
+                </span>
+              ) : null}
+            </label>
+          ) : null}
           {/* The whole line toggles (the box alone was a small target). */}
           <button
             type="button"

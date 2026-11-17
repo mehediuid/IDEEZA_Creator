@@ -12,7 +12,7 @@ import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { HACKATHON, money, prizePool, type Phase } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, competeLine, inWords, money, prizePool, type Phase } from "@/lib/hackathons/vibe-inventing";
 import { countdownParts, eat, useHackathon, useReducedMotion } from "./context";
 import { JoinButton, VoteLink } from "./actions";
 import { Heading, Initials, SECTION } from "./parts";
@@ -28,6 +28,7 @@ const ANCHORS = [
 
 /** The page's own bar, under the site's: its sections and Join. */
 export function SectionNav() {
+  const { unit } = useHackathon();
   const [active, setActive] = React.useState<string>("");
   const list = React.useRef<HTMLUListElement>(null);
   // On a phone the anchors scroll sideways: keep the lit one in view as the page moves on.
@@ -65,7 +66,7 @@ export function SectionNav() {
                   active === id && "bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] text-[color:var(--color-text-primary)]",
                 )}
               >
-                {label}
+                {id === "leaderboard" && unit === "duel" ? "Matches" : label}
               </a>
             </li>
           ))}
@@ -79,12 +80,15 @@ export function SectionNav() {
 const CRITERIA_FILL = ["bg-[var(--color-violet-600)]", "bg-[var(--color-violet-400)]", "bg-[var(--color-blue-400)]"];
 
 export function WhoAndJudging() {
+  const { unit } = useHackathon();
+  const judged = HACKATHON.winBy !== "points";
   const who = [
     `${HACKATHON.minAge} or older, living in ${HACKATHON.where}`,
-    "University students, makers, engineers and anyone with a product idea",
-    "You compete on your own, for your university or the open category",
+    HACKATHON.who,
+    competeLine(unit),
+    ...(GROUP ? [`You compete for your ${GROUP.one}${HACKATHON.openCategory ? ", or in the open category" : ""}`] : []),
     "One IDEEZA account per person, with a verified email",
-    "Judges cannot take part or vote",
+    ...(judged ? ["Judges cannot take part or vote"] : []),
   ];
   return (
     <section aria-label="Who can join and how the winner is picked" className={SECTION}>
@@ -105,40 +109,67 @@ export function WhoAndJudging() {
 
         <div className="flex flex-col gap-12 border-0 border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] lg:border-l lg:pl-24">
           <h2 className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] md:text-6xl md:leading-6xl">How the winner is picked</h2>
-          <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">
-            When building ends the board freezes. The <b className="font-semibold text-[color:var(--color-text-primary)]">top {HACKATHON.shortlist}</b> are shortlisted, and the judges score each one on:
-          </p>
-          <div>
-            <div className="flex h-[48px] w-full gap-1 overflow-hidden rounded-xl" role="img" aria-label={HACKATHON.criteria.map((c) => `${c.name} ${c.weight}%`).join(", ")}>
-              {HACKATHON.criteria.map((c, i) => (
-                <div key={c.name} style={{ flexGrow: c.weight }} className={cn("flex basis-0 items-center px-5 text-lg font-semibold leading-lg text-[color:var(--color-white)]", CRITERIA_FILL.at(i))}>
-                  {c.weight}%
+          {/* The campaign's Winner setting: the board's top N to the judges, judges and votes
+              mixed by weight, or points alone (then there are no judges). */}
+          {HACKATHON.winBy === "shortlist" ? (
+            <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">
+              When building ends the board freezes. The <b className="font-semibold text-[color:var(--color-text-primary)]">top {HACKATHON.shortlist}</b> are shortlisted, and the judges score each one on:
+            </p>
+          ) : HACKATHON.winBy === "score" ? (
+            <>
+              <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">The judges&apos; scores and the audience&apos;s votes are combined into one final score.</p>
+              <div className="flex h-[48px] w-full gap-1 overflow-hidden rounded-xl" role="img" aria-label={`Judges ${HACKATHON.judgesWeight}%, audience ${100 - HACKATHON.judgesWeight}%`}>
+                {[
+                  [`Judges ${HACKATHON.judgesWeight}%`, HACKATHON.judgesWeight, "bg-[var(--color-violet-600)]"],
+                  [`Audience ${100 - HACKATHON.judgesWeight}%`, 100 - HACKATHON.judgesWeight, "bg-[var(--color-blue-400)]"],
+                ].map(([label, w, fill]) =>
+                  (w as number) > 0 ? (
+                    <div key={label as string} style={{ flexGrow: w as number }} className={cn("flex basis-0 items-center whitespace-nowrap px-5 text-lg font-semibold leading-lg text-[color:var(--color-white)]", fill as string)}>
+                      {label}
+                    </div>
+                  ) : null,
+                )}
+              </div>
+              <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">The judges score each product on:</p>
+            </>
+          ) : (
+            <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">When building ends the board freezes. The participants with the most points win.</p>
+          )}
+          {judged ? (
+            <>
+              <div>
+                <div className="flex h-[48px] w-full gap-1 overflow-hidden rounded-xl" role="img" aria-label={HACKATHON.criteria.map((c) => `${c.name} ${c.weight}%`).join(", ")}>
+                  {HACKATHON.criteria.map((c, i) => (
+                    <div key={c.name} style={{ flexGrow: c.weight }} className={cn("flex basis-0 items-center px-5 text-lg font-semibold leading-lg text-[color:var(--color-white)]", CRITERIA_FILL.at(i))}>
+                      {c.weight}%
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="mt-6 flex flex-wrap gap-x-10 gap-y-3 text-lg leading-lg text-[color:var(--color-text-primary)]">
-              {HACKATHON.criteria.map((c, i) => (
-                <span key={c.name} className="inline-flex items-center gap-3">
-                  <span aria-hidden className={cn("size-[10px] rounded-full", CRITERIA_FILL.at(i))} />
-                  {c.name}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-6">
-            <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">The judges</span>
-            <ul className="m-0 flex list-none flex-wrap gap-x-10 gap-y-6 p-0">
-              {HACKATHON.judges.map((j) => (
-                <li key={j.name} className="flex items-center gap-4">
-                  <Initials name={j.name} className="size-[44px] text-md" />
-                  <span className="flex flex-col">
-                    <span className="text-lg font-semibold leading-lg text-[color:var(--color-text-primary)]">{j.name}</span>
-                    <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">{j.role}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+                <div className="mt-6 flex flex-wrap gap-x-10 gap-y-3 text-lg leading-lg text-[color:var(--color-text-primary)]">
+                  {HACKATHON.criteria.map((c, i) => (
+                    <span key={c.name} className="inline-flex items-center gap-3">
+                      <span aria-hidden className={cn("size-[10px] rounded-full", CRITERIA_FILL.at(i))} />
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-6">
+                <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">The judges</span>
+                <ul className="m-0 flex list-none flex-wrap gap-x-10 gap-y-6 p-0">
+                  {HACKATHON.judges.map((j) => (
+                    <li key={j.name} className="flex items-center gap-4">
+                      <Initials name={j.name} className="size-[44px] text-md" />
+                      <span className="flex flex-col">
+                        <span className="text-lg font-semibold leading-lg text-[color:var(--color-text-primary)]">{j.name}</span>
+                        <span className="text-md leading-md text-[color:var(--color-text-tertiary)]">{j.role}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </section>
@@ -211,13 +242,14 @@ export function Timeline() {
 }
 
 export function FaqAndRules() {
+  const { unit } = useHackathon();
   const faq: [string, string][] = [
-    ["Is it free to take part?", "Yes. Joining is free, and every participant builds with IDEEZA AI on Low quality."],
+    ["Is it free to take part?", `Yes. Joining is free, and every participant builds with IDEEZA AI on ${HACKATHON.baseQuality} quality.`],
     ["I have never built hardware. Can I still take part?", "Yes. No engineering background is needed: you describe the idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D."],
     ["Do I need a crypto wallet or KYC?", "No. You can build, publish and vote without a wallet and without KYC."],
     ["How do votes count?", `Each account has ${HACKATHON.votesPerPerson} votes and can take one back while voting is open. Only signed-in accounts with a verified email can vote.`],
     ["Who owns my design?", "You do. Participants keep full ownership of their designs and intellectual property."],
-    ["When are the winners announced?", `Building ends on ${eat(HACKATHON.dates.end)} (EAT). The winners are published on this page on ${eat(HACKATHON.dates.results)}.`],
+    ["When are the winners announced?", `Building ends on ${eat(HACKATHON.dates.end)} (${HACKATHON.tzShort}). The winners are published on this page on ${eat(HACKATHON.dates.results)}.`],
   ];
   return (
     <section id="faq" aria-labelledby="faq-title" className={SECTION}>
@@ -244,7 +276,7 @@ export function FaqAndRules() {
           </h2>
           <p className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{HACKATHON.rules}</p>
           <ul className="m-0 flex list-none flex-wrap gap-3 p-0">
-            {[`${HACKATHON.votesPerPerson} votes per account`, "Verified email to vote", "One account per person"].map((c) => (
+            {[...(unit === "team" ? [`Teams of ${HACKATHON.teamMin} to ${HACKATHON.teamMax}`] : []), `${HACKATHON.votesPerPerson} votes per account`, "Verified email to vote", "One account per person"].map((c) => (
               <li key={c} className="rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] px-5 py-2 text-md font-medium leading-md text-[color:var(--color-text-secondary)]">
                 {c}
               </li>
@@ -289,7 +321,7 @@ function closingClock(phase: Phase | null, now: number | null): string {
  * It fills the screen under the site bar and section bar.
  */
 export function Closing() {
-  const { now, phase } = useHackathon();
+  const { now, phase, unit } = useHackathon();
   const still = useReducedMotion();
   const wide = React.useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
   const ref = React.useRef<HTMLElement>(null);
@@ -316,11 +348,11 @@ export function Closing() {
       <div className="mx-auto flex w-full max-w-[1260px] flex-1 flex-col px-8 pb-24 pt-20 md:pt-24 min-[1292px]:px-0">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-16">
           <p className="max-w-[480px] text-lg leading-lg text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-xl md:leading-xl">
-            {HACKATHON.minProducts} products in 160 hours. No engineering background needed: describe an idea, and IDEEZA AI designs the concept, PCB, code and 3D.
+            {HACKATHON.minProducts} products in {HACKATHON.hours} hours. No engineering background needed: describe an idea, and IDEEZA AI designs the concept, PCB, code and 3D.
           </p>
           <p className="text-lg leading-lg text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-xl md:leading-xl lg:text-right">
             <b className="font-semibold text-[color:var(--color-white)]">{money(prizePool)}</b> in prizes
-            <br className="hidden lg:block" /> for the top three.
+            <br className="hidden lg:block" /> for the top {inWords(HACKATHON.prizes.length)}.
           </p>
         </div>
 
@@ -329,7 +361,7 @@ export function Closing() {
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[90%] w-[min(1000px,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-black)_62%,transparent),transparent)]" />
           <p className="text-md font-medium uppercase leading-md tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-lg md:leading-lg">{closingClock(phase, now)}</p>
           <h2 id="closing-title" className="mt-12 font-display text-6xl leading-6xl tracking-tighter [text-wrap:balance] md:text-8xl md:leading-8xl">
-            <span className="block font-medium text-[color:var(--color-white)]">Put your university</span>
+            <span className="block font-medium text-[color:var(--color-white)]">Put your {GROUP ? GROUP.one : unit === "team" ? "team" : "name"}</span>
             <span className="ix-hack-shine block font-bold">on the board.</span>
           </h2>
           <div className="mt-20 flex w-full flex-col items-center gap-8 sm:w-auto sm:flex-row">

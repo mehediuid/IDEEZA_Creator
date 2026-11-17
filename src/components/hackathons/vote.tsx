@@ -7,13 +7,13 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { HACKATHON } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, entrantOf, groupOf } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
 import { VoteButton } from "./actions";
 import { Heading, SECTION, SURFACE } from "./parts";
 
 export function VoteShelf() {
-  const { board, entry, openProject } = useHackathon();
+  const { board, entry, openProject, unit } = useHackathon();
   const items = board.filter((r) => r.p.project).sort((a, b) => b.votes - a.votes);
   const used = HACKATHON.votesPerPerson - entry.votesLeft;
 
@@ -22,7 +22,7 @@ export function VoteShelf() {
       <Heading
         id="vote-title"
         title="Vote for the products you'd use"
-        lead="Every vote is a point for the builder and their university. Signed-in accounts vote, and you can take a vote back while voting is open."
+        lead={`Every vote is a point for the ${entrantOf(unit).one}${GROUP ? ` and their ${GROUP.one}` : ""}. Signed-in accounts vote, and you can take a vote back while voting is open.`}
         aside={
           <div className="flex flex-col gap-3 md:items-end">
             <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">
@@ -52,7 +52,7 @@ export function VoteShelf() {
                 <div className="flex flex-col gap-2">
                   <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">{proj.name}</h3>
                   <p className="truncate text-md leading-md text-[color:var(--color-text-tertiary)]">
-                    {r.p.name} · {r.p.university || "Open category"}
+                    {[r.p.name, groupOf(r.p)].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <p className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{proj.summary}</p>

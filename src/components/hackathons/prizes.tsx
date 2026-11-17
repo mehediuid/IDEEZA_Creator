@@ -13,7 +13,7 @@ import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ChampionIcon, GiftIcon, SparklesIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { HACKATHON, money, prizePool } from "@/lib/hackathons/vibe-inventing";
+import { HACKATHON, inWords, money, prizePool } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon, useReducedMotion } from "./context";
 import { HERO_MEDIA, Heading, Initials, SECTION, SURFACE } from "./parts";
 
@@ -62,12 +62,35 @@ function PrizesBackdrop() {
   );
 }
 
+// How the winner is decided, in one sentence under the heading (the campaign's Winner setting).
+const DECIDED =
+  HACKATHON.winBy === "shortlist"
+    ? `The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the winners.`
+    : HACKATHON.winBy === "score"
+      ? `The judges' scores count for ${HACKATHON.judgesWeight}% and the votes for ${100 - HACKATHON.judgesWeight}%.`
+      : "The most points win.";
+
+// What everyone can win along the way, when the campaign has it.
+const EXTRAS = [
+  HACKATHON.giveaways && {
+    icon: GiftIcon,
+    title: `Giveaways every ${HACKATHON.giveaways.everyDays} days`,
+    text: `${HACKATHON.giveaways.prize}, given out every ${HACKATHON.giveaways.everyDays} days while the hackathon runs.`,
+  },
+  HACKATHON.aiUnlock && {
+    icon: SparklesIcon,
+    title: `Better AI for the top ${HACKATHON.aiUnlock.top}`,
+    text: `In the last ${HACKATHON.aiUnlock.lastDays} days the top ${HACKATHON.aiUnlock.top} build on ${HACKATHON.aiUnlock.quality} quality instead of ${HACKATHON.baseQuality}.`,
+  },
+].filter((x) => !!x);
+
 export function Prizes() {
   const { board, openProject } = useHackathon();
+  const places = inWords(HACKATHON.prizes.length);
   return (
     <section id="prizes" aria-labelledby="prizes-title" className={cn(SECTION, "relative isolate")}>
       <PrizesBackdrop />
-      <Heading className="[text-shadow:0_2px_18px_rgba(0,0,0,0.85)]" id="prizes-title" title={`${money(prizePool)} for the top three`} lead={`If building ended now, these three would stand here. The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the winners.`} />
+      <Heading className="[text-shadow:0_2px_18px_rgba(0,0,0,0.85)]" id="prizes-title" title={`${money(prizePool)} for the top ${places}`} lead={`If building ended now, these ${places} would stand here. ${DECIDED}`} />
 
       <ol className="m-0 mx-auto mt-24 grid max-w-[960px] list-none grid-cols-3 items-end p-0 md:mt-32">
         {HACKATHON.prizes.map((amount, i) => {
@@ -132,22 +155,21 @@ export function Prizes() {
         })}
       </ol>
 
-      <ul className="m-0 mx-auto mt-16 grid max-w-[960px] list-none grid-cols-1 gap-6 p-0 md:mt-20 md:grid-cols-2 md:gap-10">
-        {[
-          { icon: GiftIcon, title: "Giveaways every 2 days", text: "Bonus AI credits and IDEEZA merch, given out every 2 days while the hackathon runs." },
-          { icon: SparklesIcon, title: "Better AI for the top 50", text: "In the last 3 days the top 50 build on Medium quality instead of Low." },
-        ].map((x) => (
-          <li key={x.title} className={cn("flex items-start gap-8 rounded-2xl px-10 py-10 md:px-12", SURFACE)}>
-            <span className="flex size-[44px] shrink-0 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--color-violet-600)_22%,transparent)] text-[color:var(--color-violet-200)]">
-              <HugeiconsIcon icon={x.icon} size={22} strokeWidth={1.8} />
-            </span>
-            <span className="flex flex-col gap-3">
-              <span className="text-xl font-semibold leading-xl text-[color:var(--color-text-primary)]">{x.title}</span>
-              <span className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{x.text}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {EXTRAS.length ? (
+        <ul className="m-0 mx-auto mt-16 grid max-w-[960px] list-none grid-cols-1 gap-6 p-0 md:mt-20 md:grid-cols-2 md:gap-10">
+          {EXTRAS.map((x) => (
+            <li key={x.title} className={cn("flex items-start gap-8 rounded-2xl px-10 py-10 md:px-12", SURFACE)}>
+              <span className="flex size-[44px] shrink-0 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--color-violet-600)_22%,transparent)] text-[color:var(--color-violet-200)]">
+                <HugeiconsIcon icon={x.icon} size={22} strokeWidth={1.8} />
+              </span>
+              <span className="flex flex-col gap-3">
+                <span className="text-xl font-semibold leading-xl text-[color:var(--color-text-primary)]">{x.title}</span>
+                <span className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{x.text}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }
