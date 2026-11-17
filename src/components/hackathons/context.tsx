@@ -79,7 +79,7 @@ export function HackathonProvider({ children }: { children: React.ReactNode }) {
     phase,
     entry,
     joinHref: into("/hackathons?join=1"),
-    voteHref: into("/hackathons#vote"),
+    voteHref: into(unit === "duel" ? "/hackathons#leaderboard" : "/hackathons#vote"),
     board,
     groups,
     unit,

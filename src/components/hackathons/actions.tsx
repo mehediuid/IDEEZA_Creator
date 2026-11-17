@@ -66,8 +66,10 @@ export function JoinButton({ size = "2xl", tone = "default", arrow, className }:
 
 /** Goes to the shelf of products, where the votes are cast. */
 export function VoteLink({ size = "2xl", className }: { size?: Size; className?: string }) {
+  const { unit } = useHackathon();
+  // 1 vs 1: the votes are cast in the matches.
   return (
-    <a href="#vote" className={cn(SECONDARY(size), className)}>
+    <a href={unit === "duel" ? "#leaderboard" : "#vote"} className={cn(SECONDARY(size), className)}>
       Vote for projects
     </a>
   );

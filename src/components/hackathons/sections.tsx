@@ -40,6 +40,7 @@ export function SectionNav() {
   }, [active]);
   React.useEffect(() => {
     const els = ANCHORS.map(([id]) => document.getElementById(id)).filter((e): e is HTMLElement => !!e);
+    // (Re-observed when the style changes: the Vote section comes and goes with it.)
     const io = new IntersectionObserver(
       (es) => {
         const seen = es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
@@ -49,14 +50,15 @@ export function SectionNav() {
     );
     els.forEach((e) => io.observe(e));
     return () => io.disconnect();
-  }, []);
+  }, [unit]);
   return (
     <div className="sticky top-[80px] z-[5] border-0 border-y border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_86%,transparent)] backdrop-blur-[24px]">
       {/* Phones: a 56 px bar (with the site bar's 80, the two took 18 % of the screen at 68);
           the anchor row fades at its right edge so the hidden ones read as "more". */}
       <nav aria-label="On this page" className="mx-auto flex h-[56px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 md:h-[68px] min-[1292px]:px-0">
         <ul ref={list} className="m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0 pr-10 [scrollbar-width:none] max-md:[mask-image:linear-gradient(to_right,black_82%,transparent)] md:gap-2 md:pr-0">
-          {ANCHORS.map(([id, label]) => (
+          {/* 1 vs 1 has no Vote section: the votes are cast in the matches. */}
+          {ANCHORS.filter(([id]) => !(id === "vote" && unit === "duel")).map(([id, label]) => (
             <li key={id}>
               <a
                 href={`#${id}`}
