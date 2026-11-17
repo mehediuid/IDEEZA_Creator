@@ -6,7 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
-| [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons) | Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons | 17 Nov 2026 | Not created yet | Not started |
+| [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons) | Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
 | [CL-023](#cl-023-sample-listings-and-demo-projects-that-are-always-there) | Sample listings and demo projects that are always there | 17 Nov 2026 | None: prototype only | Nothing to build |
 | [CL-022](#cl-022-dropdown-menus-open-in-place) | Dropdown menus open in place | 17 Nov 2026 | Not created yet | Not started |
 | [CL-021](#cl-021-add-a-product--build-with-ai-uses-homes-ai-chat-box) | Add a product › Build with AI uses Home's AI chat box | 17 Nov 2026 | Not created yet | Not started |
@@ -16,9 +16,9 @@ to build and how to check it is done, and links to its Jira ticket.
 | [CL-017](#cl-017-editors-no-fake-results-and-the-code-rail-by-keyboard) | Editors: no fake results, and the Code rail by keyboard | 17 Nov 2026 | Not created yet | Not started |
 | [CL-016](#cl-016-marketplace-safer-auctions-and-listings) | Marketplace: safer auctions and listings | 17 Nov 2026 | Not created yet | Not started |
 | [CL-015](#cl-015-product-and-project-pages-the-missing-controls) | Product and project pages: the missing controls | 17 Nov 2026 | Not created yet | Not started |
-| [CL-014](#cl-014-hackathons-a-list-and-a-page-for-each-hackathon) | Hackathons: a list, and a page for each hackathon | 17 Nov 2026 | Not created yet | Not started |
-| [CL-013](#cl-013-hackathon-page-the-hackathons-own-data-1-vs-1-matches-and-a-style-switch) | Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch | 17 Nov 2026 | Not created yet | Not started |
-| [CL-012](#cl-012-hackathon-page-ideeza-vibe-inventing-online-hackathon) | Hackathon page: IDEEZA Vibe Inventing Online Hackathon | 16 Nov 2026 | Not created yet | Not started |
+| [CL-014](#cl-014-hackathons-a-list-and-a-page-for-each-hackathon) | Hackathons: a list, and a page for each hackathon | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
+| [CL-013](#cl-013-hackathon-page-the-hackathons-own-data-1-vs-1-matches-and-a-style-switch) | Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
+| [CL-012](#cl-012-hackathon-page-ideeza-vibe-inventing-online-hackathon) | Hackathon page: IDEEZA Vibe Inventing Online Hackathon | 16 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
 | [CL-011](#cl-011-redeem-a-code-for-ai-credits) | Redeem a code for AI credits | 16 Nov 2026 | [PR-9534](https://ideeza.atlassian.net/browse/PR-9534) | Ready for development |
 | [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere) | Mobile app: native mobile UX everywhere | 15 Nov 2026 | None (owner: no ticket) | Not started |
 | [CL-009](#cl-009-mobile-app-splash-onboarding-welcome-and-log-in) | Mobile app: splash, onboarding, Welcome and Log In | 9 Nov 2026 | Not created yet | Not started |
@@ -57,7 +57,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 ## CL-024 Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons
 
-**In the prototype:** 17 November 2026 · **Jira:** Not created yet · **Production:** Not started
+**In the prototype:** 17 November 2026 · **Jira:** [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the whole Hackathon page) · **Production:** Not started
 
 **Screen:** the site menu's **Hackathons** (`/hackathons`) now opens the main hackathon's page itself. Each hackathon keeps its own page, `/hackathons/<hackathon>`, and the list of CL-014 moves to `/hackathons/all`, behind **More hackathons**. The page's words, blocks and order are now the "IDEEZA Hackathons" prototype's landing page as a visitor sees it (owner: that page's content is final), in our design. Where this entry and CL-012, CL-013 or CL-014 differ, this entry wins.
 
@@ -675,7 +675,7 @@ Demo stand-ins (prototype only): demo buyers in the Sales rows ("Mira (demo crea
 
 ## CL-014 Hackathons: a list, and a page for each hackathon
 
-**In the prototype:** 17 November 2026 · **Jira:** Not created yet · **Production:** Not started
+**In the prototype:** 17 November 2026 · **Jira:** [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the whole Hackathon page) · **Production:** Not started
 
 **Changed by [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons):** the menu's Hackathons now opens the main hackathon at `/hackathons`; this list moved to `/hackathons/all`, behind More hackathons, and the page's words follow CL-024.
 
@@ -726,7 +726,7 @@ Prototype only (nothing to build): two sample hackathons fill the list so it sho
 
 ## CL-013 Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch
 
-**In the prototype:** 17 November 2026 · **Jira:** Not created yet · **Production:** Not started
+**In the prototype:** 17 November 2026 · **Jira:** [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the whole Hackathon page) · **Production:** Not started
 
 **Screen:** the Hackathon page, `/hackathons` (CL-012). The client's ask: the page is a campaign page. The organizer designs the hackathon in the *IDEEZA Hackathons* prototype's setup, and the page keeps one layout and one look while everything inside it comes from that hackathon.
 
@@ -774,7 +774,7 @@ Prototype only (nothing to build): a small **Prototype** pill floats at the bott
 
 ## CL-012 Hackathon page: IDEEZA Vibe Inventing Online Hackathon
 
-**In the prototype:** 16 November 2026 · **Jira:** Not created yet · **Production:** Not started
+**In the prototype:** 16 November 2026 · **Jira:** [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the whole Hackathon page) · **Production:** Not started
 
 **Screen:** a new public website page, `/hackathons`, open without signing in, in the website's dark look with the website's top bar and footer. The top bar gets a **Hackathons** link before Pricing. Built from the owner's *IDEEZA Hackathons* prototype (its landing view) and the owner's design briefs, in the design system.
 
