@@ -207,7 +207,7 @@ function PrizeAndClock() {
   // While it runs, how much of the hackathon has gone, as a line of light along the frame's foot.
   const gone = phase === "live" && now !== null ? Math.min(1, Math.max(0, (now - HACKATHON.dates.start) / (HACKATHON.dates.end - HACKATHON.dates.start))) : null;
   return (
-    <div className="ix-hk-rise relative mt-16 w-full max-w-[960px] md:mt-20" style={{ animationDelay: "480ms" }}>
+    <div className="ix-hk-rise relative mt-10 w-full max-w-[840px] md:mt-12" style={{ animationDelay: "480ms" }}>
       {/* The bloom behind the stage. */}
       <div aria-hidden className="pointer-events-none absolute inset-x-[8%] -inset-y-6 -z-10 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-violet-600)_42%,transparent),transparent)] blur-2xl" />
       {/* A hairline frame, brightest along the top edge, with the light line the hologram panel has. */}
@@ -223,13 +223,13 @@ function PrizeAndClock() {
           ) : null}
 
           {/* The prize. */}
-          <div className="flex flex-col items-center gap-4 px-6 pb-8 pt-10 md:px-10 md:py-12">
+          <div className="flex flex-col items-center gap-2 px-6 pb-6 pt-7 md:px-8 md:py-7">
             <Ruled>Prize pool</Ruled>
             <p className="m-0 flex items-baseline gap-3 font-display font-bold tabular-nums tracking-tight [text-shadow:0_0_40px_color-mix(in_srgb,var(--color-violet-500)_45%,transparent)]">
-              <span className="ix-hk-gleam text-6xl leading-6xl md:text-7xl md:leading-7xl">
+              <span className="ix-hk-gleam text-5xl leading-5xl md:text-6xl md:leading-6xl">
                 <CountUp value={prizePool} />
               </span>
-              <span className="text-2xl font-semibold leading-2xl text-[color:var(--color-violet-200)] md:text-3xl md:leading-3xl">{HACKATHON.currency}</span>
+              <span className="text-xl font-semibold leading-xl text-[color:var(--color-violet-200)] md:text-2xl md:leading-2xl">{HACKATHON.currency}</span>
             </p>
             <ul aria-label="Prizes by place" className="m-0 flex list-none flex-wrap items-center justify-center gap-x-5 gap-y-2 p-0 text-md leading-md text-[color:var(--color-text-secondary)] md:text-lg md:leading-lg">
               {HACKATHON.prizes.slice(0, 3).map((a, i) => (
@@ -242,12 +242,12 @@ function PrizeAndClock() {
           </div>
 
           {/* The rule between, with its node. */}
-          <div aria-hidden className="relative mx-10 h-px bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--color-violet-300)_45%,transparent),transparent)] md:mx-0 md:my-10 md:h-auto md:w-px md:bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--color-violet-300)_45%,transparent),transparent)]">
+          <div aria-hidden className="relative mx-10 h-px bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--color-violet-300)_45%,transparent),transparent)] md:mx-0 md:my-7 md:h-auto md:w-px md:bg-[linear-gradient(180deg,transparent,color-mix(in_srgb,var(--color-violet-300)_45%,transparent),transparent)]">
             <span className="absolute left-1/2 top-1/2 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--color-violet-200)] shadow-[0_0_14px_3px_color-mix(in_srgb,var(--color-violet-400)_85%,transparent)]" />
           </div>
 
           {/* The clock. */}
-          <div className="flex flex-col items-center justify-center gap-4 px-4 pb-10 pt-8 md:px-10 md:py-12">
+          <div className="flex flex-col items-center justify-center gap-2 px-4 pb-7 pt-6 md:px-8 md:py-7">
             <Ruled>
               <span aria-hidden className={cn("size-[7px] rounded-full", phase === "live" ? "bg-[var(--color-green-400)] motion-safe:animate-pulse" : "bg-[var(--color-violet-300)]")} />
               {clock ? clock.label : " "}
@@ -257,12 +257,12 @@ function PrizeAndClock() {
                 {units.map(([v, l], i) => (
                   <React.Fragment key={l}>
                     {i ? (
-                      <span aria-hidden className="px-1 font-display text-4xl font-light leading-4xl text-[color:color-mix(in_srgb,var(--color-violet-300)_55%,transparent)] sm:text-5xl sm:leading-5xl md:px-2 md:text-6xl md:leading-6xl">
+                      <span aria-hidden className="px-1 font-display text-4xl font-light leading-4xl text-[color:color-mix(in_srgb,var(--color-violet-300)_55%,transparent)] md:px-2 md:text-5xl md:leading-5xl">
                         :
                       </span>
                     ) : null}
                     <span aria-hidden className="flex flex-col items-center gap-1">
-                      <span className="font-display text-4xl font-semibold leading-4xl tabular-nums sm:text-5xl sm:leading-5xl md:text-6xl md:leading-6xl">
+                      <span className="font-display text-4xl font-semibold leading-4xl tabular-nums md:text-5xl md:leading-5xl">
                         <Digits v={v} />
                       </span>
                       <span className="text-md font-medium uppercase leading-md tracking-caps text-[color:var(--color-text-tertiary)]">{l}</span>
@@ -295,7 +295,7 @@ export function HackathonHero() {
         <Planet />
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1260px] flex-col items-center px-8 pt-[200px] text-center md:pt-[236px] lg:pt-[260px] min-[1292px]:px-0">
+      <div className="mx-auto flex w-full max-w-[1260px] flex-col items-center px-8 pt-[160px] text-center md:pt-[184px] lg:pt-[196px] min-[1292px]:px-0">
         <p className="ix-hk-fade flex items-center gap-3 rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-violet-300)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_55%,transparent)] px-5 py-2 text-md font-medium leading-md text-[color:color-mix(in_srgb,var(--color-white)_86%,transparent)] backdrop-blur-[6px] md:text-lg md:leading-lg">
           <span aria-hidden className={cn("size-[8px] shrink-0 rounded-full", phase === "live" ? "bg-[var(--color-green-400)] motion-safe:animate-pulse" : "bg-[var(--color-violet-400)]")} />
           <span>
@@ -303,7 +303,7 @@ export function HackathonHero() {
           </span>
         </p>
 
-        <h1 id="hackathon-title" className="mt-12 font-display text-6xl font-bold leading-6xl tracking-tighter text-[color:var(--color-white)] md:text-8xl md:leading-8xl">
+        <h1 id="hackathon-title" className="mt-8 font-display text-6xl font-bold leading-6xl tracking-tighter text-[color:var(--color-white)] md:text-8xl md:leading-8xl">
           <span className="ix-hk-wipe block" style={{ animationDelay: "120ms" }}>
             <span className="bg-[linear-gradient(90deg,var(--color-violet-300),var(--color-violet-500))] bg-clip-text text-transparent [-webkit-background-clip:text]">{lit}</span>
           </span>
@@ -314,13 +314,13 @@ export function HackathonHero() {
           ) : null}
         </h1>
 
-        <p className="ix-hk-rise mt-12 max-w-[760px] text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-2xl md:leading-2xl" style={{ animationDelay: "420ms" }}>
+        <p className="ix-hk-rise mt-6 max-w-[760px] text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-2xl md:leading-2xl" style={{ animationDelay: "420ms" }}>
           {HACKATHON.lead}
         </p>
 
         <PrizeAndClock />
 
-        <div className="ix-hk-rise mt-10 flex w-full flex-col items-center justify-center gap-6 sm:w-auto sm:flex-row md:mt-12" style={{ animationDelay: "540ms" }}>
+        <div className="ix-hk-rise mt-8 flex w-full flex-col items-center justify-center gap-6 sm:w-auto sm:flex-row" style={{ animationDelay: "540ms" }}>
           <JoinButton className="w-full transition-shadow duration-fast hover:shadow-[0_0_36px_color-mix(in_srgb,var(--color-violet-500)_70%,transparent)] sm:w-auto" />
           <VoteLink className="w-full sm:w-auto" />
         </div>
