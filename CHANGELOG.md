@@ -6,6 +6,15 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-023](#cl-023-sample-listings-and-demo-projects-that-are-always-there) | Sample listings and demo projects that are always there | 17 Nov 2026 | None: prototype only | Nothing to build |
+| [CL-022](#cl-022-dropdown-menus-open-in-place) | Dropdown menus open in place | 17 Nov 2026 | Not created yet | Not started |
+| [CL-021](#cl-021-add-a-product--build-with-ai-uses-homes-ai-chat-box) | Add a product › Build with AI uses Home's AI chat box | 17 Nov 2026 | Not created yet | Not started |
+| [CL-020](#cl-020-my-projects-purchased) | My projects: Purchased | 17 Nov 2026 | Not created yet | Not started |
+| [CL-019](#cl-019-explore-marketplace-asset-card-grid) | Explore marketplace: Asset Card grid | 17 Nov 2026 | Not created yet | Not started |
+| [CL-018](#cl-018-marketplace-details-a-shop-page-with-one-buy-box) | Marketplace details: a shop page with one buy box | 17 Nov 2026 | Not created yet | Not started |
+| [CL-017](#cl-017-editors-no-fake-results-and-the-code-rail-by-keyboard) | Editors: no fake results, and the Code rail by keyboard | 17 Nov 2026 | Not created yet | Not started |
+| [CL-016](#cl-016-marketplace-safer-auctions-and-listings) | Marketplace: safer auctions and listings | 17 Nov 2026 | Not created yet | Not started |
+| [CL-015](#cl-015-product-and-project-pages-the-missing-controls) | Product and project pages: the missing controls | 17 Nov 2026 | Not created yet | Not started |
 | [CL-014](#cl-014-hackathons-a-list-and-a-page-for-each-hackathon) | Hackathons: a list, and a page for each hackathon | 17 Nov 2026 | Not created yet | Not started |
 | [CL-013](#cl-013-hackathon-page-the-hackathons-own-data-1-vs-1-matches-and-a-style-switch) | Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch | 17 Nov 2026 | Not created yet | Not started |
 | [CL-012](#cl-012-hackathon-page-ideeza-vibe-inventing-online-hackathon) | Hackathon page: IDEEZA Vibe Inventing Online Hackathon | 16 Nov 2026 | Not created yet | Not started |
@@ -42,6 +51,521 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-023 Sample listings and demo projects that are always there
+
+**In the prototype:** 17 November 2026 · **Jira:** none: prototype only · **Production:** Nothing to build
+
+**Prototype only.** The prototype keeps everything in the browser, so a new account used to see an empty marketplace and empty My projects. These samples are there so every screen has something to show. Nothing here is built in production.
+
+- Explore marketplace always lists the 9 sample projects from the Innovations feed that are for sale, as other creators' listings ("By {creator}"). Each opens a shop page at `/marketplace/p<n>` with the same Marketplace box ([CL-018](#cl-018-marketplace-details-a-shop-page-with-one-buy-box)), the Creator block, About, What's inside and On Innovations. Buying one uses a demo wallet. A sample post's **View on Marketplace** opens that page.
+- Every account gets 4 demo projects in My projects, once: **Smart Plant Pot** (Listed, shared on Innovations, Main NFT on Buy now plus Physical and Virtual copies for both uses), **Gesture LED Lamp** (Sold, bought by Leo), **Heart Rate Band** (Minted) and **BLE Data Logger** (Draft).
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| — | ![After: My projects with the four demo projects](docs/changelog/2026-11-17-demo-projects-after.png) |
+
+---
+
+## CL-022 Dropdown menus open in place
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** every dropdown menu in the web app (for example Quality on Home and in Add a product, the project's and the product's ⋯ menus, sort menus) and the blog list's filter popovers.
+
+### What to build
+
+- [ ] A menu opens right under its button (or above it when there is more room there), already in its place. Only a short fade and a slight zoom (95 % → 100 %) animate.
+- [ ] It never slides in from a corner of the screen while it moves to its button.
+- [ ] With reduced motion, nothing animates.
+
+### Design
+
+- DS Menu panel, unchanged. Motion: duration fast, fade and zoom only; the panel's position is never animated.
+
+### Before → After
+
+No screenshot: the change is motion only. At rest the menu looks the same as before.
+
+---
+
+## CL-021 Add a product › Build with AI uses Home's AI chat box
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** a project's page › Products › **Add a product** › **Build with AI** (owner, 2026-11-16: "why isn't our regular AI chat box there?"). Before, this step had a bare text box with its own **Start**.
+
+### What to build
+
+- [ ] The step holds the same AI chat box as Home: the text box, **voice input** (mic), **Quality** (Low / Medium / High, each with its build price), **Enhance** and **Generate**.
+- [ ] The text box's placeholder: "e.g. A solar battery pack that charges this desk charger at night". Enter sends; Shift+Enter starts a new line.
+- [ ] Quality starts at the level picked last, on Home or here, and a pick here is remembered for Home too.
+- [ ] **Generate** opens the chat for the new product, on this project (it never asks which project) and at the picked Quality. The chat is listed in History like any other.
+- [ ] While the box is empty, Generate is the small disabled square; its label and tooltip say "Generate a product for {project} — describe the product first". Without enough credits it is disabled too.
+- [ ] Under the box: "1 concept [1 credit] · you have {n}". Without enough credits: "You need 1 credit to start. You have {n}." and the link **Top up credits**.
+- [ ] Voice input: while listening, the listening view takes the box's place, as on Home; what was said is added to what was typed.
+- [ ] The dialog's footer keeps **Back** only (Generate is the step's one primary).
+- [ ] The dialog is wider on this step so the box's toolbar stays on one row. At phone width the dialog is a bottom sheet and the toolbar wraps: Enhance and Generate go to a second line, on the right.
+
+### Design
+
+- The dialog: ModalFrame, md on this step (sm on the choice step), a bottom sheet below md.
+- The box is Home's composer: radius 2xl, 1 px border, brand border on focus; toolbar buttons 40 px; the Quality menu (DS Menu, single choice); Generate is the primary button; the cost uses the credit badge.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: Build with AI with a bare text box, Enhance and Start](docs/changelog/2026-11-17-build-with-ai-before.png) | ![After: Build with AI with Home's chat box: voice, Quality, Enhance, Generate](docs/changelog/2026-11-17-build-with-ai-after.png) |
+
+---
+
+## CL-020 My projects: Purchased
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** My projects › **Purchased** (`/projects?tab=purchased`) and a page for each project bought from (`/projects/purchased/<project>`). Web app only.
+
+### What to build
+
+**The Purchased tab**
+- [ ] A **Purchased** tab at the end of My projects' tabs (All, Draft, Minted, Listed, Sold, Purchased), with the number of projects bought from. Opening it puts `?tab=purchased` in the address.
+- [ ] Above the cards: "{n} projects bought from" ("1 project bought from").
+- [ ] One card per project, newest purchase first, in the marketplace's Asset Card frame ([CL-019](#cl-019-explore-marketplace-asset-card-grid)): the cover (no cover: a chip icon; a cover that doesn't load: an image icon), the badge **Purchased** on the picture, the name (the card's link), "By {creator}".
+- [ ] Chips for what is held: "Whole project · {n}%", "Physical NFT ×{n}", "Virtual NFT ×{n}". Under them the uses held: "Personal use", "Business use" or "Personal use · Business use".
+- [ ] A hairline, then "You own" with "{n} NFTs" ("1 NFT"): each copy counts one, the Main NFT counts once. On the right "Last bought" with its date.
+- [ ] Nothing bought: a state card "Nothing bought yet" with "What {name} buys on Explore marketplace shows here: the whole project or its copies, how many, and what each use allows." and the button **Explore marketplace**.
+- [ ] When nothing at all is bought and no project exists, My projects' first-time empty state shows as before.
+
+**The purchased page**
+- [ ] Breadcrumb: My projects › Purchased › {project}.
+- [ ] Header: the cover, the name, "By {creator}", and **View on marketplace** (to its marketplace page).
+- [ ] **What you own**: one row per kind and use, and per product for a product's own copies. Title: "Physical NFT · Business use", "Virtual NFT · Personal use · {product}" or "Whole project · {n}%". Under it: "{n} copies · #7, #8 of 50" ("1 copy · #3"); for the Main NFT "The whole project, in one token" or "A share of the project". On the right: what was paid ("0.08 ETH") and "Last bought {date}".
+- [ ] **What you can do**: one line per kind and use held.
+  - Physical NFT · Personal use: "Build it for yourself from its fabrication files. Not for sale."
+  - Physical NFT · Business use: "Build it and sell what you build, as many as your copies allow."
+  - Virtual NFT · Personal use: "Use its 3D model and preview in your own, non-commercial work."
+  - Virtual NFT · Business use: "Use its 3D model and preview in commercial work: ads, games, product pages."
+  - Whole project: "The whole project is yours: every file, the right to list it and its royalties." A share: "You own {n}% of the project: that share of its sales and royalties."
+- [ ] **Files**: what comes with each kind held. Whole project: "Every file of the project: PCB, code, 3D, wiring and parts". Physical NFT: "PCB fabrication files (Gerber)", "Enclosure (STEP and STL)", "Bill of materials (CSV)", "Assembly guide (PDF)". Virtual NFT: "3D model (GLB)", "Preview renders (PNG)".
+- [ ] **Receipts**: a table of every purchase, newest first: Date, Item, Copy ("#7 of 50", or "—" for the Main NFT), Price, Transaction (shortened, the full one on hover).
+- [ ] The creator, at the foot: for a project the creator listed, **The creator** with "Questions about what you bought go to {creator}." and **Get creator support** (to the conversation in Messages); for another creator's project, the creator's card.
+- [ ] A project the buyer hasn't bought from: a state card "{name} hasn't bought anything of this project" with **Back to Purchased**.
+- [ ] Phone width: one card per row; the receipts table scrolls sideways inside its card.
+
+Demo stand-ins (prototype only): purchases are those of the demo creator picked in "Shopping as" (Mira, Leo, Sam), and the slim Testnet demo strip above the cards switches them; "· as {name} (demo creator)" after the count and "bought as {name} (demo creator)" in the page header; the **Testnet demo** badge; test tokens; the line under Files "On the real marketplace these come with the NFT. This testnet demo has no files to download."
+
+### Design
+
+- Cards: the DS M25 Asset Card frame (radius 2xl, 12 px padding, the dark-glass badge, H4 title), A18 Tag md for the chips, the hairline at 40 %.
+- Empty: the DS State card. Page sections: the page's cards, section titles 20 bold; **View on marketplace** and **Get creator support**: A01 Button Secondary lg at 44 px.
+- Receipts: a plain table, Body 14, tabular figures, the transaction in Code.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: My projects with no Purchased tab](docs/changelog/2026-11-17-my-projects-before.png) | ![After: the Purchased tab with a bought project's card](docs/changelog/2026-11-17-purchased-after.png) |
+
+---
+
+## CL-019 Explore marketplace: Asset Card grid
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Explore marketplace, `/marketplace`: the card grid on the **For sale**, **Sold** and **Purchased** tabs. Each card is now the design system's Asset Card (M25), with its hover, and its NFT tags can be clicked.
+
+### What to build
+
+**The card, top to bottom**
+- [ ] The picture: the project's cover in a rounded frame, 372 × 233 in proportion. No cover: a chip icon. A cover that doesn't load: an icon and "Image didn't load".
+- [ ] A status badge on the picture, top right: white words on dark glass, in light and dark. **Buy now**, **Auction · {time left}** (e.g. "Auction · 2h 15m left", "Auction · Under a minute left"), **Auction ended**, **Copies**, **Sold** or **Purchased**.
+- [ ] The title on one line (cut with "…", the full name on hover). The title is the card's link and its only Tab stop; the whole card can be clicked.
+- [ ] The creator's name. Beside it, views and appreciations, only when they are real: a project shared on Innovations shows its post's counts. Otherwise no numbers. No plays count.
+- [ ] Tags **Main NFT**, **Physical NFT**, **Virtual NFT**: only what is on sale. The tag the price is for is lit (Selected).
+- [ ] A hairline, then the price block, always at the card's foot so the prices in a row line up: the label, the amount, and the token apart (e.g. "Current price" · "0.2" · "ETH"). On the right, a side fact when there is one.
+- [ ] What each card shows:
+  - Main NFT on Buy now: badge **Buy now**; tags Main NFT plus the copy kinds on sale, Main NFT lit; "Current price". Side: "Share {n}%" when less than the whole project is sold; else "You own {n}%" when the buyer already holds a share; else nothing.
+  - Main NFT on auction: badge **Auction · {time left}** or **Auction ended**; Main NFT lit; "Current bid", "Starting bid" (no bids yet) or "Winning bid" (ended with bids). Side "Ends {date, time}" or "Ended {date, time}".
+  - Copies only (no Main NFT listed): badge **Copies**; the copy kinds on sale, the kind of the lowest price lit; "From" when there is more than one offer, "Current price" when there is one. No side fact.
+  - Sold: badge **Sold**; tag Main NFT; "Sold for" (the whole project) or "Sold for {n}%". Side "Bought by {buyer}".
+  - Purchased tab: badge **Purchased**; tag Main NFT; "You own" with "{n}%" (no token). Side "Bought {date}".
+
+**Clickable tags**
+- [ ] On the For sale tab, on a card with more than one tag, each tag is a button. A click lights that tag and the price follows it. **Main NFT**: the card's Main NFT price, as above. **Physical NFT** or **Virtual NFT**: that kind's lowest price, labelled "From" when there is more than one offer of that kind, else "Current price"; the side fact goes.
+- [ ] A kind's price is what the details page sells under that tab: the whole project's copies of that kind. When the project has none, its products' copies of that kind.
+- [ ] Once a tag is clicked, the card opens the details page on that tab (`/marketplace/<project>?nft=main`, `?nft=physical`, `?nft=virtual`). Clicking a tag never opens the page.
+- [ ] On Sold and Purchased, and on a card with one tag, the tags are plain words.
+
+**Hover (the owner's design)**
+- [ ] With a pointer, on hover: the picture gets 60 px shorter from the bottom (its corners stay round and the picture moves up 30 px so it stays centred), the words slide up 60 px, and a button rises from below the card's edge to the card's foot, under the price. The button reads **View details**, or **View auction** on an auction. All of it moves together, smoothly.
+- [ ] The card's box never changes size: the card, its row and its neighbours never move. The border turns lilac.
+- [ ] The button is a real button with the primary button's hover, pressed and pointer. It goes where the card goes (with the clicked tag's tab). It is out of the Tab order and hidden from screen readers (the title link is the card's one stop).
+- [ ] No hover on touch: a tap opens the details page and nothing stays half open. With reduced motion nothing animates.
+
+**Grid**
+- [ ] As many columns as fit, none narrower than 280 px. At phone width, one column. Every width shows the same Asset Card (the old row layout below 560 px is gone).
+- [ ] While loading: skeleton cards in the Asset Card's shape. They don't pulse with reduced motion.
+
+Demo stand-ins (prototype only): the Testnet demo strip above the grid and on every marketplace page, now one slim line (about 50 px, was about 160 px): the **Testnet demo** badge, "Shopping as" with the switch ("Mira · demo creator", "Leo · demo creator", "Sam · demo creator"), and, on your own listing's details page, **Your project page** at the end (the longer explanation is read to screen readers only); the 9 sample listings from Innovations posts, each with its creator's name; the demo buyer names after "Bought by"; test tokens.
+
+### Design
+
+- DS M25 Asset Card (Figma V3uizmZLHo5Xhy65Dp3F0O node 1548:2110), with its Hover state.
+- Card: surface fill, radius 2xl (16 px), 12 px padding (20 px at the foot), 20 px between picture and words. Border: the card-glow colour (violet-200 at 20 %); on hover violet-300.
+- Picture frame: radius 2xl; surface-raised fill when there is no picture.
+- Status badge: 30 px tall, radius 2xl, 12 px in from the top and right; the overlay colour at 32 % with a 40 px background blur; Body 14 medium in white.
+- Title Heading/H4 (20 semibold). Creator Body/MD, secondary. Views and appreciations Code/MD with 16 px eye and heart icons.
+- Tags: A18 Tag md (Caption/MD), 8 px apart; the lit one is the Selected state.
+- Hairline: the border colour at 40 %. Price label Body/MD, tertiary; amount Heading/H4; token Code/MD, secondary. Side fact: label Body/MD tertiary, value Code/MD primary.
+- Hover button: A01 Button Primary lg at 44 px, 20 px in from the sides and the bottom.
+- Motion: duration normal (200 ms), ease-out, one clock for the picture, the words and the button; none with reduced motion.
+- Grid: the page grid, card minimum 280 px, the layout gutter.
+- Testnet demo strip (prototype only): one line, radius lg, 1 px border, subtle fill.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the old cards under the tall Testnet demo banner](docs/changelog/2026-11-17-market-grid-before.png) | ![After: the Asset Card grid under the slim demo strip](docs/changelog/2026-11-17-market-grid-after.png) |
+
+---
+
+## CL-018 Marketplace details: a shop page with one buy box
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Explore marketplace › a listed project, `/marketplace/<project>` (a card's tag can open a tab: `?nft=main`, `?nft=physical`, `?nft=virtual`), and a product's marketplace page, `/marketplace/<project>/products/<product>`. The page is now a shop page that answers a buyer's questions in order; the project's story stays on its Innovations post. The creator's Preview as buyer (`/projects/<project>?view=buyer`) shows the same box.
+
+### What to build
+
+**The page (a project)**
+- [ ] Order: media, header, then the Marketplace box with the Creator block, then the tabs. From 1024 px wide the box and the Creator block sit in the rail beside the header. Below 1024 px they stand under the header, above the tabs, open.
+- [ ] Media first: the same media stage as the project's Innovations post. The project video in use, then each product's video, then the pictures, with their thumbnails.
+- [ ] Header: the name (no edit pencil), the status chip (e.g. **Listed**), then "Created by {creator} · Listed {date}". The creator's name links to their profile. The page never says "you" for the creator. No Saved date and no Shared chip (the On Innovations block says it).
+- [ ] The notes under a video speak to the viewer: no "your prompt", no "your product videos".
+- [ ] The rail after the box: **Creator**, **On Innovations** (only while the project is shared there), **About**, **Legal information** (only when filled), **Recent**.
+- [ ] Tabs: **Products**, **Media**, **Network** (when there is one), **Team** (when there are contributors).
+- [ ] Each product card in Products links to that product's marketplace page and says what of its own is on sale, at its lowest price: "Physical NFT on sale · from 0.008 ETH", "Virtual NFT on sale · from {price}" or "Physical and Virtual NFTs on sale · from {price}". No line when the product sells nothing of its own.
+
+**The Marketplace box**
+- [ ] One box titled **Marketplace**, always open. Tabs **Main NFT**, **Physical NFT**, **Virtual NFT**: only the ones on sale, in that order. With only one, there are no tabs: a chip names it (e.g. **Main NFT**). The arrow keys move between tabs.
+- [ ] One tab shows at a time. Every tab is the same buy box: what is sold (a small overline), the price large, one **Buy now**, the wallet line, then **NFT details** folded.
+- [ ] The tab it opens on: the one the link asks for (`?nft=`), when that is on sale; else the Main NFT, if the buyer holds a share of it; else the copy kind the buyer holds; else the Main NFT while it can be bought; else the first copy tab.
+- [ ] The project page sells the Main NFT and the whole project's copies only. A product's copies are sold on that product's page only.
+- [ ] Nothing on sale: no box.
+
+**Main NFT tab, fixed price**
+- [ ] Overline "The whole project" or "{n}% of the project". The price large (e.g. "0.2 ETH").
+- [ ] **Buy now** (full width) opens the wallet's **Confirm purchase**. While another checkout holds the listing, Buy now is greyed and the line under it says "Someone is buying this now. Try again in a few minutes."
+- [ ] The wallet line under the button. Then the one legal line, always shown (the prototype's: "Demo on a testnet. Selling a share of a project can be regulated as an investment where you live; this is not available for real money.").
+- [ ] **NFT details**, folded: Listing (Buy now or Auction), Share, Royalties, Minting (Lazy or Minted), Chain, Collection ("—" when none). Under them: "Royalties are a share of resales, if marketplaces honour them." and, when lazy, "Lazy: the token is minted when you buy." Then the Main NFT's activity line, or "No activity yet · listed {date}" when there is none.
+- [ ] A buyer who already holds a share sees **Purchased Summary** first, then a hairline, the heading **Buy another share** and the buy box.
+
+**Main NFT tab, auction**
+- [ ] Overline "{The whole project | n% of the project} · Auction". Over the price: "Current bid", or "Starting bid" while there are no bids; once ended, "Winning bid" or "No bids". Under the price: "Ends {date, time}" with a time-left badge ("2h 15m left", "45m left", "Under a minute left"; warning colour in the last hour); "Ended {date, time}" once it is over.
+- [ ] Then: **Bid history (n)**; "You're the highest bidder." while the buyer leads; when outbid, the notice "You were outbid. {name} bid {price}." with "Your {amount} is back in your demo wallet."; **Your bid** with **Place bid**; **Buy now with {price}** when the auction has a buy-now price; the wallet line.
+- [ ] Once ended: one sentence and no field or button. "You won at {price} — the sale completes when the creator closes the auction.", or "Auction ended {date, time}. Highest bid {price} by {name} — the sale completes when the creator closes the auction.", or "Ended with no bids."
+- [ ] The legal line and **NFT details** at the foot, as for a fixed price.
+
+**Main NFT tab, when it can't be bought** (no button; NFT details stay)
+- [ ] Paused: "Paused by the creator — it can't be bought right now."
+- [ ] Removed: "The creator took this listing off the marketplace."
+- [ ] Ended: "Ended with no bids." or "Ended without a sale: no bid could be paid."
+- [ ] Sold: "Sold on {date}." and "Sold for {price} · the whole project" (or "· {n}% of the project"). The buyer who bought it sees their Purchased Summary instead.
+- [ ] Once the project is sold in full, its Physical NFT and Virtual NFT tabs leave the box.
+
+**Physical NFT and Virtual NFT tabs**
+- [ ] One line on what this kind gets you. Physical: "A licence to build {name} — whoever buys one gets its fabrication files." Virtual: "A licence to {name}'s digital twin — whoever buys one gets the 3D model and preview." {name} is the project's on the project page, the product's on a product page.
+- [ ] **Use**: always two rows, **Personal use** then **Business use**, each with its own price. A use the creator didn't list reads "Not on sale". A sold-out use reads "Sold out". Both stay in the list, greyed, and can't be picked. The first use that can be bought is picked.
+- [ ] No Version choice: "This version / With future updates" is gone. One price per use: the listing's Price. When the creator gave no separate "Price with future updates", future updates come with the copy.
+- [ ] Overline "{Physical NFT | Virtual NFT} · {Personal use | Business use}", the price large, and under it "{sold} of {total} sold" (or "All {total} sold"), plus " · you own {n}" for a buyer who has some.
+- [ ] **Buy now** buys the picked use at its price and goes straight to the wallet's **Confirm purchase**: no popup in between. There is no Buy now when that use is sold out. When every copy left is in another checkout, Buy now is greyed with "Someone is buying this now. Try again in a few minutes."
+- [ ] The wallet's Confirm purchase and the success line name the copy, its use and its number ("#{n} of {total}"). They name no version: no Tier line.
+- [ ] **NFT details**, folded: Copies, Royalties, Minting (Lazy), Chain, Collection; the royalties note; the activity line: "Bought by {buyer} · {price} · {date}", else its newest entry, else "No activity yet · listed {date}".
+
+**A product's marketplace page**
+- [ ] The header line under the name: "Part of {project} · Created by {creator}". The project's name links to the project's marketplace page; the creator's name links to their profile. How the product was built is not shown to a buyer.
+- [ ] Its Marketplace box (meta "{n} on sale") has only **Physical NFT** and **Virtual NFT**, with this product's own copies, in the same panels as above. It never shows the project's Main NFT or the project's copies.
+- [ ] A product with no copies of its own has no box. "Part of {project}" leads to the project's offers.
+
+**Creator and On Innovations**
+- [ ] **Creator** block: the creator's avatar and name (a link to their profile), "Made {project}", and one button. **Ask the creator**, or **Get creator support** for someone who bought anything of this project (the Main NFT or a copy). It opens the buyer's conversation with the creator in Messages, about the listing or about their newest purchase.
+- [ ] **On Innovations** block, only while the project is shared there: "{n} appreciations · {n} comments", then "The creator's story and the conversation about {project} are on its Innovations post.", then **Read the story** (to the post). The story and the comments are not copied here.
+- [ ] Receipts name the seller: Purchased Summary's "Purchased from" shows the creator's name (it said "You (the creator)"). The same on the phone's receipt card.
+
+**Preview as buyer**
+- [ ] The creator's Preview as buyer shows the same box, tabs, Use rows and prices, with no **Buy now** and no wallet line, and the link **Open in Explore marketplace**. A product's preview has **View on Explore marketplace**.
+
+**Phone width**
+- [ ] The box and the Creator block come right under the header, before the tabs. The tabs share the width. Tabs, Use rows and buttons are at least 44 px tall. Facts stay three to a row.
+
+Demo stand-ins (prototype only): the Testnet demo strip at the top of the page, with "Shopping as" (Mira, Leo, Sam) and, on your own listing, **Your project page** (a demo creator buys your own listings); the **Testnet demo** badge in the box and beside the wallet line; the wallet line's words ("Paying from {name}'s demo wallet · {address} · {balance}", **Manage demo wallets**); "demo wallet" in the outbid notice; "Demo on a testnet" in the legal line; test tokens; the 9 sample listings from Innovations posts (`/marketplace/p<n>`, another creator's projects, with the same box; their Business use costs twice their Personal use); the demo project Smart Plant Pot, which lists both uses.
+
+### Design
+
+- The box is the rail block **Marketplace** (not collapsible), on the rail's bordered surface from 1024 px.
+- Tabs: Body 14 semibold, at least 40 px tall (44 px at phone width and on touch), top corners radius lg. The open tab: primary ink, a 2 px primary-ink bottom border, subtle fill. The others: secondary ink, subtle fill on hover. A 1 px border under the strip. A lone kind is the A17 Badge, neutral.
+- Buy box: overline Caption 12 medium, secondary; price H4 20 semibold, tabular figures; the line under it Caption 12, secondary; spacing 6 (12 px) between the parts.
+- **Buy now**: A01 Button Primary lg at 44 px, full width, the box's only violet. **Ask the creator** and **Read the story**: A01 Button Secondary lg at 44 px.
+- Use rows: A08 Radio sm in a 44 px row, radius lg, 1 px border; the label Body 14 semibold, the price on the right Body 14 secondary. Picked: brand border on the brand-subtle fill. Can't be picked: 60 % opacity.
+- NFT details: a hairline above; the toggle Body 14 semibold with a chevron that turns; facts in three columns (label Caption 12 tertiary, value Body 14 primary).
+- Auction: A17 Badge warning for the last hour, neutral before; the outbid notice is the M01 Alert (attention).
+- Creator: A16b Avatar Label Group md.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the listing page with the Main NFT facts and the copies stacked under it](docs/changelog/2026-11-17-market-details-before.png) | ![After: media first, Created by, and one Marketplace box in the rail](docs/changelog/2026-11-17-market-details-after.png) |
+| ![Before: Physical NFT copies as cards with This version / With future updates](docs/changelog/2026-11-17-market-physical-before.png) | ![After: the Physical NFT tab with the Use rows and one price](docs/changelog/2026-11-17-market-physical-after.png) |
+
+---
+
+## CL-017 Editors: no fake results, and the Code rail by keyboard
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the product's editors: PCB (`/project/<slug>/products/<productId>/pcb`, in schematic, board and 3D view), Code (`…/code`, Code Development and Blockly Development), 3D Module (`…/3d`). The step rail also on Assembly (`…/assembly`) and Product Preview (`…/preview`).
+
+### What to build
+
+**Every editor**
+- [ ] The step rail on the left (PCB Design · Code · 3D Module · Assembly · Product Preview) is reachable with Tab in every editor, the Code step included. Enter on an item opens that step for the same product, as a click does. Screen readers hear each item as a link, and the open step as the current step; Enter on it does nothing. The rail looks the same.
+- [ ] No control shows a result that did not happen. A control with nothing behind it is greyed, does nothing when pressed, and shows its reason as the tooltip on hover (screen readers hear the reason too). Each reason is listed below.
+
+**PCB editor**
+- [ ] Help menu, in all three modes: **Community** greyed, "Community forum isn't built yet."; **Online chat** (**Online Chat** in the 3D view) greyed, "Online chat isn't built yet."; **About** greyed, "About page isn't built yet." Tutorials, Tour of this editor, Tour Guide… and Report a problem… work as before.
+- [ ] The floating support chat in the 3D view is gone.
+- [ ] Board, View ▸ Grid Type: **Grid dot**, **Grid** and **None** set the canvas grid (the same setting as the toolbar's grid picker), and the tick follows what is drawn. **Cartesian Coordinate System** stays ticked. **Polar Coordinate System** greyed, "Polar coordinates aren't built yet."
+- [ ] Top bar: the sidebar button greyed, "Sidebar toggle isn't built yet."
+- [ ] Properties panel: **Jump to net** (beside the Net of a track, via or pad) highlights that net on the canvas, as the Nets tab does. With no net it is greyed, "This object has no net yet." The gear beside a dropdown field is greyed, "{field} settings aren't built yet."
+- [ ] Bottom panel › Logs: **Export** downloads `log.txt` with the rows the severity filters show, one per line: "{time} [{severity}] {message}". A notice says "Exported {n} log entries" ("Exported 1 log entry"). With no rows shown the notice says "No log entries to export" and nothing downloads.
+- [ ] Logs: a designator link in a row (such as U3) selects every object with that designator, opens its sheet in the schematic, and zooms to it. Not found: "{designator} isn't in this design". The links are reachable with Tab and open with Enter or Space.
+- [ ] Bottom panel › Parts Audit: **Refresh List** greyed, "Refreshing the parts audit isn't built yet."; **Set to Check** and **Not Check** greyed, "Marking rows to check isn't built yet."; each row's **Assign LCSC Part** greyed, "Assigning an LCSC part isn't built yet."
+- [ ] Array dialog: **Adjust Array Spacing By Cursor** greyed, "Adjusting the spacing by cursor isn't built yet."; **Preview** greyed, "Array preview isn't built yet." **Confirm** works as before.
+- [ ] Export 3D File dialog, Include in Export: **PCB Board** and **Component Models** toggle and change the file. **Silkscreen** ("Silkscreen in the 3D export isn't built yet."), **Signal Layer Circuits** ("Signal layers in the 3D export aren't built yet.") and **Vias** ("Vias in the 3D export aren't built yet.") are greyed and off.
+- [ ] Export 3D File: **Auto-generate missing 3D models** is locked on and greyed, "Exporting bound 3D models isn't built yet, so every part is built from its footprint height."
+- [ ] Export 3D File: "Estimated file size: {size}" is the real size of the file Export would write now, in KB under 1 MB (at least 1 KB), else in MB with one decimal. It follows the format and the pills. The old "~4.2 MB · Last exported 3 days ago" is gone.
+- [ ] Export 3D File and Export 3D Shell File: **Order 3D Shell** greyed, "Ordering a 3D shell isn't built yet." (it showed "Order placed — 3D shell"). **Export** writes the STL / OBJ file as before.
+
+**Code step: Code Development**
+- [ ] Edit ▸ **Undo**, **Redo**, **Cut**, **Copy**, **Paste** and **Select All** (also Selection ▸ Select All) act on the open file. They did nothing before.
+- [ ] File ▸ **Open…** picks a text file from the computer, adds it as a new file and opens it. A file with the same name already in the product is not added; the terminal says "{name} is already a file in this product."
+- [ ] File ▸ **Export…** downloads the open file under its own name.
+- [ ] File ▸ **Save All** saves now, like Save, and the terminal says "Saved {n} files."
+- [ ] Go ▸ **Go to Symbol** opens the editor's list of symbols in the file.
+- [ ] Greyed: Go ▸ **Go to File…** ("Go to File isn't built yet."); Run ▸ **Run File**, **Run Selection**, **Stop** ("Running code isn't built yet."); Run ▸ **Debug** ("Debugging isn't built yet."); Help ▸ **Welcome** ("Welcome page isn't built yet."), **Documentation** ("Documentation isn't built yet."), **Keyboard Shortcuts** ("Keyboard shortcuts list isn't built yet."), **About IDEEZA Code** ("About page isn't built yet.").
+- [ ] The activity bar's Run button is greyed, "Running code isn't built yet." It no longer prints "executing… Done." in the terminal.
+- [ ] The terminal's **Output** tab is greyed, "Output panel isn't built yet." Typing `run` in the terminal answers "Running code isn't built yet." `help` lists "Built-ins: ls, dir, cat <file>, clear, help".
+
+**Code step: Blockly Development**
+- [ ] Settings ▸ **Toggle Grid** hides or shows the workspace grid, and turns snapping off or on with it.
+- [ ] Greyed: Edit ▸ **Find** ("Find isn't built yet."); Settings ▸ **Toggle Trashcan** ("Trashcan isn't built yet."); Help ▸ **Documentation** ("Documentation isn't built yet."), **Keyboard Shortcuts** ("Keyboard shortcuts list isn't built yet."), **About IDEEZA Code** ("About page isn't built yet.").
+
+**3D Module**
+- [ ] Greyed in the menu, and in the toolbar where they have a button: Shape Creation ▸ **Import 3D File…** ("3D file import isn't built yet."); Modeling Operation ▸ **Extrude** ("Extrude isn't built yet."), **Revolve** ("Revolve isn't built yet."), **Sweep** ("Sweep isn't built yet."), **Loft** ("Loft isn't built yet."), **Fillet** ("Fillet isn't built yet."), **Chamfer** ("Chamfer isn't built yet."), **Boolean Union** ("Boolean union isn't built yet."), **Boolean Subtract** ("Boolean subtract isn't built yet."), **Boolean Intersect** ("Boolean intersect isn't built yet."); Transformation & Utilities ▸ **Group** ("Grouping isn't built yet."), **Measure** ("Measure tool isn't built yet."), **Section View** ("Section view isn't built yet."). None of them changes, swaps or deletes a shape any more.
+- [ ] The part's right-click menu in the left panel: **Group** greyed, "Grouping isn't built yet."
+- [ ] Toolbar: **Pointer / select** puts away the move, rotate and scale handles; a click picks a shape. **Pan (hand)** greyed, "Pan tool isn't built yet." (it opened the move handles).
+- [ ] View controls: **Zoom in** and **Zoom out** move the camera 1.25× closer to or farther from the point it orbits, per press, within the usual zoom limits. They showed "Wheel-zoom in the viewport" before.
+- [ ] Shell, Mirror, Pattern… and the other working items are unchanged.
+
+Demo stand-ins (prototype only): the sample rows in Logs and Parts Audit; "Couldn't save {n} files: this browser's storage is full or blocked."
+
+### Design
+
+- Greyed rows and buttons use each editor's existing disabled look: 45 % opacity, tertiary text, the default or not-allowed cursor, the reason as the tooltip. Dialog buttons are DS Button Secondary MD, disabled.
+- The step rail looks the same; only keyboard focus and Enter are added.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+No screenshot: the change lives in dialogs and disabled rows; What to build lists every state.
+
+---
+
+## CL-016 Marketplace: safer auctions and listings
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** web app. The phone app (`/m`) is not part of this entry.
+- Explore marketplace, a project's page (`/marketplace/<id>`): the Main NFT's **Buy now**, the auction card, the copy offers.
+- Explore marketplace, a product's page (`/marketplace/<id>/products/<productId>`): the copy offers.
+- Earn › Sell (`/projects/<id>/earn/sell`): the Main NFT row and the card its **Manage** opens.
+- The Main NFT's **Add to marketplace** and **Edit listing** dialogs.
+
+### What to build
+
+**In checkout: one buyer at a time**
+- [ ] While a buyer's purchase stands in the wallet's confirm, the item is held for that checkout. An item is a Main NFT listing or one Physical / Virtual copy listing.
+- [ ] Every other buyer's view of a held Main NFT greys **Buy now** (and the auction's **Buy now with {price}**) and shows under it: "Someone is buying this now. Try again in a few minutes." The button stays focusable and does nothing when pressed. **Place bid** is not affected.
+- [ ] A copy offer's **Buy now · {price}** is greyed with the same line only when every unit still for sale is held by other checkouts.
+- [ ] The owner sees "In checkout · a buyer is paying now" as the Main NFT row's state in Earn › Sell, and as the state line of the card **Manage** opens.
+- [ ] The hold ends when the purchase succeeds, is rejected, is closed or fails, or when the buyer leaves the page. If none of these happens it lapses after 10 minutes.
+- [ ] Every view updates live, with no reload, when a hold starts, ends or lapses.
+- [ ] The hold is a courtesy, not the sale's lock: the existing check at payment still decides who gets the item ("This listing was just sold.").
+
+**Outbid notice**
+- [ ] On the auction card, when a later, higher bid passes the buyer's leading bid, a notice sits above the bid form: title "You were outbid. {name} bid {amount}." and under it "Your {amount} is back in your demo wallet."
+- [ ] The bid form stays under it, so the buyer can bid again.
+- [ ] Screen readers hear both lines once, when it happens while the card is open.
+- [ ] No notice while the buyer leads ("You're the highest bidder." as before), when they never bid, when their best bid never led, or after the auction ended.
+
+**Cancel an auction with no bids**
+- [ ] In the card that the Main NFT row's **Manage** opens, a live auction that nobody has bid on and that hasn't ended shows a quiet **Cancel auction** button under its facts. The owner's only.
+- [ ] The old line "An auction can't be changed once it starts." is gone. Once someone bids, the button goes and the card reads "An auction can't be cancelled once someone bids."
+- [ ] **Cancel auction** opens a dialog titled "Cancel the auction?" with "Nobody has bid yet. The listing comes down and you can list it again." An on-chain listing adds "Removing an on-chain listing costs a network fee (test tokens — no real cost)."
+- [ ] Buttons: **Keep it** (focused) and **Cancel auction** (red, with a spinner while it works). ✕ and Escape close it except while it works.
+- [ ] An on-chain listing asks the wallet for the network fee, the same request as Remove. Rejecting it in the wallet changes nothing.
+- [ ] At the press everything is checked again. If it changed, nothing is written and a red banner in the dialog says why: "It has just sold, so it can't be cancelled.", "An auction can't be cancelled once someone bids.", "The auction has ended. Close it instead." or "This listing no longer exists."
+- [ ] On success the listing comes down, the Main NFT stays minted, and its terms are kept for the next listing. Screen readers hear "Auction cancelled · off the marketplace". Focus moves to the button that starts a new listing, as after Remove.
+
+**Discard prompt on the listing dialog**
+- [ ] In **Add to marketplace** and **Edit listing** (Main NFT), closing with any field changed from how the dialog opened (Cancel, ✕, Escape or a click outside) first asks: title "Discard this listing?", text "Nothing entered here is saved yet. Closing now throws it away.", buttons **Cancel** (focused, back to the form) and **Discard** (closes the listing dialog).
+- [ ] With nothing changed it closes at once.
+
+Demo stand-ins (prototype only): demo buyers (Mira, Leo, Sam) and the demo wallet that holds and returns bids (the word "demo" in "Your {amount} is back in your demo wallet."); testnet tokens and "(test tokens — no real cost)"; the checkout hold is shared between browser tabs (open the same item in two tabs to see it).
+
+### Design
+
+- Held Buy now: the same button at 60 % opacity with a not-allowed cursor; the reason under it in 14 px secondary text.
+- In checkout: the owner's row and card use the live state's existing colour; no new chip.
+- Outbid notice: M01 Banner, attention tone, with the title and its line.
+- **Cancel auction** on the card: the card's quiet button (1 px border, surface fill, surface-raised on hover), left-aligned, 40 px beside the page and 44 px when stacked or on a touch screen.
+- Cancel dialog: ModalFrame dialog, size sm; Button Secondary 40 **Keep it**, Button Danger 40 **Cancel auction** with a 16 px Spinner; M01 Banner in error tone for a failure.
+- Discard prompt: ConfirmDialog (M11, danger) over the listing dialog; Button Secondary MD **Cancel**, Button Danger MD **Discard**.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+No screenshot: the change lives in dialogs and disabled rows; What to build lists every state.
+
+---
+
+## CL-015 Product and project pages: the missing controls
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** web app. The phone app (`/m`) is not part of this entry.
+- Product page, owner's view (`/projects/<id>/products/<productId>`): the ⋯ menu beside **Open in editor**, the description under the title, the new **Sales** tab (`?tab=customers`), the Specs block in the right rail, and the 3D Module tab (`?tab=3d`).
+- My projects (`/projects`): the hint line at the foot of each card.
+- The **Videos** dialog and every dialog that lists the products' videos before a step (Share to Innovations, Add to marketplace, Give to community, Relist on the marketplace, Add {product} NFTs to the marketplace), and the **Generate video** dialog it opens.
+- Innovations post (`/innovations/<slug>`): the actions card in the rail and the action bar at the bottom on a phone.
+
+### What to build
+
+**Product ⋯ menu**
+- [ ] The owner's ⋯ menu holds, in this order: **Edit name and description**, **Open chat “{chat title}”** (unchanged, with "Where it was built — change it there" under it), then a divider and **Delete product…** in its own group at the end. **Rename product** is gone; Edit name and description replaces it.
+- [ ] The menu is the owner's only. It is not shown in a preview or on Explore marketplace. **Edit name and description** is not shown on a locked project (sold in full).
+- [ ] **Delete product…** is red (icon and label). While a rule blocks it, it stays in the menu, greyed, does nothing when pressed, and shows the reason under its label. The first rule that matches wins:
+  1. The project has one product: "A project needs at least one product. Delete the project instead."
+  2. Copies of this product sold: "Copies of this product have sold, so it can't be deleted."
+  3. Copies of the whole project sold: "Copies of the whole project have sold, so its products can't be deleted."
+  4. This product's copies are listed: "Its copies are on the marketplace. Remove the listing in Earn › Sell first."
+  5. Whole-project copies are listed: "Copies of the whole project are on the marketplace. Remove the listing in Earn › Sell first."
+  6. The Main NFT sold: "The project's Main NFT has sold, so its products can't be deleted."
+  7. The Main NFT is in an auction: "The project's Main NFT is in an auction. Close it in Earn › Sell first."
+  8. The Main NFT is listed: "The project's Main NFT is listed. Remove the listing in Earn › Sell first."
+
+**Edit name and description**
+- [ ] Opens from the ⋯ menu, and from **Add a description** (a quiet text button with a + icon) that shows under the title when the product has no description. Both are the owner's only.
+- [ ] Dialog title **Edit name and description**, line under it: "They show on its page and on its card in the project."
+- [ ] **Name**: required, trimmed, up to 80 characters. A count "{n}/80" sits right of the label and turns red past 80. Errors under the field: empty after pressing Save, "Give the product a name."; over 80, at once, "Keep it to 80 characters."
+- [ ] **Description**: optional, trimmed, up to 1,000 characters, 6 rows, placeholder "What it does, and who it is for." A count "{n} / 1,000" appears from 800 characters. Over 1,000: "Keep it under 1,000 characters (now {n})." in red. ⌘/Ctrl + Enter in the description saves.
+- [ ] Footer: **Cancel** and **Save** (reads **Saving…** while it saves). Save with nothing changed just closes.
+- [ ] Save follows the same rules as the project's own name and description: a live Buy now listing first asks to pause it (the existing pause confirm opens over this dialog); during an auction or on a locked project Save is unavailable and the reason shows under the fields ("An auction is running — you can change the project after it closes." / "Close the auction first, then change the project.").
+- [ ] Closing with changes (Cancel, ✕, Escape) does not close at once. The footer becomes **Discard changes?** with **Keep editing** (focused) and **Discard** (red). With no changes it closes at once.
+- [ ] After saving, screen readers hear "Name and description saved", or "Renamed to “{name}”", or "Description saved", by what changed. The page and the product's card in the project show the new words.
+- [ ] The product page shows the saved description on the product's current version. An older version (`?v=n`) still shows the description its build had.
+
+**Delete product**
+- [ ] Confirm dialog titled `Delete "{product name}"?` with two bullet lists.
+- [ ] **What goes**, one line each, only the lines that apply:
+  - "The product — its name and description"
+  - One line per editor with work in it, with what it holds, as Delete project lists them: "The PCB board — …", "The old 2D wiring — …", "The assembly — …", "Code — …", "The 3D model — …". A board with only the sample circuit: "The PCB board — the sample circuit only".
+  - "Its NFT copies, never listed — Physical (private use), Virtual (commercial use)" (the copies it has)
+  - "Its shipping plan for physical copies"
+  - "Its activity history — {n} entries and {m} activity files"
+  - "Its video — {n} takes"
+  - "Its snapshots on the Media tab — {n} pictures"
+  - "Its image as the project cover — the project goes back to its default cover"
+- [ ] **What stays**: "The project and its other product" (or "… its other {n} products"), and for a built product "The build it came from stays in History and in the project's versions."
+- [ ] When editor work or NFT copies would be lost, a field asks "Type the product name to confirm". **Delete product** stays unavailable until the typed name matches exactly. Pressing it with a wrong name shows `That doesn't match "{name}".` Enter in the field confirms.
+- [ ] Buttons: **Cancel** (first, focused) and **Delete product** (reads **Deleting…** while it works).
+- [ ] At confirm the rules are checked again. If a sale or listing arrived while the dialog was open, nothing is deleted and the reason shows in a banner at the top of the dialog.
+- [ ] Delete removes the product, its editor documents, its unlisted copies, shipping plan, activity entries and their files, video takes and snapshots. If its image was the project cover, the project goes back to its default cover.
+- [ ] The page then goes to the project page (`/projects/<id>`), which shows a green banner `Deleted "{name}"` at the top, once.
+
+**Sales tab on the product page**
+- [ ] The owner's product page has a **Sales** tab after Media (past the hairline divider). It is the owner's only.
+- [ ] It lists the sales of this product's Physical and Virtual copies only, newest first. Main NFT sales never show here. The rows, row details and actions are the same as Earn › Money › Sales for this product.
+- [ ] Heading **Sales**. With sales: "{n} sales to {m} people." ("1 sale to 1 person.") and the line "To tell everyone who bought at once, add to Activity." with its link.
+- [ ] Columns: **Bought by · Item · Price · Date · Benefits** (no Share column: a copy carries no share). 10 rows per page with pagination.
+- [ ] Empty state: title "No sales of this product yet", body "People who buy {product}'s physical or virtual NFTs show up here. Main NFT sales are in the project's Sales.", link **Project sales** to Earn › Money › Sales.
+- [ ] Below 640 px of panel width the table becomes a stacked list.
+
+**Network row**
+- [ ] When the project has a network, the product page's Specs block (right rail) gets a row **Network** with "{network name} · **View network**". The link opens the project page's Network tab (`/projects/<id>?tab=network`). A network with no name reads "Unnamed Network".
+- [ ] No network, no row. A product with no build but with a project network still shows the Specs block with this row.
+- [ ] The row only shows to a viewer whose project page has the Network tab. It is not shown on an Innovations post's product page. In a preview the link keeps the preview.
+
+**Download the 3D model**
+- [ ] On the 3D Module tab, under **Downloads**, a button **Download 3D model (.glb)** when the build made its own 3D model for this product (the build's main product).
+- [ ] The file is named "{product name}-3d-model.glb". The button shows a spinner while it downloads.
+- [ ] If the download fails: "The 3D model couldn't be downloaded. Try again." in red under the button.
+- [ ] Only viewers who may take the files see it (the owner, a contributor, a buyer who holds a share). Everyone else still reads "Firmware and downloads come with a purchase."
+
+**My projects card: video progress**
+- [ ] While a video renders for the project or any of its products, the card's hint reads "Video rendering · {p}%" (tabular figures). When every render is still queued it reads "Video waiting to render".
+- [ ] With several renders, the percent is the one furthest behind. It is the same percent as the render notice in the corner, and it moves live.
+- [ ] When every render has finished or failed, the normal hint comes back. The card gets no button.
+
+**Replace a ready video**
+- [ ] In the Videos dialog and every dialog that lists the products' videos, a product row that reads **Video ready** (in use, nothing rendering or waiting for review beside it) gets a quiet **Replace** button.
+- [ ] Replace opens the Generate video dialog on top, filled from the take in use (as Regenerate fills it), with "← Back to {dialog title}".
+- [ ] The take in use stays in use until the new take is chosen with **Use this video**.
+- [ ] Below 640 px Replace is full width.
+
+**Generate video: no Recommended on AR**
+- [ ] Under "How should it be made?", the **AR** card no longer carries the "Recommended" badge. **AI** stays the choice the form opens on.
+
+**Share menu on an Innovations post**
+- [ ] One **Share** menu ("Share this post") with: **Copy link**, **Share on Facebook**, **Share on LinkedIn**, **Share on X**, **Share on WhatsApp**.
+- [ ] Copy link copies the post's full address and shows "Link copied" (or "Couldn't copy the link. Copy it from the address bar.").
+- [ ] Each network opens its share page in a new tab with the post's address: `https://www.facebook.com/sharer/sharer.php?u={url}`, `https://www.linkedin.com/sharing/share-offsite/?url={url}`, `https://x.com/intent/tweet?url={url}&text={title}`, `https://wa.me/?text={title} {url}`. Nothing is posted for the user.
+- [ ] Visitor: the actions card shows Appreciate, Save and a Share icon button (it replaces the Copy link icon button).
+- [ ] Maker: the actions card shows a **Share** button (it replaces **Copy link**).
+- [ ] Phone width: the bottom action bar reads Appreciate · Save · Comments · Share (Share replaces Copy link) and opens the same menu.
+- [ ] The post's ⋯ menu no longer has Copy link. A visitor's ⋯ holds only **Report post** (or **Reported**, greyed, "You reported this post."). The maker has no ⋯.
+
+Demo stand-ins (prototype only): demo buyers in the Sales rows ("Mira (demo creator)"); the Testnet demo badge and the line "Demo purchases from Explore marketplace, made in this browser. Nothing is on a blockchain."; the browser-storage messages ("This browser's storage is full — the change wasn't saved.", "This browser's marketplace records couldn't be read, so we can't tell whether its copies sold.", and the Sales error card "Sales can't be shown" / "This browser's sales record couldn't be read. It's been left as it is."); the sample 3D model shown when a build has none of its own, which never offers the download; videos rendered in the browser.
+
+### Design
+
+- Product ⋯ menu: the project page's ⋯ menu panel and rows (radius xl, 1 px border, surface fill, shadow 3, rows at least 44 px, 18 px icons, width up to 300 px and never wider than the screen less 32 px). The delete group sits under a 1 px border divider. Delete: text-error label and icon, bg-error-subtle on hover. Blocked: text-disabled label and icon, the reason in 12 px secondary text under it.
+- Edit name and description: ModalFrame dialog, size sm (512 px). Labels 14 semibold. DS Text Input 40, DS Textarea. Button Ghost 40 **Cancel**, Button Primary 40 **Save**; the discard row Button Secondary 40 **Keep editing** and Button Ghost 40 **Discard** in text-error. 44 px tap height on a phone or touch screen.
+- **Add a description**: the project page's quiet text button with a 16 px + icon.
+- Delete product: ConfirmDialog (M11, danger: intent badge, Button Secondary MD **Cancel**, Button Danger MD **Delete product**), M01 Banner in attention tone for a late block, DS Text Input 44 for the typed name, the error line in text-error. The project page's confirmation is an M01 Banner in good tone.
+- Sales tab: the existing Sales panel (M48 Empty State, Testnet demo badge, table or stacked list, pagination).
+- Network row: a Specs rail fact; **View network** in the rail's link style.
+- 3D download: Button Secondary MD with its loading state; the error line text-md, text-error.
+- Card hint: the card's existing hint line, tabular figures while it shows a percent.
+- Replace: Button Ghost MD, 44 px tap height on a phone or touch screen.
+- Share: DS Menu (40 px rows, 20 px icons, aligned to the trigger's end). Maker's trigger Button Secondary 40 with a 16 px share icon; visitor's A02 Icon Button Secondary 40; on a phone the bar's 48 px square button.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the product's ⋯ menu with Rename product](docs/changelog/2026-11-17-product-menu-before.png) | ![After: the product's ⋯ menu with Edit name and description and Delete product…](docs/changelog/2026-11-17-product-menu-after.png) |
 
 ---
 
