@@ -26,6 +26,9 @@ export const PRIMARY = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "p
 export const SECONDARY = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "secondary", size }), LANDING_SECONDARY, "hover:text-[color:var(--color-text-primary)]");
 const INVERSE = (size: Size) => cn(buttonVariants({ hierarchy: "inverse", size }), "rounded-full hover:text-[color:var(--color-button-inverse-text)]");
 
+// The prototype's call for this format: a team registers, a person joins.
+const JOIN = HACKATHON.unit === "team" ? "Register your team" : "Join the hackathon";
+
 export function JoinButton({ size = "2xl", tone = "default", arrow, className }: { size?: Size; tone?: "default" | "inverse"; arrow?: boolean; className?: string }) {
   const { phase, entry, joinHref, openJoin } = useHackathon();
   const look = cn(tone === "inverse" ? INVERSE(size) : PRIMARY(size), arrow && "group gap-4");
@@ -49,14 +52,14 @@ export function JoinButton({ size = "2xl", tone = "default", arrow, className }:
   if (!entry.signedIn) {
     return (
       <Link href={joinHref} className={cn(look, className)}>
-        Join the hackathon
+        {JOIN}
         {tail}
       </Link>
     );
   }
   return (
     <button type="button" onClick={openJoin} className={cn(look, className)}>
-      Join the hackathon
+      {JOIN}
       {tail}
     </button>
   );

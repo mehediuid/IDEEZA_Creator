@@ -7,7 +7,7 @@
 import * as React from "react";
 import { ModalFrame } from "@/components/ideeza/dialog";
 import { Badge } from "@/components/ideeza/badge";
-import { HACKATHON, qualified, type Row } from "@/lib/hackathons/vibe-inventing";
+import { HACKATHON, groupOf, qualified, type Row } from "@/lib/hackathons/vibe-inventing";
 import { VoteButton } from "./actions";
 import { ProductMedia } from "./parts";
 
@@ -22,7 +22,7 @@ export function ProjectDialog({ row, onClose, container }: { row: Row | null; on
       container={container}
       size="sm"
       title={proj.name}
-      description={`By ${p.name} · ${p.university || "Open category"}`}
+      description={[`By ${p.name}`, groupOf(p)].filter(Boolean).join(" · ")}
       footer={
         <div className="flex w-full items-center justify-between gap-8">
           <span className="text-md leading-md text-[color:var(--color-text-secondary)]">

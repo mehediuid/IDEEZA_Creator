@@ -10,7 +10,7 @@ import * as React from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEntry } from "@/components/auth/use-entry";
 import { useHackathonEntry } from "@/lib/hackathons/entry";
-import { phaseAt, standings, universityStandings, type Phase, type Row, type UniversityRow } from "@/lib/hackathons/vibe-inventing";
+import { HACKATHON, groupStandings, phaseAt, standings, type GroupRow, type Phase, type Row } from "@/lib/hackathons/vibe-inventing";
 import { JoinDialog } from "./join-dialog";
 import { ProjectDialog } from "./project-dialog";
 
@@ -24,8 +24,8 @@ type Ctx = {
   voteHref: string;
   /** Every participant, best first. */
   board: Row[];
-  /** University vs university. */
-  unis: UniversityRow[];
+  /** The group ranking (empty when the hackathon has no groups). */
+  groups: GroupRow[];
   openJoin: () => void;
   openProject: (r: Row) => void;
 };
@@ -53,7 +53,7 @@ export function HackathonProvider({ children }: { children: React.ReactNode }) {
   const [joinOpen, setJoinOpen] = React.useState(false);
   const [projectId, setProjectId] = React.useState<string | null>(null);
   const board = React.useMemo(() => standings(entry.votes), [entry.votes]);
-  const unis = React.useMemo(() => universityStandings(board), [board]);
+  const groups = React.useMemo(() => groupStandings(board), [board]);
   // The open project is read from the board, so its votes and rank follow a vote cast in the dialog.
   const project = projectId ? (board.find((r) => r.p.id === projectId) ?? null) : null;
   // The dialogs mount here, inside the page's dark theme (a portal to <body> would take the app's theme).
@@ -77,7 +77,7 @@ export function HackathonProvider({ children }: { children: React.ReactNode }) {
     joinHref: into("/hackathons?join=1"),
     voteHref: into("/hackathons#vote"),
     board,
-    unis,
+    groups,
     openJoin: () => setJoinOpen(true),
     openProject: (r) => setProjectId(r.p.id),
   };
@@ -115,7 +115,7 @@ export function useReducedMotion(): boolean {
   return React.useSyncExternalStore(subscribeMotion, () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => true);
 }
 
-/** "16 Nov, 09:00" in the event's time zone (EAT). */
+/** "16 Nov, 09:00" in the hackathon's own time zone. */
 export function eat(ms: number): string {
-  return new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Addis_Ababa" });
+  return new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: HACKATHON.timeZone });
 }
