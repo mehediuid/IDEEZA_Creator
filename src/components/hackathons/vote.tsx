@@ -4,6 +4,9 @@
 // picture, what it does, who made it, its votes and the Vote button. Before,
 // voting hid inside the podium cards and a dialog; a friend arriving from a
 // shared link had to hunt for it. The votes left are counted in the heading.
+// In 1 vs 1 the votes are cast in the matches, so this shelf is not shown
+// (owner 2026-11-17: two places to vote for the same products made no sense);
+// the matches carry the votes-left count instead.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -12,10 +15,28 @@ import { useHackathon } from "./context";
 import { VoteButton } from "./actions";
 import { Heading, SECTION, SURFACE } from "./parts";
 
+/** "n of 10 votes left" over ten pips — the voter's count, beside the place they vote. */
+export function VotesLeft() {
+  const { entry } = useHackathon();
+  const used = HACKATHON.votesPerPerson - entry.votesLeft;
+  return (
+    <div className="flex flex-col gap-3 md:items-end">
+      <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">
+        {entry.signedIn ? `${entry.votesLeft} of ${HACKATHON.votesPerPerson} votes left` : `${HACKATHON.votesPerPerson} votes per account`}
+      </span>
+      <span aria-hidden className="flex gap-2">
+        {Array.from({ length: HACKATHON.votesPerPerson }, (_, i) => (
+          <span key={i} className={cn("h-[8px] w-[20px] rounded-full", entry.signedIn && i < used ? "bg-[var(--color-violet-400)]" : "bg-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)]")} />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 export function VoteShelf() {
   const { board, entry, openProject, unit } = useHackathon();
   const items = board.filter((r) => r.p.project).sort((a, b) => b.votes - a.votes);
-  const used = HACKATHON.votesPerPerson - entry.votesLeft;
+  if (unit === "duel") return null;
 
   return (
     <section id="vote" aria-labelledby="vote-title" className={SECTION}>
@@ -23,18 +44,7 @@ export function VoteShelf() {
         id="vote-title"
         title="Vote for the products you'd use"
         lead={`Every vote is a point for the ${entrantOf(unit).one}${GROUP ? ` and their ${GROUP.one}` : ""}. Signed-in accounts vote, and you can take a vote back while voting is open.`}
-        aside={
-          <div className="flex flex-col gap-3 md:items-end">
-            <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">
-              {entry.signedIn ? `${entry.votesLeft} of ${HACKATHON.votesPerPerson} votes left` : `${HACKATHON.votesPerPerson} votes per account`}
-            </span>
-            <span aria-hidden className="flex gap-2">
-              {Array.from({ length: HACKATHON.votesPerPerson }, (_, i) => (
-                <span key={i} className={cn("h-[8px] w-[20px] rounded-full", entry.signedIn && i < used ? "bg-[var(--color-violet-400)]" : "bg-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)]")} />
-              ))}
-            </span>
-          </div>
-        }
+        aside={<VotesLeft />}
       />
 
       <ul className="m-0 mt-24 grid list-none grid-cols-1 gap-10 p-0 sm:grid-cols-2 md:mt-32 lg:grid-cols-3 lg:gap-12">

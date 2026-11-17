@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { GROUP, HACKATHON, entrantOf, groupOf, matchesOf, qualified, qualityOf, type Row, type Unit } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
 import { VoteButton } from "./actions";
+import { VotesLeft } from "./vote";
 import { Heading, Initials, SECTION, SURFACE } from "./parts";
 
 const ROWS = 10;
@@ -51,18 +52,23 @@ export function Leaderboard() {
         title={title}
         lead={lead}
         aside={
-          <dl className="grid grid-cols-3 gap-8 md:gap-12">
-            {[
-              [board.length, entrant.many],
-              [products, "products"],
-              [votes, "votes"],
-            ].map(([v, l]) => (
-              <div key={l as string} className="flex flex-col">
-                <dd className="order-1 font-display text-4xl font-semibold leading-4xl tabular-nums text-[color:var(--color-text-primary)]">{(v as number).toLocaleString("en-US")}</dd>
-                <dt className="order-2 text-lg leading-lg text-[color:var(--color-text-tertiary)]">{l}</dt>
-              </div>
-            ))}
-          </dl>
+          // 1 vs 1: the votes are cast here, so the voter's count sits here.
+          unit === "duel" ? (
+            <VotesLeft />
+          ) : (
+            <dl className="grid grid-cols-3 gap-8 md:gap-12">
+              {[
+                [board.length, entrant.many],
+                [products, "products"],
+                [votes, "votes"],
+              ].map(([v, l]) => (
+                <div key={l as string} className="flex flex-col">
+                  <dd className="order-1 font-display text-4xl font-semibold leading-4xl tabular-nums text-[color:var(--color-text-primary)]">{(v as number).toLocaleString("en-US")}</dd>
+                  <dt className="order-2 text-lg leading-lg text-[color:var(--color-text-tertiary)]">{l}</dt>
+                </div>
+              ))}
+            </dl>
+          )
         }
       />
 
