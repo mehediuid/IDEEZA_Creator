@@ -67,6 +67,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 - [ ] The menu's **Hackathons** opens the main hackathon (the organizer's main event) at `/hackathons`. No list comes first.
 - [ ] Every hackathon is listed at `/hackathons/all` (the list of CL-014). In it, the main hackathon's card opens `/hackathons`.
 - [ ] The page's section bar has **More hackathons** with a green "{n} live" count: the other hackathons that are open, running or being judged. With none of those, it reads **All hackathons** with no count. Below 1024 px it is the last item of the section menu; from 1024 px it is a button beside **Join the hackathon**.
+- [ ] One bar at a time (hackathon pages only): once the section bar has reached the top and the page scrolls on down, the site's top bar slides up out of view and the section bar takes the very top; the moment the page scrolls back up, the site's bar slides back and the section bar sits under it again. Above the point where the section bar sticks, the site's bar always shows. Other pages keep their fixed top bar.
 
 **Hero**
 - [ ] Status pill: "Live now · Build & vote" while it runs (green dot); otherwise "Registration", "Judging" or "Results".
