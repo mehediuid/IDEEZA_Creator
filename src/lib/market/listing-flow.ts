@@ -17,6 +17,7 @@ import { formatAmount } from "../wallet/money";
 import type { Charge, MintStatus, MintType, SummaryRow, WalletRequest } from "../wallet/types";
 import { auctionStateOf, bidsOf, timeLeftLabel, type SettleResult } from "./auction";
 import { feePercentText, payoutOf } from "./fee";
+import { AUCTION_BIDS_LINE, cancelBlockOf } from "./listing";
 import { listingInputFromBrief, listingInputFromListing, sellingSteps, type ListingInput } from "./listing-form";
 import type { Bid, Listing, ListingView, UtilityBenefit } from "./types";
 
@@ -266,6 +267,7 @@ export function updatedAnnouncement(l: Listing): string {
 }
 
 export const REMOVED_ANNOUNCEMENT = "Removed from the marketplace";
+export const AUCTION_CANCELLED_ANNOUNCEMENT = "Auction cancelled · off the marketplace";
 export const RELISTED_ANNOUNCEMENT = "Back on the marketplace";
 
 /** "0.05 MATIC · Buy now · 10%" / "0.02 MATIC minimum bid · Auction · 100%". */
@@ -292,7 +294,10 @@ export type MarketplaceCard =
       closeReady: boolean;
       closeHint: string | null;
       bids: number;
-      fixedNote: string;
+      /** Nobody has bid and it hasn't ended: the maker may cancel it. */
+      cancellable: boolean;
+      /** Once someone bids, why it can't be cancelled; null before that. */
+      fixedNote: string | null;
     }
   | { kind: "paused"; since: MetaPart[]; changed: string; terms: string }
   | { kind: "sold"; state: MetaPart[]; facts: CardFact[] };
@@ -375,7 +380,8 @@ export function marketplaceCardOf(view: ListingView, ctx: { bids: Bid[]; now: nu
         closeReady: ended,
         closeHint: ended ? null : `You can close it once it ends on ${formatDateTime(endsAt)}.`,
         bids: count,
-        fixedNote: "An auction can't be changed once it starts.",
+        cancellable: cancelBlockOf(l, ctx.bids, ctx.now) === null,
+        fixedNote: count > 0 ? AUCTION_BIDS_LINE : null,
       };
     }
     case "paused": {

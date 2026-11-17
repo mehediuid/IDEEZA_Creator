@@ -330,6 +330,7 @@ function ProductCard({
             </p>
           )}
           {card.video && <p className="text-sm text-text-secondary">{card.video}</p>}
+          {card.sale && <p className="text-sm font-medium text-text-primary">{card.sale}</p>}
           {versionLine && <p className="text-sm text-text-tertiary">{versionLine}</p>}
           {partChangesLine && (
             <p className="text-md text-text-secondary">

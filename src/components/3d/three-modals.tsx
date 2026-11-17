@@ -1,15 +1,15 @@
 "use client";
 
 // 3D Module — modal dispatcher for menu items that need a form or info dialog:
-// Preferences, Units, Grid, Snap, Align, Pattern, Section, Measure, About,
-// Shortcuts, Documentation. Each is a small dialog rendered above a scrim.
+// Preferences, Units, Grid, Snap, Align, Pattern, About, Shortcuts,
+// Documentation. Each is a small dialog rendered above a scrim.
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 
 export type ModalId =
   | "preferences" | "units" | "grid" | "snap"
-  | "align" | "pattern" | "section" | "measure"
+  | "align" | "pattern"
   | "about" | "shortcuts" | "docs" | null;
 
 function Frame({ title, children, onClose, footer, width = 460 }: { title: string; children: React.ReactNode; onClose: () => void; footer?: React.ReactNode; width?: number }) {
@@ -185,31 +185,12 @@ export function ThreeModals({
           </Row>
         </Frame>
       );
-    case "section":
-      return (
-        <Frame title="Section view" onClose={onClose} footer={<Btn primary onClick={onClose}>OK</Btn>}>
-          <p style={{ fontSize: "var(--font-size-sm)", color: C.body }}>
-            Section view will clip the model along a chosen plane — preview only
-            in this build.
-          </p>
-        </Frame>
-      );
-    case "measure":
-      return (
-        <Frame title="Measure" onClose={onClose} footer={<Btn primary onClick={onClose}>OK</Btn>}>
-          <p style={{ fontSize: "var(--font-size-sm)", color: C.body }}>
-            Click two points in the viewport to measure their distance. Live
-            distance to the cursor is shown in the right panel's Mouse Information
-            row.
-          </p>
-        </Frame>
-      );
     case "about":
       return (
         <Frame title="About IDEEZA 3D Module" onClose={onClose} footer={<Btn primary onClick={onClose}>Done</Btn>}>
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)", fontSize: "var(--font-size-sm)", color: C.body }}>
             <p>Built on three.js + @react-three/fiber + @react-three/drei.</p>
-            <p>All shape ops, transforms, selections, and panel state persist to your browser's localStorage.</p>
+            <p>All shape ops, transforms, selections, and panel state persist to your browser&apos;s localStorage.</p>
             <p style={{ color: C.text, fontWeight: 600 }}>© IDEEZA Labs · v0.2.</p>
           </div>
         </Frame>

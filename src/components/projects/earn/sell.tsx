@@ -11,9 +11,11 @@
 //   existing listing flow (ListingFlow, which also opens once on `?list=1`);
 //   while a Main listing is live or paused its Manage opens the listing's own
 //   controls under the row (rail-marketplace.tsx's ListingBody: Edit, Remove,
-//   Relist, Bidding history, Close auction). A missing ladder step stands
-//   under the row in Sell's place. Then the note that selling the Main NFT
-//   sells the project, and, quiet, "Mint details".
+//   Relist, Bidding history, Close auction, Cancel auction). While a buyer's
+//   checkout holds the live listing the row reads "In checkout · a buyer is
+//   paying now". A missing ladder step stands under the row in Sell's place.
+//   Then the note that selling the Main NFT sells the project, and, quiet,
+//   "Mint details".
 // - "One product at a time" (`#copies`): editions.tsx.
 // Everything asks `can(viewer, …, view.canCtx)` as before, so a project sold
 // in full reads without a write. No control here is violet: the listing's own
@@ -27,6 +29,7 @@ import { TestnetDemoBadge } from "@/components/ideeza";
 import { ListingFlow } from "@/components/projects/listing/listing-flow";
 import { earnMintHref } from "@/lib/manual/earn-route";
 import { earnPairOf, mainRowStateOf } from "@/lib/manual/earn-view";
+import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import type { NextAction } from "@/lib/manual/project-summary";
@@ -107,12 +110,14 @@ function MainRow(props: SlotProps) {
   const pair = earnPairOf(project, view.summary, brief, viewer, view.canCtx);
   const actions = [pair.first, pair.second].filter((a): a is NextAction => a !== null);
   const listing = actions.find((a): a is Extract<NextAction, { kind: "add-to-marketplace" }> => a.kind === "add-to-marketplace") ?? null;
+  const holds = useCheckoutHolds();
   const state = mainRowStateOf({
     status: view.summary.status,
     listing: view.listing,
     locked: view.lock !== null,
     canList: listing !== null,
     manage: can(viewer, "facts.seeOwnerOnly") && (view.listing.kind === "live" || view.listing.kind === "paused"),
+    inCheckout: view.listing.kind === "live" && holds.any(view.listing.listing.id) > 0,
   });
   const { check, ready } = useCommitGate("list", earnSourceOf(project, view, brief), { handled: LIST_HANDLED });
   const steps = state.action === "list" && ready && !check.ok;

@@ -5,8 +5,11 @@
 
 import type { StoredDraft } from "../brief/project-brief";
 import { LICENSES, type Intent } from "../brief/types";
+import { PROJECT_SCOPE, type EditionKind, type EditionTrack, type EditionUse, type Sale } from "../market/types";
 import type { MintStatus } from "../wallet/types";
+import { EARN_SECTION_LABEL } from "./earn-route";
 import type { EditorWork, StepFact } from "./editor-work";
+import type { DeleteFacts } from "./p2-types";
 import { countLabel, formatDate, type ProjectStatus } from "./project-summary";
 
 export type DeletePlanInput = {
@@ -169,4 +172,170 @@ function buildsLine(builds: number, chats: number): string {
 /** §5.1.10: the trimmed entry equals the trimmed project name, case and all. */
 export function matchesTypedName(entry: string, name: string): boolean {
   return entry.trim() === name.trim();
+}
+
+// ─────────────────────────── Delete product (owner, 2026-11-15) ───────────────────────────
+//
+// The product ⋯ menu's Delete product…, on the project delete's terms: the menu item stays,
+// aria-disabled with the reason, while a rule blocks it, and the dialog lists what goes and
+// what stays and asks for the typed product name only when the same kind of loss would happen
+// as on the project — editor work, or a mint record (the product's NFT copies, made with a
+// signature when they were set up).
+
+/** What the block reads: the page's one derivation (`view.deleteFacts`, `view.sales`,
+ *  `view.editions`), or the stores as they are at confirm. */
+export type ProductDeleteFactsInput = {
+  /** The rows the project lists (`productRowsOf`). */
+  products: number;
+  deleteFacts: DeleteFacts;
+  /** The project's sales. */
+  sales: readonly Sale[];
+  /** The project's edition tracks. */
+  editions: readonly EditionTrack[];
+};
+
+export type ProductDeleteFacts = {
+  products: number;
+  marketUnreadable: boolean;
+  main: { sold: boolean; auction: boolean; listed: boolean };
+  /** This product's copies, and the whole project's — each of those holds this product too. */
+  copies: { sold: number; listed: number; projectSold: number; projectListed: number };
+};
+
+export function productDeleteFactsOf(input: ProductDeleteFactsInput, productId: string): ProductDeleteFacts {
+  const f = input.deleteFacts;
+  const soldOf = (scope: string) =>
+    input.sales.filter((s) => s.item.nft !== "main" && s.item.productId === scope).length;
+  const listedOf = (scope: string) => input.editions.filter((t) => t.productId === scope && t.listing !== null).length;
+  return {
+    products: input.products,
+    marketUnreadable: f.marketUnreadable,
+    main: { sold: f.sold.sharePct > 0, auction: f.auction !== null, listed: f.listed },
+    copies: {
+      sold: soldOf(productId),
+      listed: listedOf(productId),
+      projectSold: soldOf(PROJECT_SCOPE),
+      projectListed: listedOf(PROJECT_SCOPE),
+    },
+  };
+}
+
+export type ProductDeleteBlockId =
+  | "onlyProduct"
+  | "marketUnreadable"
+  | "copiesSold"
+  | "copiesListed"
+  | "mainSold"
+  | "mainAuction"
+  | "mainListed";
+/** `reason` is the whole line: the menu item's second line and the dialog's banner. */
+export type ProductDeleteBlock = { id: ProductDeleteBlockId; reason: string };
+
+const SELL = `Earn › ${EARN_SECTION_LABEL.sell}`;
+
+/** First match wins. */
+const PRODUCT_DELETE_RULES: readonly {
+  id: ProductDeleteBlockId;
+  applies: (f: ProductDeleteFacts) => boolean;
+  reason: (f: ProductDeleteFacts) => string;
+}[] = [
+  {
+    id: "onlyProduct",
+    applies: (f) => f.products < 2,
+    reason: () => "A project needs at least one product. Delete the project instead.",
+  },
+  {
+    // An unreadable sales record must not allow an irreversible delete (as on the project).
+    id: "marketUnreadable",
+    applies: (f) => f.marketUnreadable,
+    reason: () => "This browser's marketplace records couldn't be read, so we can't tell whether its copies sold.",
+  },
+  {
+    id: "copiesSold",
+    applies: (f) => f.copies.sold > 0 || f.copies.projectSold > 0,
+    reason: (f) =>
+      f.copies.sold > 0
+        ? "Copies of this product have sold, so it can't be deleted."
+        : "Copies of the whole project have sold, so its products can't be deleted.",
+  },
+  {
+    id: "copiesListed",
+    applies: (f) => f.copies.listed > 0 || f.copies.projectListed > 0,
+    reason: (f) =>
+      f.copies.listed > 0
+        ? `Its copies are on the marketplace. Remove the listing in ${SELL} first.`
+        : `Copies of the whole project are on the marketplace. Remove the listing in ${SELL} first.`,
+  },
+  {
+    id: "mainSold",
+    applies: (f) => f.main.sold,
+    reason: () => "The project's Main NFT has sold, so its products can't be deleted.",
+  },
+  {
+    id: "mainAuction",
+    applies: (f) => f.main.auction,
+    reason: () => `The project's Main NFT is in an auction. Close it in ${SELL} first.`,
+  },
+  {
+    id: "mainListed",
+    applies: (f) => f.main.listed,
+    reason: () => `The project's Main NFT is listed. Remove the listing in ${SELL} first.`,
+  },
+];
+
+/** Why Delete product is blocked, or null. */
+export function productDeleteBlockOf(facts: ProductDeleteFacts): ProductDeleteBlock | null {
+  const rule = PRODUCT_DELETE_RULES.find((r) => r.applies(facts));
+  return rule ? { id: rule.id, reason: rule.reason(facts) } : null;
+}
+
+export type ProductDeletePlanInput = {
+  /** The rows the project lists, this one among them. */
+  products: number;
+  /** This row's editor facts (`editorWorkOf`), read when the dialog opens. */
+  work: EditorWork;
+  /** Its edition tracks — none listed or sold, or the delete is blocked. */
+  copies: readonly { kind: EditionKind; use: EditionUse }[];
+  /** A physical copies' shipping plan is kept for it (Earn › Sell). */
+  shipping: boolean;
+  /** Its activity entries and theirs of its copies, and the files attached to them. */
+  activity: { entries: number; files: number };
+  /** Its video's takes. */
+  takes: number;
+  /** Product Preview snapshots of it on the Media tab. */
+  snapshots: number;
+  /** The project uses its image as the cover. */
+  cover: boolean;
+  /** A build stands behind it. */
+  built: boolean;
+};
+
+export type ProductDeletePlan = { goes: string[]; stays: string[]; typed: boolean };
+
+const KIND_WORD: Record<EditionKind, string> = { physical: "Physical", virtual: "Virtual" };
+const USE_WORD: Record<EditionUse, string> = { private: "private use", commercial: "commercial use" };
+const many = (n: number, one: string, more: string) => `${n} ${n === 1 ? one : more}`;
+
+export function productDeletePlanOf(input: ProductDeletePlanInput): ProductDeletePlan {
+  const goes = ["The product — its name and description"];
+  const work = workLines(input.work);
+  goes.push(...work.lines);
+  if (input.copies.length > 0) {
+    goes.push(`Its NFT copies, never listed — ${input.copies.map((c) => `${KIND_WORD[c.kind]} (${USE_WORD[c.use]})`).join(", ")}`);
+  }
+  if (input.shipping) goes.push("Its shipping plan for physical copies");
+  const { entries, files } = input.activity;
+  if (entries > 0) {
+    goes.push(
+      `Its activity history — ${many(entries, "entry", "entries")}${files > 0 ? ` and ${many(files, "activity file", "activity files")}` : ""}`,
+    );
+  }
+  if (input.takes > 0) goes.push(`Its video — ${many(input.takes, "take", "takes")}`);
+  if (input.snapshots > 0) goes.push(`Its snapshots on the Media tab — ${many(input.snapshots, "picture", "pictures")}`);
+  if (input.cover) goes.push("Its image as the project cover — the project goes back to its default cover");
+
+  const others = input.products - 1;
+  const stays = [`The project and its other ${others === 1 ? "product" : `${others} products`}`];
+  if (input.built) stays.push("The build it came from stays in History and in the project's versions.");
+  return { goes, stays, typed: work.lost || input.copies.length > 0 };
 }

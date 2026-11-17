@@ -269,7 +269,19 @@ test("marketplaceCardOf auction: the pill follows the clock — success, then wa
   assert.deepEqual(ended.pill, { text: "Ended", tone: "neutral" });
   assert.equal(ended.closeReady, true);
   assert.equal(ended.closeHint, null);
-  assert.equal(ended.fixedNote, "An auction can't be changed once it starts.");
+  assert.equal(ended.fixedNote, null);
+  assert.equal(ended.cancellable, false);
+});
+
+test("marketplaceCardOf auction: Cancel while nobody has bid, the line once someone has", () => {
+  const l = auction();
+  const open = flow.marketplaceCardOf(view(l), { bids: [], now: NOW });
+  assert.equal(open.cancellable, true);
+  assert.equal(open.fixedNote, null);
+  const bids = [bid("bid_1", "0.03", "buyer-leo", NOW - MIN)];
+  const bidOn = flow.marketplaceCardOf(view(l, { bids }), { bids, now: NOW });
+  assert.equal(bidOn.cancellable, false);
+  assert.equal(bidOn.fixedNote, "An auction can't be cancelled once someone bids.");
 });
 
 test("marketplaceCardOf auction: the top bid and the count", () => {

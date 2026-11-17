@@ -110,20 +110,22 @@ test("the product page carries Open in editor and the Editor block, both gated o
 test("the product strip reads PRODUCT_SLOTS for its people tab and Media, with the strip's order (P2-EDITOR-16, 18)", () => {
   const tabs = read(PRODUCT + "product-tabs.tsx");
   assert.match(tabs, /panels\.contributors !== undefined &&\s*buyerSide\(viewer\) &&/, "Contributors is the buyer's side only (P0)");
-  assert.match(tabs, /customers: false,/, "Customers moved to Earn (P0)");
+  assert.match(tabs, /customers: panels\.customers !== undefined && can\(viewer, "customers\.see"\),/, "Sales is the owner's (2026-11-15)");
   assert.match(tabs, /label="Product sections"/);
   assert.match(tabs, /onTab\(id === tabs\[0\] \? null : id\)/, "the first tab is never written to ?tab=");
   assert.match(tabs, /mediaFirst: buyerSide\(viewer\),/, "a buyer's side opens on Media; the owner's on the pieces");
 });
 
-test("P0: the product page is engineering for the owner — no Customers panel, and Editions only on the buyer's side", () => {
+test("P0: the product page is engineering for the owner — its Sales tab aside (2026-11-15), and Editions only on the buyer's side", () => {
   const slots = read(PRODUCT + "product-slots.tsx");
-  assert.doesNotMatch(slots, /customers:|ProductCustomers/);
-  assert.match(slots, /return buyerSide\(props\.viewer\) \? <EditionBlock \{\.\.\.props\} \/> : null;/);
+  assert.match(slots, /customers: CustomersSlot,/);
+  // The buyer's side only, and only the product's own copies (2026-11-15: never its project's offers).
+  assert.match(slots, /if \(!buyerSide\(props\.viewer\)\) return null;/);
+  assert.match(slots, /return <EditionBlock \{\.\.\.props\} \/>;/);
   const page = read(PRODUCT + "product-page.tsx");
   assert.match(page, /<VersionSelect/);
   assert.match(page, /<ProductRail\s+slot=\{slot\}\s+built=\{bp\}\s+confidence=\{confidence\}\s+partChanges=\{partChanges\}/, "Specs and Build check are the rail's");
-  assert.match(page, /<ProductMenu slot=\{slot\}/, "the owner's ⋯ menu");
+  assert.match(page, /<ProductMenu\s+slot=\{slot\}/, "the owner's ⋯ menu");
   assert.match(page, /\{lockLine && <LockLine line=\{lockLine\} \/>\}/);
 });
 
@@ -138,10 +140,10 @@ test("P0: SLOTS is the engineering page — Team, and the commerce blocks only o
   for (const slot of ["MarketplaceSlot", "LegalSlot", "UtilityPillSlot"]) {
     assert.match(src, new RegExp(`function ${slot}\\(props: SlotProps\\) \\{\\s*return buyerSide\\(props\\.viewer\\) \\?`), slot);
   }
-  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "details", "legal", "versions", "log"\]/);
+  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "story", "details", "legal", "versions", "log"\]/);
   // Explore marketplace keeps reading the same slots (P2-MARKETPLACE-8).
   const market = read("components/marketplace/market-slots.tsx");
-  for (const key of ["team: SLOTS.tabs.team", "details: SLOTS.rail.details", "legal: SLOTS.rail.legal", "marketplace: BuyerRail"]) {
+  for (const key of ["team: SLOTS.tabs.team", "details: SLOTS.rail.details", "legal: SLOTS.rail.legal", "marketplace: MarketLead"]) {
     assert.ok(market.includes(key), key);
   }
 });
@@ -183,7 +185,10 @@ test("the Add a product tile is the owner's first tile; it opens the dialog on t
   assert.match(tab, /gate\.reasonOf\("addProduct"\)/, "a blocked project says why instead of opening");
   assert.match(tab, /\{canAddProduct && <AddProductTile/);
   const dialog = read(DETAILS + "add-product-dialog.tsx");
-  assert.match(dialog, /createChat\(prompt\.trim\(\), \{ addTo: project\.id \}\)/, "AI starts the ordinary chat, on this project");
+  assert.match(dialog, /createChat\(prompt\.trim\(\), \{ quality, addTo: project\.id \}\)/, "AI starts the ordinary chat, on this project, at its Quality");
+  // The regular AI chat box, not a bare textarea (owner, 2026-11-16).
+  assert.match(dialog, /<PromptCard\b/);
+  assert.doesNotMatch(dialog, /<textarea\b/);
   assert.match(dialog, /router\.push\(`\/chat\/\$\{chat\.id\}`\)/);
   assert.match(dialog, /gate\.guard\("addProduct"/, "a manual product passes the listing's pause first");
   assert.match(dialog, /editorHref\(project, rowId, "pcb"\)/);

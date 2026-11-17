@@ -149,7 +149,7 @@ function ClipStage({ post, mine, media }: { post: InnovationPost; mine: MinePost
   const name = isProjectKey(take.productId)
     ? post.title
     : (post.products.find((p) => p.id === take.productId)?.name ?? media.label);
-  return <VideoPlayer take={take} productName={name} projectId={mine.project.id} />;
+  return <VideoPlayer take={take} productName={name} projectId={mine.project.id} audience="viewer" />;
 }
 
 function Thumb({ media, on, onPick }: { media: PostMedia; on: boolean; onPick: () => void }) {

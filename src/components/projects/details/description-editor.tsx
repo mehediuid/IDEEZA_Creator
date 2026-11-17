@@ -118,8 +118,9 @@ export function ProjectDescription({
   );
 }
 
-/** A quiet text control: neutral, brightening on hover; 44 px tall at phone width. */
-function TextButton({ className, ...props }: React.ComponentProps<"button">) {
+/** A quiet text control: neutral, brightening on hover; 44 px tall at phone width. The product
+ *  page's "Add a description" is this one too. */
+export function TextButton({ className, ...props }: React.ComponentProps<"button">) {
   return (
     <button
       type="button"

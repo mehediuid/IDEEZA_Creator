@@ -73,7 +73,8 @@ test("every post's copy, stage, licence and listing follow the rules", () => {
       assert.equal(post.listing, null, `${at} listing without a mint`);
     }
     if (post.listing) {
-      assert.equal(post.listing.href, "/marketplace");
+      // Its shop page on Explore marketplace (owner, 2026-11-16: the marketplace always has these).
+      assert.equal(post.listing.href, `/marketplace/${PROJECTS.find((p) => post.id === `sample:${p.id}`).id}`);
       assert.ok(post.listing.rows.length > 0);
       for (const row of post.listing.rows) assert.match(row.price, /^\d+(\.\d+)? ETH$/);
     }
@@ -175,7 +176,7 @@ test("smart-plant-watering-hub matches the approved mockup", () => {
       { label: "Physical copy · 2 of 30 sold", price: "0.05 ETH" },
       { label: "Virtual copy", price: "0.02 ETH" },
     ],
-    href: "/marketplace",
+    href: "/marketplace/p12",
   });
   assert.deepEqual(
     post.media.map((m) => [m.kind, m.src, m.label]),

@@ -23,6 +23,10 @@
 //   top bidder's held bid counts back in to the funds check (R1-3).
 // - A Main sale that leaves the maker 0 % locks the project (decision 12):
 //   its Physical and Virtual NFT listings come off the marketplace with it.
+// - While the wallet dialog is open the item is held for this checkout
+//   (`holdCheckout`, checkout-hold-store.ts): another tab's Buy waits and the
+//   owner's Sell row reads "In checkout". The hold goes when the request
+//   settles: success, reject, close or error.
 // - A demo buyer is never the maker (C4); the seller's payout wallet is the
 //   mint record's, else Demo account 1 (lib `payoutAddressOf`, one rule for a
 //   purchase and an auction's close).
@@ -42,6 +46,7 @@ import { estimateGas } from "@/lib/brief/gas";
 import { SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
+import { holdCheckout } from "@/lib/market/checkout-hold-store";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import { makeSale, purchaseQuote } from "@/lib/market/purchase";
 import { holdingOf } from "@/lib/market/sales";
@@ -157,6 +162,8 @@ export function usePurchase({
       };
 
       setBusy(true);
+      // Every other view of the listing waits while this checkout is open.
+      const release = holdCheckout(listing.id);
       try {
         const result = await request(req, {
           recheck: () => {
@@ -206,6 +213,7 @@ export function usePurchase({
         });
         return result.ok ? `Purchase successful. ${doneLine}` : null;
       } finally {
+        release();
         setBusy(false);
       }
     },
@@ -246,12 +254,16 @@ export function useEditionPurchase({
   view,
   buyerId,
   request: askWallet,
+  versionless = false,
 }: {
   project: ManualProject;
   view: ProjectView;
   buyerId: DemoBuyerId;
   /** Another wallet surface's request (the phone's bottom sheet); the Demo wallet dialog's otherwise. */
   request?: WalletRequestApi["request"];
+  /** The buyer never picked a version (the web's Marketplace box, owner 2026-11-15): the wallet and the
+   *  done line don't name one. */
+  versionless?: boolean;
 }): { busyId: string | null; buy: (track: EditionTrack, tier: EditionTier) => Promise<string | null> } {
   const dialog = useWalletRequest();
   const request = askWallet ?? dialog.request;
@@ -275,7 +287,7 @@ export function useEditionPurchase({
       const productName = whole ? project.name : displayProductName(view.products.find((p) => p.id === track.productId)?.name ?? "");
       const what = `${USE_WORD[track.use]} ${KIND_WORD[track.kind]} NFT`;
       const serialNow = nextSerialOf(track.id, view.sales);
-      const doneLine = `${productName} · ${what} (${TIER_WORD[tier]}) was minted to ${name}'s demo wallet.`;
+      const doneLine = `${productName} · ${what}${versionless ? "" : ` (${TIER_WORD[tier]})`} was minted to ${name}'s demo wallet.`;
 
       const req: WalletRequest = {
         kind: "transaction",
@@ -286,7 +298,7 @@ export function useEditionPurchase({
         summary: [
           whole ? { label: "Project", value: `${project.name} · a copy, not the project` } : { label: "Product", value: `${productName} · ${project.name}` },
           { label: "NFT", value: `${KIND_WORD[track.kind]} NFT · ${USE_WORD[track.use]} · #${serialNow} of ${track.supply.total}` },
-          { label: "Tier", value: TIER_LINE[tier] },
+          ...(versionless ? [] : [{ label: "Tier", value: TIER_LINE[tier] }]),
           { label: "Token", value: "Minted on this sale (lazy mint)" },
           { label: "Paying from", value: `${name}'s demo wallet · ${shortAddress(buyerAddress)}` },
         ],
@@ -302,6 +314,7 @@ export function useEditionPurchase({
       };
 
       setBusyId(track.id);
+      const release = holdCheckout(track.id);
       try {
         const result = await request(req, {
           recheck: () => trackClosedReason(project, track, tier, readMarketNow(), quote.price),
@@ -350,10 +363,11 @@ export function useEditionPurchase({
         });
         return result.ok ? `Purchase successful. ${doneLine}` : null;
       } finally {
+        release();
         setBusyId(null);
       }
     },
-    [request, appendSale, project, view, buyerId],
+    [request, appendSale, project, view, buyerId, versionless],
   );
 
   return { busyId, buy };

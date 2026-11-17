@@ -4,7 +4,9 @@
 // actions with the post's counts, what is on the Marketplace, About and More
 // from the maker. Beside the story on a wide page; on a narrow one the page
 // places each block in the flow (post-page.tsx), and on a phone the actions
-// move to the sticky bar at the bottom (PostActionBar).
+// move to the sticky bar at the bottom (PostActionBar). Sharing has one home
+// in each place: a Share menu with Copy link and the four networks
+// (owner, 2026-11-15), for the maker and a visitor alike.
 
 import { FollowButton } from "@/components/profile/person-actions";
 import { PersonName } from "@/components/profile/person-name";
@@ -18,15 +20,21 @@ import {
   BookmarkCheck02Icon,
   Comment01Icon,
   CpuIcon,
+  Facebook01Icon,
   FavouriteIcon,
   Link01Icon,
+  Linkedin01Icon,
+  NewTwitterIcon,
+  Share08Icon,
+  WhatsappIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { useMainScrollPadding } from "@/components/dashboard/main-scroll";
-import { AvatarLabelGroup, Badge, Button, buttonVariants, IconButton } from "@/components/ideeza";
+import { AvatarLabelGroup, Badge, Button, buttonVariants, IconButton, Menu, type MenuItem, type MenuTriggerProps } from "@/components/ideeza";
 import { MessageCreator, useMessageRefusal } from "@/components/newsfeed/creator-row";
 import { formatCount } from "@/lib/feed";
 import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
+import { SHARE_NETWORKS, type ShareNetwork } from "@/lib/innovations/share-links";
 import { postHref } from "@/lib/innovations/slug";
 import { ME_ID, type InnovationPost } from "@/lib/innovations/types";
 import { formatDate } from "@/lib/manual/project-summary";
@@ -48,6 +56,8 @@ export type PostActions = {
   toggleAppreciate: () => void;
   toggleSave: () => void;
   copyLink: () => void;
+  /** Opens the network's share page for this post in a new tab. */
+  shareTo: (network: ShareNetwork) => void;
 };
 
 const firstName = (name: string) => name.split(" ")[0] || name;
@@ -130,6 +140,33 @@ export function MakerBlock({ post, owner, layout, className }: { post: Innovatio
 
 // ─────────────────────────── actions ───────────────────────────
 
+const NETWORK_ICON: Record<ShareNetwork, Parameters<typeof Icon>[0]["icon"]> = {
+  facebook: Facebook01Icon,
+  linkedin: Linkedin01Icon,
+  x: NewTwitterIcon,
+  whatsapp: WhatsappIcon,
+};
+
+/** Share: Copy link, then Facebook, LinkedIn, X and WhatsApp, behind one trigger. */
+export function ShareMenu({
+  actions,
+  trigger,
+}: {
+  actions: PostActions;
+  trigger: (props: MenuTriggerProps) => React.ReactNode;
+}) {
+  const items: MenuItem[] = [
+    { id: "copy", label: "Copy link", icon: <Icon icon={Link01Icon} size={20} />, onSelect: actions.copyLink },
+    ...SHARE_NETWORKS.map((n) => ({
+      id: n.id,
+      label: n.label,
+      icon: <Icon icon={NETWORK_ICON[n.id]} size={20} />,
+      onSelect: () => actions.shareTo(n.id),
+    })),
+  ];
+  return <Menu label="Share this post" align="end" items={items} trigger={trigger} />;
+}
+
 export function AppreciateButton({
   counts,
   onToggle,
@@ -187,7 +224,7 @@ export function CountsLine({ counts, className }: { counts: PostCounts; classNam
   );
 }
 
-/** Appreciate (the page's one primary), Save and Copy link for a visitor; Copy link for the maker. */
+/** Appreciate (the page's one primary), Save and Share for a visitor; Share for the maker. */
 export function ActionsCard({
   owner,
   counts,
@@ -202,9 +239,14 @@ export function ActionsCard({
   return (
     <section aria-label="Actions" className={cn(CARD, "flex flex-col gap-7", className)}>
       {owner ? (
-        <Button type="button" hierarchy="secondary" size="lg" onClick={actions.copyLink} iconLeading={<Icon icon={Link01Icon} size={16} />} className={TAP}>
-          Copy link
-        </Button>
+        <ShareMenu
+          actions={actions}
+          trigger={(props) => (
+            <Button {...props} type="button" hierarchy="secondary" size="lg" iconLeading={<Icon icon={Share08Icon} size={16} />} className={TAP}>
+              Share
+            </Button>
+          )}
+        />
       ) : (
         <div className="flex gap-4">
           <AppreciateButton counts={counts} onToggle={actions.toggleAppreciate} size="lg" className="flex-1" />
@@ -218,14 +260,19 @@ export function ActionsCard({
             icon={<Icon icon={counts.saved ? BookmarkCheck02Icon : Bookmark02Icon} size={20} />}
             className={cn("border-solid", counts.saved && "text-text-brand")}
           />
-          <IconButton
-            type="button"
-            hierarchy="secondary"
-            size="lg"
-            aria-label="Copy link to this post"
-            onClick={actions.copyLink}
-            icon={<Icon icon={Link01Icon} size={20} />}
-            className="border-solid"
+          <ShareMenu
+            actions={actions}
+            trigger={(props) => (
+              <IconButton
+                {...props}
+                type="button"
+                hierarchy="secondary"
+                size="lg"
+                aria-label="Share this post"
+                icon={<Icon icon={Share08Icon} size={20} />}
+                className="border-solid"
+              />
+            )}
           />
         </div>
       )}
@@ -234,7 +281,7 @@ export function ActionsCard({
   );
 }
 
-/** A phone's actions, in reach of a thumb: Appreciate n · Save · Comments n · Copy link. */
+/** A phone's actions, in reach of a thumb: Appreciate n · Save · Comments n · Share. */
 export function PostActionBar({ owner, counts, actions }: { owner: boolean; counts: PostCounts; actions: PostActions }) {
   const square =
     "inline-flex h-[48px] flex-1 items-center justify-center gap-3 rounded-lg border border-solid border-border bg-bg-surface text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
@@ -277,9 +324,14 @@ export function PostActionBar({ owner, counts, actions }: { owner: boolean; coun
         <Icon icon={Comment01Icon} size={20} />
         {counts.comments !== null && <span className="tabular-nums">{formatCount(counts.comments)}</span>}
       </button>
-      <button type="button" onClick={actions.copyLink} aria-label="Copy link to this post" className={square}>
-        <Icon icon={Link01Icon} size={20} />
-      </button>
+      <ShareMenu
+        actions={actions}
+        trigger={(props) => (
+          <button {...props} type="button" aria-label="Share this post" className={square}>
+            <Icon icon={Share08Icon} size={20} />
+          </button>
+        )}
+      />
     </div>
   );
 }

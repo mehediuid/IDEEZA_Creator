@@ -37,11 +37,11 @@ import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { useAuctionClock } from "@/components/marketplace/bid-card";
+import { useCreatorName } from "@/components/marketplace/use-creator-name";
 import { usePurchase } from "@/components/marketplace/purchase-dialog";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { useClipUrl } from "@/components/video-jobs/video-player";
 import { StatusChip } from "@/components/projects/status-chip";
-import { useAuth } from "@/lib/account/auth";
 import { can } from "@/lib/manual/permissions";
 import { phoneMarketHref } from "@/lib/manual/phone-earn";
 import { sampleProjectOf, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
@@ -55,8 +55,6 @@ import { holdingOf } from "@/lib/market/sales";
 import type { EditionTrack, Listing, Sale } from "@/lib/market/types";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
-import { displayNameOf } from "@/lib/people/ids";
-import { useMyProfile } from "@/lib/people/profile-store";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY } from "@/lib/video/types";
@@ -357,13 +355,6 @@ function ListingHero({ project, view }: { project: ManualProject; view: Ready["v
   );
 }
 
-/** The creator's name as buyers read it: the profile name, else the account's (Settings › Account's rule). */
-function useCreatorName(): string {
-  const { account } = useAuth();
-  const { fields } = useMyProfile();
-  const name = displayNameOf(fields.name || `${account?.firstName ?? ""} ${account?.lastName ?? ""}`.trim());
-  return name === "You" ? "the creator" : name;
-}
 
 function ClosedOrNothing({ view, holdsSale }: { view: Ready["view"]; holdsSale: boolean }) {
   const closed = closedLineOf(view);

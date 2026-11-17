@@ -76,6 +76,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
     icon: o.icon || "blank",
     sub: o.sub || [],
     flagged: !!o.flagged,
+    disabled: !!o.disabled,
     note: o.note,
     onClick: o.sub ? noop : o.onClick || close,
   });
@@ -446,13 +447,15 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       label: "Help",
       key: "H",
       items: [
-        item("Community", { icon: "community" }),
+        // No forum, support chat or About page exists yet: greyed with the
+        // reason rather than rows that close the menu and do nothing.
+        item("Community", { icon: "community", disabled: true, note: "Community forum isn't built yet." }),
         item("Tutorials", { k: "F1", icon: "tutorial", onClick: () => { close(); openTutorialTab("/tutorials/code-tech/pcb-editor"); } }),
         item("Tour of this editor", { icon: "tutorial", onClick: () => { close(); startTourChapter("pcb"); } }),
         item("Tour Guide…", { icon: "tutorial", onClick: () => { close(); openTourGuide(null); } }),
         item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
-        item("Online chat", { icon: "chat" }),
-        item("About", { icon: "about" }),
+        item("Online chat", { icon: "chat", disabled: true, note: "Online chat isn't built yet." }),
+        item("About", { icon: "about", disabled: true, note: "About page isn't built yet." }),
       ],
     },
   ];
@@ -676,15 +679,18 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         }),
         item("Grid Size (G)", { icon: "grid", sub: gridFlyout }),
         item("Snap Size", { icon: "snap", sub: gridFlyout }),
+        // The grid style is state.gridType, the value the toolbar's grid
+        // picker sets, so the rows set it and tick what is really drawn.
+        // Cartesian is the only coordinate system there is.
         item("Grid Type", {
           icon: "tGridOptions",
           sub: [
             su("Cartesian Coordinate System", "", { icon: "check" }),
-            su("Polar Coordinate System"),
+            su("Polar Coordinate System", "", { disabled: true, note: "Polar coordinates aren't built yet." }),
             dv,
-            su("Grid dot"),
-            su("Grid"),
-            su("None", "", { icon: "check" }),
+            su("Grid dot", "", { icon: state.gridType === "dots" ? "check" : "blank", onClick: () => { actions.setGridType("dots"); close(); } }),
+            su("Grid", "", { icon: state.gridType === "lines" ? "check" : "blank", onClick: () => { actions.setGridType("lines"); close(); } }),
+            su("None", "", { icon: state.gridType === "none" ? "check" : "blank", onClick: () => { actions.setGridType("none"); close(); } }),
           ],
         }),
         dv,
@@ -988,13 +994,15 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "Help",
       key: "H",
       items: [
-        item("Community", { icon: "community" }),
+        // No forum, support chat or About page exists yet: greyed with the
+        // reason rather than rows that close the menu and do nothing.
+        item("Community", { icon: "community", disabled: true, note: "Community forum isn't built yet." }),
         item("Tutorials", { k: "F1", icon: "tutorial", onClick: () => { close(); openTutorialTab("/tutorials/code-tech/pcb-editor"); } }),
         item("Tour of this editor", { icon: "tutorial", onClick: () => { close(); startTourChapter("pcb"); } }),
         item("Tour Guide…", { icon: "tutorial", onClick: () => { close(); openTourGuide(null); } }),
         item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
-        item("Online chat", { icon: "chat" }),
-        item("About", { icon: "about" }),
+        item("Online chat", { icon: "chat", disabled: true, note: "Online chat isn't built yet." }),
+        item("About", { icon: "about", disabled: true, note: "About page isn't built yet." }),
       ],
     },
   ];
@@ -1027,6 +1035,8 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
     hasSub: !!o.sub,
     icon: o.icon || "blank",
     sub: o.sub || [],
+    disabled: !!o.disabled,
+    note: o.note,
     onClick: o.sub ? noop : o.onClick || close,
   });
   // Panel toggles: `o.tog` is the internal viewTog key, `label` is what the
@@ -1110,13 +1120,15 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       label: "Help",
       key: "H",
       items: [
-        item("Community", { icon: "community" }),
+        // The chat panel was a scripted conversation with a made-up agent whose
+        // input answered "Message sent"; there is no support chat behind it.
+        item("Community", { icon: "community", disabled: true, note: "Community forum isn't built yet." }),
         item("Tutorials", { k: "F1", icon: "tutorial", onClick: () => { close(); openTutorialTab("/tutorials/code-tech/pcb-editor"); } }),
         item("Tour of this editor", { icon: "tutorial", onClick: () => { close(); startTourChapter("pcb"); } }),
         item("Tour Guide…", { icon: "tutorial", onClick: () => { close(); openTourGuide(null); } }),
         item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
-        item("Online Chat", { icon: "chat", onClick: () => actions.toggleChat() }),
-        item("About", { icon: "about" }),
+        item("Online Chat", { icon: "chat", disabled: true, note: "Online chat isn't built yet." }),
+        item("About", { icon: "about", disabled: true, note: "About page isn't built yet." }),
       ],
     },
   ];

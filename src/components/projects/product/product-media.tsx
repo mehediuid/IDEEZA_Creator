@@ -95,7 +95,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
         <h2 id={headingId} className="text-2xl font-semibold leading-2xl text-text-primary">
           Video
         </h2>
-        <VideoPlayer take={inUse} productName={name} projectId={project.id} />
+        <VideoPlayer take={inUse} productName={name} projectId={project.id} audience="viewer" />
       </section>
     );
   }

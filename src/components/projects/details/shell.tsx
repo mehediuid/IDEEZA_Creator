@@ -30,6 +30,7 @@ import {
   type ProjectTabId,
 } from "@/lib/manual/project-route";
 import type { ManualProject } from "@/lib/manual/projects";
+import { ProjectNotice } from "@/components/projects/project-notice";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { LiveRegion, usePageArrival } from "./arrival";
 import { Breadcrumb, type Crumb } from "./breadcrumb";
@@ -108,10 +109,12 @@ export function ProjectShell({
     <>
       <ProjectFrame
         banner={
-          // A write the browser refused says so first (A7, COR-93), then the
-          // preview banners, each null unless it applies.
+          // A write the browser refused says so first (A7, COR-93), then a
+          // queued confirmation ("Deleted "{product}"" after a product delete),
+          // then the preview banners, each null unless it applies.
           <>
             <StorageErrorBanner className="mb-8" />
+            <ProjectNotice className="mb-8" />
             {Banner ? <Banner {...props} /> : null}
             {slots.banners?.map((B, i) => <B key={i} {...props} />)}
           </>

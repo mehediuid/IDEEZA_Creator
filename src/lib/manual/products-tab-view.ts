@@ -193,6 +193,8 @@ export type ProductCardView = {
   video: string | null;
   /** The product's current activity (spec §7.2): its newest entry, else "Planning". */
   stage: StagePill | null;
+  /** Explore marketplace only: what of this product's own is on sale ("Physical NFT on sale · from 0.008 ETH"). */
+  sale?: string | null;
 };
 
 /**

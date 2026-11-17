@@ -260,13 +260,13 @@ export function VideoForm({ target, value, onChange, promptRef, describedBy, onH
   );
 }
 
-/** AR or AI: two cards, a radiogroup. AR is the Figma's Recommended way — a real clip of the
- *  real product — and opens the phone hand-off; AI makes it from prompts. */
+/** AR or AI: two cards, a radiogroup. AR (a real clip of the real product) opens the phone
+ *  hand-off; AI makes it from prompts and is the one the form opens on. */
 function MethodField({ value, onChange }: { value: VideoMethod; onChange: (m: VideoMethod) => void }) {
   const labelId = React.useId();
   const refs = React.useRef<Record<VideoMethod, HTMLDivElement | null>>({ ar: null, ai: null });
-  const options: { id: VideoMethod; title: string; text: string; icon: Parameters<typeof Icon>[0]["icon"]; badge?: string }[] = [
-    { id: "ar", title: "AR", text: "Record a video of the real product with your phone.", icon: VrIcon, badge: "Recommended" },
+  const options: { id: VideoMethod; title: string; text: string; icon: Parameters<typeof Icon>[0]["icon"] }[] = [
+    { id: "ar", title: "AR", text: "Record a video of the real product with your phone.", icon: VrIcon },
     { id: "ai", title: "AI", text: "AI makes the video from your prompts.", icon: SparklesIcon },
   ];
   const pick = (m: VideoMethod) => {
@@ -309,9 +309,6 @@ function MethodField({ value, onChange }: { value: VideoMethod; onChange: (m: Vi
                 <RadioMark checked={checked} />
                 <span className={cn("text-md font-semibold", checked ? "text-text-brand" : "text-text-primary")}>{o.title}</span>
                 <Icon icon={o.icon} size={18} className={checked ? "text-text-brand" : "text-text-secondary"} />
-                {o.badge && (
-                  <span className="rounded-full bg-bg-success-subtle px-[8px] py-[2px] text-xs font-semibold text-text-success">{o.badge}</span>
-                )}
               </span>
               <span className="text-sm leading-relaxed text-text-secondary">{o.text}</span>
             </div>

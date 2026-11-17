@@ -45,6 +45,7 @@ import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
+import { useCreatorName } from "@/components/marketplace/use-creator-name";
 import { BuyBox, Disclosure, IconLine, ReceiptCard, WalletLine, type BoxFact } from "./parts";
 import { LIST_CARD } from "../../kit/list";
 import { T } from "../../type";
@@ -465,6 +466,8 @@ export function MainActivity({ projectId, sales, listedAt }: { projectId: string
 /** 18e: what the active buyer holds of the Main NFT, from their own Sale records (the web's Purchased
  *  Summary), as a receipt card. */
 export function PurchaseSummary({ holding, toggleRef }: { holding: { sharePct: number; sales: Sale[] }; toggleRef?: React.Ref<HTMLButtonElement> }) {
+  // Bought from the creator, named as the buyer knows them, never "you" (owner, 2026-11-15).
+  const creator = useCreatorName();
   const sales = [...holding.sales].sort((a, b) => a.at - b.at);
   const latest = sales[sales.length - 1];
   const n = sales.length;
@@ -490,7 +493,7 @@ export function PurchaseSummary({ holding, toggleRef }: { holding: { sharePct: n
         { label: "Collection", value: latest.collection },
         { label: "Blockchain", value: networkLabelOf(latest.network) },
         { label: "Price paid", value: `${price} (+ ${fee} network fee)` },
-        { label: "Purchased from", value: "You (the creator)" },
+        { label: "Purchased from", value: creator },
         { label: "Transaction", value: `${shortAddress(latest.txHash)} · Demo` },
         { label: "Purchased", value: formatDateTime(latest.at) },
       ]}
