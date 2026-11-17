@@ -4,8 +4,10 @@
 // primary on the page) and Vote. Join follows the account: signed out it is the
 // way in (Sign up, or Sign in once this browser has an account) and comes back
 // to join; signed in it opens the join step; joined it reads "Start building"
-// and goes to Home. Vote is open only while the hackathon is live. On the
-// closing brand panel Join wears the DS inverse fill (violet on violet would vanish).
+// and goes to Home. Once joining has closed it is not shown (the prototype's
+// landing page), and the other action — See the projects / See the winners —
+// takes the primary look. Vote is open only while the hackathon is live. On
+// the closing brand panel Join wears the DS inverse fill (violet on violet would vanish).
 
 import * as React from "react";
 import Link from "next/link";
@@ -40,13 +42,14 @@ export function JoinButton({ size = "2xl", tone = "default", arrow, className }:
       </Link>
     );
   }
-  if (phase !== null && !canJoin(phase)) {
+  if (phase === "soon") {
     return (
       <span aria-disabled="true" className={cn(look, "pointer-events-none opacity-50", className)}>
-        {phase === "soon" ? "Registration opens soon" : "Joining has closed"}
+        Registration opens soon
       </span>
     );
   }
+  if (phase !== null && !canJoin(phase)) return null;
   if (!entry.signedIn) {
     return (
       <Link href={joinHref} className={cn(look, className)}>
@@ -63,15 +66,16 @@ export function JoinButton({ size = "2xl", tone = "default", arrow, className }:
   );
 }
 
-/** Goes to the shelf of products, where the votes are cast. */
-export function VoteLink({ size = "2xl", className }: { size?: Size; className?: string }) {
-  const { phase, shelf } = useHackathon();
-  // 1 vs 1 (and a board with no products yet): the votes are cast in the matches / on the board.
-  // Once building has ended there is no voting left, only the projects to look at.
-  const ended = phase === "judging" || phase === "results";
+/** Goes to the standings, where the votes are cast (the matches in 1 vs 1). */
+export function VoteLink({ size = "2xl", tone, className }: { size?: Size; tone?: "inverse"; className?: string }) {
+  const { phase } = useHackathon();
+  // The prototype's second call: vote while it is live, the winners once they are out, else the projects.
+  const label = phase === "results" ? "See the winners" : phase === "live" || phase === null ? "Vote for projects" : "See the projects";
+  // When Join is not shown (joining has closed) this is the page's one call.
+  const look = phase !== null && phase !== "soon" && !canJoin(phase) ? (tone === "inverse" ? INVERSE(size) : PRIMARY(size)) : SECONDARY(size);
   return (
-    <a href={shelf ? "#vote" : "#leaderboard"} className={cn(SECONDARY(size), className)}>
-      {ended ? "See the projects" : "Vote for projects"}
+    <a href="#leaderboard" className={cn(look, className)}>
+      {label}
     </a>
   );
 }

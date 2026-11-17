@@ -1,37 +1,92 @@
 "use client";
 
-// The hackathon page's quieter sections and its sticky bar:
-//  - SectionNav: one site top bar, then this page's own anchors and Join;
-//  - WhoAndJudging: who can enter, and how the winner is picked (a weighted
-//    bar, not three loose chips), side by side with a hairline between;
-//  - Timeline: one track across the four phases, filled up to now;
-//  - FaqAndRules: questions as a ruled list, the terms beside them;
-//  - Closing: full screen over the owner's wave video — the clock and Join again.
+// The hackathon page's quieter sections, its sticky bar and its order, with
+// the prototype landing page's words (owner 2026-11-17: that page's content
+// is final):
+//  - HackathonSections: the sections in the prototype's order for the phase —
+//    before building, how it works comes first and the board last; while it
+//    runs, the board comes right after the prizes; once it has ended, the
+//    board (the winners) leads and how it works is gone;
+//  - SectionNav: one site top bar, then this page's own anchors in that order,
+//    More hackathons (with how many others are live) and Join;
+//  - WhoAndJudging: who can participate, and how the winner is decided (a
+//    weighted bar, not three loose chips), side by side with a hairline between;
+//  - Timeline: the key dates on one track, filled up to now, and the phases;
+//  - FaqAndRules: questions and answers as a ruled list, the terms beside them;
+//  - Closing: full screen over the owner's wave video — the promise and Join again.
 
 import * as React from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { inWords, type Campaign, type Phase } from "@/lib/hackathons/vibe-inventing";
-import { countdownParts, useHackathon, useReducedMotion } from "./context";
-import { INVERSE, JoinButton, VoteLink } from "./actions";
+import { HACKATHONS } from "@/lib/hackathons/campaigns";
+import { phaseAt, type Phase } from "@/lib/hackathons/vibe-inventing";
+import { useHackathon, useReducedMotion } from "./context";
+import { JoinButton, VoteLink } from "./actions";
 import { Heading, Initials, SECTION } from "./parts";
+import { Prizes } from "./prizes";
+import { HowToWin } from "./how-to-win";
+import { Leaderboard } from "./leaderboard";
 
-const ANCHORS = [
-  ["prizes", "Prizes"],
-  ["how", "How to win"],
-  ["leaderboard", "Leaderboard"],
-  ["vote", "Vote"],
-  ["dates", "Dates"],
-  ["faq", "FAQ"],
-] as const;
+type Part = "prizes" | "leaderboard" | "how" | "who" | "dates";
 
-/** The page's own bar, under the site's: its sections and Join. */
+/** The sections' order for the phase (the prototype's landing page). */
+const orderOf = (phase: Phase | null): Part[] =>
+  phase === "judging" || phase === "results"
+    ? ["leaderboard", "prizes", "who", "dates"]
+    : phase === "soon" || phase === "registration"
+      ? ["prizes", "how", "who", "dates", "leaderboard"]
+      : ["prizes", "leaderboard", "how", "who", "dates"];
+
+const PARTS: Record<Part, () => React.ReactNode> = {
+  prizes: () => <Prizes />,
+  leaderboard: () => <Leaderboard />,
+  how: () => <HowToWin />,
+  who: () => <WhoAndJudging />,
+  dates: () => <Timeline />,
+};
+
+/** The page's sections between the bar and the questions, in the phase's order. */
+export function HackathonSections() {
+  const { phase } = useHackathon();
+  return (
+    <>
+      {orderOf(phase).map((k) => (
+        <React.Fragment key={k}>{PARTS[k]()}</React.Fragment>
+      ))}
+    </>
+  );
+}
+
+/** The board's name in the bar: the winners once they are out, the projects in 1 vs 1 or before anyone has built. */
+function boardLabel(phase: Phase | null, duel: boolean, empty: boolean): string {
+  if (phase === "results") return "Winners";
+  return duel || empty ? "Projects" : "Leaderboard";
+}
+
+// Subscribed to nothing: the other hackathons' phases are read once on the client (null under SSR).
+const noop = () => () => {};
+
+/** The page's own bar, under the site's: its sections, More hackathons and Join. */
 export function SectionNav() {
-  const { shelf, unit } = useHackathon();
+  const { c, phase, unit, board } = useHackathon();
   const [active, setActive] = React.useState<string>("");
   const list = React.useRef<HTMLUListElement>(null);
+  const ended = phase === "judging" || phase === "results";
+  const anchors: [string, string][] = [
+    ...orderOf(phase)
+      .filter((k) => k !== "who")
+      .map((k): [string, string] => [k, k === "leaderboard" ? boardLabel(phase, unit === "duel", board.length === 0) : k === "prizes" ? "Prizes" : k === "how" ? "How it works" : "Dates"]),
+    ["faq", "FAQ"],
+  ];
+  // The other hackathons that are open or running (the prototype counts registration, building and judging).
+  const live = React.useSyncExternalStore(
+    noop,
+    () => HACKATHONS.filter((h) => h.id !== c.HACKATHON.id && ["registration", "live", "judging"].includes(phaseAt(h, Date.now()))).length,
+    () => 0,
+  );
+  const others = HACKATHONS.length > 1;
   // On a phone the anchors scroll sideways: keep the lit one in view as the page moves on.
   React.useEffect(() => {
     const ul = list.current;
@@ -39,9 +94,12 @@ export function SectionNav() {
     if (!ul || !a || ul.scrollWidth <= ul.clientWidth) return;
     ul.scrollTo({ left: a.offsetLeft - (ul.clientWidth - a.offsetWidth) / 2, behavior: "smooth" });
   }, [active]);
+  const ids = anchors.map(([id]) => id).join(" ");
   React.useEffect(() => {
-    const els = ANCHORS.map(([id]) => document.getElementById(id)).filter((e): e is HTMLElement => !!e);
-    // (Re-observed when the style changes: the Vote section comes and goes with it.)
+    const els = ids
+      .split(" ")
+      .map((id) => document.getElementById(id))
+      .filter((e): e is HTMLElement => !!e);
     const io = new IntersectionObserver(
       (es) => {
         const seen = es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
@@ -51,15 +109,14 @@ export function SectionNav() {
     );
     els.forEach((e) => io.observe(e));
     return () => io.disconnect();
-  }, [unit, shelf]);
+  }, [ids, unit]);
   return (
     <div className="sticky top-[80px] z-[5] border-0 border-y border-solid border-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_86%,transparent)] backdrop-blur-[24px]">
       {/* Phones: a 56 px bar (with the site bar's 80, the two took 18 % of the screen at 68);
           the anchor row fades at its right edge so the hidden ones read as "more". */}
       <nav aria-label="On this page" className="mx-auto flex h-[56px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 md:h-[68px] min-[1292px]:px-0">
-        <ul ref={list} className="m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0 pr-10 [scrollbar-width:none] max-md:[mask-image:linear-gradient(to_right,black_82%,transparent)] md:gap-2 md:pr-0">
-          {/* No Vote section in 1 vs 1 (the votes are cast in the matches) or before there is a product. */}
-          {ANCHORS.filter(([id]) => id !== "vote" || shelf).map(([id, label]) => (
+        <ul ref={list} className="m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0 pr-10 [scrollbar-width:none] max-lg:[mask-image:linear-gradient(to_right,black_82%,transparent)] md:gap-2 lg:pr-0">
+          {anchors.map(([id, label]) => (
             <li key={id}>
               <a
                 href={`#${id}`}
@@ -69,14 +126,44 @@ export function SectionNav() {
                   active === id && "bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] text-[color:var(--color-text-primary)]",
                 )}
               >
-                {id === "leaderboard" && unit === "duel" ? "Matches" : label}
+                {label}
               </a>
             </li>
           ))}
+          {/* Phones and tablets: More hackathons is the last anchor (the bar has no room for both buttons). */}
+          {others ? (
+            <li className="lg:hidden">
+              <Link href="/hackathons/all" className="flex h-[40px] items-center gap-3 whitespace-nowrap rounded-full px-5 text-lg font-medium leading-lg text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]">
+                {live ? "More hackathons" : "All hackathons"}
+                {live ? <LiveCount n={live} /> : null}
+              </Link>
+            </li>
+          ) : null}
         </ul>
-        <JoinButton size="lg" className="hidden shrink-0 md:inline-flex" />
+        <div className="hidden shrink-0 items-center gap-4 md:flex">
+          {others ? (
+            <Link
+              href="/hackathons/all"
+              className="hidden h-[44px] items-center lg:flex gap-3 whitespace-nowrap rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_16%,transparent)] px-6 text-lg font-medium leading-lg text-[color:var(--color-text-primary)] transition-colors duration-fast hover:bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] hover:text-[color:var(--color-text-primary)]"
+            >
+              {live ? "More hackathons" : "All hackathons"}
+              {live ? <LiveCount n={live} /> : null}
+            </Link>
+          ) : null}
+          {ended ? null : <JoinButton size="lg" />}
+        </div>
       </nav>
     </div>
+  );
+}
+
+/** "2 live", beside More hackathons. */
+function LiveCount({ n }: { n: number }) {
+  return (
+    <span className="flex items-center gap-2 rounded-full bg-[color:color-mix(in_srgb,var(--color-green-400)_14%,transparent)] px-3 text-md font-semibold leading-md text-[color:var(--color-green-400)]">
+      <span aria-hidden className="size-[6px] rounded-full bg-[var(--color-green-400)]" />
+      {n} live
+    </span>
   );
 }
 
@@ -84,21 +171,14 @@ const CRITERIA_FILL = ["bg-[var(--color-violet-600)]", "bg-[var(--color-violet-4
 
 export function WhoAndJudging() {
   const { c, unit } = useHackathon();
-  const { HACKATHON, GROUP, competeLine } = c;
+  const { HACKATHON, whoCan, decided } = c;
   const judged = HACKATHON.winBy !== "points";
-  const who = [
-    `${HACKATHON.minAge} or older, living in ${HACKATHON.where}`,
-    HACKATHON.who,
-    competeLine(unit),
-    ...(GROUP ? [`You compete for your ${GROUP.one}${HACKATHON.openCategory ? ", or in the open category" : ""}`] : []),
-    "One IDEEZA account per person, with a verified email",
-    ...(judged ? ["Judges cannot take part or vote"] : []),
-  ];
+  const who = whoCan(unit);
   return (
-    <section aria-label="Who can join and how the winner is picked" className={SECTION}>
+    <section id="who" aria-label="Who can participate and how the winner is decided" className={SECTION}>
       <div className="grid grid-cols-1 gap-24 lg:grid-cols-2 lg:gap-0">
         <div className="flex flex-col gap-12 lg:pr-24">
-          <h2 className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] md:text-6xl md:leading-6xl">Who can join</h2>
+          <h2 className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] md:text-6xl md:leading-6xl">Who can participate</h2>
           <ul className="m-0 flex list-none flex-col gap-8 p-0">
             {who.map((w) => (
               <li key={w} className="flex items-start gap-5 text-xl leading-xl text-[color:var(--color-text-secondary)]">
@@ -112,20 +192,17 @@ export function WhoAndJudging() {
         </div>
 
         <div className="flex flex-col gap-12 border-0 border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] lg:border-l lg:pl-24">
-          <h2 className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] md:text-6xl md:leading-6xl">How the winner is picked</h2>
+          <h2 className="font-display text-5xl font-semibold leading-5xl tracking-snug text-[color:var(--color-text-primary)] md:text-6xl md:leading-6xl">How the winner is decided</h2>
           {/* The campaign's Winner setting: the board's top N to the judges, judges and votes
               mixed by weight, or points alone (then there are no judges). */}
-          {HACKATHON.winBy === "shortlist" ? (
-            <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">
-              When building ends the board freezes. The <b className="font-semibold text-[color:var(--color-text-primary)]">top {HACKATHON.shortlist}</b> are shortlisted, and the judges score each one on:
-            </p>
-          ) : HACKATHON.winBy === "score" ? (
-            <>
-              <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">The judges&apos; scores and the audience&apos;s votes are combined into one final score.</p>
-              <div className="flex h-[48px] w-full gap-1 overflow-hidden rounded-xl" role="img" aria-label={`Judges ${HACKATHON.judgesWeight}%, audience ${100 - HACKATHON.judgesWeight}%`}>
+          <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">{decided}</p>
+          {HACKATHON.winBy === "score" ? (
+            <div className="flex flex-col gap-6">
+              <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">Final score</span>
+              <div className="flex h-[48px] w-full gap-1 overflow-hidden rounded-xl" role="img" aria-label={`Judges ${HACKATHON.judgesWeight}%, audience votes ${100 - HACKATHON.judgesWeight}%`}>
                 {[
                   [`Judges ${HACKATHON.judgesWeight}%`, HACKATHON.judgesWeight, "bg-[var(--color-violet-600)]"],
-                  [`Audience ${100 - HACKATHON.judgesWeight}%`, 100 - HACKATHON.judgesWeight, "bg-[var(--color-blue-400)]"],
+                  [`Audience votes ${100 - HACKATHON.judgesWeight}%`, 100 - HACKATHON.judgesWeight, "bg-[var(--color-blue-400)]"],
                 ].map(([label, w, fill]) =>
                   (w as number) > 0 ? (
                     <div key={label as string} style={{ flexGrow: w as number }} className={cn("flex basis-0 items-center whitespace-nowrap px-5 text-lg font-semibold leading-lg text-[color:var(--color-white)]", fill as string)}>
@@ -134,14 +211,12 @@ export function WhoAndJudging() {
                   ) : null,
                 )}
               </div>
-              <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">The judges score each product on:</p>
-            </>
-          ) : (
-            <p className="text-xl leading-xl text-[color:var(--color-text-secondary)]">When building ends the board freezes. The participants with the most points win.</p>
-          )}
+            </div>
+          ) : null}
           {judged ? (
             <>
-              <div>
+              <div className="flex flex-col gap-6">
+                <span className="text-lg font-medium leading-lg text-[color:var(--color-text-secondary)]">The judges score each project on</span>
                 <div className="flex h-[48px] w-full gap-1 overflow-hidden rounded-xl" role="img" aria-label={HACKATHON.criteria.map((c) => `${c.name} ${c.weight}%`).join(", ")}>
                   {HACKATHON.criteria.map((c, i) => (
                     <div key={c.name} style={{ flexGrow: c.weight }} className={cn("flex basis-0 items-center px-5 text-lg font-semibold leading-lg text-[color:var(--color-white)]", CRITERIA_FILL.at(i))}>
@@ -149,7 +224,7 @@ export function WhoAndJudging() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-6 flex flex-wrap gap-x-10 gap-y-3 text-lg leading-lg text-[color:var(--color-text-primary)]">
+                <div className="flex flex-wrap gap-x-10 gap-y-3 text-lg leading-lg text-[color:var(--color-text-primary)]">
                   {HACKATHON.criteria.map((c, i) => (
                     <span key={c.name} className="inline-flex items-center gap-3">
                       <span aria-hidden className={cn("size-[10px] rounded-full", CRITERIA_FILL.at(i))} />
@@ -180,52 +255,50 @@ export function WhoAndJudging() {
   );
 }
 
-const phasesOf = ({ HACKATHON }: Campaign): { key: Phase; label: string; from: number; to: number | null }[] => [
-  { key: "registration", label: "Registration", from: HACKATHON.dates.registration, to: HACKATHON.dates.start },
-  { key: "live", label: "Build & vote", from: HACKATHON.dates.start, to: HACKATHON.dates.end },
-  { key: "judging", label: "Judging", from: HACKATHON.dates.end, to: HACKATHON.dates.results },
-  { key: "results", label: "Winners announced", from: HACKATHON.dates.results, to: null },
-];
+const PHASES: Phase[] = ["registration", "live", "judging", "results"];
 
 /**
- * The four phases on one track. Each phase owns an equal stretch; the fill
- * runs through the finished ones and into the current one as far as its time
- * has gone, so "where are we" is read from the line itself.
+ * The key dates on one track (the prototype's Timeline: registration opens,
+ * the hackathon starts, the hackathon ends). The fill runs through the dates
+ * already passed and into the stretch to the next one as far as its time has
+ * gone, so "where are we" is read from the line itself. Under it, the four
+ * phases as pills, the current one lit.
  */
 export function Timeline() {
   const { c, now, phase } = useHackathon();
-  const { HACKATHON, eat } = c;
-  const PHASES = phasesOf(c);
-  const at = PHASES.findIndex((p) => p.key === phase);
-  const part = (() => {
-    if (now === null || at < 0) return 0;
-    const p = PHASES.at(at);
-    if (!p || p.to === null) return 1;
-    return Math.min(1, Math.max(0, (now - p.from) / (p.to - p.from)));
+  const { HACKATHON, eat, keyDates, stageName } = c;
+  const DATES = keyDates();
+  // The dates already passed; the next one is "Next", the rest "Upcoming".
+  const passed = now === null ? 0 : DATES.filter(([, t]) => t <= now).length;
+  const fill = (() => {
+    if (now === null || passed === 0) return 0;
+    if (passed >= DATES.length) return 100;
+    const from = DATES[passed - 1][1];
+    const to = DATES[passed][1];
+    return Math.min(100, ((passed - 1 + Math.min(1, Math.max(0, (now - from) / (to - from)))) / (DATES.length - 1)) * 100);
   })();
-  // Phase i's node sits at the start of its stretch; the last node closes the track.
-  const fill = at < 0 ? 0 : Math.min(100, ((at + part) / (PHASES.length - 1)) * 100);
+  const at = phase ? PHASES.indexOf(phase) : -1;
 
   return (
     <section id="dates" aria-labelledby="dates-title" className={SECTION}>
-      <Heading id="dates-title" title="Dates" lead={`All times in ${HACKATHON.timezone}.`} />
+      <Heading id="dates-title" title="Timeline" lead={`All times in ${HACKATHON.timezone}.`} />
       <div className="relative mt-24 md:mt-32">
         {/* The track: down the left on a phone, across on wider screens. */}
         <div aria-hidden className="absolute bottom-[12px] left-[11px] top-[12px] w-[2px] bg-[color:color-mix(in_srgb,var(--color-white)_12%,transparent)] md:bottom-auto md:left-[12px] md:right-[12px] md:h-[2px] md:w-auto">
           <div className="h-[var(--fill)] w-full bg-[var(--color-violet-400)] md:h-full md:w-[var(--fill)]" style={{ ["--fill" as string]: `${fill}%` }} />
         </div>
-        <ol className="relative m-0 grid list-none grid-cols-1 gap-16 p-0 md:grid-cols-4 md:gap-10">
-          {PHASES.map((p, i) => {
-            const isNow = i === at;
-            const done = at > i;
+        <ol className="relative m-0 grid list-none grid-cols-1 gap-16 p-0 md:grid-cols-3 md:gap-10">
+          {DATES.map(([label, t], i) => {
+            const done = i < passed;
+            const next = i === passed;
             return (
-              <li key={p.key} aria-current={isNow ? "step" : undefined} className="flex gap-6 md:flex-col md:gap-8">
+              <li key={label} aria-current={next ? "step" : undefined} className={cn("flex gap-6 md:flex-col md:gap-8", i === DATES.length - 1 && "md:items-end md:text-right", i > 0 && i < DATES.length - 1 && "md:items-center md:text-center")}>
                 <span
                   aria-hidden
                   className={cn(
                     "relative flex size-[24px] shrink-0 items-center justify-center rounded-full",
-                    isNow
-                      ? "bg-[var(--color-violet-400)] shadow-[0_0_0_6px_color-mix(in_srgb,var(--color-violet-400)_24%,transparent)]"
+                    next
+                      ? "border-2 border-solid border-[color:var(--color-violet-400)] bg-[var(--color-bg-page)] shadow-[0_0_0_6px_color-mix(in_srgb,var(--color-violet-400)_24%,transparent)]"
                       : done
                         ? "bg-[var(--color-violet-400)]"
                         : "border-2 border-solid border-[color:color-mix(in_srgb,var(--color-white)_24%,transparent)] bg-[var(--color-bg-page)]",
@@ -234,37 +307,48 @@ export function Timeline() {
                   {done ? <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2.6} className="text-[color:var(--color-white)]" /> : null}
                 </span>
                 <span className="flex flex-col gap-2">
-                  <span className={cn("text-md font-semibold leading-md", isNow ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{isNow ? "Now" : done ? "Done" : "Next"}</span>
-                  <span className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">{p.label}</span>
-                  <span className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{p.to ? `${eat(p.from)} – ${eat(p.to)}` : eat(p.from)}</span>
+                  <span className={cn("text-md font-semibold leading-md", next ? "text-[color:var(--color-violet-300)]" : "text-[color:var(--color-text-tertiary)]")}>{done ? "Done" : next ? "Next" : "Upcoming"}</span>
+                  <span className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">{label}</span>
+                  <span className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{eat(t)}</span>
                 </span>
               </li>
             );
           })}
         </ol>
       </div>
+      {/* The phases, the current one lit. */}
+      <ol aria-label="Phases" className="m-0 mt-20 flex list-none flex-wrap gap-3 p-0 md:mt-24">
+        {PHASES.map((p, i) => (
+          <li
+            key={p}
+            aria-current={i === at ? "step" : undefined}
+            className={cn(
+              "rounded-full border border-solid px-5 py-2 text-md font-medium leading-md",
+              i === at
+                ? "border-[color:var(--color-violet-300)] bg-[color:color-mix(in_srgb,var(--color-violet-500)_24%,transparent)] text-[color:var(--color-white)]"
+                : i < at
+                  ? "border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] text-[color:var(--color-text-secondary)]"
+                  : "border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)] text-[color:var(--color-text-tertiary)]",
+            )}
+          >
+            {stageName(p)}
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }
 
 export function FaqAndRules() {
   const { c, unit } = useHackathon();
-  const { HACKATHON, eat } = c;
-  const faq: [string, string][] = [
-    ["Is it free to take part?", `Yes. Joining is free, and every participant builds with IDEEZA AI on ${HACKATHON.baseQuality} quality.`],
-    ["I have never built hardware. Can I still take part?", "Yes. No engineering background is needed: you describe the idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D."],
-    ["Do I need a crypto wallet or KYC?", "No. You can build, publish and vote without a wallet and without KYC."],
-    ["How do votes count?", `Each account has ${HACKATHON.votesPerPerson} votes and can take one back while voting is open. Only signed-in accounts with a verified email can vote.`],
-    ["Who owns my design?", "You do. Participants keep full ownership of their designs and intellectual property."],
-    ["When are the winners announced?", `Building ends on ${eat(HACKATHON.dates.end)} (${HACKATHON.tzShort}). The winners are published on this page on ${eat(HACKATHON.dates.results)}.`],
-  ];
+  const { HACKATHON, faq } = c;
   return (
     <section id="faq" aria-labelledby="faq-title" className={SECTION}>
       <div className="grid grid-cols-1 gap-24 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-32">
         <div>
-          <Heading id="faq-title" title="Questions" />
+          <Heading id="faq-title" title="Questions and answers" />
           <div className="mt-16 border-0 border-b border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)]">
-            {faq.map(([q, a]) => (
+            {faq().map(([q, a]) => (
               <details key={q} className="group border-0 border-t border-solid border-[color:color-mix(in_srgb,var(--color-white)_10%,transparent)]">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-8 py-10 text-xl font-semibold leading-xl text-[color:var(--color-text-primary)] [&::-webkit-details-marker]:hidden">
                   {q}
@@ -283,7 +367,7 @@ export function FaqAndRules() {
           </h2>
           <p className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{HACKATHON.rules}</p>
           <ul className="m-0 flex list-none flex-wrap gap-3 p-0">
-            {[...(unit === "team" ? [`Teams of ${HACKATHON.teamMin} to ${HACKATHON.teamMax}`] : []), `${HACKATHON.votesPerPerson} votes per account`, "Verified email to vote", "One account per person"].map((c) => (
+            {[...(unit === "team" ? [`Teams of ${HACKATHON.teamMin} to ${HACKATHON.teamMax}`] : []), `${HACKATHON.votesPerPerson} votes per person`, `Voters verify with ${HACKATHON.verify.join(" or ")}`].map((c) => (
               <li key={c} className="rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] px-5 py-2 text-md font-medium leading-md text-[color:var(--color-text-secondary)]">
                 {c}
               </li>
@@ -307,31 +391,21 @@ function subscribeWide(on: () => void) {
   return () => q.removeEventListener("change", on);
 }
 
-/** "Building ends in 6 days · 08:04:38" — the closing line's clock, one line of caps. */
-function closingClock({ HACKATHON, eat }: Campaign, phase: Phase | null, now: number | null): string {
-  if (phase === "results") return `Building has ended · winners announced ${eat(HACKATHON.dates.results)}`;
-  if (phase === "judging") return `Building has ended · winners on ${eat(HACKATHON.dates.results)}`;
-  const to = phase === "registration" || phase === "soon" ? HACKATHON.dates.start : HACKATHON.dates.end;
-  const t = countdownParts(to, now);
-  const days = Number(t.d);
-  return `Building ${phase === "registration" || phase === "soon" ? "starts" : "ends"} in ${Number.isNaN(days) ? "--" : days} ${days === 1 ? "day" : "days"} · ${t.h}:${t.m}:${t.s}`;
-}
-
 /**
  * The last word, full screen (owner 2026-11-16: the concept from their brief,
- * in our fonts, colours and words). Behind it, the brief's wave video (kept in
+ * in our fonts and colours; since 2026-11-17 in the prototype landing page's
+ * words). Behind it, the brief's wave video (kept in
  * public/hackathons) — a slow violet-and-blue light on black, already in the
  * brand's colours — with
  * only its top and bottom edges faded into the page so the light stays the
- * picture. On it: the promise and the prize in two short lines, the clock in
+ * picture. On it: the promise and the prize in two short lines, the kicker in
  * one line of caps, the headline with its second line shining, and Join with
  * an arrow that steps forward. The video loads only when the section is near.
  * It fills the screen under the site bar and section bar.
  */
 export function Closing() {
-  const { c, now, phase, unit } = useHackathon();
-  const { HACKATHON, GROUP, money, prizePool } = c;
-  const ended = phase === "judging" || phase === "results";
+  const { c } = useHackathon();
+  const { money, prizePool } = c;
   const still = useReducedMotion();
   const wide = React.useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
   const ref = React.useRef<HTMLElement>(null);
@@ -358,32 +432,25 @@ export function Closing() {
       <div className="mx-auto flex w-full max-w-[1260px] flex-1 flex-col px-8 pb-24 pt-20 md:pt-24 min-[1292px]:px-0">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-16">
           <p className="max-w-[480px] text-lg leading-lg text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-xl md:leading-xl">
-            {HACKATHON.minProducts} products in {HACKATHON.hours} hours. No engineering background needed: describe an idea, and IDEEZA AI designs the concept, PCB, code and 3D.
+            Build hardware at the speed of software. One prompt gives you a 3D prototype, a PCB and the code that runs it.
           </p>
           <p className="text-lg leading-lg text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-xl md:leading-xl lg:text-right">
             <b className="font-semibold text-[color:var(--color-white)]">{money(prizePool)}</b> in prizes
-            <br className="hidden lg:block" /> for the top {inWords(HACKATHON.prizes.length)}.
           </p>
         </div>
 
         <div className="relative isolate flex flex-1 flex-col items-center justify-center py-24 text-center">
           {/* A soft shade under the words only: when the wave's bright edge passes behind them they stay readable. */}
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[90%] w-[min(1000px,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-black)_62%,transparent),transparent)]" />
-          <p className="text-md font-medium uppercase leading-md tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-lg md:leading-lg">{closingClock(c, phase, now)}</p>
-          {/* Once building has ended there is nothing to join here: the call is the next hackathon. */}
+          <p className="text-md font-medium uppercase leading-md tracking-caps text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-lg md:leading-lg">The creator economy meets hardware</p>
           <h2 id="closing-title" className="mt-12 font-display text-6xl leading-6xl tracking-tighter [text-wrap:balance] md:text-8xl md:leading-8xl">
-            <span className="block font-medium text-[color:var(--color-white)]">{ended ? "This one has ended." : `Put your ${GROUP ? GROUP.one : unit === "team" ? "team" : "name"}`}</span>
-            <span className="ix-hack-shine block font-bold">{ended ? "Join the next one." : "on the board."}</span>
+            <span className="block font-medium text-[color:var(--color-white)]">The next hardware product</span>
+            <span className="ix-hack-shine block font-bold">could be yours.</span>
           </h2>
+          {/* Join while joining is open; once it has closed the other call takes the inverse look. */}
           <div className="mt-20 flex w-full flex-col items-center gap-8 sm:w-auto sm:flex-row">
-            {ended ? (
-              <Link href="/hackathons" className={cn(INVERSE(), "w-full sm:w-auto")}>
-                See all hackathons
-              </Link>
-            ) : (
-              <JoinButton tone="inverse" arrow className="w-full sm:w-auto" />
-            )}
-            <VoteLink className="w-full sm:w-auto" />
+            <JoinButton tone="inverse" arrow className="w-full sm:w-auto" />
+            <VoteLink tone="inverse" className="w-full sm:w-auto" />
           </div>
         </div>
       </div>

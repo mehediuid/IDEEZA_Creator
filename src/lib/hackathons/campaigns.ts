@@ -49,9 +49,13 @@ const EAST_AFRICA_CUP: Hackathon = {
     results: Date.parse("2026-12-08T18:00:00+03:00"),
   },
   who: "Students, makers, engineers and anyone with a product idea",
-  baseQuality: "Low",
+  category: "Hardware",
+  langs: "English",
+  baseQuality: "Low Mode",
   aiUnlock: null,
-  giveaways: null,
+  extras: null,
+  appVoteWeight: 2,
+  verify: ["Email"],
   points: { build: 10, publish: 5, vote: 1, referral: 15, buildDay: 2 },
   criteria: [
     { name: "Innovation", weight: 50 },
@@ -98,9 +102,13 @@ const SMART_HOME_SPRINT: Hackathon = {
     results: Date.parse("2026-10-11T18:00:00+03:00"),
   },
   who: "University students, makers, engineers and anyone with a product idea",
-  baseQuality: "Low",
+  category: "Smart home",
+  langs: "English",
+  baseQuality: "Low Mode",
   aiUnlock: null,
-  giveaways: null,
+  extras: null,
+  appVoteWeight: 2,
+  verify: ["Email"],
   points: { build: 10, publish: 5, vote: 1, referral: 15, buildDay: 2 },
   criteria: [],
   judges: [],
@@ -110,6 +118,12 @@ const SMART_HOME_SPRINT: Hackathon = {
 };
 
 export const HACKATHONS: Hackathon[] = [VIBE_INVENTING, EAST_AFRICA_CUP, SMART_HOME_SPRINT];
+
+/**
+ * The main hackathon: the one the site menu's Hackathons opens, at /hackathons
+ * (the prototype's "main event", chosen by the organizer; owner 2026-11-17).
+ */
+export const MAIN_HACKATHON: Hackathon = VIBE_INVENTING;
 
 export const hackathonBySlug = (slug: string): Hackathon | null => HACKATHONS.find((h) => h.slug === slug) ?? null;
 

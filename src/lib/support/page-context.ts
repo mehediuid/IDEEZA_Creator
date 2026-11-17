@@ -169,7 +169,9 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
       if (!b) return { page: "Landing page", route: "/landing" };
       break;
     case "hackathons":
-      return b ? { page: "Hackathon", route: "/hackathons/[slug]" } : { page: "Hackathons", route: "/hackathons" };
+      // /hackathons is the main hackathon's page; /hackathons/all lists every hackathon.
+      if (b === "all") return { page: "Hackathons", route: "/hackathons/all" };
+      return b ? { page: "Hackathon", route: "/hackathons/[slug]" } : { page: "Hackathon", route: "/hackathons" };
     case "events":
       return b ? { page: "Event", route: "/events/[slug]" } : { page: "Events", route: "/events" };
     case "balance":

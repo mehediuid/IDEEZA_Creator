@@ -6,7 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { VIBE_INVENTING, campaignOf, groupStandings, inWords, matchesOf } from "../../.tmp-test/lib/hackathons/vibe-inventing.js";
-import { HACKATHONS, hackathonBySlug, listOrder, statusOf } from "../../.tmp-test/lib/hackathons/campaigns.js";
+import { HACKATHONS, MAIN_HACKATHON, hackathonBySlug, listOrder, statusOf } from "../../.tmp-test/lib/hackathons/campaigns.js";
 
 const row = (id, votes, group = "", project = true) => ({
   p: { id, name: id, group, products: 3, published: 3, votes, referrals: 0, buildDays: 0, moved: 0, project: project ? { id: `${id}-x`, name: `${id} product`, image: "", thumb: "", video: "", summary: "" } : undefined },
@@ -43,7 +43,7 @@ test("the running campaign: individuals, university vs university, the board's t
   assert.equal(HACKATHON.unit, "solo");
   assert.equal(unitLabel(HACKATHON.unit), "Individuals");
   assert.equal(competeLine(HACKATHON.unit), "You compete as an individual");
-  assert.equal(unitLabel("duel"), "1 vs 1");
+  assert.equal(unitLabel("duel"), "1 vs 1 (head-to-head)");
   assert.equal(GROUP?.one, "university");
   assert.equal(groupOf(row("a", 1, "").p), "Open category");
   assert.equal(HACKATHON.winBy, "shortlist");
@@ -65,7 +65,7 @@ test("every hackathon has its own link and id; the Ethiopia page keeps its board
 
 test("each record makes its own page data: groups, format, money, board", () => {
   const cup = campaignOf(hackathonBySlug("east-africa-1-vs-1"));
-  assert.equal(cup.unitLabel(cup.HACKATHON.unit), "1 vs 1");
+  assert.equal(cup.unitLabel(cup.HACKATHON.unit), "1 vs 1 (head-to-head)");
   assert.equal(cup.GROUP?.one, "country");
   assert.equal(cup.money(cup.prizePool), "8,000 USD");
   // It has not started: nobody has built yet, so its board is empty.
@@ -90,4 +90,44 @@ test("the list: running first, then starting soon, then ended; the server keeps 
   assert.equal(statusOf("live"), "live");
   assert.equal(statusOf("judging"), "judging");
   assert.equal(statusOf("results"), "ended");
+});
+
+test("the page's words are the prototype landing page's, from the record", () => {
+  const c = campaignOf(VIBE_INVENTING);
+  const steps = c.steps("solo");
+  assert.equal(steps.length, 7);
+  assert.deepEqual(steps.map(([t]) => t), ["Sign up or log in", "Join the hackathon", "Build", "Publish", "Share and collect votes", "Earn points", "Climb and win"]);
+  assert.equal(steps[1][1], "Join from this page and pick your university. You get a personal referral link.");
+  assert.equal(steps[2][1], "Build 3 or more products with IDEEZA AI in Low Mode. A product counts when all design stages are done.");
+  assert.equal(steps[6][1], "When the hackathon ends the leaderboard freezes. The top 10 are shortlisted and the judges pick the winners.");
+  assert.equal(c.groupByLabel, "University vs university");
+  assert.deepEqual(c.whoCan("solo"), [
+    "University students, makers, engineers and anyone with a product idea",
+    "Open to participants in Ethiopia",
+    "You must be 18 or older",
+    "You compete as an individual",
+    "You pick your university when you join. Not part of one? Join the open category",
+    "You need an IDEEZA account with a verified email",
+    "Judges cannot take part or vote",
+  ]);
+  const faq = Object.fromEntries(c.faq());
+  assert.equal(faq["Is it free to take part?"], "Yes. Joining is free, and every participant builds in Low Mode.");
+  assert.equal(
+    faq["How do votes count?"],
+    "Each person has 10 votes. Only logged-in users with a verified account can vote. A vote from the IDEEZA mobile app counts as 2 points. A vote on the web counts as 1 point.",
+  );
+  assert.equal(c.clockOf("live").label, "The hackathon ends in");
+  assert.equal(c.clockOf("judging").to, null);
+  assert.deepEqual(c.keyDates().map(([l]) => l), ["Registration opens", "Hackathon starts", "Hackathon ends"]);
+  // Without judges the last step and the winner line say points decide.
+  const sprint = campaignOf(hackathonBySlug("smart-home-sprint"));
+  assert.equal(sprint.decided, "The standings freeze when the hackathon ends. The participants with the most points win.");
+  assert.ok(!sprint.whoCan("solo").includes("Judges cannot take part or vote"));
+});
+
+test("the menu's Hackathons opens the main hackathon; the list is under More hackathons", () => {
+  assert.ok(HACKATHONS.includes(MAIN_HACKATHON));
+  assert.equal(MAIN_HACKATHON.slug, "vibe-inventing-ethiopia");
+  // "all" is the list's own address, never a hackathon's.
+  assert.ok(!HACKATHONS.some((h) => h.slug === "all"));
 });

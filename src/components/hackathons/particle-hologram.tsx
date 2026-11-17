@@ -3,8 +3,8 @@
 // The hackathon hero's hologram (owner 2026-11-16: a visual of its own, not
 // art the landing page already uses). Thousands of violet-to-blue points of
 // light take the shape of an idea (a light bulb), scatter, gather into its
-// PCB (a board, its traces, the chip and its pins), scatter again and become
-// the product (a drone), then start over — "describe it, IDEEZA AI builds
+// PCB (a board, its traces, the chip and its pins), then its code (a code
+// window with "</>"), then the product in 3D (a drone), then start over — "describe it, IDEEZA AI builds
 // it", told without a word. The shapes are made here from simple geometry,
 // so nothing is borrowed from elsewhere on the site.
 //
@@ -211,6 +211,70 @@ function pcb(n: number): Float32Array {
   );
 }
 
+/** Its code: a code window — the frame and title bar, three dots, lines of code, and "</>" floating in front. */
+function code(n: number): Float32Array {
+  const W = 1.6;
+  const H = 1.05;
+  // Lines of code above and below the glyph (y, x, length), so "</>" stays clear in the middle.
+  const lines: [number, number, number][] = [
+    [0.6, -1.35, 0.9],
+    [0.48, -1.1, 1.3],
+    [-0.62, -1.1, 0.8],
+    [-0.75, -1.35, 1.2],
+  ];
+  // The glyph's strokes: "<", "/", ">" (x1, y1, x2, y2).
+  const glyph: [number, number, number, number][] = [
+    [-1.0, -0.02, -0.5, 0.36],
+    [-1.0, -0.02, -0.5, -0.4],
+    [1.0, -0.02, 0.5, 0.36],
+    [1.0, -0.02, 0.5, -0.4],
+    [-0.18, -0.42, 0.18, 0.38],
+  ];
+  return build(
+    n,
+    [
+      {
+        w: 0.22,
+        gen: (r) => {
+          const t = r() * 4;
+          if (t < 1) return [lerp(-W, W, t), -H, -0.15];
+          if (t < 2) return [W, lerp(-H, H, t - 1), -0.15];
+          if (t < 3) return [lerp(W, -W, t - 2), H, -0.15];
+          return [-W, lerp(H, -H, t - 3), -0.15];
+        },
+      },
+      { w: 0.08, gen: (r) => [lerp(-W, W, r()), 0.78, -0.15] },
+      {
+        w: 0.04,
+        gen: (r) => {
+          const k = Math.floor(r() * 3);
+          const th = r() * Math.PI * 2;
+          return [-1.42 + k * 0.16 + Math.cos(th) * 0.04, 0.92 + Math.sin(th) * 0.04, -0.15];
+        },
+      },
+      {
+        w: 0.16,
+        gen: (r) => {
+          const [y, x, len] = lines[Math.floor(r() * lines.length)];
+          return [x + r() * len, y, -0.15];
+        },
+      },
+      {
+        w: 0.5,
+        gen: (r) => {
+          const [x1, y1, x2, y2] = glyph[Math.floor(r() * glyph.length)];
+          const t = r();
+          return [lerp(x1, x2, t) + (r() - 0.5) * 0.06, lerp(y1, y2, t) + (r() - 0.5) * 0.06, 0.12 + (r() - 0.5) * 0.06];
+        },
+      },
+    ],
+    41,
+    0.12,
+    -0.25,
+    1.05,
+  );
+}
+
 /** The product: a drone — body, dome, arms, rotor guards, blades, skids, camera. */
 function drone(n: number): Float32Array {
   const ends: V3[] = [
@@ -338,7 +402,7 @@ export function ParticleHologram({ still, onStep }: { still: boolean; onStep: (i
     if (!el) return;
     const phone = window.matchMedia("(max-width: 767px)").matches;
     const N = phone ? 4200 : 7600;
-    const shapes = [bulb(N), pcb(N), drone(N)];
+    const shapes = [bulb(N), pcb(N), code(N), drone(N)];
 
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: "high-performance" });
     const pr = Math.min(2, window.devicePixelRatio || 1);
@@ -355,7 +419,7 @@ export function ParticleHologram({ still, onStep }: { still: boolean; onStep: (i
     const tok = (name: string, fb: string) => new THREE.Color((css.getPropertyValue(name) || fb).trim() || fb);
 
     const geo = new THREE.BufferGeometry();
-    const start = still ? shapes[2] : shapes[0];
+    const start = still ? shapes[3] : shapes[0];
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(start), 3));
     const aFrom = new THREE.BufferAttribute(new Float32Array(start), 3);
     const aTo = new THREE.BufferAttribute(new Float32Array(start), 3);
@@ -403,7 +467,7 @@ export function ParticleHologram({ still, onStep }: { still: boolean; onStep: (i
     if (still) {
       group.rotation.set(0.15, -0.5, 0);
       renderer.render(scene, camera);
-      stepCb.current(2);
+      stepCb.current(3);
       return () => {
         ro.disconnect();
         geo.dispose();
