@@ -6,9 +6,11 @@
 // own glow video, screen-blended so its black disappears), a big centred
 // headline under it, the lede and the two actions, and a dark violet-edged
 // panel rising from the bottom with a light line along its top edge. The
-// panel holds the page's own particle hologram — an idea becoming a PCB
-// becoming a product (hero-showcase.tsx), not an app, not the page's product
-// photos, not art the landing page already shows (owner).
+// panel holds the page's own particle hologram — concept, PCB, code, 3D
+// (hero-showcase.tsx), not an app, not the page's product photos, not art the
+// landing page already shows (owner). The words — the hackathon's name, its
+// lead, the clock and the facts — are the prototype landing page's (owner
+// 2026-11-17: that page's content is final).
 //
 // Sky: the stars are drawn once on a canvas; nothing in the sky is animated
 // in code — only the video moves it. The video plays on wide landscape
@@ -21,21 +23,12 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import type { Phase } from "@/lib/hackathons/vibe-inventing";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { countdownParts, useHackathon, useReducedMotion } from "./context";
 import { JoinButton, VoteLink } from "./actions";
 import { HeroShowcase } from "./hero-showcase";
 import { HERO_MEDIA } from "./parts";
-
-const STATUS: Record<Phase, string> = {
-  soon: "Registration opens soon",
-  registration: "Registration is open",
-  live: "Live now",
-  judging: "Building has ended · judging",
-  results: "Winners announced",
-};
 
 const DESKTOP = "(min-width: 900px) and (orientation: landscape)";
 function subscribeDesktop(on: () => void) {
@@ -118,21 +111,24 @@ function Planet() {
   );
 }
 
+/**
+ * The name over two lines, the first lit (the prototype's title: half the
+ * words, rounded up, on top). "1 vs 1" counts as one word, so it never breaks.
+ */
+function titleLines(name: string): [string, string] {
+  const w = name.trim().match(/\d+ vs \d+|\S+/g) ?? [];
+  const k = w.length > 3 ? Math.ceil(w.length / 2) : Math.max(1, w.length - 1);
+  return [w.slice(0, k).join(" "), w.slice(k).join(" ")];
+}
+
 export function HackathonHero() {
   const { c, phase, now, unit } = useHackathon();
-  const { HACKATHON, GROUP, money, unitLabel, eat } = c;
-  // The two facts a visitor needs beside Join (the brief's hero left them to the bottom of
-  // the page): how long is left, and whether they can enter.
-  const left = countdownParts(phase === "registration" || phase === "soon" ? HACKATHON.dates.start : HACKATHON.dates.end, now);
-  const deadline =
-    phase === "results"
-      ? `Winners announced ${eat(HACKATHON.dates.results)}`
-      : phase === "judging"
-      ? `Winners on ${eat(HACKATHON.dates.results)}`
-      : `${phase === "registration" || phase === "soon" ? "Starts" : "Ends"} in ${Number.isNaN(Number(left.d)) ? "--" : Number(left.d)}d ${left.h}h ${left.m}m`;
-  // "Free to join" only while joining is open.
-  const ended = phase === "judging" || phase === "results";
-  const facts = [deadline, ...(ended ? [] : ["Free to join"]), `${HACKATHON.minAge}+, living in ${HACKATHON.where}`, unitLabel(unit)];
+  const { HACKATHON, money, prizePool, unitLabel, groupByLabel, clockOf, stageName } = c;
+  // The prototype's facts beside Join: the clock, the prize, who, the format and the groups.
+  const clock = phase ? clockOf(phase) : null;
+  const left = countdownParts(clock?.to ?? 0, now);
+  const facts = [`${money(prizePool)} in prizes`, `${HACKATHON.minAge}+ · ${HACKATHON.where}`, unitLabel(unit), ...(groupByLabel ? [groupByLabel] : [])];
+  const [lit, rest] = titleLines(HACKATHON.name);
   return (
     <section aria-labelledby="hackathon-title" className="relative isolate overflow-hidden bg-[var(--color-black)]">
       <div aria-hidden className="absolute inset-0 -z-10">
@@ -148,23 +144,23 @@ export function HackathonHero() {
         <p className="ix-hk-fade flex items-center gap-3 rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-violet-300)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_55%,transparent)] px-5 py-2 text-md font-medium leading-md text-[color:color-mix(in_srgb,var(--color-white)_86%,transparent)] backdrop-blur-[6px] md:text-lg md:leading-lg">
           <span aria-hidden className={cn("size-[8px] shrink-0 rounded-full", phase === "live" ? "bg-[var(--color-green-400)] motion-safe:animate-pulse" : "bg-[var(--color-violet-400)]")} />
           <span>
-            {phase ? STATUS[phase] : " "} · {/* phones: the short name, so the pill stays one line */}
-            <span className="max-sm:hidden">{HACKATHON.name}</span>
-            <span className="sm:hidden">{HACKATHON.shortName}</span>
+            {phase ? `${phase === "live" ? "Live now · " : ""}${stageName(phase)}` : " "}
           </span>
         </p>
 
         <h1 id="hackathon-title" className="mt-12 font-display text-6xl font-bold leading-6xl tracking-tighter text-[color:var(--color-white)] md:text-8xl md:leading-8xl">
           <span className="ix-hk-wipe block" style={{ animationDelay: "120ms" }}>
-            <span className="bg-[linear-gradient(90deg,var(--color-violet-300),var(--color-violet-500))] bg-clip-text text-transparent [-webkit-background-clip:text]">Invent hardware</span> <span className="whitespace-nowrap">with AI.</span>
+            <span className="bg-[linear-gradient(90deg,var(--color-violet-300),var(--color-violet-500))] bg-clip-text text-transparent [-webkit-background-clip:text]">{lit}</span>
           </span>
-          <span className="ix-hk-wipe block" style={{ animationDelay: "260ms" }}>
-            Win {money(HACKATHON.prizes[0])}.
-          </span>
+          {rest ? (
+            <span className="ix-hk-wipe block" style={{ animationDelay: "260ms" }}>
+              {rest}
+            </span>
+          ) : null}
         </h1>
 
         <p className="ix-hk-rise mt-12 max-w-[760px] text-xl leading-xl text-[color:var(--color-text-secondary)] [text-wrap:pretty] md:text-2xl md:leading-2xl" style={{ animationDelay: "420ms" }}>
-          No engineering background needed. Describe an idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D. Build {HACKATHON.minProducts} products in {HACKATHON.hours} hours{GROUP ? `, collect votes, and put your ${GROUP.one} on top.` : " and collect votes."}
+          {HACKATHON.lead}
         </p>
 
         <div className="ix-hk-rise mt-20 flex w-full flex-col items-center justify-center gap-6 sm:w-auto sm:flex-row md:mt-24" style={{ animationDelay: "540ms" }}>
@@ -172,17 +168,27 @@ export function HackathonHero() {
           <VoteLink className="w-full sm:w-auto" />
         </div>
         <ul className="ix-hk-rise m-0 mt-10 flex list-none flex-wrap justify-center gap-x-10 gap-y-4 p-0 md:mt-12 text-md leading-md text-[color:var(--color-text-secondary)] md:text-lg md:leading-lg" style={{ animationDelay: "620ms" }}>
-          {facts.map((f, i) => (
-            <li key={f} className={cn("flex items-center gap-2", i === 0 && "font-semibold text-[color:var(--color-white)] tabular-nums")}>
-              {i === 0 ? (
-                <span aria-hidden className={cn("size-[8px] rounded-full", phase === "live" ? "bg-[var(--color-green-400)]" : "bg-[var(--color-violet-400)]")} />
-              ) : (
-                <HugeiconsIcon icon={Tick02Icon} size={16} strokeWidth={2.2} aria-hidden className="text-[color:var(--color-green-400)]" />
-              )}
+          {clock ? (
+            <li className="flex items-center gap-2 text-[color:var(--color-white)]">
+              <span aria-hidden className={cn("size-[8px] rounded-full", phase === "live" ? "bg-[var(--color-green-400)]" : "bg-[var(--color-violet-400)]")} />
+              {clock.label}
+              {clock.to !== null ? (
+                <b className="font-semibold tabular-nums">
+                  {Number.isNaN(Number(left.d)) ? "--" : Number(left.d)}d {left.h}:{left.m}:{left.s}
+                </b>
+              ) : null}
+            </li>
+          ) : null}
+          {facts.map((f) => (
+            <li key={f} className="flex items-center gap-2">
+              <HugeiconsIcon icon={Tick02Icon} size={16} strokeWidth={2.2} aria-hidden className="text-[color:var(--color-green-400)]" />
               {f}
             </li>
           ))}
         </ul>
+        <p className="ix-hk-rise mt-6 text-md leading-md text-[color:var(--color-text-tertiary)] md:text-lg md:leading-lg" style={{ animationDelay: "660ms" }}>
+          {HACKATHON.category} · {HACKATHON.langs}
+        </p>
       </div>
 
       <div className="relative mx-auto mt-24 w-full max-w-[1236px] px-4 pb-24 md:mt-32 md:px-8 md:pb-32 xl:px-4">

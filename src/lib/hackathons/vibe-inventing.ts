@@ -60,12 +60,20 @@ export type Hackathon = {
   shortlist: number;
   dates: { registration: number; start: number; end: number; results: number };
   who: string;
-  /** The AI quality every participant builds with. */
+  /** What is built, as the prototype's setup names it ("Hardware"). */
+  category: string;
+  /** The languages it runs in ("English, Amharic"). */
+  langs: string;
+  /** The AI mode every participant builds in ("Low Mode"). */
   baseQuality: string;
-  /** Stronger AI for the top of the board near the end, or null. */
+  /** A stronger AI mode for the top of the board near the end, or null. */
   aiUnlock: { top: number; lastDays: number; quality: string } | null;
-  /** Giveaways while the hackathon runs, or null. */
-  giveaways: { everyDays: number; prize: string } | null;
+  /** Extra rewards beyond the places, in the organizer's words, or null. */
+  extras: string | null;
+  /** A vote from the IDEEZA mobile app counts this many points (a web vote counts 1), or null when the app is off. */
+  appVoteWeight: number | null;
+  /** How voters verify ("Email"). */
+  verify: string[];
   /** Points per action — the prototype's points table. */
   points: { build: number; publish: number; vote: number; referral: number; buildDay: number };
   criteria: { name: string; weight: number }[];
@@ -145,9 +153,13 @@ export const VIBE_INVENTING: Hackathon = {
     results: Date.parse("2026-11-24T18:00:00+03:00"),
   },
   who: "University students, makers, engineers and anyone with a product idea",
-  baseQuality: "Low",
-  aiUnlock: { top: 50, lastDays: 3, quality: "Medium" },
-  giveaways: { everyDays: 2, prize: "Bonus AI credits and IDEEZA merch" },
+  category: "Hardware",
+  langs: "English, Amharic",
+  baseQuality: "Low Mode",
+  aiUnlock: { top: 50, lastDays: 3, quality: "Medium Mode" },
+  extras: "Bonus AI credits and merch giveaways every 2 days",
+  appVoteWeight: 2,
+  verify: ["Email"],
   points: { build: 10, publish: 5, vote: 1, referral: 15, buildDay: 2 },
   criteria: [
     { name: "Innovation", weight: 40 },
@@ -175,6 +187,9 @@ const GROUP_WORDS = {
 
 /** The words for who competes: one person, or one team (the style can be switched on the page). */
 export const entrantOf = (unit: Unit) => (unit === "team" ? { one: "team", many: "teams", title: "Team" } : { one: "builder", many: "builders", title: "Builder" });
+
+const UNIT_LABEL: Record<Unit, string> = { solo: "Individuals", team: "Teams", duel: "1 vs 1 (head-to-head)" };
+const GROUPBY_LABEL: Record<Exclude<GroupBy, "none">, string> = { university: "University vs university", country: "Country vs country", custom: "Custom groups" };
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 /** 3 → "three" (up to ten; then the figure). */
@@ -271,6 +286,11 @@ export function matchesOf(rows: readonly Row[]): Match[] {
   return out;
 }
 
+/** "16 Nov, 09:00" in the hackathon's own time zone. */
+const eatOf = (h: Hackathon, ms: number) => new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: h.timeZone });
+
+const STAGE_NAME: Record<Phase, string> = { soon: "Registration opens soon", registration: "Registration", live: "Build & vote", judging: "Judging", results: "Results" };
+
 function phaseOf(h: Hackathon, now: number): Phase {
   const d = h.dates;
   if (now < d.registration) return "soon";
@@ -319,8 +339,10 @@ function makeCampaign(h: Hackathon) {
     POINTS,
     /** The words the page uses for the hackathon's groups (null when there are none). */
     GROUP,
-    /** "Individuals", "Teams of 2–5", "1 vs 1" — the prototype's format names. */
-    unitLabel: (unit: Unit) => (unit === "team" ? `Teams of ${h.teamMin}–${h.teamMax}` : unit === "duel" ? "1 vs 1" : "Individuals"),
+    /** "Individuals", "Teams", "1 vs 1 (head-to-head)" — the prototype's format names. */
+    unitLabel: (unit: Unit) => UNIT_LABEL[unit],
+    /** "University vs university"… — the group ranking's name, or null without groups. */
+    groupByLabel: h.groupBy === "none" ? null : GROUPBY_LABEL[h.groupBy],
     /** How you compete, in the prototype's words. */
     competeLine: (unit: Unit) =>
       unit === "team"
@@ -347,11 +369,77 @@ function makeCampaign(h: Hackathon) {
       const u = h.aiUnlock;
       return u && rank <= u.top && h.dates.end - now <= u.lastDays * 86_400_000 ? u.quality : h.baseQuality;
     },
+    // The page's words, as the "IDEEZA Hackathons" prototype's landing page
+    // writes them for a visitor (owner 2026-11-17: that page's content is final).
+    /** "How it works": the steps from sign-up to winning, for this setup. */
+    steps: (unit: Unit): [string, string][] => [
+      ["Sign up or log in", "Create your IDEEZA account and verify your email."],
+      ["Join the hackathon", `Join from this page${GROUP ? ` and pick your ${GROUP.one}` : ""}${unit === "team" ? ", then invite your teammates" : ""}. You get a personal referral link.`],
+      ["Build", `Build ${h.minProducts > 1 ? `${h.minProducts} or more products` : "one or more products"} with IDEEZA AI in ${h.baseQuality}. A product counts when all design stages are done.`],
+      ["Publish", "Publish each product to the NFT marketplace under Give to Community and to the social feed. No wallet or KYC is needed."],
+      ["Share and collect votes", "Share your personal link on any platform. Votes on the IDEEZA social feed count."],
+      ["Earn points", "Builds, posts and votes, referrals and streaks all add to one score on the leaderboard."],
+      [
+        "Climb and win",
+        h.winBy === "score"
+          ? `Judges’ scores count for ${h.judgesWeight}% and audience votes for ${100 - h.judgesWeight}%.`
+          : h.winBy === "shortlist"
+            ? `When the hackathon ends the leaderboard freezes. The top ${h.shortlist} are shortlisted and the judges pick the winners.`
+            : "When the hackathon ends the leaderboard freezes. The participants with the most points win.",
+      ],
+    ],
+    /** "Who can participate". */
+    whoCan: (unit: Unit): string[] => [
+      h.who,
+      /world/i.test(h.where) ? "Open to participants worldwide" : `Open to participants in ${h.where}`,
+      `You must be ${h.minAge} or older`,
+      unit === "team" ? `You compete as a team of ${h.teamMin} to ${h.teamMax} people` : unit === "duel" ? "You compete head-to-head: one opponent per round, and the winner advances" : "You compete as an individual",
+      ...(GROUP ? [`You pick your ${GROUP.one} when you join${h.openCategory ? ". Not part of one? Join the open category" : ""}`] : []),
+      "You need an IDEEZA account with a verified email",
+      ...(h.winBy !== "points" ? ["Judges cannot take part or vote"] : []),
+    ],
+    /** "How the winner is decided", in one paragraph. */
+    decided:
+      h.winBy === "score"
+        ? "Judges’ scores and audience votes are combined into one final score."
+        : h.winBy === "shortlist"
+          ? `When the hackathon ends the standings freeze and the top ${h.shortlist} are shortlisted. The judges score them and confirm the winners.`
+          : "The standings freeze when the hackathon ends. The participants with the most points win.",
+    /** "Questions and answers". */
+    faq: (): [string, string][] => [
+      ["Is it free to take part?", `Yes. Joining is free, and every participant builds in ${h.baseQuality}.`],
+      ["Do I need a crypto wallet or KYC?", "No. You can build, publish and vote without a wallet and without KYC."],
+      [
+        "How do votes count?",
+        `Each person has ${h.votesPerPerson} votes. Only logged-in users with a verified account can vote.${h.appVoteWeight ? ` A vote from the IDEEZA mobile app counts as ${h.appVoteWeight} points. A vote on the web counts as 1 point.` : ""}`,
+      ],
+      ["Who owns my design?", "You do. Participants keep full ownership of their designs and intellectual property."],
+      ["When are the winners announced?", `The hackathon ends on ${eatOf(h, h.dates.end)} (${h.timezone}). The winners are published on this page after judging.`],
+    ],
+    /** The phase's name ("Build & vote"…), as the status line and the phase pills say it. */
+    stageName: (phase: Phase): string => STAGE_NAME[phase],
+    /** The hero clock's words, and what it counts down to (null: no clock in this phase). */
+    clockOf: (phase: Phase): { label: string; to: number | null } =>
+      phase === "soon"
+        ? { label: "Registration opens in", to: h.dates.registration }
+        : phase === "registration"
+          ? { label: "Registration closes in", to: h.dates.start }
+          : phase === "live"
+            ? { label: "The hackathon ends in", to: h.dates.end }
+            : phase === "judging"
+              ? { label: "The leaderboard is frozen. Judging is in progress", to: null }
+              : { label: "This hackathon has ended", to: null },
+    /** The timeline's dates (building and voting run together). */
+    keyDates: (): [string, number][] => [
+      ["Registration opens", h.dates.registration],
+      ["Hackathon starts", h.dates.start],
+      ["Hackathon ends", h.dates.end],
+    ],
     phaseAt: (now: number) => phaseOf(h, now),
     prizePool: h.prizes.reduce((s, x) => s + x, 0),
     money: (n: number) => `${n.toLocaleString("en-US")} ${h.currency}`,
     /** "16 Nov, 09:00" in the hackathon's own time zone. */
-    eat: (ms: number) => new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: h.timeZone }),
+    eat: (ms: number) => eatOf(h, ms),
   };
 }
 

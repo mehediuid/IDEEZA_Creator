@@ -1,21 +1,20 @@
 "use client";
 
 // The prizes as a podium (owner 2026-11-16: the reference podium's design —
-// solid 3D steps with a lit top face and the place number on the front, the
-// person standing on each, a trophy over first — in our colours). On each
-// step stands whoever holds that place on the board right now: their
-// product's picture (no people photos exist), their name, and the prize the
-// place pays. Steps: 2nd · 1st · 3rd, first the tallest, all violet-lit
-// glass, first lit the most. The extras (giveaways, the AI unlock) sit under
-// it as what everyone can win along the way.
+// solid 3D steps with a lit top face and the place number on the front, a
+// trophy over first — in our colours). Over each step, as the prototype's
+// landing page has it (owner 2026-11-17: its content is final): the place and
+// what it pays — a cup over first, a medal over the others. Steps: 2nd · 1st ·
+// 3rd, first the tallest, all violet-lit glass, first lit the most. Further
+// places and the extra rewards sit under it.
 
 import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ChampionIcon, GiftIcon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { ChampionIcon, GiftIcon, Medal01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { inWords, type Campaign } from "@/lib/hackathons/vibe-inventing";
+import type { Campaign } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon, useReducedMotion } from "./context";
-import { HERO_MEDIA, Heading, Initials, SECTION, SURFACE } from "./parts";
+import { HERO_MEDIA, Heading, SECTION, SURFACE } from "./parts";
 
 // Visual order on the podium: 2nd · 1st · 3rd (the list itself stays 1st → 3rd for screen readers).
 const ORDER = ["order-2", "order-1", "order-3"];
@@ -62,76 +61,38 @@ function PrizesBackdrop() {
   );
 }
 
-// How the winner is decided, in one sentence under the heading (the campaign's Winner setting).
-const decidedOf = ({ HACKATHON }: Campaign) =>
-  HACKATHON.winBy === "shortlist"
-    ? `The board's top ${HACKATHON.shortlist} go to the judges, and the judges pick the winners.`
-    : HACKATHON.winBy === "score"
-      ? `The judges' scores count for ${HACKATHON.judgesWeight}% and the votes for ${100 - HACKATHON.judgesWeight}%.`
-      : "The most points win.";
-
-// What everyone can win along the way, when the campaign has it.
-const extrasOf = ({ HACKATHON }: Campaign) => [
-  HACKATHON.giveaways && {
-    icon: GiftIcon,
-    title: `Giveaways every ${HACKATHON.giveaways.everyDays} days`,
-    text: `${HACKATHON.giveaways.prize}, given out every ${HACKATHON.giveaways.everyDays} days while the hackathon runs.`,
-  },
-  HACKATHON.aiUnlock && {
-    icon: SparklesIcon,
-    title: `Better AI for the top ${HACKATHON.aiUnlock.top}`,
-    text: `In the last ${HACKATHON.aiUnlock.lastDays} days the top ${HACKATHON.aiUnlock.top} build on ${HACKATHON.aiUnlock.quality} quality instead of ${HACKATHON.baseQuality}.`,
-  },
-].filter((x) => !!x);
+// Under the podium, as the prototype's landing page lists them: the places
+// after the third, and the campaign's extra rewards.
+const ORD = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
+const extrasOf = ({ HACKATHON, money }: Campaign) => [
+  ...HACKATHON.prizes.slice(3).map((a, i) => ({ icon: Medal01Icon, title: `${ORD(i + 4)} place`, text: money(a) })),
+  ...(HACKATHON.extras ? [{ icon: GiftIcon, title: "Extra rewards", text: `${HACKATHON.extras}.` }] : []),
+];
 
 export function Prizes() {
-  const { c, board, openProject, phase } = useHackathon();
+  const { c } = useHackathon();
   const { HACKATHON, money, prizePool } = c;
-  const places = inWords(HACKATHON.prizes.length);
-  const DECIDED = decidedOf(c);
   const EXTRAS = extrasOf(c);
-  // Who stands on the steps: nobody before building starts; the final standings once it has ended.
-  const lead = !board.length
-    ? DECIDED
-    : phase === "judging" || phase === "results"
-      ? `Building has ended: these ${places} finished on top. ${DECIDED}`
-      : `If building ended now, these ${places} would stand here. ${DECIDED}`;
   return (
     <section id="prizes" aria-labelledby="prizes-title" className={cn(SECTION, "relative isolate")}>
       <PrizesBackdrop />
-      <Heading className="[text-shadow:0_2px_18px_rgba(0,0,0,0.85)]" id="prizes-title" title={`${money(prizePool)} for the top ${places}`} lead={lead} />
+      <Heading className="[text-shadow:0_2px_18px_rgba(0,0,0,0.85)]" id="prizes-title" title={`${money(prizePool)} in prizes`} />
 
       <ol className="m-0 mx-auto mt-24 grid max-w-[960px] list-none grid-cols-3 items-end p-0 md:mt-32">
-        {HACKATHON.prizes.map((amount, i) => {
+        {HACKATHON.prizes.slice(0, 3).map((amount, i) => {
           const first = i === 0;
-          const r = board.at(i);
           return (
-            <li key={i} aria-label={`${PLACE.at(i)}: ${money(amount)}${r ? `, now ${r.p.name}` : ""}`} className={cn("relative flex min-w-0 flex-col items-center", ORDER.at(i), first && "z-[1]")}>
-              {/* Who stands here now. */}
+            <li key={i} aria-label={`${PLACE.at(i)}: ${money(amount)}`} className={cn("relative flex min-w-0 flex-col items-center", ORDER.at(i), first && "z-[1]")}>
+              {/* The place and what it pays: a cup over first, a medal over the others. */}
               <div className="flex w-full min-w-0 flex-col items-center gap-4 px-1 pb-8 text-center md:gap-5 md:pb-10">
-                {first ? (
-                  <HugeiconsIcon icon={ChampionIcon} size={44} strokeWidth={1.6} aria-hidden className="text-[color:var(--color-violet-300)] drop-shadow-[0_0_18px_color-mix(in_srgb,var(--color-violet-500)_80%,transparent)]" />
-                ) : null}
-                {r ? (
-                  <button
-                    type="button"
-                    disabled={!r.p.project}
-                    onClick={() => openProject(r)}
-                    aria-label={r.p.project ? `Open ${r.p.project.name}, by ${r.p.name}` : r.p.name}
-                    className={cn(
-                      "relative shrink-0 overflow-hidden rounded-full border-0 p-0 ring-2 ring-offset-4 ring-offset-[var(--color-bg-page)] focus-visible:outline-none focus-visible:shadow-focus-brand disabled:cursor-default",
-                      first ? "size-[72px] ring-[color:var(--color-violet-400)] md:size-[104px]" : "size-[60px] ring-[color:color-mix(in_srgb,var(--color-violet-300)_45%,transparent)] md:size-[88px]",
-                    )}
-                  >
-                    {r.p.project ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.p.project.thumb} alt="" className="h-full w-full bg-[var(--color-bg-subtle)] object-cover" />
-                    ) : (
-                      <Initials name={r.p.name} className="h-full w-full text-xl" />
-                    )}
-                  </button>
-                ) : null}
-                <span className="max-w-full truncate rounded-xl bg-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] px-2 py-1 text-lg max-md:whitespace-normal max-md:[overflow-wrap:anywhere] font-medium leading-lg text-[color:var(--color-white)] backdrop-blur-[8px] md:px-3 md:text-2xl md:leading-2xl">{r ? r.p.name : PLACE.at(i)}</span>
+                <HugeiconsIcon
+                  icon={first ? ChampionIcon : Medal01Icon}
+                  size={first ? 44 : 36}
+                  strokeWidth={1.6}
+                  aria-hidden
+                  className={cn(first ? "text-[color:var(--color-violet-300)] drop-shadow-[0_0_18px_color-mix(in_srgb,var(--color-violet-500)_80%,transparent)]" : "text-[color:var(--color-violet-200)]")}
+                />
+                <span className="max-w-full truncate rounded-xl bg-[color:color-mix(in_srgb,var(--color-black)_50%,transparent)] px-2 py-1 text-lg max-md:whitespace-normal max-md:[overflow-wrap:anywhere] font-medium leading-lg text-[color:var(--color-white)] backdrop-blur-[8px] md:px-3 md:text-2xl md:leading-2xl">{PLACE.at(i)}</span>
                 <span className="rounded-xl border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--color-black)_62%,transparent)] px-3 py-1 backdrop-blur-[8px] text-md font-semibold leading-md tabular-nums text-[color:var(--color-white)] md:px-5 md:py-2 md:text-xl md:leading-xl">
                   {amount.toLocaleString("en-US")} <span className="font-regular text-[color:var(--color-text-secondary)]">{HACKATHON.currency}</span>
                 </span>
@@ -165,7 +126,7 @@ export function Prizes() {
       </ol>
 
       {EXTRAS.length ? (
-        <ul className="m-0 mx-auto mt-16 grid max-w-[960px] list-none grid-cols-1 gap-6 p-0 md:mt-20 md:grid-cols-2 md:gap-10">
+        <ul className={cn("m-0 mx-auto mt-16 grid list-none grid-cols-1 gap-6 p-0 md:mt-20 md:gap-10", EXTRAS.length > 1 ? "max-w-[960px] md:grid-cols-2" : "max-w-[560px]")}>
           {EXTRAS.map((x) => (
             <li key={x.title} className={cn("flex items-start gap-8 rounded-2xl px-10 py-10 md:px-12", SURFACE)}>
               <span className="flex size-[44px] shrink-0 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--color-violet-600)_22%,transparent)] text-[color:var(--color-violet-200)]">

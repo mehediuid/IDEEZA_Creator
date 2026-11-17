@@ -31,8 +31,6 @@ type Ctx = {
   voteHref: string;
   /** Every participant, best first (none before building starts). */
   board: Row[];
-  /** The Vote shelf is shown: products to vote for, outside 1 vs 1 (there the matches take the votes). */
-  shelf: boolean;
   /** The group ranking (empty when the hackathon has no groups). */
   groups: GroupRow[];
   /** The style shown: the campaign's own, or the one picked on the prototype switch. */
@@ -71,7 +69,6 @@ export function HackathonProvider({ slug, children }: { slug: string; children: 
   const [projectId, setProjectId] = React.useState<string | null>(null);
   const [unit, setUnit] = React.useState<Unit>(c.HACKATHON.unit);
   const board = React.useMemo(() => c.standings(entry.votes), [c, entry.votes]);
-  const shelf = unit !== "duel" && board.some((r) => r.p.project);
   const groups = React.useMemo(() => groupStandings(board), [board]);
   // The open project is read from the board, so its votes and rank follow a vote cast in the dialog.
   const project = projectId ? (board.find((r) => r.p.id === projectId) ?? null) : null;
@@ -96,9 +93,8 @@ export function HackathonProvider({ slug, children }: { slug: string; children: 
     phase,
     entry,
     joinHref: into(`${path}?join=1`),
-    voteHref: into(`${path}${shelf ? "#vote" : "#leaderboard"}`),
+    voteHref: into(`${path}#leaderboard`),
     board,
-    shelf,
     groups,
     unit,
     setUnit,
