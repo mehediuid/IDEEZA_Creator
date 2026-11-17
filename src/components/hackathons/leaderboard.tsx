@@ -22,24 +22,25 @@ import { SearchInput } from "@/components/ideeza/search-input";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, ArrowRight01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { ENTRANT, GROUP, HACKATHON, groupOf, matchesOf, qualified, qualityOf, type Row } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, entrantOf, groupOf, matchesOf, qualified, qualityOf, type Row, type Unit } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
 import { VoteButton } from "./actions";
 import { Heading, Initials, SECTION, SURFACE } from "./parts";
 
 const ROWS = 10;
 
-const DUEL = HACKATHON.unit === "duel";
-const TO_JUDGES = HACKATHON.winBy === "shortlist" ? `; the top ${HACKATHON.shortlist} ${HACKATHON.unit === "team" ? "teams" : "people"} go to the judges` : "";
-const TITLE = DUEL ? "Head-to-head matches" : GROUP ? `Which ${GROUP.one} builds best?` : "Leaderboard";
-const LEAD = DUEL
-  ? "Two products a match, decided by votes. The winner goes to the next round."
-  : GROUP
-    ? `Every point a ${GROUP.member} earns counts for their ${GROUP.one}. Updated every hour${TO_JUDGES}.`
-    : `${ENTRANT.title}s ranked by points. Updated every hour${TO_JUDGES}.`;
+/** The section's title and lead for the style shown. */
+function headingFor(unit: Unit): [string, string] {
+  if (unit === "duel") return ["Head-to-head matches", "Two products a match, decided by votes. The winner goes to the next round."];
+  const toJudges = HACKATHON.winBy === "shortlist" ? `; the top ${HACKATHON.shortlist} ${unit === "team" ? "teams" : "people"} go to the judges` : "";
+  if (GROUP) return [`Which ${GROUP.one} builds best?`, `Every point a ${GROUP.member} earns counts for their ${GROUP.one}. Updated every hour${toJudges}.`];
+  return ["Leaderboard", `${entrantOf(unit).title}s ranked by points. Updated every hour${toJudges}.`];
+}
 
 export function Leaderboard() {
-  const { board, groups } = useHackathon();
+  const { board, groups, unit } = useHackathon();
+  const [title, lead] = headingFor(unit);
+  const entrant = entrantOf(unit);
   const products = board.reduce((s, r) => s + r.p.products, 0);
   const votes = board.reduce((s, r) => s + r.votes, 0);
 
@@ -47,12 +48,12 @@ export function Leaderboard() {
     <section id="leaderboard" aria-labelledby="leaderboard-title" className={SECTION}>
       <Heading
         id="leaderboard-title"
-        title={TITLE}
-        lead={LEAD}
+        title={title}
+        lead={lead}
         aside={
           <dl className="grid grid-cols-3 gap-8 md:gap-12">
             {[
-              [board.length, ENTRANT.many],
+              [board.length, entrant.many],
               [products, "products"],
               [votes, "votes"],
             ].map(([v, l]) => (
@@ -65,7 +66,7 @@ export function Leaderboard() {
         }
       />
 
-      {DUEL ? (
+      {unit === "duel" ? (
         <Matches board={board} />
       ) : (
         <div className={cn("mt-24 grid grid-cols-1 gap-10 md:mt-32 lg:gap-12", GROUP && "lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]")}>
@@ -174,7 +175,8 @@ function GroupLeague({ groups }: { groups: ReturnType<typeof useHackathon>["grou
 }
 
 function People({ board }: { board: Row[] }) {
-  const { now, openProject } = useHackathon();
+  const { now, openProject, unit } = useHackathon();
+  const entrant = entrantOf(unit);
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
   // Ten builders a page (owner: "Show all" ran the page 54 rows longer); the list keeps its height.
@@ -183,7 +185,7 @@ function People({ board }: { board: Row[] }) {
   const pool = open ? board.filter((r) => !r.p.group) : board;
   const query = q.trim().toLowerCase();
   const found = query ? pool.filter((r) => `${r.p.name} ${r.p.group}`.toLowerCase().includes(query)) : pool;
-  const find = `Find your name${GROUP ? ` or ${GROUP.one}` : HACKATHON.unit === "team" ? " or team" : ""}`;
+  const find = `Find your name${GROUP ? ` or ${GROUP.one}` : unit === "team" ? " or team" : ""}`;
   const pages = Math.max(1, Math.ceil(found.length / ROWS));
   const at = Math.min(page, pages - 1);
   const shown = found.slice(at * ROWS, at * ROWS + ROWS);
@@ -191,7 +193,7 @@ function People({ board }: { board: Row[] }) {
   return (
     <div className={cn("flex flex-col rounded-3xl px-4 py-10 md:px-12 md:py-12", SURFACE)}>
       <div className="flex flex-col gap-6 px-4 md:flex-row md:items-center md:justify-between md:px-0">
-        <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">Top {ENTRANT.many}</h3>
+        <h3 className="text-2xl font-semibold leading-2xl text-[color:var(--color-text-primary)]">Top {entrant.many}</h3>
         {/* "Open category" only when the campaign has groups and a category for people in none. */}
         {GROUP && HACKATHON.openCategory ? (
           <div className="flex items-center gap-4">
@@ -224,7 +226,7 @@ function People({ board }: { board: Row[] }) {
         <SearchInput value={q} onValueChange={(v) => { setQ(v); setPage(0); }} onClear={() => { setQ(""); setPage(0); }} placeholder={find} aria-label={find} containerClassName="w-full" />
       </div>
 
-      <ol className="m-0 mt-8 flex list-none flex-col gap-1 p-0" aria-label={`${ENTRANT.title}s by points`}>
+      <ol className="m-0 mt-8 flex list-none flex-col gap-1 p-0" aria-label={`${entrant.title}s by points`}>
         {shown.map((r) => {
           const podium = r.rank <= 3 && !open && !query;
           return (

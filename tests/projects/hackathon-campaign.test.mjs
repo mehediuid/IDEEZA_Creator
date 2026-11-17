@@ -3,7 +3,7 @@
 // from it: the 1 vs 1 pairing, the group ranking, and the running campaign's words.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { COMPETE, GROUP, HACKATHON, UNIT_LABEL, groupOf, groupStandings, inWords, matchesOf } from "../../.tmp-test/lib/hackathons/vibe-inventing.js";
+import { GROUP, HACKATHON, competeLine, groupOf, groupStandings, inWords, matchesOf, unitLabel } from "../../.tmp-test/lib/hackathons/vibe-inventing.js";
 
 const row = (id, votes, group = "", project = true) => ({
   p: { id, name: id, group, products: 3, published: 3, votes, referrals: 0, buildDays: 0, moved: 0, project: project ? { id: `${id}-x`, name: `${id} product`, image: "", thumb: "", video: "", summary: "" } : undefined },
@@ -37,8 +37,9 @@ test("the group ranking sums each group's points and leaves out people in no gro
 
 test("the running campaign: individuals, university vs university, the board's top to the judges", () => {
   assert.equal(HACKATHON.unit, "solo");
-  assert.equal(UNIT_LABEL, "Individuals");
-  assert.equal(COMPETE, "You compete as an individual");
+  assert.equal(unitLabel(HACKATHON.unit), "Individuals");
+  assert.equal(competeLine(HACKATHON.unit), "You compete as an individual");
+  assert.equal(unitLabel("duel"), "1 vs 1");
   assert.equal(GROUP?.one, "university");
   assert.equal(groupOf(row("a", 1, "").p), "Open category");
   assert.equal(HACKATHON.winBy, "shortlist");

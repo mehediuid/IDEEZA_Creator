@@ -26,11 +26,10 @@ export const PRIMARY = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "p
 export const SECONDARY = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "secondary", size }), LANDING_SECONDARY, "hover:text-[color:var(--color-text-primary)]");
 const INVERSE = (size: Size) => cn(buttonVariants({ hierarchy: "inverse", size }), "rounded-full hover:text-[color:var(--color-button-inverse-text)]");
 
-// The prototype's call for this format: a team registers, a person joins.
-const JOIN = HACKATHON.unit === "team" ? "Register your team" : "Join the hackathon";
-
 export function JoinButton({ size = "2xl", tone = "default", arrow, className }: { size?: Size; tone?: "default" | "inverse"; arrow?: boolean; className?: string }) {
-  const { phase, entry, joinHref, openJoin } = useHackathon();
+  const { phase, entry, joinHref, openJoin, unit } = useHackathon();
+  // The prototype's call for this style: a team registers, a person joins.
+  const JOIN = unit === "team" ? "Register your team" : "Join the hackathon";
   const look = cn(tone === "inverse" ? INVERSE(size) : PRIMARY(size), arrow && "group gap-4");
   // The arrow steps forward on hover (the closing panel's call).
   const tail = arrow ? <HugeiconsIcon icon={ArrowRight01Icon} size={20} strokeWidth={2} aria-hidden className="transition-transform duration-fast ease-decelerate group-hover:translate-x-2 motion-reduce:transition-none" /> : null;

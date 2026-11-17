@@ -9,6 +9,7 @@ import { HowToWin } from "@/components/hackathons/how-to-win";
 import { Leaderboard } from "@/components/hackathons/leaderboard";
 import { VoteShelf } from "@/components/hackathons/vote";
 import { Closing, FaqAndRules, SectionNav, Timeline, WhoAndJudging } from "@/components/hackathons/sections";
+import { StyleSwitch } from "@/components/hackathons/style-switch";
 import { HACKATHON } from "@/lib/hackathons/vibe-inventing";
 
 export const metadata: Metadata = {
@@ -45,6 +46,8 @@ export default function HackathonsPage() {
             <FaqAndRules />
             <Closing />
           </main>
+          {/* Prototype only: flip the hackathon's style (Individuals / 1 vs 1) to see what each shows. */}
+          <StyleSwitch />
         </HackathonProvider>
       </Suspense>
       <LandingFooter />

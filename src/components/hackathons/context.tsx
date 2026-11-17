@@ -10,7 +10,7 @@ import * as React from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEntry } from "@/components/auth/use-entry";
 import { useHackathonEntry } from "@/lib/hackathons/entry";
-import { HACKATHON, groupStandings, phaseAt, standings, type GroupRow, type Phase, type Row } from "@/lib/hackathons/vibe-inventing";
+import { HACKATHON, groupStandings, phaseAt, standings, type GroupRow, type Phase, type Row, type Unit } from "@/lib/hackathons/vibe-inventing";
 import { JoinDialog } from "./join-dialog";
 import { ProjectDialog } from "./project-dialog";
 
@@ -26,6 +26,9 @@ type Ctx = {
   board: Row[];
   /** The group ranking (empty when the hackathon has no groups). */
   groups: GroupRow[];
+  /** The style shown: the campaign's own, or the one picked on the prototype switch. */
+  unit: Unit;
+  setUnit: (u: Unit) => void;
   openJoin: () => void;
   openProject: (r: Row) => void;
 };
@@ -52,6 +55,7 @@ export function HackathonProvider({ children }: { children: React.ReactNode }) {
   const { into } = useEntry();
   const [joinOpen, setJoinOpen] = React.useState(false);
   const [projectId, setProjectId] = React.useState<string | null>(null);
+  const [unit, setUnit] = React.useState<Unit>(HACKATHON.unit);
   const board = React.useMemo(() => standings(entry.votes), [entry.votes]);
   const groups = React.useMemo(() => groupStandings(board), [board]);
   // The open project is read from the board, so its votes and rank follow a vote cast in the dialog.
@@ -78,6 +82,8 @@ export function HackathonProvider({ children }: { children: React.ReactNode }) {
     voteHref: into("/hackathons#vote"),
     board,
     groups,
+    unit,
+    setUnit,
     openJoin: () => setJoinOpen(true),
     openProject: (r) => setProjectId(r.p.id),
   };

@@ -12,13 +12,13 @@ import { Select } from "@/components/ideeza/select";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { buttonVariants } from "@/components/ideeza/button";
 import { cn } from "@/lib/utils";
-import { COMPETE, GROUP, HACKATHON } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, competeLine } from "@/lib/hackathons/vibe-inventing";
 import { useHackathon } from "./context";
 
 const OPEN = "__open";
 
 export function JoinDialog({ open, onClose, container }: { open: boolean; onClose: () => void; container: Element | null }) {
-  const { entry } = useHackathon();
+  const { entry, unit } = useHackathon();
   const [group, setGroup] = React.useState("");
   const [eligible, setEligible] = React.useState(false);
   const [tried, setTried] = React.useState(false);
@@ -53,7 +53,7 @@ export function JoinDialog({ open, onClose, container }: { open: boolean; onClos
       description={
         joined
           ? [GROUP ? joined.group || "Open category" : "", HACKATHON.name].filter(Boolean).join(" · ")
-          : `${GROUP ? `Pick your ${GROUP.one}. ` : ""}${COMPETE} and get a personal link to share.`
+          : `${GROUP ? `Pick your ${GROUP.one}. ` : ""}${competeLine(unit)} and get a personal link to share.`
       }
       footer={
         joined ? (

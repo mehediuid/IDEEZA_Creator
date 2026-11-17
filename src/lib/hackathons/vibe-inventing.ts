@@ -158,17 +158,20 @@ export const GROUP = (
   } as const
 )[HACKATHON.groupBy];
 
+// The style can be switched on the page (owner 2026-11-17: the prototype must show
+// every style), so the words that follow it take the style being shown.
+
 /** The words for who competes: one person, or one team. */
-export const ENTRANT = HACKATHON.unit === "team" ? { one: "team", many: "teams", title: "Team" } : { one: "builder", many: "builders", title: "Builder" };
+export const entrantOf = (unit: Unit) => (unit === "team" ? { one: "team", many: "teams", title: "Team" } : { one: "builder", many: "builders", title: "Builder" });
 
 /** "Individuals", "Teams of 2–5", "1 vs 1" — the prototype's format names. */
-export const UNIT_LABEL = HACKATHON.unit === "team" ? `Teams of ${HACKATHON.teamMin}–${HACKATHON.teamMax}` : HACKATHON.unit === "duel" ? "1 vs 1" : "Individuals";
+export const unitLabel = (unit: Unit) => (unit === "team" ? `Teams of ${HACKATHON.teamMin}–${HACKATHON.teamMax}` : unit === "duel" ? "1 vs 1" : "Individuals");
 
 /** How you compete, in the prototype's words. */
-export const COMPETE =
-  HACKATHON.unit === "team"
+export const competeLine = (unit: Unit) =>
+  unit === "team"
     ? `You compete as a team of ${HACKATHON.teamMin} to ${HACKATHON.teamMax} people`
-    : HACKATHON.unit === "duel"
+    : unit === "duel"
       ? "You compete head-to-head: one opponent per round, and the winner advances"
       : "You compete as an individual";
 

@@ -12,7 +12,7 @@ import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { COMPETE, GROUP, HACKATHON, inWords, money, prizePool, type Phase } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, competeLine, inWords, money, prizePool, type Phase } from "@/lib/hackathons/vibe-inventing";
 import { countdownParts, eat, useHackathon, useReducedMotion } from "./context";
 import { JoinButton, VoteLink } from "./actions";
 import { Heading, Initials, SECTION } from "./parts";
@@ -20,7 +20,7 @@ import { Heading, Initials, SECTION } from "./parts";
 const ANCHORS = [
   ["prizes", "Prizes"],
   ["how", "How to win"],
-  ["leaderboard", HACKATHON.unit === "duel" ? "Matches" : "Leaderboard"],
+  ["leaderboard", "Leaderboard"],
   ["vote", "Vote"],
   ["dates", "Dates"],
   ["faq", "FAQ"],
@@ -28,6 +28,7 @@ const ANCHORS = [
 
 /** The page's own bar, under the site's: its sections and Join. */
 export function SectionNav() {
+  const { unit } = useHackathon();
   const [active, setActive] = React.useState<string>("");
   const list = React.useRef<HTMLUListElement>(null);
   // On a phone the anchors scroll sideways: keep the lit one in view as the page moves on.
@@ -65,7 +66,7 @@ export function SectionNav() {
                   active === id && "bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] text-[color:var(--color-text-primary)]",
                 )}
               >
-                {label}
+                {id === "leaderboard" && unit === "duel" ? "Matches" : label}
               </a>
             </li>
           ))}
@@ -79,11 +80,13 @@ export function SectionNav() {
 const CRITERIA_FILL = ["bg-[var(--color-violet-600)]", "bg-[var(--color-violet-400)]", "bg-[var(--color-blue-400)]"];
 
 export function WhoAndJudging() {
+  const { unit } = useHackathon();
   const judged = HACKATHON.winBy !== "points";
   const who = [
     `${HACKATHON.minAge} or older, living in ${HACKATHON.where}`,
     HACKATHON.who,
-    `${COMPETE}${GROUP ? `, for your ${GROUP.one}${HACKATHON.openCategory ? " or the open category" : ""}` : ""}`,
+    competeLine(unit),
+    ...(GROUP ? [`You compete for your ${GROUP.one}${HACKATHON.openCategory ? ", or in the open category" : ""}`] : []),
     "One IDEEZA account per person, with a verified email",
     ...(judged ? ["Judges cannot take part or vote"] : []),
   ];
@@ -239,6 +242,7 @@ export function Timeline() {
 }
 
 export function FaqAndRules() {
+  const { unit } = useHackathon();
   const faq: [string, string][] = [
     ["Is it free to take part?", `Yes. Joining is free, and every participant builds with IDEEZA AI on ${HACKATHON.baseQuality} quality.`],
     ["I have never built hardware. Can I still take part?", "Yes. No engineering background is needed: you describe the idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D."],
@@ -272,7 +276,7 @@ export function FaqAndRules() {
           </h2>
           <p className="text-lg leading-lg text-[color:var(--color-text-secondary)]">{HACKATHON.rules}</p>
           <ul className="m-0 flex list-none flex-wrap gap-3 p-0">
-            {[...(HACKATHON.unit === "team" ? [`Teams of ${HACKATHON.teamMin} to ${HACKATHON.teamMax}`] : []), `${HACKATHON.votesPerPerson} votes per account`, "Verified email to vote", "One account per person"].map((c) => (
+            {[...(unit === "team" ? [`Teams of ${HACKATHON.teamMin} to ${HACKATHON.teamMax}`] : []), `${HACKATHON.votesPerPerson} votes per account`, "Verified email to vote", "One account per person"].map((c) => (
               <li key={c} className="rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] px-5 py-2 text-md font-medium leading-md text-[color:var(--color-text-secondary)]">
                 {c}
               </li>
@@ -317,7 +321,7 @@ function closingClock(phase: Phase | null, now: number | null): string {
  * It fills the screen under the site bar and section bar.
  */
 export function Closing() {
-  const { now, phase } = useHackathon();
+  const { now, phase, unit } = useHackathon();
   const still = useReducedMotion();
   const wide = React.useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => true);
   const ref = React.useRef<HTMLElement>(null);
@@ -357,7 +361,7 @@ export function Closing() {
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[90%] w-[min(1000px,120%)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-black)_62%,transparent),transparent)]" />
           <p className="text-md font-medium uppercase leading-md tracking-caps tabular-nums text-[color:color-mix(in_srgb,var(--color-white)_84%,transparent)] md:text-lg md:leading-lg">{closingClock(phase, now)}</p>
           <h2 id="closing-title" className="mt-12 font-display text-6xl leading-6xl tracking-tighter [text-wrap:balance] md:text-8xl md:leading-8xl">
-            <span className="block font-medium text-[color:var(--color-white)]">Put your {GROUP ? GROUP.one : HACKATHON.unit === "team" ? "team" : "name"}</span>
+            <span className="block font-medium text-[color:var(--color-white)]">Put your {GROUP ? GROUP.one : unit === "team" ? "team" : "name"}</span>
             <span className="ix-hack-shine block font-bold">on the board.</span>
           </h2>
           <div className="mt-20 flex w-full flex-col items-center gap-8 sm:w-auto sm:flex-row">

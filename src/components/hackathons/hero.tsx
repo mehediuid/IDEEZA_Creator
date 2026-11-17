@@ -21,7 +21,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { GROUP, HACKATHON, UNIT_LABEL, money, type Phase } from "@/lib/hackathons/vibe-inventing";
+import { GROUP, HACKATHON, money, unitLabel, type Phase } from "@/lib/hackathons/vibe-inventing";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { countdownParts, eat, useHackathon, useReducedMotion } from "./context";
@@ -119,7 +119,7 @@ function Planet() {
 }
 
 export function HackathonHero() {
-  const { phase, now } = useHackathon();
+  const { phase, now, unit } = useHackathon();
   // The two facts a visitor needs beside Join (the brief's hero left them to the bottom of
   // the page): how long is left, and whether they can enter.
   const left = countdownParts(phase === "registration" || phase === "soon" ? HACKATHON.dates.start : HACKATHON.dates.end, now);
@@ -127,7 +127,7 @@ export function HackathonHero() {
     phase === "judging" || phase === "results"
       ? `Winners on ${eat(HACKATHON.dates.results)}`
       : `${phase === "registration" || phase === "soon" ? "Starts" : "Ends"} in ${Number.isNaN(Number(left.d)) ? "--" : Number(left.d)}d ${left.h}h ${left.m}m`;
-  const facts = [deadline, "Free to join", `${HACKATHON.minAge}+, living in ${HACKATHON.where}`, UNIT_LABEL];
+  const facts = [deadline, "Free to join", `${HACKATHON.minAge}+, living in ${HACKATHON.where}`, unitLabel(unit)];
   return (
     <section aria-labelledby="hackathon-title" className="relative isolate overflow-hidden bg-[var(--color-black)]">
       <div aria-hidden className="absolute inset-0 -z-10">
