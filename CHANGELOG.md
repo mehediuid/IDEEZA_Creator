@@ -165,6 +165,7 @@ Prototype only (not to build as is): the board is 64 seeded sample builders; the
 - Brand violet and blue ramps for every accent; the page's deep navy as the ground; no new tokens.
 - Buttons: Button primary (Join), the website's secondary pill (Vote), Button inverse (closing Join). Dialogs, select, checkbox, search field and badges are the design system's.
 - Media: the briefs' videos (hero glow, Prizes ribbon, closing wave); product pictures as small WebP (720 px card, 192 px avatar); the hologram drawn in code.
+  - Updated 17 November 2026: every brief file (hero glow video, the light strip over the hero panel, Prizes ribbon video, closing wave) is stored with the site, never loaded from the brief's own links, which can disappear. Videos are H.264 MP4 so every browser plays them: the brief's ribbon was HEVC, which Firefox and many Windows browsers cannot play (now 4.2 MB, was 9.5 MB).
 
 ### Before → After
 
