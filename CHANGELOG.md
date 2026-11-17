@@ -61,6 +61,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 - [ ] Who can join says "You compete as an individual" / "You compete as a team of 2 to 5 people" / "You compete head-to-head: one opponent per round, and the winner advances".
 - [ ] Teams: Join reads **Register your team**, How to win step 1 adds "Then invite your teammates.", the terms show a "Teams of 2 to 5" chip, and the board counts teams ("Top teams").
 - [ ] **1 vs 1:** the standings become **Head-to-head matches**, lead "Two products a match, decided by votes. The winner goes to the next round." The section bar link reads **Matches**.
+  - Votes are cast only in the matches: there is no separate Vote section in 1 vs 1, and the section bar has no Vote link. **Vote for projects** (hero, closing) and the way back after signing in go to the matches. The voter's count ("10 votes per account" / "n of 10 votes left" over ten pips) sits beside the matches' heading.
   - Products are paired by votes: 1st against 2nd, 3rd against 4th, and so on; an odd one out waits.
   - Each match is a card: "Match 1 · the winner goes to the next round", then the two products side by side with "vs" between them. Each side: the product picture (opens the product), its name, maker · university, votes, **Leads** on the one ahead, and **Vote**. Under them, one bar split by each side's share of the votes (violet · blue).
   - Two cards a row on wide screens, one on phones. With fewer than two products: "Not enough entries for a match yet."
@@ -87,7 +88,7 @@ Prototype only (nothing to build): a small **Prototype** pill floats at the bott
 
 | Before (one style) | After: Individuals | After: 1 vs 1 |
 | --- | --- | --- |
-| ![The board before: the university league and Top builders](docs/changelog/2026-11-16-hackathons-leaderboard.png) | ![The same board, with the Prototype pill at the bottom-left set to Individuals](docs/changelog/2026-11-17-hackathons-individuals-after.png) | ![Head-to-head matches: two products per card, votes, Leads and Vote](docs/changelog/2026-11-17-hackathons-1v1-after.png) |
+| ![The board before: the university league and Top builders](docs/changelog/2026-11-16-hackathons-leaderboard.png) | ![The same board, with the Prototype pill at the bottom-left set to Individuals](docs/changelog/2026-11-17-hackathons-individuals-after.png) | ![Head-to-head matches: two products per card, votes, Leads and Vote; the votes-left count beside the heading; no Vote link in the section bar](docs/changelog/2026-11-17-hackathons-1v1-after.png) |
 
 ---
 
