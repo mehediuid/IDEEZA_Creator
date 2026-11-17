@@ -20,7 +20,7 @@ import { ProjectDialog } from "./project-dialog";
 type Ctx = {
   /** The hackathon this page shows, and everything derived from its record. */
   c: Campaign;
-  /** Its page: /hackathons/<slug>. */
+  /** This page: /hackathons/<slug>, or /hackathons for the main hackathon. */
   path: string;
   now: number | null;
   phase: Phase | null;
@@ -58,9 +58,8 @@ export function useHackathon(): Ctx {
 /** The hackathon this page shows (its record as HACKATHON, its words, board and dates). */
 export const useCampaign = (): Campaign => useHackathon().c;
 
-export function HackathonProvider({ slug, children }: { slug: string; children: React.ReactNode }) {
+export function HackathonProvider({ slug, path, children }: { slug: string; path: string; children: React.ReactNode }) {
   const c = campaignOf(hackathonBySlug(slug) ?? VIBE_INVENTING);
-  const path = `/hackathons/${c.HACKATHON.slug}`;
   const now = React.useSyncExternalStore(subscribeClock, clockNow, () => null);
   const phase = now === null ? null : c.phaseAt(now);
   const entry = useHackathonEntry(c.HACKATHON);

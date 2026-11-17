@@ -6,7 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { VIBE_INVENTING, campaignOf, groupStandings, inWords, matchesOf } from "../../.tmp-test/lib/hackathons/vibe-inventing.js";
-import { HACKATHONS, hackathonBySlug, listOrder, statusOf } from "../../.tmp-test/lib/hackathons/campaigns.js";
+import { HACKATHONS, MAIN_HACKATHON, hackathonBySlug, listOrder, statusOf } from "../../.tmp-test/lib/hackathons/campaigns.js";
 
 const row = (id, votes, group = "", project = true) => ({
   p: { id, name: id, group, products: 3, published: 3, votes, referrals: 0, buildDays: 0, moved: 0, project: project ? { id: `${id}-x`, name: `${id} product`, image: "", thumb: "", video: "", summary: "" } : undefined },
@@ -123,4 +123,11 @@ test("the page's words are the prototype landing page's, from the record", () =>
   const sprint = campaignOf(hackathonBySlug("smart-home-sprint"));
   assert.equal(sprint.decided, "The standings freeze when the hackathon ends. The participants with the most points win.");
   assert.ok(!sprint.whoCan("solo").includes("Judges cannot take part or vote"));
+});
+
+test("the menu's Hackathons opens the main hackathon; the list is under More hackathons", () => {
+  assert.ok(HACKATHONS.includes(MAIN_HACKATHON));
+  assert.equal(MAIN_HACKATHON.slug, "vibe-inventing-ethiopia");
+  // "all" is the list's own address, never a hackathon's.
+  assert.ok(!HACKATHONS.some((h) => h.slug === "all"));
 });

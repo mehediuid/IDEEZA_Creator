@@ -119,6 +119,12 @@ const SMART_HOME_SPRINT: Hackathon = {
 
 export const HACKATHONS: Hackathon[] = [VIBE_INVENTING, EAST_AFRICA_CUP, SMART_HOME_SPRINT];
 
+/**
+ * The main hackathon: the one the site menu's Hackathons opens, at /hackathons
+ * (the prototype's "main event", chosen by the organizer; owner 2026-11-17).
+ */
+export const MAIN_HACKATHON: Hackathon = VIBE_INVENTING;
+
 export const hackathonBySlug = (slug: string): Hackathon | null => HACKATHONS.find((h) => h.slug === slug) ?? null;
 
 /** The card's status, from the hackathon's phase. */

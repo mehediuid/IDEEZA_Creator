@@ -1,8 +1,8 @@
 "use client";
 
-// The Hackathons list, /hackathons (owner 2026-11-17: several hackathons can
-// run at once — the menu's Hackathons opens this list; each card opens that
-// hackathon's own page). It is drawn like the website's other list, Events
+// The Hackathons list, /hackathons/all (owner 2026-11-17: several hackathons
+// can run at once; the menu's Hackathons opens the main one, and its More
+// hackathons opens this list; each card opens that hackathon's own page). It is drawn like the website's other list, Events
 // (Figma "Event for Join Waitlist"): the same header, the first hackathon as a
 // wide card, the others as rows — the words on the left, the picture card on
 // the right. Running first, then starting soon, then ended (campaigns.ts).
@@ -19,8 +19,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
 import { LandingEyebrow } from "@/components/landing/section-header";
 import { cn } from "@/lib/utils";
-import { STATUS_LABEL, listOrder, statusOf, type ListStatus } from "@/lib/hackathons/campaigns";
+import { MAIN_HACKATHON, STATUS_LABEL, listOrder, statusOf, type ListStatus } from "@/lib/hackathons/campaigns";
 import { campaignOf, inWords, type Hackathon } from "@/lib/hackathons/vibe-inventing";
+
+/** A hackathon's page: the main one lives at /hackathons (the menu's Hackathons), the others at /hackathons/<slug>. */
+const pageOf = (h: Hackathon) => (h.id === MAIN_HACKATHON.id ? "/hackathons" : `/hackathons/${h.slug}`);
 
 const FRAME = "block rounded-[20px] border-solid border border-[rgba(210,197,252,0.2)] p-[12px] focus-visible:outline-none focus-visible:shadow-focus-brand";
 const PHOTO = "relative flex flex-col justify-end overflow-hidden rounded-[14px] border-solid border border-[var(--color-border-strong)]";
@@ -103,7 +106,7 @@ function Open({ h, now, big }: { h: Hackathon; now: number | null; big?: boolean
 function Featured({ h, now }: { h: Hackathon; now: number | null }) {
   const { money, prizePool, unitLabel } = campaignOf(h);
   return (
-    <Link href={`/hackathons/${h.slug}`} aria-label={`${h.name} — view hackathon`} className={cn(FRAME, "group")}>
+    <Link href={pageOf(h)} aria-label={`${h.name} — view hackathon`} className={cn(FRAME, "group")}>
       <div className={cn(PHOTO, "min-h-[440px] gap-10 p-10 md:min-h-[520px] md:p-12 xl:min-h-[578px] xl:p-16")}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={h.cover} alt="" width={1600} height={684} className="absolute inset-0 block size-full object-cover object-top transition-transform duration-slower ease-decelerate group-hover:scale-[1.02] motion-reduce:transition-none" />
@@ -159,7 +162,7 @@ function Row({ h, now }: { h: Hackathon; now: number | null }) {
         </dl>
       </div>
 
-      <Link href={`/hackathons/${h.slug}`} aria-label={`${h.name} — view hackathon`} className={cn(FRAME, "group w-full lg:w-[679px] lg:shrink-0")}>
+      <Link href={pageOf(h)} aria-label={`${h.name} — view hackathon`} className={cn(FRAME, "group w-full lg:w-[679px] lg:shrink-0")}>
         <div className={cn(PHOTO, "h-[300px] p-10 md:h-[400px] md:p-12 lg:h-[460px]")}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={h.cover} alt="" width={1600} height={900} loading="lazy" className="absolute inset-0 block size-full object-cover transition-transform duration-slower ease-decelerate group-hover:scale-[1.02] motion-reduce:transition-none" />

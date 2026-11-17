@@ -133,7 +133,7 @@ export function SectionNav() {
           {/* Phones: More hackathons is the last anchor (the bar has no room for buttons). */}
           {others ? (
             <li className="md:hidden">
-              <Link href="/hackathons" className="flex h-[40px] items-center gap-3 whitespace-nowrap rounded-full px-5 text-lg font-medium leading-lg text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]">
+              <Link href="/hackathons/all" className="flex h-[40px] items-center gap-3 whitespace-nowrap rounded-full px-5 text-lg font-medium leading-lg text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]">
                 {live ? "More hackathons" : "All hackathons"}
                 {live ? <LiveCount n={live} /> : null}
               </Link>
@@ -143,7 +143,7 @@ export function SectionNav() {
         <div className="hidden shrink-0 items-center gap-4 md:flex">
           {others ? (
             <Link
-              href="/hackathons"
+              href="/hackathons/all"
               className="flex h-[44px] items-center gap-3 whitespace-nowrap rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_16%,transparent)] px-6 text-lg font-medium leading-lg text-[color:var(--color-text-primary)] transition-colors duration-fast hover:bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] hover:text-[color:var(--color-text-primary)]"
             >
               {live ? "More hackathons" : "All hackathons"}
