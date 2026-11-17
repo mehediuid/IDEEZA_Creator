@@ -21,10 +21,10 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { GROUP, HACKATHON, money, unitLabel, type Phase } from "@/lib/hackathons/vibe-inventing";
+import type { Phase } from "@/lib/hackathons/vibe-inventing";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
-import { countdownParts, eat, useHackathon, useReducedMotion } from "./context";
+import { countdownParts, useHackathon, useReducedMotion } from "./context";
 import { JoinButton, VoteLink } from "./actions";
 import { HeroShowcase } from "./hero-showcase";
 import { HERO_MEDIA } from "./parts";
@@ -119,15 +119,20 @@ function Planet() {
 }
 
 export function HackathonHero() {
-  const { phase, now, unit } = useHackathon();
+  const { c, phase, now, unit } = useHackathon();
+  const { HACKATHON, GROUP, money, unitLabel, eat } = c;
   // The two facts a visitor needs beside Join (the brief's hero left them to the bottom of
   // the page): how long is left, and whether they can enter.
   const left = countdownParts(phase === "registration" || phase === "soon" ? HACKATHON.dates.start : HACKATHON.dates.end, now);
   const deadline =
-    phase === "judging" || phase === "results"
+    phase === "results"
+      ? `Winners announced ${eat(HACKATHON.dates.results)}`
+      : phase === "judging"
       ? `Winners on ${eat(HACKATHON.dates.results)}`
       : `${phase === "registration" || phase === "soon" ? "Starts" : "Ends"} in ${Number.isNaN(Number(left.d)) ? "--" : Number(left.d)}d ${left.h}h ${left.m}m`;
-  const facts = [deadline, "Free to join", `${HACKATHON.minAge}+, living in ${HACKATHON.where}`, unitLabel(unit)];
+  // "Free to join" only while joining is open.
+  const ended = phase === "judging" || phase === "results";
+  const facts = [deadline, ...(ended ? [] : ["Free to join"]), `${HACKATHON.minAge}+, living in ${HACKATHON.where}`, unitLabel(unit)];
   return (
     <section aria-labelledby="hackathon-title" className="relative isolate overflow-hidden bg-[var(--color-black)]">
       <div aria-hidden className="absolute inset-0 -z-10">

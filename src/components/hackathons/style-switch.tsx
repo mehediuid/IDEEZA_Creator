@@ -20,14 +20,14 @@ const STYLES: [Unit, string][] = [
 ];
 
 export function StyleSwitch() {
-  const { unit, setUnit } = useHackathon();
+  const { c, unit, setUnit } = useHackathon();
   return (
     <div
       role="group"
       aria-label="Prototype: hackathon style"
       className="fixed bottom-6 left-6 z-[10] flex items-center gap-4 rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] bg-[color:color-mix(in_srgb,var(--color-bg-page)_88%,transparent)] py-2 pl-6 pr-2 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-[24px] md:bottom-8 md:left-8"
     >
-      <span className="text-md font-medium leading-md text-[color:var(--color-text-tertiary)]">Prototype</span>
+      <span className="text-md font-medium leading-md text-[color:var(--color-text-tertiary)]">{c.HACKATHON.sample ? "Prototype · sample hackathon" : "Prototype"}</span>
       <div className="flex rounded-full bg-[color:color-mix(in_srgb,var(--color-white)_6%,transparent)] p-1">
         {STYLES.map(([value, label]) => (
           <button

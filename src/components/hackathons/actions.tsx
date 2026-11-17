@@ -14,7 +14,6 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { buttonVariants } from "@/components/ideeza/button";
 import { LANDING_SECONDARY } from "@/components/landing/buttons";
 import { cn } from "@/lib/utils";
-import { HACKATHON } from "@/lib/hackathons/vibe-inventing";
 import { canJoin, canVote, useHackathon } from "./context";
 
 type Size = "md" | "lg" | "xl" | "2xl";
@@ -24,7 +23,7 @@ type Size = "md" | "lg" | "xl" | "2xl";
 // text colour on hover (a light-blue word on the white button was unreadable).
 export const PRIMARY = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "primary", size }), "rounded-full hover:text-[color:var(--color-button-primary-text)]");
 export const SECONDARY = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "secondary", size }), LANDING_SECONDARY, "hover:text-[color:var(--color-text-primary)]");
-const INVERSE = (size: Size) => cn(buttonVariants({ hierarchy: "inverse", size }), "rounded-full hover:text-[color:var(--color-button-inverse-text)]");
+export const INVERSE = (size: Size = "2xl") => cn(buttonVariants({ hierarchy: "inverse", size }), "rounded-full hover:text-[color:var(--color-button-inverse-text)]");
 
 export function JoinButton({ size = "2xl", tone = "default", arrow, className }: { size?: Size; tone?: "default" | "inverse"; arrow?: boolean; className?: string }) {
   const { phase, entry, joinHref, openJoin, unit } = useHackathon();
@@ -66,17 +65,19 @@ export function JoinButton({ size = "2xl", tone = "default", arrow, className }:
 
 /** Goes to the shelf of products, where the votes are cast. */
 export function VoteLink({ size = "2xl", className }: { size?: Size; className?: string }) {
-  const { unit } = useHackathon();
-  // 1 vs 1: the votes are cast in the matches.
+  const { phase, shelf } = useHackathon();
+  // 1 vs 1 (and a board with no products yet): the votes are cast in the matches / on the board.
+  // Once building has ended there is no voting left, only the projects to look at.
+  const ended = phase === "judging" || phase === "results";
   return (
-    <a href={unit === "duel" ? "#leaderboard" : "#vote"} className={cn(SECONDARY(size), className)}>
-      Vote for projects
+    <a href={shelf ? "#vote" : "#leaderboard"} className={cn(SECONDARY(size), className)}>
+      {ended ? "See the projects" : "Vote for projects"}
     </a>
   );
 }
 
 export function VoteButton({ projectId, name, className }: { projectId: string; name: string; className?: string }) {
-  const { phase, entry, voteHref } = useHackathon();
+  const { c, phase, entry, voteHref } = useHackathon();
   const [note, setNote] = React.useState("");
   const voted = entry.votes.includes(projectId);
   const base = cn(
@@ -107,7 +108,7 @@ export function VoteButton({ projectId, name, className }: { projectId: string; 
         aria-label={voted ? `Take back your vote for ${name}` : `Vote for ${name}`}
         onClick={() => {
           const ok = entry.toggleVote(projectId);
-          setNote(ok ? "" : `You have used all ${HACKATHON.votesPerPerson} votes. Take one back to vote again.`);
+          setNote(ok ? "" : `You have used all ${c.HACKATHON.votesPerPerson} votes. Take one back to vote again.`);
         }}
         className={base}
       >

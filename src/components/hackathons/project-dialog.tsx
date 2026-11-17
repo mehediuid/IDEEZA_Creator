@@ -7,11 +7,13 @@
 import * as React from "react";
 import { ModalFrame } from "@/components/ideeza/dialog";
 import { Badge } from "@/components/ideeza/badge";
-import { HACKATHON, groupOf, qualified, type Row } from "@/lib/hackathons/vibe-inventing";
+import type { Row } from "@/lib/hackathons/vibe-inventing";
+import { useCampaign } from "./context";
 import { VoteButton } from "./actions";
 import { ProductMedia } from "./parts";
 
 export function ProjectDialog({ row, onClose, container }: { row: Row | null; onClose: () => void; container: Element | null }) {
+  const { HACKATHON, groupOf, qualified } = useCampaign();
   const proj = row?.p.project;
   if (!row || !proj) return null;
   const { p } = row;
