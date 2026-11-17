@@ -115,7 +115,7 @@ export function SectionNav() {
       {/* Phones: a 56 px bar (with the site bar's 80, the two took 18 % of the screen at 68);
           the anchor row fades at its right edge so the hidden ones read as "more". */}
       <nav aria-label="On this page" className="mx-auto flex h-[56px] w-full max-w-[1260px] items-center justify-between gap-8 px-8 md:h-[68px] min-[1292px]:px-0">
-        <ul ref={list} className="m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0 pr-10 [scrollbar-width:none] max-md:[mask-image:linear-gradient(to_right,black_82%,transparent)] md:gap-2 md:pr-0">
+        <ul ref={list} className="m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0 pr-10 [scrollbar-width:none] max-lg:[mask-image:linear-gradient(to_right,black_82%,transparent)] md:gap-2 lg:pr-0">
           {anchors.map(([id, label]) => (
             <li key={id}>
               <a
@@ -130,9 +130,9 @@ export function SectionNav() {
               </a>
             </li>
           ))}
-          {/* Phones: More hackathons is the last anchor (the bar has no room for buttons). */}
+          {/* Phones and tablets: More hackathons is the last anchor (the bar has no room for both buttons). */}
           {others ? (
-            <li className="md:hidden">
+            <li className="lg:hidden">
               <Link href="/hackathons/all" className="flex h-[40px] items-center gap-3 whitespace-nowrap rounded-full px-5 text-lg font-medium leading-lg text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]">
                 {live ? "More hackathons" : "All hackathons"}
                 {live ? <LiveCount n={live} /> : null}
@@ -144,7 +144,7 @@ export function SectionNav() {
           {others ? (
             <Link
               href="/hackathons/all"
-              className="flex h-[44px] items-center gap-3 whitespace-nowrap rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_16%,transparent)] px-6 text-lg font-medium leading-lg text-[color:var(--color-text-primary)] transition-colors duration-fast hover:bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] hover:text-[color:var(--color-text-primary)]"
+              className="hidden h-[44px] items-center lg:flex gap-3 whitespace-nowrap rounded-full border border-solid border-[color:color-mix(in_srgb,var(--color-white)_16%,transparent)] px-6 text-lg font-medium leading-lg text-[color:var(--color-text-primary)] transition-colors duration-fast hover:bg-[color:color-mix(in_srgb,var(--color-white)_8%,transparent)] hover:text-[color:var(--color-text-primary)]"
             >
               {live ? "More hackathons" : "All hackathons"}
               {live ? <LiveCount n={live} /> : null}
