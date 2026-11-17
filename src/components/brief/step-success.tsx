@@ -49,6 +49,7 @@ import { useMarket } from "@/lib/market/market-store";
 import type { ListingMetadata } from "@/lib/market/types";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
+import { needsProjectVideo } from "@/lib/video/project-video";
 import { PROJECT_VIDEO_KEY, type VideoTake } from "@/lib/video/types";
 import { PROJECT_VIDEO_TITLE } from "@/lib/video/video-copy";
 import { MintStep, TAP } from "./brief-card";
@@ -94,7 +95,8 @@ export function StepSuccess({
     r.status.state === "ready" ? [{ product: r.product, take: r.status.take }] : [],
   );
   const own = productVideoStatus(videos?.products[PROJECT_VIDEO_KEY], jobs, now);
-  const projectTake = own.state === "ready" ? own.take : null;
+  // With one product its poster already is the project's (owner, 2026-11-17).
+  const projectTake = needsProjectVideo(products) && own.state === "ready" ? own.take : null;
   const projectLabel = projectName.trim() || PROJECT_VIDEO_TITLE;
   // Live once nothing renders any more (only a Save can arrive with a render running).
   const isLive = rendering === 0;

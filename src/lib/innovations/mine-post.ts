@@ -12,6 +12,7 @@ import type { ProjectProduct, ProjectView } from "../manual/project-read";
 import { coverOf } from "../manual/project-read";
 import type { ManualProject } from "../manual/projects";
 import { formatAmount } from "../manual/rail-copy";
+import { needsProjectVideo } from "../video/project-video";
 import { PROJECT_VIDEO_KEY } from "../video/types";
 import { PROJECT_VIDEO_TITLE } from "../video/video-copy";
 import { ME } from "./people";
@@ -45,8 +46,10 @@ function clipOf(p: ProjectProduct, view: ProjectView): PostVideo | null {
 }
 
 /** The project video in use: it stands for the whole project (owner, 2026-10-21), so it is named
- *  after the project, never a product. */
+ *  after the project, never a product. A project with one product has none: that product's video
+ *  opens the post (owner, 2026-11-17). */
 function projectClipOf(project: ManualProject, view: ProjectView): PostVideo | null {
+  if (!needsProjectVideo(view.products)) return null;
   const pv = view.videos.record?.products[PROJECT_VIDEO_KEY];
   const take = pv?.inUseId ? pv.takes.find((t) => t.id === pv.inUseId) : null;
   if (!take) return null;

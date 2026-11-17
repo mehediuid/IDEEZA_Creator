@@ -253,7 +253,7 @@ function useScrolledPast(target: React.RefObject<HTMLElement | null>, root: Reac
 
 // ─────────────────────────── media first ───────────────────────────
 
-/** The project video in use, playing as the Feed plays it (the buyer page's MediaHero); else the
+/** The project video in use (one product: its video), playing as the Feed plays it (the buyer page's MediaHero); else the
  *  cover, whose tap opens the build images full size (Use as cover lives there). Nothing when the
  *  project has no picture at all (hand-made products only). */
 function ProjectHero() {
@@ -261,7 +261,8 @@ function ProjectHero() {
   const { record } = useProjectVideos(project.id);
   const { jobs, now } = useVideoJobs();
   const status = projectVideoStatusOf({ products: view.products, videos: record, jobs, now });
-  const take = status.video.state === "ready" ? status.video.take : null;
+  // The project video in use, or with one product that product's video (owner, 2026-11-17).
+  const take = status.face;
   const clip = useClipUrl(take?.id ?? null);
   const cover = coverOf(project, view.refs);
   const tiles = React.useMemo(() => mediaTilesOf(view.refs), [view.refs]);

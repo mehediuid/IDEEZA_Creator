@@ -35,7 +35,7 @@ import { progressOf } from "@/lib/video/jobs";
 import { INTRO_MS, OUTRO_MS, cutMs, defaultJoinPlan, joinLengthMs, mergeJoinDraft, projectVideoStatusOf } from "@/lib/video/project-video";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY, VIDEO_QUALITY, qualityOpen, type JoinPlan, type OnScreenLines, type VideoQuality } from "@/lib/video/types";
-import { HIGH_LOCKED_NOTE, LINE_MAX, PROJECT_HONESTY, RENDER_KEEPS_RUNNING } from "@/lib/video/video-copy";
+import { HIGH_LOCKED_NOTE, LINE_MAX, PROJECT_HONESTY, RENDER_KEEPS_RUNNING, SINGLE_PRODUCT_NOTE } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
 import { ChoiceList, UseBar } from "../project-earn/video/review";
@@ -169,6 +169,13 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
   let footer: React.ReactNode = null;
   if (!ready) {
     body = <div aria-busy="true" className="h-[240px] rounded-lg bg-bg-subtle motion-safe:animate-pulse" />;
+  } else if (status.state === "single") {
+    // One product: no project video to make; its video is the project's (owner, 2026-11-17).
+    body = (
+      <Banner tone="info" title="One product, one video">
+        {SINGLE_PRODUCT_NOTE}
+      </Banner>
+    );
   } else if (reviewTake) {
     body = (
       <div className="flex flex-col gap-6">

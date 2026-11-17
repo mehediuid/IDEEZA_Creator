@@ -751,7 +751,8 @@ export function MintDone({
   const rows = products.map((p) => productVideoStatus(videos?.products[p.id], jobs, now));
   const rendering = rows.filter((r) => r.state === "rendering").length;
   const ready = rows.filter((r) => r.state === "ready").length;
-  const own = productVideoStatus(videos?.products[PROJECT_VIDEO_KEY], jobs, now);
+  // A project video only with two or more products (owner, 2026-11-17).
+  const own = products.length >= 2 ? productVideoStatus(videos?.products[PROJECT_VIDEO_KEY], jobs, now) : { state: "none" as const };
   const live = rendering === 0;
   const listing = intent === "sell" ? listingViewOf(project.id, { ...market, now: clock, current: NO_METADATA }) : null;
   const listed = listing && listing.kind !== "none" ? listing.listing : null;

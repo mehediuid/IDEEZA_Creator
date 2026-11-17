@@ -22,9 +22,10 @@ import { LOG_SHOWN, logLinesOf } from "@/lib/manual/rail-rows";
 import { phoneProjectHref, phoneProjectPath, phoneWords } from "@/lib/manual/phone-project";
 import { PROTOCOLS } from "@/lib/network/catalog";
 import { useProjectNetwork } from "@/lib/network/store";
+import { productVideoStatus } from "@/lib/video/product-video";
 import { projectVideoStatusOf } from "@/lib/video/project-video";
 import { useProjectVideos } from "@/lib/video/store";
-import { projectRowCopy, resolutionOf } from "@/lib/video/video-copy";
+import { projectRowCopy, resolutionOf, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { ListCard as KitListCard, ListRow } from "../kit/list";
 import { T } from "../type";
@@ -52,19 +53,23 @@ function useAboutRows() {
   }, [project, view.products, network]);
 }
 
-/** The project video's state in a line: the take in use, else the web's row words. */
+/** The project video's state in a line: the take in use, else the web's row words. With one
+ *  product, that product's video is the project's (owner, 2026-11-17). */
 function useMediaLine(): string | null {
   const { project, view } = useProject();
   const { record } = useProjectVideos(project.id);
   const { jobs, now } = useVideoJobs();
   if (currentProductsOf(view.products).length === 0) return null;
   const status = projectVideoStatusOf({ products: view.products, videos: record, jobs, now });
-  const take = status.video.state === "ready" ? status.video.take : null;
-  if (take && status.state === "ready") {
-    return ["Project video", `Take ${take.n}`, resolutionOf(take.quality), take.clip ? `${Math.round(take.clip.durationMs / 1000)} s` : null]
+  const take = status.face;
+  const single = status.state === "single";
+  if (take && (single || status.state === "ready")) {
+    return [single ? "Video" : "Project video", `Take ${take.n}`, resolutionOf(take.quality), take.clip ? `${Math.round(take.clip.durationMs / 1000)} s` : null]
       .filter(Boolean)
       .join(" · ");
   }
+  // One product with no video in use yet: that product's own state is the project's.
+  if (single) return statusCopy(productVideoStatus(record?.products[currentProductsOf(view.products)[0].id], jobs, now)).text;
   return projectRowCopy(status).text;
 }
 

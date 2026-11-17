@@ -123,11 +123,11 @@ test("give with license: null fails on license — after videos and ownership pa
   });
   const r = readinessOf(f, "give");
   assert.equal(r.ok, false);
-  assert.deepEqual(r.rules.map((x) => x.id), ["videos", "projectVideo", "ownership", "license"]);
+  // One product: no project video is asked (owner, 2026-11-17).
+  assert.deepEqual(r.rules.map((x) => x.id), ["videos", "ownership", "license"]);
   assert.equal(r.rules[0].ok, true);
   assert.equal(r.rules[1].ok, true);
-  assert.equal(r.rules[2].ok, true);
-  assert.equal(r.rules[3].ok, false);
+  assert.equal(r.rules[2].ok, false);
   assert.equal(r.blocker, "Choose the license it is given under.");
 });
 
@@ -235,7 +235,7 @@ test("sell/give fix ownership on the form, not the gate dialog", () => {
 const { videoCountOf, videosBlockerOf } = await import("../../.tmp-test/lib/manual/readiness.js");
 
 test("every whole-project purpose asks for the project video, after the product videos; an edition doesn't", () => {
-  const f = facts({ products: [product("a", "A")], videos: { a: readyVideo("t_a") }, status: "minted", product: product("a", "A") });
+  const f = facts({ products: [product("a", "A"), product("b", "B")], videos: { a: readyVideo("t_a"), b: readyVideo("t_b") }, status: "minted", product: product("a", "A") });
   for (const purpose of ["showcase", "sell", "give", "relist", "videos"]) {
     const ids = readinessOf(f, purpose).rules.map((x) => x.id);
     assert.equal(ids[ids.indexOf("videos") + 1], "projectVideo", purpose);
@@ -275,7 +275,7 @@ test("a product added after the project video: its video first, then update", ()
 });
 
 test("the project video's fix lives where the product videos' does", () => {
-  const f = facts({ products: [product("a", "A")], videos: { a: readyVideo("t_a") }, status: "minted" });
+  const f = facts({ products: [product("a", "A"), product("b", "B")], videos: { a: readyVideo("t_a"), b: readyVideo("t_b") }, status: "minted" });
   assert.equal(readinessOf(f, "showcase").rules.find((x) => x.id === "projectVideo").fixedIn, "gate");
   assert.equal(readinessOf(f, "relist").rules.find((x) => x.id === "projectVideo").fixedIn, "gate");
   assert.equal(readinessOf(f, "sell").rules.find((x) => x.id === "projectVideo").fixedIn, "brief");
@@ -302,9 +302,36 @@ test("missing beats rendering beats review", () => {
 });
 
 test("a project video waiting for review blocks with its own line", () => {
-  const join = { intro: ["P", ""], cuts: [{ productId: "a", takeId: "t_a", fromMs: 0, ms: 5_000, label: "a" }], outro: "Built with IDEEZA" };
+  const join = { intro: ["P", ""], cuts: [{ productId: "a", takeId: "t_a", fromMs: 0, ms: 5_000, label: "a" }, { productId: "b", takeId: "t_b", fromMs: 0, ms: 5_000, label: "b" }], outro: "Built with IDEEZA" };
   const project = { takes: [{ ...readyTake("t_project"), productId: "project", join, toReview: true }], inUseId: null };
-  const r = readinessOf(facts({ products: [product("a", "A")], videos: { a: readyVideo("t_a"), project } }), "sell");
+  const r = readinessOf(facts({ products: [product("a", "A"), product("b", "B")], videos: { a: readyVideo("t_a"), b: readyVideo("t_b"), project } }), "sell");
   assert.equal(r.project.state, "review");
   assert.equal(r.blocker, "Review the project video to continue.");
+});
+
+// ─────────────────────────── one product, one video (owner, 2026-11-17) ───────────────────────
+
+test("one product: its video is the project's — no project video asked for sell, give, share or relist", () => {
+  const f = facts({ products: [product("a", "A")], videos: { a: readyVideo("t_a") }, status: "minted" });
+  for (const purpose of ["showcase", "sell", "give", "relist", "videos"]) {
+    const r = readinessOf(f, purpose);
+    assert.equal(r.rules.some((x) => x.id === "projectVideo"), false, purpose);
+    assert.equal(r.project, null, purpose);
+    assert.deepEqual(videoCountOf(r), { ready: 1, total: 1 }, purpose);
+  }
+  assert.equal(readinessOf(f, "sell").ok, true);
+  // A dropped second product doesn't count: still one.
+  const dropped = facts({ products: [product("a", "A"), product("b", "B", { lastIn: 1, current: 2 })], videos: { a: readyVideo("t_a") } });
+  assert.equal(readinessOf(dropped, "sell").project, null);
+});
+
+test("one product with no video: the line asks for it, never for a project video", () => {
+  const r = readinessOf(facts({ products: [product("a", "A")], videos: {} }), "sell");
+  assert.equal(r.blocker, "1 product still needs an AI video.");
+});
+
+test("a second product added: the project video is asked again", () => {
+  const r = readinessOf(facts({ products: [product("a", "A"), product("b", "B")], videos: { a: readyVideo("t_a"), b: readyVideo("t_b") } }), "sell");
+  assert.equal(r.project.state, "make");
+  assert.deepEqual(videoCountOf(r), { ready: 2, total: 3 });
 });
