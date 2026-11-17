@@ -154,13 +154,18 @@ function LanguageMenu() {
 // 2026-11-04: one secondary style on the page).
 const START = LANDING_SECONDARY;
 
-export function LandingNav() {
+/**
+ * `hidden`: the bar slides up out of view (a hackathon page hands the top to
+ * its own section bar while scrolling down); never while its menu is open.
+ */
+export function LandingNav({ hidden = false }: { hidden?: boolean } = {}) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const away = hidden && !mobileOpen;
   const { signedIn, into, signInHref, signUpHref } = useEntry();
   const join = signedIn ? { label: "Open IDEEZA", href: "/" } : { label: "Join Us", href: signUpHref };
 
   return (
-    <header className="fixed inset-x-0 top-0 z-sticky backdrop-blur-[32px]">
+    <header inert={away} className={cn("fixed inset-x-0 top-0 z-sticky backdrop-blur-[32px] transition-transform duration-slow ease-standard", away && "-translate-y-full")}>
       <nav
         aria-label="Main"
         className="mx-auto flex h-[80px] w-full max-w-[1440px] items-center justify-between px-8 py-8 lg:px-40"

@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { LandingNav } from "@/components/landing/nav";
 import { LandingFooter } from "@/components/landing/footer";
 import { HackathonProvider } from "./context";
 import { HackathonHero } from "./hero";
 import { Closing, FaqAndRules, HackathonSections, SectionNav } from "./sections";
 import { StyleSwitch } from "./style-switch";
+import { HackathonSiteNav } from "./site-bar";
 
 // One hackathon's public page — at its own link, /hackathons/<slug>, and for
 // the main hackathon also at /hackathons, where the site menu's Hackathons
@@ -23,7 +23,7 @@ import { StyleSwitch } from "./style-switch";
 export function HackathonPageBody({ slug, path }: { slug: string; path: string }) {
   return (
     <div data-theme="dark" className="min-h-screen overflow-x-clip bg-[var(--color-bg-page)] font-display text-[color:var(--color-text-primary)]">
-      <LandingNav />
+      <HackathonSiteNav />
       <Suspense>
         <HackathonProvider slug={slug} path={path}>
           <main>
