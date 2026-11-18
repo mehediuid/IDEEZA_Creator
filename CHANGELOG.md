@@ -6,7 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
-| [CL-027](#cl-027-home-an-inspiration-image-with-the-idea) | Home: an inspiration image with the idea | 18 Nov 2026 | Not created yet | Not started |
+| [CL-027](#cl-027-an-inspiration-image-with-the-idea-home-and-add-a-product) | An inspiration image with the idea (Home and Add a product) | 18 Nov 2026 | Not created yet | Not started |
 | [CL-026](#cl-026-the-projects-earn-button-opens-earns-overview) | The project's Earn button opens Earn's Overview | 18 Nov 2026 | Not created yet | Not started |
 | [CL-025](#cl-025-one-product-one-video) | One product, one video | 18 Nov 2026 | Not created yet | Not started |
 | [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons) | Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
@@ -58,15 +58,15 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 ---
 
-## CL-027 Home: an inspiration image with the idea
+## CL-027 An inspiration image with the idea (Home and Add a product)
 
 **In the prototype:** 18 November 2026 · **Jira:** not created yet · **Production:** Not started
 
-**Screen:** Home (`/`), the **Generate with AI** box; the concept chat it opens (`/chat/<id>`), its build log and its first concept.
+**Screen:** the AI box: Home (`/`) **Generate with AI**, and a project page's **Add a product › Build with AI** (`/projects/<id>`, the same box); the concept chat it opens (`/chat/<id>`), its build log and its first concept.
 
 ### What to build
 
-- [ ] An image button beside the mic in the Generate with AI box, on Home only. Its tooltip and label: *Add an inspiration image*; once a picture is there, *Change the inspiration image*.
+- [ ] An image button beside the mic in the AI box. Home's **Generate with AI** and a project's **Add a product › Build with AI** are one box: everything below works the same in both. Its tooltip and label: *Add an inspiration image*; once a picture is there, *Change the inspiration image*.
 - [ ] It opens the file picker for **JPG, PNG or WebP**. A picture can also be **pasted** into the box or **dropped** on the box; while a file is dragged over it, the box's border turns dashed brand.
 - [ ] One picture per idea: picking, pasting or dropping another replaces it.
 - [ ] The picture is cropped to the concept's 4:3 frame (centred) and made small (512 × 384) in the browser before it is sent, so a phone photo uploads fast. A phone photo's rotation is respected.
@@ -80,7 +80,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 - [ ] The chat keeps the picture with the idea: in the build log, under **You**, the first message shows the same chip (thumbnail and name, no ✕).
 - [ ] The main product's concept is **drawn from the picture**: its first drawing and every **Regenerate** start from it (image-to-image), keeping the picture's shape, angle and light while the prompt decides what the product is. Companion products and **Refine** do not use it. Only a picture the maker uploaded can be used this way, never a concept image or anything from another site.
 - [ ] The price does not change: a concept with a picture costs the same 1 credit.
-- [ ] **Add a product › Build with AI** on a project page keeps its box as it is: no image button, no paste or drop.
+- [ ] **Add a product › Build with AI**: the chat it opens adds the new product to that project (already picked, as without a picture), and the new product's concept is drawn from the picture.
 - [ ] Phone width: the buttons wrap as before (mic, image, Quality; then Enhance and Generate) and the page never scrolls sideways.
 
 **In the prototype only (nothing to build):** the idea's summary and spec are written from the text alone; only the drawing uses the picture.
@@ -95,6 +95,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 | --- | --- |
 | ![Before: the Generate with AI box had no way to add a picture](docs/changelog/2026-11-18-inspiration-image-before.png) | ![After: an image button beside the mic and the picture as a chip above the idea](docs/changelog/2026-11-18-inspiration-image-after.png) |
 | | ![After: the first concept is drawn from the picture](docs/changelog/2026-11-18-inspiration-image-concept-after.png) |
+| ![Before: Add a product › Build with AI had no way to add a picture](docs/changelog/2026-11-18-inspiration-image-add-product-before.png) | ![After: Add a product › Build with AI takes a picture the same way](docs/changelog/2026-11-18-inspiration-image-add-product-after.png) |
 
 ---
 
