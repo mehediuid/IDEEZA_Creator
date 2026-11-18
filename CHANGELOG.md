@@ -16,7 +16,7 @@ to build and how to check it is done, and links to its Jira ticket.
 | [CL-021](#cl-021-add-a-product--build-with-ai-uses-homes-ai-chat-box) | Add a product › Build with AI uses Home's AI chat box | 17 Nov 2026 | Not created yet | Not started |
 | [CL-020](#cl-020-my-projects-purchased) | My projects: Purchased | 17 Nov 2026 | Not created yet | Not started |
 | [CL-019](#cl-019-explore-marketplace-asset-card-grid) | Explore marketplace: Asset Card grid | 17 Nov 2026 | Not created yet | Not started |
-| [CL-018](#cl-018-marketplace-details-a-shop-page-with-one-buy-box) | Marketplace details: a shop page with one buy box | 17 Nov 2026 | Not created yet | Not started |
+| [CL-018](#cl-018-marketplace-details-a-shop-page-with-one-buy-box) | Marketplace details: a shop page with one buy box | 17 Nov 2026 | [PR-9661](https://ideeza.atlassian.net/browse/PR-9661) | Not started |
 | [CL-017](#cl-017-editors-no-fake-results-and-the-code-rail-by-keyboard) | Editors: no fake results, and the Code rail by keyboard | 17 Nov 2026 | Not created yet | Not started |
 | [CL-016](#cl-016-marketplace-safer-auctions-and-listings) | Marketplace: safer auctions and listings | 17 Nov 2026 | Not created yet | Not started |
 | [CL-015](#cl-015-product-and-project-pages-the-missing-controls) | Product and project pages: the missing controls | 17 Nov 2026 | Not created yet | Not started |
@@ -508,7 +508,7 @@ Demo stand-ins (prototype only): the Testnet demo strip above the grid and on ev
 
 ## CL-018 Marketplace details: a shop page with one buy box
 
-**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+**In the prototype:** 17 November 2026 · **Jira:** [PR-9661](https://ideeza.atlassian.net/browse/PR-9661) · **Production:** Not started
 
 **Screen:** Explore marketplace › a listed project, `/marketplace/<project>` (a card's tag can open a tab: `?nft=main`, `?nft=physical`, `?nft=virtual`), and a product's marketplace page, `/marketplace/<project>/products/<product>`. The page is now a shop page that answers a buyer's questions in order; the project's story stays on its Innovations post. The creator's Preview as buyer (`/projects/<project>?view=buyer`) shows the same box.
 
