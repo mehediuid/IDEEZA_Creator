@@ -29,7 +29,7 @@ import { useCreateHistory } from "@/lib/create/history";
 import { editorHref } from "@/lib/manual/editor-scope";
 import { PROJECT_NAME_MAX, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { CreditBadge } from "@/components/credits/credit-badge";
-import { PromptCard, useLastQuality } from "@/components/dashboard/prompt-card";
+import { PromptCard, useLastQuality, type PromptImage } from "@/components/dashboard/prompt-card";
 
 type Step = "choose" | "ai" | "manual";
 
@@ -149,7 +149,9 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
     }
   };
 
-  const start = () => {
+  // `image`: the inspiration image, already stored by the box (prompt-card.tsx);
+  // the new product's concept is drawn from it, as on Home.
+  const start = (image?: PromptImage) => {
     if (starting) return;
     if (prompt.trim() === "") {
       areaRef.current?.focus();
@@ -159,7 +161,7 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
     // Busy until the chat page takes over: this dialog unmounts with the navigation.
     setStarting(true);
     try {
-      const chat = createChat(prompt.trim(), { quality, addTo: project.id });
+      const chat = createChat(prompt.trim(), { quality, addTo: project.id, ...image });
       router.push(`/chat/${chat.id}`);
     } catch {
       setStarting(false);

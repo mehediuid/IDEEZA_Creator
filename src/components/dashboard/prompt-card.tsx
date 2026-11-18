@@ -3,8 +3,9 @@
 // The regular AI chat box: the idea, voice input, Quality (Low / Medium / High, remembered), Enhance and Generate.
 // Home's WorkspacePrompt holds it, and so does a project page's "Add a product › Build with AI" (owner,
 // 2026-11-16: "why isn't our regular AI chat box there?"), so both start a chat the same way.
-// The inspiration image (owner, 2026-11-01) is Home's only: the card shows its button, paste and drop
-// when the caller passes `onImage`.
+// The inspiration image (owner, 2026-11-01) lives here too, whole: the button beside the mic, paste and drop, the
+// chip, the upload on Generate (owner, 2026-11-18: one shared box, so every place that holds it takes a picture).
+// The caller only gets the stored picture with `onSubmit` and hands it to `createChat`.
 
 import * as React from "react";
 import {
@@ -26,7 +27,8 @@ import {
 } from "@/lib/create/quality";
 import { creditsLabel, defaultPick, pickCost } from "@/lib/create/pieces";
 import { QualityMenu } from "@/components/create/quality-menu";
-import { INSPIRATION_TYPES } from "@/lib/create/inspiration";
+import { INSPIRATION_TYPES, pickProblem } from "@/lib/create/inspiration";
+import { shrinkInspiration, uploadInspiration } from "@/lib/create/inspiration-client";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
 import { Icon, type IconValue } from "./icon";
@@ -34,7 +36,11 @@ import { Icon, type IconValue } from "./icon";
 type Mode = "ai" | "manual";
 
 /** An inspiration image picked in the page, before Generate uploads it. */
-export type InspirationPick = { dataUrl: string; name: string };
+type InspirationPick = { dataUrl: string; name: string };
+
+/** The stored inspiration image Generate hands the caller — the same names
+ *  `createChat` takes, so it can be spread into its options. */
+export type PromptImage = { inspiration: string; inspirationName: string };
 
 // The Quality picked last, read where the browser keeps it. The server has
 // no store, so it draws Medium and the client takes over on hydration; a
@@ -69,7 +75,8 @@ export const PromptCard = React.forwardRef<
   {
     value: string;
     onChange: (v: string) => void;
-    onSubmit: () => void;
+    /** Generate. With a picture in the box it arrives already stored. */
+    onSubmit: (image?: PromptImage) => void;
     submitting: boolean;
     placeholder: string;
     mode: Mode;
@@ -87,12 +94,6 @@ export const PromptCard = React.forwardRef<
     sendLabel?: string;
     /** Why Generate waits while the box is empty. */
     emptyHint?: string;
-    /** The inspiration image, as it will go with the idea. */
-    inspiration?: InspirationPick | null;
-    /** Takes a picked, pasted or dropped picture. Without it the card has no image button. */
-    onImage?: (file: File) => void;
-    onDropImage?: () => void;
-    imageError?: string | null;
   }
 >(function PromptCard(
   {
@@ -111,17 +112,58 @@ export const PromptCard = React.forwardRef<
     label = "Describe your electronics project",
     sendLabel = "Generate project",
     emptyHint = "describe your project first",
-    inspiration = null,
-    onImage,
-    onDropImage,
-    imageError = null,
   },
   ref,
 ) {
   const localRef = React.useRef<HTMLTextAreaElement | null>(null);
   const fileRef = React.useRef<HTMLInputElement | null>(null);
   const [dragging, setDragging] = React.useState(false);
-  const takesImages = mode === "ai" && !!onImage;
+  const takesImages = mode === "ai";
+  // The inspiration image (lib/create/inspiration.ts), shrunk in the page and
+  // kept here until Generate stores it with the idea. One per idea: another
+  // pick replaces it.
+  const [inspiration, setInspiration] = React.useState<InspirationPick | null>(null);
+  const [imageError, setImageError] = React.useState<string | null>(null);
+  const [uploading, setUploading] = React.useState(false);
+  const takeImage = async (file: File) => {
+    const problem = pickProblem(file);
+    if (problem) {
+      setImageError(problem);
+      return;
+    }
+    try {
+      const dataUrl = await shrinkInspiration(file);
+      setInspiration({ dataUrl, name: file.name || "Pasted image" });
+      setImageError(null);
+    } catch {
+      setImageError("We couldn't open that picture — try a JPG or PNG.");
+    }
+  };
+  const dropImage = () => {
+    setInspiration(null);
+    setImageError(null);
+    requestAnimationFrame(() => localRef.current?.focus());
+  };
+  // Generate. The picture goes up first, so the chat opens already holding
+  // it; if it can't be kept, the idea waits here with the reason rather than
+  // opening without what the maker asked for. An empty box or a short balance
+  // goes straight to the caller, which says why.
+  const send = async () => {
+    if (uploading) return;
+    if (!inspiration || !value.trim() || !canRender) {
+      onSubmit();
+      return;
+    }
+    setUploading(true);
+    setImageError(null);
+    const up = await uploadInspiration(inspiration.dataUrl);
+    setUploading(false);
+    if ("error" in up) {
+      setImageError(up.error);
+      return;
+    }
+    onSubmit({ inspiration: up.url, inspirationName: inspiration.name });
+  };
   // No dep array on purpose. The listening view below replaces this
   // whole card, so the textarea is unmounted and remounted once per
   // dictation; a handle computed only at mount would hand the parent a
@@ -183,7 +225,7 @@ export const PromptCard = React.forwardRef<
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      onSubmit();
+      void send();
     }
   };
 
@@ -247,7 +289,7 @@ export const PromptCard = React.forwardRef<
                 setDragging(false);
                 if (!file) return;
                 e.preventDefault();
-                onImage?.(file);
+                void takeImage(file);
               }
             : undefined
         }
@@ -269,7 +311,7 @@ export const PromptCard = React.forwardRef<
               <span className="min-w-0 truncate text-sm text-text-secondary">{inspiration.name}</span>
               <button
                 type="button"
-                onClick={onDropImage}
+                onClick={dropImage}
                 aria-label={`Remove ${inspiration.name}`}
                 title="Remove"
                 className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
@@ -295,7 +337,7 @@ export const PromptCard = React.forwardRef<
                   const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
                   if (!file) return;
                   e.preventDefault();
-                  onImage?.(file);
+                  void takeImage(file);
                 }
               : undefined
           }
@@ -339,7 +381,7 @@ export const PromptCard = React.forwardRef<
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     e.target.value = "";
-                    if (file) onImage?.(file);
+                    if (file) void takeImage(file);
                   }}
                 />
               </>
@@ -358,8 +400,8 @@ export const PromptCard = React.forwardRef<
               />
             )}
             <SendButton
-              onClick={onSubmit}
-              submitting={submitting}
+              onClick={() => void send()}
+              submitting={submitting || uploading}
               hasText={value.trim().length > 0}
               canRender={canRender}
               label={sendLabel}
