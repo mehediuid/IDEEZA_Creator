@@ -41,7 +41,7 @@ import { discountFor, usd, type BillingCycle } from "@/lib/create/credit-pricing
 import { useCreatePlan } from "@/lib/create/plan";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useCredits } from "@/lib/create/credits";
-import { fitsYou, usageOf } from "@/lib/create/upsell";
+import { fitsYou, takesPlanSlot, usageOf } from "@/lib/create/upsell";
 import {
   HIGH_VIDEO_TIER,
   PLANS,
@@ -80,7 +80,7 @@ export function PlansPanel() {
   const { hydrated: creditsReady, ledger } = useCredits();
   const { hydrated: projectsReady, projects } = useManualProjects();
   const [now] = React.useState(() => Date.now());
-  const usage = usageOf(ledger, projects.length, now);
+  const usage = usageOf(ledger, projects.filter((p) => takesPlanSlot(p.id)).length, now);
   // A plan above yours that covers it is named; otherwise your own plan covers it (never a nudge down).
   const fitTier = fitsYou(usage);
   const fit = PLAN_ORDER.indexOf(fitTier) > PLAN_ORDER.indexOf(sub.tier) ? fitTier : sub.tier;
@@ -671,7 +671,7 @@ function Helpful({ vote, onVote }: { vote: "up" | "down" | undefined; onVote: (v
 export function usePlanUsage(): { projects: number; mostContributors: number } {
   const { projects } = useManualProjects();
   return {
-    projects: projects.length,
+    projects: projects.filter((p) => takesPlanSlot(p.id)).length,
     mostContributors: projects.reduce((m, p) => Math.max(m, p.contributors?.length ?? 0), 0),
   };
 }

@@ -25,7 +25,7 @@ import { checkoutHref } from "@/lib/create/checkout-route";
 import { usd } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { planOf, priceOf } from "@/lib/create/plans";
-import { pitchCycle, pitchPlan, projectRoom } from "@/lib/create/upsell";
+import { pitchCycle, pitchPlan, projectRoom, takesPlanSlot } from "@/lib/create/upsell";
 import { useManualProjects } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,8 @@ const MAX_TILES = 5;
 /** Whether one more project fits the plan, and what to say when it doesn't. */
 export function useProjectRoom() {
   const { hydrated: planReady, sub } = useCreatePlan();
-  const { hydrated: projectsReady, projects } = useManualProjects();
+  const { hydrated: projectsReady, projects: all } = useManualProjects();
+  const projects = all.filter((p) => takesPlanSlot(p.id));
   const room = projectRoom(sub.tier, projects.length);
   const plan = planOf(sub.tier);
   const pitch = pitchPlan(sub.tier);

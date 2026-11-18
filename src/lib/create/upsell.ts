@@ -14,6 +14,7 @@
 
 import { discountFor, type BillingCycle } from "./credit-pricing";
 import { PLANS, planOf, priceOf, type Plan, type PlanTier, type Subscription } from "./plans";
+import { DEMO_PROJECT_PREFIX } from "../demo/demo-projects";
 
 /** The plan a nudge names; null on the top plan. */
 export function pitchPlan(tier: PlanTier): Plan | null {
@@ -98,6 +99,12 @@ export function fitsYou(usage: { credits: number; projects: number }): PlanTier 
 }
 
 /** C5 — whether one more project fits the plan. */
+/** Whether a project uses one of the plan's slots. The demo projects every account starts
+ *  with (lib/demo, prototype only) don't: a new Free account has four of them and three slots. */
+export function takesPlanSlot(projectId: string): boolean {
+  return !projectId.startsWith(DEMO_PROJECT_PREFIX);
+}
+
 export function projectRoom(tier: PlanTier, held: number): { allowed: number; held: number; full: boolean } {
   const allowed = planOf(tier).projects;
   return { allowed, held, full: held >= allowed };

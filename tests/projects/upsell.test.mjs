@@ -65,6 +65,13 @@ test("C5: a project fits until the plan's allowance is used", () => {
   assert.equal(U.projectRoom("free", U.projectRoom("free", 0).allowed).full, true);
 });
 
+test("C5: the demo projects every account starts with take no plan slot", async () => {
+  const D = await import("../../.tmp-test/lib/demo/demo-projects.js");
+  assert.ok(D.DEMO_PROJECT_IDS.length > U.projectRoom("free", 0).allowed, "more demos than Free slots");
+  for (const id of D.DEMO_PROJECT_IDS) assert.equal(U.takesPlanSlot(id), false, id);
+  assert.equal(U.takesPlanSlot("proj_abc123"), true);
+});
+
 test("one capped card a day across the app; the same card keeps showing that day", () => {
   let e = N.EMPTY_NUDGES;
   assert.equal(N.mayShow(e, "first-build", NOW), true);
