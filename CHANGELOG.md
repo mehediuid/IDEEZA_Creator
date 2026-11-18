@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-030](#cl-030-ai-videos-start-them-one-after-another-and-sell-while-they-render) | AI videos: start them one after another, and sell while they render | 18 Nov 2026 | Not created yet | Not started |
 | [CL-029](#cl-029-innovations-post-the-story-page-with-an-on-marketplace-card) | Innovations post: the story page with an On Marketplace card | 13 Oct 2026 | [PR-9662](https://ideeza.atlassian.net/browse/PR-9662) | Not started |
 | [CL-028](#cl-028-earn--sell-one-board-for-everything-you-sell) | Earn › Sell: one board for everything you sell | 18 Nov 2026 | [PR-9660](https://ideeza.atlassian.net/browse/PR-9660) | Not started |
 | [CL-027](#cl-027-an-inspiration-image-with-the-idea-home-and-add-a-product) | An inspiration image with the idea (Home and Add a product) | 18 Nov 2026 | [PR-9658](https://ideeza.atlassian.net/browse/PR-9658) | Not started |
@@ -57,6 +58,88 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-030 AI videos: start them one after another, and sell while they render
+
+**In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** a project's **Media** tab, **Generate video** and **Project video**; every place a maker sells or shares (Add to marketplace, the mint with Sell, Sell copies, Relist, Share to Innovations, Earn › Overview); **Earn › Sell**; the project header; the My projects card; the **Videos** button in the bottom-right corner of every page (web).
+
+One AI video takes minutes, and a project with 5 products needs 6 of them (one per product, plus the project video). The maker no longer waits for any render: they start every video one after another, keep working, and can sell or share as soon as every video is started. What they sign waits off Explore marketplace and Innovations, and goes live by itself once every video has **Use this video**.
+
+### What to build
+
+**One video after another**
+
+- [ ] Every video is still made storyboard first: **Generate AI video** → the form → *Drafting your storyboard…* → *Review your storyboard* → **Generate video**. There is no button that makes all videos in one press, and nothing starts a video by itself.
+- [ ] The render screen keeps the progress (*Take 1 · Stage 2 of 5 · Drafting visual sequences*, *under a minute left*) and *You can close this — the render keeps running, and its progress shows in the corner.* Under it the switch *Notify me on this browser · for every video*.
+- [ ] Its buttons: **Cancel render**, **Close** and, while another video of this project has not started, **Next video: WaveLight** (the primary button) with *PlantPal keeps rendering while you set up the next one.* under it. Next video closes this screen and opens that video's form: the next product without a started video (in the products' order, after this one, then from the top), then the project video.
+- [ ] When every video of the project has started: **Close** is the primary button and the line reads *Every video of this project has started.*
+- [ ] The project video's render screen works the same way (*The project video keeps rendering while you set up the next one.*).
+
+**The project video never waits for the product videos**
+
+- [ ] Media › Project video says *Made from your products’ prompts and specs*. With none yet: *No project video yet · it can start now* and **Make project video**, right away. *Opens when every product has a video* is gone.
+- [ ] The Project video dialog: *Smart Home Kit · drafted from your 3 products’ prompts and specs*. The storyboard: **Intro** (2 s: the project's name and the first sentence of its description), one scene per product (5 s, *from its prompt and spec*: the product's concept image, its name, and one line from its prompt, the first sentence up to 60 characters), **Outro** (2 s, *Built with IDEEZA*). The order, the names and the lines can be changed as before. **Generate project video** makes it from the products' images and lines; no product video is needed.
+- [ ] After the products change: *The products changed. You can update the project video now.*
+- [ ] Only a project with 2 or more products has a project video (CL-025).
+
+**Every video must be started before moving on**
+
+- [ ] A video is started when it is rendering or waiting for review. It is not started when it has no video yet or its last render failed; the project video also when it is not made yet or out of date.
+- [ ] Wherever the maker sells or shares, the button stays shut while a video it needs has not started: **Continue to listing** (Add to marketplace), **Sign and list** (the mint with Sell), **Sign and sell** (Sell copies), **Relist**, **Share to Innovations**, and Overview's **Choose what to sell**. The line under it names what is missing: *Start every video first: PulseBand hasn't started yet.* or *Start every video first: WaveLight, LogTag and the project video haven't started yet.*
+- [ ] The dialog's lead says the rule: *Start every video first. You don't wait for them to finish: the listing stays off Explore marketplace until they're ready.* For a post: *The post needs your story, and every video has to be started. You don't wait for them to finish: the post stays off Innovations until they're ready.* For copies of one product: *Start PlantPal's video first. You don't wait for it to finish: these wait off Explore marketplace until it's ready.* Each video's row has its own **Generate AI video** or **Try again**.
+- [ ] Copies of one product need only that product's video. Selling, sharing or relisting the whole project needs every product's video and the project video.
+
+**Sign now, go live later: Waiting for videos**
+
+- [ ] Once every video it needs has started, the button opens, even while the videos render or wait for review. The dialog adds *You don't have to wait. It stays off Explore marketplace until all 4 videos are ready, then goes live by itself. We'll tell you when it does.* and, under the button, *Goes live when all 4 videos are ready · 2 of 4 now* (one video: *Goes live when the video is ready · 0 of 1 now*).
+- [ ] The maker fills in and signs as before. What they signed waits: it is not on Explore marketplace or Innovations, and nobody can see or buy it. The signed lines: *Signed. It goes on Explore marketplace when every video is ready — we'll tell you.*; copies: *Signed: 20 Physical copies of Smart Home Kit. They go on Explore marketplace when every video is ready.*; a relist: *Signed. It goes back on Explore marketplace when every video is ready.*; a post: *Your post goes on Innovations when every video is ready.*
+- [ ] A video is ready when the maker has pressed **Use this video** on it (the review stays as before). When every video an item waits for is ready, the item goes live by itself, whatever page the maker is on: the Main NFT listing on Explore marketplace (listed at that moment), the copies on sale, the paused listing back on sale, the post on Innovations.
+- [ ] When it goes live: a toast *Now on Explore marketplace* (or *Now on Innovations*) with the project's name; a bell notice *Smart Home Kit is live on Explore marketplace* · *Every video is ready, so it went live by itself.* that opens Earn › Sell (a post opens the project); and a browser notification when the switch is on and the tab is in the background.
+- [ ] A failed render keeps it waiting. A product added later keeps it waiting until that product's video is ready too.
+- [ ] **Cancel listing** (or **Cancel the post**) asks *Cancel this listing? Nothing of it was live.* with **Keep it** and **Cancel listing**. Deleting the project drops what waits. Signing the same thing again replaces what waited.
+
+**Where a waiting item shows**
+
+- [ ] The project header: the chip **Waiting for videos**, and in the warning colour *Main NFT listing · goes live when all 4 videos are ready · 2 of 4 ·* **Review videos** (opens the Videos panel at this project).
+- [ ] Earn › Sell: the tile's chip *Waiting for videos*, its use and price (*Buy now · 10% of the project*, *0.5 ETH*) and *0 of 1 videos ready*. The item panel's head reads *Signed · goes live when its videos are ready*, then the waiting block: the chip, *Main NFT listing · signed Nov 18, 2026 · 4:44 PM*, *Goes live on Explore marketplace when the video is ready. Nobody can see or buy it yet.*, a **Videos ready** progress bar, *0 of 1 video ready · Review 1 video to continue.*, **Review videos** and **Cancel listing**. A copies panel shows the same block.
+- [ ] The mint's last step: heading *Minted · listing waits for videos*, the line *It goes on Explore marketplace by itself when every video is ready — we'll tell you.*, and the waiting block for each thing it signed.
+- [ ] The My projects card: the chip *Waiting for videos* and the hint *Next: review 2 videos* (*Waiting for videos* while they still render). The project stays under **Minted** until it is live.
+- [ ] The project's ⋯ menu: while the post waits, **Share to Innovations** reads *Waiting for videos · goes live when they're ready* and opens the Videos panel.
+
+**The Videos button and panel**
+
+- [ ] Bottom-right on every page, while something is going on: a ring with the overall progress (the number to review once nothing renders), **Videos**, a summary such as *2 rendering · 1 to review* (also *1 didn't finish*, *1 waiting*), and a badge with the number to review. Not shown in buyer views (Preview as others see it, Explore marketplace).
+- [ ] It replaces the stack of progress toasts. Toasts are only for moments and hide after 7 seconds: *Video ready · review it* (**Review**), *Video render failed* (**Try again**), *Now on Explore marketplace*.
+- [ ] The panel: **Videos**, *They keep going while you work. Each one waits for your review before it's used.*, ✕. One group per project (its name and *Media ›*, or *Earn › Sell ›* when something waits), then each product's video and the project video with its state (*Rendering · 30 %*, *Ready to review*, *Video ready*, *No video yet*, *Render failed*) and one action: **Review**, **Generate AI video**, **Make project video**, **Try again** or **Cancel**. When something waits: *Waiting for videos · Main NFT listing goes live on Explore marketplace when the video is ready (0 of 1 now).*
+- [ ] At the bottom the switch *Notify me on this browser · for every video*: one setting for all videos (the same switch as on the render screen). Turning it on asks the browser's permission. A notification comes only when the tab is in the background.
+
+**Not in this change**
+
+- The phone app keeps its own flow for now (videos before listing); it follows later.
+
+### Design
+
+- The **Waiting for videos** chip: radius full, `bg-warning-subtle`, `text-warning`, 12 px semibold, a clock icon (14). The waiting block: `bg-warning-subtle`, 1 px `border-warning`, radius `lg`, padding 20/24, the DS ProgressBar, A01 primary (**Review videos**) and ghost (**Cancel listing**) buttons; danger for the confirmed cancel.
+- The Videos button: a `bg-surface-raised` pill, radius full, with a progress ring (brand), the review badge `bg-brand` with `text-on-brand`. The panel: 440 px wide (at most the screen width minus 32 px), `bg-surface`, radius `2xl`, rows divided by `border`. Moment toasts: 400 px, a 32 px icon tile (`bg-success-subtle`, `bg-error-subtle` or `bg-brand-subtle`) and a matching border.
+- **Next video** is the dialog's A01 primary button; Close becomes secondary while a next video exists. The notify switch is the DS Checkbox.
+- Project video storyboard scenes: the product's concept image as the thumbnail, the scene line in a DS text input.
+- Text: body 14, captions 12.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the project video waited for every product video](docs/changelog/2026-11-18-video-queue-media-before.png) | ![After: the project video can start now, with the Videos button in the corner](docs/changelog/2026-11-18-video-queue-media-after.png) |
+| ![Before: Continue to listing waited for a video to finish rendering](docs/changelog/2026-11-18-video-queue-listing-before.png) | ![After: with every video started, Continue to listing opens and the listing waits](docs/changelog/2026-11-18-video-queue-listing-after.png) |
+| ![Before: the project video was cut from the product videos](docs/changelog/2026-11-18-video-queue-project-video-before.png) | ![After: the project video's storyboard is drafted from the products' prompts and specs](docs/changelog/2026-11-18-video-queue-project-video-after.png) |
+| ![Before: nothing could be listed while a video rendered](docs/changelog/2026-11-18-video-queue-sell-before.png) | ![After: the signed listing waits for its video on Earn › Sell](docs/changelog/2026-11-18-video-queue-sell-after.png) |
+| ![Before: one progress toast per video](docs/changelog/2026-11-18-video-queue-panel-before.png) | ![After: one Videos button and panel](docs/changelog/2026-11-18-video-queue-panel-after.png) |
+| | ![After: a video not started yet keeps Continue to listing shut](docs/changelog/2026-11-18-video-queue-start-first-after.png) |
+| | ![After: Next video on the render screen](docs/changelog/2026-11-18-video-queue-next-video-after.png) |
 
 ---
 
@@ -247,6 +330,8 @@ On main since 13 October 2026, so there is no Before.
 ## CL-025 One product, one video
 
 **In the prototype:** 18 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Changed by [CL-030](#cl-030-ai-videos-start-them-one-after-another-and-sell-while-they-render):** on the web, the project video no longer waits for the product videos (it is drafted from the products and can start right away), and listing, sharing and selling no longer wait for videos to finish: every video has to be started, then what the maker signs waits until every video is in use.
 
 **Screen:** the project page's Media tab; the Videos part of Review and sign (mint, sell, give); the Videos dialog (Make videos); Share to Innovations, Add to marketplace, Relist and selling the whole project's copies; the Innovations post; the mint's success screen; the mobile app's project page, Media, Feed clip and marketplace screen.
 
