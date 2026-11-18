@@ -6,8 +6,8 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
-| [CL-031](#cl-031-earn-from-a-product-page) | Earn from a product page | 18 Nov 2026 | Not created yet | Not started |
-| [CL-030](#cl-030-ai-videos-start-them-one-after-another-and-sell-while-they-render) | AI videos: start them one after another, and sell while they render | 18 Nov 2026 | Not created yet | Not started |
+| [CL-031](#cl-031-earn-from-a-product-page) | Earn from a product page | 18 Nov 2026 | [PR-9675](https://ideeza.atlassian.net/browse/PR-9675) | Not started |
+| [CL-030](#cl-030-ai-videos-start-them-one-after-another-and-sell-while-they-render) | AI videos: start them one after another, and sell while they render | 18 Nov 2026 | [PR-9674](https://ideeza.atlassian.net/browse/PR-9674) | Not started |
 | [CL-029](#cl-029-innovations-post-the-story-page-with-an-on-marketplace-card) | Innovations post: the story page with an On Marketplace card | 13 Oct 2026 | [PR-9662](https://ideeza.atlassian.net/browse/PR-9662) | Not started |
 | [CL-028](#cl-028-earn--sell-one-board-for-everything-you-sell) | Earn › Sell: one board for everything you sell | 18 Nov 2026 | [PR-9660](https://ideeza.atlassian.net/browse/PR-9660) | Not started |
 | [CL-027](#cl-027-an-inspiration-image-with-the-idea-home-and-add-a-product) | An inspiration image with the idea (Home and Add a product) | 18 Nov 2026 | [PR-9658](https://ideeza.atlassian.net/browse/PR-9658) | Not started |
@@ -64,7 +64,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 ## CL-031 Earn from a product page
 
-**In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
+**In the prototype:** 18 November 2026 · **Jira:** [PR-9675](https://ideeza.atlassian.net/browse/PR-9675) · **Production:** Not started
 
 **Screen:** a product's page (`/projects/<id>/products/<product>`, web), its header; it leads to **Earn › Sell** (`/projects/<id>/earn/sell`).
 
@@ -122,7 +122,7 @@ A product's page had no way to earning: the maker had to go back to the project 
 
 ## CL-030 AI videos: start them one after another, and sell while they render
 
-**In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
+**In the prototype:** 18 November 2026 · **Jira:** [PR-9674](https://ideeza.atlassian.net/browse/PR-9674) · **Production:** Not started
 
 **Screen:** a project's **Media** tab, **Generate video** and **Project video**; every place a maker sells or shares (Add to marketplace, the mint with Sell, Sell copies, Relist, Share to Innovations, Earn › Overview); **Earn › Sell**; the project header; the My projects card; the **Videos** button in the bottom-right corner of every page (web).
 
