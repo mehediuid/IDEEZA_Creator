@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-027](#cl-027-home-an-inspiration-image-with-the-idea) | Home: an inspiration image with the idea | 18 Nov 2026 | Not created yet | Not started |
 | [CL-026](#cl-026-the-projects-earn-button-opens-earns-overview) | The project's Earn button opens Earn's Overview | 18 Nov 2026 | Not created yet | Not started |
 | [CL-025](#cl-025-one-product-one-video) | One product, one video | 18 Nov 2026 | Not created yet | Not started |
 | [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons) | Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
@@ -54,6 +55,46 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-027 Home: an inspiration image with the idea
+
+**In the prototype:** 18 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Home (`/`), the **Generate with AI** box; the concept chat it opens (`/chat/<id>`), its build log and its first concept.
+
+### What to build
+
+- [ ] An image button beside the mic in the Generate with AI box, on Home only. Its tooltip and label: *Add an inspiration image*; once a picture is there, *Change the inspiration image*.
+- [ ] It opens the file picker for **JPG, PNG or WebP**. A picture can also be **pasted** into the box or **dropped** on the box; while a file is dragged over it, the box's border turns dashed brand.
+- [ ] One picture per idea: picking, pasting or dropping another replaces it.
+- [ ] The picture is cropped to the concept's 4:3 frame (centred) and made small (512 × 384) in the browser before it is sent, so a phone photo uploads fast. A phone photo's rotation is respected.
+- [ ] Above the text the picture shows as a small chip: a 32 × 24 thumbnail, the file's own name (cut short with … when long; *Pasted image* when it has none) and ✕ to remove it. No title or explanation beside it.
+- [ ] A file that can't be taken leaves the box as it is and shows the reason in red under it:
+  - not a JPG, PNG or WebP: *That file isn't a picture we can use — pick a JPG, PNG or WebP.*
+  - over 15 MB: *That picture is over 15 MB — pick a smaller one.*
+  - the browser can't open it: *We couldn't open that picture — try a JPG or PNG.*
+- [ ] **Generate** saves the picture first, then opens the chat with it. If it can't be saved, the chat does not open, the idea stays in the box and the reason shows under it: *We couldn't keep the picture — try again.* or, offline, *We couldn't send the picture — check your connection and try again.*
+- [ ] The server checks what it is given: only a JPG, PNG or WebP (by its real bytes, not its label), at most 1 MB after shrinking; it keeps the picture with the concept images and marks it as the maker's upload.
+- [ ] The chat keeps the picture with the idea: in the build log, under **You**, the first message shows the same chip (thumbnail and name, no ✕).
+- [ ] The main product's concept is **drawn from the picture**: its first drawing and every **Regenerate** start from it (image-to-image), keeping the picture's shape, angle and light while the prompt decides what the product is. Companion products and **Refine** do not use it. Only a picture the maker uploaded can be used this way, never a concept image or anything from another site.
+- [ ] The price does not change: a concept with a picture costs the same 1 credit.
+- [ ] **Add a product › Build with AI** on a project page keeps its box as it is: no image button, no paste or drop.
+- [ ] Phone width: the buttons wrap as before (mic, image, Quality; then Enhance and Generate) and the page never scrolls sideways.
+
+**In the prototype only (nothing to build):** the idea's summary and spec are written from the text alone; only the drawing uses the picture.
+
+### Design
+
+- The image button is the same toolbar icon button as the mic (40 × 40, `ImageAdd01Icon` from the DS icon set). The chip: radius `lg`, 1 px `border` border, the thumbnail radius `sm`, the name `text-sm` in `text-secondary`, ✕ `Cancel01Icon` 14 px in `text-tertiary` (44 px touch target on a phone). Drag-over: dashed `border-brand`. Errors use the voice error's line: `text-sm` `text-error`.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the Generate with AI box had no way to add a picture](docs/changelog/2026-11-18-inspiration-image-before.png) | ![After: an image button beside the mic and the picture as a chip above the idea](docs/changelog/2026-11-18-inspiration-image-after.png) |
+| | ![After: the first concept is drawn from the picture](docs/changelog/2026-11-18-inspiration-image-concept-after.png) |
 
 ---
 
