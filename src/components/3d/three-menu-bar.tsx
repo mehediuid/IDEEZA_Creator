@@ -18,11 +18,32 @@ export type ThreeAction =
   // Modeling Operation
   | "model:extrude" | "model:revolve" | "model:sweep" | "model:loft" | "model:fillet" | "model:chamfer" | "model:shell" | "model:union" | "model:subtract" | "model:intersect" | "model:mirror" | "model:pattern"
   // Transformation & Utilities
-  | "xform:move" | "xform:rotate" | "xform:scale" | "xform:copy" | "xform:align" | "xform:group" | "xform:measure" | "xform:section" | "xform:hide" | "xform:lock"
+  | "xform:select" | "xform:move" | "xform:rotate" | "xform:scale" | "xform:copy" | "xform:align" | "xform:group" | "xform:measure" | "xform:section" | "xform:hide" | "xform:lock"
   // Settings
   | "settings:preferences" | "settings:units" | "settings:grid" | "settings:snap" | "settings:resetView" | "settings:resetScene"
   // Help
   | "help:docs" | "help:shortcuts" | "help:about";
+
+/**
+ * Operations with no geometry engine behind them. The menu and the toolbar grey
+ * them with this reason: they used to swap the shape for a sphere, torus or cone,
+ * delete other shapes, or toast "merged" / "grouped" with nothing changed.
+ */
+export const THREE_NOT_BUILT: Partial<Record<ThreeAction, string>> = {
+  "shape:import": "3D file import isn't built yet.",
+  "model:extrude": "Extrude isn't built yet.",
+  "model:revolve": "Revolve isn't built yet.",
+  "model:sweep": "Sweep isn't built yet.",
+  "model:loft": "Loft isn't built yet.",
+  "model:fillet": "Fillet isn't built yet.",
+  "model:chamfer": "Chamfer isn't built yet.",
+  "model:union": "Boolean union isn't built yet.",
+  "model:subtract": "Boolean subtract isn't built yet.",
+  "model:intersect": "Boolean intersect isn't built yet.",
+  "xform:group": "Grouping isn't built yet.",
+  "xform:measure": "Measure tool isn't built yet.",
+  "xform:section": "Section view isn't built yet.",
+};
 
 export function dispatchThreeAction(action: ThreeAction) {
   if (typeof window !== "undefined") {

@@ -45,17 +45,25 @@ export function LeftRail({
         zIndex: 16,
       }}
     >
-      {items.map((r) => (
+      {items.map((r) => {
+        // Skip the active item (already here) and unknown keys. Navigation
+        // is project-scoped through the active project.
+        const go = () => {
+          const step = RAIL_KEY_TO_STEP[r.key];
+          if (step && r.key !== activeKey && activeProject) goStep(step);
+        };
+        // A link to its step for the keyboard and screen readers (it was a bare
+        // <div onClick>): Tab reaches it, Enter follows it, the current step says so.
+        return (
         <div
           key={r.key}
+          role="link"
+          tabIndex={0}
+          aria-current={r.key === activeKey ? "step" : undefined}
           className="ix-nav"
           data-tour={`rail-${r.key}`}
-          onClick={() => {
-            // Skip the active item (already here) and unknown keys. Navigation
-            // is project-scoped through the active project.
-            const step = RAIL_KEY_TO_STEP[r.key];
-            if (step && r.key !== activeKey && activeProject) goStep(step);
-          }}
+          onClick={go}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); go(); } }}
           style={{
             display: "flex",
             flexDirection: "column",
@@ -94,7 +102,8 @@ export function LeftRail({
             {r.label}
           </span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -25,6 +25,20 @@ export function bidsOf(listingId: string, bids: Bid[]): Bid[] {
     });
 }
 
+/** The outbid notice (selling states B2): `buyerId` held the top bid and a later, higher bid
+ *  passed it. `top` leads now (it is always later and higher than the buyer's best); `mine`
+ *  is the buyer's best bid, whose hold is back in their demo wallet (`heldBy` holds only a top
+ *  bid). Null while the buyer leads, never bid, or their best bid never led. */
+export function outbidOf(listingId: string, bids: Bid[], buyerId: DemoBuyerId): { top: Bid; mine: Bid } | null {
+  const ordered = bidsOf(listingId, bids);
+  const top = ordered[0];
+  if (!top || top.bidderId === buyerId) return null;
+  const mine = ordered.find((b) => b.bidderId === buyerId);
+  if (!mine) return null;
+  const led = !ordered.some((b) => b.id !== mine.id && b.at <= mine.at && compareAmounts(b.amount, mine.amount) >= 0);
+  return led ? { top, mine } : null;
+}
+
 /** "2h 14m left" · "42m left" · "Under a minute left". */
 export function timeLeftLabel(ms: number): string {
   if (ms < 60_000) return "Under a minute left";

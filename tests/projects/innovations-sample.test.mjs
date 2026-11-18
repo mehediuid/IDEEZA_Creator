@@ -66,14 +66,15 @@ test("every post's copy, stage, licence and listing follow the rules", () => {
     assert.ok(REAL_STAGES.includes(post.stage), `${at} stage ${post.stage}`);
     if (post.minted) {
       assert.ok(["Commercial use", "Personal use"].includes(post.license), `${at} license`);
-      assert.equal(post.chain, "Polygon");
+      assert.equal(post.chain, "Base Sepolia (Testnet)");
     } else {
       assert.equal(post.license, null);
       assert.equal(post.chain, null);
       assert.equal(post.listing, null, `${at} listing without a mint`);
     }
     if (post.listing) {
-      assert.equal(post.listing.href, "/marketplace");
+      // Its shop page on Explore marketplace (owner, 2026-11-16: the marketplace always has these).
+      assert.equal(post.listing.href, `/marketplace/${PROJECTS.find((p) => post.id === `sample:${p.id}`).id}`);
       assert.ok(post.listing.rows.length > 0);
       for (const row of post.listing.rows) assert.match(row.price, /^\d+(\.\d+)? ETH$/);
     }
@@ -168,14 +169,14 @@ test("smart-plant-watering-hub matches the approved mockup", () => {
   assert.equal(post.stage, "testing");
   assert.equal(post.network, "Mesh · 1 hub, 4 probes");
   assert.equal(post.license, "Commercial use");
-  assert.equal(post.chain, "Polygon");
+  assert.equal(post.chain, "Base Sepolia (Testnet)");
   assert.deepEqual(post.listing, {
     rows: [
       { label: "Whole project (Main NFT)", price: "0.40 ETH" },
       { label: "Physical copy · 2 of 30 sold", price: "0.05 ETH" },
       { label: "Virtual copy", price: "0.02 ETH" },
     ],
-    href: "/marketplace",
+    href: "/marketplace/p12",
   });
   assert.deepEqual(
     post.media.map((m) => [m.kind, m.src, m.label]),

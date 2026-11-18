@@ -12,7 +12,7 @@ import type { License } from "../brief/types";
 import type { StoredDraft } from "../brief/project-brief";
 import { etaLabel, progressOf, type VideoJob } from "../video/jobs";
 import { productVideoStatus } from "../video/product-video";
-import { projectVideoStatusOf, type ProjectVideoStatus } from "../video/project-video";
+import { needsProjectVideo, projectVideoStatusOf, type ProjectVideoStatus } from "../video/project-video";
 import type { ProjectVideos } from "../video/types";
 import type { ManualProject } from "./projects";
 import type { ProjectProduct, ProjectView } from "./project-read";
@@ -113,6 +113,7 @@ function videosReason(
 function projectVideoReason(project: ProjectVideoStatus): string | null {
   switch (project.state) {
     case "ready":
+    case "single":
       return null;
     case "waiting":
       return "The project video is made once every product has its video.";
@@ -195,11 +196,16 @@ export function readinessOf(facts: ReadinessFacts, purpose: ReadinessPurpose): R
   const review = products.filter((p) => p.video.state === "review").length;
   const missing = total - ready - rendering - review;
   const counts = { total, ready, rendering, review, missing };
-  const project = RULES_OF[purpose].includes("projectVideo")
+  // The project video is asked only of two or more current products; with one, its video is the
+  // project's (owner, 2026-11-17).
+  const asksProject = RULES_OF[purpose].includes("projectVideo") && needsProjectVideo(facts.products);
+  const project = asksProject
     ? projectVideoStatusOf({ products: facts.products, videos: facts.videos, jobs: facts.jobs, now: facts.now })
     : null;
 
-  const rules = RULES_OF[purpose].map((id) => buildRule(id, purpose, facts, products, counts, project));
+  const rules = RULES_OF[purpose]
+    .filter((id) => id !== "projectVideo" || asksProject)
+    .map((id) => buildRule(id, purpose, facts, products, counts, project));
   const failing = rules.filter((r) => !r.ok);
 
   return {

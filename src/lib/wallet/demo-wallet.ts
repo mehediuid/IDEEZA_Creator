@@ -25,6 +25,7 @@ import type {
   MakerId,
   PresaleBuy,
   RequestPurpose,
+  StakeRecord,
   WalletActivity,
 } from "./types";
 
@@ -51,6 +52,10 @@ const REQUEST_PURPOSES: readonly RequestPurpose[] = [
   "subscribe",
   "buyIdz",
   "claimIdz",
+  "stakeIdz",
+  "unstakeIdz",
+  "claimStakeReward",
+  "claimReferral",
 ];
 const DEFAULT_NETWORK: Network = "baseSepolia";
 
@@ -164,6 +169,29 @@ function sanitizePresale(raw: unknown): PresaleBuy | undefined {
   return { idz: raw.idz, paid, usd: raw.usd, price: raw.price, round: raw.round, whitelisted: raw.whitelisted, unlocksAt: raw.unlocksAt };
 }
 
+function isDays(v: unknown): v is number {
+  return typeof v === "number" && Number.isInteger(v) && v > 0;
+}
+
+/** A stored stake's terms, or undefined when any part of it doesn't read. */
+function sanitizeStake(raw: unknown): StakeRecord | undefined {
+  if (!isDict(raw)) return undefined;
+  if (typeof raw.contract !== "string" || typeof raw.option !== "string" || !isAmount(raw.amount)) return undefined;
+  if (typeof raw.aprBps !== "number" || !Number.isInteger(raw.aprBps) || raw.aprBps < 0) return undefined;
+  if (!isDays(raw.lockDays) || !isDays(raw.intervalDays) || !isDays(raw.dayMs)) return undefined;
+  if (typeof raw.graceDays !== "number" || !Number.isInteger(raw.graceDays) || raw.graceDays < 0) return undefined;
+  return {
+    contract: raw.contract,
+    option: raw.option,
+    amount: raw.amount,
+    aprBps: raw.aprBps,
+    lockDays: raw.lockDays,
+    intervalDays: raw.intervalDays,
+    graceDays: raw.graceDays,
+    dayMs: raw.dayMs,
+  };
+}
+
 function sanitizeActivityEntry(raw: unknown): WalletActivity | null {
   if (!isDict(raw)) return null;
   if (typeof raw.id !== "string" || typeof raw.at !== "number" || !Number.isFinite(raw.at)) return null;
@@ -192,6 +220,8 @@ function sanitizeActivityEntry(raw: unknown): WalletActivity | null {
   if (typeof raw.claims === "string") entry.claims = raw.claims;
   const credit = sanitizeCharge(raw.credit);
   if (credit) entry.credit = credit;
+  const stake = sanitizeStake(raw.stake);
+  if (stake) entry.stake = stake;
   return entry;
 }
 

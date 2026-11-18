@@ -95,7 +95,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
         <h2 id={headingId} className="text-2xl font-semibold leading-2xl text-text-primary">
           Video
         </h2>
-        <VideoPlayer take={inUse} productName={name} projectId={project.id} />
+        <VideoPlayer take={inUse} productName={name} projectId={project.id} audience="viewer" />
       </section>
     );
   }
@@ -270,7 +270,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
 /** This product's concept images across its versions, newest first, each
  *  image once — the project Media tab's tiles, for one product. Version
  *  history is the owner's: anyone else gets the version on screen only. */
-function productImageTiles({ view, product, version, viewer }: Pick<ProductSlotProps, "view" | "product" | "version" | "viewer">): MediaTile[] {
+export function productImageTiles({ view, product, version, viewer }: Pick<ProductSlotProps, "view" | "product" | "version" | "viewer">): MediaTile[] {
   // A hand-made product has no build, so no version and no images.
   const at = version?.build.buildId ?? product.built?.ref.buildId;
   const lineage = at ? (view.versions.find((g) => g.some((x) => x.buildId === at)) ?? []) : [];

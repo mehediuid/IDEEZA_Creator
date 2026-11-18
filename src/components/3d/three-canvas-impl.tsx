@@ -239,6 +239,22 @@ function ResetCamera({ tick }: { tick: number }) {
   return null;
 }
 
+// The view controls' Zoom in / Zoom out: scale the camera's distance to the
+// orbit target, then let OrbitControls re-clamp it to its min/max distance.
+function ZoomCamera({ zoom }: { zoom?: { tick: number; factor: number } }) {
+  const { camera, controls } = useThree();
+  const tick = zoom?.tick ?? 0;
+  React.useEffect(() => {
+    if (!zoom || tick === 0) return;
+    const c = controls as unknown as { target?: THREE.Vector3; update?: () => void } | null;
+    const target = c?.target ?? new THREE.Vector3();
+    camera.position.sub(target).multiplyScalar(zoom.factor).add(target);
+    c?.update?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+  return null;
+}
+
 function SceneContents(props: ViewportProps) {
   const { shapes, selectedId, onSelect, material, effects, snap, gridSize, resolution, transformMode, onTransform, onMouse, fitTick } = props;
   const segments = getResolutionSegments(resolution);
@@ -336,6 +352,7 @@ function SceneContents(props: ViewportProps) {
       <MouseReporter onMouse={onMouse} />
       <FitCamera shapes={shapes} tick={fitTick} />
       <ResetCamera tick={props.resetTick} />
+      <ZoomCamera zoom={props.zoom} />
     </>
   );
 }

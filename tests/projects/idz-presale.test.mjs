@@ -210,7 +210,7 @@ test("ledger: a held Buy row, then a Claim row; it still reconciles with the der
   assert.match(rows[1].title, /Presale Round 1 · paid 0\.000228 ETH/);
   const net = rows.reduce((sum, r) => sum + (r.held ? 0 : (r.direction === "in" ? 1 : -1) * Number(r.amount)), 0);
   assert.equal(String(net), balancesOf("maker-1", ctx(w)).idz);
-  assert.deepEqual(idz.TRANSFER_TYPES.map((t) => t.label), ["Reward", "Project Create", "Credits", "Buy", "Claim"]);
+  assert.deepEqual(idz.TRANSFER_TYPES.map((t) => t.label), ["Reward", "Project Create", "Credits", "Buy", "Claim", "Stake", "Withdraw"]);
   assert.deepEqual(idz.filterIdzLedger(rows, { network: "all", type: "buy" }).map((r) => r.id), [p.id]);
 });
 

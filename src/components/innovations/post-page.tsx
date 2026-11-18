@@ -12,7 +12,9 @@
 // - One page for both sources (usePost): a sample post, or a project this
 //   browser shared. On the maker's own post the owner bar sits on top
 //   (Edit post, Stop sharing; Share again once it isn't shared) and the rail
-//   offers Copy link alone.
+//   offers Share alone. Share is one menu — Copy link, Facebook, LinkedIn, X
+//   and WhatsApp (owner, 2026-11-15) — in the rail's actions and the phone's
+//   bar; the ⋯ menu keeps Report post for a visitor.
 // - Below a 1024 px page container it is one column, each rail block placed
 //   where it reads in the flow (the maker under the title; Marketplace and
 //   About before the comments; More from at the end), so the Tab order is the
@@ -27,12 +29,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight01Icon, CpuIcon, Flag01Icon, Link01Icon, MoreHorizontalIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, CpuIcon, Flag01Icon, MoreHorizontalIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar, Badge, IconButton, Menu, type MenuItem } from "@/components/ideeza";
 import { LiveRegion, usePageArrival } from "@/components/projects/details/arrival";
 import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-store";
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
+import { shareIntentUrl } from "@/lib/innovations/share-links";
 import { postHref, postProductHref } from "@/lib/innovations/slug";
 import type { InnovationPost } from "@/lib/innovations/types";
 import { sampleJourneyOf, sampleStatusOf } from "@/lib/innovations/sample-activity";
@@ -121,6 +124,10 @@ function PostBody({
       else toast(own.saved ? "Removed from saved" : "Saved");
     },
     copyLink,
+    shareTo: (network) => {
+      const url = new URL(postHref(post.slug), window.location.origin).toString();
+      window.open(shareIntentUrl(network, url, post.title), "_blank", "noopener,noreferrer");
+    },
   };
 
   // A visitor's view, once per post, once this browser's reactions are read. The maker's own isn't one.
@@ -145,7 +152,7 @@ function PostBody({
 
         <div className="flex items-center justify-between gap-6">
           <PostBreadcrumb trail={[{ label: post.title }]} />
-          <PostMenu post={post} owner={owner} copyLink={copyLink} />
+          <PostMenu post={post} owner={owner} />
         </div>
 
         <div className={POST_COLUMNS}>
@@ -227,18 +234,17 @@ function PostBody({
 
 // ─────────────────────────── the post's ⋯ ───────────────────────────
 
-function PostMenu({ post, owner, copyLink }: { post: InnovationPost; owner: boolean; copyLink: () => void }) {
+/** Report post, a visitor's only. Copy link lives in Share (one home); the maker has no ⋯. */
+function PostMenu({ post, owner }: { post: InnovationPost; owner: boolean }) {
   const toast = usePostToast();
   const { reported, markReported } = useReportedPost(post.id);
   const [reporting, setReporting] = React.useState(false);
-  const items: MenuItem[] = [{ id: "copy", label: "Copy link", icon: <Icon icon={Link01Icon} size={20} />, onSelect: copyLink }];
-  if (!owner) {
-    items.push(
-      reported
-        ? { id: "report", label: "Reported", icon: <Icon icon={Flag01Icon} size={20} />, disabled: true, hint: "You reported this post.", onSelect: () => {} }
-        : { id: "report", label: "Report post", icon: <Icon icon={Flag01Icon} size={20} />, onSelect: () => setReporting(true) },
-    );
-  }
+  if (owner) return null;
+  const items: MenuItem[] = [
+    reported
+      ? { id: "report", label: "Reported", icon: <Icon icon={Flag01Icon} size={20} />, disabled: true, hint: "You reported this post.", onSelect: () => {} }
+      : { id: "report", label: "Report post", icon: <Icon icon={Flag01Icon} size={20} />, onSelect: () => setReporting(true) },
+  ];
   return (
     <>
       <Menu
@@ -343,7 +349,7 @@ function AboutProject({ text }: { text: string }) {
 }
 
 /** One row per product, each to its product view. */
-function WhatsInside({ post }: { post: InnovationPost }) {
+export function WhatsInside({ post }: { post: InnovationPost }) {
   const id = React.useId();
   return (
     <section aria-labelledby={id} className="flex flex-col gap-6">

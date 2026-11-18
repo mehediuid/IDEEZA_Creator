@@ -14,6 +14,7 @@ import { demoAddress, demoHex } from "./demo-wallet";
 import { IDZ_USD_PRICE } from "./idz-price";
 import { addAmounts, compareAmounts, formatAmount, toMicros } from "./money";
 import { purchaseStatusOf, purchasesOf } from "./presale-records";
+import { stakedIdzOf } from "./staking";
 import type { Amount, DemoWallet, IdentityId, RequestPurpose, WalletActivity } from "./types";
 
 export { IDZ_USD_PRICE };
@@ -48,8 +49,8 @@ export function idzCompactOf(amount: Amount): string {
 
 // ── the ledger ──────────────────────────────────────────────────────────
 
-/** D11. Stake and Withdraw join when Stake is built. */
-export type TransferType = "reward" | "projectCreate" | "credits" | "buy" | "claim";
+/** D11, with Stake and Withdraw now that staking is built (Earn Coin › Stake). */
+export type TransferType = "reward" | "projectCreate" | "credits" | "buy" | "claim" | "stake" | "withdraw";
 
 export const TRANSFER_TYPES: readonly { value: TransferType; label: string }[] = [
   { value: "reward", label: "Reward" },
@@ -57,6 +58,8 @@ export const TRANSFER_TYPES: readonly { value: TransferType; label: string }[] =
   { value: "credits", label: "Credits" },
   { value: "buy", label: "Buy" },
   { value: "claim", label: "Claim" },
+  { value: "stake", label: "Stake" },
+  { value: "withdraw", label: "Withdraw" },
 ];
 
 export function transferTypeLabel(t: TransferType): string {
@@ -88,6 +91,7 @@ const PURPOSE_TYPE: Partial<Record<RequestPurpose, TransferType>> = {
   upgradeMint: "projectCreate",
   buyCredits: "credits",
   subscribe: "credits",
+  stakeIdz: "stake",
 };
 
 /** Only a mint and a credits or plan payment charge IDZ, so a record from
@@ -163,9 +167,11 @@ export function idzLedgerOf(w: DemoWallet | undefined, id: IdentityId): IdzRow[]
       if (a.projectId) row.projectId = a.projectId;
       rows.push(row);
     }
-    // A tutorial reward (`credit`): IDZ in, typed Reward, as `balancesOf` counts it.
+    // A tutorial, staking or referral reward (`credit`): IDZ in, typed Reward, as `balancesOf`
+    // counts it; a withdrawn stake's IDZ back is a Withdraw.
     const paidIn = idzIn(a);
-    if (paidIn) rows.push({ id: `${a.id}:in`, at: a.at, network: a.network, type: "reward", direction: "in", amount: paidIn, title: a.title, txHash: a.txHash ?? null, address });
+    const inType: TransferType = a.purpose === "unstakeIdz" ? "withdraw" : "reward";
+    if (paidIn) rows.push({ id: `${a.id}:in`, at: a.at, network: a.network, type: inType, direction: "in", amount: paidIn, title: a.title, txHash: a.txHash ?? null, address });
   }
   rows.sort((x, y) => (y.at ?? 0) - (x.at ?? 0));
   const seed = seedBalancesOf(id).idz;
@@ -183,8 +189,8 @@ export function filterIdzLedger(rows: readonly IdzRow[], f: IdzLedgerFilter): Id
 
 export type IdzHoldings = { available: Amount; staked: Amount; claimable: Amount; pending: Amount };
 
-/** N1: what is free to use, and what the presale holds — Pending while a purchase is locked,
- *  Ready to claim once it unlocks. Staked stays 0 until staking exists. */
+/** N1: what is free to use, what is staked, and what the presale holds — Pending while a
+ *  purchase is locked, Ready to claim once it unlocks. */
 export function idzHoldingsOf(w: DemoWallet | undefined, id: IdentityId, ctx: BalanceCtx): IdzHoldings {
   const claimable: Amount[] = [];
   const pending: Amount[] = [];
@@ -195,7 +201,7 @@ export function idzHoldingsOf(w: DemoWallet | undefined, id: IdentityId, ctx: Ba
   }
   return {
     available: balancesOf(id, { ...ctx, wallet: w }).idz,
-    staked: "0",
+    staked: stakedIdzOf(w, id),
     claimable: addAmounts(...claimable),
     pending: addAmounts(...pending),
   };

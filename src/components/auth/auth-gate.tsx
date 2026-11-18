@@ -8,7 +8,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { isOpenPath, signOut, signedOutPath, useAuth } from "@/lib/account/auth";
+import { isMobilePath, isOpenPath, signOut, signedOutPath, useAuth } from "@/lib/account/auth";
 
 // Set while Sign out takes you to Sign in itself, so the gate doesn't race it there.
 let signingOut = false;
@@ -19,7 +19,7 @@ export function AuthGate() {
   const { hydrated, accounts, signedIn } = useAuth();
 
   React.useEffect(() => {
-    if (isOpenPath(pathname)) {
+    if (isOpenPath(pathname) || isMobilePath(pathname)) {
       signingOut = false;
       return;
     }

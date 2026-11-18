@@ -6,6 +6,27 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-027](#cl-027-an-inspiration-image-with-the-idea-home-and-add-a-product) | An inspiration image with the idea (Home and Add a product) | 18 Nov 2026 | [PR-9658](https://ideeza.atlassian.net/browse/PR-9658) | Not started |
+| [CL-026](#cl-026-the-projects-earn-button-opens-earns-overview) | The project's Earn button opens Earn's Overview | 18 Nov 2026 | Not created yet | Not started |
+| [CL-025](#cl-025-one-product-one-video) | One product, one video | 18 Nov 2026 | Not created yet | Not started |
+| [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons) | Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
+| [CL-023](#cl-023-sample-listings-and-demo-projects-that-are-always-there) | Sample listings and demo projects that are always there | 17 Nov 2026 | None: prototype only | Nothing to build |
+| [CL-022](#cl-022-dropdown-menus-open-in-place) | Dropdown menus open in place | 17 Nov 2026 | Not created yet | Not started |
+| [CL-021](#cl-021-add-a-product--build-with-ai-uses-homes-ai-chat-box) | Add a product › Build with AI uses Home's AI chat box | 17 Nov 2026 | Not created yet | Not started |
+| [CL-020](#cl-020-my-projects-purchased) | My projects: Purchased | 17 Nov 2026 | Not created yet | Not started |
+| [CL-019](#cl-019-explore-marketplace-asset-card-grid) | Explore marketplace: Asset Card grid | 17 Nov 2026 | Not created yet | Not started |
+| [CL-018](#cl-018-marketplace-details-a-shop-page-with-one-buy-box) | Marketplace details: a shop page with one buy box | 17 Nov 2026 | Not created yet | Not started |
+| [CL-017](#cl-017-editors-no-fake-results-and-the-code-rail-by-keyboard) | Editors: no fake results, and the Code rail by keyboard | 17 Nov 2026 | Not created yet | Not started |
+| [CL-016](#cl-016-marketplace-safer-auctions-and-listings) | Marketplace: safer auctions and listings | 17 Nov 2026 | Not created yet | Not started |
+| [CL-015](#cl-015-product-and-project-pages-the-missing-controls) | Product and project pages: the missing controls | 17 Nov 2026 | Not created yet | Not started |
+| [CL-014](#cl-014-hackathons-a-list-and-a-page-for-each-hackathon) | Hackathons: a list, and a page for each hackathon | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
+| [CL-013](#cl-013-hackathon-page-the-hackathons-own-data-1-vs-1-matches-and-a-style-switch) | Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
+| [CL-012](#cl-012-hackathon-page-ideeza-vibe-inventing-online-hackathon) | Hackathon page: IDEEZA Vibe Inventing Online Hackathon | 16 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
+| [CL-011](#cl-011-redeem-a-code-for-ai-credits) | Redeem a code for AI credits | 16 Nov 2026 | [PR-9534](https://ideeza.atlassian.net/browse/PR-9534) | Ready for development |
+| [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere) | Mobile app: native mobile UX everywhere | 15 Nov 2026 | None (owner: no ticket) | Not started |
+| [CL-009](#cl-009-mobile-app-splash-onboarding-welcome-and-log-in) | Mobile app: splash, onboarding, Welcome and Log In | 9 Nov 2026 | Not created yet | Not started |
+| [CL-008](#cl-008-mobile-app-create-flow-the-image-first-the-3d-as-the-result) | Mobile app create flow: the image first, the 3D as the result | 9 Nov 2026 | Not created yet | Not started |
+| [CL-007](#cl-007-landing-page-events-section-moments-from-ideeza) | Landing page: Events section, Moments From IDEEZA | 8 Nov 2026 | [PR-9089](https://ideeza.atlassian.net/browse/PR-9089) | Ready for development |
 | [CL-006](#cl-006-coupon-codes-when-buying-a-plan) | Coupon codes when buying a plan | 5 Nov 2026 | [PR-9062](https://ideeza.atlassian.net/browse/PR-9062) | Ready for development |
 | [CL-005](#cl-005-each-account-has-its-own-work-a-new-account-starts-fresh) | Each account has its own work; a new account starts fresh | 4 Nov 2026 | None: prototype only | Nothing to build |
 | [CL-004](#cl-004-welcome-offer-50-off-the-first-payment-for-12-hours) | Welcome offer: 50% off the first payment, for 12 hours | 4 Nov 2026 | [PR-9013](https://ideeza.atlassian.net/browse/PR-9013) | Ready for development |
@@ -34,6 +55,1197 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-027 An inspiration image with the idea (Home and Add a product)
+
+**In the prototype:** 18 November 2026 · **Jira:** [PR-9658](https://ideeza.atlassian.net/browse/PR-9658) · **Production:** Not started
+
+**Screen:** the AI box: Home (`/`) **Generate with AI**, and a project page's **Add a product › Build with AI** (`/projects/<id>`, the same box); the concept chat it opens (`/chat/<id>`), its build log and its first concept.
+
+### What to build
+
+- [ ] An image button beside the mic in the AI box. Home's **Generate with AI** and a project's **Add a product › Build with AI** are one box: everything below works the same in both. Its tooltip and label: *Add an inspiration image*; once a picture is there, *Change the inspiration image*.
+- [ ] It opens the file picker for **JPG, PNG or WebP**. A picture can also be **pasted** into the box or **dropped** on the box; while a file is dragged over it, the box's border turns dashed brand.
+- [ ] One picture per idea: picking, pasting or dropping another replaces it.
+- [ ] The picture is cropped to the concept's 4:3 frame (centred) and made small (512 × 384) in the browser before it is sent, so a phone photo uploads fast. A phone photo's rotation is respected.
+- [ ] Above the text the picture shows as a small chip: a 32 × 24 thumbnail, the file's own name (cut short with … when long; *Pasted image* when it has none) and ✕ to remove it. No title or explanation beside it.
+- [ ] A file that can't be taken leaves the box as it is and shows the reason in red under it:
+  - not a JPG, PNG or WebP: *That file isn't a picture we can use — pick a JPG, PNG or WebP.*
+  - over 15 MB: *That picture is over 15 MB — pick a smaller one.*
+  - the browser can't open it: *We couldn't open that picture — try a JPG or PNG.*
+- [ ] **Generate** saves the picture first, then opens the chat with it. If it can't be saved, the chat does not open, the idea stays in the box and the reason shows under it: *We couldn't keep the picture — try again.* or, offline, *We couldn't send the picture — check your connection and try again.*
+- [ ] The server checks what it is given: only a JPG, PNG or WebP (by its real bytes, not its label), at most 1 MB after shrinking; it keeps the picture with the concept images and marks it as the maker's upload.
+- [ ] The chat keeps the picture with the idea: in the build log, under **You**, the first message shows the same chip (thumbnail and name, no ✕).
+- [ ] The main product's concept is **drawn from the picture**: its first drawing and every **Regenerate** start from it (image-to-image), keeping the picture's shape, angle and light while the prompt decides what the product is. Companion products and **Refine** do not use it. Only a picture the maker uploaded can be used this way, never a concept image or anything from another site.
+- [ ] The price does not change: a concept with a picture costs the same 1 credit.
+- [ ] **Add a product › Build with AI**: the chat it opens adds the new product to that project (already picked, as without a picture), and the new product's concept is drawn from the picture.
+- [ ] Phone width: the buttons wrap as before (mic, image, Quality; then Enhance and Generate) and the page never scrolls sideways.
+
+**In the prototype only (nothing to build):** the idea's summary and spec are written from the text alone; only the drawing uses the picture.
+
+### Design
+
+- The image button is the same toolbar icon button as the mic (40 × 40, `ImageAdd01Icon` from the DS icon set). The chip: radius `lg`, 1 px `border` border, the thumbnail radius `sm`, the name `text-sm` in `text-secondary`, ✕ `Cancel01Icon` 14 px in `text-tertiary` (44 px touch target on a phone). Drag-over: dashed `border-brand`. Errors use the voice error's line: `text-sm` `text-error`.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the Generate with AI box had no way to add a picture](docs/changelog/2026-11-18-inspiration-image-before.png) | ![After: an image button beside the mic and the picture as a chip above the idea](docs/changelog/2026-11-18-inspiration-image-after.png) |
+| | ![After: the first concept is drawn from the picture](docs/changelog/2026-11-18-inspiration-image-concept-after.png) |
+| ![Before: Add a product › Build with AI had no way to add a picture](docs/changelog/2026-11-18-inspiration-image-add-product-before.png) | ![After: Add a product › Build with AI takes a picture the same way](docs/changelog/2026-11-18-inspiration-image-add-product-after.png) |
+
+---
+
+## CL-026 The project's Earn button opens Earn's Overview
+
+**In the prototype:** 18 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the project page's header, the **Earn** button (web), and the project page's bottom bar, **Earn** (mobile app).
+
+### What to build
+
+- [ ] Earn on the project page opens Earn on its **Overview** tab (`/projects/<id>/earn`), with Overview selected in the tabs (Overview · Sell · Business plan · Money). It used to open on Sell.
+- [ ] Sell, Business plan and Money stay one tap away in the same tabs.
+- [ ] Every state of the button opens Overview: not ready yet ("n of m ready to sell"), ready, listed, listing paused, part sold, sold in full, given.
+- [ ] Mobile app: Earn in the project's bottom bar opens the Earn hub (its overview), not the Sell screen.
+- [ ] Links that name a part of Earn on purpose keep their place (for example a fix that opens Sell, or Splits from Team).
+
+### Design
+
+- No visual change: the same button and the same Earn tabs. Only where it lands changes.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: Earn opened on the Sell tab](docs/changelog/2026-11-18-earn-button-before.png) | ![After: Earn opens on the Overview tab](docs/changelog/2026-11-18-earn-button-after.png) |
+
+---
+
+## CL-025 One product, one video
+
+**In the prototype:** 18 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the project page's Media tab; the Videos part of Review and sign (mint, sell, give); the Videos dialog (Make videos); Share to Innovations, Add to marketplace, Relist and selling the whole project's copies; the Innovations post; the mint's success screen; the mobile app's project page, Media, Feed clip and marketplace screen.
+
+### What to build
+
+- [ ] A project with **one** current product has **one** video: that product's video is also the project's video. No project video is made for it and none is asked for.
+- [ ] Media tab with one product: only **Product videos** (the product's video, its takes and Review as today). No **Project video** section, no Make project video.
+- [ ] Review and sign with one product: **Videos · 1 of 1 ready**, only the product's row, no Project video group. With the product's video in use the line reads *Every video is ready.* and the commit (Sign and list, Sign and give…) is not held by videos. Without it: *1 product still needs an AI video.* (never "The project video comes next").
+- [ ] Share to Innovations, Add to marketplace, Give, Relist and selling copies of the whole project: with one product, only that product's video is needed. The sell check reads *Each product has its AI video* (no project video row); the relist checklist has no "The project video" row; the share note never asks for a project video.
+- [ ] Where the whole project shows one video, one product's video is it: the Innovations post opens on it, the mint's success screen shows its poster (no second "project" poster), the marketplace and the mobile Feed play it, the mobile project page plays it on top.
+- [ ] Mobile app Media line with one product: *Video · Take n · 480p · 10 s*; before a video is in use, the product's own state (*No video yet*, *Ready to review*, …).
+- [ ] No corner toast "All n product videos are ready · Make project video" for a one-product project.
+- [ ] Opening the Project video dialog (or the mobile Project video screen) on a one-product project shows only: *This project has one product, so its video is the project video too. Add another product and a project video is made from both.* and Close.
+- [ ] A product added later (two or more current products): the project video is asked again exactly as before (the Project video section and group return, *Opens when every product has a video · 1 of 2 ready*, then Make project video). A dropped product does not count: a project back to one current product goes back to one video, and a project video left over from before is not used.
+
+### Design
+
+- No new components. The Project video section and group are simply not shown with one product; the dialog's note is the DS Banner (info) with the dialog's one Close button.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: a one-product project's Media asked for a project video](docs/changelog/2026-11-18-one-video-media-before.png) | ![After: one product, one video, no Project video section](docs/changelog/2026-11-18-one-video-media-after.png) |
+
+---
+
+## CL-024 Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons
+
+**In the prototype:** 17 November 2026 · **Jira:** [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the whole Hackathon page) · **Production:** Not started
+
+**Screen:** the site menu's **Hackathons** (`/hackathons`) now opens the main hackathon's page itself. Each hackathon keeps its own page, `/hackathons/<hackathon>`, and the list of CL-014 moves to `/hackathons/all`, behind **More hackathons**. The page's words, blocks and order are now the "IDEEZA Hackathons" prototype's landing page as a visitor sees it (owner: that page's content is final), in our design. Where this entry and CL-012, CL-013 or CL-014 differ, this entry wins.
+
+### What to build
+
+**Where things are**
+- [ ] The menu's **Hackathons** opens the main hackathon (the organizer's main event) at `/hackathons`. No list comes first.
+- [ ] Every hackathon is listed at `/hackathons/all` (the list of CL-014). In it, the main hackathon's card opens `/hackathons`.
+- [ ] The page's section bar has **More hackathons** with a green "{n} live" count: the other hackathons that are open, running or being judged. With none of those, it reads **All hackathons** with no count. Below 1024 px it is the last item of the section menu; from 1024 px it is a button beside **Join the hackathon**.
+- [ ] One bar at a time (hackathon pages only): once the section bar has reached the top and the page scrolls on down, the site's top bar slides up out of view and the section bar takes the very top; the moment the page scrolls back up, the site's bar slides back and the section bar sits under it again. Above the point where the section bar sticks, the site's bar always shows. Other pages keep their fixed top bar.
+
+**Hero**
+- [ ] Status pill: "Live now · Build & vote" while it runs (green dot); otherwise "Registration", "Judging" or "Results".
+- [ ] Title: the hackathon's name over two lines, the first line in the violet gradient (half the words, rounded up, on the first line; "1 vs 1" never breaks).
+- [ ] Lead: the hackathon's description, e.g. "A 160-hour online hackathon. Build products with IDEEZA AI, publish them to Give to Community, collect votes and climb the leaderboard."
+- [ ] **Prize and countdown**, right above the buttons, in one panel:
+  - left: "PRIZE POOL", the total (e.g. **160,000** birr) and under it "1st 100,000 · 2nd 40,000 · 3rd 20,000". When the page opens the total counts up from 0; a slow light crosses it every few seconds;
+  - right: the clock's label for the phase — "Registration closes in", "The hackathon ends in", "The leaderboard is frozen. Judging is in progress" or "This hackathon has ended" — and, while there is something to count, days : hours : minutes : seconds with DAYS / HOURS / MINUTES / SECONDS under them. Each digit that changes drops into place;
+  - while it runs, a line of light along the panel's bottom edge shows how much of the hackathon has passed;
+  - phones: the prize above, the clock below;
+  - reduced motion: no count-up, no dropping digits, no light.
+- [ ] Buttons: **Join the hackathon** while joining is open ("Register your team" for teams), and **Vote for projects** while it runs, **See the projects** before or after, **See the winners** once the results are out. When joining has closed, Join is not shown and the other button is the primary one.
+- [ ] Under the buttons: "18+ · Ethiopia", the format ("Individuals", "Teams" or "1 vs 1 (head-to-head)") and the groups ("University vs university", "Country vs country" or "Custom groups"); then "{category} · {languages}", e.g. "Hardware · English, Amharic".
+- [ ] Join the hackathon is in the first screen: on a 1280 × 760 window, a 1000 × 706 window and a 375 × 812 phone.
+- [ ] The hero's visual: four steps, **Concept → PCB → Code → 3D**, the current one lit, each with its caption: "Describe your idea in plain language. IDEEZA AI turns it into a product concept." · "The electronics are designed for you. Schematic and PCB, generated by AI." · "The firmware is written for you. Code that runs on your board." · "Your product takes shape in 3D. Ready to share, and ready for votes." In the corner: "Most voted · {product} · {n} votes" ("Built with IDEEZA AI" before there is one).
+
+**The order of the sections**
+- [ ] While it runs: Prizes, Leaderboard, How it works, Who can participate + How the winner is decided, Timeline, then Questions and answers and the closing.
+- [ ] Before building starts: Prizes, How it works, Who can participate + How the winner is decided, Timeline, Leaderboard.
+- [ ] Once building has ended: Leaderboard, Prizes, Who can participate + How the winner is decided, Timeline (no How it works).
+- [ ] The section menu follows the same order: Prizes · Leaderboard · How it works · Dates · FAQ. The board's item reads **Winners** once the results are out, and **Projects** in 1 vs 1 or before anyone has built.
+
+**Prizes**
+- [ ] Title "{prize pool} in prizes", e.g. "160,000 birr in prizes". No lead.
+- [ ] The podium shows each place and its prize only (no person): a cup over 1st, a medal over 2nd and 3rd, "1st place" and "100,000 birr".
+- [ ] Under it: places after the 3rd ("4th place", amount) and **Extra rewards** with the organizer's text, e.g. "Bonus AI credits and merch giveaways every 2 days."
+
+**Leaderboard**
+- [ ] Over the title: "Live standings" (green dot) while it runs, "Standings are frozen" while judging, "Final results" after.
+- [ ] Title: "Leaderboard", "The winners" once the results are out, "Head-to-head matches" in 1 vs 1. Beside it four figures: participants (teams), projects, votes, prizes.
+- [ ] Before anyone has built: "0 projects in the competition" and one card, "No projects yet. Be the first to add one." with Join.
+- [ ] Tabs: **Top participants** ("Top teams"), **Universities** ("Countries", "Groups") and **Open category** (only with groups and an open category).
+- [ ] Top participants:
+  - the top three as cards: the product's picture, "1st place · 100,000 birr", the name, the AI mode when it is better than everyone's ("Medium Mode"), "{university} · ✓ Qualified", points / products / votes, **View {product}** and **Vote**;
+  - then a list: "{n} participants", "Ranked by points. Updated every hour.", "{n} of 10 votes left" over ten pips (while voting is open), a search "Find your name or university", and rows 4 to 10: rank, initials, name, movement (▲2 / ▼3), the AI mode, "{university} · {n} products · ✓ Qualified · View project", points;
+  - **Show the top {n}** opens up to 100 rows; **Show fewer** closes them.
+- [ ] Universities: "University league", "Ranked by the total points of each university's participants.", each with its points, a bar against the leader and "{n} participants · {n} builders".
+- [ ] Open category: "Open category", "Participants who are not in a university, ranked by points. Updated every hour.", the same rows counted from 1.
+- [ ] Votes are cast here (in the matches in 1 vs 1). The separate Vote section and the points table are gone.
+
+**How it works**
+- [ ] Title "From idea to the competition in 7 steps", lead "No engineering background needed. Describe your idea in plain language and IDEEZA AI generates the full hardware design.", Join and Vote; the title stays in view beside the steps on wide screens.
+- [ ] The steps:
+  1. **Sign up or log in** — "Create your IDEEZA account and verify your email."
+  2. **Join the hackathon** — "Join from this page and pick your university. You get a personal referral link." (teams: "…, then invite your teammates.")
+  3. **Build** — "Build 3 or more products with IDEEZA AI in Low Mode. A product counts when all design stages are done."
+  4. **Publish** — "Publish each product to the NFT marketplace under Give to Community and to the social feed. No wallet or KYC is needed."
+  5. **Share and collect votes** — "Share your personal link on any platform. Votes on the IDEEZA social feed count."
+  6. **Earn points** — "Builds, posts and votes, referrals and streaks all add to one score on the leaderboard."
+  7. **Climb and win** — "When the hackathon ends the leaderboard freezes. The top 10 are shortlisted and the judges pick the winners." (judges + votes: "Judges' scores count for {x}% and audience votes for {y}%."; points only: "… The participants with the most points win.")
+
+**Who can participate · How the winner is decided**
+- [ ] Who can participate: "University students, makers, engineers and anyone with a product idea" · "Open to participants in Ethiopia" · "You must be 18 or older" · "You compete as an individual" (or as a team of {min} to {max} people, or head-to-head) · "You pick your university when you join. Not part of one? Join the open category" · "You need an IDEEZA account with a verified email" · "Judges cannot take part or vote" (not when points alone decide).
+- [ ] How the winner is decided: "When the hackathon ends the standings freeze and the top 10 are shortlisted. The judges score them and confirm the winners." (judges + votes: "Judges' scores and audience votes are combined into one final score." with a **Final score** bar; points only: "The standings freeze when the hackathon ends. The participants with the most points win."). Then "The judges score each project on" with the criteria bar, and "The judges".
+
+**Timeline**
+- [ ] Title "Timeline", lead "All times in East Africa Time (EAT)."
+- [ ] Three dates on one track: **Registration opens**, **Hackathon starts**, **Hackathon ends**, each "Done", "Next" or "Upcoming" with its date and time. The track fills up to now.
+- [ ] Under it the phases as pills, the current one lit: Registration · Build & vote · Judging · Results.
+
+**Questions and answers**
+- [ ] Title "Questions and answers":
+  - "Is it free to take part?" — "Yes. Joining is free, and every participant builds in Low Mode."
+  - "Do I need a crypto wallet or KYC?" — "No. You can build, publish and vote without a wallet and without KYC."
+  - "How do votes count?" — "Each person has 10 votes. Only logged-in users with a verified account can vote. A vote from the IDEEZA mobile app counts as 2 points. A vote on the web counts as 1 point."
+  - "Who owns my design?" — "You do. Participants keep full ownership of their designs and intellectual property."
+  - "When are the winners announced?" — "The hackathon ends on {date, time} ({time zone}). The winners are published on this page after judging."
+- [ ] Beside them, **Terms of participation** with the rules and the chips "10 votes per person" and "Voters verify with Email" ("Teams of {min} to {max}" first for teams).
+
+**Closing**
+- [ ] Top left "Build hardware at the speed of software. One prompt gives you a 3D prototype, a PCB and the code that runs it."; top right "**160,000 birr** in prizes".
+- [ ] "THE CREATOR ECONOMY MEETS HARDWARE", then "The next hardware product **could be yours.**" (the second line shining), with Join and Vote (See the projects / See the winners once joining has closed).
+
+**The hackathon's setup** gains: its category ("Hardware"), its languages ("English, Amharic"), the extra rewards text, how many points an app vote counts, and how voters verify ("Email").
+
+Prototype only (nothing to build): the standings, products and the two sample hackathons are sample data, as in CL-014.
+
+### Design
+
+- Same DS and page frame as CL-012. The prize and countdown panel is in the hero's own language: a hairline frame lit violet along its top edge (as the visual's panel below), a soft violet bloom behind it, no boxes inside, a fine divider with a glowing node. Numerals: Display, tabular figures, the total 60 px on wide screens; captions and units 14 px caps; the places 16–18 px.
+- Leaderboard cards: the page's card surface, radius 24, the picture 4:3, the place tag a dark glass pill. Tabs: the DS segmented pill. Text sizes follow the website scale (body 16–18, meta ≥14).
+
+### Before → After
+
+| Before | After: the hero | After: the leaderboard | After: how it works |
+| --- | --- | --- | --- |
+| ![Before: the hero with a slogan headline and the clock in the facts line](docs/changelog/2026-11-16-hackathons-hero.png) | ![The hero: Live now · Build & vote, IDEEZA Vibe Inventing Online Hackathon, the lead, the prize pool 160,000 birr with 1st 100,000 · 2nd 40,000 · 3rd 20,000 beside the countdown 05 : 05 : 15 : 20, then Join the hackathon and Vote for projects](docs/changelog/2026-11-17-hackathons-hero-after.png) | ![Live standings, Leaderboard with 64 participants, 141 projects, 3,830 votes, 3 prizes; tabs Top participants, Universities, Open category; the top three cards with 1st place · 100,000 birr, 2nd place · 40,000 birr, 3rd place · 20,000 birr](docs/changelog/2026-11-17-hackathons-leaderboard-after.png) | ![From idea to the competition in 7 steps, with Join and Vote, beside the steps Sign up or log in, Join the hackathon, Build, Publish, Share and collect votes](docs/changelog/2026-11-17-hackathons-how-after.png) |
+
+---
+
+## CL-023 Sample listings and demo projects that are always there
+
+**In the prototype:** 17 November 2026 · **Jira:** none: prototype only · **Production:** Nothing to build
+
+**Prototype only.** The prototype keeps everything in the browser, so a new account used to see an empty marketplace and empty My projects. These samples are there so every screen has something to show. Nothing here is built in production.
+
+- Explore marketplace always lists the 9 sample projects from the Innovations feed that are for sale, as other creators' listings ("By {creator}"). Each opens a shop page at `/marketplace/p<n>` with the same Marketplace box ([CL-018](#cl-018-marketplace-details-a-shop-page-with-one-buy-box)), the Creator block, About, What's inside and On Innovations. Buying one uses a demo wallet. A sample post's **View on Marketplace** opens that page.
+- Every account gets 4 demo projects in My projects, once: **Smart Plant Pot** (Listed, shared on Innovations, Main NFT on Buy now plus Physical and Virtual copies for both uses), **Gesture LED Lamp** (Sold, bought by Leo), **Heart Rate Band** (Minted) and **BLE Data Logger** (Draft).
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| — | ![After: My projects with the four demo projects](docs/changelog/2026-11-17-demo-projects-after.png) |
+
+---
+
+## CL-022 Dropdown menus open in place
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** every dropdown menu in the web app (for example Quality on Home and in Add a product, the project's and the product's ⋯ menus, sort menus) and the blog list's filter popovers.
+
+### What to build
+
+- [ ] A menu opens right under its button (or above it when there is more room there), already in its place. Only a short fade and a slight zoom (95 % → 100 %) animate.
+- [ ] It never slides in from a corner of the screen while it moves to its button.
+- [ ] With reduced motion, nothing animates.
+
+### Design
+
+- DS Menu panel, unchanged. Motion: duration fast, fade and zoom only; the panel's position is never animated.
+
+### Before → After
+
+No screenshot: the change is motion only. At rest the menu looks the same as before.
+
+---
+
+## CL-021 Add a product › Build with AI uses Home's AI chat box
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** a project's page › Products › **Add a product** › **Build with AI** (owner, 2026-11-16: "why isn't our regular AI chat box there?"). Before, this step had a bare text box with its own **Start**.
+
+### What to build
+
+- [ ] The step holds the same AI chat box as Home: the text box, **voice input** (mic), **Quality** (Low / Medium / High, each with its build price), **Enhance** and **Generate**.
+- [ ] The text box's placeholder: "e.g. A solar battery pack that charges this desk charger at night". Enter sends; Shift+Enter starts a new line.
+- [ ] Quality starts at the level picked last, on Home or here, and a pick here is remembered for Home too.
+- [ ] **Generate** opens the chat for the new product, on this project (it never asks which project) and at the picked Quality. The chat is listed in History like any other.
+- [ ] While the box is empty, Generate is the small disabled square; its label and tooltip say "Generate a product for {project} — describe the product first". Without enough credits it is disabled too.
+- [ ] Under the box: "1 concept [1 credit] · you have {n}". Without enough credits: "You need 1 credit to start. You have {n}." and the link **Top up credits**.
+- [ ] Voice input: while listening, the listening view takes the box's place, as on Home; what was said is added to what was typed.
+- [ ] The dialog's footer keeps **Back** only (Generate is the step's one primary).
+- [ ] The dialog is wider on this step so the box's toolbar stays on one row. At phone width the dialog is a bottom sheet and the toolbar wraps: Enhance and Generate go to a second line, on the right.
+
+### Design
+
+- The dialog: ModalFrame, md on this step (sm on the choice step), a bottom sheet below md.
+- The box is Home's composer: radius 2xl, 1 px border, brand border on focus; toolbar buttons 40 px; the Quality menu (DS Menu, single choice); Generate is the primary button; the cost uses the credit badge.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: Build with AI with a bare text box, Enhance and Start](docs/changelog/2026-11-17-build-with-ai-before.png) | ![After: Build with AI with Home's chat box: voice, Quality, Enhance, Generate](docs/changelog/2026-11-17-build-with-ai-after.png) |
+
+---
+
+## CL-020 My projects: Purchased
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** My projects › **Purchased** (`/projects?tab=purchased`) and a page for each project bought from (`/projects/purchased/<project>`). Web app only.
+
+### What to build
+
+**The Purchased tab**
+- [ ] A **Purchased** tab at the end of My projects' tabs (All, Draft, Minted, Listed, Sold, Purchased), with the number of projects bought from. Opening it puts `?tab=purchased` in the address.
+- [ ] Above the cards: "{n} projects bought from" ("1 project bought from").
+- [ ] One card per project, newest purchase first, in the marketplace's Asset Card frame ([CL-019](#cl-019-explore-marketplace-asset-card-grid)): the cover (no cover: a chip icon; a cover that doesn't load: an image icon), the badge **Purchased** on the picture, the name (the card's link), "By {creator}".
+- [ ] Chips for what is held: "Whole project · {n}%", "Physical NFT ×{n}", "Virtual NFT ×{n}". Under them the uses held: "Personal use", "Business use" or "Personal use · Business use".
+- [ ] A hairline, then "You own" with "{n} NFTs" ("1 NFT"): each copy counts one, the Main NFT counts once. On the right "Last bought" with its date.
+- [ ] Nothing bought: a state card "Nothing bought yet" with "What {name} buys on Explore marketplace shows here: the whole project or its copies, how many, and what each use allows." and the button **Explore marketplace**.
+- [ ] When nothing at all is bought and no project exists, My projects' first-time empty state shows as before.
+
+**The purchased page**
+- [ ] Breadcrumb: My projects › Purchased › {project}.
+- [ ] Header: the cover, the name, "By {creator}", and **View on marketplace** (to its marketplace page).
+- [ ] **What you own**: one row per kind and use, and per product for a product's own copies. Title: "Physical NFT · Business use", "Virtual NFT · Personal use · {product}" or "Whole project · {n}%". Under it: "{n} copies · #7, #8 of 50" ("1 copy · #3"); for the Main NFT "The whole project, in one token" or "A share of the project". On the right: what was paid ("0.08 ETH") and "Last bought {date}".
+- [ ] **What you can do**: one line per kind and use held.
+  - Physical NFT · Personal use: "Build it for yourself from its fabrication files. Not for sale."
+  - Physical NFT · Business use: "Build it and sell what you build, as many as your copies allow."
+  - Virtual NFT · Personal use: "Use its 3D model and preview in your own, non-commercial work."
+  - Virtual NFT · Business use: "Use its 3D model and preview in commercial work: ads, games, product pages."
+  - Whole project: "The whole project is yours: every file, the right to list it and its royalties." A share: "You own {n}% of the project: that share of its sales and royalties."
+- [ ] **Files**: what comes with each kind held. Whole project: "Every file of the project: PCB, code, 3D, wiring and parts". Physical NFT: "PCB fabrication files (Gerber)", "Enclosure (STEP and STL)", "Bill of materials (CSV)", "Assembly guide (PDF)". Virtual NFT: "3D model (GLB)", "Preview renders (PNG)".
+- [ ] **Receipts**: a table of every purchase, newest first: Date, Item, Copy ("#7 of 50", or "—" for the Main NFT), Price, Transaction (shortened, the full one on hover).
+- [ ] The creator, at the foot: for a project the creator listed, **The creator** with "Questions about what you bought go to {creator}." and **Get creator support** (to the conversation in Messages); for another creator's project, the creator's card.
+- [ ] A project the buyer hasn't bought from: a state card "{name} hasn't bought anything of this project" with **Back to Purchased**.
+- [ ] Phone width: one card per row; the receipts table scrolls sideways inside its card.
+
+Demo stand-ins (prototype only): purchases are those of the demo creator picked in "Shopping as" (Mira, Leo, Sam), and the slim Testnet demo strip above the cards switches them; "· as {name} (demo creator)" after the count and "bought as {name} (demo creator)" in the page header; the **Testnet demo** badge; test tokens; the line under Files "On the real marketplace these come with the NFT. This testnet demo has no files to download."
+
+### Design
+
+- Cards: the DS M25 Asset Card frame (radius 2xl, 12 px padding, the dark-glass badge, H4 title), A18 Tag md for the chips, the hairline at 40 %.
+- Empty: the DS State card. Page sections: the page's cards, section titles 20 bold; **View on marketplace** and **Get creator support**: A01 Button Secondary lg at 44 px.
+- Receipts: a plain table, Body 14, tabular figures, the transaction in Code.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: My projects with no Purchased tab](docs/changelog/2026-11-17-my-projects-before.png) | ![After: the Purchased tab with a bought project's card](docs/changelog/2026-11-17-purchased-after.png) |
+
+---
+
+## CL-019 Explore marketplace: Asset Card grid
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Explore marketplace, `/marketplace`: the card grid on the **For sale**, **Sold** and **Purchased** tabs. Each card is now the design system's Asset Card (M25), with its hover, and its NFT tags can be clicked.
+
+### What to build
+
+**The card, top to bottom**
+- [ ] The picture: the project's cover in a rounded frame, 372 × 233 in proportion. No cover: a chip icon. A cover that doesn't load: an icon and "Image didn't load".
+- [ ] A status badge on the picture, top right: white words on dark glass, in light and dark. **Buy now**, **Auction · {time left}** (e.g. "Auction · 2h 15m left", "Auction · Under a minute left"), **Auction ended**, **Copies**, **Sold** or **Purchased**.
+- [ ] The title on one line (cut with "…", the full name on hover). The title is the card's link and its only Tab stop; the whole card can be clicked.
+- [ ] The creator's name. Beside it, views and appreciations, only when they are real: a project shared on Innovations shows its post's counts. Otherwise no numbers. No plays count.
+- [ ] Tags **Main NFT**, **Physical NFT**, **Virtual NFT**: only what is on sale. The tag the price is for is lit (Selected).
+- [ ] A hairline, then the price block, always at the card's foot so the prices in a row line up: the label, the amount, and the token apart (e.g. "Current price" · "0.2" · "ETH"). On the right, a side fact when there is one.
+- [ ] What each card shows:
+  - Main NFT on Buy now: badge **Buy now**; tags Main NFT plus the copy kinds on sale, Main NFT lit; "Current price". Side: "Share {n}%" when less than the whole project is sold; else "You own {n}%" when the buyer already holds a share; else nothing.
+  - Main NFT on auction: badge **Auction · {time left}** or **Auction ended**; Main NFT lit; "Current bid", "Starting bid" (no bids yet) or "Winning bid" (ended with bids). Side "Ends {date, time}" or "Ended {date, time}".
+  - Copies only (no Main NFT listed): badge **Copies**; the copy kinds on sale, the kind of the lowest price lit; "From" when there is more than one offer, "Current price" when there is one. No side fact.
+  - Sold: badge **Sold**; tag Main NFT; "Sold for" (the whole project) or "Sold for {n}%". Side "Bought by {buyer}".
+  - Purchased tab: badge **Purchased**; tag Main NFT; "You own" with "{n}%" (no token). Side "Bought {date}".
+
+**Clickable tags**
+- [ ] On the For sale tab, on a card with more than one tag, each tag is a button. A click lights that tag and the price follows it. **Main NFT**: the card's Main NFT price, as above. **Physical NFT** or **Virtual NFT**: that kind's lowest price, labelled "From" when there is more than one offer of that kind, else "Current price"; the side fact goes.
+- [ ] A kind's price is what the details page sells under that tab: the whole project's copies of that kind. When the project has none, its products' copies of that kind.
+- [ ] Once a tag is clicked, the card opens the details page on that tab (`/marketplace/<project>?nft=main`, `?nft=physical`, `?nft=virtual`). Clicking a tag never opens the page.
+- [ ] On Sold and Purchased, and on a card with one tag, the tags are plain words.
+
+**Hover (the owner's design)**
+- [ ] With a pointer, on hover: the picture gets 60 px shorter from the bottom (its corners stay round and the picture moves up 30 px so it stays centred), the words slide up 60 px, and a button rises from below the card's edge to the card's foot, under the price. The button reads **View details**, or **View auction** on an auction. All of it moves together, smoothly.
+- [ ] The card's box never changes size: the card, its row and its neighbours never move. The border turns lilac.
+- [ ] The button is a real button with the primary button's hover, pressed and pointer. It goes where the card goes (with the clicked tag's tab). It is out of the Tab order and hidden from screen readers (the title link is the card's one stop).
+- [ ] No hover on touch: a tap opens the details page and nothing stays half open. With reduced motion nothing animates.
+
+**Grid**
+- [ ] As many columns as fit, none narrower than 280 px. At phone width, one column. Every width shows the same Asset Card (the old row layout below 560 px is gone).
+- [ ] While loading: skeleton cards in the Asset Card's shape. They don't pulse with reduced motion.
+
+Demo stand-ins (prototype only): the Testnet demo strip above the grid and on every marketplace page, now one slim line (about 50 px, was about 160 px): the **Testnet demo** badge, "Shopping as" with the switch ("Mira · demo creator", "Leo · demo creator", "Sam · demo creator"), and, on your own listing's details page, **Your project page** at the end (the longer explanation is read to screen readers only); the 9 sample listings from Innovations posts, each with its creator's name; the demo buyer names after "Bought by"; test tokens.
+
+### Design
+
+- DS M25 Asset Card (Figma V3uizmZLHo5Xhy65Dp3F0O node 1548:2110), with its Hover state.
+- Card: surface fill, radius 2xl (16 px), 12 px padding (20 px at the foot), 20 px between picture and words. Border: the card-glow colour (violet-200 at 20 %); on hover violet-300.
+- Picture frame: radius 2xl; surface-raised fill when there is no picture.
+- Status badge: 30 px tall, radius 2xl, 12 px in from the top and right; the overlay colour at 32 % with a 40 px background blur; Body 14 medium in white.
+- Title Heading/H4 (20 semibold). Creator Body/MD, secondary. Views and appreciations Code/MD with 16 px eye and heart icons.
+- Tags: A18 Tag md (Caption/MD), 8 px apart; the lit one is the Selected state.
+- Hairline: the border colour at 40 %. Price label Body/MD, tertiary; amount Heading/H4; token Code/MD, secondary. Side fact: label Body/MD tertiary, value Code/MD primary.
+- Hover button: A01 Button Primary lg at 44 px, 20 px in from the sides and the bottom.
+- Motion: duration normal (200 ms), ease-out, one clock for the picture, the words and the button; none with reduced motion.
+- Grid: the page grid, card minimum 280 px, the layout gutter.
+- Testnet demo strip (prototype only): one line, radius lg, 1 px border, subtle fill.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the old cards under the tall Testnet demo banner](docs/changelog/2026-11-17-market-grid-before.png) | ![After: the Asset Card grid under the slim demo strip](docs/changelog/2026-11-17-market-grid-after.png) |
+
+---
+
+## CL-018 Marketplace details: a shop page with one buy box
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Explore marketplace › a listed project, `/marketplace/<project>` (a card's tag can open a tab: `?nft=main`, `?nft=physical`, `?nft=virtual`), and a product's marketplace page, `/marketplace/<project>/products/<product>`. The page is now a shop page that answers a buyer's questions in order; the project's story stays on its Innovations post. The creator's Preview as buyer (`/projects/<project>?view=buyer`) shows the same box.
+
+### What to build
+
+**The page (a project)**
+- [ ] Order: media, header, then the Marketplace box with the Creator block, then the tabs. From 1024 px wide the box and the Creator block sit in the rail beside the header. Below 1024 px they stand under the header, above the tabs, open.
+- [ ] Media first: the same media stage as the project's Innovations post. The project video in use, then each product's video, then the pictures, with their thumbnails.
+- [ ] Header: the name (no edit pencil), the status chip (e.g. **Listed**), then "Created by {creator} · Listed {date}". The creator's name links to their profile. The page never says "you" for the creator. No Saved date and no Shared chip (the On Innovations block says it).
+- [ ] The notes under a video speak to the viewer: no "your prompt", no "your product videos".
+- [ ] The rail after the box: **Creator**, **On Innovations** (only while the project is shared there), **About**, **Legal information** (only when filled), **Recent**.
+- [ ] Tabs: **Products**, **Media**, **Network** (when there is one), **Team** (when there are contributors).
+- [ ] Each product card in Products links to that product's marketplace page and says what of its own is on sale, at its lowest price: "Physical NFT on sale · from 0.008 ETH", "Virtual NFT on sale · from {price}" or "Physical and Virtual NFTs on sale · from {price}". No line when the product sells nothing of its own.
+
+**The Marketplace box**
+- [ ] One box titled **Marketplace**, always open. Tabs **Main NFT**, **Physical NFT**, **Virtual NFT**: only the ones on sale, in that order. With only one, there are no tabs: a chip names it (e.g. **Main NFT**). The arrow keys move between tabs.
+- [ ] One tab shows at a time. Every tab is the same buy box: what is sold (a small overline), the price large, one **Buy now**, the wallet line, then **NFT details** folded.
+- [ ] The tab it opens on: the one the link asks for (`?nft=`), when that is on sale; else the Main NFT, if the buyer holds a share of it; else the copy kind the buyer holds; else the Main NFT while it can be bought; else the first copy tab.
+- [ ] The project page sells the Main NFT and the whole project's copies only. A product's copies are sold on that product's page only.
+- [ ] Nothing on sale: no box.
+
+**Main NFT tab, fixed price**
+- [ ] Overline "The whole project" or "{n}% of the project". The price large (e.g. "0.2 ETH").
+- [ ] **Buy now** (full width) opens the wallet's **Confirm purchase**. While another checkout holds the listing, Buy now is greyed and the line under it says "Someone is buying this now. Try again in a few minutes."
+- [ ] The wallet line under the button. Then the one legal line, always shown (the prototype's: "Demo on a testnet. Selling a share of a project can be regulated as an investment where you live; this is not available for real money.").
+- [ ] **NFT details**, folded: Listing (Buy now or Auction), Share, Royalties, Minting (Lazy or Minted), Chain, Collection ("—" when none). Under them: "Royalties are a share of resales, if marketplaces honour them." and, when lazy, "Lazy: the token is minted when you buy." Then the Main NFT's activity line, or "No activity yet · listed {date}" when there is none.
+- [ ] A buyer who already holds a share sees **Purchased Summary** first, then a hairline, the heading **Buy another share** and the buy box.
+
+**Main NFT tab, auction**
+- [ ] Overline "{The whole project | n% of the project} · Auction". Over the price: "Current bid", or "Starting bid" while there are no bids; once ended, "Winning bid" or "No bids". Under the price: "Ends {date, time}" with a time-left badge ("2h 15m left", "45m left", "Under a minute left"; warning colour in the last hour); "Ended {date, time}" once it is over.
+- [ ] Then: **Bid history (n)**; "You're the highest bidder." while the buyer leads; when outbid, the notice "You were outbid. {name} bid {price}." with "Your {amount} is back in your demo wallet."; **Your bid** with **Place bid**; **Buy now with {price}** when the auction has a buy-now price; the wallet line.
+- [ ] Once ended: one sentence and no field or button. "You won at {price} — the sale completes when the creator closes the auction.", or "Auction ended {date, time}. Highest bid {price} by {name} — the sale completes when the creator closes the auction.", or "Ended with no bids."
+- [ ] The legal line and **NFT details** at the foot, as for a fixed price.
+
+**Main NFT tab, when it can't be bought** (no button; NFT details stay)
+- [ ] Paused: "Paused by the creator — it can't be bought right now."
+- [ ] Removed: "The creator took this listing off the marketplace."
+- [ ] Ended: "Ended with no bids." or "Ended without a sale: no bid could be paid."
+- [ ] Sold: "Sold on {date}." and "Sold for {price} · the whole project" (or "· {n}% of the project"). The buyer who bought it sees their Purchased Summary instead.
+- [ ] Once the project is sold in full, its Physical NFT and Virtual NFT tabs leave the box.
+
+**Physical NFT and Virtual NFT tabs**
+- [ ] One line on what this kind gets you. Physical: "A licence to build {name} — whoever buys one gets its fabrication files." Virtual: "A licence to {name}'s digital twin — whoever buys one gets the 3D model and preview." {name} is the project's on the project page, the product's on a product page.
+- [ ] **Use**: always two rows, **Personal use** then **Business use**, each with its own price. A use the creator didn't list reads "Not on sale". A sold-out use reads "Sold out". Both stay in the list, greyed, and can't be picked. The first use that can be bought is picked.
+- [ ] No Version choice: "This version / With future updates" is gone. One price per use: the listing's Price. When the creator gave no separate "Price with future updates", future updates come with the copy.
+- [ ] Overline "{Physical NFT | Virtual NFT} · {Personal use | Business use}", the price large, and under it "{sold} of {total} sold" (or "All {total} sold"), plus " · you own {n}" for a buyer who has some.
+- [ ] **Buy now** buys the picked use at its price and goes straight to the wallet's **Confirm purchase**: no popup in between. There is no Buy now when that use is sold out. When every copy left is in another checkout, Buy now is greyed with "Someone is buying this now. Try again in a few minutes."
+- [ ] The wallet's Confirm purchase and the success line name the copy, its use and its number ("#{n} of {total}"). They name no version: no Tier line.
+- [ ] **NFT details**, folded: Copies, Royalties, Minting (Lazy), Chain, Collection; the royalties note; the activity line: "Bought by {buyer} · {price} · {date}", else its newest entry, else "No activity yet · listed {date}".
+
+**A product's marketplace page**
+- [ ] The header line under the name: "Part of {project} · Created by {creator}". The project's name links to the project's marketplace page; the creator's name links to their profile. How the product was built is not shown to a buyer.
+- [ ] Its Marketplace box (meta "{n} on sale") has only **Physical NFT** and **Virtual NFT**, with this product's own copies, in the same panels as above. It never shows the project's Main NFT or the project's copies.
+- [ ] A product with no copies of its own has no box. "Part of {project}" leads to the project's offers.
+
+**Creator and On Innovations**
+- [ ] **Creator** block: the creator's avatar and name (a link to their profile), "Made {project}", and one button. **Ask the creator**, or **Get creator support** for someone who bought anything of this project (the Main NFT or a copy). It opens the buyer's conversation with the creator in Messages, about the listing or about their newest purchase.
+- [ ] **On Innovations** block, only while the project is shared there: "{n} appreciations · {n} comments", then "The creator's story and the conversation about {project} are on its Innovations post.", then **Read the story** (to the post). The story and the comments are not copied here.
+- [ ] Receipts name the seller: Purchased Summary's "Purchased from" shows the creator's name (it said "You (the creator)"). The same on the phone's receipt card.
+
+**Preview as buyer**
+- [ ] The creator's Preview as buyer shows the same box, tabs, Use rows and prices, with no **Buy now** and no wallet line, and the link **Open in Explore marketplace**. A product's preview has **View on Explore marketplace**.
+
+**Phone width**
+- [ ] The box and the Creator block come right under the header, before the tabs. The tabs share the width. Tabs, Use rows and buttons are at least 44 px tall. Facts stay three to a row.
+
+Demo stand-ins (prototype only): the Testnet demo strip at the top of the page, with "Shopping as" (Mira, Leo, Sam) and, on your own listing, **Your project page** (a demo creator buys your own listings); the **Testnet demo** badge in the box and beside the wallet line; the wallet line's words ("Paying from {name}'s demo wallet · {address} · {balance}", **Manage demo wallets**); "demo wallet" in the outbid notice; "Demo on a testnet" in the legal line; test tokens; the 9 sample listings from Innovations posts (`/marketplace/p<n>`, another creator's projects, with the same box; their Business use costs twice their Personal use); the demo project Smart Plant Pot, which lists both uses.
+
+### Design
+
+- The box is the rail block **Marketplace** (not collapsible), on the rail's bordered surface from 1024 px.
+- Tabs: Body 14 semibold, at least 40 px tall (44 px at phone width and on touch), top corners radius lg. The open tab: primary ink, a 2 px primary-ink bottom border, subtle fill. The others: secondary ink, subtle fill on hover. A 1 px border under the strip. A lone kind is the A17 Badge, neutral.
+- Buy box: overline Caption 12 medium, secondary; price H4 20 semibold, tabular figures; the line under it Caption 12, secondary; spacing 6 (12 px) between the parts.
+- **Buy now**: A01 Button Primary lg at 44 px, full width, the box's only violet. **Ask the creator** and **Read the story**: A01 Button Secondary lg at 44 px.
+- Use rows: A08 Radio sm in a 44 px row, radius lg, 1 px border; the label Body 14 semibold, the price on the right Body 14 secondary. Picked: brand border on the brand-subtle fill. Can't be picked: 60 % opacity.
+- NFT details: a hairline above; the toggle Body 14 semibold with a chevron that turns; facts in three columns (label Caption 12 tertiary, value Body 14 primary).
+- Auction: A17 Badge warning for the last hour, neutral before; the outbid notice is the M01 Alert (attention).
+- Creator: A16b Avatar Label Group md.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the listing page with the Main NFT facts and the copies stacked under it](docs/changelog/2026-11-17-market-details-before.png) | ![After: media first, Created by, and one Marketplace box in the rail](docs/changelog/2026-11-17-market-details-after.png) |
+| ![Before: Physical NFT copies as cards with This version / With future updates](docs/changelog/2026-11-17-market-physical-before.png) | ![After: the Physical NFT tab with the Use rows and one price](docs/changelog/2026-11-17-market-physical-after.png) |
+
+---
+
+## CL-017 Editors: no fake results, and the Code rail by keyboard
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the product's editors: PCB (`/project/<slug>/products/<productId>/pcb`, in schematic, board and 3D view), Code (`…/code`, Code Development and Blockly Development), 3D Module (`…/3d`). The step rail also on Assembly (`…/assembly`) and Product Preview (`…/preview`).
+
+### What to build
+
+**Every editor**
+- [ ] The step rail on the left (PCB Design · Code · 3D Module · Assembly · Product Preview) is reachable with Tab in every editor, the Code step included. Enter on an item opens that step for the same product, as a click does. Screen readers hear each item as a link, and the open step as the current step; Enter on it does nothing. The rail looks the same.
+- [ ] No control shows a result that did not happen. A control with nothing behind it is greyed, does nothing when pressed, and shows its reason as the tooltip on hover (screen readers hear the reason too). Each reason is listed below.
+
+**PCB editor**
+- [ ] Help menu, in all three modes: **Community** greyed, "Community forum isn't built yet."; **Online chat** (**Online Chat** in the 3D view) greyed, "Online chat isn't built yet."; **About** greyed, "About page isn't built yet." Tutorials, Tour of this editor, Tour Guide… and Report a problem… work as before.
+- [ ] The floating support chat in the 3D view is gone.
+- [ ] Board, View ▸ Grid Type: **Grid dot**, **Grid** and **None** set the canvas grid (the same setting as the toolbar's grid picker), and the tick follows what is drawn. **Cartesian Coordinate System** stays ticked. **Polar Coordinate System** greyed, "Polar coordinates aren't built yet."
+- [ ] Top bar: the sidebar button greyed, "Sidebar toggle isn't built yet."
+- [ ] Properties panel: **Jump to net** (beside the Net of a track, via or pad) highlights that net on the canvas, as the Nets tab does. With no net it is greyed, "This object has no net yet." The gear beside a dropdown field is greyed, "{field} settings aren't built yet."
+- [ ] Bottom panel › Logs: **Export** downloads `log.txt` with the rows the severity filters show, one per line: "{time} [{severity}] {message}". A notice says "Exported {n} log entries" ("Exported 1 log entry"). With no rows shown the notice says "No log entries to export" and nothing downloads.
+- [ ] Logs: a designator link in a row (such as U3) selects every object with that designator, opens its sheet in the schematic, and zooms to it. Not found: "{designator} isn't in this design". The links are reachable with Tab and open with Enter or Space.
+- [ ] Bottom panel › Parts Audit: **Refresh List** greyed, "Refreshing the parts audit isn't built yet."; **Set to Check** and **Not Check** greyed, "Marking rows to check isn't built yet."; each row's **Assign LCSC Part** greyed, "Assigning an LCSC part isn't built yet."
+- [ ] Array dialog: **Adjust Array Spacing By Cursor** greyed, "Adjusting the spacing by cursor isn't built yet."; **Preview** greyed, "Array preview isn't built yet." **Confirm** works as before.
+- [ ] Export 3D File dialog, Include in Export: **PCB Board** and **Component Models** toggle and change the file. **Silkscreen** ("Silkscreen in the 3D export isn't built yet."), **Signal Layer Circuits** ("Signal layers in the 3D export aren't built yet.") and **Vias** ("Vias in the 3D export aren't built yet.") are greyed and off.
+- [ ] Export 3D File: **Auto-generate missing 3D models** is locked on and greyed, "Exporting bound 3D models isn't built yet, so every part is built from its footprint height."
+- [ ] Export 3D File: "Estimated file size: {size}" is the real size of the file Export would write now, in KB under 1 MB (at least 1 KB), else in MB with one decimal. It follows the format and the pills. The old "~4.2 MB · Last exported 3 days ago" is gone.
+- [ ] Export 3D File and Export 3D Shell File: **Order 3D Shell** greyed, "Ordering a 3D shell isn't built yet." (it showed "Order placed — 3D shell"). **Export** writes the STL / OBJ file as before.
+
+**Code step: Code Development**
+- [ ] Edit ▸ **Undo**, **Redo**, **Cut**, **Copy**, **Paste** and **Select All** (also Selection ▸ Select All) act on the open file. They did nothing before.
+- [ ] File ▸ **Open…** picks a text file from the computer, adds it as a new file and opens it. A file with the same name already in the product is not added; the terminal says "{name} is already a file in this product."
+- [ ] File ▸ **Export…** downloads the open file under its own name.
+- [ ] File ▸ **Save All** saves now, like Save, and the terminal says "Saved {n} files."
+- [ ] Go ▸ **Go to Symbol** opens the editor's list of symbols in the file.
+- [ ] Greyed: Go ▸ **Go to File…** ("Go to File isn't built yet."); Run ▸ **Run File**, **Run Selection**, **Stop** ("Running code isn't built yet."); Run ▸ **Debug** ("Debugging isn't built yet."); Help ▸ **Welcome** ("Welcome page isn't built yet."), **Documentation** ("Documentation isn't built yet."), **Keyboard Shortcuts** ("Keyboard shortcuts list isn't built yet."), **About IDEEZA Code** ("About page isn't built yet.").
+- [ ] The activity bar's Run button is greyed, "Running code isn't built yet." It no longer prints "executing… Done." in the terminal.
+- [ ] The terminal's **Output** tab is greyed, "Output panel isn't built yet." Typing `run` in the terminal answers "Running code isn't built yet." `help` lists "Built-ins: ls, dir, cat <file>, clear, help".
+
+**Code step: Blockly Development**
+- [ ] Settings ▸ **Toggle Grid** hides or shows the workspace grid, and turns snapping off or on with it.
+- [ ] Greyed: Edit ▸ **Find** ("Find isn't built yet."); Settings ▸ **Toggle Trashcan** ("Trashcan isn't built yet."); Help ▸ **Documentation** ("Documentation isn't built yet."), **Keyboard Shortcuts** ("Keyboard shortcuts list isn't built yet."), **About IDEEZA Code** ("About page isn't built yet.").
+
+**3D Module**
+- [ ] Greyed in the menu, and in the toolbar where they have a button: Shape Creation ▸ **Import 3D File…** ("3D file import isn't built yet."); Modeling Operation ▸ **Extrude** ("Extrude isn't built yet."), **Revolve** ("Revolve isn't built yet."), **Sweep** ("Sweep isn't built yet."), **Loft** ("Loft isn't built yet."), **Fillet** ("Fillet isn't built yet."), **Chamfer** ("Chamfer isn't built yet."), **Boolean Union** ("Boolean union isn't built yet."), **Boolean Subtract** ("Boolean subtract isn't built yet."), **Boolean Intersect** ("Boolean intersect isn't built yet."); Transformation & Utilities ▸ **Group** ("Grouping isn't built yet."), **Measure** ("Measure tool isn't built yet."), **Section View** ("Section view isn't built yet."). None of them changes, swaps or deletes a shape any more.
+- [ ] The part's right-click menu in the left panel: **Group** greyed, "Grouping isn't built yet."
+- [ ] Toolbar: **Pointer / select** puts away the move, rotate and scale handles; a click picks a shape. **Pan (hand)** greyed, "Pan tool isn't built yet." (it opened the move handles).
+- [ ] View controls: **Zoom in** and **Zoom out** move the camera 1.25× closer to or farther from the point it orbits, per press, within the usual zoom limits. They showed "Wheel-zoom in the viewport" before.
+- [ ] Shell, Mirror, Pattern… and the other working items are unchanged.
+
+Demo stand-ins (prototype only): the sample rows in Logs and Parts Audit; "Couldn't save {n} files: this browser's storage is full or blocked."
+
+### Design
+
+- Greyed rows and buttons use each editor's existing disabled look: 45 % opacity, tertiary text, the default or not-allowed cursor, the reason as the tooltip. Dialog buttons are DS Button Secondary MD, disabled.
+- The step rail looks the same; only keyboard focus and Enter are added.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+No screenshot: the change lives in dialogs and disabled rows; What to build lists every state.
+
+---
+
+## CL-016 Marketplace: safer auctions and listings
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** web app. The phone app (`/m`) is not part of this entry.
+- Explore marketplace, a project's page (`/marketplace/<id>`): the Main NFT's **Buy now**, the auction card, the copy offers.
+- Explore marketplace, a product's page (`/marketplace/<id>/products/<productId>`): the copy offers.
+- Earn › Sell (`/projects/<id>/earn/sell`): the Main NFT row and the card its **Manage** opens.
+- The Main NFT's **Add to marketplace** and **Edit listing** dialogs.
+
+### What to build
+
+**In checkout: one buyer at a time**
+- [ ] While a buyer's purchase stands in the wallet's confirm, the item is held for that checkout. An item is a Main NFT listing or one Physical / Virtual copy listing.
+- [ ] Every other buyer's view of a held Main NFT greys **Buy now** (and the auction's **Buy now with {price}**) and shows under it: "Someone is buying this now. Try again in a few minutes." The button stays focusable and does nothing when pressed. **Place bid** is not affected.
+- [ ] A copy offer's **Buy now · {price}** is greyed with the same line only when every unit still for sale is held by other checkouts.
+- [ ] The owner sees "In checkout · a buyer is paying now" as the Main NFT row's state in Earn › Sell, and as the state line of the card **Manage** opens.
+- [ ] The hold ends when the purchase succeeds, is rejected, is closed or fails, or when the buyer leaves the page. If none of these happens it lapses after 10 minutes.
+- [ ] Every view updates live, with no reload, when a hold starts, ends or lapses.
+- [ ] The hold is a courtesy, not the sale's lock: the existing check at payment still decides who gets the item ("This listing was just sold.").
+
+**Outbid notice**
+- [ ] On the auction card, when a later, higher bid passes the buyer's leading bid, a notice sits above the bid form: title "You were outbid. {name} bid {amount}." and under it "Your {amount} is back in your demo wallet."
+- [ ] The bid form stays under it, so the buyer can bid again.
+- [ ] Screen readers hear both lines once, when it happens while the card is open.
+- [ ] No notice while the buyer leads ("You're the highest bidder." as before), when they never bid, when their best bid never led, or after the auction ended.
+
+**Cancel an auction with no bids**
+- [ ] In the card that the Main NFT row's **Manage** opens, a live auction that nobody has bid on and that hasn't ended shows a quiet **Cancel auction** button under its facts. The owner's only.
+- [ ] The old line "An auction can't be changed once it starts." is gone. Once someone bids, the button goes and the card reads "An auction can't be cancelled once someone bids."
+- [ ] **Cancel auction** opens a dialog titled "Cancel the auction?" with "Nobody has bid yet. The listing comes down and you can list it again." An on-chain listing adds "Removing an on-chain listing costs a network fee (test tokens — no real cost)."
+- [ ] Buttons: **Keep it** (focused) and **Cancel auction** (red, with a spinner while it works). ✕ and Escape close it except while it works.
+- [ ] An on-chain listing asks the wallet for the network fee, the same request as Remove. Rejecting it in the wallet changes nothing.
+- [ ] At the press everything is checked again. If it changed, nothing is written and a red banner in the dialog says why: "It has just sold, so it can't be cancelled.", "An auction can't be cancelled once someone bids.", "The auction has ended. Close it instead." or "This listing no longer exists."
+- [ ] On success the listing comes down, the Main NFT stays minted, and its terms are kept for the next listing. Screen readers hear "Auction cancelled · off the marketplace". Focus moves to the button that starts a new listing, as after Remove.
+
+**Discard prompt on the listing dialog**
+- [ ] In **Add to marketplace** and **Edit listing** (Main NFT), closing with any field changed from how the dialog opened (Cancel, ✕, Escape or a click outside) first asks: title "Discard this listing?", text "Nothing entered here is saved yet. Closing now throws it away.", buttons **Cancel** (focused, back to the form) and **Discard** (closes the listing dialog).
+- [ ] With nothing changed it closes at once.
+
+Demo stand-ins (prototype only): demo buyers (Mira, Leo, Sam) and the demo wallet that holds and returns bids (the word "demo" in "Your {amount} is back in your demo wallet."); testnet tokens and "(test tokens — no real cost)"; the checkout hold is shared between browser tabs (open the same item in two tabs to see it).
+
+### Design
+
+- Held Buy now: the same button at 60 % opacity with a not-allowed cursor; the reason under it in 14 px secondary text.
+- In checkout: the owner's row and card use the live state's existing colour; no new chip.
+- Outbid notice: M01 Banner, attention tone, with the title and its line.
+- **Cancel auction** on the card: the card's quiet button (1 px border, surface fill, surface-raised on hover), left-aligned, 40 px beside the page and 44 px when stacked or on a touch screen.
+- Cancel dialog: ModalFrame dialog, size sm; Button Secondary 40 **Keep it**, Button Danger 40 **Cancel auction** with a 16 px Spinner; M01 Banner in error tone for a failure.
+- Discard prompt: ConfirmDialog (M11, danger) over the listing dialog; Button Secondary MD **Cancel**, Button Danger MD **Discard**.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+No screenshot: the change lives in dialogs and disabled rows; What to build lists every state.
+
+---
+
+## CL-015 Product and project pages: the missing controls
+
+**In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** web app. The phone app (`/m`) is not part of this entry.
+- Product page, owner's view (`/projects/<id>/products/<productId>`): the ⋯ menu beside **Open in editor**, the description under the title, the new **Sales** tab (`?tab=customers`), the Specs block in the right rail, and the 3D Module tab (`?tab=3d`).
+- My projects (`/projects`): the hint line at the foot of each card.
+- The **Videos** dialog and every dialog that lists the products' videos before a step (Share to Innovations, Add to marketplace, Give to community, Relist on the marketplace, Add {product} NFTs to the marketplace), and the **Generate video** dialog it opens.
+- Innovations post (`/innovations/<slug>`): the actions card in the rail and the action bar at the bottom on a phone.
+
+### What to build
+
+**Product ⋯ menu**
+- [ ] The owner's ⋯ menu holds, in this order: **Edit name and description**, **Open chat “{chat title}”** (unchanged, with "Where it was built — change it there" under it), then a divider and **Delete product…** in its own group at the end. **Rename product** is gone; Edit name and description replaces it.
+- [ ] The menu is the owner's only. It is not shown in a preview or on Explore marketplace. **Edit name and description** is not shown on a locked project (sold in full).
+- [ ] **Delete product…** is red (icon and label). While a rule blocks it, it stays in the menu, greyed, does nothing when pressed, and shows the reason under its label. The first rule that matches wins:
+  1. The project has one product: "A project needs at least one product. Delete the project instead."
+  2. Copies of this product sold: "Copies of this product have sold, so it can't be deleted."
+  3. Copies of the whole project sold: "Copies of the whole project have sold, so its products can't be deleted."
+  4. This product's copies are listed: "Its copies are on the marketplace. Remove the listing in Earn › Sell first."
+  5. Whole-project copies are listed: "Copies of the whole project are on the marketplace. Remove the listing in Earn › Sell first."
+  6. The Main NFT sold: "The project's Main NFT has sold, so its products can't be deleted."
+  7. The Main NFT is in an auction: "The project's Main NFT is in an auction. Close it in Earn › Sell first."
+  8. The Main NFT is listed: "The project's Main NFT is listed. Remove the listing in Earn › Sell first."
+
+**Edit name and description**
+- [ ] Opens from the ⋯ menu, and from **Add a description** (a quiet text button with a + icon) that shows under the title when the product has no description. Both are the owner's only.
+- [ ] Dialog title **Edit name and description**, line under it: "They show on its page and on its card in the project."
+- [ ] **Name**: required, trimmed, up to 80 characters. A count "{n}/80" sits right of the label and turns red past 80. Errors under the field: empty after pressing Save, "Give the product a name."; over 80, at once, "Keep it to 80 characters."
+- [ ] **Description**: optional, trimmed, up to 1,000 characters, 6 rows, placeholder "What it does, and who it is for." A count "{n} / 1,000" appears from 800 characters. Over 1,000: "Keep it under 1,000 characters (now {n})." in red. ⌘/Ctrl + Enter in the description saves.
+- [ ] Footer: **Cancel** and **Save** (reads **Saving…** while it saves). Save with nothing changed just closes.
+- [ ] Save follows the same rules as the project's own name and description: a live Buy now listing first asks to pause it (the existing pause confirm opens over this dialog); during an auction or on a locked project Save is unavailable and the reason shows under the fields ("An auction is running — you can change the project after it closes." / "Close the auction first, then change the project.").
+- [ ] Closing with changes (Cancel, ✕, Escape) does not close at once. The footer becomes **Discard changes?** with **Keep editing** (focused) and **Discard** (red). With no changes it closes at once.
+- [ ] After saving, screen readers hear "Name and description saved", or "Renamed to “{name}”", or "Description saved", by what changed. The page and the product's card in the project show the new words.
+- [ ] The product page shows the saved description on the product's current version. An older version (`?v=n`) still shows the description its build had.
+
+**Delete product**
+- [ ] Confirm dialog titled `Delete "{product name}"?` with two bullet lists.
+- [ ] **What goes**, one line each, only the lines that apply:
+  - "The product — its name and description"
+  - One line per editor with work in it, with what it holds, as Delete project lists them: "The PCB board — …", "The old 2D wiring — …", "The assembly — …", "Code — …", "The 3D model — …". A board with only the sample circuit: "The PCB board — the sample circuit only".
+  - "Its NFT copies, never listed — Physical (private use), Virtual (commercial use)" (the copies it has)
+  - "Its shipping plan for physical copies"
+  - "Its activity history — {n} entries and {m} activity files"
+  - "Its video — {n} takes"
+  - "Its snapshots on the Media tab — {n} pictures"
+  - "Its image as the project cover — the project goes back to its default cover"
+- [ ] **What stays**: "The project and its other product" (or "… its other {n} products"), and for a built product "The build it came from stays in History and in the project's versions."
+- [ ] When editor work or NFT copies would be lost, a field asks "Type the product name to confirm". **Delete product** stays unavailable until the typed name matches exactly. Pressing it with a wrong name shows `That doesn't match "{name}".` Enter in the field confirms.
+- [ ] Buttons: **Cancel** (first, focused) and **Delete product** (reads **Deleting…** while it works).
+- [ ] At confirm the rules are checked again. If a sale or listing arrived while the dialog was open, nothing is deleted and the reason shows in a banner at the top of the dialog.
+- [ ] Delete removes the product, its editor documents, its unlisted copies, shipping plan, activity entries and their files, video takes and snapshots. If its image was the project cover, the project goes back to its default cover.
+- [ ] The page then goes to the project page (`/projects/<id>`), which shows a green banner `Deleted "{name}"` at the top, once.
+
+**Sales tab on the product page**
+- [ ] The owner's product page has a **Sales** tab after Media (past the hairline divider). It is the owner's only.
+- [ ] It lists the sales of this product's Physical and Virtual copies only, newest first. Main NFT sales never show here. The rows, row details and actions are the same as Earn › Money › Sales for this product.
+- [ ] Heading **Sales**. With sales: "{n} sales to {m} people." ("1 sale to 1 person.") and the line "To tell everyone who bought at once, add to Activity." with its link.
+- [ ] Columns: **Bought by · Item · Price · Date · Benefits** (no Share column: a copy carries no share). 10 rows per page with pagination.
+- [ ] Empty state: title "No sales of this product yet", body "People who buy {product}'s physical or virtual NFTs show up here. Main NFT sales are in the project's Sales.", link **Project sales** to Earn › Money › Sales.
+- [ ] Below 640 px of panel width the table becomes a stacked list.
+
+**Network row**
+- [ ] When the project has a network, the product page's Specs block (right rail) gets a row **Network** with "{network name} · **View network**". The link opens the project page's Network tab (`/projects/<id>?tab=network`). A network with no name reads "Unnamed Network".
+- [ ] No network, no row. A product with no build but with a project network still shows the Specs block with this row.
+- [ ] The row only shows to a viewer whose project page has the Network tab. It is not shown on an Innovations post's product page. In a preview the link keeps the preview.
+
+**Download the 3D model**
+- [ ] On the 3D Module tab, under **Downloads**, a button **Download 3D model (.glb)** when the build made its own 3D model for this product (the build's main product).
+- [ ] The file is named "{product name}-3d-model.glb". The button shows a spinner while it downloads.
+- [ ] If the download fails: "The 3D model couldn't be downloaded. Try again." in red under the button.
+- [ ] Only viewers who may take the files see it (the owner, a contributor, a buyer who holds a share). Everyone else still reads "Firmware and downloads come with a purchase."
+
+**My projects card: video progress**
+- [ ] While a video renders for the project or any of its products, the card's hint reads "Video rendering · {p}%" (tabular figures). When every render is still queued it reads "Video waiting to render".
+- [ ] With several renders, the percent is the one furthest behind. It is the same percent as the render notice in the corner, and it moves live.
+- [ ] When every render has finished or failed, the normal hint comes back. The card gets no button.
+
+**Replace a ready video**
+- [ ] In the Videos dialog and every dialog that lists the products' videos, a product row that reads **Video ready** (in use, nothing rendering or waiting for review beside it) gets a quiet **Replace** button.
+- [ ] Replace opens the Generate video dialog on top, filled from the take in use (as Regenerate fills it), with "← Back to {dialog title}".
+- [ ] The take in use stays in use until the new take is chosen with **Use this video**.
+- [ ] Below 640 px Replace is full width.
+
+**Generate video: no Recommended on AR**
+- [ ] Under "How should it be made?", the **AR** card no longer carries the "Recommended" badge. **AI** stays the choice the form opens on.
+
+**Share menu on an Innovations post**
+- [ ] One **Share** menu ("Share this post") with: **Copy link**, **Share on Facebook**, **Share on LinkedIn**, **Share on X**, **Share on WhatsApp**.
+- [ ] Copy link copies the post's full address and shows "Link copied" (or "Couldn't copy the link. Copy it from the address bar.").
+- [ ] Each network opens its share page in a new tab with the post's address: `https://www.facebook.com/sharer/sharer.php?u={url}`, `https://www.linkedin.com/sharing/share-offsite/?url={url}`, `https://x.com/intent/tweet?url={url}&text={title}`, `https://wa.me/?text={title} {url}`. Nothing is posted for the user.
+- [ ] Visitor: the actions card shows Appreciate, Save and a Share icon button (it replaces the Copy link icon button).
+- [ ] Maker: the actions card shows a **Share** button (it replaces **Copy link**).
+- [ ] Phone width: the bottom action bar reads Appreciate · Save · Comments · Share (Share replaces Copy link) and opens the same menu.
+- [ ] The post's ⋯ menu no longer has Copy link. A visitor's ⋯ holds only **Report post** (or **Reported**, greyed, "You reported this post."). The maker has no ⋯.
+
+Demo stand-ins (prototype only): demo buyers in the Sales rows ("Mira (demo creator)"); the Testnet demo badge and the line "Demo purchases from Explore marketplace, made in this browser. Nothing is on a blockchain."; the browser-storage messages ("This browser's storage is full — the change wasn't saved.", "This browser's marketplace records couldn't be read, so we can't tell whether its copies sold.", and the Sales error card "Sales can't be shown" / "This browser's sales record couldn't be read. It's been left as it is."); the sample 3D model shown when a build has none of its own, which never offers the download; videos rendered in the browser.
+
+### Design
+
+- Product ⋯ menu: the project page's ⋯ menu panel and rows (radius xl, 1 px border, surface fill, shadow 3, rows at least 44 px, 18 px icons, width up to 300 px and never wider than the screen less 32 px). The delete group sits under a 1 px border divider. Delete: text-error label and icon, bg-error-subtle on hover. Blocked: text-disabled label and icon, the reason in 12 px secondary text under it.
+- Edit name and description: ModalFrame dialog, size sm (512 px). Labels 14 semibold. DS Text Input 40, DS Textarea. Button Ghost 40 **Cancel**, Button Primary 40 **Save**; the discard row Button Secondary 40 **Keep editing** and Button Ghost 40 **Discard** in text-error. 44 px tap height on a phone or touch screen.
+- **Add a description**: the project page's quiet text button with a 16 px + icon.
+- Delete product: ConfirmDialog (M11, danger: intent badge, Button Secondary MD **Cancel**, Button Danger MD **Delete product**), M01 Banner in attention tone for a late block, DS Text Input 44 for the typed name, the error line in text-error. The project page's confirmation is an M01 Banner in good tone.
+- Sales tab: the existing Sales panel (M48 Empty State, Testnet demo badge, table or stacked list, pagination).
+- Network row: a Specs rail fact; **View network** in the rail's link style.
+- 3D download: Button Secondary MD with its loading state; the error line text-md, text-error.
+- Card hint: the card's existing hint line, tabular figures while it shows a percent.
+- Replace: Button Ghost MD, 44 px tap height on a phone or touch screen.
+- Share: DS Menu (40 px rows, 20 px icons, aligned to the trigger's end). Maker's trigger Button Secondary 40 with a 16 px share icon; visitor's A02 Icon Button Secondary 40; on a phone the bar's 48 px square button.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the product's ⋯ menu with Rename product](docs/changelog/2026-11-17-product-menu-before.png) | ![After: the product's ⋯ menu with Edit name and description and Delete product…](docs/changelog/2026-11-17-product-menu-after.png) |
+
+---
+
+## CL-014 Hackathons: a list, and a page for each hackathon
+
+**In the prototype:** 17 November 2026 · **Jira:** [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the whole Hackathon page) · **Production:** Not started
+
+**Changed by [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons):** the menu's Hackathons now opens the main hackathon at `/hackathons`; this list moved to `/hackathons/all`, behind More hackathons, and the page's words follow CL-024.
+
+**Screen:** the site menu's **Hackathons** now opens a list of hackathons, `/hackathons`. Each hackathon has its own page and link, `/hackathons/<hackathon>`: the Hackathon page of CL-012 and CL-013, in the same layout, with that hackathon's own data. Several hackathons can run at once.
+
+### What to build
+
+**The list (`/hackathons`)**
+- [ ] Header as on the Events list: the eyebrow **Hackathons**, the title "Invent hardware with AI. Win prizes.", and the lead "Build products with IDEEZA AI, publish them and collect votes. Join a hackathon that is open, vote in one that is running, or see who won."
+- [ ] Order: running hackathons first, then the ones starting soon (soonest first), then the ones being judged, then the ended ones (latest first). The first hackathon is the wide card; the others are rows (the words on the left, the picture card on the right), as on the Events list.
+- [ ] Each hackathon shows:
+  - a status chip: **Live now** (green dot), **Starting soon**, **Judging** (violet dot) or **Ended** (grey dot);
+  - beside it, the date that matters now: "Registration opens {date}", "Registration open · building starts {date}", "Building ends {date}", "Winners on {date}" or "Winners announced {date}";
+  - its name;
+  - the wide card: "{where} · {format} · {building dates}" (e.g. "Ethiopia · Individuals · 16–22 Nov 2026") and, on the right, the prize pool (e.g. "160,000 birr") over "in prizes for the top three";
+  - a row: its lead, then four facts: **Prizes** ("8,000 USD for the top three"), **Building** ("1–6 Dec 2026"), **Format** ("Individuals", "Teams of 2–5" or "1 vs 1"), **Who can join** ("18+, living in East Africa").
+- [ ] The whole picture card is the link, with **View hackathon** and the site's glass arrow pill. An ended hackathon reads **See the winners**.
+- [ ] Each hackathon has its own card picture, set by the organizer.
+- [ ] Phones: one column; the wide card's lower part darkens so its words read over the picture.
+
+**Each hackathon's page (`/hackathons/<hackathon>`)**
+- [ ] Same layout for every hackathon; every setup word and number comes from that hackathon (CL-013).
+- [ ] Join and votes count per hackathon: joining one does not join the others, and each has its own 10 votes.
+- [ ] The personal link to share, and the way back after signing up or signing in, lead to that hackathon's page.
+- [ ] Before building starts nobody has built anything yet, so the standings section shows one card in place of the board: **No entries yet** — "The board fills once building starts on {date, time} ({time zone}). Join now and you build from the first hour." (1 vs 1: "The first matches appear once…") — with **Join the hackathon**. The Vote section and its link are not shown until there is a product, and the Prizes podium shows the places without names.
+- [ ] Once building has ended:
+  - the hero's facts drop "Free to join";
+  - the board's lead says "Final standings" instead of "Updated every hour";
+  - the podium's lead reads "Building has ended: these three finished on top. …";
+  - **Vote for projects** reads **See the projects**;
+  - the closing reads "This one has ended. **Join the next one.**" with **See all hackathons** (to the list) in place of Join;
+  - after the results are out, the hero reads "Winners announced {date}".
+
+Prototype only (nothing to build): two sample hackathons fill the list so it shows each status: **IDEEZA East Africa 1 vs 1 Cup** (starting soon) and **IDEEZA Smart Home Sprint** (ended). Both are marked "Prototype sample" on the list, and "Prototype · sample hackathon" in the page's prototype pill. They also use other setups (1 vs 1 with countries and judges + votes; individuals with no groups and points only), so the same layout can be seen with other data. The real hackathon is still the Ethiopia one, now at `/hackathons/vibe-inventing-ethiopia`.
+
+### Design
+
+- The list reuses the Events list's frame: the 20-radius card with the lilac ring, the picture at radius 14 faded into the page, the glass arrow pill, and the same header sizes. The status chip is the hackathon page's hero pill. Text: titles Display, facts 16, labels 14.
+- The **No entries yet** card is the page's own card surface with one primary button.
+
+### Before → After
+
+| Before | After: the list | After: starting soon and ended | After: before building starts |
+| --- | --- | --- | --- |
+| ![Before: the menu's Hackathons opened the one hackathon page](docs/changelog/2026-11-16-hackathons-hero.png) | ![The list: the running hackathon as the wide card — Live now, Building ends 22 Nov, Ethiopia · Individuals · 16–22 Nov 2026, 160,000 birr, View hackathon](docs/changelog/2026-11-17-hackathons-list-after.png) | ![A row: Starting soon, Registration open · building starts 1 Dec, Prototype sample, name, lead, Prizes, Building, Format, Who can join, and the picture card](docs/changelog/2026-11-17-hackathons-list-rows-after.png) | ![A hackathon that has not started: Head-to-head matches with the No entries yet card and Join the hackathon](docs/changelog/2026-11-17-hackathons-no-entries-after.png) |
+
+---
+
+## CL-013 Hackathon page: the hackathon's own data, 1 vs 1 matches and a style switch
+
+**In the prototype:** 17 November 2026 · **Jira:** [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the whole Hackathon page) · **Production:** Not started
+
+**Screen:** the Hackathon page, `/hackathons` (CL-012). The client's ask: the page is a campaign page. The organizer designs the hackathon in the *IDEEZA Hackathons* prototype's setup, and the page keeps one layout and one look while everything inside it comes from that hackathon.
+
+### What to build
+
+**One layout, the hackathon's data**
+- [ ] Every word and number that depends on the hackathon's setup comes from that hackathon: name, prizes and currency, dates and time zone, how long building runs, products needed to qualify, votes per account, rules text, judges, criteria, the AI quality and its unlock for the top, giveaways. A giveaway or AI-unlock card shows only when the hackathon has one.
+- [ ] Sections, order and look stay the same for every hackathon.
+
+**Who competes (setup: Individuals / Teams / 1 vs 1)**
+- [ ] The hero's facts line says "Individuals", "Teams of 2–5" (the setup's sizes) or "1 vs 1".
+- [ ] Who can join says "You compete as an individual" / "You compete as a team of 2 to 5 people" / "You compete head-to-head: one opponent per round, and the winner advances".
+- [ ] Teams: Join reads **Register your team**, How to win step 1 adds "Then invite your teammates.", the terms show a "Teams of 2 to 5" chip, and the board counts teams ("Top teams").
+- [ ] **1 vs 1:** the standings become **Head-to-head matches**, lead "Two products a match, decided by votes. The winner goes to the next round." The section bar link reads **Matches**.
+  - Votes are cast only in the matches: there is no separate Vote section in 1 vs 1, and the section bar has no Vote link. **Vote for projects** (hero, closing) and the way back after signing in go to the matches. The voter's count ("10 votes per account" / "n of 10 votes left" over ten pips) sits beside the matches' heading.
+  - Products are paired by votes: 1st against 2nd, 3rd against 4th, and so on; an odd one out waits.
+  - Each match is a card: "Match 1 · the winner goes to the next round", then the two products side by side with "vs" between them. Each side: the product picture (opens the product), its name, maker · university, votes, **Leads** on the one ahead, and **Vote**. Under them, one bar split by each side's share of the votes (violet · blue).
+  - Two cards a row on wide screens, one on phones. With fewer than two products: "Not enough entries for a match yet."
+
+**Group ranking (setup: university / country / custom groups / none)**
+- [ ] With groups, the words follow the group: "{University / Country / Group} league", "Which {university / country / group} builds best?", Join's picker ("Choose your university"), the search ("Find your name or university"), and the closing "Put your {university / country / group} on the board."
+- [ ] The open category (Everyone / Open category filter, "Not at a university — open category" in Join, "Not at a university? Join the open category." in How to win) shows only when the setup has one.
+- [ ] No groups: no league (the builders' list takes the full width), no filter, no group in the rows, no picker in Join. The section is titled "Leaderboard" with "Builders ranked by points. Updated every hour…"; the closing says "Put your name on the board." ("your team" for teams).
+- [ ] Who can join gives the group its own line: "You compete for your university, or in the open category."
+
+**How the winner is decided (setup: the board's top to the judges / judges + audience / points only)**
+- [ ] The board's top to the judges: as in CL-012.
+- [ ] Judges + audience: "The judges' scores and the audience's votes are combined into one final score." One bar shows **Judges 70% · Audience 30%** (the setup's split), then "The judges score each product on:" with the criteria bar and the judges. The Prizes lead and How to win's last step ("The judges and the votes decide") give the same split.
+- [ ] Points only: "When building ends the board freezes. The participants with the most points win." No criteria, no judges, and no "Judges cannot take part or vote". Prizes lead: "The most points win."
+
+Prototype only (nothing to build): a small **Prototype** pill floats at the bottom-left corner with **Individuals | 1 vs 1**. It flips the page between the two styles so the page can be reviewed both ways. In production the style comes from the hackathon's setup, and there is no switch. The running hackathon is still the Ethiopia one (Individuals, university vs university, the board's top 10 to the judges).
+
+### Design
+
+- No new look: the match card is the page's own card surface (hairline border, the cards' radius, 16–24 px padding) with the page's type sizes (product name 18, meta 14, votes 20). The vote-share bar and the judges/audience bar use the brand violet and blue, drawn like the criteria bar.
+- The prototype pill reuses the board's two-way pill (Everyone / Open category): 40 px buttons, 14 px text.
+
+### Before → After
+
+| Before (one style) | After: Individuals | After: 1 vs 1 |
+| --- | --- | --- |
+| ![The board before: the university league and Top builders](docs/changelog/2026-11-16-hackathons-leaderboard.png) | ![The same board, with the Prototype pill at the bottom-left set to Individuals](docs/changelog/2026-11-17-hackathons-individuals-after.png) | ![Head-to-head matches: two products per card, votes, Leads and Vote; the votes-left count beside the heading; no Vote link in the section bar](docs/changelog/2026-11-17-hackathons-1v1-after.png) |
+
+---
+
+## CL-012 Hackathon page: IDEEZA Vibe Inventing Online Hackathon
+
+**In the prototype:** 16 November 2026 · **Jira:** [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the whole Hackathon page) · **Production:** Not started
+
+**Screen:** a new public website page, `/hackathons`, open without signing in, in the website's dark look with the website's top bar and footer. The top bar gets a **Hackathons** link before Pricing. Built from the owner's *IDEEZA Hackathons* prototype (its landing view) and the owner's design briefs, in the design system.
+
+### What to build
+
+Page order, top to bottom: hero · section bar · Prizes · How to win · Who can join and how the winner is picked · Leaderboard · Vote · Dates · Questions · closing.
+
+**Hero**
+- [ ] A black sky with stars and the glowing violet rim of a planet across the top. On wide landscape screens (900 px and up) the rim is the brief's looping glow video, screen-blended so its black disappears. On phones, and until the video can play, a still painted rim.
+- [ ] A status pill: the phase (Registration opens soon / Registration is open / Live now / Building has ended · judging / Winners announced) · the event name. On phones the short name "Vibe Inventing Hackathon".
+- [ ] Headline "Invent hardware with AI. Win 100,000 birr." The first words carry a violet gradient. Then the lead: "No engineering background needed. Describe an idea in plain words and IDEEZA AI designs the concept, PCB, code and 3D. Build 3 products in 160 hours, collect votes, and put your university on top."
+- [ ] Two buttons: **Join the hackathon** (primary) and **Vote for projects** (goes to the Vote section).
+- [ ] A facts line under them. The time left is live, e.g. "Ends in 6d 06h 01m" (before the start "Starts in …"; after the end "Winners on …"), then "Free to join", "18+, living in Ethiopia" and "Individuals".
+- [ ] Under the hero, a violet-edged panel with a light line along its top edge. Inside, a particle hologram: points of light form a light bulb (Idea), then a PCB, then a drone (Product), on a loop. Labels Idea → PCB → Product light the current step. One line: "Say the idea in plain words. IDEEZA AI builds the hardware." It turns slowly and leans toward the pointer. It pauses off screen and holds still with reduced motion.
+- [ ] Entrance: the headline wipes up line by line, then the lead, buttons and panel rise. Reduced motion shows everything at once.
+
+**Section bar**
+- [ ] A bar that sticks under the top bar, with links to Prizes, How to win, Leaderboard, Vote, Dates and FAQ, plus **Join the hackathon** (hidden on phones). The section in view is lit.
+- [ ] On phones the bar is 56 px tall and its links scroll sideways. The row fades at the right edge, and the lit link scrolls into view as the page moves.
+
+**Prizes**
+- [ ] Title "160,000 birr for the top three". Lead: "If building ended now, these three would stand here. The board's top 10 go to the judges, and the judges pick the winners."
+- [ ] A podium in 3D steps, 2nd · 1st · 3rd. First is the tallest, each step has a lit top face and its place number on the front, and first is lit violet. A trophy sits over first.
+- [ ] On each step stands whoever holds that place now: a round picture of their product (opens it), their name, and the prize as a pill (100,000 / 40,000 / 20,000 birr). On phones a long name wraps to two lines.
+- [ ] Two cards under it: "Giveaways every 2 days" (bonus AI credits and IDEEZA merch) and "Better AI for the top 50" (Medium quality instead of Low in the last 3 days).
+- [ ] The section's background is the brief's particle-ribbon video, full width with no scrim. It is graded into the site's colours, violet to blue, and its black becomes the page's deep navy. Its top and bottom edges fade into the page.
+
+**How to win**
+- [ ] Five numbered steps on one line: Join and pick your university · Build 3 or more products · Publish each one (Give to Community + the feed, no wallet or KYC) · Share your link and collect votes · The top 10 go to the judges. Then **Join the hackathon**.
+- [ ] Beside them, a points card: build a product +10, publish +5, build on a new day +2, each vote +1, a friend you invited builds +15. A worked example: "3 products built and published on 3 days, with 40 votes = 30 + 15 + 6 + 40 = 91 points."
+
+**Who can join · How the winner is picked**
+- [ ] Who can join, ticked: 18 or older, living in Ethiopia · university students, makers, engineers and anyone with a product idea · you compete on your own, for your university or the open category · one IDEEZA account per person with a verified email · judges cannot take part or vote.
+- [ ] How the winner is picked: the board freezes when building ends and the top 10 are shortlisted. One bar shows the criteria weights: Innovation 40%, Manufacturability 30%, Completeness 30%. The judges are listed.
+
+**Leaderboard**
+- [ ] Title "Which university builds best?" Beside it, builders · products · votes, summed from the board.
+- [ ] University league: each university's points (its students' points summed) as a bar against the leader, with students and products under it. Rank, name, bar and facts start on one left edge. Phones show the top 6 with "Show all 11 universities".
+- [ ] Top builders: rank, movement since the last update (▲/▼), initials (the top three show their product), name, university or Open category, products, **Qualified** (3+ products, written out with a tick), **Medium quality** when unlocked, and points.
+- [ ] The list shows **ten a page** with ‹ › and "11–20 of 64"; the page never grows. Everyone / Open category filter. Search "Find your name or university" (no match: "No one matches …"). Search and filter go back to page one.
+- [ ] No moderation flags on the public board. A note says the standings are sample data while they are.
+
+**Vote**
+- [ ] "Vote for the products you'd use": every published product as a card with its picture, name, maker and university, what it does, its votes, and **Vote**. The picture opens the project.
+- [ ] Each account has 10 votes, shown as 10 pips and "n of 10 votes left". Vote turns into Voted and can be taken back while voting is open. With none left: "You have used all 10 votes. Take one back to vote again."
+- [ ] Signed out, Vote leads to sign up or sign in and back here. Voting is open only while the hackathon is live.
+
+**Dates · Questions · closing**
+- [ ] Dates: one track across Registration, Build & vote, Judging and Winners announced. Each has its dates in EAT and Done / Now / Next, and the track fills up to now.
+- [ ] Questions: six questions that open and close: free? · never built hardware? · wallet or KYC? · how votes count · who owns my design · when are winners announced. Beside them, the terms of participation and three chips.
+- [ ] Closing, full screen: the brief's wave video behind it. Two lines on top (the promise · the prize pool), the time left in one line of capitals, "Put your university / on the board." with a shine across the second line, **Join the hackathon** (white, an arrow that steps forward on hover) and **Vote for projects**.
+
+**Join**
+- [ ] Signed out, Join goes to sign up (sign in if the browser has an account) and comes back to this page with the join step open.
+- [ ] The join step: choose a university (12 listed) or "Not at a university — open category", and tick "I am 18 or older and live in Ethiopia". Errors: "Choose your university, or the open category." / "The hackathon is open to people 18+ in Ethiopia."
+- [ ] Joined: "You're in" with a personal link to share (Copy). Every Join button then reads **Start building** and goes to Home.
+- [ ] Join is closed before registration opens and after building ends.
+
+**A project, opened**
+- [ ] A dialog with the product's video (a still with reduced motion), what it does, its maker, its place, points and products, Qualified, its votes and **Vote**.
+
+Prototype only (not to build as is): the board is 64 seeded sample builders; the judges are the prototype's sample names; the dates are fixed at 14 Nov (registration), 16 Nov 09:00 to 22 Nov 21:00 (build and vote) and 24 Nov 18:00 (winners), EAT; joining and votes are kept in the browser per account.
+
+### Design
+
+- Website dark theme; Manrope; type only from the design system scale. Main paragraphs 18 px (16 on phones), other body 16, captions 14, nothing under 14.
+- Spacing from the design system scale, one rhythm for the whole page (phones step down through the tokens): sections 96 px top and bottom (64 on phones), a section heading 64 px above its content, 20 px between a title and its lead, cards 20–24 px inside and 20–24 px apart.
+- Brand violet and blue ramps for every accent; the page's deep navy as the ground; no new tokens.
+- Buttons: Button primary (Join), the website's secondary pill (Vote), Button inverse (closing Join). Dialogs, select, checkbox, search field and badges are the design system's.
+- Media: the briefs' videos (hero glow, Prizes ribbon, closing wave); product pictures as small WebP (720 px card, 192 px avatar); the hologram drawn in code.
+  - Updated 17 November 2026: every brief file (hero glow video, the light strip over the hero panel, Prizes ribbon video, closing wave) is stored with the site, never loaded from the brief's own links, which can disappear. Videos are H.264 MP4 so every browser plays them: the brief's ribbon was HEVC, which Firefox and many Windows browsers cannot play (now 4.2 MB, was 9.5 MB).
+
+### Before → After
+
+A new page (there was no Before).
+
+| Hero | Prizes | Leaderboard |
+| --- | --- | --- |
+| ![The hero: planet rim, headline, Join and Vote, the facts line](docs/changelog/2026-11-16-hackathons-hero.png) | ![The podium over the ribbon video](docs/changelog/2026-11-16-hackathons-prizes.png) | ![University league beside Top builders](docs/changelog/2026-11-16-hackathons-leaderboard.png) |
+
+---
+
+## CL-011 Redeem a code for AI credits
+
+**In the prototype:** 16 November 2026 · **Jira:** [PR-9534](https://ideeza.atlassian.net/browse/PR-9534) · **Production:** Ready for development
+
+**Screen:** Plan & pricing › Credits (`/settings/plan?tab=credits`): a new card between the three credit packs and Custom amount. Figma has no design for it; it is built from the page's own card and design system parts.
+
+### What to build
+
+- [ ] A card titled **Redeem a code**, with one line under the title: "Got a credit code from IDEEZA or an event? Enter it and its credits go straight into your balance."
+- [ ] A text field (placeholder **Enter code**) with a **Redeem** button beside it. Enter in the field redeems too. What is typed shows in capitals; spaces and letter case don't matter (" ideeza 100" is IDEEZA100).
+- [ ] A code has three things: the code, how many credits it adds, and the last day it can be redeemed (it works to the end of that day, UTC).
+- [ ] Each code works once per account.
+- [ ] A valid code adds its credits to the balance at once. The field clears, and a green line under it says: "{N} credits added from {CODE}, valid for 12 months. Your balance is now {B} credits." The **Current balance** at the top of the page shows the new total.
+- [ ] Redeemed credits are valid for 12 months from the day they are redeemed, the same as bought credits, and are spent the same way (the credits that expire first are used first).
+- [ ] **Credit history** lists the code as its own line: Type "Code {CODE}", the date, the credits, what remains, the expiry date, and Price "Free". The mobile app's credit history shows the same line.
+- [ ] When a code doesn't work, the field shows its error state and a red line under it says why. Typing again clears the line.
+  - Nothing typed: "Type a code first."
+  - Unknown code: "Sorry, this code is not valid. Check the spelling and try again."
+  - A plan coupon typed here: "{CODE} is a plan coupon. Use it when you buy a plan."
+  - Past its last day: "Sorry, this code ended on {day month year}."
+  - Already redeemed on this account: "You've already redeemed this code. Each one works once."
+- [ ] On a phone-width browser the card stacks: the title, the line, then the field and **Redeem** in one row, the message under them.
+
+Demo stand-ins (prototype only): the codes IDEEZA100 (100 credits), WELCOME50 (50), EVENT250 (250) and BETA20 (ended 31 Oct 2026).
+
+### Design
+
+- The Custom amount card's frame: radius 2xl, 1 px border, surface fill, 24 px padding.
+- Title 20 semibold; the line Body 14, secondary text.
+- DS Text Input 40 and Button Tonal 40, as in the plan checkout's coupon field.
+- The message is Support Text 12/16: the input error colour for a problem, the success text colour when credits were added.
+- No new colours or tokens; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the three packs, then Custom amount](docs/changelog/2026-11-16-redeem-code-before.png) | ![After: Redeem a code between the packs and Custom amount, after redeeming IDEEZA100](docs/changelog/2026-11-16-redeem-code-after.png) |
+
+---
+
+## CL-010 Mobile app: native mobile UX everywhere
+
+**In the prototype:** 15 November 2026 · **Jira:** none (the owner asked for no ticket) · **Production:** Not started
+
+**Screen:** the whole mobile app at `/m`. The owner reviewed it and asked that it work the way a phone app works, not like the website made smaller. Every screen was reworked by area. Nothing was removed: things moved, were grouped, or went one tap deeper.
+
+### What to build
+
+**Rules for every screen**
+- [ ] One header: the top bar holds the context and takes the name once the large title scrolls away. No second title, link or chip stacked under it.
+- [ ] Summary first. The 1–3 facts that matter come first (a large figure or a three-up fact grid); the full list sits behind **All details** or a row that opens it.
+- [ ] Explanations take one line at most. Longer text opens from an **ⓘ** button beside the heading, in a sheet with the full words.
+- [ ] No more than three tabs. A tab that held a whole workflow becomes a **row** (icon, title, live value, ›) that opens its own screen; Back returns.
+- [ ] No text links outside sentences: a row with ›, or an action in the top bar's **⋯**.
+- [ ] One primary action per screen, in the bottom bar (thumb zone). Secondary actions are rows or sit in **⋯**.
+- [ ] An object's own page (project, product) leads with its picture or video.
+- [ ] A running build shows as a slim bar under the header, and the video render tray sits above the bottom bar. Neither ever covers a title, a field or a button.
+- [ ] Rows and buttons show a pressed state; every tap target is at least 44 px.
+
+**Sheets and confirms**
+- [ ] A sheet's foot holds **one** primary button. The ✕, a swipe down and a tap outside close it, so there is no Cancel / Close / Done / Not now button that only closes. A sheet whose only button was one of those has no foot.
+- [ ] A reason the button is off (*2 products still need an AI video…*) sits above the button.
+- [ ] A confirm (*Stop sharing to Feed?*, *Delete…?*) puts **Cancel** and the action side by side, the action on the right; labels too long for half the width stack.
+- [ ] A sheet never squeezes its content: it scrolls.
+- [ ] Coming back with Back or Close reopens what was open: the screen and sheet the maker left from (e.g. Sell › Main NFT › *Add to marketplace* → a product's video → Close lands on that sheet again). Arriving any other way opens the screen clean.
+
+**Way in (follows the website's sign-up)**
+- [ ] Onboarding: **Next** on screens 1–3, **Continue** on the last.
+- [ ] Create account has the website's fields: first and last name, email, password with its checklist, re-type, date of birth (day, month, year), and the consent line in label size.
+- [ ] After the code: *Where did you hear about IDEEZA?* (once, unless the link said), then the Welcome map. No handle step, no profile steps, no Face ID, no Apple anywhere (Google and Facebook only).
+- [ ] The tour points at each tab: the screen dims around the tab, a small card with an arrow says what it does, with Back / Next and Skip. Tapping the lit tab is Next.
+
+**Home · Feed**
+- [ ] Only items on the marketplace appear, the maker's own shared projects too (they leave the Feed when nothing is for sale).
+- [ ] A clip's text keeps to about a fifth of the screen: a type icon before the title (project or product), two lines of title, one line of description with *more*, and offers as one slim pill (*Main NFT · 0.8 ETH*, *+3*, ›) that opens the buy page.
+- [ ] A clip that can't play says so in a small dark card that doesn't cover the side buttons.
+- [ ] Share to Feed on a project with nothing for sale says *Share to Feed · List it first* and opens a sheet that goes to Sell. The mint flow offers Share to Feed after a sale listing only.
+- [ ] Search: browse by kind and search history; *See all results* first; people as rows with Follow, posts as a cover grid. Notifications: the whole row opens it, an icon and an unread dot, one meta line. Saved: two tabs, **Saved · Appreciated**.
+
+**Buying (someone else's item, or the demo buyer on your own listing)**
+- [ ] The page leads with the clip's video, then the name, then a **buy box**: what is sold (*Whole project · Main NFT*), the price large, the facts three to a row, the wallet line, the last activity, *Testnet demo · shopping as Mira · Change*. Copies are rows with a small **Buy** (two prices ask which in a sheet). The bottom bar's **Buy now** buys the Main NFT.
+- [ ] After buying: a receipt card (*You own 40% of the project*, Token · Paid · Purchased, **All details** closed).
+
+**Project page (yours)**
+- [ ] Media first (project video in use, else the cover), the name, the status chip and *Built · n products*, the description.
+- [ ] Products are the main content; the description tip comes after them.
+- [ ] Rows instead of tabs: Activity, Media, Versions, Team, Network, each with its live value.
+- [ ] Bottom bar: Publish + Earn while it can be published, else the live fact (*Listed*, *Sold 40%*) beside **Earn**.
+
+**Earn**
+- [ ] One header with **⋯** (Preview as others see it, Sell copies of a product). The summary first: *Earned* large, Price · Copies sold · Bought by. Then rows **Sell · Business plan · Money**, each opening its own screen. A finished checklist folds to one row.
+- [ ] Sell: Main NFT, Physical and Virtual as rows with their live state; each opens its screen (summary, *Before you can list* as one card, activity, edit and remove as rows, one bottom-bar action). The listing form has one bottom-bar button and puts advanced fields under **More options**. The mint keeps the website's four steps.
+- [ ] Money: earnings first, then Splits, Sales and Rights as lists; adding is each list's last row.
+- [ ] *Add to marketplace*: each product is one row (state, then *Generate AI video* ›) and both fit.
+
+**Product page (yours)**
+- [ ] One scroll, no tabs: the concept image (or video) first, one header, then Build (piece rows with their state), a Media row, Activity rows and Specs.
+
+**Money screens**
+- [ ] Get paid: the balance first, **Withdraw money** in the bottom bar, one *Verify your identity* row, demo rates and tax notes behind ⓘ.
+- [ ] Plans, credits, checkout, withdraw: pick, then pay with the bottom-bar button.
+- [ ] Earn Coin: your IDZ balance first, then *Ways to earn* as rows.
+
+**Everything else**
+- [ ] Settings and Profile: grouped rows with values and ›; long help behind ⓘ; Delete account red and last. Edit profile: the cover with the photo, then each field as a row that opens its own sheet.
+- [ ] Messages: chat-app inbox rows (name, relation, time; subject; last line and unread count); the thread's header shows avatar and relation; a request is one sentence with ⓘ and Block · Delete · Accept.
+- [ ] AI tab: the prompt box pinned at the foot, ideas as chips above it; the project question is one list with **Continue** pinned at the foot, and the prompt box steps aside while it's open.
+
+Demo stand-ins (prototype only): testnet money, demo buyers (Mira, Leo, Sam), sample Feed items.
+
+### Design
+
+- Mobile design system only: the mobile type scale (no raw sizes anywhere), list cards and rows, bottom sheets (handle, title, ✕), the bottom bar, Primary / Secondary / Danger XL buttons, badges, the media chip and scrim for text on video.
+- No new colours or tokens; DS default radius; light and dark.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: project page with no picture, two meta lines, a tip card and four tabs](docs/changelog/2026-11-15-m-project-before.png) | ![After: project page with the cover first and products as content](docs/changelog/2026-11-15-m-project-after.png) |
+| ![Before: Earn with a stacked header and four tabs](docs/changelog/2026-11-15-m-earn-before.png) | ![After: Earn hub, summary first and rows](docs/changelog/2026-11-15-m-earn-after.png) |
+| ![Before: Money with paragraphs and tables](docs/changelog/2026-11-15-m-money-before.png) | ![After: Money, earnings first and lists](docs/changelog/2026-11-15-m-money-after.png) |
+| ![Before: product page with no picture and a banner](docs/changelog/2026-11-15-m-product-before.png) | ![After: product page, image first and piece rows](docs/changelog/2026-11-15-m-product-after.png) |
+| ![Before: Earn Coin as four paragraph cards](docs/changelog/2026-11-15-m-earncoin-before.png) | ![After: Earn Coin, balance first and rows](docs/changelog/2026-11-15-m-earncoin-after.png) |
+| ![Before: Get paid with Withdraw inside a card and greyed rows](docs/changelog/2026-11-15-m-getpaid-before.png) | ![After: Get paid, balance first and Withdraw in the bar](docs/changelog/2026-11-15-m-getpaid-after.png) |
+| — | ![After: the buy page with the buy box](docs/changelog/2026-11-15-m-market-after.png) |
+| — | ![After: the receipt after buying](docs/changelog/2026-11-15-m-receipt-after.png) |
+| — | ![After: a Feed clip, slim text and one offer pill](docs/changelog/2026-11-15-m-feed-after.png) |
+| — | ![After: Share to Feed, List it first](docs/changelog/2026-11-15-m-listfirst-after.png) |
+| — | ![After: a confirm with Cancel and the action side by side](docs/changelog/2026-11-15-m-confirm-after.png) |
+| — | ![After: Sign-in & security as grouped rows](docs/changelog/2026-11-15-m-security-after.png) |
+
+---
+
+## CL-009 Mobile app: splash, onboarding, Welcome and Log In
+
+**In the prototype:** 9 November 2026 · **Jira:** not created yet (a Story under PR-9007 once Jira is connected) · **Production:** Not started
+
+**Screen:** the mobile app's way in, in the phone prototype at `/m`: the splash
+on opening, the onboarding (`/m/onboarding`), Welcome (`/m/welcome`), Log In
+(`/m/sign-in`) and Sign up (`/m/sign-up`). Built from the owner's onboarding
+design (4 screens) and dark auth design (8 screens). Every screen before
+signing in is dark, in the light theme too.
+
+### What to build
+
+**Splash**
+- [ ] On the brand night: the IDEEZA logo with a slow glow, *Build Hardware at the Speed of Software*, faint circuit traces behind, and three steps at the foot — **Idea → Concept → Build** — lighting one after another, in place of a spinner.
+- [ ] Shown while the app opens (about 1.2 s on the first open), and while signing in (*Signing you in*). With reduced motion nothing moves.
+
+**Onboarding (first open, signed out)**
+- [ ] Order on the first open: Splash → Onboarding → Welcome. Once the maker skips or finishes it, it doesn't come back.
+- [ ] Four screens, each an illustration, a title and one line; dots under them, **Continue** at the foot, **Skip** at the top; swiping works too.
+  1. *Turn Your Idea Into a Real Product* — *Describe your hardware idea in a single prompt. Our AI instantly generates the PCB, Coding, and 3D enclosure.*
+  2. *No Engineering Skills? No Problem* — *Let AI build it for you, or dive in manually if you're an engineer. Both paths lead to the same place.*
+  3. *From Design to Manufacturing* — *Ready to build it for real? Connect with verified manufacturing partners and bring your product to life.*
+  4. *Your Invention, Now your Digital Asset* — *Register your product as a digital asset, own it as an NFT, and showcase it to a global creator community.*
+- [ ] **Continue** on the last screen, or **Skip**, goes to Welcome.
+
+**Welcome**
+- [ ] The logo in the middle; **Sign up** (primary) and **Log In** (secondary) at the foot. Nothing else: no Explore first, no Apple sign-in (owner decision).
+- [ ] Offline: *You’re offline. Connect to sign up or log in.*
+
+**Log In**
+- [ ] Title *Enter your Email to Log In*; **Email** (*Enter your email*), **Password** (*8 characters and more*, with show/hide); **Remember me** and **Forgot password**; **Log In**.
+- [ ] *Or login with* → **Google** and **Facebook**; at the foot *Don’t Have an Account? Sign Up*.
+- [ ] Errors under their field: *Enter your email.*, *Invalid email address*, *Enter your password.*, *Your password is incorrect!*
+- [ ] Account suspended: the title becomes *Welcome to IDEEZA*, a red alert *Account Suspended — Your account has been suspended due to a violation of our platform policies. Check your email or contact support@ideeza.io*, and the button reads **Account Suspended** (disabled).
+- [ ] Kept from before: too many tries with a countdown, email not verified → **Send code**, offline with the input kept, session expired.
+- [ ] **Remember me** unticked: the maker is signed out when the app is closed. Ticked: they stay signed in.
+
+**Sign up**
+- [ ] Same dark layout: centered *Create your IDEEZA account* / *Then choose your handle.*, the form, **Create account**, and at the foot *Have an Account? Log In*.
+
+Demo stand-ins (prototype only): suspended and expired have no cause in the demo, so `?demo=suspended|expired` shows them; Remember me unticked lasts while the browser tab does.
+
+### Design
+
+- Mobile design system only: brand night (violet-950 → gray-950) with violet and blue glows, Primary / Secondary XL buttons, Text inputs XL, Checkbox, the mobile alert, the mobile type scale (title, body, caption).
+- Dark tokens on every screen before signing in, whatever the app's theme.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| — | ![After: the branded splash with Idea, Concept, Build](docs/changelog/2026-11-09-m-splash-after.png) |
+| — | ![After: the four onboarding screens](docs/changelog/2026-11-09-m-onboarding-after.png) |
+| ![Before: Welcome with a hero and four sign-in buttons](docs/changelog/2026-11-09-m-welcome-before.png) | ![After: Welcome, the logo with Sign up and Log In](docs/changelog/2026-11-09-m-welcome-after.png) |
+| — | ![After: Log In](docs/changelog/2026-11-09-m-login-after.png) |
+| — | ![After: Log In, wrong password](docs/changelog/2026-11-09-m-login-error-after.png) |
+| — | ![After: Log In, account suspended](docs/changelog/2026-11-09-m-login-suspended-after.png) |
+| — | ![After: Sign up](docs/changelog/2026-11-09-m-signup-after.png) |
+
+---
+
+## CL-008 Mobile app create flow: the image first, the 3D as the result
+
+**In the prototype:** 9 November 2026 · **Jira:** not created yet (a Story under PR-9008 once Jira is connected) · **Production:** Not started
+
+**Screen:** the mobile app's AI Product Generate chat (`/m/ai`, then the chat), in
+the phone prototype at `/m`. This release brings the `/m` mobile prototype to the
+live prototype; this entry covers only the create flow the owner approved
+(design sample "create-flow round 2"): what the maker sees once concepts are
+drawn, while the build runs, and when it is done.
+
+### What to build
+
+**Concepts ready**
+- [ ] With two or more products, a switcher on top: one chip per product with its thumbnail, name and state — *Drawing…*, *Couldn't draw*, *Always built* (the main product), *In this build*, *Not in this build*.
+- [ ] The chosen product's concept is the page: a big 4:3 image with its state badge (*Ready*, *Reading the parts*, *Doesn't fit its size*) and a full-screen button; under it the name, one line of up to three facts, and **Change**.
+- [ ] **Change** opens one bottom sheet: the description, the fact chips, the prompt (with Copy), **Refine** (with its credit price), **Regenerate**, **Edit spec** (*View spec* once built).
+- [ ] The prompt box gives way once concepts are on the page; the **Build** bar is pinned at the foot: *N products · X credits*, *Quality · About N min · Options*, and **Build** / **Build N products**.
+- [ ] **Options** opens a bottom sheet: each product with a tick (the main product is always built), its credits and **Quality · …** (Low / Medium / High); the total and **Done**.
+
+**While it builds**
+- [ ] The concept stays big, with the build badge (no percentage), the project name and *N products · M pieces each*.
+- [ ] One stage line — *Step k of n · Building the PCB* (or *Waiting in the build queue* / *Paused*) — and one bar. No per-piece percentage anywhere.
+- [ ] *Runs in the background. You can leave, and we'll notify you when it's ready.*
+- [ ] Each product's pieces behind one **Pieces · d of n ready** button (a bottom sheet; each row opens its deliverable).
+- [ ] A failed piece stays on the page: *Wiring didn't finish* + why, and **Retry Wiring · Free**.
+
+**Finished**
+- [ ] The result is the page: a big 3D of the product (the Assembly, else the 3D Module) with **3D / Concept image**, one-tap **Explode** / **Put together**, and **Layers** (a sheet to show or hide each system, **Show all**).
+- [ ] **Pieces · N ready** under it. With two or more products the switcher stays on top (*Ready · 6 pieces*).
+- [ ] **Save project** (*Save project · 2 products*, *Add to {project}*, *Save version N*) is pinned at the foot with one helper line; once saved, **View project**.
+
+**A piece failed — save what's ready**
+- [ ] The build still opens on its result: badge *5 of 6 ready*, the failed piece with **Retry · Free**, **Pieces · 5 of 6 ready**.
+- [ ] The foot says **Save what's ready** (*Save what's ready · 11 of 12 pieces* with two products; *Add what's ready to {project}* when joining) and *Wiring stays “Not built”. You can retry it after saving.*
+- [ ] Saving keeps every product; the failed piece can be retried later from the chat or the product.
+
+**A product left out of the build**
+- [ ] A product unticked in Options shows in the finished switcher as *Drawn · not built*.
+- [ ] Its card: the concept image, *Not in this build*, **You left this one out**, *Its concept stays in {project}. Build it any time, no need to draw it again.*, and **Build {product} · N credits**.
+- [ ] Building it adds it to the same build, from its concept (no new drawing), charged on its own; the other product stays *Ready*. Short of credits → Buy credits; a size that doesn't fit → its spec opens to fix it.
+- [ ] Until it is built, Save says *Saves {built product} and keeps the {left-out product} concept in {project}.* A project already saved gets the new product too.
+
+### Design
+
+- Mobile design system only; every popup is the mobile bottom sheet (handle, title, ✕). Text uses the mobile type scale (section, meta, body, row title).
+- Switcher chips: surface card, 38 px thumbnail, border/brand 2 px when chosen, a red dot on a failed product.
+- Concept and result frames: radius XL, bg/subtle behind the image; 3D stage 260 px tall on the result.
+- Build bar and Save: primary XL button at the foot, helper in Caption.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: the concept is a small thumbnail](docs/changelog/2026-11-09-m-concept-before.png) | ![After: the concept is the page, Change and the pinned Build bar](docs/changelog/2026-11-09-m-concept-after.png) |
+| ![Before: a percentage on every piece](docs/changelog/2026-11-09-m-building-before.png) | ![After: one stage line, no percentage](docs/changelog/2026-11-09-m-building-after.png) |
+| ![Before: a finished list, no 3D](docs/changelog/2026-11-09-m-finished-before.png) | ![After: the 3D is the result, Explode and Layers](docs/changelog/2026-11-09-m-finished-after.png) |
+| — | ![After: a failed piece, Save what's ready](docs/changelog/2026-11-09-m-partial-after.png) |
+| — | ![After: a product left out, Build it later](docs/changelog/2026-11-09-m-left-out-after.png) |
+
+---
+
+## CL-007 Landing page: Events section, Moments From IDEEZA
+
+**In the prototype:** 8 November 2026 · **Jira:** [PR-9089](https://ideeza.atlassian.net/browse/PR-9089) · **Production:** Ready for development
+
+**Screen:** the landing page (`/landing`, and `/` for anyone signed out), a new
+section between The Ecosystem and Mobile Application. From the Figma *IDEEZA
+Website V-2*, page "Join Waitlist" › Event, the list frame's header and event
+cards (18542:22943).
+
+### What to build
+
+- [ ] The section sits just above **Mobile Application**.
+- [ ] Header, centred like every landing section: eyebrow **Events**, title **Moments From IDEEZA**, lead *Moments from IDEEZA hackathons, university tours, and product launches around the world — see where our community is building.*
+- [ ] Three event cards, each the event's own photo with its title and one line over it:
+  - **IDEEZA Hardware Hackathon** — *Build Hardware with AI*
+  - **IDEEZA Launch In Ethiopia** — *IDEEZA's First Introduction to the African Ecosystem*
+  - **The IDEEZA National Tour** — *Building Africa's Hardware Creator Ecosystem*
+- [ ] The cards are one still picture: no card is a link and none reacts to hover or click.
+- [ ] One **Explore Events** button, centred under the cards.
+- [ ] Wide screens: three cards in a row. Phone: one row that swipes sideways with the next card peeking in; no horizontal scroll of the page at 375 px.
+
+### Design
+
+- Dark mode of the design system; the header is the landing section header (eyebrow chip, Display/MD title, lead).
+- Card: a 20-radius frame with a soft lilac ring, 12 inside it the photo at radius 14 with a border/strong ring, fading to the page colour (bg/page) from the middle down; title Heading/H2 in text/primary, line Body/LG Medium in text/secondary.
+- **Explore Events** is the page's one secondary button (no fill, gradient glass ring, pill), like Explore Marketplace and Explore Community.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: The Ecosystem goes straight into Mobile Application](docs/changelog/2026-11-08-events-landing-before.png) | ![After: Moments From IDEEZA, three event cards and Explore Events](docs/changelog/2026-11-08-events-landing-after.png) |
 
 ---
 

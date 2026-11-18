@@ -9,7 +9,8 @@
 //    controls are Earn › Sell): it shows only listed tracks, else it is
 //    absent.
 // 2. Specs and 3. Build check (product-facts.tsx; owner, 2026-10-11: facts
-//    out of the header): a built product's labelled facts and its check.
+//    out of the header): a built product's labelled facts and its check, and
+//    the project's network with a link to its tab (not on a post).
 // 4. Editor: six rows into this product's editor, and the seed caption
 //    (P2-EDITOR-11). Absent in every preview and on a locked project.
 // On an Innovations post (`post`, read as a visitor) 0 is absent and the
@@ -27,7 +28,7 @@ import type { BuildProduct } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { ActivityCard } from "../details/activity/activity-card";
 import { ProductEditorBlock } from "./product-editor-block";
-import { ProductCheckBlock, ProductSpecsBlock } from "./product-facts";
+import { ProductCheckBlock, ProductSpecsBlock, useNetworkFact } from "./product-facts";
 import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
 
 export function ProductRail({
@@ -48,11 +49,12 @@ export function ProductRail({
   post?: React.ReactNode;
 }) {
   const Marketplace = PRODUCT_SLOTS.rail.marketplace;
+  const network = useNetworkFact(slot, !post);
   return (
     <aside aria-label="Product record" className={cn(RAIL_SURFACE, "empty:hidden")}>
       {!post && can(slot.viewer, "facts.seeOwnerOnly") && <ActivityCard {...slot} productId={slot.product.id} />}
       {!post && Marketplace ? <Marketplace {...slot} /> : null}
-      {built && <ProductSpecsBlock product={built} partChanges={partChanges} />}
+      {(built || network) && <ProductSpecsBlock product={built} partChanges={partChanges} network={network} />}
       {confidence && <ProductCheckBlock confidence={confidence} />}
       {post ?? (
         <ProductEditorBlock

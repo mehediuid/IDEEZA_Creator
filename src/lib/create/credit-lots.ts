@@ -5,7 +5,7 @@
 // never stored beside it, so it can't drift from the balance.
 //
 // - The starting balance never expires. A top-up or a purchase expires
-//   VALIDITY_MONTHS after it came in (its `expiresAt`, or that rule for a
+//   VALIDITY_MONTHS after it came in, as does a redeemed code's (its `expiresAt`, or that rule for a
 //   ledger written before purchases had one); a plan's monthly grant at the
 //   end of its period (`expiresAt`).
 // - A charge (a build, a concept render) takes from the earliest-expiring lot
@@ -43,7 +43,7 @@ export type Lot = {
   remaining: number;
 };
 
-const INCOMING = new Set(["seed", "topup", "purchase", "grant"]);
+const INCOMING = new Set(["seed", "topup", "purchase", "grant", "redeem"]);
 const SPENDING = new Set(["build", "concept"]);
 
 export function expiryOf(line: LotLine): number | null {

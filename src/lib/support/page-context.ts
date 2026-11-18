@@ -46,6 +46,26 @@ export type PageRef = {
   productId?: string;
 };
 
+/** The mobile prototype's screens (/m), by their first segment. */
+const MOBILE_PAGES: Record<string, string> = {
+  "": "Home",
+  earn: "Earn Coin",
+  ai: "AI",
+  messages: "Message",
+  profile: "Profile",
+  kit: "Shared kit",
+  welcome: "Welcome",
+  "sign-in": "Sign in",
+  "sign-up": "Create account",
+  verify: "Verify email",
+  reset: "Reset password",
+  "signing-in": "Signing you in",
+  "add-email": "Add your email",
+  link: "Link accounts",
+  source: "Where did you hear about IDEEZA?",
+  "welcome-map": "Welcome map",
+};
+
 export function pageRefFor(pathname: string, search = ""): PageRef {
   const parts = pathname.split("?")[0].split("#")[0].split("/").filter(Boolean).map(safeDecode);
   const q = new URLSearchParams(search);
@@ -54,6 +74,11 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
   if (parts.length === 0) return { page: "Home", route: "/" };
 
   switch (a) {
+    case "m": {
+      // A screen this table doesn't name yet still reads as itself ("earn-history" → "Earn history").
+      const name = MOBILE_PAGES[b ?? ""] ?? (b ? b.charAt(0).toUpperCase() + b.slice(1).replace(/-/g, " ") : "");
+      return { page: name ? `Mobile › ${name}` : "Mobile", route: b ? `/m/${b}` : "/m" };
+    }
     case "history":
       return { page: q.get("tab") === "builds" ? "History · Builds" : "History", route: "/history" };
     case "chat":
@@ -143,6 +168,10 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
     case "landing":
       if (!b) return { page: "Landing page", route: "/landing" };
       break;
+    case "hackathons":
+      // /hackathons is the main hackathon's page; /hackathons/all lists every hackathon.
+      if (b === "all") return { page: "Hackathons", route: "/hackathons/all" };
+      return b ? { page: "Hackathon", route: "/hackathons/[slug]" } : { page: "Hackathon", route: "/hackathons" };
     case "events":
       return b ? { page: "Event", route: "/events/[slug]" } : { page: "Events", route: "/events" };
     case "balance":

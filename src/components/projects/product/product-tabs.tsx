@@ -2,7 +2,7 @@
 
 // The product page's one tab strip and its tabpanel (P2-EDITOR-16…18 as
 // changed; P2-TABS-2 as changed; spec §2.3, C2; Build and Earn P0):
-//   3D model · PCB · Firmware code · Wiring · Parts · Media[ ┆ Contributors]
+//   3D model · PCB · Firmware code · Wiring · Parts · Media[ ┆ Contributors][ ┆ Sales]
 // - Owner, 2026-10-11: the build's pieces lead and Media follows them; a
 //   buyer's side opens on Media first. The first tab is the default and is
 //   never written to `?tab=`; an unknown or absent `?tab=` reads as the first;
@@ -11,10 +11,11 @@
 // - A piece the build never made has no tab (H-5); a hand-made, build-gone
 //   or unmatched product has Media only — and then no tab strip at all, just
 //   the panel. The firmware source waits for `deliverables.download` (O12).
-// - P0: the owner's page is engineering only. Customers moved to Earn ›
-//   Customers, and the team is the project's Team tab, so Contributors — a
-//   team credit with ≥ 1 contributor — is the buyer's side only (`buyerSide`:
-//   Preview as buyer and Explore marketplace, which are not changed in P0).
+// - P0: the team is the project's Team tab, so Contributors — a team credit
+//   with ≥ 1 contributor — is the buyer's side only (`buyerSide`: Preview as
+//   buyer and Explore marketplace, which are not changed in P0). Sales is the
+//   owner's (`customers.see`, 2026-11-15): who bought this product's copies,
+//   the same rows as Earn › Money › Sales, with its own empty state.
 // - Panels come from PRODUCT_SLOTS.panels, and a missing panel means a
 //   missing tab; Media, the one tab every product has, is VIDEO's panel.
 // - The ┆ is an `aria-hidden` hairline, never a tab stop; the arrows cross it.
@@ -102,7 +103,7 @@ export function ProductTabs({
             panels.contributors !== undefined &&
             buyerSide(viewer) &&
             (can(viewer, "people.seeRoster") || (can(viewer, "people.seeTeam") && contributors > 0)),
-          customers: false,
+          customers: panels.customers !== undefined && can(viewer, "customers.see"),
           mediaFirst: buyerSide(viewer),
           leftOut: owner,
         },
@@ -133,7 +134,14 @@ export function ProductTabs({
 
   const lockedPanel = post && POST_LOCKED.has(active) ? post.locked(active as PostLockedTab) : null;
   const piece = lockedPanel ? undefined : PIECE[active];
-  const Panel = active === "media" ? panels.media : active === "contributors" ? panels.contributors : undefined;
+  const Panel =
+    active === "media"
+      ? panels.media
+      : active === "contributors"
+        ? panels.contributors
+        : active === "customers"
+          ? panels.customers
+          : undefined;
 
   // One tab is no choice: its panel stands alone, without a strip.
   if (tabs.length === 1) {

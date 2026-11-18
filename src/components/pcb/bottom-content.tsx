@@ -11,6 +11,7 @@ import * as React from "react";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import type { CanvasObject, ErcSeverity } from "@/lib/pcb/types";
 import { SEV_META, SEV_ORDER, sevKeyOf, type SevKey } from "@/lib/pcb/colors";
+import { downloadBlob } from "@/lib/pcb/exporters";
 
 // ── shared atoms ─────────────────────────────────────────────────────────────
 const T = {
@@ -35,13 +36,16 @@ function Pane({ left, right }: { left: React.ReactNode; right: React.ReactNode }
   );
 }
 
-function Btn({ children, onClick, primary, full }: { children: React.ReactNode; onClick?: () => void; primary?: boolean; full?: boolean }) {
+// `reason` = nothing behind the button yet: it is greyed and the tooltip says why.
+function Btn({ children, onClick, primary, full, reason }: { children: React.ReactNode; onClick?: () => void; primary?: boolean; full?: boolean; reason?: string }) {
   return (
     <button
-      onClick={onClick}
+      onClick={reason ? undefined : onClick}
+      disabled={!!reason}
+      title={reason}
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
-        padding: "6px 12px", borderRadius: "var(--radius-md)", cursor: "pointer",
+        padding: "6px 12px", borderRadius: "var(--radius-md)", cursor: reason ? "not-allowed" : "pointer", opacity: reason ? 0.45 : 1,
         fontSize: T.sm, fontWeight: 600, fontFamily: "inherit",
         width: full ? "100%" : undefined,
         background: primary ? T.brand : "transparent",
@@ -144,12 +148,24 @@ const LOG_ROWS: LogRow[] = [
 ];
 
 function LinkList({ names }: { names: string[] }) {
+  const state = usePcbState();
   const actions = usePcbActions();
+  // Locate = select the parts carrying this designator and frame them (on their
+  // sheet, in the schematic); it used to toast "Locate U3" and move nothing.
+  const locate = (name: string) => {
+    const scope = state.mode === "schematic" ? "schematic" : "pcb";
+    const hits = state.objects.filter((o) => (!o.scope || o.scope === scope) && o.text === name);
+    if (!hits.length) { actions.flashToast(`${name} isn't in this design`); return; }
+    const sheet = hits[0].sheetId ?? state.schematicSheets[0]?.id;
+    if (scope === "schematic" && sheet && sheet !== state.activeSheetId) actions.gotoSheet(sheet);
+    actions.selectMany(hits.map((o) => o.id));
+    actions.zoomFit("selection");
+  };
   return (
     <>
       {names.map((n, i) => (
         <React.Fragment key={n}>
-          <span onClick={() => actions.flashToast(`Locate ${n}`)} style={{ color: T.brand, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}>{n}</span>
+          <span role="button" tabIndex={0} onClick={() => locate(n)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); locate(n); } }} style={{ color: T.brand, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}>{n}</span>
           {i < names.length - 1 && <span style={{ color: T.mut }}>, </span>}
         </React.Fragment>
       ))}
@@ -162,9 +178,16 @@ function LogTab() {
   const [rows, setRows] = React.useState<LogRow[]>(LOG_ROWS);
   const [sev, setSev] = React.useState<Record<Sev, boolean>>({ fatal: true, error: true, warn: true, info: true });
   const shown = rows.filter((r) => sev[r.sev]);
+  // Export writes the rows the filters show to a text file (it only toasted).
+  const exportLog = () => {
+    if (!shown.length) { actions.flashToast("No log entries to export"); return; }
+    const line = (r: LogRow) => `${r.ts} [${SEV[r.sev].label}] ${[r.msg, r.links?.join(", "), r.tail].filter(Boolean).join(" ")}`;
+    downloadBlob("log.txt", shown.map(line).join("\n") + "\n", "text/plain;charset=utf-8");
+    actions.flashToast(`Exported ${shown.length} log entr${shown.length === 1 ? "y" : "ies"}`);
+  };
   return (
     <Pane
-      left={<SevControls rows={rows} sev={sev} setSev={setSev} onExport={() => actions.flashToast(`Exported ${shown.length} log entries`)} onClear={() => setRows([])} />}
+      left={<SevControls rows={rows} sev={sev} setSev={setSev} onExport={exportLog} onClear={() => setRows([])} />}
       right={
         shown.length === 0 ? <Empty text="No log entries" /> : (
           <div style={{ padding: "4px 0" }}>
@@ -196,7 +219,6 @@ const DEV_FILTERS: Array<[string, string]> = [["all", "All"], ["undetermined", "
 const DEV_COLS = ["No.", "Designator", "Operation", "Supplier Part", "Supplier", "LCSC Stock", "Unit Price", "Comment", "Footprint", "Count", "Manufacturer Part", "Manufacturer"];
 
 function DeviceTab() {
-  const actions = usePcbActions();
   const [filter, setFilter] = React.useState("all");
   const [q, setQ] = React.useState("");
   const [combined, setCombined] = React.useState(true);
@@ -204,7 +226,7 @@ function DeviceTab() {
   const [sel, setSel] = React.useState<Set<number>>(new Set());
   const count = (c: string) => (c === "all" ? DEV_ROWS.length : DEV_ROWS.filter((r) => r.cat === c).length);
   const shown = DEV_ROWS.filter((r) => (filter === "all" || r.cat === filter) && (!q || r.desig.toLowerCase().includes(q.toLowerCase()) || r.comment.toLowerCase().includes(q.toLowerCase())));
-  const toggleRow = (n: number) => setSel((s) => { const c = new Set(s); c.has(n) ? c.delete(n) : c.add(n); return c; });
+  const toggleRow = (n: number) => setSel((s) => { const c = new Set(s); if (c.has(n)) c.delete(n); else c.add(n); return c; });
   return (
     <Pane
       left={
@@ -216,10 +238,11 @@ function DeviceTab() {
           <div style={{ height: 1, background: T.line, margin: "4px 0" }} />
           <Tgl label="Combined Designators" on={combined} onToggle={() => setCombined((v) => !v)} />
           <Tgl label="Show Recommendations" on={recs} onToggle={() => setRecs((v) => !v)} />
-          <Btn full onClick={() => actions.flashToast("Re-scanned schematic for designators")}>Refresh List</Btn>
+          {/* No parts-audit engine behind these yet; they used to toast as if they ran. */}
+          <Btn full reason="Refreshing the parts audit isn't built yet.">Refresh List</Btn>
           <div style={{ display: "flex", gap: 6 }}>
-            <Btn onClick={() => actions.flashToast(`${sel.size || "0"} row(s) → Check`)}>Set to Check</Btn>
-            <Btn onClick={() => actions.flashToast(`${sel.size || "0"} row(s) → Not Check`)}>Not Check</Btn>
+            <Btn reason="Marking rows to check isn't built yet.">Set to Check</Btn>
+            <Btn reason="Marking rows to check isn't built yet.">Not Check</Btn>
           </div>
         </>
       }
@@ -232,7 +255,7 @@ function DeviceTab() {
                 <td style={td}><input type="checkbox" checked={sel.has(r.no)} onChange={() => toggleRow(r.no)} /></td>
                 <td style={td}>{r.no}</td>
                 <td style={{ ...td, color: T.ink, fontWeight: 600 }}>{r.desig}</td>
-                <td style={td}><span onClick={() => actions.flashToast(`Assign LCSC part for ${r.desig}`)} style={{ color: T.brand, cursor: "pointer" }}>Assign LCSC Part</span></td>
+                <td style={td}><span aria-disabled title="Assigning an LCSC part isn't built yet." style={{ color: T.mut, cursor: "default" }}>Assign LCSC Part</span></td>
                 <td style={td}>{r.supPart}</td><td style={td}>{r.supplier}</td><td style={td}>{r.stock}</td><td style={td}>{r.price}</td>
                 <td style={td}>{r.comment}</td><td style={td}>{r.fp}</td><td style={td}>{r.count}</td><td style={td}>{r.mfrPart}</td><td style={td}>{r.mfr}</td>
               </tr>

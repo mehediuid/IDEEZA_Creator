@@ -43,13 +43,13 @@ import {
   type ProductConfidence,
 } from "@/lib/create/confidence";
 
-const GROUP_LABEL: Record<IssueGroup, string> = {
+export const GROUP_LABEL: Record<IssueGroup, string> = {
   "design-rule": "Design rule issues",
   assembly: "Assembly checks",
   compatibility: "Works-with issues",
 };
 
-const GROUP_ORDER: IssueGroup[] = ["design-rule", "assembly", "compatibility"];
+export const GROUP_ORDER: IssueGroup[] = ["design-rule", "assembly", "compatibility"];
 
 /** One id, shared by the toggle's `aria-controls` and the panel's own `id`.
  *  The two render in different places in the tree now (L1), so neither can

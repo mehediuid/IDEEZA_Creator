@@ -29,6 +29,11 @@ export function honestyLine(productName: string): string {
   return `Made in this browser from ${productName}'s image and on-screen text — the AI video model isn't connected yet. Your prompt is kept with the video.`;
 }
 
+/** The same honesty for someone who isn't the maker (a buyer, a visitor): nothing about "your" prompt. */
+export function viewerHonestyLine(productName: string): string {
+  return `Made in this browser from ${productName}'s image and on-screen text — the AI video model isn't connected yet.`;
+}
+
 export const SILENT_NOTE = "The video is silent.";
 
 /** Under the storyboard (owner, 2026-10-12): what the browser can make of it today. */
@@ -130,6 +135,10 @@ export function actionLabel(action: StatusCopy["action"]): string | null {
   return action === "generate" ? "Generate AI video" : action === "retry" ? "Try again" : action === "review" ? "Review" : null;
 }
 
+/** The readiness row's quiet action on a settled "Video ready": a new take, made as Regenerate
+ *  makes one, while the take in use stays until the maker chooses the new one. */
+export const REPLACE_LABEL = "Replace";
+
 export type ReadinessCopy = { title: string; info: string; cta: string };
 
 /** P2-VIDEO-14's table, with §4.3's two added purposes. */
@@ -211,8 +220,14 @@ export function moreToastsLine(n: number): string {
 
 export const PROJECT_VIDEO_TITLE = "Project video";
 export const PROJECT_GROUP_META = "Made from your product videos";
+/** Owner, 2026-11-17: one product, one video. */
+export const SINGLE_PRODUCT_NOTE =
+  "This project has one product, so its video is the project video too. Add another product and a project video is made from both.";
 export const PROJECT_HONESTY =
   "Made in this browser from your product videos, silent for now. The intro, order, lines and sound are kept with the video for the AI video model.";
+/** PROJECT_HONESTY for someone who isn't the maker. */
+export const PROJECT_HONESTY_VIEWER =
+  "Made in this browser from the product videos, silent for now — the AI video model isn't connected yet.";
 
 /** "0:19" — a project video's length on its row. */
 export function clockOf(ms: number): string {
@@ -236,6 +251,16 @@ export type ProjectRowCopy = {
 export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
   const v = s.video;
   switch (s.state) {
+    case "single":
+      // Never a row of its own: the one product's video is the project's (owner, 2026-11-17).
+      return {
+        text: s.face ? "Its product's video is the project video" : "Its product's video will be the project video",
+        sub: null,
+        tone: "neutral",
+        icon: "info",
+        action: null,
+        progress: null,
+      };
     case "waiting":
       return {
         text: s.total === 1 ? "Opens when your product video is ready" : `Opens when every product has a video · ${s.ready} of ${s.total} ready`,
@@ -344,6 +369,7 @@ export function projectStateLine(s: ProjectVideoStatus, productCount: number): s
     case "failed":
       return "Project video render failed.";
     case "waiting":
+    case "single":
       return null;
   }
 }

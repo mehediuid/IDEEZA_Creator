@@ -2563,14 +2563,14 @@ export function samplePostOf(project: Project): InnovationPost {
     creator: personOf(project.creator.id),
     minted: project.minted,
     license: project.minted ? seed.license ?? "Commercial use" : null,
-    chain: project.minted ? "Polygon" : null,
+    chain: project.minted ? "Base Sepolia (Testnet)" : null,
     network: seed.network ?? null,
     media: mediaOf(products, cover),
     products,
     partsCount: products.reduce((sum, p) => sum + p.parts.length, 0),
     listing:
       project.minted && seed.listing && seed.listing.length > 0
-        ? { rows: seed.listing.map(([label, price]) => ({ label, price })), href: "/marketplace" }
+        ? { rows: seed.listing.map(([label, price]) => ({ label, price })), href: `/marketplace/${project.id}` }
         : null,
     base: { appreciations: project.appreciations, views: project.views },
     shared: true,

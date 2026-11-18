@@ -37,6 +37,7 @@ import { ownedBySegment, ownershipOf } from "./ownership";
 import { lockOf } from "./edit-gate";
 import { can, type Viewer } from "./permissions";
 import type { OwnershipSplit, ProjectLock } from "./p2-types";
+import { progressOf, type VideoJob } from "../video/jobs";
 
 // ─────────────────────────── the status ───────────────────────────
 
@@ -687,6 +688,26 @@ export function hintOf(s: Pick<ProjectSummary, "status" | "next" | "pendingVersi
     case "minted":
       return "Record not in this browser";
   }
+}
+
+/**
+ * The web card's hint while a video renders (owner, 2026-11-15): it stands in for `hintOf` until
+ * every render for the project, or for any of its products, has finished or failed; then the
+ * normal hint returns. The percent is the corner toast's own source (`useVideoJobs`'s jobs and
+ * clock, through `progressOf`), and with several renders it is the furthest behind, the one that
+ * decides when the line goes. Null when nothing renders.
+ *
+ * | renders for the project | hint |
+ * |---|---|
+ * | none, or all done or failed | null (the normal hint) |
+ * | every one still queued | Video waiting to render |
+ * | otherwise | Video rendering · {p}% |
+ */
+export function renderHintOf(projectId: string, jobs: readonly VideoJob[], now: number): string | null {
+  const active = jobs.filter((j) => j.projectId === projectId && j.stage !== "done" && j.stage !== "failed");
+  if (active.length === 0) return null;
+  if (active.every((j) => j.stage === "queued")) return "Video waiting to render";
+  return `Video rendering · ${Math.min(...active.map((j) => Math.round(progressOf(j, now).total)))}%`;
 }
 
 export function cardText(s: ProjectSummary, now: number): CardText {

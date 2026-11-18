@@ -9,7 +9,10 @@
 // ink; without one they take the design's brand-subtle fill and brand ink. An
 // image `src` covers the initials, and a broken image falls back to them.
 // Decorative by default (`aria-hidden`): beside a name the picture adds
-// nothing to say. Given a `label` it is an image with that name.
+// nothing to say. Given a `label` it is an image with that name. `phone`: in
+// the mobile prototype, where the type tokens take phone values, LG and XL
+// initials name the class whose phone value is the Figma's (H5 18/26, H3
+// 24/32); the web's look is unchanged without it.
 //
 // AvatarLabelGroup — the avatar beside a name and an optional supporting
 // line, in the four sizes the design draws (SM–XL). The avatar in it is always
@@ -30,6 +33,12 @@ const SIZE_CLASS: Record<AvatarSize, string> = {
   xl: "size-[64px] text-3xl leading-3xl tracking-slight",
 };
 
+/** LG and XL at phone width (the smaller sizes' tokens don't change on a phone). */
+const PHONE_SIZE_CLASS: Partial<Record<AvatarSize, string>> = {
+  lg: "size-[48px] text-2xl leading-2xl tracking-normal",
+  xl: "size-[64px] text-4xl leading-4xl tracking-slight",
+};
+
 export interface AvatarProps {
   initials: string;
   /** The person's colour, a DS token string (`var(--color-…)`). */
@@ -38,10 +47,12 @@ export interface AvatarProps {
   size?: AvatarSize;
   /** Names the avatar for assistive tech; without it the avatar is decorative. */
   label?: string;
+  /** The mobile prototype's initials sizes (LG H5 18/26, XL H3 24/32 at phone width). */
+  phone?: boolean;
   className?: string;
 }
 
-export function Avatar({ initials, color, src, size = "sm", label, className }: AvatarProps) {
+export function Avatar({ initials, color, src, size = "sm", label, phone, className }: AvatarProps) {
   // Remembered per src, so a new picture gets its own chance to load.
   const [brokenSrc, setBrokenSrc] = React.useState<string | null>(null);
   const showImage = !!src && brokenSrc !== src;
@@ -52,7 +63,7 @@ export function Avatar({ initials, color, src, size = "sm", label, className }: 
       aria-hidden={label ? undefined : true}
       className={cn(
         "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden whitespace-nowrap rounded-full font-semibold",
-        SIZE_CLASS[size],
+        (phone && PHONE_SIZE_CLASS[size]) || SIZE_CLASS[size],
         color ? "text-text-on-brand" : "bg-bg-brand-subtle text-text-brand",
         className,
       )}

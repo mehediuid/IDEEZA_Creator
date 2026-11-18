@@ -305,12 +305,12 @@ function FreeCard({ hydrated, onAct }: { hydrated: boolean; onAct: () => void })
 
 // ── Compare plans ─────────────────────────────────────────────────────
 
-type Cell = string | number | boolean;
+export type Cell = string | number | boolean;
 type Row = { label: string; values: Cell[]; chip?: boolean };
 
 // The rows that mean something in the app today, grouped as the design groups
 // them. "Mint, list and buy" says it isn't a plan's to give.
-const COMPARE: { group: string; rows: Row[] }[] = [
+export const COMPARE: { group: string; rows: Row[] }[] = [
   {
     group: "AI & resources",
     rows: [
@@ -457,15 +457,15 @@ function CompareHead({ plan: p, cycle, hydrated, offer, onAct }: { plan: Plan; c
 
 // ── Pricing FAQs ──────────────────────────────────────────────────────
 
-type FaqTab = "general" | "tinkerer" | "builder" | "disruptor";
-const FAQ_TABS: { id: FaqTab; label: string }[] = [
+export type FaqTab = "general" | "tinkerer" | "builder" | "disruptor";
+export const FAQ_TABS: { id: FaqTab; label: string }[] = [
   { id: "general", label: "General" },
   { id: "tinkerer", label: "Tinkerer plan" },
   { id: "builder", label: "Builder plan" },
   { id: "disruptor", label: "Disruptor plan" },
 ];
 
-const FAQ: Record<FaqTab, { q: string; a: string }[]> = {
+export const FAQ: Record<FaqTab, { q: string; a: string }[]> = {
   general: [
     {
       q: "Is IDEEZA priced on usage or a subscription?",
@@ -506,7 +506,7 @@ const FAQ: Record<FaqTab, { q: string; a: string }[]> = {
   ],
 };
 
-const HELPFUL_KEY = "ideeza:pricing:faq-helpful";
+export const HELPFUL_KEY = "ideeza:pricing:faq-helpful";
 
 function Faq() {
   const [tab, setTab] = React.useState<FaqTab>("general");

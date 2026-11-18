@@ -24,6 +24,7 @@ import { expiredLines } from "./credit-lots";
 import { withinCap } from "./credit-limits";
 import { readSettings } from "../settings/prefs";
 import { VALIDITY_MONTHS, addMonths } from "./credit-pricing";
+import { redeemOrderId } from "./redeem-codes";
 
 /** What building ONE product costs. A build covers every product in the
  *  project, each with its own five deliverables, so the price is per product —
@@ -77,8 +78,8 @@ export type CreditEntry = {
   delta: number;
   /** `topup`: the free demo top-ups of earlier builds, kept readable.
    *  `purchase`: credits bought. `grant`: the plan's monthly credits.
-   *  `expiry`: a lot ran out of time. */
-  reason: ChargeReason | "seed" | "refund" | "topup" | "purchase" | "grant" | "expiry";
+   *  `expiry`: a lot ran out of time. `redeem`: a code's free credits. */
+  reason: ChargeReason | "seed" | "refund" | "topup" | "purchase" | "grant" | "expiry" | "redeem";
   /** What was charged: a build id, or a concept turn id. The field keeps
    *  its name because ledgers are already stored under it. */
   buildId?: string;
@@ -99,6 +100,8 @@ export type CreditEntry = {
   payer?: string;
   /** An expiry: the lot (ledger line id) it empties. */
   lotId?: string;
+  /** A redeem: the code typed ("IDEEZA100"). */
+  code?: string;
 };
 
 export type CreditsState = {
@@ -293,6 +296,24 @@ export function grantState(
   });
 }
 
+// A code's credits (redeem-codes.ts), valid VALIDITY_MONTHS like bought ones. Idempotent per code: its order id is
+// `redeem:<CODE>`, so a double press or a second try adds once.
+export function redeemState(state: CreditsState, r: { code: string; credits: number; ts?: number }): CreditsState {
+  const credits = Math.trunc(r.credits);
+  const orderId = redeemOrderId(r.code);
+  if (credits <= 0 || state.ledger.some((e) => e.orderId === orderId)) return state;
+  const ts = r.ts ?? Date.now();
+  return applyEntry(state, {
+    id: makeId(),
+    delta: credits,
+    reason: "redeem",
+    orderId,
+    code: orderId.slice("redeem:".length),
+    ts,
+    expiresAt: addMonths(ts, VALIDITY_MONTHS),
+  });
+}
+
 // The lots past their expiry at `now` lose what they had left: one `expiry`
 // line each, so the balance and the ledger stay one story.
 export function expireState(state: CreditsState, now: number): CreditsState {
@@ -321,6 +342,8 @@ export function describeEntry(entry: CreditEntry, subject?: string): string {
       return `${sign}${amount} ${entry.pack ?? "Plan"} plan credits`;
     case "expiry":
       return `${sign}${amount} Expired`;
+    case "redeem":
+      return `${sign}${amount} Code ${entry.code ?? ""}`.trimEnd();
     case "build":
       return `${sign}${amount} Build${about}`;
     case "concept":
@@ -350,6 +373,8 @@ type Ctx = {
   purchase: (order: CreditOrder) => boolean;
   /** Adds a plan's monthly credits once per grant id. */
   grant: (g: Parameters<typeof grantState>[1]) => boolean;
+  /** Adds a code's credits once per code; false when it already did. */
+  redeem: (r: { code: string; credits: number }) => boolean;
 };
 
 const CreditsContext = React.createContext<Ctx | null>(null);
@@ -479,6 +504,14 @@ export function CreditsProvider({
     return true;
   }, []);
 
+  const redeem = React.useCallback((r: { code: string; credits: number }) => {
+    const next = redeemState(stateRef.current, r);
+    if (next === stateRef.current) return false;
+    stateRef.current = next;
+    setState(next);
+    return true;
+  }, []);
+
   const value: Ctx = {
     hydrated,
     balance: state.balance,
@@ -489,6 +522,7 @@ export function CreditsProvider({
     refund,
     purchase,
     grant,
+    redeem,
   };
 
   return (

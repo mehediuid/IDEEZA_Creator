@@ -168,6 +168,9 @@ const IdeezaTheme = Blockly.Theme.defineTheme("ideeza", {
 
 /** The workspace is per product (`ideeza:code:blockly-workspace:<projectId>:<productId>`,
  *  P2-EDITOR-3); the pre-P2 global one is the maker's to bring in (P2-EDITOR-5). */
+/** The workspace grid's dot length; 0 hides the grid (Settings ▸ Toggle Grid). */
+const GRID_DOT_LENGTH = 2;
+
 const blocklyKey = (scope: EditorScope | null) => (scope ? editorDocKey("code.blockly", scope) : null);
 
 function ChevronRight({ down }: { down?: boolean }) {
@@ -618,7 +621,7 @@ export function BlocklyImpl() {
     const newWs = Blockly.inject(wsHostRef.current, {
       theme: IdeezaTheme,
       renderer: "thrasos",
-      grid: { spacing: 20, length: 2, colour: "#e2e8f0", snap: true },
+      grid: { spacing: 20, length: GRID_DOT_LENGTH, colour: "#e2e8f0", snap: true },
       zoom: { controls: false, wheel: true, startScale: 1, maxScale: 3, minScale: 0.3, scaleSpeed: 1.2 },
       move: { scrollbars: true, drag: true, wheel: false },
       trashcan: false,
@@ -744,8 +747,14 @@ export function BlocklyImpl() {
           return;
         }
         case "settings:toggleGrid": {
-          const grid = cur.getGrid() as unknown as { snap_?: boolean };
-          if (grid) grid.snap_ = !grid.snap_;
+          // Blockly 13's Grid has no `snap_` (the old write changed nothing):
+          // hide or show the dots and turn snapping off or on with them.
+          const grid = cur.getGrid();
+          if (!grid) return;
+          const on = grid.getLength() > 0;
+          grid.setLength(on ? 0 : GRID_DOT_LENGTH);
+          grid.setSnapToGrid(!on);
+          grid.update(cur.scale);
           return;
         }
         case "settings:clearWorkspace": cur.clear(); return;

@@ -12,6 +12,7 @@
 import type { StoredDraft } from "../brief/project-brief";
 import { commitStepsOf, type CommitPoint, type EarnFacts } from "../commerce/ladder";
 import { earnedOf, payoutLinesText } from "../commerce/payout";
+import { IN_CHECKOUT_OWNER_LINE } from "../market/checkout-hold";
 import type { CommercialState } from "../commerce/state";
 import type { EditionTrack, ListingView, Sale } from "../market/types";
 import { formatAmount } from "../wallet/money";
@@ -66,8 +67,8 @@ export function earnButtonOf(input: {
     label: EARN_LABEL,
     sub,
     violet: false,
-    // Earn opens on Sell (owner, 2026-10-12: "Earn → straight to Sell").
-    href: earnHref(input.projectId, "sell"),
+    // Earn opens on its Overview (owner, 2026-11-17; it opened on Sell from 2026-10-12).
+    href: earnHref(input.projectId),
   });
   switch (input.commercial) {
     case "soldOut":
@@ -311,8 +312,9 @@ export type MainRowState = {
 };
 
 /** The Main NFT row's state and button, first match wins: not minted (Sell is the mint), sold in
- *  full, given, a live or paused listing (Manage), else "Not selling" with Sell when the maker
- *  may list (`canList`: the Sell pair's Add to marketplace / List another share). */
+ *  full, given, a live or paused listing (Manage; "In checkout" while a buyer pays), else "Not
+ *  selling" with Sell when the maker may list (`canList`: the Sell pair's Add to marketplace /
+ *  List another share). */
 export function mainRowStateOf(f: {
   status: ProjectStatus;
   listing: ListingView;
@@ -320,6 +322,8 @@ export function mainRowStateOf(f: {
   canList: boolean;
   /** The owner sees the listing's controls. */
   manage: boolean;
+  /** A buyer's checkout holds the live listing (checkout-hold.ts). */
+  inCheckout?: boolean;
 }): MainRowState {
   const row = (line: string, action: MainRowState["action"], label: MainRowState["label"] = "Sell", live = false): MainRowState => ({
     line,
@@ -335,8 +339,9 @@ export function mainRowStateOf(f: {
   switch (v.kind) {
     case "live": {
       const l = v.listing;
-      const line =
-        l.type === "auction"
+      const line = f.inCheckout
+        ? IN_CHECKOUT_OWNER_LINE
+        : l.type === "auction"
           ? `Auction · from ${formatAmount(l.minBid ?? "0", l.token)} · ${l.percentSelling}%`
           : `Listed · ${formatAmount(l.price ?? "0", l.token)} · ${l.percentSelling}%`;
       return row(line, f.manage ? "manage" : "none", "Manage", true);

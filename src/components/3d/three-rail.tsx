@@ -29,15 +29,22 @@ export function ThreeRail({ topOffset = 132 }: { topOffset?: number } = {}) {
         zIndex: 16,
       }}
     >
-      {items.map((r) => (
+      {items.map((r) => {
+        const go = () => {
+          const step = RAIL_KEY_TO_STEP[r.key];
+          if (step && r.key !== "3d" && activeProject) goStep(step);
+        };
+        // Keyboard- and screen-reader-reachable, like the PCB rail.
+        return (
         <div
           key={r.key}
+          role="link"
+          tabIndex={0}
+          aria-current={r.key === "3d" ? "step" : undefined}
           className="ix-nav"
           data-tour={`rail-${r.key}`}
-          onClick={() => {
-            const step = RAIL_KEY_TO_STEP[r.key];
-            if (step && r.key !== "3d" && activeProject) goStep(step);
-          }}
+          onClick={go}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); go(); } }}
           style={{
             display: "flex",
             flexDirection: "column",
@@ -76,7 +83,8 @@ export function ThreeRail({ topOffset = 132 }: { topOffset?: number } = {}) {
             {r.label}
           </span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

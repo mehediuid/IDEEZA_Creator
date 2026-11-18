@@ -11,8 +11,8 @@
 //
 // Kept for the whole browser, never parked (BROWSER_KEYS): the accounts, who is
 // signed in, the account waiting for its email, the welcome offer (already by
-// email), the tester id and the parking flag, and anything not under `ideeza:`
-// (the theme).
+// email), the tester id and the parking flag, the mobile prototype's way-in
+// keys, and anything not under `ideeza:` (the theme).
 //
 // Work from before accounts kept their own (no `ideeza:parking` flag yet)
 // stays with whoever the caller names (auth.ts: the account coming in, unless
@@ -37,6 +37,19 @@ export const BROWSER_KEYS: ReadonlySet<string> = new Set([
   "ideeza:welcome-offer",
   "ideeza:tester",
   PARKING_FLAG,
+  // The mobile prototype's way in (phone.ts): this phone's memory, each
+  // account's sign-in methods by email, the code being typed, the sign-in
+  // tries, a provider's answer and the toast a reload carries.
+  "ideeza:m:phone",
+  "ideeza:m:accounts",
+  "ideeza:m:code",
+  "ideeza:m:sign-in-tries",
+  "ideeza:m:provider",
+  "ideeza:m:toast",
+  // Sign-in & security (security.ts): each account's 2-step, devices and
+  // scheduled deletion by email, and this browser's device id.
+  "ideeza:m:security",
+  "ideeza:m:device",
 ]);
 
 /** Where `email`'s work waits while it is signed out. */

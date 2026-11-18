@@ -111,7 +111,7 @@ function EarnPage({
           <StorageErrorBanner className="mb-8 print:hidden" />
           {SLOTS.banners?.map((B, i) => <B key={i} {...props} />)}
           {owner ? (
-            <div className={cn(EARN_COLUMN, "flex flex-col")}>
+            <div className="flex min-w-0 flex-col">
               <EarnHeader {...props} commercial={commercial} titleRef={titleRef} />
               <div className="mt-10">
                 <EarnNav projectId={project.id} section={section} />
@@ -185,7 +185,7 @@ export function EarnSkeleton({ children }: { children?: React.ReactNode }) {
     <div role="status" aria-label="Loading earning" className={PAGE_CONTAINER}>
       <span className="sr-only">Loading earning</span>
       <div aria-hidden className={PAGE_CONTENT}>
-        <div className={cn(EARN_COLUMN, "flex flex-col")}>
+        <div className="flex min-w-0 flex-col">
           <Bone className="h-6 w-[160px]" />
           <Bone className="mt-6 h-12 w-[220px]" />
           <div className="mt-10 flex gap-4 border-b border-solid border-border pb-2">
@@ -193,7 +193,7 @@ export function EarnSkeleton({ children }: { children?: React.ReactNode }) {
               <Bone key={i} className="h-8 w-[96px] shrink-0" />
             ))}
           </div>
-          <div className="mt-12 flex flex-col gap-16">
+          <div className={cn(EARN_COLUMN, "mt-12 flex flex-col gap-16")}>
             <Bone className="h-[64px] w-full" />
             <div className={cn(EARN_CARD, "border-transparent bg-bg-subtle motion-safe:animate-pulse")}>
               <span className="block h-[160px]" />

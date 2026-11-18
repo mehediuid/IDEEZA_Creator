@@ -31,6 +31,8 @@ import {
   CANNOT_PLAY_COPY,
   FAILURE_COPY,
   PROJECT_HONESTY,
+  PROJECT_HONESTY_VIEWER,
+  viewerHonestyLine,
   actionLabel,
   clipMetaLine,
   honestyLine,
@@ -131,16 +133,27 @@ export type VideoPlayerProps = {
   status?: ProductVideoStatus;
   /** "Generate again" / "Try again" / "Generate AI video" — owner only. */
   onGenerate?: () => void;
+  /** Who reads the notes under the clip: "viewer" (a buyer, a visitor) drops the maker's "your
+   *  prompt / your product videos". The maker's words otherwise. */
+  audience?: "maker" | "viewer";
   className?: string;
 };
 
 const BOX = "relative aspect-video w-full overflow-hidden rounded-xl border border-solid border-border bg-bg-surface-raised";
 
-export function VideoPlayer({ take, productName, projectId, owner = false, status, onGenerate, className }: VideoPlayerProps) {
+export function VideoPlayer({ take, productName, projectId, owner = false, status, onGenerate, audience = "maker", className }: VideoPlayerProps) {
   return (
     <div className={cn("flex flex-col gap-4", className)}>
       {take ? (
-        <ReadyPlayer key={take.id} take={take} productName={productName} projectId={projectId} owner={owner} onGenerate={onGenerate} />
+        <ReadyPlayer
+          key={take.id}
+          take={take}
+          productName={productName}
+          projectId={projectId}
+          owner={owner}
+          onGenerate={onGenerate}
+          audience={audience}
+        />
       ) : owner && status ? (
         <StatusPanel status={status} productName={productName} onGenerate={onGenerate} />
       ) : null}
@@ -183,12 +196,14 @@ function ReadyPlayer({
   projectId,
   owner,
   onGenerate,
+  audience,
 }: {
   take: VideoTake;
   productName: string;
   projectId: string;
   owner: boolean;
   onGenerate?: () => void;
+  audience: "maker" | "viewer";
 }) {
   const clip = useClipUrl(take.id);
   const videoRef = React.useRef<HTMLVideoElement>(null);
@@ -325,7 +340,14 @@ function ReadyPlayer({
             ))}
           </ul>
         </details>
-        <p className="text-sm text-text-tertiary">{take.join ? PROJECT_HONESTY : honestyLine(productName)}</p>
+        <p className="text-sm text-text-tertiary">{audience === "viewer"
+            ? take.join
+              ? PROJECT_HONESTY_VIEWER
+              : viewerHonestyLine(productName)
+            : take.join
+              ? PROJECT_HONESTY
+              : honestyLine(productName)}
+        </p>
       </div>
     </>
   );

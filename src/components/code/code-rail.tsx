@@ -30,15 +30,22 @@ export function CodeRail({ topOffset = 152 }: { topOffset?: number } = {}) {
         zIndex: 16,
       }}
     >
-      {items.map((r) => (
+      {items.map((r) => {
+        const go = () => {
+          const step = RAIL_KEY_TO_STEP[r.key];
+          if (step && r.key !== "code" && activeProject) goStep(step);
+        };
+        // Keyboard- and screen-reader-reachable, like the PCB and 3D rails.
+        return (
         <div
           key={r.key}
+          role="link"
+          tabIndex={0}
+          aria-current={r.key === "code" ? "step" : undefined}
           className="ix-nav"
           data-tour={`rail-${r.key}`}
-          onClick={() => {
-            const step = RAIL_KEY_TO_STEP[r.key];
-            if (step && r.key !== "code" && activeProject) goStep(step);
-          }}
+          onClick={go}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); go(); } }}
           style={{
             display: "flex",
             flexDirection: "column",
@@ -77,7 +84,8 @@ export function CodeRail({ topOffset = 152 }: { topOffset?: number } = {}) {
             {r.label}
           </span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

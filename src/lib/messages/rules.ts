@@ -268,6 +268,8 @@ export function send(
     id: string;
     contextId: string;
     teamIds?: readonly PersonId[];
+    /** A message of this conversation the new one replies to; any other id is left out. */
+    replyTo?: string;
   },
 ): Result<{ data: MessagesData; entry: MessageEntry }> {
   const c = conversationOf(data, o.conversationId);
@@ -281,6 +283,7 @@ export function send(
   if (o.context && !sameContext(latestContextOf(data, c.id), o.context)) {
     added.push({ id: o.contextId, conversationId: c.id, kind: "context", from: o.from, at: o.now, context: o.context });
   }
+  const repliesTo = o.replyTo ? messageById(data, o.replyTo) : null;
   const entry: MessageEntry = {
     id: o.id,
     conversationId: c.id,
@@ -290,6 +293,7 @@ export function send(
     text: o.draft.text.trim(),
     files: o.draft.files,
     cards: o.draft.cards,
+    ...(repliesTo && repliesTo.conversationId === c.id ? { replyTo: repliesTo.id } : {}),
   };
   added.push(entry);
   const next = patchConversation({ ...data, entries: [...data.entries, ...added] }, c.id, (conv) => {
