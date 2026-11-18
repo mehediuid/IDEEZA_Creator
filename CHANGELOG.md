@@ -6,7 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
-| [CL-027](#cl-027-an-inspiration-image-with-the-idea-home-and-add-a-product) | An inspiration image with the idea (Home and Add a product) | 18 Nov 2026 | Not created yet | Not started |
+| [CL-027](#cl-027-an-inspiration-image-with-the-idea-home-and-add-a-product) | An inspiration image with the idea (Home and Add a product) | 18 Nov 2026 | [PR-9658](https://ideeza.atlassian.net/browse/PR-9658) | Not started |
 | [CL-026](#cl-026-the-projects-earn-button-opens-earns-overview) | The project's Earn button opens Earn's Overview | 18 Nov 2026 | Not created yet | Not started |
 | [CL-025](#cl-025-one-product-one-video) | One product, one video | 18 Nov 2026 | Not created yet | Not started |
 | [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons) | Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
@@ -60,7 +60,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 ## CL-027 An inspiration image with the idea (Home and Add a product)
 
-**In the prototype:** 18 November 2026 · **Jira:** not created yet · **Production:** Not started
+**In the prototype:** 18 November 2026 · **Jira:** [PR-9658](https://ideeza.atlassian.net/browse/PR-9658) · **Production:** Not started
 
 **Screen:** the AI box: Home (`/`) **Generate with AI**, and a project page's **Add a product › Build with AI** (`/projects/<id>`, the same box); the concept chat it opens (`/chat/<id>`), its build log and its first concept.
 
