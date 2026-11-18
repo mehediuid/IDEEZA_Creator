@@ -6,6 +6,8 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-026](#cl-026-the-projects-earn-button-opens-earns-overview) | The project's Earn button opens Earn's Overview | 18 Nov 2026 | Not created yet | Not started |
+| [CL-025](#cl-025-one-product-one-video) | One product, one video | 18 Nov 2026 | Not created yet | Not started |
 | [CL-024](#cl-024-hackathon-page-the-final-content-the-prize-and-countdown-and-the-main-hackathon-at-hackathons) | Hackathon page: the final content, the prize and countdown, and the main hackathon at /hackathons | 17 Nov 2026 | [PR-9653](https://ideeza.atlassian.net/browse/PR-9653) (one Story for the Hackathon page) | Not started |
 | [CL-023](#cl-023-sample-listings-and-demo-projects-that-are-always-there) | Sample listings and demo projects that are always there | 17 Nov 2026 | None: prototype only | Nothing to build |
 | [CL-022](#cl-022-dropdown-menus-open-in-place) | Dropdown menus open in place | 17 Nov 2026 | Not created yet | Not started |
@@ -52,6 +54,62 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-026 The project's Earn button opens Earn's Overview
+
+**In the prototype:** 18 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the project page's header, the **Earn** button (web), and the project page's bottom bar, **Earn** (mobile app).
+
+### What to build
+
+- [ ] Earn on the project page opens Earn on its **Overview** tab (`/projects/<id>/earn`), with Overview selected in the tabs (Overview · Sell · Business plan · Money). It used to open on Sell.
+- [ ] Sell, Business plan and Money stay one tap away in the same tabs.
+- [ ] Every state of the button opens Overview: not ready yet ("n of m ready to sell"), ready, listed, listing paused, part sold, sold in full, given.
+- [ ] Mobile app: Earn in the project's bottom bar opens the Earn hub (its overview), not the Sell screen.
+- [ ] Links that name a part of Earn on purpose keep their place (for example a fix that opens Sell, or Splits from Team).
+
+### Design
+
+- No visual change: the same button and the same Earn tabs. Only where it lands changes.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: Earn opened on the Sell tab](docs/changelog/2026-11-18-earn-button-before.png) | ![After: Earn opens on the Overview tab](docs/changelog/2026-11-18-earn-button-after.png) |
+
+---
+
+## CL-025 One product, one video
+
+**In the prototype:** 18 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the project page's Media tab; the Videos part of Review and sign (mint, sell, give); the Videos dialog (Make videos); Share to Innovations, Add to marketplace, Relist and selling the whole project's copies; the Innovations post; the mint's success screen; the mobile app's project page, Media, Feed clip and marketplace screen.
+
+### What to build
+
+- [ ] A project with **one** current product has **one** video: that product's video is also the project's video. No project video is made for it and none is asked for.
+- [ ] Media tab with one product: only **Product videos** (the product's video, its takes and Review as today). No **Project video** section, no Make project video.
+- [ ] Review and sign with one product: **Videos · 1 of 1 ready**, only the product's row, no Project video group. With the product's video in use the line reads *Every video is ready.* and the commit (Sign and list, Sign and give…) is not held by videos. Without it: *1 product still needs an AI video.* (never "The project video comes next").
+- [ ] Share to Innovations, Add to marketplace, Give, Relist and selling copies of the whole project: with one product, only that product's video is needed. The sell check reads *Each product has its AI video* (no project video row); the relist checklist has no "The project video" row; the share note never asks for a project video.
+- [ ] Where the whole project shows one video, one product's video is it: the Innovations post opens on it, the mint's success screen shows its poster (no second "project" poster), the marketplace and the mobile Feed play it, the mobile project page plays it on top.
+- [ ] Mobile app Media line with one product: *Video · Take n · 480p · 10 s*; before a video is in use, the product's own state (*No video yet*, *Ready to review*, …).
+- [ ] No corner toast "All n product videos are ready · Make project video" for a one-product project.
+- [ ] Opening the Project video dialog (or the mobile Project video screen) on a one-product project shows only: *This project has one product, so its video is the project video too. Add another product and a project video is made from both.* and Close.
+- [ ] A product added later (two or more current products): the project video is asked again exactly as before (the Project video section and group return, *Opens when every product has a video · 1 of 2 ready*, then Make project video). A dropped product does not count: a project back to one current product goes back to one video, and a project video left over from before is not used.
+
+### Design
+
+- No new components. The Project video section and group are simply not shown with one product; the dialog's note is the DS Banner (info) with the dialog's one Close button.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: a one-product project's Media asked for a project video](docs/changelog/2026-11-18-one-video-media-before.png) | ![After: one product, one video, no Project video section](docs/changelog/2026-11-18-one-video-media-after.png) |
 
 ---
 
