@@ -308,7 +308,7 @@ export type CoinInput = {
   offer?: { startedAt: number; endsAt: number } | null;
 };
 
-const credits = (n: number) => `${n} credit${n === 1 ? "" : "s"}`;
+const credits = (n: number) => `${n.toLocaleString("en-US")} credit${n === 1 ? "" : "s"}`;
 
 /** The ledger line that last took the balance to `lowAt` or under. */
 function crossingOf(ledger: readonly LotLine[], lowAt: number): LotLine | null {

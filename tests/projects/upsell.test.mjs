@@ -163,6 +163,8 @@ test("D3: each month's credits get a notice, never the account's first grant, an
   const g = paid.find((n) => n.id === "coin:grant:g2");
   assert.equal(g.title, "Your 300 credits for this month are here");
   assert.equal(g.body, undefined, "paid makers hear of a bigger plan only at a limit");
+  const top = S.coinNotices(coinIn({ ledger: [ledger[1], { ...ledger[2], delta: 1200 }], onFree: false, pitch: null }));
+  assert.equal(top.find((n) => n.id === "coin:grant:g2").title, "Your 1,200 credits for this month are here");
 });
 
 test("F1: the welcome offer's last hour gets one notice, and only then", () => {
