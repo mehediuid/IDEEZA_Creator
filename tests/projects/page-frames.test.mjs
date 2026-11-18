@@ -185,7 +185,16 @@ test("the Add a product tile is the owner's first tile; it opens the dialog on t
   assert.match(tab, /gate\.reasonOf\("addProduct"\)/, "a blocked project says why instead of opening");
   assert.match(tab, /\{canAddProduct && <AddProductTile/);
   const dialog = read(DETAILS + "add-product-dialog.tsx");
-  assert.match(dialog, /createChat\(prompt\.trim\(\), \{ quality, addTo: project\.id \}\)/, "AI starts the ordinary chat, on this project, at its Quality");
+  assert.match(
+    dialog,
+    /createChat\(prompt\.trim\(\), \{ quality, addTo: project\.id, \.\.\.image \}\)/,
+    "AI starts the ordinary chat, on this project, at its Quality, with the box's inspiration image",
+  );
+  // The shared box owns the inspiration image whole and hands it over stored (owner, 2026-11-18).
+  assert.match(dialog, /const start = \(image\?: PromptImage\) =>/);
+  const card = read("components/dashboard/prompt-card.tsx");
+  assert.match(card, /uploadInspiration\(inspiration\.dataUrl\)/);
+  assert.match(card, /onSubmit\(\{ inspiration: up\.url, inspirationName: inspiration\.name \}\)/);
   // The regular AI chat box, not a bare textarea (owner, 2026-11-16).
   assert.match(dialog, /<PromptCard\b/);
   assert.doesNotMatch(dialog, /<textarea\b/);
