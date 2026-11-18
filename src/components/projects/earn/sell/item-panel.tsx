@@ -2,10 +2,10 @@
 
 // Earn › Sell's item panel (owner, 2026-11-18, the Sell desk plan, A with
 // every recommendation): the one home for the tile picked on the board (D4).
-// It sits in the page frame's rail beside the board, or under the board below
-// a 1024 px page (D12: the board's Sell and listing flows open their own
-// dialogs, so the panel stays in the page rather than a sheet under them —
-// one floating layer at a time).
+// It sits in the page frame's rail beside the board; under a 1024 px page it
+// opens from the side as the DS Drawer when a tile is tapped (owner,
+// 2026-11-18: "on a small screen the info goes far below — open it from the
+// side"), with the item's title in the drawer's header.
 //
 // Every control here is the one the row had, unchanged:
 // - Main NFT: before the mint, the mint flow (sell intent); minted and not
@@ -66,28 +66,40 @@ export type MainDesk = {
 
 export type CopyDesk = { tile: DeskTile; state: CopyRowState; scope: CopyScope; kind: EditionKind };
 
-/** The panel's frame: one surface card, its parts divided; "Back to the board" where it sits under the board. */
-export function PanelFrame({ children, onBack, id }: { children: React.ReactNode; onBack: () => void; id: string }) {
+/** The panel's frame beside the board: one surface card, its parts divided, held in view while the board scrolls. */
+export function PanelFrame({ children, id }: { children: React.ReactNode; id: string }) {
   return (
     <aside
       id={id}
       aria-label="Selected item"
-      className="flex min-w-0 scroll-mt-10 flex-col divide-y divide-border rounded-2xl border border-solid border-border bg-bg-surface [@container(min-width:1024px)]:sticky [@container(min-width:1024px)]:top-8"
+      className="sticky top-8 flex min-w-0 flex-col divide-y divide-border rounded-2xl border border-solid border-border bg-bg-surface"
     >
-      <div className="px-10 pt-8 [@container(min-width:1024px)]:hidden">
-        <button type="button" onClick={onBack} className={cn(EARN_LINK, "bg-transparent p-0")}>
-          ‹ Back to the board
-        </button>
-      </div>
       {children}
     </aside>
   );
 }
 
+/** True inside the drawer (under a 1024 px page): its header already says the item's kind and title. */
+const InDrawer = React.createContext(false);
+export const PanelInDrawer = InDrawer.Provider;
+
+/** The drawer's title and line for an item: what the panel's head says beside the board. */
+export function panelHeadOf(
+  item: { kind: "draft" } | { kind: DeskKind; scopeName: string | null },
+  projectName: string,
+): { title: string; description: string } {
+  if (item.kind === "draft") return { title: `Mint ${projectName} to start selling`, description: "Not minted yet" };
+  if (item.kind === "main") return { title: projectName, description: `${KIND_NAME.main} · ${MAIN_SUB}` };
+  return { title: deskTitleOf(item.kind, item.scopeName, projectName), description: `${KIND_NAME[item.kind]} · ${DESK_KIND_LINE[item.kind]}` };
+}
+
+const MAIN_SUB = "The project itself. Whoever buys it gets everything inside it.";
+
 function Head({ kind, title, sub, chip, lines }: { kind: DeskKind; title: string; sub: string; chip: DeskTile["chip"]; lines: string[] }) {
+  const inDrawer = React.useContext(InDrawer);
   return (
     <div className={SECTION}>
-      <div className="flex min-w-0 flex-col gap-2">
+      <div className={cn("flex min-w-0 flex-col gap-2", inDrawer && "hidden")}>
         <span className="flex items-center gap-3 text-sm font-semibold leading-sm text-text-tertiary">
           <KindDot kind={kind} />
           {KIND_NAME[kind]}
@@ -225,7 +237,7 @@ export function MainPanel(props: SlotProps & { desk: MainDesk }) {
   const pct = tile.meter?.sold ?? 0;
   return (
     <>
-      <Head kind="main" title={project.name} sub="The project itself. Whoever buys it gets everything inside it." chip={tile.chip} lines={[state.line]} />
+      <Head kind="main" title={project.name} sub={MAIN_SUB} chip={tile.chip} lines={[state.line]} />
 
       {locked && mainSale ? (
         <div className={SECTION}>
@@ -405,10 +417,11 @@ export function CopyPanel(props: SlotProps & { desk: CopyDesk }) {
 
 /** D10: nothing is minted, so the board is one band and the panel offers the mint's two ways. */
 export function DraftPanel({ project }: Pick<SlotProps, "project">) {
+  const inDrawer = React.useContext(InDrawer);
   return (
     <>
       <div className={SECTION}>
-        <div className="flex min-w-0 flex-col gap-2">
+        <div className={cn("flex min-w-0 flex-col gap-2", inDrawer && "hidden")}>
           <span className="text-sm font-semibold leading-sm text-text-tertiary">Not minted yet</span>
           <h3 className="m-0 break-words text-xl font-semibold leading-xl text-text-primary">Mint {project.name} to start selling</h3>
         </div>

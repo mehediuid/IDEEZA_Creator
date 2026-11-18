@@ -7,8 +7,10 @@
 //   behind ⓘ. Each column's head says its rule in a line.
 // - The board: a row for the whole project and one per product (D3: a
 //   one-product project has one row), a column for Main, Physical and
-//   Virtual. A product's Main cell is empty and says why ("Products sell copies
-//   only, not a Main NFT."), so the rule shows in the board's shape.
+//   Virtual, in two labelled groups (owner, 2026-11-18): "Whole project" and
+//   "One product at a time · n products — Products sell copies only, not a
+//   Main NFT." A product's Main cell is empty, so the rule shows in the
+//   board's shape.
 // - A tile is the row's state in a chip, its price, how much has sold (a
 //   meter) and what it earned (D6). A tile only picks (aria-pressed); every
 //   control for it is in the item panel (D4).
@@ -83,6 +85,7 @@ export function SellBoard({
   onSelect,
   draft,
   sold,
+  opens,
 }: {
   rows: BoardRow[];
   caption: { value: string; label: string }[] | null;
@@ -92,6 +95,8 @@ export function SellBoard({
   draft: { name: string; selected: boolean } | null;
   /** Sold in full: the heading says what was sold, the rules stay behind their disclosure. */
   sold: boolean;
+  /** The item panel opens as a drawer (under a 1024 px page). */
+  opens: boolean;
 }) {
   const headingId = React.useId();
   const [rules, setRules] = React.useState(false);
@@ -169,38 +174,47 @@ export function SellBoard({
           ))}
         </div>
         {rows.map((row, i) => (
-          <div
-            key={row.scope}
-            id={i === 0 ? undefined : `editions-${row.scope}`}
-            className={cn(ROW, "scroll-mt-10 border-0 border-t border-solid border-border py-8", i === 0 && "[@container(max-width:479px)]:border-t-0")}
-          >
-            <ScopeCell row={row} />
-            {draft && i === 0 ? (
-              <button
-                type="button"
-                aria-pressed={draft.selected}
-                onClick={() => onSelect("draft")}
-                className={cn(
-                  "col-span-full grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-7 gap-y-1 rounded-xl border border-dashed border-border-strong bg-transparent px-9 py-8 text-left outline-none transition-colors duration-fast hover:border-text-tertiary focus-visible:ring-2 focus-visible:ring-border-focus [@container(min-width:720px)]:col-span-3",
-                  draft.selected && "border-solid border-border-brand bg-bg-brand-subtle",
-                )}
-              >
-                <span aria-hidden className="row-span-2 inline-flex size-[40px] items-center justify-center rounded-xl bg-bg-subtle text-text-secondary">
-                  <Icon icon={LockIcon} size={20} />
-                </span>
-                <span className="text-md font-semibold leading-md text-text-primary">Not minted yet</span>
-                <span className="text-md leading-md text-text-secondary">
-                  Mint {draft.name} once, and each of these can go on sale on its own: the Main NFT, Physical copies and Virtual copies.
-                </span>
-              </button>
-            ) : (
-              DESK_KINDS.map((k) => {
-                const tile = row.tiles[k];
-                if (!tile) return <EmptyMain key={k} first={i === 1} />;
-                return <Tile key={k} tile={tile} rowName={row.name} selected={selected === tile.key} onSelect={onSelect} />;
-              })
+          <React.Fragment key={row.scope}>
+            {i === 0 && <GroupBand title="Whole project" lead="The Main NFT, and copies of everything in it." />}
+            {i === 1 && (
+              <GroupBand
+                title="One product at a time"
+                count={rows.length - 1 === 1 ? "1 product" : `${rows.length - 1} products`}
+                lead="Products sell copies only, not a Main NFT."
+              />
             )}
-          </div>
+            <div
+              id={i === 0 ? undefined : `editions-${row.scope}`}
+              className={cn(ROW, "scroll-mt-10 py-8", i > 1 && "border-0 border-t border-solid border-border")}
+            >
+              <ScopeCell row={row} />
+              {draft && i === 0 ? (
+                <button
+                  type="button"
+                  aria-pressed={draft.selected}
+                  onClick={() => onSelect("draft")}
+                  className={cn(
+                    "col-span-full grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-7 gap-y-1 rounded-xl border border-dashed border-border-strong bg-transparent px-9 py-8 text-left outline-none transition-colors duration-fast hover:border-text-tertiary focus-visible:ring-2 focus-visible:ring-border-focus [@container(min-width:720px)]:col-span-3",
+                    draft.selected && "border-solid border-border-brand bg-bg-brand-subtle",
+                  )}
+                >
+                  <span aria-hidden className="row-span-2 inline-flex size-[40px] items-center justify-center rounded-xl bg-bg-subtle text-text-secondary">
+                    <Icon icon={LockIcon} size={20} />
+                  </span>
+                  <span className="text-md font-semibold leading-md text-text-primary">Not minted yet</span>
+                  <span className="text-md leading-md text-text-secondary">
+                    Mint {draft.name} once, and each of these can go on sale on its own: the Main NFT, Physical copies and Virtual copies.
+                  </span>
+                </button>
+              ) : (
+                DESK_KINDS.map((k) => {
+                  const tile = row.tiles[k];
+                  if (!tile) return <EmptyMain key={k} />;
+                  return <Tile key={k} tile={tile} rowName={row.name} selected={selected === tile.key} onSelect={onSelect} opens={opens} />;
+                })
+              )}
+            </div>
+          </React.Fragment>
         ))}
       </div>
     </section>
@@ -238,16 +252,59 @@ function initialsOf(name: string): string {
   return (parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase();
 }
 
-/** A product's Main cell: products sell copies only. The first one says so; the others are a dash. */
-function EmptyMain({ first }: { first: boolean }) {
+/** The board's two groups (owner, 2026-11-18: "keep a divider between the project and the products —
+ *  a line alone doesn't read"): a labelled band above the whole project's row and above the products'. */
+function GroupBand({ title, lead, count }: { title: string; lead: string; count?: string }) {
+  return (
+    <div className="mt-6 flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1 rounded-lg bg-bg-subtle px-7 py-4 first:mt-0">
+      <h3 className="m-0 text-md font-semibold leading-md text-text-primary">{title}</h3>
+      {count && <Badge tone="neutral" className="h-[22px] bg-bg-surface px-[8px] py-0 text-sm font-semibold leading-sm">{count}</Badge>}
+      <span className="text-sm leading-sm text-text-secondary">{lead}</span>
+    </div>
+  );
+}
+
+/** A product's Main cell: empty — its band says products sell copies only. */
+function EmptyMain() {
   return (
     <span className="hidden min-h-[112px] items-center justify-center rounded-xl border border-dashed border-border px-6 text-center text-sm leading-sm text-text-tertiary [@container(min-width:480px)]:flex">
-      {first ? "Products sell copies only, not a Main NFT." : <span aria-label="No Main NFT">—</span>}
+      <span aria-label="No Main NFT">—</span>
     </span>
   );
 }
 
-function Tile({ tile, rowName, selected, onSelect }: { tile: DeskTile; rowName: string; selected: boolean; onSelect: (key: string) => void }) {
+/** What a tile's tap does, said on the tile where the panel opens beside the page (a drawer). */
+function opensWord(tile: DeskTile): string {
+  switch (tile.chip.label) {
+    case "Not selling":
+      return "Sell";
+    case "Not minted yet":
+      return "Mint";
+    case "Sold in full":
+      return "Receipt";
+    case "Stopped":
+    case "Given":
+    case "Can't sell":
+      return "Details";
+    default:
+      return "Manage";
+  }
+}
+
+function Tile({
+  tile,
+  rowName,
+  selected,
+  onSelect,
+  opens,
+}: {
+  tile: DeskTile;
+  rowName: string;
+  selected: boolean;
+  onSelect: (key: string) => void;
+  /** The panel opens as a drawer (under a 1024 px page): the tile says what a tap does. */
+  opens: boolean;
+}) {
   const earned = tile.earned.length ? payoutLinesText(tile.earned) : null;
   const meterLabel = `${KIND_NAME[tile.kind]} of ${rowName}: ${tile.soldLine ?? ""}`;
   return (
@@ -281,10 +338,11 @@ function Tile({ tile, rowName, selected, onSelect }: { tile: DeskTile; rowName: 
           <span className="font-semibold text-text-success">{earned}</span>
         ) : tile.hint ? (
           <span className="font-semibold text-text-warning">{tile.hint}</span>
-        ) : tile.chip.label === "Not selling" ? (
+        ) : tile.chip.label === "Not selling" && !opens ? (
           <span className="font-semibold text-text-link">Set a price ›</span>
         ) : null}
       </span>
+      {opens && <span className="self-end text-sm font-semibold leading-sm text-text-link">{opensWord(tile)} ›</span>}
     </button>
   );
 }
