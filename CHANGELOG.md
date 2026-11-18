@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-031](#cl-031-earn-from-a-product-page) | Earn from a product page | 18 Nov 2026 | Not created yet | Not started |
 | [CL-030](#cl-030-ai-videos-start-them-one-after-another-and-sell-while-they-render) | AI videos: start them one after another, and sell while they render | 18 Nov 2026 | Not created yet | Not started |
 | [CL-029](#cl-029-innovations-post-the-story-page-with-an-on-marketplace-card) | Innovations post: the story page with an On Marketplace card | 13 Oct 2026 | [PR-9662](https://ideeza.atlassian.net/browse/PR-9662) | Not started |
 | [CL-028](#cl-028-earn--sell-one-board-for-everything-you-sell) | Earn › Sell: one board for everything you sell | 18 Nov 2026 | [PR-9660](https://ideeza.atlassian.net/browse/PR-9660) | Not started |
@@ -58,6 +59,64 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-031 Earn from a product page
+
+**In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** a product's page (`/projects/<id>/products/<product>`, web), its header; it leads to **Earn › Sell** (`/projects/<id>/earn/sell`).
+
+A product's page had no way to earning: the maker had to go back to the project and open Earn from there. Now the product's header has its own **Earn**, which opens the product's copies on Earn › Sell, with one line saying how they sell.
+
+### What to build
+
+**The button**
+
+- [ ] The product header's buttons are **Open in editor**, **Earn** and ⋯, in that order. Earn has the coins icon, like the project page's Earn.
+- [ ] Open in editor stays the page's one violet button, so Earn is the quiet button. When the product's editor can't be opened (a project sold in full), Earn is the violet one.
+- [ ] Only the owner sees it, on their own project. It is not on the product page in Explore marketplace, on an Innovations post or in Preview as others see it.
+- [ ] While the page is leaving for Earn (or for the editor), both buttons wait, so a second click does nothing.
+
+**The line under it**
+
+- [ ] One line under the buttons says how this product's copies sell (a product sells Physical and Virtual copies only; the Main NFT is the whole project's):
+  - *Not selling copies yet*
+  - *Physical copies on sale*, *Virtual copies on sale* or *Physical and Virtual copies on sale*, with *· 3 sold* once some have sold
+  - *Sold out · 50 sold* when every listed copy has sold
+  - *1 copy sold* or *4 copies sold* when nothing is on sale any more
+  - *Copies wait for videos* when a copies listing of this product is signed and waits for its videos (CL-030)
+  - *Sold in full* once the project is sold in full
+- [ ] In a project with one product, the whole project's copies are that product's, so they count in its line.
+- [ ] The button's accessible description is that line.
+
+**Where it goes**
+
+- [ ] Earn opens **Earn › Sell** on this product's row, and the item panel opens on its copies (Physical first; Virtual when Physical can't be sold), for example *Physical copies of RC Car* with **Sell physical copies** or that listing's controls.
+- [ ] In a project with one product (which has no product row on the board), it opens on the whole project's copies, which are that product's.
+- [ ] Below a 1024 px wide page the board scrolls to the product's row and a tap on a tile opens the panel as a drawer, as on Earn › Sell today (CL-028).
+
+**Layout**
+
+- [ ] Beside the title (from a 720 px wide header) the buttons sit on the right and the line under them is right-aligned. Narrower, the buttons come under the description with the line beside them; at phone width the buttons share one row, 44 px tall, and the line goes under them. The page never scrolls sideways.
+
+**Not in this change**
+
+- The phone app's product page is unchanged.
+
+### Design
+
+- The project header's own action group and button: 40 px tall beside the title, 44 px at phone width. Earn is the quiet header button (`bg-surface`, 1 px `border`, `text-primary`, hover `bg-surface-raised`) with the coins icon (16), the same as the project page's Earn; the violet one is the primary header button. ⋯ is the existing menu button.
+- The line: `text-sm` (14), `text-secondary`, with the same spacing as the project header's line under its buttons.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: only Open in editor and ⋯; no way to earning from the product](docs/changelog/2026-11-18-product-earn-before.png) | ![After: Earn beside Open in editor, with the product's copies line under it](docs/changelog/2026-11-18-product-earn-after.png) |
+| | ![After: Earn opens Earn › Sell on RC Car's row, with its Physical copies in the panel](docs/changelog/2026-11-18-product-earn-sell-after.png) |
+| | ![After: at phone width the buttons share a row and the line sits under them](docs/changelog/2026-11-18-product-earn-phone-after.png) |
 
 ---
 
