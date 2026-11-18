@@ -1,0 +1,22 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="Group 1000005189">
+<path id="Ellipse 1628" d="M0 12C0 18.6274 5.37258 24 12 24C18.6274 24 24 18.6274 24 12C24 5.37258 18.6274 0 12 0C5.37258 0 0 5.37258 0 12ZM21.2389 12C21.2389 17.1025 17.1025 21.2389 12 21.2389C6.89748 21.2389 2.76107 17.1025 2.76107 12C2.76107 6.89748 6.89748 2.76107 12 2.76107C17.1025 2.76107 21.2389 6.89748 21.2389 12Z" fill="url(#paint0_linear_0_174)" fill-opacity="0.6"/>
+<g id="Ellipse 1629">
+<use xlink:href="#stroke0_0_174" fill="#D9D9D9"/>
+<use xlink:href="#stroke0_0_174" fill="url(#paint1_linear_0_174)"/>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_174" x1="21" y1="26.7" x2="-7.24731" y2="3.37775" gradientUnits="userSpaceOnUse">
+<stop offset="0.206514" stop-color="#AF94FD" stop-opacity="0.16"/>
+<stop offset="0.462473" stop-color="#AF94FB" stop-opacity="0.8"/>
+<stop offset="0.748825" stop-color="#AF94FD" stop-opacity="0.24"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_174" x1="21" y1="26.7" x2="-7.24731" y2="3.37775" gradientUnits="userSpaceOnUse">
+<stop offset="0.206514" stop-color="#AF94FD" stop-opacity="0.16"/>
+<stop offset="0.462473" stop-color="#AF94FB" stop-opacity="0.8"/>
+<stop offset="0.748825" stop-color="#AF94FD" stop-opacity="0.24"/>
+</linearGradient>
+<path id="stroke0_0_174" d="M12 0C13.79 -2.13452e-08 15.5573 0.40044 17.1724 1.17198C18.7876 1.94353 20.2097 3.06663 21.3345 4.45901C22.4594 5.85139 23.2585 7.47778 23.6733 9.21902C24.0881 10.9603 24.1082 12.7723 23.7319 14.5222C23.3557 16.2722 22.5927 17.9159 21.499 19.3328C20.4052 20.7497 19.0082 21.904 17.4105 22.711C15.8128 23.5181 14.0548 23.9575 12.2653 23.9971C10.4757 24.0366 8.70001 23.6754 7.0682 22.9397L8.20295 20.4226C9.4593 20.989 10.8265 21.2671 12.2042 21.2367C13.582 21.2062 14.9355 20.8679 16.1656 20.2465C17.3957 19.6252 18.4712 18.7365 19.3133 17.6456C20.1555 16.5547 20.7429 15.2892 21.0325 13.9419C21.3222 12.5946 21.3068 11.1995 20.9874 9.8589C20.668 8.51829 20.0528 7.26612 19.1868 6.19411C18.3207 5.1221 17.2258 4.25741 15.9823 3.66339C14.7388 3.06937 13.3781 2.76107 12 2.76107V0Z"/>
+</defs>
+</svg>

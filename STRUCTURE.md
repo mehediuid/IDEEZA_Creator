@@ -31,6 +31,8 @@ ideeza-creator-panel/
    │  ├─ api/                Server API routes (concept/generate · concept/summarize
    │  │                      · refine · build/start · three/generate · business-plan/section
    │  │                      · and others)
+   │  ├─ (auth)/             the demo sign-in, outside the shell: sign-up/ (+ check-email/,
+   │  │                      welcome/: the one question) and sign-in/ (+ Forgot password)
    │  ├─ (dashboard)/        Home + Parts + Innovations
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
    │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
@@ -57,7 +59,17 @@ ideeza-creator-panel/
    │
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
-   │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), command-palette (⌘K)
+   │  ├─ auth/               the demo sign-in's pages (sign up, check email, the one question,
+   │  │                      sign in), the 3D stage beside them, the Demo email, AuthGate +
+   │  │                      useSignOut, Home's SourceNudge
+   │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), hero-glow (its wash, shared with sign-in), deliverable-icon, command-palette (⌘K)
+   │  ├─ hackathons/         the public hackathon page /hackathons (data: lib/hackathons/)
+   │  ├─ landing/            the public landing page /landing: nav, section-header, one file per section (art: public/landing/); events/ = /events + /events/[slug] (photos: public/events/)
+   │  ├─ mobile/             the /m mobile prototype: phone frame, status bar, top bar, tab bar,
+   │  │                      screen; kit/ = the Shared kit (sheets, menus, confirms, report, toasts, states);
+   │  │                      account/ = the way in (gate, ways in, code step, guest gate); one folder
+   │  │                      per area: ai, feed, project, project-earn, product, messages, profile,
+   │  │                      settings, plans, help, earn-coin
    │  ├─ credits/            Settings › Plan & pricing (User Panel V2 layouts): pricing-frame (sheet,
    │  │                      breadcrumb, pill tabs), plan-pricing-page, plans-panel, credits-panel,
    │  │                      billing-history, payment-method-panel, plan-banner (+ plan details),
@@ -155,8 +167,9 @@ ideeza-creator-panel/
    │  ├─ notifications/      the notice model: sources (builds, Blog, Messages, market, credits,
    │  │                      videos, comments), filter (heard or quiet, count, quiet hours, pop-up
    │  │                      mode, hidden words), popups (daily summary, browser pop-ups), read state; withdrawal-method notices
-   │  ├─ account/            the account: payment token, invoices, summary, your private identity
-   │  │                      (ideeza:account:identity: the legal name) and countries
+   │  ├─ account/            the account: the demo sign-in (auth.ts: ideeza:accounts, ideeza:session, ideeza:verify,
+   │  │                      the pre-paint gate; zone-countries.ts), payment token, invoices, summary,
+   │  │                      your private identity (ideeza:account:identity: the legal name) and countries
    │  ├─ support/            Report a problem: form rules, page names, recent
    │  │                      errors, image shrink/capture, openReportProblem()
    │  ├─ server/             server-only: Vercel Blob driver, report store, the text model (Groq, then Pollinations)

@@ -219,9 +219,9 @@ function layoutOnly(style?: React.CSSProperties): React.CSSProperties | undefine
   return { flex, marginLeft, marginRight, marginTop, marginBottom, width, textAlign, alignSelf };
 }
 
-function Pill({ children, onClick, style }: { children: React.ReactNode; onClick?: () => void; style?: React.CSSProperties }) {
+function Pill({ children, onClick, style, disabled, title }: { children: React.ReactNode; onClick?: () => void; style?: React.CSSProperties; disabled?: boolean; title?: string }) {
   return (
-    <Button hierarchy="secondary" size="md" onClick={onClick} style={layoutOnly(style)}>
+    <Button hierarchy="secondary" size="md" onClick={onClick} style={layoutOnly(style)} disabled={disabled} title={title}>
       {children}
     </Button>
   );
@@ -345,15 +345,18 @@ function ArrayModal() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-7) var(--spacing-12) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Pill onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-12)", borderRadius: "var(--radius-lg)" }}>Cancel</Pill>
+          {/* Neither has an engine behind it: the first toasted "Drag on canvas to
+              set spacing" with no drag handler, the second "Preview: R × C" with
+              nothing drawn. */}
           <button
             type="button"
-            onClick={() => hasSel && actions.flashToast("Drag on canvas to set spacing")}
-            disabled={!hasSel}
-            style={{ padding: "var(--spacing-5) var(--spacing-10)", background: "var(--color-bg-subtle)", border: "none", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-md)", fontWeight: 500, color: "var(--color-text-tertiary)", cursor: hasSel ? "pointer" : "not-allowed", opacity: hasSel ? 1 : 0.5, fontFamily: "inherit" }}
+            disabled
+            title="Adjusting the spacing by cursor isn't built yet."
+            style={{ padding: "var(--spacing-5) var(--spacing-10)", background: "var(--color-bg-subtle)", border: "none", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-md)", fontWeight: 500, color: "var(--color-text-tertiary)", cursor: "not-allowed", opacity: 0.5, fontFamily: "inherit" }}
           >
             Adjust Array Spacing By Cursor
           </button>
-          <Pill style={{ marginLeft: "auto", padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }} onClick={() => actions.flashToast(`Preview: ${state.arr.row} × ${state.arr.col} array`)}>Preview</Pill>
+          <Pill style={{ marginLeft: "auto", padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }} disabled title="Array preview isn't built yet.">Preview</Pill>
           <PrimaryBtn onClick={runArray} style={{ padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }}>Confirm</PrimaryBtn>
         </div>
       </Card>
@@ -2225,16 +2228,31 @@ function TextModal() {
 }
 
 // ── 3D export (Export ▸ 3D File / 3D Shell File) ─────────────────────────────
-// Faithful UI to the Figma "3D Section" export modals; controls are interactive
-// (local state) but Export/Cancel just close — no real file generation.
+// The Figma "3D Section" export modals; Export writes a real STL / OBJ of the
+// board and its parts (exporters.ts). Only those two reach the mesh, so the
+// other Include pills are greyed with the reason instead of toggling nothing.
+const INCLUDE_NOT_BUILT: Record<string, string> = {
+  Silkscreen: "Silkscreen in the 3D export isn't built yet.",
+  "Signal Layer Circuits": "Signal layers in the 3D export aren't built yet.",
+  Vias: "Vias in the 3D export aren't built yet.",
+};
 function Export3DModal({ shell }: { shell?: boolean }) {
   const actions = usePcbActions();
   const state = usePcbState();
   const [fileName, setFileName] = React.useState("3D_shell_PCB1");
   const [type, setType] = React.useState<"STL" | "OBJ">("STL");
-  const [autoGen, setAutoGen] = React.useState(true);
   const INCLUDE = ["PCB Board", "Component Models", "Silkscreen", "Signal Layer Circuits", "Vias"];
-  const [inc, setInc] = React.useState<Record<string, boolean>>({ "PCB Board": true, "Component Models": true, Silkscreen: true, "Signal Layer Circuits": true, Vias: false });
+  const [inc, setInc] = React.useState<Record<string, boolean>>({ "PCB Board": true, "Component Models": true });
+  const include = shell ? { board: true, comps: false } : { board: inc["PCB Board"] !== false, comps: inc["Component Models"] !== false };
+  // The real size of the file Export would write now (it read "~4.2 MB · Last exported 3 days ago").
+  const fileBytes = React.useMemo(() => {
+    if (shell) return 0;
+    const m = collectPcbModel(state);
+    const slab = include.board ? exportSlabTriangles(m) : null;
+    return (type === "OBJ" ? buildObj(m, include, slab) : buildStl(m, include, slab)).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shell, state, type, include.board, include.comps]);
+  const fileSize = fileBytes >= 1024 * 1024 ? `${(fileBytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(fileBytes / 1024))} KB`;
 
   const groupCss: React.CSSProperties = { fontSize: "var(--font-size-xs)", fontWeight: 700, letterSpacing: ".4px", textTransform: "uppercase", color: "var(--color-text-tertiary)", marginBottom: "var(--spacing-4)" };
   const inputCss: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-primary)", fontSize: "var(--font-size-sm)", outline: "none", fontFamily: "inherit" };
@@ -2282,10 +2300,11 @@ function Export3DModal({ shell }: { shell?: boolean }) {
               <div style={groupCss}>Include in Export</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-3)" }}>
                 {INCLUDE.map((k) => {
-                  const on = inc[k];
+                  const off = INCLUDE_NOT_BUILT[k];
+                  const on = !off && inc[k];
                   return (
-                    <button key={k} type="button" onClick={() => setInc((s) => ({ ...s, [k]: !s[k] }))}
-                      style={{ display: "inline-flex", alignItems: "center", gap: "var(--spacing-2)", padding: "var(--spacing-3) var(--spacing-5)", borderRadius: "var(--radius-full)", border: `var(--border-width-1) solid ${on ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: on ? "var(--color-bg-brand-subtle)" : "transparent", color: on ? "var(--color-text-brand)" : "var(--color-text-secondary)", fontSize: "var(--font-size-sm)", fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "inherit" }}>
+                    <button key={k} type="button" disabled={!!off} title={off} aria-pressed={on} onClick={() => !off && setInc((s) => ({ ...s, [k]: !s[k] }))}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "var(--spacing-2)", padding: "var(--spacing-3) var(--spacing-5)", borderRadius: "var(--radius-full)", border: `var(--border-width-1) solid ${on ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: on ? "var(--color-bg-brand-subtle)" : "transparent", color: off ? "var(--color-text-disabled)" : on ? "var(--color-text-brand)" : "var(--color-text-secondary)", fontSize: "var(--font-size-sm)", fontWeight: on ? 600 : 500, cursor: off ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: off ? 0.5 : 1 }}>
                       <span style={{ width: 7, height: 7, borderRadius: "50%", background: on ? "var(--color-violet-600)" : "var(--color-border-strong, #888)" }} />
                       {k}
                     </button>
@@ -2303,12 +2322,14 @@ function Export3DModal({ shell }: { shell?: boolean }) {
                   <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Auto-generate missing 3D models</div>
                   <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>Components without a bound 3D model will be built from footprint height data</div>
                 </div>
-                <button type="button" role="switch" aria-checked={autoGen} onClick={() => setAutoGen((v) => !v)}
-                  style={{ width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: autoGen ? "var(--color-violet-600)" : "var(--color-border-default)", position: "relative", flex: "0 0 auto", transition: "background .15s" }}>
-                  <span style={{ position: "absolute", top: 2, left: autoGen ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                {/* Always on: no part carries a bound model the exporter reads, so
+                    every part is built from its footprint; off changed nothing. */}
+                <button type="button" role="switch" aria-checked disabled title="Exporting bound 3D models isn't built yet, so every part is built from its footprint height."
+                  style={{ width: 40, height: 22, borderRadius: 11, border: "none", cursor: "not-allowed", background: "var(--color-violet-600)", position: "relative", flex: "0 0 auto", opacity: 0.5 }}>
+                  <span style={{ position: "absolute", top: 2, left: 20, width: 18, height: 18, borderRadius: "50%", background: "#fff" }} />
                 </button>
               </div>
-              <div style={noteCss}>Estimated file size: ~4.2 MB · Last exported 3 days ago</div>
+              <div style={noteCss}>Estimated file size: {fileSize}</div>
             </>
           ) : (
             <div style={noteCss}>Shell-only export includes board outline + mounting holes. For full component geometry, use &ldquo;3D File&rdquo; instead.</div>
@@ -2316,10 +2337,10 @@ function Export3DModal({ shell }: { shell?: boolean }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="secondary" size="md" onClick={() => { actions.flashToast("Order placed — 3D shell"); actions.closeModal(); }}>Order 3D Shell</Button>
+          {/* It toasted "Order placed" and ordered nothing. */}
+          <Button hierarchy="secondary" size="md" disabled title="Ordering a 3D shell isn't built yet.">Order 3D Shell</Button>
           <Button hierarchy="primary" size="md" onClick={() => {
             const m = collectPcbModel(state);
-            const include = shell ? { board: true, comps: false } : { board: inc["PCB Board"] !== false, comps: inc["Component Models"] !== false };
             const slab = include.board ? exportSlabTriangles(m) : null;
             const base = fileName.replace(/\.(stl|obj)$/i, "");
             if (type === "OBJ") downloadBlob(`${base}.obj`, buildObj(m, include, slab), "text/plain;charset=utf-8");

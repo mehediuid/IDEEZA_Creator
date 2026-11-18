@@ -114,6 +114,7 @@ function entryIn(v: unknown): Entry | null {
     ...(optNum(v.editedAt) !== undefined ? { editedAt: v.editedAt as number } : {}),
     ...(optNum(v.deletedAt) !== undefined ? { deletedAt: v.deletedAt as number } : {}),
     ...(isId(v.sourceId) ? { sourceId: v.sourceId } : {}),
+    ...(isId(v.replyTo) ? { replyTo: v.replyTo } : {}),
   };
 }
 

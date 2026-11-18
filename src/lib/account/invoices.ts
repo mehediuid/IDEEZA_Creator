@@ -40,6 +40,8 @@ export type PaidOrder = {
   price?: number;
   credit?: number;
   creditFrom?: PlanTier;
+  offer?: number;
+  coupon?: { code: string; amount: number; rule: string };
   txHash?: string;
   payer?: string;
 };
@@ -57,6 +59,8 @@ export type Invoice = {
   lines: InvoiceLine[];
   /** Taken off the lines, as positive dollars. */
   adjustments: { label: string; amount: number }[];
+  /** A plan bought with a coupon: its code and what it took off. */
+  coupon: { code: string; amount: number } | null;
   subtotal: number;
   tax: number;
   total: number;
@@ -96,6 +100,7 @@ function creditInvoice(e: PaidLine): Invoice {
     item: `${description} · ${count(e.delta)} credits`,
     lines: [{ description, detail, qty: 1, unit: list, total: list }],
     adjustments: off > 0 ? [{ label: "Plan discount", amount: off }] : [],
+    coupon: null,
     subtotal: list,
     tax: 0,
     total: price,
@@ -111,8 +116,10 @@ function creditInvoice(e: PaidLine): Invoice {
 function planInvoice(o: PaidOrder): Invoice {
   const plan = planOf(o.tier);
   const renewal = o.kind === "renewal";
-  const price = o.price ?? cents(o.amount + (o.credit ?? 0));
+  const coupon = o.coupon && o.coupon.amount > 0 ? o.coupon : null;
+  const price = o.price ?? cents(o.amount + (o.credit ?? 0) + (o.offer ?? 0) + (coupon?.amount ?? 0));
   const credit = o.credit ?? 0;
+  const offer = o.offer ?? 0;
   const cycle = o.cycle === "yearly" ? "annual" : "monthly";
   const to = addMonths(o.ts, cycleMonths(o.cycle));
   return {
@@ -130,10 +137,15 @@ function planInvoice(o: PaidOrder): Invoice {
         total: price,
       },
     ],
-    adjustments: credit > 0 ? [{ label: `Unused time on ${o.creditFrom ? planOf(o.creditFrom).name : "your last plan"}`, amount: credit }] : [],
+    adjustments: [
+      ...(credit > 0 ? [{ label: `Unused time on ${o.creditFrom ? planOf(o.creditFrom).name : "your last plan"}`, amount: credit }] : []),
+      ...(offer > 0 ? [{ label: "Welcome offer (50% off)", amount: offer }] : []),
+      ...(coupon ? [{ label: `Coupon ${coupon.code} (${coupon.rule})`, amount: coupon.amount }] : []),
+    ],
+    coupon: coupon ? { code: coupon.code, amount: coupon.amount } : null,
     subtotal: price,
     tax: 0,
-    total: cents(price - credit),
+    total: cents(price - credit - offer - (coupon?.amount ?? 0)),
     paid: renewal ? 0 : o.amount,
     paidWith: o.paidWith,
     status: renewal ? "Not charged" : "Paid",

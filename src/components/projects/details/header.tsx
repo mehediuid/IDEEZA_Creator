@@ -45,12 +45,14 @@ import { Icon } from "@/components/dashboard/icon";
 import { Badge, Banner } from "@/components/ideeza";
 import { LeaveButton } from "@/components/create/leave-button";
 import { SharedPostChip } from "@/components/innovations/shared-post-chip";
+import { PersonName } from "@/components/profile/person-name";
 import { ShowcaseChip, StatusChip } from "@/components/projects/status-chip";
 import { LockLine } from "@/components/projects/product/product-states";
 import { roleChipOf } from "@/lib/manual/contributors";
 import { earnHref, publishOptionsOf } from "@/lib/manual/earn-route";
 import { earnButtonOf } from "@/lib/manual/earn-view";
 import { headerText, type MetaPart } from "@/lib/manual/project-summary";
+import { ME } from "@/lib/messages/types";
 import { buyerSide } from "@/lib/manual/project-route";
 import { labelOf } from "@/lib/manual/journey";
 import { ActivityNow } from "./activity/now-block";
@@ -87,6 +89,7 @@ export function ProjectHeader({
   announce,
   parts,
   context = "project",
+  creatorName,
 }: SlotProps & {
   /** The shell's h1 ref (COR-7), forwarded to ProjectTitle. */
   titleRef: React.RefObject<HTMLHeadingElement | null>;
@@ -94,6 +97,9 @@ export function ProjectHeader({
   parts?: ProjectSlots["headerParts"];
   /** "market" on Explore marketplace's buyer view: the meta line leads with "Created by you · Listed {date}". */
   context?: "project" | "market";
+  /** On Explore marketplace, the creator as the buyer knows them: "Created by {name}" (a link to
+   *  their profile) instead of "you", and the line leaves out the owner's Saved date. */
+  creatorName?: string;
 }) {
   const router = useRouter();
   // Which control is taking the maker off the page. Never cleared: the navigation unmounts it.
@@ -146,14 +152,29 @@ export function ProjectHeader({
   // P2-CONTRIB-10 on the buyer's side: "Owned by Ana Silva" (a visitor never sees the roster, so
   // the name is never a link). On Explore marketplace: "Created by you · Listed Sep 28, 2026" (§2.4).
   const lead: React.ReactNode[] = [];
+  const market = context === "market" && creatorName !== undefined;
   if (!engineering) {
-    if (text.createdBy) lead.push(text.createdBy);
+    if (text.createdBy && market) {
+      // "Created by you · Listed {date}" → "Created by {name}" (a link) · "Listed {date}".
+      const rest = text.createdBy.replace(/^Created by you(?: · )?/, "");
+      lead.push(
+        <React.Fragment key="by">
+          Created by{" "}
+          <PersonName id={ME} tone="secondary">
+            {creatorName}
+          </PersonName>
+        </React.Fragment>,
+      );
+      if (rest) lead.push(rest);
+    } else if (text.createdBy) lead.push(text.createdBy);
     else if (text.ownedBy?.created) lead.push(text.ownedBy.created);
     if (text.ownedBy) lead.push(`Owned by ${text.ownedBy.ownedBy}`);
   }
   const meta: MetaPart[] = engineering
     ? [{ kind: "text", text: stageLineOf(view.engineering, summary) }, ...engineeringMetaOf(summary, { label: labelOf(view.current) })]
-    : text.meta;
+    : market
+      ? text.meta.filter((m) => m.kind !== "time")
+      : text.meta;
   // One editor for the name and the description, opened from ⋯, "Add a description" and the coachmark.
   const canEdit = can(viewer, "project.rename", canCtx) || can(viewer, "project.editDescription", canCtx);
   const fallbackFocus = React.useCallback(() => menuRef.current ?? titleRef.current, [titleRef]);
@@ -191,7 +212,8 @@ export function ProjectHeader({
           {!engineering && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
               <StatusChip status={summary.status} word={text.chip.word} />
-              {text.chip.badge && <ShowcaseChip />}
+              {/* On Explore marketplace the post is the rail's On Innovations block, not a chip. */}
+              {text.chip.badge && !market && <ShowcaseChip />}
               {parts?.statusRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
             </div>
           )}

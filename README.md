@@ -13,6 +13,10 @@ ERC/DRC engines and real manufacturing exports.
 
 This is a real product, not a prototype. Every control does verified work.
 
+**What changed lately:** see [CHANGELOG.md](CHANGELOG.md). Each entry gives the
+decision behind a change, what changed for the user, and before/after
+screenshots.
+
 ## Quick start
 
 Requirements: **Node 22** and **pnpm**. (npm also works with the same scripts.)
@@ -115,6 +119,8 @@ The full annotated tree lives in [STRUCTURE.md](STRUCTURE.md).
 
 ## Documentation
 
+- [CHANGELOG.md](CHANGELOG.md): what changed in the live app, with the decision
+  behind each change and before/after screenshots.
 - [AGENTS.md](AGENTS.md): the project guide, with the scope, code,
   verification and UI/UX rules. `CLAUDE.md` loads it.
 - [docs/guides/features/](docs/guides/features/README.md): the **living feature

@@ -51,7 +51,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
           ),
           h2("Good to know before you start"),
           p(
-            "There is no sign-in yet. Your projects, profile and wallet are kept in this browser, so come back in the same browser to find them. The wallet, minting and the marketplace are a testnet demo, so nothing you do there uses real money or a real blockchain.",
+            "Your account, projects, profile and wallet are kept in this browser, so come back in the same browser and sign in to find them. The wallet, minting and the marketplace are a testnet demo, so nothing you do there uses real money or a real blockchain.",
           ),
         ],
       },
@@ -150,7 +150,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
           ),
           h2("Your account menu"),
           p(
-            "The same account menu shows your plan, your credit balance and your level. It also holds Appearance, where you choose Light, Dark or Match system. There is no sign-in yet, so your profile is saved in this browser.",
+            "The same account menu shows your plan, your credit balance and your level. It also holds Appearance, where you choose Light, Dark or Match system, and Sign out. Your account and profile are saved in this browser.",
           ),
         ],
       },

@@ -92,6 +92,7 @@ import { useProjectNetwork } from "@/lib/network/store";
 import { BuildStatus } from "./build-status";
 import { useBuildModel } from "./use-build-model";
 import { ChatThread, conceptLabels } from "./chat-thread";
+import { CanvasFooterSlot } from "./canvas-footer";
 import { useSaveMode } from "./save-step";
 import { COMPOSER_INPUT_ID, PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
@@ -2071,41 +2072,43 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       <section
         aria-label="Canvas"
         className={[
-          "min-h-0 flex-1 overflow-y-auto bg-bg-page",
-          pane === "work" ? "block" : tabs ? "hidden" : "hidden md:block",
+          "min-h-0 flex-1 flex-col overflow-y-auto bg-bg-page",
+          pane === "work" ? "flex" : tabs ? "hidden" : "hidden md:flex",
         ].join(" ")}
       >
-        <div className="w-full p-[var(--layout-page-inset)]">
-          <ChatThread
-            chat={chat}
-            regeneratingFrom={regeneratingFrom}
-            preparingTurnId={preparingTurnId}
-            projects={setupProjects}
-            onAnswerSetup={handleAnswerSetup}
-            projectName={projectName}
-            onRegenerateAt={handleRegenerate}
-            onBuild={handleUseTurn}
-            onRefineTurn={handleOpenEditor}
-            onAddProduct={handleAddProduct}
-            onAddNamedProduct={handleAddNamedProduct}
-            onRemoveProduct={handleRemoveProduct}
-            onRestoreProduct={handleRestoreProduct}
-            onToggleInBuild={handleToggleInBuild}
-            job={activeBuild}
-            focusedProduct={focusedProduct ?? undefined}
-            onFocusProduct={(productId) => select(productId)}
-            specSheetFor={sheetProduct?.productId ?? null}
-            specDocked={docked}
-            onOpenSpec={(productId) => openSpec(productId, "sheet")}
-            // piecesFor={piecesFor}
-            // onOpenPieces={openPieces}
-            onPieceQuality={setPieceQuality}
-            onFocusSpec={focusSpec}
-            onSpecChange={handleSpecChange}
-            rereading={rereading}
-            onRereadConcept={readConcept}
-          />
-        </div>
+        <CanvasFooterSlot>
+          <div className="w-full p-[var(--layout-page-inset)]">
+            <ChatThread
+              chat={chat}
+              regeneratingFrom={regeneratingFrom}
+              preparingTurnId={preparingTurnId}
+              projects={setupProjects}
+              onAnswerSetup={handleAnswerSetup}
+              projectName={projectName}
+              onRegenerateAt={handleRegenerate}
+              onBuild={handleUseTurn}
+              onRefineTurn={handleOpenEditor}
+              onAddProduct={handleAddProduct}
+              onAddNamedProduct={handleAddNamedProduct}
+              onRemoveProduct={handleRemoveProduct}
+              onRestoreProduct={handleRestoreProduct}
+              onToggleInBuild={handleToggleInBuild}
+              job={activeBuild}
+              focusedProduct={focusedProduct ?? undefined}
+              onFocusProduct={(productId) => select(productId)}
+              specSheetFor={sheetProduct?.productId ?? null}
+              specDocked={docked}
+              onOpenSpec={(productId) => openSpec(productId, "sheet")}
+              // piecesFor={piecesFor}
+              // onOpenPieces={openPieces}
+              onPieceQuality={setPieceQuality}
+              onFocusSpec={focusSpec}
+              onSpecChange={handleSpecChange}
+              rereading={rereading}
+              onRereadConcept={readConcept}
+            />
+          </div>
+        </CanvasFooterSlot>
       </section>
 
       {/* The selected product's spec: a column beside the canvas where the

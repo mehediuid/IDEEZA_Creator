@@ -35,8 +35,12 @@
 // "+N more videos" line under them — so however many renders finish, the
 // stack never climbs over the rail's controls (a phone's Marketplace block
 // sits near the fold). Hiding or watching one brings the next one up.
+//
+// On /m (the mobile prototype) the phone's own render tray stands in for the
+// stack, inside the phone (mobile/project-earn/video/render-tray.tsx).
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCreateHistory } from "@/lib/create/history";
@@ -62,6 +66,9 @@ import {
   useVideoJobs,
   type VideoJob,
 } from "./video-jobs-provider";
+
+/** The phone's render tray, loaded only on /m. */
+const PhoneRenderTray = dynamic(() => import("@/components/mobile/project-earn/video/render-tray").then((m) => m.PhoneRenderTray), { ssr: false });
 
 type Watching = { projectId: string; productId: string; takeId: string; productName: string };
 
@@ -95,13 +102,20 @@ function refocusAfterToast() {
 }
 
 export function GlobalRenderIndicator() {
+  // The mobile prototype (/m) has its own render tray, inside the phone, above its foot; these
+  // corner toasts would cover that foot.
+  const phone = /^\/m(\/|$)/.test(usePathname() ?? "");
   return (
     <>
       <VideoUpkeep />
-      {/* useSearchParams: a prerendered page renders this part on the client only. */}
-      <React.Suspense fallback={null}>
-        <RenderToasts />
-      </React.Suspense>
+      {phone ? (
+        <PhoneRenderTray />
+      ) : (
+        // useSearchParams: a prerendered page renders this part on the client only.
+        <React.Suspense fallback={null}>
+          <RenderToasts />
+        </React.Suspense>
+      )}
     </>
   );
 }

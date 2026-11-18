@@ -16,6 +16,9 @@
 // Text is Figma's Suffix Text addon: a bg/subtle segment at least 60 wide,
 // the unit centred in it in text/secondary. Anything else (an icon) sits where
 // Figma's right icon does, inside the field's padding.
+//
+// `leading` is Figma's Left Icon (hasLeftIcon): a 16 px icon in icon/default
+// inside the field's padding, 8 before the value.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -56,20 +59,52 @@ export interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInput
   invalid?: boolean;
   /** Unit or action adornment rendered inside the field, on the right. */
   suffix?: React.ReactNode;
+  /** A control inside the field, on the right, that the keyboard and screen
+   *  readers reach (a show-password toggle) — `suffix` is decoration only. */
+  action?: React.ReactNode;
+  /** Figma's Left Icon: a 16 px icon before the value (decoration only). */
+  leading?: React.ReactNode;
+  /** Text Input Type=Prefix Text: fixed text before the value, on the subtle
+   *  ground the unit suffix uses ("ideeza.com/creators/", "x.com/"). */
+  prefixText?: string;
   containerClassName?: string;
 }
 
 export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
-  { value, onValueChange, size = "md", invalid, suffix, disabled, className, containerClassName, ...props },
+  { value, onValueChange, size = "md", invalid, suffix, action, leading, prefixText, disabled, className, containerClassName, ...props },
   ref,
 ) {
   const s = SIZES[size];
   const unit = typeof suffix === "string" || typeof suffix === "number";
+  const trailing = suffix || action;
   return (
     <div
       className={cn(shell(invalid, disabled), containerClassName)}
       style={{ height: s.h, borderRadius: s.radius, borderWidth: "var(--border-width-1-5)" }}
     >
+      {leading ? (
+        <span
+          aria-hidden
+          className="inline-flex shrink-0 items-center text-[color:var(--color-icon-default)] [&_svg]:size-[16px]"
+          style={{ paddingLeft: s.px }}
+        >
+          {leading}
+        </span>
+      ) : null}
+      {prefixText ? (
+        <span
+          aria-hidden
+          className={cn(
+            "inline-flex shrink-0 items-center whitespace-nowrap bg-[var(--color-bg-subtle)] font-[family-name:var(--font-family-body)]",
+            disabled ? "text-[color:var(--color-input-placeholder)]" : "text-[color:var(--color-text-secondary)]",
+            s.text,
+            s.lh,
+          )}
+          style={{ paddingLeft: s.px, paddingRight: s.px }}
+        >
+          {prefixText}
+        </span>
+      ) : null}
       <input
         ref={ref}
         value={value}
@@ -77,9 +112,10 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
         onChange={(e) => onValueChange?.(e.target.value)}
         className={cn(field(s), className)}
         // Figma keeps 8 between the value and whatever trails it.
-        style={{ paddingLeft: s.px, paddingRight: suffix ? "var(--spacing-4)" : s.px }}
+        style={{ paddingLeft: leading ? "var(--spacing-4)" : s.px, paddingRight: trailing ? "var(--spacing-4)" : s.px }}
         {...props}
       />
+      {action ? <span className="inline-flex shrink-0 items-center pr-[var(--spacing-2)]">{action}</span> : null}
       {suffix ? (
         unit ? (
           <span

@@ -7,7 +7,7 @@
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
-import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
+import { dispatchThreeAction, THREE_NOT_BUILT, type ThreeAction } from "./three-menu-bar";
 import { openReportProblem } from "@/lib/support/open-report";
 import { openTourGuide, openTutorialTab, startTourChapter } from "@/lib/tour/open";
 
@@ -202,8 +202,9 @@ function MenuLabel({
             padding: "var(--spacing-2) 0",
           }}
         >
-          {items.map((it, i) =>
-            it.divider ? (
+          {items.map((it, i) => {
+            const note = it.action ? THREE_NOT_BUILT[it.action] : undefined;
+            return it.divider ? (
               <div
                 key={`d-${i}`}
                 style={{
@@ -216,8 +217,11 @@ function MenuLabel({
               <div
                 key={it.label}
                 role="menuitem"
-                className="ix-menu"
+                aria-disabled={note ? true : undefined}
+                title={note}
+                className={note ? undefined : "ix-menu"}
                 onClick={() => {
+                  if (note) return;
                   if (it.run) it.run();
                   else if (it.action) dispatchThreeAction(it.action);
                   onSelect();
@@ -227,8 +231,9 @@ function MenuLabel({
                   justifyContent: "space-between",
                   padding: "var(--spacing-2) var(--spacing-4)",
                   fontSize: "var(--font-size-sm)",
-                  cursor: "pointer",
-                  color: C.text,
+                  cursor: note ? "default" : "pointer",
+                  color: note ? "var(--color-text-tertiary)" : C.text,
+                  opacity: note ? 0.45 : 1,
                 }}
               >
                 <span>{it.label}</span>
@@ -243,8 +248,8 @@ function MenuLabel({
                   </span>
                 )}
               </div>
-            ),
-          )}
+            );
+          })}
         </div>
       )}
     </div>

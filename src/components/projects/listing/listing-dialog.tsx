@@ -22,10 +22,13 @@
 // - Busy: the CTA reads "Listing…" / "Updating…", and the wallet dialog on
 //   top owns the keyboard. Cancelled in the wallet: back here, nothing
 //   written. A refused write: this dialog stays open and says why.
+// - Closing (Cancel, ✕, Escape, the scrim) with any field changed asks
+//   "Discard this listing?" first, in the copies sell flow's words; with
+//   nothing changed it closes at once.
 
 import * as React from "react";
 import { whenDialogsClose } from "@/components/create/use-dialog-focus";
-import { Banner, Button, ModalFrame, Spinner, TestnetDemoBadge } from "@/components/ideeza";
+import { Banner, Button, ConfirmDialog, ModalFrame, Spinner, TestnetDemoBadge } from "@/components/ideeza";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { MintCostRows, WalletFactLine, useMintShortfall } from "@/components/wallet/mint-cost";
 import { useMint } from "@/components/wallet/use-mint";
@@ -185,6 +188,9 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
           now,
         }),
   );
+  // What the form opened with: closing asks first once anything differs from it.
+  const [opening] = React.useState(input);
+  const [discarding, setDiscarding] = React.useState(false);
   const [left, setLeft] = React.useState<ReadonlySet<ListingField>>(() => new Set());
   const [submitted, setSubmitted] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -224,7 +230,9 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
   const leave = (field: ListingField) => setLeft((s) => (s.has(field) ? s : new Set(s).add(field)));
 
   const close = () => {
-    if (!busy) onClose();
+    if (busy) return;
+    if (JSON.stringify(input) !== JSON.stringify(opening)) setDiscarding(true);
+    else onClose();
   };
 
   const runAdd = async (): Promise<{ result: RequestResult; written: Listing | null }> => {
@@ -359,102 +367,116 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
   const summary = summaryRows(input, ctx);
 
   return (
-    <ModalFrame
-      open
-      onClose={close}
-      covered={busy}
-      size="sm"
-      initialFocus={titleRef}
-      title={
-        <span ref={titleRef} tabIndex={-1} className="outline-none">
-          {title}
-        </span>
-      }
-      description={`Main NFT · ${project.name}`}
-      footer={
-        <div className="ml-auto flex w-full flex-col items-stretch gap-3 [@media(min-width:480px)]:w-auto [@media(min-width:480px)]:items-end">
-          <div className="flex flex-col-reverse gap-4 [@media(min-width:480px)]:flex-row [@media(min-width:480px)]:justify-end">
-            <Button type="button" hierarchy="secondary" size="lg" disabled={busy} className={TAP} onClick={close}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              hierarchy="primary"
-              size="lg"
-              aria-disabled={firstReason ? true : undefined}
-              aria-describedby={firstReason ? reasonId : undefined}
-              aria-busy={busy || undefined}
-              className={cn(TAP, "aria-disabled:cursor-not-allowed aria-disabled:opacity-60")}
-              onClick={() => void submit()}
-            >
-              {busy && <Spinner size={16} />}
-              {cta}
-            </Button>
-          </div>
-          {firstReason && (
-            <p id={reasonId} className="max-w-[40ch] text-md text-text-secondary [@media(min-width:480px)]:text-right">
-              {firstReason}
-            </p>
-          )}
-        </div>
-      }
-    >
-      <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-8">
-        <p className="flex flex-wrap items-center gap-3 text-md text-text-secondary">
-          <TestnetDemoBadge />
-          {DEMO_LINE}
-        </p>
-        {error && <Banner tone="error">{error}</Banner>}
-        {!editing && <p className="text-md font-medium text-text-success">{VIDEOS_READY_LINE}</p>}
-
-        <ListingFields
-          mode={editing ? "edit" : "add"}
-          value={input}
-          onChange={change}
-          errors={shown}
-          onLeave={leave}
-          creatorPct={creatorPct}
-          mintStatus={mintStatus}
-          mintAddress={view.mint.record?.wallet.address}
-          now={now}
-          newBenefitId={() => randomId("ben_")}
-        />
-
-        {network && (
-          <div className="flex flex-col gap-6">
-            {editing ? (
-              <EditCost onChain={editing.mintingType === "instant"} network={network} />
-            ) : mintStatus === "onChain" ? (
-              <PlainCost line="Nothing to pay now — the token is already on chain. You sign the listing." />
-            ) : (
-              <MintCostRows type={input.mintingType} network={network} intent="sell" listing={listingCostRow(input)} />
+    <>
+      <ModalFrame
+        open
+        onClose={close}
+        covered={busy || discarding}
+        size="sm"
+        initialFocus={titleRef}
+        title={
+          <span ref={titleRef} tabIndex={-1} className="outline-none">
+            {title}
+          </span>
+        }
+        description={`Main NFT · ${project.name}`}
+        footer={
+          <div className="ml-auto flex w-full flex-col items-stretch gap-3 [@media(min-width:480px)]:w-auto [@media(min-width:480px)]:items-end">
+            <div className="flex flex-col-reverse gap-4 [@media(min-width:480px)]:flex-row [@media(min-width:480px)]:justify-end">
+              <Button type="button" hierarchy="secondary" size="lg" disabled={busy} className={TAP} onClick={close}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                hierarchy="primary"
+                size="lg"
+                aria-disabled={firstReason ? true : undefined}
+                aria-describedby={firstReason ? reasonId : undefined}
+                aria-busy={busy || undefined}
+                className={cn(TAP, "aria-disabled:cursor-not-allowed aria-disabled:opacity-60")}
+                onClick={() => void submit()}
+              >
+                {busy && <Spinner size={16} />}
+                {cta}
+              </Button>
+            </div>
+            {firstReason && (
+              <p id={reasonId} className="max-w-[40ch] text-md text-text-secondary [@media(min-width:480px)]:text-right">
+                {firstReason}
+              </p>
             )}
-            <WalletFactLine
-              type={(editing ? editing.mintingType === "instant" : mints && input.mintingType === "instant") ? "instant" : "lazy"}
-              network={network}
-            />
           </div>
-        )}
-
-        <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
+        }
+      >
+        <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-8">
+          <p className="flex flex-wrap items-center gap-3 text-md text-text-secondary">
             <TestnetDemoBadge />
-          </div>
-          {summary.map((r, i) => (
-            <p key={i} className="text-md text-text-secondary">
-              {r.label ? (
-                <>
-                  <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>
-                </>
+            {DEMO_LINE}
+          </p>
+          {error && <Banner tone="error">{error}</Banner>}
+          {!editing && <p className="text-md font-medium text-text-success">{VIDEOS_READY_LINE}</p>}
+
+          <ListingFields
+            mode={editing ? "edit" : "add"}
+            value={input}
+            onChange={change}
+            errors={shown}
+            onLeave={leave}
+            creatorPct={creatorPct}
+            mintStatus={mintStatus}
+            mintAddress={view.mint.record?.wallet.address}
+            now={now}
+            newBenefitId={() => randomId("ben_")}
+          />
+
+          {network && (
+            <div className="flex flex-col gap-6">
+              {editing ? (
+                <EditCost onChain={editing.mintingType === "instant"} network={network} />
+              ) : mintStatus === "onChain" ? (
+                <PlainCost line="Nothing to pay now — the token is already on chain. You sign the listing." />
               ) : (
-                r.value
+                <MintCostRows type={input.mintingType} network={network} intent="sell" listing={listingCostRow(input)} />
               )}
-            </p>
-          ))}
-        </section>
-      </div>
-    </ModalFrame>
+              <WalletFactLine
+                type={(editing ? editing.mintingType === "instant" : mints && input.mintingType === "instant") ? "instant" : "lazy"}
+                network={network}
+              />
+            </div>
+          )}
+
+          <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
+              <TestnetDemoBadge />
+            </div>
+            {summary.map((r, i) => (
+              <p key={i} className="text-md text-text-secondary">
+                {r.label ? (
+                  <>
+                    <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>
+                  </>
+                ) : (
+                  r.value
+                )}
+              </p>
+            ))}
+          </section>
+        </div>
+      </ModalFrame>
+      <ConfirmDialog
+        open={discarding}
+        title="Discard this listing?"
+        confirmLabel="Discard"
+        onCancel={() => setDiscarding(false)}
+        onConfirm={() => {
+          setDiscarding(false);
+          onClose();
+        }}
+      >
+        Nothing entered here is saved yet. Closing now throws it away.
+      </ConfirmDialog>
+    </>
   );
 }
 

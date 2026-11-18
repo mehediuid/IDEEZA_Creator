@@ -39,10 +39,15 @@ import { NoticeBell } from "@/components/notifications/notice-bell";
 
 const VIOLET = "var(--color-violet-600)";
 
-function ToolBtn({ children, size = 34 }: { children: React.ReactNode; size?: number }) {
+// `reason`: nothing behind the button yet. It stays in its place, greyed by its
+// cursor, and says why (it had no handler at all).
+function ToolBtn({ children, size = 34, reason }: { children: React.ReactNode; size?: number; reason: string }) {
   return (
     <button
-      className="ix-tool"
+      type="button"
+      aria-disabled
+      aria-label={reason}
+      title={reason}
       style={{
         width: size,
         height: size,
@@ -50,7 +55,7 @@ function ToolBtn({ children, size = 34 }: { children: React.ReactNode; size?: nu
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        cursor: "pointer",
+        cursor: "default",
         background: "transparent",
         border: "none",
         position: "relative",
@@ -250,7 +255,7 @@ export function TopBar() {
           </div>
         )}
 
-        <ToolBtn size={30}>
+        <ToolBtn size={30} reason="Sidebar toggle isn't built yet.">
           <HugeiconsIcon icon={SidebarLeft01Icon} size={16} color="var(--color-text-tertiary)" strokeWidth={2} />
         </ToolBtn>
       </div>

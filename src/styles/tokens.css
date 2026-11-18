@@ -282,15 +282,6 @@
     --layout-page-inset: var(--spacing-8);
     --layout-gutter: var(--spacing-8);
 
-    /* Radius (mobile) */
-    --radius-xs: 4px;
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 10px;
-    --radius-xl: 14px;
-    --radius-2xl: 18px;
-    --radius-3xl: 28px;
-
     /* Typography (mobile) */
     --font-size-xl: 16px;
     --font-size-2xl: 18px;
@@ -318,11 +309,32 @@
   }
 }
 
+/* Radius (mobile mode) — not inside the mobile prototype (/m, whose root is
+   #m-app): the owner's rule is that DS variable modes are never switched there,
+   so its buttons, cards and fields keep the default radius the mobile Figma
+   draws (radius/xl 12, radius/lg 8). On :root, so its portalled sheets follow. */
+@media (max-width: 767px) {
+  :root:not(:has(#m-app)) {
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 14px;
+    --radius-2xl: 18px;
+    --radius-3xl: 28px;
+  }
+}
+
 /* ============================================================
  * Light theme (default) — semantic & component tokens
  * ============================================================ */
+/* Every [data-theme], not only "light": a nested theme (the landing page's
+   dark wrapper, the editor shell) recomputes the aliases below from its own
+   values, as <html> does; the dark block after this one then overrides. With
+   "light" only, a nested dark took aliases the dark block doesn't repeat
+   (--color-button-primary-bg…) already resolved to the light page's colours. */
 :root,
-[data-theme="light"] {
+[data-theme] {
   color-scheme: light;
 
   /* Backgrounds */

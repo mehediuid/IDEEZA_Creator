@@ -19,12 +19,16 @@ import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
 import { ReportProblemHost } from "@/components/support/report-problem";
 import { TourHost } from "@/components/tour/tour-host";
+import { WelcomeOfferHost } from "@/components/credits/welcome-offer";
 import { ResearchHost } from "@/components/research/research-host";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NoticePopups } from "@/components/notifications/notice-popups";
 import { SIDEBAR_PREPAINT } from "@/components/dashboard/sidebar-state";
 import { APPEARANCE_PREPAINT } from "@/lib/settings/appearance";
 import { AppearanceSync } from "@/components/settings/appearance-sync";
+import { AuthGate } from "@/components/auth/auth-gate";
+import { AUTH_PREPAINT } from "@/lib/account/auth";
+import { DemoProjectsSeed } from "@/components/projects/demo-projects-seed";
 
 export const metadata: Metadata = {
   title: "IDEEZA Creator Panel",
@@ -98,9 +102,16 @@ export default function RootLayout({
         {/* Settings › Appearance's text size, contrast and motion, the same
             way (lib/settings/appearance.ts); AppearanceSync follows changes. */}
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_PREPAINT }} />
+        {/* The demo sign-in (lib/account/auth.ts): a signed-out visitor goes
+            to Sign up or Sign in before anything paints. */}
+        <script dangerouslySetInnerHTML={{ __html: AUTH_PREPAINT }} />
       </head>
       <body>
         <AppearanceSync />
+        <AuthGate />
+        {/* The account's demo projects (owner, 2026-11-16: My projects always has
+            data), planted ahead of the providers so every store reads them. */}
+        <DemoProjectsSeed />
         <ThemeProvider>
           {/* PcbProvider lives at the root so the AppMenuBar inside the
               TopBar can read the existing buildMenus / buildMenus2D /
@@ -165,6 +176,9 @@ export default function RootLayout({
                                   chapters' steps, and the panel Support ›
                                   Tour Guide and ⌘K open (openTourGuide()). */}
                               <TourHost />
+                              {/* The welcome offer: on Home after the Welcome, once
+                                  (components/credits/welcome-offer.tsx). */}
+                              <WelcomeOfferHost />
                             </BuyCreditsProvider>
                           </WalletProvider>
                           {/* A build is a background job: it has to keep

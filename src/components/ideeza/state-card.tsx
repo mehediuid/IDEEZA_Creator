@@ -3,6 +3,10 @@
 // 480 wide, radius md, 12 padding inside the subtle edge (Figma strokes
 // inside, so the edge comes out of the padding), 10 between badge, text and
 // actions, no shadow.
+//
+// `phone`: inside the mobile prototype the type tokens take their phone
+// values, so the title names the class whose phone value is the Figma's H3
+// (24/32); the web's look is unchanged without it.
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +19,7 @@ export function StateCard({
   className,
   titleAs = "p",
   titleRef,
+  phone,
 }: {
   tone: "empty" | "error";
   icon: React.ReactNode;
@@ -28,8 +33,12 @@ export function StateCard({
   /** With titleAs="h1": the page moves focus to the title on arrival, so the
    *  h1 takes tabIndex -1. */
   titleRef?: React.Ref<HTMLHeadingElement>;
+  /** The mobile prototype's sizes (title Heading/H3 24/32 at phone width). */
+  phone?: boolean;
 }) {
-  const titleClass = "text-3xl font-semibold leading-3xl tracking-slight text-text-primary";
+  const titleClass = phone
+    ? "text-4xl font-semibold leading-4xl tracking-slight text-text-primary"
+    : "text-3xl font-semibold leading-3xl tracking-slight text-text-primary";
   return (
     <div
       role={tone === "error" ? "alert" : "status"}

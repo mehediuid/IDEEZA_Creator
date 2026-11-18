@@ -98,6 +98,40 @@ async function deleteFile(key: FileKey): Promise<WriteResult> {
   }
 }
 
+const FILE_KEYS: readonly FileKey[] = ["photo", "cover"];
+
+/** Moves each `from` record to its `to` (replacing it) in one transaction; a missing `from` moves
+ *  nothing. `drop` records are deleted. Then every place showing the photo or cover refreshes. */
+async function rearrange(pairs: readonly (readonly [string, string])[], drop: readonly string[] = []): Promise<void> {
+  const db = await openDb();
+  if (!db) return;
+  try {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    for (const k of drop) store.delete(k);
+    for (const [from, to] of pairs) {
+      const req = store.get(from);
+      req.onsuccess = () => {
+        if (req.result === undefined) return;
+        store.put(req.result, to);
+        store.delete(from);
+      };
+    }
+    await done(tx);
+  } catch {
+    // Blocked: the files stay where they are.
+  } finally {
+    db.close();
+  }
+  for (const k of FILE_KEYS) announce(k);
+}
+
+// An account switch (account/work-vault.ts): the photo and cover wait under the account's prefix
+// while it is signed out, and come back when it signs in.
+export const parkProfileFiles = (prefix: string) => rearrange(FILE_KEYS.map((k) => [k, prefix + k] as const));
+export const unparkProfileFiles = (prefix: string) => rearrange(FILE_KEYS.map((k) => [prefix + k, k] as const));
+export const dropProfileFiles = () => rearrange([], FILE_KEYS);
+
 export const getPhoto = () => getFile("photo");
 export const putPhoto = (blob: Blob) => putFile("photo", blob);
 export const deletePhoto = () => deleteFile("photo");

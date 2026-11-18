@@ -1,33 +1,37 @@
 "use client";
 
 // The buyer view's header (Phase 2 spec §2.4; P2-MARKETPLACE-8, -9 as
-// changed). It is the project page's own ProjectHeader in its "market"
-// context, so the two can't drift: the h1 with no pencil, the status chip
-// ("Listed" for any live listing, the line naming Auction), the Showcase
-// badge, "Created by you · Listed Sep 28, 2026", and the read-only
-// description. `can()` refuses the demo buyer every owner control, so the
-// pair, the pencil and Preview as buyer are absent, not disabled (PPL-6).
-//
-// Every creator here is the person at the keyboard, so it adds one quiet
-// link back to the owner's page: "Your project page".
+// changed; owner, 2026-11-15: the marketplace details page is a shop page,
+// media first, as the phone's approved market screen):
+// - the project's media stage on top — the project video in use, then each
+//   product's, then the images, with their thumbnails — the Innovations
+//   post's own stage (post-media.tsx), so the two pages show the project the
+//   same way;
+// - then the project page's own ProjectHeader in its "market" context, so
+//   the two can't drift: the h1 with no pencil, the status chip ("Listed" for
+//   any live listing, the line naming Auction), "Created by {the creator} ·
+//   Listed {date}" — the page speaks to the buyer, never "you" for the
+//   creator — the read-only description and the project's Activity. `can()`
+//   refuses the demo buyer every owner control, so the pair, the pencil and
+//   Preview as buyer are absent, not disabled (PPL-6).
+// The way back to the owner's own page is the Testnet demo banner's.
 
-import Link from "next/link";
-import { ArrowRight02Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
+import * as React from "react";
+import { PostMediaStage } from "@/components/innovations/post-media";
 import { ProjectHeader } from "@/components/projects/details/header";
 import type { HeaderSlotProps } from "@/components/projects/details/slots";
-
-const QUIET_LINK =
-  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
+import { minePostOf } from "@/lib/innovations/mine-post";
+import { useCreatorName } from "./use-creator-name";
 
 export function MarketHeader(props: HeaderSlotProps) {
+  const { project, view, brief } = props;
+  const creator = useCreatorName();
+  const post = React.useMemo(() => minePostOf(project, view), [project, view]);
+  const mine = React.useMemo(() => ({ project, view, brief }), [project, view, brief]);
   return (
-    <div className="flex flex-col gap-6">
-      <ProjectHeader {...props} context="market" />
-      <Link href={`/projects/${props.project.id}`} className={QUIET_LINK}>
-        Your project page
-        <Icon icon={ArrowRight02Icon} size={14} />
-      </Link>
+    <div className="flex flex-col gap-10">
+      <PostMediaStage post={post} mine={mine} />
+      <ProjectHeader {...props} context="market" creatorName={creator} />
     </div>
   );
 }

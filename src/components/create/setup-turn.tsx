@@ -27,6 +27,7 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import { SelectMenu } from "@/components/ideeza";
 import { CreditBadge } from "@/components/credits/credit-badge";
+import { CanvasFooter } from "./canvas-footer";
 import type { Companion } from "@/lib/create/companions";
 import type { SetupAnswer } from "@/lib/create/history";
 
@@ -175,7 +176,7 @@ export function SetupTurn({
           ))}
         </Question>
         <Footer
-          note={`${extra.length + 1} concept${extra.length ? "s" : ""}`}
+          note={countNote(extra.length + 1, companions.length + 1)}
           credits={extra.length + 1}
           spends={!!addTo}
           label={addTo ? "Start drawing" : "Continue"}
@@ -279,7 +280,7 @@ export function SetupTurn({
         )}
       </Question>
       <Footer
-        note={`${extra.length + 1} concept${extra.length ? "s" : ""}`}
+        note={countNote(extra.length + 1, companions.length + 1)}
         credits={extra.length + 1}
         spends
         label="Start drawing"
@@ -440,31 +441,40 @@ function Footer({
   const reasonId = React.useId();
   const blocked = !ready && !!reason;
   return (
-    <div className="flex items-center justify-end gap-[12px] pt-[2px]">
-      <span
-        id={blocked ? reasonId : undefined}
-        className="inline-flex items-center gap-[6px] text-sm text-text-tertiary"
-      >
-        {blocked ? reason : note}
-        {!blocked && credits !== undefined && !spends && <CreditBadge credits={credits} />}
-      </span>
-      <button
-        type="button"
-        aria-disabled={!ready}
-        aria-describedby={blocked ? reasonId : undefined}
-        onClick={ready ? onGo : undefined}
-        className={
-          ready
-            ? "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-            : "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled outline-none"
-        }
-      >
-        {label}
-        {credits !== undefined && spends && <CreditBadge credits={credits} onBrand={ready} />}
-        <Icon icon={ArrowRight01Icon} size={16} />
-      </button>
-    </div>
+    <CanvasFooter>
+      <div className="flex w-full items-center justify-end gap-[12px] pt-[2px]">
+        <span
+          id={blocked ? reasonId : undefined}
+          className="inline-flex items-center gap-[6px] text-sm text-text-tertiary"
+        >
+          {blocked ? reason : note}
+          {!blocked && credits !== undefined && !spends && <CreditBadge credits={credits} />}
+        </span>
+        <button
+          type="button"
+          aria-disabled={!ready}
+          aria-describedby={blocked ? reasonId : undefined}
+          onClick={ready ? onGo : undefined}
+          className={
+            ready
+              ? "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+              : "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled outline-none"
+          }
+        >
+          {label}
+          {credits !== undefined && spends && <CreditBadge credits={credits} onBrand={ready} />}
+          <Icon icon={ArrowRight01Icon} size={16} />
+        </button>
+      </div>
+    </CanvasFooter>
   );
+}
+
+/** How many products are ticked out of how many the idea can have (owner,
+ *  2026-11-03: the count of what can be made and what is chosen). One
+ *  product has nothing to choose between, so it is just named. */
+function countNote(chosen: number, offered: number): string {
+  return offered > 1 ? `${chosen} of ${offered} products selected` : "1 product";
 }
 
 /** One option. The whole row is the target — a 16px box is not something to

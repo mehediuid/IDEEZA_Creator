@@ -441,6 +441,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** A subtree that shows its own wallet popup (the phone's bottom sheet, `/m`): the web's hooks under
+ *  it (`useMint`, `usePurchase`, `usePlaceBid`, …) send their requests to it instead of this dialog. */
+export function WalletRequestScope({ api, children }: { api: WalletRequestApi; children: React.ReactNode }) {
+  return <WalletContext.Provider value={api}>{children}</WalletContext.Provider>;
+}
+
 export function useWalletRequest(): WalletRequestApi {
   const ctx = React.useContext(WalletContext);
   if (!ctx) throw new Error("useWalletRequest must be used inside <WalletProvider>");

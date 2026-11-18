@@ -89,6 +89,7 @@ export const TRIGGER =
 export const TRIGGER_IDLE = "border-border bg-bg-surface text-text-primary hover:border-border-strong";
 export const TRIGGER_ON = "border-border-brand bg-bg-brand-subtle text-text-brand";
 
-/** The floating panel's surface, as the DS Menu's (Elevation/2, radius xl). */
+/** The floating panel's surface, as the DS Menu's (Elevation/2, radius xl). transition-none: the
+ *  enter animation's duration would otherwise also time the move from the corner to its place. */
 export const PANEL =
-  "fixed left-0 top-0 z-popover overflow-y-auto rounded-xl border border-solid border-border-subtle bg-bg-surface shadow-2 outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-fast";
+  "fixed left-0 top-0 z-popover overflow-y-auto rounded-xl border border-solid border-border-subtle bg-bg-surface shadow-2 outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-fast transition-none";

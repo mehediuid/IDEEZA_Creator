@@ -5,10 +5,13 @@
 // file draws the rest, in order:
 // - Bid history (n) ▾ — a disclosure, highest first, "You (Sam)" for the
 //   active buyer's own rows, five and then "Show all (n)";
-// - "You're the highest bidder." while the active buyer leads;
+// - "You're the highest bidder." while the active buyer leads; once a later
+//   bid passes theirs, "You were outbid. {name} bid {x}." and "Your {y} is back
+//   in your demo wallet." above the form instead, said once in the live region;
 // - "Your bid" and the inline ★ Place bid (the page's one violet), checked by
 //   `validateBid` (T04) on submit and on blur against `freeMicrosFor`;
-// - "Buy now with {x}" (secondary) when the listing has a buy-now price;
+// - "Buy now with {x}" (secondary) when the listing has a buy-now price, greyed
+//   while another tab's checkout holds the listing;
 // - once ended, the sentence of who leads, and no field or button.
 //
 // Timing: `useAuctionClock` ticks each minute and once more at `endsAt`, so the
@@ -24,10 +27,11 @@ import * as React from "react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { whenDialogsClose } from "@/components/create/use-dialog-focus";
 import { Icon } from "@/components/dashboard/icon";
-import { Button, TextInput } from "@/components/ideeza";
+import { Banner, Button, TextInput } from "@/components/ideeza";
 import { formatDateTime } from "@/lib/manual/project-summary";
 import type { ManualProject } from "@/lib/manual/projects";
-import { bidsOf, validateBid } from "@/lib/market/auction";
+import { bidsOf, outbidOf, validateBid } from "@/lib/market/auction";
+import { IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
 import { useMarket } from "@/lib/market/market-store";
 import type { AuctionState, Bid, Listing } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
@@ -123,8 +127,10 @@ export function BidCard({
   canBid,
   canBuy,
   buyBusy,
+  buyHeld = false,
   onBuyNow,
   facts,
+  details,
   wallet,
   announce,
 }: {
@@ -140,8 +146,12 @@ export function BidCard({
   canBid: boolean;
   canBuy: boolean;
   buyBusy: boolean;
+  /** Another tab's checkout holds the listing: Buy now waits, with the reason under it. */
+  buyHeld?: boolean;
   onBuyNow: () => void;
   facts: React.ReactNode;
+  /** The listing's small facts, under the button (offer-parts.tsx DealFacts). */
+  details?: React.ReactNode;
   wallet: React.ReactNode;
   announce: (message: string) => void;
 }) {
@@ -149,6 +159,18 @@ export function BidCard({
   const leads = buyerId !== null && state.top?.bidderId === buyerId;
   const leaderRef = React.useRef<HTMLParagraphElement>(null);
   const afterClose = useAfterDialogClose();
+  const heldId = React.useId();
+  const outbid = !ended && buyerId !== null ? outbidOf(listing.id, bids, buyerId) : null;
+  const outbidTitle = outbid ? `You were outbid. ${buyerLabel(outbid.top.bidderId)} bid ${formatAmount(outbid.top.amount, listing.token)}.` : null;
+  const outbidBack = outbid ? `Your ${formatAmount(outbid.mine.amount, listing.token)} is back in your demo wallet.` : null;
+
+  // Said once, politely, when a bid passes the buyer's while the card is on screen.
+  const outbidBy = outbid?.top.id ?? null;
+  const seenOutbid = React.useRef(outbidBy);
+  React.useEffect(() => {
+    if (outbidBy && outbidBy !== seenOutbid.current && outbidTitle && outbidBack) announce(`${outbidTitle} ${outbidBack}`);
+    seenOutbid.current = outbidBy;
+  }, [outbidBy, outbidTitle, outbidBack, announce]);
 
   // "The auction has ended." once, when it ends while the card is on screen.
   const wasEnded = React.useRef(ended);
@@ -164,7 +186,7 @@ export function BidCard({
     });
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {facts}
       <BidHistory listing={listing} bids={bids} buyerId={buyerId} now={clock} />
       {ended ? (
@@ -176,30 +198,44 @@ export function BidCard({
               You&apos;re the highest bidder.
             </p>
           )}
+          {outbidTitle && (
+            <Banner tone="attention" title={outbidTitle}>
+              {outbidBack}
+            </Banner>
+          )}
           {buyerId !== null && canBid && (
             <BidForm project={project} listing={listing} state={state} clock={clock} buyerId={buyerId} onPlaced={onPlaced} />
           )}
           {canBuy && listing.auctionBuyNow && (
-            <Button
-              type="button"
-              hierarchy="secondary"
-              size="lg"
-              className="h-[44px] w-full"
-              // Not `disabled`, which would drop focus before the wallet dialog reads its opener.
-              aria-disabled={buyBusy || undefined}
-              onClick={(e) => {
-                if (buyBusy) return;
-                // Safari doesn't focus a clicked button.
-                e.currentTarget.focus();
-                onBuyNow();
-              }}
-            >
-              Buy now with {formatAmount(listing.auctionBuyNow, listing.token)}
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                hierarchy="secondary"
+                size="lg"
+                className={cn("h-[44px] w-full", buyHeld && "cursor-not-allowed opacity-60")}
+                // Not `disabled`, which would drop focus before the wallet dialog reads its opener.
+                aria-disabled={buyBusy || buyHeld || undefined}
+                aria-describedby={buyHeld ? heldId : undefined}
+                onClick={(e) => {
+                  if (buyBusy || buyHeld) return;
+                  // Safari doesn't focus a clicked button.
+                  e.currentTarget.focus();
+                  onBuyNow();
+                }}
+              >
+                Buy now with {formatAmount(listing.auctionBuyNow, listing.token)}
+              </Button>
+              {buyHeld && (
+                <p id={heldId} className="m-0 text-md text-text-secondary">
+                  {IN_CHECKOUT_BUYER_LINE}
+                </p>
+              )}
+            </div>
           )}
           {buyerId !== null && wallet}
         </>
       )}
+      {details}
     </div>
   );
 }

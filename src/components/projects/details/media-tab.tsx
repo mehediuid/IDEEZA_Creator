@@ -306,7 +306,7 @@ function ProjectVideoSection({
     return (
       <div className="mt-7 flex max-w-[var(--layout-content-narrow)] flex-col gap-4">
         <h3 className="text-md font-semibold text-text-secondary">{PROJECT_VIDEO_TITLE}</h3>
-        <VideoPlayer take={inUse} productName={project.name} projectId={project.id} />
+        <VideoPlayer take={inUse} productName={project.name} projectId={project.id} audience="viewer" />
       </div>
     );
   }

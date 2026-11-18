@@ -77,6 +77,12 @@ export interface ModalFrameProps {
   /** The body is the header's own text (ConfirmDialog's message): it starts 4 px under the title,
    *  as the description does, instead of under the header's 24 px foot. */
   bodyContinuesHeader?: boolean;
+  /** A full-bleed band in place of the header (an offer's art, on the brand stage): it holds the
+   *  heading `labelledBy` names, and ✕ sits over it in white. */
+  hero?: React.ReactNode;
+  /** Where the dialog mounts (default document.body) — a page that pins its own
+   *  data-theme on a wrapper mounts it inside, so the dialog takes that theme. */
+  container?: Element | null;
 }
 
 export function ModalFrame({
@@ -97,6 +103,8 @@ export function ModalFrame({
   describedBy,
   icon,
   bodyContinuesHeader = false,
+  hero,
+  container,
 }: ModalFrameProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
@@ -139,6 +147,19 @@ export function ModalFrame({
             "max-md:max-h-[90dvh] max-md:max-w-none max-md:rounded-b-none max-md:border-x-0 max-md:border-b-0 max-md:motion-safe:slide-in-from-bottom-4",
         )}
       >
+        {hero ? (
+          <div className="relative shrink-0">
+            {hero}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute right-[12px] top-[12px] inline-flex size-[var(--touch-min)] items-center justify-center rounded-full text-[color:var(--color-white)] outline-none transition-colors duration-fast hover:bg-[color:color-mix(in_srgb,var(--color-white)_14%,transparent)] focus-visible:ring-2 focus-visible:ring-[var(--color-white)]"
+            >
+              <Icon icon={Cancel01Icon} size={24} />
+            </button>
+          </div>
+        ) : (
         <div className={cn("relative flex flex-col gap-8 px-12 pt-12", labelledBy || bodyContinuesHeader ? "pb-0" : "pb-12")}>
           <div className="flex h-[var(--touch-min)] items-start">{icon}</div>
           {/* Named from the body (labelledBy): the heading there is the only one, read once. */}
@@ -169,7 +190,8 @@ export function ModalFrame({
             <Icon icon={Cancel01Icon} size={24} />
           </button>
         </div>
-        <div className={cn("min-h-0 flex-1 overflow-y-auto px-12 pb-12", bodyContinuesHeader && "pt-2", bodyClassName)}>
+        )}
+        <div className={cn("min-h-0 flex-1 overflow-y-auto px-12 pb-12", bodyContinuesHeader && "pt-2", hero && "pt-10", bodyClassName)}>
           {children}
         </div>
         {footer && (
@@ -179,7 +201,7 @@ export function ModalFrame({
         )}
       </div>
     </div>,
-    document.body,
+    container ?? document.body,
   );
 }
 

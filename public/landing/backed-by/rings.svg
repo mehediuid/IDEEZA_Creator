@@ -1,0 +1,16 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="93" height="85" viewBox="0 0 93 85" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 1000005232">
+<mask id="stroke0_0_50" fill="white">
+<path d="M93 18C93 27.9411 72.1812 36 46.5 36C20.8188 36 0 27.9411 0 18C0 8.05887 20.8188 0 46.5 0C72.1812 0 93 8.05887 93 18Z"/>
+</mask>
+<path id="Ellipse 1709" d="M93 18C93 27.9411 72.1812 36 46.5 36C20.8188 36 0 27.9411 0 18C0 8.05887 20.8188 0 46.5 0C72.1812 0 93 8.05887 93 18Z" stroke-width="2" stroke="#0C121D" mask="url(#stroke0_0_50)"/>
+<mask id="stroke1_0_50" fill="white">
+<path d="M93 42C93 51.9411 72.1812 60 46.5 60C20.8188 60 0 51.9411 0 42C0 32.0589 20.8188 24 46.5 24C72.1812 24 93 32.0589 93 42Z"/>
+</mask>
+<path id="Ellipse 1710" d="M93 42C93 51.9411 72.1812 60 46.5 60C20.8188 60 0 51.9411 0 42C0 32.0589 20.8188 24 46.5 24C72.1812 24 93 32.0589 93 42Z" stroke-width="2" stroke="#0C121D" mask="url(#stroke1_0_50)"/>
+<mask id="stroke2_0_50" fill="white">
+<path d="M93 67C93 76.9411 72.1812 85 46.5 85C20.8188 85 0 76.9411 0 67C0 57.0589 20.8188 49 46.5 49C72.1812 49 93 57.0589 93 67Z"/>
+</mask>
+<path id="Ellipse 1711" d="M93 67C93 76.9411 72.1812 85 46.5 85C20.8188 85 0 76.9411 0 67C0 57.0589 20.8188 49 46.5 49C72.1812 49 93 57.0589 93 67Z" stroke-width="2" stroke="#0C121D" mask="url(#stroke2_0_50)"/>
+</g>
+</svg>

@@ -63,7 +63,8 @@ export interface BannerProps {
   tone: BannerTone;
   /** Optional heading above the message (M01's title, with the message as its description). */
   title?: React.ReactNode;
-  children: React.ReactNode;
+  /** The message; a title-only banner leaves it out. */
+  children?: React.ReactNode;
   /**
    * A control the banner offers with its message — e.g. Preview as buyer's
    * Exit preview (PPL-5), or a pending-version notice's Review version /
@@ -102,7 +103,7 @@ export function Banner({ tone, title, children, action, className }: BannerProps
         {title ? (
           <>
             <div className="font-medium">{title}</div>
-            <div className="text-[length:var(--font-size-sm)] leading-xs text-[color:var(--color-text-secondary)]">{children}</div>
+            {children != null && <div className="text-[length:var(--font-size-sm)] leading-xs text-[color:var(--color-text-secondary)]">{children}</div>}
           </>
         ) : (
           <div className="font-medium">{children}</div>

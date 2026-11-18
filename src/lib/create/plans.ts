@@ -20,6 +20,7 @@
 // Pure, relative imports only.
 
 import { addMonths, discountFor, type BillingCycle } from "./credit-pricing";
+import type { AppliedCoupon } from "./coupons";
 
 export type PlanTier = "free" | "tinkerer" | "builder" | "disruptor";
 
@@ -120,6 +121,12 @@ export type PlanOrder = {
   price?: number;
   credit?: number;
   creditFrom?: PlanTier;
+  /** The welcome offer's half off the first payment (lib/account/welcome-offer.ts):
+   *  `amount` = price − credit − offer. */
+  offer?: number;
+  /** A coupon code and what it took off (lib/create/coupons.ts): `amount` =
+   *  price − credit − coupon. One discount per order, so never beside `offer`. */
+  coupon?: AppliedCoupon;
   /** The wallet's transaction and the address that paid. */
   txHash?: string;
   payer?: string;
@@ -132,6 +139,8 @@ export type PlanPayment = {
   paidWith: string;
   price?: number;
   credit?: number;
+  offer?: number;
+  coupon?: AppliedCoupon;
   txHash?: string;
   payer?: string;
 };
@@ -200,6 +209,8 @@ export function startPlan(
     kind: "start",
     ...(pay.price !== undefined ? { price: pay.price } : {}),
     ...(pay.credit ? { credit: pay.credit, creditFrom: sub.tier } : {}),
+    ...(pay.offer ? { offer: pay.offer } : {}),
+    ...(pay.coupon && pay.coupon.amount > 0 ? { coupon: { ...pay.coupon } } : {}),
     ...(pay.txHash ? { txHash: pay.txHash } : {}),
     ...(pay.payer ? { payer: pay.payer } : {}),
   };

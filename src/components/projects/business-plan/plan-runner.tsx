@@ -428,6 +428,8 @@ export function PlanRunner() {
     () =>
       onPlanCompletion((c) => {
         if (c.kind !== "done") return;
+        // The phone prototype (/m) says it in its own Business plan tab.
+        if (pathRef.current === "/m" || pathRef.current.startsWith("/m/")) return;
         // A buyer's view — the preview (`?view=`) or Explore marketplace — shows
         // none of the owner's notices; the chip says it once the preview ends.
         if (pathRef.current.startsWith("/marketplace") || new URLSearchParams(window.location.search).has("view")) return;
