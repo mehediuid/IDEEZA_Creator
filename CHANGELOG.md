@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-028](#cl-028-earn--sell-one-board-for-everything-you-sell) | Earn › Sell: one board for everything you sell | 18 Nov 2026 | [PR-9660](https://ideeza.atlassian.net/browse/PR-9660) | Not started |
 | [CL-027](#cl-027-an-inspiration-image-with-the-idea-home-and-add-a-product) | An inspiration image with the idea (Home and Add a product) | 18 Nov 2026 | [PR-9658](https://ideeza.atlassian.net/browse/PR-9658) | Not started |
 | [CL-026](#cl-026-the-projects-earn-button-opens-earns-overview) | The project's Earn button opens Earn's Overview | 18 Nov 2026 | Not created yet | Not started |
 | [CL-025](#cl-025-one-product-one-video) | One product, one video | 18 Nov 2026 | Not created yet | Not started |
@@ -55,6 +56,70 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-028 Earn › Sell: one board for everything you sell
+
+**In the prototype:** 18 November 2026 · **Jira:** [PR-9660](https://ideeza.atlassian.net/browse/PR-9660) · **Production:** Not started
+
+**Screen:** a project's **Earn › Sell** (`/projects/<id>/earn/sell`, web), and the header and tabs of every Earn tab.
+
+### What to build
+
+**Page width**
+
+- [ ] Earn's header (back to the project, **Earn**, the status pill, **Preview as others see it**) and its tabs (Overview · Sell · Business plan · Money) span the full page width on every Earn tab. Overview, Business plan and Money keep their content in the narrow column (720 px) under them.
+- [ ] Sell uses the full width: the board on the left and, from a 1024 px wide page, the item panel (360 px) beside it on the right.
+
+**The board**
+
+- [ ] Heading **What you're selling** (once the project is sold in full: **What you sold**), the **Testnet demo** badge, and a **How selling works** button that opens the three rule cards with their lead, word for word as before (Main NFT, Physical NFT, Virtual NFT and *Each one is listed on its own…*).
+- [ ] Under the heading the lead *Each one is listed on its own. You can sell Physical or Virtual copies without listing the Main NFT, and copies never sell the project itself.* (left out once the project is sold in full).
+- [ ] One line of totals: *n of m on sale* · *n sold out* (only when some are) · *n copies sold* · *X earned*, where earned is the payouts of every sale of the project, the same number as Overview's **Earned** (*Nothing earned yet* when there are none). Sold in full: *Sold in full* · *X earned*.
+- [ ] Column heads: **Main NFT** *The project itself · whole project only*, **Physical NFT** *A built unit you make and ship*, **Virtual NFT** *The design files with a licence*.
+- [ ] Two labelled groups, each a band across the board: **Whole project** *The Main NFT, and copies of everything in it.*, then **One product at a time**, a count (*3 products*) and *Products sell copies only, not a Main NFT.*
+- [ ] The whole project's row: its cover picture, name, *Whole project · n products*, what it earned, then the Main, Physical and Virtual tiles. Each product's row: its initials, name, *Product*, what it earned, an empty dashed Main cell, then its Physical and Virtual tiles.
+- [ ] A project with one product shows one row, the whole project, with the product's name under it. A product row appears only when that product already has copies of its own.
+- [ ] A tile shows a status chip (*On sale*, *Auction*, *In checkout*, *Paused*, *Part sold*, *Sold out*, *Sold in full*, *Not selling*, *Not minted yet*, *Stopped*, *Given*, *Can't sell*), its use (*Buy now*, *Top bid* or *Opening bid*, *Personal use*, *Business use*, *2 uses*), its price (a range for two uses: *0.03–0.04 ETH*), a sold bar with *1 of 50 sold* (copies sold of copies made; for the Main NFT the share sold: *40% sold*), and what it earned. Not selling: *No price yet* and *Set a price ›*. The Main NFT with a step still missing before listing: *1 step before listing*.
+- [ ] A whole tile is one button: clicking it shows that item in the panel and marks the tile (brand border and fill). Rows have no Sell or Manage buttons of their own.
+- [ ] Not minted: one band replaces the tiles, a lock icon, *Not minted yet* and *Mint {project} once, and each of these can go on sale on its own: the Main NFT, Physical copies and Virtual copies.*
+- [ ] Under the board: *Selling the Main NFT sells the project. When all of it is sold, whoever bought it owns everything and your copy listings stop.* (left out once sold in full), **Mint details**, and with no products *No products yet. Add one to the project to sell its copies.* with **Open products**.
+
+**The item panel**
+
+- [ ] Its head: the kind (a dot and *Main NFT*, *Physical NFT* or *Virtual NFT*), the title (the project's name for the Main NFT; *Physical copies of the whole project*, *Virtual copies of {product}*), one line about it, the status chip and the item's state lines (for example *Personal use · 0 of 30 sold · 0.03 ETH*).
+- [ ] Main NFT. Not minted: **Mint and sell the project** (the mint, with Sell chosen). Minted and not listed: the steps still missing (*Before you can list*, each with its fix), then **Sell the Main NFT**, which opens the listing as before (a fixed price or an auction, all of it or a share). Listed or paused: the listing's controls and facts as before (Edit, Remove, Relist, Bidding history, Close auction). Part sold: the listing for another share. Sold in full: **Receipt**, the price, *Bought by*, *You got*, *Date*, *Share*, *It's theirs now, so this project is read-only. The payment joined your balance in Get paid.*, **See this sale in Money** and **Get paid**.
+- [ ] Copies. Not selling: one line on what is asked and **Sell physical copies** or **Sell virtual copies**, which opens the two-step Sell copies dialog as before, with the kind already chosen. On sale: four facts (*Sold* with its bar, *Earned*, *Bought by*, *Last sale*); when sold out, *Every copy is sold. Add copies to keep selling, or leave it closed.*; then each use's controls as before (Price, Price with future updates, Royalties; Edit, Remove listing, Add copies) and *Sell business use copies too* while the other use is open. Blocked: the reason (for example *Stopped · the project was sold*).
+- [ ] The NFT's **Activity** line (add, the latest, its history) for a minted Main NFT and for copies that exist. It is here now, no longer under each row.
+- [ ] **Recent sales**: the item's last three sales, each with the buyer's initial and name (*Sam (demo creator)*), *Copy #1 · Business use* or *40% of the project*, the price and the date; **All sales in Money ›** (*All n sales in Money* past three). None yet: *No sales yet. When someone buys, it shows here.*
+- [ ] **What buyers see**: the project's own Explore marketplace card, exactly as buyers see it. Before anything is on sale: *Not on Explore marketplace yet. Once something here is on sale, buyers find it there.* While the item is on sale: **View on marketplace** (the project's marketplace page on that NFT's tab, or the product's page).
+- [ ] The panel opens on the item that waits for the maker: copies sold out, then a buyer in checkout, an auction ending soon, a paused listing, the Main NFT not listed; else the item sold most recently; else the Main NFT. Overview's *Sell copies of a product* opens the first product's copies; the project page's **Publish › Sell** opens the Main NFT and its listing.
+
+**Small screens**
+
+- [ ] Below a 1024 px wide page there is no panel beside the board and no tile is marked. Each tile says what a tap does: *Manage ›*, *Sell ›*, *Mint ›*, *Receipt ›* or *Details ›*.
+- [ ] A tap opens the panel as a drawer from the right (550 px; full width on a phone), titled with the item and its line, with ✕. Escape or a tap outside closes it and focus goes back to the tile.
+- [ ] A dialog opened from the drawer (Sell copies, the listing, Edit) sits on top of it. While it is open, Tab and Escape stay with the dialog; closing it goes back to the drawer.
+- [ ] The board: from 720 px wide a row's name sits beside its three tiles; narrower, above them; under 480 px the tiles stack and each says its kind. The page never scrolls sideways.
+
+### Design
+
+- Page frame with the rail: content 720 px on the other Earn tabs, rail 360 px, gutter 24 px.
+- The board is one surface card (`bg-surface`, 1 px `border`, radius `2xl`). Group bands: `bg-subtle`, radius `lg`, title `text-md` semibold, lead `text-sm` `text-secondary`, the count an A17 Badge (neutral).
+- Tiles: radius `xl`, 1 px `border`, hover `border-strong`, selected `border-brand` with `bg-brand-subtle`. Status chips are A17 Badges (success, brand, neutral, warning, info) at 12 px semibold, like Earn's status pill. Price `text-lg` semibold; the sold bar 4 px, a `bg-subtle` track with a `bg-success` fill (`bg-brand` when full); earned `text-success`; *Set a price ›* `text-link`; *1 step before listing* `text-warning`.
+- Kind dots: Main `bg-brand`, Physical `bg-warning`, Virtual `bg-info`.
+- The panel is the same surface card, its parts divided by `border`. Fact boxes are Overview's (`bg-subtle`, radius `xl`). One primary button (A01 primary) per panel. The buyer's card is M25 Asset Card. Small screens: M08 Drawer.
+- Text: body 14, captions 12, the panel title 18, the board heading 20.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: one narrow column; rule cards first, then every row stacked, the right side empty](docs/changelog/2026-11-18-sell-desk-listed-before.png) | ![After: the board across the page with the item panel on the right](docs/changelog/2026-11-18-sell-desk-listed-after.png) |
+| ![Before: a one-product project listed its product's copies twice](docs/changelog/2026-11-18-sell-desk-minted-before.png) | ![After: one row, and the Main NFT's missing step in the panel](docs/changelog/2026-11-18-sell-desk-minted-after.png) |
+| | ![After: below 1024 px a tile opens the panel as a drawer from the side](docs/changelog/2026-11-18-sell-desk-tablet-after.png) |
+| | ![After: on a phone the drawer is full width](docs/changelog/2026-11-18-sell-desk-phone-after.png) |
 
 ---
 
