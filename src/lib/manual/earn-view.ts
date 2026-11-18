@@ -67,8 +67,8 @@ export function earnButtonOf(input: {
     label: EARN_LABEL,
     sub,
     violet: false,
-    // Earn opens on Sell (owner, 2026-10-12: "Earn → straight to Sell").
-    href: earnHref(input.projectId, "sell"),
+    // Earn opens on its Overview (owner, 2026-11-17; it opened on Sell from 2026-10-12).
+    href: earnHref(input.projectId),
   });
   switch (input.commercial) {
     case "soldOut":
