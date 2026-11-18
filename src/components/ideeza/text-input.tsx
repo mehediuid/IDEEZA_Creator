@@ -64,11 +64,14 @@ export interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInput
   action?: React.ReactNode;
   /** Figma's Left Icon: a 16 px icon before the value (decoration only). */
   leading?: React.ReactNode;
+  /** Text Input Type=Prefix Text: fixed text before the value, on the subtle
+   *  ground the unit suffix uses ("ideeza.com/creators/", "x.com/"). */
+  prefixText?: string;
   containerClassName?: string;
 }
 
 export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
-  { value, onValueChange, size = "md", invalid, suffix, action, leading, disabled, className, containerClassName, ...props },
+  { value, onValueChange, size = "md", invalid, suffix, action, leading, prefixText, disabled, className, containerClassName, ...props },
   ref,
 ) {
   const s = SIZES[size];
@@ -86,6 +89,20 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
           style={{ paddingLeft: s.px }}
         >
           {leading}
+        </span>
+      ) : null}
+      {prefixText ? (
+        <span
+          aria-hidden
+          className={cn(
+            "inline-flex shrink-0 items-center whitespace-nowrap bg-[var(--color-bg-subtle)] font-[family-name:var(--font-family-body)]",
+            disabled ? "text-[color:var(--color-input-placeholder)]" : "text-[color:var(--color-text-secondary)]",
+            s.text,
+            s.lh,
+          )}
+          style={{ paddingLeft: s.px, paddingRight: s.px }}
+        >
+          {prefixText}
         </span>
       ) : null}
       <input

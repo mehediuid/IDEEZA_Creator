@@ -4,25 +4,33 @@
 // (Figma 41505:134087; P2-MARKETPLACE-10…15, -18, P2-LISTING-21). One block id
 // with LISTING's owner card (T22), so the listing has one home.
 //
-// - A demo buyer on /marketplace/[id]:
+// One Marketplace box (owner, 2026-11-15: "after the Main NFT there is so much
+// information, then Physical, then Virtual — it isn't right"): the dev app's
+// Marketplace section, tabs Main NFT / Physical NFT / Virtual NFT, only the
+// ones on sale (a lone one is a chip), one panel at a time (offer-parts.tsx).
+// The box opens on what the buyer holds, else on the Main NFT while it can be
+// bought, else on the first copy tab.
+//
+// - Main NFT tab, a demo buyer on /marketplace/[id]:
 //   - a holder reads Purchased Summary first;
-//   - a live Buy now reads its facts, ★ Buy now (the page's one violet, 44 px)
-//     and the wallet line — headed "Buy another share" for a holder;
+//   - a live Buy now reads what is sold and its price large, ★ Buy now (the
+//     panel's one violet, 44 px), the wallet line and the one legal line —
+//     headed "Buy another share" for a holder;
 //   - a live auction is the Auction card (bid-card.tsx);
-//   - paused, removed, closed with no bids and sold each say so, with no button.
+//   - while another tab's checkout holds the listing, Buy waits, greyed, with
+//     "Someone is buying this now. Try again in a few minutes." under it;
+//   - paused, removed, closed with no bids and sold each say so, with no button;
+//   - its facts and activity are folded under "NFT details".
+// - Physical NFT / Virtual NFT tabs: the whole project's own copies only
+//   (copy-panel.tsx); a product's copies are its page's. Copies sell without
+//   the Main NFT (owner, 2026-10-11); only the lock (sold in full) hides them.
 // - Preview as buyer (`?view=buyer`) and a contributor preview that may see
-//   the listing read the same facts with no button, the Testnet demo badge,
+//   the listing read the same tabs with no button, the Testnet demo badge,
 //   and a quiet "Open in Explore marketplace" (preview stays read-only, PPL-6).
-// - Below the Main NFT, the project's listed Physical and Virtual NFTs, of the
-//   whole project and of each product (edition-offers.tsx, T27): a tier choice
-//   and a quiet Buy now for a demo buyer, the prices alone in a preview. They
-//   don't need the Main NFT (owner, 2026-10-11): with no Main listing the block
-//   holds the copies alone. Only the lock (sold in full) hides them.
-// - A project with neither has no block.
-// - A demo buyer's block ends with its one way to the creator, a link into
-//   Messages: "Get creator support" for a holder of any sale of the project
-//   (Main or a copy), about the newest one, else "Ask the creator", about the
-//   listing. A preview has none.
+// - A project with nothing on sale has no block.
+// - The way to the creator — "Get creator support" for a holder of any sale of
+//   the project (Main or a copy), about the newest one, else "Ask the
+//   creator", about the listing — is the Creator block's (market-rail.tsx).
 //
 // Every `can()` passes `view.canCtx` (listingLive, auction, holding); an auction
 // asks again at the card's own clock, so Place bid goes the moment it ends.
@@ -30,34 +38,32 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowUpRight01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { useSearchParams } from "next/navigation";
+import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Banner, Button, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
-import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
+import { Button, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import { can } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
-import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
-import { auctionStateOf, timeLeftLabel } from "@/lib/market/auction";
-import { useMarket } from "@/lib/market/market-store";
+import { formatDate } from "@/lib/manual/project-summary";
+import { auctionStateOf } from "@/lib/market/auction";
+import { IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
+import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import { holdingOf } from "@/lib/market/sales";
-import type { AuctionState, Listing, Sale } from "@/lib/market/types";
+import { PROJECT_SCOPE, type AuctionState, type Listing, type Sale } from "@/lib/market/types";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
-import { availableOf } from "@/lib/wallet/balances";
-import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
 import { formatAmount } from "@/lib/wallet/money";
-import { networkLabelOf, testCoin } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
-import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
-import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { RailBlock, RailFact, RailFacts } from "@/components/projects/details/rail-block";
+import { RailBlock } from "@/components/projects/details/rail-block";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { cn } from "@/lib/utils";
 import { BidCard, useAfterDialogClose, useAuctionClock } from "./bid-card";
-import { EditionOffers } from "./edition-offers";
+import { CopyPanel, heldKindOf, listedKindsOf } from "./copy-panel";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
-import { buyerNameOf, usePurchase } from "./purchase-dialog";
+import { usePurchase } from "./purchase-dialog";
 import { PurchasedSummary } from "./purchased-summary";
+import { NFT_PARAM, offerTabOf } from "./offer-tab";
+import { AuctionTop, DealFacts, LegalLine, MoreFacts, OfferTabs, OfferTop, soldWhatOf, WalletLine, type OfferTab } from "./offer-parts";
 
 const QUIET_LINK =
   "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
@@ -82,159 +88,82 @@ function closedLine(view: ProjectView): { title: string; detail?: string } | nul
   return null;
 }
 
-/** The listing's facts, read-only for everyone (P2-MARKETPLACE-10, -11). */
-function ListingFacts({ listing, view, auction }: { listing: Listing; view: ProjectView; auction: AuctionState | null }) {
-  const minting =
-    view.mint.status === "lazyMinted"
-      ? "Lazy — the token is minted when you buy"
-      : view.mint.status === "onChain"
-        ? `Minted on ${networkLabelOf(listing.network)}`
-        : listing.mintingType === "lazy"
-          ? "Lazy — the token is minted when you buy"
-          : `Minted on ${networkLabelOf(listing.network)}`;
-  const ended = auction?.phase === "ended";
-  return (
-    <>
-      <RailFacts>
-        <RailFact label="Listing type">{listing.type === "auction" ? "Auction" : "Buy now"}</RailFact>
-        {listing.type === "auction" && auction ? (
-          <RailFact label={auction.top ? "Current bid" : "Starting bid"}>
-            <span className="font-semibold tabular-nums">
-              {formatAmount(auction.top?.amount ?? listing.minBid ?? "0", listing.token)}
-            </span>
-          </RailFact>
-        ) : (
-          <RailFact label="Price">
-            <span className="font-semibold tabular-nums">{formatAmount(listing.price ?? "0", listing.token)}</span>
-          </RailFact>
-        )}
-        <RailFact label="Selling percentage">
-          <span className="tabular-nums">{listing.percentSelling}%</span>
-        </RailFact>
-        {listing.type === "auction" && auction && (
-          <RailFact label={ended ? "Ended" : "Ends"}>
-            <span className="tabular-nums">
-              <time dateTime={new Date(listing.endsAt ?? listing.listedAt).toISOString()}>
-                {formatDateTime(listing.endsAt ?? listing.listedAt)}
-              </time>
-            </span>
-            {!ended && (
-              <span className="ml-2 inline-flex align-middle">
-                <Badge tone={auction.phase === "endingSoon" ? "warning" : "neutral"}>{timeLeftLabel(auction.msLeft)}</Badge>
-              </span>
-            )}
-          </RailFact>
-        )}
-        <RailFact label="Royalties">{royaltyText(listing.royaltiesPct)}</RailFact>
-        <RailFact label="Minting">{minting}</RailFact>
-        <RailFact label="Collection">{listing.collection || "—"}</RailFact>
-        <RailFact label="Blockchain">{networkLabelOf(listing.network)}</RailFact>
-      </RailFacts>
-      <Banner tone="info">{SHARE_SALE_NOTE}</Banner>
-    </>
-  );
-}
-
-/** "Paying from Mira's demo wallet · 0x7d50…8993 · 10 test MATIC" (P2-MARKETPLACE-13 as changed), then the
- *  one home of every wallet control, the Demo wallet dialog. */
-function WalletLine({ buyerId, listing, verb, now }: { buyerId: DemoBuyerId; listing: Listing; verb: "buy" | "bid"; now: number }) {
-  const wallet = useDemoWallet();
-  const { data } = useMarket();
-  const { openManage } = useWalletRequest();
-  const name = buyerNameOf(buyerId);
-  const connected = wallet?.identities[buyerId]?.connected === true;
-  const have = availableOf(buyerId, listing.token, listing.network, { wallet, market: data, now });
-  return (
-    <div className="flex flex-col gap-3 text-md text-text-secondary">
-      <div className="flex items-start gap-3">
-        <span aria-hidden className="mt-[2px] inline-flex shrink-0 text-text-tertiary">
-          <Icon icon={Wallet01Icon} size={14} />
-        </span>
-        <p className="min-w-0 break-words">
-          {wallet === undefined ? (
-            "Reading the demo wallet…"
-          ) : connected ? (
-            <span className="tabular-nums">
-              Paying from {name}&apos;s demo wallet · {shortAddress(demoAddress(buyerId))} · {testCoin(have, listing.token)}
-            </span>
-          ) : (
-            <>
-              {name}&apos;s demo wallet isn&apos;t connected — you&apos;ll connect it when you {verb}.
-            </>
-          )}{" "}
-          <TestnetDemoBadge className="align-middle" />
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={openManage}
-        className={cn(QUIET_LINK, "text-text-secondary hover:text-text-primary")}
-      >
-        Manage demo wallets
-      </button>
-    </div>
-  );
-}
-
 export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
   const listing = view.listing.kind === "none" ? null : view.listing.listing;
-  // Called on every render (hooks can't wait on the viewer): the auction card's clock.
+  // Called on every render (hooks can't wait on the viewer): the auction card's clock, the picked tab.
   const clock = useAuctionClock(listing?.type === "auction" ? listing.endsAt : undefined, now);
+  const [picked, setPicked] = React.useState<OfferTab | null>(null);
+  // A card's clicked tag opens its tab (?nft=); the page sits in a Suspense boundary (market-project-page.tsx).
+  const asked = offerTabOf(useSearchParams().get(NFT_PARAM));
   if (viewer.kind === "local-owner" || !can(viewer, "listing.seePublic", view.canCtx)) return null;
-  const copies = view.lock === null && view.editions.some((t) => t.listing !== null);
-  const ask =
-    viewer.kind === "demo-buyer" ? <AskCreator projectId={project.id} sales={view.sales} buyerId={viewer.buyerId} /> : null;
-  if (!listing) {
-    return copies ? (
-      <RailBlock title="Marketplace" meta="Copies" collapsible={false}>
-        <EditionOffers project={project} view={view} viewer={viewer} announce={announce} alone />
-        {ask}
-      </RailBlock>
-    ) : null;
-  }
+  const kinds = listedKindsOf(view, PROJECT_SCOPE);
+  const tabs: OfferTab[] = listing ? ["main", ...kinds] : kinds;
+  if (tabs.length === 0) return null;
+  const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
+  const heldMain = buyerId !== null && view.sales.some((s) => s.buyerId === buyerId && s.item.nft === "main");
+  const first: OfferTab =
+    asked && tabs.includes(asked)
+      ? asked
+      : listing && heldMain
+      ? "main"
+      : (heldKindOf(view, PROJECT_SCOPE, buyerId, kinds) ??
+        (listing && (view.listing.kind === "live" || kinds.length === 0) ? "main" : kinds[0]));
+  const tab = picked && tabs.includes(picked) ? picked : first;
   const live = view.listing.kind === "live";
-  const auction = live && listing.type === "auction" ? auctionStateOf(listing, view.bids, clock) : null;
-  const meta = live
-    ? listing.type === "auction"
-      ? auction?.phase === "ended"
-        ? "Auction ended"
-        : "Auction"
-      : `Buy now · ${formatAmount(listing.price ?? "0", listing.token)}`
-    : undefined;
+  const auction = listing && live && listing.type === "auction" ? auctionStateOf(listing, view.bids, clock) : null;
 
   return (
-    <RailBlock title="Marketplace" meta={meta} collapsible={false}>
+    <RailBlock title="Marketplace" collapsible={false}>
+      <OfferTabs tabs={tabs} active={tab} onSelect={setPicked}>
+        {tab !== "main" ? (
+          <CopyPanel
+            project={project}
+            view={view}
+            viewer={viewer}
+            now={clock}
+            scopeId={PROJECT_SCOPE}
+            scopeName={project.name}
+            kind={tab}
+            announce={announce}
+          />
+        ) : listing && viewer.kind === "demo-buyer" ? (
+          <BuyerBody
+            project={project}
+            view={view}
+            buyerId={viewer.buyerId}
+            listing={listing}
+            auction={auction}
+            clock={clock}
+            announce={announce}
+            viewer={viewer}
+          />
+        ) : listing ? (
+          <PreviewBody project={project} view={view} listing={listing} auction={auction} clock={clock} announce={announce} />
+        ) : null}
+      </OfferTabs>
+    </RailBlock>
+  );
+}
+
+/** The Main NFT's facts and activity, folded at the foot of its tab. */
+function MainFacts({ project, listing, view }: { project: SlotProps["project"]; listing: Listing; view: ProjectView }) {
+  return (
+    <MoreFacts>
+      <DealFacts listing={listing} view={view} />
       <ActivityNow
         variant="line"
         projectId={project.id}
         target={{ kind: "main" }}
-        heading="Main NFT activity"
+        heading="Activity"
         emptyNote={`No activity yet · listed ${formatDate(listing.listedAt)}`}
-        className="border-b border-solid border-border pb-3"
       />
-      {viewer.kind === "demo-buyer" ? (
-        <BuyerBody
-          project={project}
-          view={view}
-          buyerId={viewer.buyerId}
-          listing={listing}
-          auction={auction}
-          clock={clock}
-          announce={announce}
-          viewer={viewer}
-        />
-      ) : (
-        <PreviewBody project={project} view={view} listing={listing} auction={auction} clock={clock} announce={announce} />
-      )}
-      <EditionOffers project={project} view={view} viewer={viewer} announce={announce} />
-      {ask}
-    </RailBlock>
+    </MoreFacts>
   );
 }
 
 /** Get creator support (a holder, about the buyer's newest sale) or Ask the creator (about the
  *  listing): opens the buyer's conversation with the creator in Messages, acting as the buyer. */
-function AskCreator({ projectId, sales, buyerId }: { projectId: string; sales: Sale[]; buyerId: DemoBuyerId }) {
+export function AskCreator({ projectId, sales, buyerId }: { projectId: string; sales: Sale[]; buyerId: DemoBuyerId }) {
   const latest = sales
     .filter((s) => s.buyerId === buyerId)
     .reduce<Sale | null>((a, s) => (!a || s.at > a.at ? s : a), null);
@@ -261,7 +190,7 @@ function AskCreator({ projectId, sales, buyerId }: { projectId: string; sales: S
   );
 }
 
-/** Preview as buyer and a contributor preview: the facts, no button (PPL-6, P2-LISTING-21). */
+/** Preview as buyer and a contributor preview: the Main NFT's price and facts, no button (PPL-6, P2-LISTING-21). */
 function PreviewBody({
   project,
   view,
@@ -278,7 +207,6 @@ function PreviewBody({
   announce: (m: string) => void;
 }) {
   const closed = closedLine(view);
-  const facts = <ListingFacts listing={listing} view={view} auction={auction} />;
   return (
     <>
       <TestnetDemoBadge className="self-start" />
@@ -296,13 +224,21 @@ function PreviewBody({
           canBuy={false}
           buyBusy={false}
           onBuyNow={() => {}}
-          facts={facts}
+          facts={<AuctionTop listing={listing} auction={auction} />}
+          details={
+            <>
+              <LegalLine />
+              <MainFacts project={project} listing={listing} view={view} />
+            </>
+          }
           wallet={null}
           announce={announce}
         />
       ) : (
-        facts
+        <OfferTop overline={soldWhatOf(listing)} price={formatAmount(listing.price ?? "0", listing.token)} />
       )}
+      {!closed && !auction && <LegalLine />}
+      {!auction && <MainFacts project={project} listing={listing} view={view} />}
       <Link href={`/marketplace/${project.id}`} className={QUIET_LINK}>
         Open in Explore marketplace
         <Icon icon={ArrowUpRight01Icon} size={14} />
@@ -314,8 +250,8 @@ function PreviewBody({
 function ClosedLine({ line }: { line: { title: string; detail?: string } }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-md font-medium text-text-primary">{line.title}</p>
-      {line.detail && <p className="text-md tabular-nums text-text-secondary">{line.detail}</p>}
+      <p className="m-0 text-md font-medium text-text-primary">{line.title}</p>
+      {line.detail && <p className="m-0 text-md tabular-nums text-text-secondary">{line.detail}</p>}
     </div>
   );
 }
@@ -340,6 +276,10 @@ function BuyerBody({
   announce: (m: string) => void;
 }) {
   const { busy, buy } = usePurchase({ project, view, buyerId });
+  const holds = useCheckoutHolds();
+  // Another tab's checkout holds the listing: Buy waits until it settles or lapses.
+  const held = holds.others(listing.id) > 0;
+  const heldId = React.useId();
   const summaryRef = React.useRef<HTMLButtonElement>(null);
   const afterClose = useAfterDialogClose();
   // The Main share only: Purchased Summary and "Buy another share" are about it, whatever else the buyer holds.
@@ -360,36 +300,45 @@ function BuyerBody({
     });
   };
 
-  const facts = <ListingFacts listing={listing} view={view} auction={auction} />;
   return (
     <>
       {holding && can(viewer, "purchase.seeSummary", ctx) && (
         <PurchasedSummary holding={holding} toggleRef={summaryRef} />
       )}
       {live && listing.type === "buyNow" ? (
-        <div className={cn("flex flex-col gap-8", holding && "border-t border-solid border-border pt-8")}>
-          {holding && <h3 className="text-md font-bold text-text-primary">Buy another share</h3>}
-          {facts}
+        <div className={cn("flex flex-col gap-6", holding && "border-t border-solid border-border pt-8")}>
+          {holding && <h3 className="m-0 text-md font-bold text-text-primary">Buy another share</h3>}
+          <OfferTop overline={soldWhatOf(listing)} price={formatAmount(listing.price ?? "0", listing.token)} />
           {canBuy && (
-            <Button
-              type="button"
-              hierarchy="primary"
-              size="lg"
-              className="h-[44px] w-full"
-              // Not `disabled`: that drops its focus before the wallet dialog reads its opener,
-              // so Reject or Close would hand focus to <body> (the dialog covers it meanwhile).
-              aria-disabled={busy || undefined}
-              onClick={(e) => {
-                if (busy) return;
-                // Safari doesn't focus a clicked button.
-                e.currentTarget.focus();
-                void purchase("buyNow");
-              }}
-            >
-              Buy now
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                hierarchy="primary"
+                size="lg"
+                className={cn("h-[44px] w-full", held && "cursor-not-allowed opacity-60")}
+                // Not `disabled`: that drops its focus before the wallet dialog reads its opener,
+                // so Reject or Close would hand focus to <body> (the dialog covers it meanwhile).
+                aria-disabled={busy || held || undefined}
+                aria-describedby={held ? heldId : undefined}
+                onClick={(e) => {
+                  if (busy || held) return;
+                  // Safari doesn't focus a clicked button.
+                  e.currentTarget.focus();
+                  void purchase("buyNow");
+                }}
+              >
+                Buy now
+              </Button>
+              {held && (
+                <p id={heldId} className="m-0 text-md text-text-secondary">
+                  {IN_CHECKOUT_BUYER_LINE}
+                </p>
+              )}
+            </div>
           )}
-          <WalletLine buyerId={buyerId} listing={listing} verb="buy" now={clock} />
+          <WalletLine buyerId={buyerId} token={listing.token} network={listing.network} verb="buy" now={clock} />
+          <LegalLine />
+          <MainFacts project={project} listing={listing} view={view} />
         </div>
       ) : live && auction ? (
         <div className={cn(holding && "border-t border-solid border-border pt-8")}>
@@ -403,14 +352,24 @@ function BuyerBody({
             canBid={canBid}
             canBuy={canBuy}
             buyBusy={busy}
+            buyHeld={held}
             onBuyNow={() => void purchase("auctionBuyNow")}
-            facts={facts}
-            wallet={<WalletLine buyerId={buyerId} listing={listing} verb="bid" now={clock} />}
+            facts={<AuctionTop listing={listing} auction={auction} />}
+            details={
+            <>
+              <LegalLine />
+              <MainFacts project={project} listing={listing} view={view} />
+            </>
+          }
+            wallet={<WalletLine buyerId={buyerId} token={listing.token} network={listing.network} verb="bid" now={clock} />}
             announce={announce}
           />
         </div>
       ) : closed && !(holding && view.listing.kind === "sold" && view.listing.sale.buyerId === buyerId) ? (
-        <ClosedLine line={closed} />
+        <>
+          <ClosedLine line={closed} />
+          <MainFacts project={project} listing={listing} view={view} />
+        </>
       ) : null}
     </>
   );

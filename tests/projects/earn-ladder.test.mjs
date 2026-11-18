@@ -299,7 +299,7 @@ test("ladder × Sell gate: two products without videos and no ownership fail bot
   const r = earnLevelOf(f);
   assert.equal(r.level, 2, "neither keeps the project from its mint");
   assert.deepEqual(ids(r.next.missing), ["ownership", "videos"]);
-  assert.equal(r.next.missing.find((s) => s.id === "videos").reason, "2 products still need an AI video. The project video comes next.");
+  assert.equal(r.next.missing.find((s) => s.id === "videos").reason, "2 products still need an AI video. The project video isn't made yet.");
 });
 
 test("ladder × Sell gate: every video ready and ownership confirmed passes L3", () => {
@@ -318,7 +318,7 @@ test("ladder × Sell gate: a dropped product needs no video (COR-108)", () => {
 test("ladder × Sell gate: product videos alone don't make the step — the project video is part of it", () => {
   const f = fromGate(gateFacts({ videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1"), p2: readyVideo("t2") } } }));
   assert.equal(f.videosReady, false);
-  assert.equal(f.reasons.videos, "Every product has its video. Make the project video to continue.");
+  assert.equal(f.reasons.videos, "The project video isn't made yet.");
   assert.equal(earnLevelOf(f).level, 2);
 });
 

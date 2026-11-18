@@ -72,6 +72,8 @@ export type MessageEntry = {
   deletedAt?: number;
   /** The support request a migrated message came from. */
   sourceId?: string;
+  /** The message this one replies to, in the same conversation (the phone's swipe to reply). */
+  replyTo?: string;
 };
 
 export type ContextEntry = {

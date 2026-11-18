@@ -35,6 +35,7 @@ import { productsOf, type BuildJob, type BuildProduct } from "../create/history"
 // ../wallet/mint.ts join the same cycle on the same terms.
 import { lineageProjectOf, modelNameOf } from "./project-read";
 import { addHandProduct, renameProduct as renameProductPatch, stampEditorOpened } from "./editor-scope";
+import { productDetailsPatch, productStorageKeys, withoutProduct } from "./product-edit";
 import {
   CONTRIBUTOR_NAME_MAX,
   CONTRIBUTORS_MAX,
@@ -1170,6 +1171,14 @@ type Ctx = {
    *  while they agree). False, and no write, for an empty name or an unknown
    *  row. Bumps updatedAt. */
   renameProduct: (id: string, rowId: string, name: string) => boolean;
+  /** The product ⋯ menu's Edit name and description: both in one write (`productDetailsPatch`).
+   *  False, and no write, for an empty name, an unknown row or no change. Bumps updatedAt. */
+  updateProductDetails: (id: string, rowId: string, details: { name: string; description: string }) => boolean;
+  /** The product ⋯ menu's Delete product…: removes the row (`withoutProduct`) and its editor
+   *  documents in this browser (`productStorageKeys`). Callers check productDeleteBlockOf()
+   *  first and sweep the product's other records (copies, activity, video) themselves. False,
+   *  and nothing removed, for the project's only product or a row it doesn't hold. */
+  deleteProduct: (id: string, rowId: string) => boolean;
   /** "Add a product" › Build manually: a new hand-made row named `name`, after the others. Its id,
    *  or null when the name is empty or the project isn't there. Bumps updatedAt. */
   addProduct: (id: string, name: string) => string | null;
@@ -1520,6 +1529,46 @@ export function ManualProjectsProvider({
     [recordOf],
   );
 
+  const updateProductDetails = React.useCallback(
+    (id: string, rowId: string, details: { name: string; description: string }) => {
+      const base = recordOf(id);
+      const now = Date.now();
+      if (!base || !Object.keys(productDetailsPatch(base, rowId, details, now)).length) return false;
+      setProjects((arr) =>
+        arr.map((p) => {
+          if (p.id !== id) return p;
+          const patch = productDetailsPatch(p, rowId, details, now);
+          return Object.keys(patch).length ? applyPatch(p, patch, now) : p;
+        }),
+      );
+      return true;
+    },
+    [recordOf],
+  );
+
+  // The row and its editor documents; the first row also takes the legacy
+  // per-project keys it adopted, so the next first row can't adopt them.
+  const deleteProduct = React.useCallback(
+    (id: string, rowId: string) => {
+      const base = recordOf(id);
+      const now = Date.now();
+      if (!base || !withoutProduct(base, rowId, now)) return false;
+      const head = base.products?.[0]?.id === rowId;
+      setProjects((arr) => arr.map((p) => (p.id === id ? (withoutProduct(p, rowId, now) ?? p) : p)));
+      setScope((cur) => (cur?.projectId === id && cur.productId === rowId ? null : cur));
+      if (typeof window === "undefined") return true;
+      for (const key of productStorageKeys(id, rowId, head)) {
+        try {
+          window.localStorage.removeItem(key);
+        } catch {
+          // Storage refused this key (blocked site data): the rest still go.
+        }
+      }
+      return true;
+    },
+    [recordOf],
+  );
+
   const addProduct = React.useCallback(
     (id: string, name: string) => {
       const base = recordOf(id);
@@ -1714,6 +1763,8 @@ export function ManualProjectsProvider({
     activeProductId,
     touchOpened,
     renameProduct,
+    updateProductDetails,
+    deleteProduct,
     addProduct,
     setMint,
     addContributor,

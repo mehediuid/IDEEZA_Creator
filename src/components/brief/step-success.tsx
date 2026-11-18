@@ -24,6 +24,8 @@ import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog"
 import { ShareDialog } from "@/components/projects/share-dialog";
 import { useMinuteClock, useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { HeldBlock } from "@/components/video-jobs/held-block";
+import { hold, heldId, heldOf, useHeld } from "@/lib/market/held";
 import { VideoPlayerDialog, useClipUrl } from "@/components/video-jobs/video-player";
 import { MintProofCard } from "@/components/wallet/mint-proof-card";
 import {
@@ -49,6 +51,7 @@ import { useMarket } from "@/lib/market/market-store";
 import type { ListingMetadata } from "@/lib/market/types";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
+import { needsProjectVideo } from "@/lib/video/project-video";
 import { PROJECT_VIDEO_KEY, type VideoTake } from "@/lib/video/types";
 import { PROJECT_VIDEO_TITLE } from "@/lib/video/video-copy";
 import { MintStep, TAP } from "./brief-card";
@@ -94,12 +97,21 @@ export function StepSuccess({
     r.status.state === "ready" ? [{ product: r.product, take: r.status.take }] : [],
   );
   const own = productVideoStatus(videos?.products[PROJECT_VIDEO_KEY], jobs, now);
-  const projectTake = own.state === "ready" ? own.take : null;
+  // With one product its poster already is the project's (owner, 2026-11-17).
+  const projectTake = needsProjectVideo(products) && own.state === "ready" ? own.take : null;
   const projectLabel = projectName.trim() || PROJECT_VIDEO_TITLE;
   // Live once nothing renders any more (only a Save can arrive with a render running).
   const isLive = rendering === 0;
-  const heading = isLive ? HEADING_LIVE_BY_INTENT[intent] : "Mint complete";
-  const subline = isLive ? liveSubline(intent, ready.length > 0 || projectTake !== null) : pendingSubline();
+  // A Sell signed while its videos still render or wait for review (owner, 2026-11-18): minted, and
+  // the listing waits off the marketplace — never "Listed" until it is.
+  const { store: heldStore } = useHeld();
+  const waitingSale = intent === "sell" && projectId ? heldOf(heldStore, projectId).some((i) => i.kind === "main") : false;
+  const heading = waitingSale ? "Minted · listing waits for videos" : isLive ? HEADING_LIVE_BY_INTENT[intent] : "Mint complete";
+  const subline = waitingSale
+    ? "It goes on Explore marketplace by itself when every video is ready — we'll tell you."
+    : isLive
+      ? liveSubline(intent, ready.length > 0 || projectTake !== null)
+      : pendingSubline();
 
   // The listing as its record holds it now, so an edit from the rail shows here too.
   const listing =
@@ -167,6 +179,8 @@ export function StepSuccess({
             )}
           </section>
         ) : null}
+
+        {projectId && <SuccessHeld projectId={projectId} />}
 
         {!isLive && <PendingCard rows={rows} rendering={rendering} />}
 
@@ -294,6 +308,8 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
   const undoRef = React.useRef<HTMLButtonElement>(null);
   const project = data.state === "ready" ? data.project : null;
   const on = typeof project?.showcasedAt === "number";
+  const { store: held } = useHeld();
+  const waitingShare = project ? heldOf(held, project.id).some((i) => i.kind === "share") : false;
   // The control that replaces the one just pressed takes focus once it has rendered.
   const focusNext = React.useRef<"show" | "undo" | null>(null);
   React.useEffect(() => {
@@ -317,9 +333,17 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
 
   const flip = (next: boolean, post?: SharePost) => {
     focusNext.current = next ? "undo" : "show";
+    // A video still being made (owner, 2026-11-18): the post waits off Innovations, then goes live.
+    if (next && post && videosBlockerOf(readiness)) {
+      hold({ id: heldId(), projectId: project.id, kind: "share", at: Date.now(), story: post.story });
+      setSaid(HELD_SHARE_ANNOUNCEMENT);
+      return;
+    }
     setShowcase(project.id, next, undefined, post);
     setSaid(shareAnnouncement(next, project.name));
   };
+  // Already waiting for its videos: SuccessHeld shows it.
+  if (waitingShare) return null;
 
   return (
     <div className="flex w-full flex-col items-stretch gap-3">
@@ -380,6 +404,23 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
     </div>
   );
 }
+
+/** What this mint signed that waits for its videos (owner, 2026-11-18): the listing, the post. */
+function SuccessHeld({ projectId }: { projectId: string }) {
+  const data = useProjectPageData(projectId, "project");
+  const { store } = useHeld();
+  const items = heldOf(store, projectId);
+  if (data.state !== "ready" || items.length === 0) return null;
+  return (
+    <section aria-label="Waiting for videos" className="flex w-full flex-col gap-[10px] text-left">
+      {items.map((item) => (
+        <HeldBlock key={item.id} item={item} projectId={projectId} products={data.view.products} />
+      ))}
+    </section>
+  );
+}
+
+const HELD_SHARE_ANNOUNCEMENT = "Your post goes on Innovations when every video is ready.";
 
 /** A Save's videos still rendering: each one's progress, and that they need no one to wait. */
 function PendingCard({

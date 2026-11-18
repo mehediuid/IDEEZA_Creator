@@ -41,8 +41,30 @@ export type WalletActivity = {
   presale?: PresaleBuy;
   /** A claim (`claimIdz`): the id of the purchase whose IDZ it releases. */
   claims?: string;
-  /** What the entry paid in: a tutorial reward ("Tutorial reward · …"). */
+  /** What the entry paid in: a tutorial reward ("Tutorial reward · …"), a withdrawn stake, a
+   *  staking or referral reward. */
   credit?: Charge;
+  /** A stake (`stakeIdz`): its terms, fixed when it was made. A withdrawal or reward claim names
+   *  it in `claims`. */
+  stake?: StakeRecord;
+};
+
+/**
+ * One stake (Earn Coin › Stake, `lib/wallet/staking.ts`): the IDZ locked in a demo staking
+ * contract's option, with that option's terms as they were when it was made. Its activity line's
+ * charge is the IDZ plus the gas; a withdrawal's credit brings the IDZ back.
+ */
+export type StakeRecord = {
+  contract: string;
+  option: string;
+  amount: Amount;
+  /** Basis points a year: 3790 = 37.9 %. */
+  aprBps: number;
+  lockDays: number;
+  intervalDays: number;
+  graceDays: number;
+  /** How long a staking day lasts in the demo, in ms. */
+  dayMs: number;
 };
 
 /**
@@ -128,7 +150,15 @@ export type RequestPurpose =
   /** IDZ bought in the demo presale (Balance › Buy IDZ Token). */
   | "buyIdz"
   /** A presale purchase's IDZ claimed once it unlocks. */
-  | "claimIdz";
+  | "claimIdz"
+  /** IDZ staked in a demo staking contract (Earn Coin › Stake). */
+  | "stakeIdz"
+  /** A stake's IDZ withdrawn back into the balance. */
+  | "unstakeIdz"
+  /** A stake's unlocked rewards claimed. */
+  | "claimStakeReward"
+  /** A referral campaign's rewards claimed (Earn Coin › Refer & Earn). */
+  | "claimReferral";
 
 export type WalletRequest = {
   kind: "signature" | "transaction";
@@ -149,8 +179,16 @@ export type WalletRequest = {
   releases?: string;
   /** `buyIdz`: what the confirmed line records as its purchase. */
   presale?: PresaleDraft;
-  /** `claimIdz`: the purchase it claims. */
+  /** `claimIdz`: the purchase it claims; `unstakeIdz` / `claimStakeReward`: the stake;
+   *  `claimReferral`: the campaign. */
   claims?: string;
+  /** `stakeIdz`: what the confirmed line records as its stake. */
+  stake?: StakeRecord;
+  /** What the confirmed line pays in (a withdrawal, a reward claim). */
+  credit?: Charge;
+  /** A purchase the market store doesn't hold (a Feed sample project bought on the phone,
+   *  `market/phone-sample-sales.ts`): no Sale debits it, so its activity line carries the charge. */
+  offMarket?: true;
 };
 
 export type RequestPhase =

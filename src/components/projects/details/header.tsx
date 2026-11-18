@@ -45,12 +45,14 @@ import { Icon } from "@/components/dashboard/icon";
 import { Badge, Banner } from "@/components/ideeza";
 import { LeaveButton } from "@/components/create/leave-button";
 import { SharedPostChip } from "@/components/innovations/shared-post-chip";
+import { PersonName } from "@/components/profile/person-name";
 import { ShowcaseChip, StatusChip } from "@/components/projects/status-chip";
 import { LockLine } from "@/components/projects/product/product-states";
 import { roleChipOf } from "@/lib/manual/contributors";
 import { earnHref, publishOptionsOf } from "@/lib/manual/earn-route";
 import { earnButtonOf } from "@/lib/manual/earn-view";
 import { headerText, type MetaPart } from "@/lib/manual/project-summary";
+import { ME } from "@/lib/messages/types";
 import { buyerSide } from "@/lib/manual/project-route";
 import { labelOf } from "@/lib/manual/journey";
 import { ActivityNow } from "./activity/now-block";
@@ -64,6 +66,10 @@ import { ProjectMenu } from "./project-menu";
 import { PublishDialog } from "./publish-dialog";
 import type { ProjectSlots, SlotProps } from "./slots";
 import { ProjectTitle } from "./title-editor";
+import { HeldChip } from "@/components/video-jobs/held-block";
+import { openVideosPanel } from "@/components/video-jobs/videos-panel-store";
+import { heldLabelOf, heldOf, useHeld } from "@/lib/market/held";
+import { videoCountOf } from "@/lib/manual/readiness";
 
 /** Preview as buyer's id (PPL-5). The button lives in Earn's header now; Exit preview still
  *  hands focus to it when it is on the page, else to the h1. */
@@ -87,6 +93,7 @@ export function ProjectHeader({
   announce,
   parts,
   context = "project",
+  creatorName,
 }: SlotProps & {
   /** The shell's h1 ref (COR-7), forwarded to ProjectTitle. */
   titleRef: React.RefObject<HTMLHeadingElement | null>;
@@ -94,6 +101,9 @@ export function ProjectHeader({
   parts?: ProjectSlots["headerParts"];
   /** "market" on Explore marketplace's buyer view: the meta line leads with "Created by you · Listed {date}". */
   context?: "project" | "market";
+  /** On Explore marketplace, the creator as the buyer knows them: "Created by {name}" (a link to
+   *  their profile) instead of "you", and the line leaves out the owner's Saved date. */
+  creatorName?: string;
 }) {
   const router = useRouter();
   // Which control is taking the maker off the page. Never cleared: the navigation unmounts it.
@@ -146,14 +156,29 @@ export function ProjectHeader({
   // P2-CONTRIB-10 on the buyer's side: "Owned by Ana Silva" (a visitor never sees the roster, so
   // the name is never a link). On Explore marketplace: "Created by you · Listed Sep 28, 2026" (§2.4).
   const lead: React.ReactNode[] = [];
+  const market = context === "market" && creatorName !== undefined;
   if (!engineering) {
-    if (text.createdBy) lead.push(text.createdBy);
+    if (text.createdBy && market) {
+      // "Created by you · Listed {date}" → "Created by {name}" (a link) · "Listed {date}".
+      const rest = text.createdBy.replace(/^Created by you(?: · )?/, "");
+      lead.push(
+        <React.Fragment key="by">
+          Created by{" "}
+          <PersonName id={ME} tone="secondary">
+            {creatorName}
+          </PersonName>
+        </React.Fragment>,
+      );
+      if (rest) lead.push(rest);
+    } else if (text.createdBy) lead.push(text.createdBy);
     else if (text.ownedBy?.created) lead.push(text.ownedBy.created);
     if (text.ownedBy) lead.push(`Owned by ${text.ownedBy.ownedBy}`);
   }
   const meta: MetaPart[] = engineering
     ? [{ kind: "text", text: stageLineOf(view.engineering, summary) }, ...engineeringMetaOf(summary, { label: labelOf(view.current) })]
-    : text.meta;
+    : market
+      ? text.meta.filter((m) => m.kind !== "time")
+      : text.meta;
   // One editor for the name and the description, opened from ⋯, "Add a description" and the coachmark.
   const canEdit = can(viewer, "project.rename", canCtx) || can(viewer, "project.editDescription", canCtx);
   const fallbackFocus = React.useCallback(() => menuRef.current ?? titleRef.current, [titleRef]);
@@ -162,6 +187,13 @@ export function ProjectHeader({
   // Publish (owner, 2026-10-12): how a Draft or a Private project goes out, chosen here once.
   const publishOptions = menu && view.lock === null ? publishOptionsOf(summary.status, brief?.state.mintedAt != null) : null;
   const [publishing, setPublishing] = React.useState(false);
+  // What the maker signed while videos were still being made (owner, 2026-11-18).
+  const { store: heldStore } = useHeld();
+  const waiting = owner ? heldOf(heldStore, project.id) : [];
+  const waitCount = videoCountOf(view.videos.readiness.sell);
+  const waitingLine = `${[...new Set(waiting.map(heldLabelOf))].join(", ")} · goes live when ${
+    waitCount.total === 1 ? "the video is" : `all ${waitCount.total} videos are`
+  } ready · ${waitCount.ready} of ${waitCount.total} ·`;
   const publishLine = !publishOptions
     ? null
     : publishOptions.length === 3
@@ -179,6 +211,7 @@ export function ProjectHeader({
               <ProjectTitle project={project} titleRef={titleRef} />
             </div>
             {engineering && owner && <StatusChip status={summary.status} word={text.chip.word} />}
+            {engineering && owner && waiting.length > 0 && <HeldChip />}
             {engineering && text.chip.badge && (owner ? <SharedPostChip project={project} /> : <ShowcaseChip />)}
             {parts?.titleRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
             {role && (
@@ -191,7 +224,8 @@ export function ProjectHeader({
           {!engineering && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
               <StatusChip status={summary.status} word={text.chip.word} />
-              {text.chip.badge && <ShowcaseChip />}
+              {/* On Explore marketplace the post is the rail's On Innovations block, not a chip. */}
+              {text.chip.badge && !market && <ShowcaseChip />}
               {parts?.statusRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
             </div>
           )}
@@ -286,10 +320,24 @@ export function ProjectHeader({
                 <ProjectMenu {...slotProps} canEdit={canEdit} onEdit={() => edit.open()} triggerRef={menuRef} />
               )}
             </div>
-            {(publishLine ?? earn?.sub) && (
-              <span id={earnFactId} className="text-sm text-text-secondary">
-                {publishLine ?? earn?.sub}
+            {waiting.length > 0 ? (
+              // Signed while videos were still being made (owner, 2026-11-18): when it goes live.
+              <span id={earnFactId} className="flex flex-wrap items-center gap-x-2 text-md font-semibold text-text-warning">
+                {waitingLine}
+                <button
+                  type="button"
+                  onClick={() => openVideosPanel(project.id)}
+                  className="rounded-md font-semibold text-text-link underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  Review videos
+                </button>
               </span>
+            ) : (
+              (publishLine ?? earn?.sub) && (
+                <span id={earnFactId} className="text-sm text-text-secondary">
+                  {publishLine ?? earn?.sub}
+                </span>
+              )
             )}
           </div>
         )}

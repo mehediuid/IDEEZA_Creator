@@ -22,8 +22,11 @@
 //   storyboard · Generate video. The take keeps the prompts, what was left to
 //   AI and the storyboard; each scene's speech is its on-screen line.
 // - render: "Take {n} · Stage {i} of 5 · {label}", the progress, the time
-//   left, "Notify me on this browser"; Cancel render · Close. Closing leaves
-//   the render running — its toast carries on in the corner.
+//   left, "Notify me on this browser · for every video" (one switch, owner
+//   2026-11-18); Cancel render · Close · "Next video: {name}" when another of
+//   the project's videos hasn't started, which opens that one's form while
+//   this one renders (owner 2026-11-18: one after another, never waiting).
+//   Closing leaves the render running — the Videos button tracks it.
 // - review (owner, 2026-10-21): a finished take counts only once the maker
 //   says so. The player (never autoplaying; its line names the take),
 //   "Is this the video you want?", Use this video (and which take stays in
@@ -41,12 +44,15 @@ import { ArrowDown01Icon, ArrowLeft01Icon, ArrowUp01Icon, Clock01Icon, SparklesI
 import { Icon } from "@/components/dashboard/icon";
 import { PromptHelpModal } from "@/components/brief/prompt-help-modal";
 import { Badge, Banner, Button, Checkbox, ModalFrame, ProgressBar, Spinner, Textarea, Toggle } from "@/components/ideeza";
-import type { ProjectProduct } from "@/lib/manual/project-read";
+import { useCreateHistory } from "@/lib/create/history";
+import { buildsOf, productsOfProject, type ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import type { ManualProject, ProductSource } from "@/lib/manual/projects";
+import { useManualProjects, type ManualProject, type ProductSource } from "@/lib/manual/projects";
 import { WRITE_ERROR_MESSAGE } from "@/lib/storage-status";
 import { etaLabel, progressOf } from "@/lib/video/jobs";
 import { defaultLines, productVideoStatus } from "@/lib/video/product-video";
+import { nextVideoOf } from "@/lib/video/next-video";
+import { useNotifyAll, writeNotifyAll } from "@/lib/video/notify-pref";
 import { useProjectVideos } from "@/lib/video/store";
 import {
   SCENE_FIELD_MAX,
@@ -83,6 +89,7 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { pitchCycle } from "@/lib/create/upsell";
 import { ArRecordPanel } from "./ar-record-panel";
 import { useVideoJobs } from "./video-jobs-provider";
+import { openVideoFlowSoon } from "./video-flow";
 import { VideoPlayer } from "./video-player";
 
 // ─────────────────────────── the target ───────────────────────────
@@ -261,13 +268,13 @@ export function VideoForm({ target, value, onChange, promptRef, describedBy, onH
   );
 }
 
-/** AR or AI: two cards, a radiogroup. AR is the Figma's Recommended way — a real clip of the
- *  real product — and opens the phone hand-off; AI makes it from prompts. */
+/** AR or AI: two cards, a radiogroup. AR (a real clip of the real product) opens the phone
+ *  hand-off; AI makes it from prompts and is the one the form opens on. */
 function MethodField({ value, onChange }: { value: VideoMethod; onChange: (m: VideoMethod) => void }) {
   const labelId = React.useId();
   const refs = React.useRef<Record<VideoMethod, HTMLDivElement | null>>({ ar: null, ai: null });
-  const options: { id: VideoMethod; title: string; text: string; icon: Parameters<typeof Icon>[0]["icon"]; badge?: string }[] = [
-    { id: "ar", title: "AR", text: "Record a video of the real product with your phone.", icon: VrIcon, badge: "Recommended" },
+  const options: { id: VideoMethod; title: string; text: string; icon: Parameters<typeof Icon>[0]["icon"] }[] = [
+    { id: "ar", title: "AR", text: "Record a video of the real product with your phone.", icon: VrIcon },
     { id: "ai", title: "AI", text: "AI makes the video from your prompts.", icon: SparklesIcon },
   ];
   const pick = (m: VideoMethod) => {
@@ -310,9 +317,6 @@ function MethodField({ value, onChange }: { value: VideoMethod; onChange: (m: Vi
                 <RadioMark checked={checked} />
                 <span className={cn("text-md font-semibold", checked ? "text-text-brand" : "text-text-primary")}>{o.title}</span>
                 <Icon icon={o.icon} size={18} className={checked ? "text-text-brand" : "text-text-secondary"} />
-                {o.badge && (
-                  <span className="rounded-full bg-bg-success-subtle px-[8px] py-[2px] text-xs font-semibold text-text-success">{o.badge}</span>
-                )}
               </span>
               <span className="text-sm leading-relaxed text-text-secondary">{o.text}</span>
             </div>
@@ -690,6 +694,13 @@ function GenerateVideoDialogOpen({
   const { sub: planSub } = useCreatePlan();
   const planTier = planSub.tier;
   const video = record?.products[target.productId];
+  const notifyAll = useNotifyAll();
+  // The project's products, for "Next video".
+  const { projects } = useManualProjects();
+  const { builds } = useCreateHistory();
+  const project = projects.find((p) => p.id === target.projectId);
+  const products = React.useMemo(() => (project ? productsOfProject(project, buildsOf(project, builds)) : []), [project, builds]);
+  const next = nextVideoOf({ products, videos: record, jobs, now, after: target.productId });
 
   // The take asked for; else a render already running for this product; else
   // the form a caller asked for; else a take waiting for its review.
@@ -1024,30 +1035,55 @@ function GenerateVideoDialogOpen({
         <ProgressBar value={total} label={`${target.productName} video`} />
         <p className="text-sm text-text-secondary">{etaLabel(etaSec)} left</p>
         <p className="text-sm text-text-secondary">{RENDER_KEEPS_RUNNING}</p>
+        {/* One switch for every video (owner, 2026-11-18, D5); an older take's own tick still counts. */}
         <button
           type="button"
           role="checkbox"
-          aria-checked={job.browserNotify}
-          onClick={() => setBrowserNotify(job.id, !job.browserNotify)}
+          aria-checked={notifyAll || job.browserNotify}
+          onClick={() => {
+            const on = !(notifyAll || job.browserNotify);
+            writeNotifyAll(on);
+            if (!on && job.browserNotify) setBrowserNotify(job.id, false);
+          }}
           className={cn(
             "flex min-h-[32px] items-center gap-[10px] self-start rounded-md px-[4px] text-left text-sm font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
             TAP,
           )}
         >
-          <Checkbox checked={job.browserNotify} decorative />
-          Notify me on this browser
+          <Checkbox checked={notifyAll || job.browserNotify} decorative />
+          Notify me on this browser · for every video
         </button>
         <p className="text-xs text-text-tertiary">{honestyLine(target.productName)}</p>
       </div>
     );
+    // Next video (owner, 2026-11-18, D2): the next one starts its storyboard while this one renders.
     footer = (
-      <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
-        <Button type="button" hierarchy="ghost" size="lg" className={TAP} onClick={() => cancelRender(take.id)}>
-          Cancel render
-        </Button>
-        <Button type="button" hierarchy="primary" size="lg" className={TAP} onClick={onClose}>
-          Close
-        </Button>
+      <div className="ml-auto flex flex-col items-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-6">
+          <Button type="button" hierarchy="ghost" size="lg" className={TAP} onClick={() => cancelRender(take.id)}>
+            Cancel render
+          </Button>
+          <Button type="button" hierarchy={next ? "secondary" : "primary"} size="lg" className={TAP} onClick={onClose}>
+            Close
+          </Button>
+          {next && (
+            <Button
+              type="button"
+              hierarchy="primary"
+              size="lg"
+              className={TAP}
+              onClick={() => {
+                onClose();
+                openVideoFlowSoon(target.projectId, next.productId);
+              }}
+            >
+              {`Next video: ${next.name}`}
+            </Button>
+          )}
+        </div>
+        <p className="text-sm text-text-secondary">
+          {next ? `${target.productName} keeps rendering while you set up the next one.` : "Every video of this project has started."}
+        </p>
       </div>
     );
   } else if (view === "review" && take) {

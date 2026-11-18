@@ -12,7 +12,11 @@
 //
 // The tabs are the outcome — All · Draft · Minted · Listed · Sold (owner,
 // 2026-10-11). Showcase is membership, not a state (owner decision O5), so it is
-// a filter beside Sort: Showcase only.
+// a filter beside Sort: Showcase only. Then Purchased (owner, 2026-11-16:
+// "anything bought goes to My projects"): what the active demo creator bought,
+// one card per project (purchased/purchased-tab.tsx), `?tab=purchased`; it is
+// not an outcome of the maker's own projects, so it lives beside the list's
+// tabs, not in its query (project-list.ts, which the phone shares, is untouched).
 //
 // The view lives in the URL (LST-28): tab, q, sort, showcase and page, written
 // with replaceState and defaults left out; an old tab=private|given|showcase
@@ -62,10 +66,13 @@ import {
   NoShowcaseState,
 } from "./project-card";
 import { Pagination } from "./pagination";
+import { PurchasedTab } from "./purchased/purchased-tab";
+import { usePurchased } from "./purchased/use-purchased";
 import { motionReduced } from "@/lib/settings/appearance";
 
 const PANEL_ID = "projects-panel";
-const tabId = (tab: ListTab) => `projects-tab-${tab}`;
+const tabId = (tab: ListTab | typeof PURCHASED) => `projects-tab-${tab}`;
+const PURCHASED = "purchased";
 
 // ───────────────────────── brief drafts ─────────────────────────
 
@@ -180,6 +187,8 @@ export function MyProjects() {
   const pathname = usePathname();
   const params = useSearchParams();
   const now = useMinuteClock();
+  const bought = usePurchased();
+  const onPurchased = params.get("tab") === PURCHASED;
 
   // ── the view ──
   const query = React.useMemo(() => parseListQuery(params), [params]);
@@ -307,7 +316,11 @@ export function MyProjects() {
   };
 
   const tabLabel = LIST_TABS.find((t) => t.id === view.tab)?.label ?? "All";
-  const noProjects = result !== null && result.total === 0;
+  const noProjects = result !== null && result.total === 0 && bought.ready && bought.purchases.length === 0;
+  const openPurchased = () => {
+    urlSearch.current = `?tab=${PURCHASED}`;
+    window.history.replaceState(null, "", `${pathname}?tab=${PURCHASED}`);
+  };
 
   return (
     // The page container is what the toolbar, the chips and the pagination
@@ -323,8 +336,19 @@ export function MyProjects() {
           <NoProjectsState onGoHome={() => router.push("/")} />
         ) : (
           <>
-            <ProjectTabs tab={view.tab} counts={result?.counts ?? null} onChange={(tab) => changeView({ tab })} />
+            <ProjectTabs
+              tab={onPurchased ? null : view.tab}
+              counts={result?.counts ?? null}
+              onChange={(tab) => changeView({ tab })}
+              purchased={{ active: onPurchased, count: bought.ready ? bought.purchases.length : null, onSelect: openPurchased }}
+            />
 
+            {onPurchased ? (
+              <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(PURCHASED)}>
+                <h2 className="sr-only">Purchased</h2>
+                {bought.ready ? <PurchasedTab purchases={bought.purchases} buyerName={bought.buyer.name} /> : <ProjectsSkeleton className="mt-8" />}
+              </div>
+            ) : (
             <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(view.tab)}>
               {/* The results heading (LST-60): the focus target after a page turn. */}
               <h2 ref={headingRef} tabIndex={-1} className="sr-only">
@@ -446,6 +470,7 @@ export function MyProjects() {
                 </>
               )}
             </div>
+            )}
           </>
         )}
       </div>
@@ -529,19 +554,26 @@ export function ProjectsSkeleton({ className }: { className?: string }) {
 
 // A real ARIA tablist (LST-8): one Tab stop, ← → Home End move and select,
 // every tab names its count, and all of them control the one panel.
+type TabId = ListTab | typeof PURCHASED;
+
 function ProjectTabs({
   tab,
   counts,
   onChange,
+  purchased,
 }: {
-  tab: ListTab;
+  /** The list's tab, or null while Purchased is open. */
+  tab: ListTab | null;
   counts: ListCounts | null;
   onChange: (tab: ListTab) => void;
+  /** The Purchased tab beside the outcomes: its count is "—" until every store is read. */
+  purchased: { active: boolean; count: number | null; onSelect: () => void };
 }) {
-  const refs = React.useRef(new Map<ListTab, HTMLButtonElement>());
-  const ids = LIST_TABS.map((t) => t.id);
+  const refs = React.useRef(new Map<TabId, HTMLButtonElement>());
+  const ids: TabId[] = [...LIST_TABS.map((t) => t.id), PURCHASED];
+  const select = (to: TabId) => (to === PURCHASED ? purchased.onSelect() : onChange(to));
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, from: ListTab) => {
+  const onKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, from: TabId) => {
     const i = ids.indexOf(from);
     const to =
       e.key === "ArrowRight"
@@ -555,9 +587,14 @@ function ProjectTabs({
               : null;
     if (!to) return;
     e.preventDefault();
-    onChange(to);
+    select(to);
     refs.current.get(to)?.focus();
   };
+
+  const all: { id: TabId; label: string; n: number | null; active: boolean }[] = [
+    ...LIST_TABS.map((t) => ({ id: t.id as TabId, label: t.label, n: counts ? counts[t.id] : null, active: t.id === tab })),
+    { id: PURCHASED, label: "Purchased", n: purchased.count, active: purchased.active },
+  ];
 
   return (
     <div
@@ -565,10 +602,9 @@ function ProjectTabs({
       aria-label="Projects by outcome"
       className="flex flex-wrap items-center gap-[8px] border-b border-solid border-border pb-[16px]"
     >
-      {LIST_TABS.map((t) => {
-        const active = t.id === tab;
+      {all.map((t) => {
         // "—" until the projects and every brief draft have been read (LST-7).
-        const n = counts ? counts[t.id] : null;
+        const { active, n } = t;
         return (
           <button
             key={t.id}
@@ -583,7 +619,7 @@ function ProjectTabs({
             aria-controls={PANEL_ID}
             aria-label={`${t.label}, ${n === null ? "not counted yet" : tabCountLabel(n)}`}
             tabIndex={active ? 0 : -1}
-            onClick={() => onChange(t.id)}
+            onClick={() => select(t.id)}
             onKeyDown={(e) => onKeyDown(e, t.id)}
             className={cn(
               "inline-flex h-[36px] items-center gap-[8px] rounded-full border border-solid px-[14px] text-md font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none [@container(max-width:559px)]:h-[44px]",

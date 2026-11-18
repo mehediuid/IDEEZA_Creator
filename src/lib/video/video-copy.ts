@@ -29,6 +29,11 @@ export function honestyLine(productName: string): string {
   return `Made in this browser from ${productName}'s image and on-screen text — the AI video model isn't connected yet. Your prompt is kept with the video.`;
 }
 
+/** The same honesty for someone who isn't the maker (a buyer, a visitor): nothing about "your" prompt. */
+export function viewerHonestyLine(productName: string): string {
+  return `Made in this browser from ${productName}'s image and on-screen text — the AI video model isn't connected yet.`;
+}
+
 export const SILENT_NOTE = "The video is silent.";
 
 /** Under the storyboard (owner, 2026-10-12): what the browser can make of it today. */
@@ -130,6 +135,10 @@ export function actionLabel(action: StatusCopy["action"]): string | null {
   return action === "generate" ? "Generate AI video" : action === "retry" ? "Try again" : action === "review" ? "Review" : null;
 }
 
+/** The readiness row's quiet action on a settled "Video ready": a new take, made as Regenerate
+ *  makes one, while the take in use stays until the maker chooses the new one. */
+export const REPLACE_LABEL = "Replace";
+
 export type ReadinessCopy = { title: string; info: string; cta: string };
 
 /** P2-VIDEO-14's table, with §4.3's two added purposes. */
@@ -138,36 +147,53 @@ export function readinessCopy(purpose: ReadinessPurpose, productName = "This pro
     case "showcase":
       return {
         title: "Share to Innovations",
-        info: "Every product needs an AI video, and the post needs your story.",
+        info: "The post needs your story, and every video has to be started. You don't wait for them to finish: the post stays off Innovations until they're ready.",
         cta: "Share to Innovations",
       };
     case "sell":
       return {
         title: "Add to marketplace",
-        info: "To add this project to the marketplace, every product needs an AI video.",
+        info: "Start every video first. You don't wait for them to finish: the listing stays off Explore marketplace until they're ready.",
         cta: "Continue to listing",
       };
     case "give":
       return {
         title: "Give to community",
-        info: "To give this project to the community, every product needs an AI video.",
+        info: "Start every video first. You don't wait for them to finish: its post stays off Innovations until they're ready.",
         cta: "Continue",
       };
     case "relist":
-      return { title: "Relist on the marketplace", info: "To relist, every product needs an AI video.", cta: "Relist" };
+      return {
+        title: "Relist on the marketplace",
+        info: "Start every video first. You don't wait for them to finish: it stays off Explore marketplace until they're ready.",
+        cta: "Relist",
+      };
     case "edition":
       return {
         title: `Add ${productName} NFTs to the marketplace`,
-        info: `${productName} needs an AI video first.`,
+        info: `Start ${productName}'s video first. You don't wait for it to finish: these wait off Explore marketplace until it's ready.`,
         cta: "Continue",
       };
     case "videos":
       return {
         title: "Videos",
-        info: "Every product needs an AI video. Then the project video is made from them.",
+        info: "Every product needs an AI video, and the project needs its own. Start each one, one after another: they render together.",
         cta: "Continue",
       };
   }
+}
+
+/** Under a commit that no longer waits for the videos (owner, 2026-11-18): it goes live by itself. */
+export function heldNoteOf(where: string, total: number): string {
+  const all = total === 1 ? "the video is" : `all ${total} videos are`;
+  return `You don't have to wait. It stays off ${where} until ${all} ready, then goes live by itself. We'll tell you when it does.`;
+}
+
+/** "Goes live when all 4 videos are ready · 2 of 4 now". */
+export function heldCountLine(ready: number, total: number): string {
+  return total === 1
+    ? `Goes live when the video is ready · ${ready} of 1 now`
+    : `Goes live when all ${total} videos are ready · ${ready} of ${total} now`;
 }
 
 /** "1 of 2 ready" — the readiness dialog's Products meta. */
@@ -210,9 +236,15 @@ export function moreToastsLine(n: number): string {
 // ─────────────────────────── the project video (owner, 2026-10-21) ───────────────────────────
 
 export const PROJECT_VIDEO_TITLE = "Project video";
-export const PROJECT_GROUP_META = "Made from your product videos";
+export const PROJECT_GROUP_META = "Made from your products’ prompts and specs";
+/** Owner, 2026-11-17: one product, one video. */
+export const SINGLE_PRODUCT_NOTE =
+  "This project has one product, so its video is the project video too. Add another product and a project video is made from both.";
 export const PROJECT_HONESTY =
-  "Made in this browser from your product videos, silent for now. The intro, order, lines and sound are kept with the video for the AI video model.";
+  "Made in this browser from your products’ images and lines, silent for now. The intro, order, lines and sound are kept with the video for the AI video model.";
+/** PROJECT_HONESTY for someone who isn't the maker. */
+export const PROJECT_HONESTY_VIEWER =
+  "Made in this browser from the products’ images, silent for now — the AI video model isn't connected yet.";
 
 /** "0:19" — a project video's length on its row. */
 export function clockOf(ms: number): string {
@@ -236,6 +268,16 @@ export type ProjectRowCopy = {
 export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
   const v = s.video;
   switch (s.state) {
+    case "single":
+      // Never a row of its own: the one product's video is the project's (owner, 2026-11-17).
+      return {
+        text: s.face ? "Its product's video is the project video" : "Its product's video will be the project video",
+        sub: null,
+        tone: "neutral",
+        icon: "info",
+        action: null,
+        progress: null,
+      };
     case "waiting":
       return {
         text: s.total === 1 ? "Opens when your product video is ready" : `Opens when every product has a video · ${s.ready} of ${s.total} ready`,
@@ -246,7 +288,8 @@ export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
         progress: null,
       };
     case "make":
-      return { text: "Every product video is ready.", sub: null, tone: "neutral", icon: "check", action: "make", progress: null };
+      // It never waits for the product videos (owner, 2026-11-18): it can be made any time.
+      return { text: "No project video yet · it can start now", sub: null, tone: "neutral", icon: "info", action: "make", progress: null };
     case "rendering": {
       const progress = v.state === "rendering" ? v.progress : v.state === "ready" && v.next ? v.next.progress : 0;
       const eta = v.state === "rendering" ? v.eta : v.state === "ready" && v.next ? v.next.eta : "";
@@ -277,7 +320,8 @@ export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
       // Finished, not chosen yet (owner, 2026-10-21): it doesn't count until Use this video.
       return { text: "Ready to review", sub: null, tone: "brand", icon: "eye", action: "review", progress: null };
     case "outdated": {
-      const canUpdate = s.total > 0 && s.ready === s.total;
+      // Drawn from the products themselves, so it can always be updated (owner, 2026-11-18).
+      const canUpdate = s.total > 0;
       const what =
         s.missing.length > 0
           ? `${listNames(s.missing)} ${s.missing.length === 1 ? "isn't" : "aren't"} in it yet.`
@@ -327,12 +371,8 @@ export function projectActionLabel(action: ProjectRowCopy["action"]): string | n
 }
 
 /** What a screen reader hears when the project row changes state — never progress ticks. */
-export function projectStateLine(s: ProjectVideoStatus, productCount: number): string | null {
+export function projectStateLine(s: ProjectVideoStatus): string | null {
   switch (s.state) {
-    case "make":
-      return productCount === 1
-        ? "Your product video is ready. You can make the project video now."
-        : `All ${productCount} product videos are ready. You can make the project video now.`;
     case "rendering":
       return "Project video is rendering.";
     case "ready":
@@ -340,10 +380,12 @@ export function projectStateLine(s: ProjectVideoStatus, productCount: number): s
     case "review":
       return "The project video is ready to review.";
     case "outdated":
-      return s.total > 0 && s.ready === s.total ? "Every product has its video. You can update the project video now." : null;
+      return "The products changed. You can update the project video now.";
     case "failed":
       return "Project video render failed.";
+    case "make":
     case "waiting":
+    case "single":
       return null;
   }
 }

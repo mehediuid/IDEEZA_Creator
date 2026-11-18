@@ -47,8 +47,9 @@ export type PanelSlot = React.ComponentType<SlotProps>;
  *  Outcome moved to Earn, and Marketplace and Legal stay only for the buyer's
  *  side (`buyerSide`), which reads Marketplace · About · Legal · Recent. The
  *  owner's rail is About · Versions · Recent (owner, 2026-10-11): Share to
- *  Innovations and Delete project live in the header's ⋯ menu. */
-export const RAIL_ORDER = ["marketplace", "details", "legal", "versions", "log"] as const;
+ *  Innovations and Delete project live in the header's ⋯ menu. On Innovations is
+ *  Explore marketplace's alone (owner, 2026-11-15; market-rail.tsx). */
+export const RAIL_ORDER = ["marketplace", "story", "details", "legal", "versions", "log"] as const;
 export type RailBlockId = (typeof RAIL_ORDER)[number];
 
 /** The listing start's props — "Add to marketplace" / "List another share"

@@ -23,6 +23,7 @@ import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { Amount, Coin } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
 import { RailFact, RailFacts } from "@/components/projects/details/rail-block";
+import { useCreatorName } from "./use-creator-name";
 
 /** Same-coin amounts summed, in first-seen order: "0.1 MATIC" or "0.05 MATIC + 5 USDC". */
 function sumByCoin(parts: { amount: Amount; coin: Coin }[]): string {
@@ -44,6 +45,8 @@ export function PurchasedSummary({
   /** The disclosure button — where focus lands after a purchase's dialog closes. */
   toggleRef: React.RefObject<HTMLButtonElement | null>;
 }) {
+  // The buyer bought from the creator, named as they know them (owner, 2026-11-15: never "you").
+  const creator = useCreatorName();
   const [open, setOpen] = React.useState(true);
   const panelId = React.useId();
 
@@ -94,7 +97,7 @@ export function PurchasedSummary({
               {price} (+ {fee} network fee)
             </span>
           </RailFact>
-          <RailFact label="Purchased from">You (the creator)</RailFact>
+          <RailFact label="Purchased from">{creator}</RailFact>
           <RailFact label="Transaction">
             <span title={latest.txHash} className="tabular-nums">
               <span aria-hidden>{shortAddress(latest.txHash)}</span>

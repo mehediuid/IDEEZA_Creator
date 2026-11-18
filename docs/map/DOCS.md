@@ -6,6 +6,7 @@ Authority when two disagree: [AGENTS.md › Read first](../../AGENTS.md#read-fir
 |---|---|---|
 | What are the rules for any change? | [AGENTS.md](../../AGENTS.md) | Loaded every session (Claude Code via `CLAUDE.md`) |
 | What exists today, per area? | [docs/guides/features/](../guides/features/README.md) | Was `CLAUDE.md` §5 |
+| How is a mobile prototype (/m) screen built: which Figma page, which parts, tokens at phone width, checking it? | [docs/guides/mobile-prototype.md](../guides/mobile-prototype.md) | Owner rules 2026-11-04/05 |
 | Which URL does what? | [docs/guides/app-map.md](../guides/app-map.md) | Was §3 |
 | How is the PCB module built (store, persistence, `CanvasObject`)? | [docs/guides/pcb-architecture.md](../guides/pcb-architecture.md) | Was §4 |
 | Why a UI rule exists; component notes; recorded exceptions | [docs/guides/ui-ux.md](../guides/ui-ux.md) | Was §7; the one-line rules stay in AGENTS.md |

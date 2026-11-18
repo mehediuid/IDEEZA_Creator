@@ -16,7 +16,6 @@ import { LeftPanel } from "@/components/pcb/left-panel";
 import { LeftRail } from "@/components/pcb/left-rail";
 import { Modals } from "@/components/pcb/modals";
 import { ExportMeter } from "@/components/pcb/export-meter";
-import { OnlineChat } from "@/components/pcb/settings-dialogs";
 import { RightPanel } from "@/components/pcb/right-panel";
 import { SettingsOverlay } from "@/components/pcb/settings-overlay";
 import { Toolbar } from "@/components/pcb/toolbar";
@@ -97,11 +96,9 @@ function EditorBody() {
 
       {/* TOAST (Phase 5 — quick feedback for toolbar Save / Open / etc.) */}
       <Toast />
+
       {/* Exports left this month, said in the toast after each export (upgrade plan C6). */}
       <ExportMeter />
-
-      {/* Online Chat — floating support widget in the 3D view (spec §13) */}
-      {state.mode === "3d" && <OnlineChat />}
     </EditorShell>
   );
 }

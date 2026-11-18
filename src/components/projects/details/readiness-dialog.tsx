@@ -10,7 +10,10 @@
 //   poster, else the concept image, else a neutral icon; the name; the
 //   P2-VIDEO-4 status; and the owner's action — Generate AI video / Try
 //   again / Review opens the Generate dialog on top (Review on the waiting
-//   take's Review), with ← Back to this one.
+//   take's Review), with ← Back to this one. A settled "Video ready" row
+//   carries a quiet Replace instead: the Generate form from the take in use,
+//   as Regenerate opens it, and that take stays in use until the maker
+//   chooses the new one.
 // - Every whole-project purpose (not an edition) adds the "Project video"
 //   group under the products (owner, 2026-10-21): one row, made from the
 //   product videos. It waits, with its reason, until every product has its
@@ -42,13 +45,16 @@ import type { ProductReadiness, Readiness, ReadinessPurpose } from "@/lib/manual
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf, videosStartBlockerOf } from "@/lib/manual/readiness";
 import { useProjectVideos } from "@/lib/video/store";
 import {
   PROJECT_GROUP_META,
   PROJECT_VIDEO_TITLE,
+  REPLACE_LABEL,
   actionLabel,
   projectStateLine,
+  heldCountLine,
+  heldNoteOf,
   readinessCopy,
   readyCountLine,
   stateChangeLine,
@@ -74,14 +80,27 @@ export type ReadinessDialogProps = {
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
-/** What this dialog can fix, so what its CTA waits on: the videos and the
- *  project video (every purpose — they're the rows here) and any rule marked
- *  fixed in the gate. */
+/** What holds this dialog's CTA. Since 2026-11-18 (owner: a maker never waits on a render) a video
+ *  still rendering or waiting for review doesn't: what the maker signs waits off the marketplace and
+ *  Innovations until it's ready (lib/market/held.ts). But every video has to be started first —
+ *  the maker can't move on without putting each one in generation (owner, same day). Then a rule
+ *  fixed in the gate itself (Showcase's ownership box); and the videos alone, for the Videos
+ *  dialog, whose only point is the videos. */
 export function dialogBlockerOf(readiness: Readiness): string | null {
+  if (readiness.purpose === "videos") {
+    return readiness.rules.find((r) => !r.ok && (r.id === "videos" || r.id === "projectVideo"))?.reason ?? null;
+  }
   return (
-    readiness.rules.find((r) => !r.ok && (r.fixedIn === "gate" || r.id === "videos" || r.id === "projectVideo"))?.reason ??
+    videosStartBlockerOf(readiness) ??
+    readiness.rules.find((r) => !r.ok && r.fixedIn === "gate" && r.id !== "videos" && r.id !== "projectVideo")?.reason ??
     null
   );
+}
+
+/** Opening this dialog first still helps while videos are missing: their rows, their progress and
+ *  the note that the listing or post will wait for them. */
+export function videosWaitOf(readiness: Readiness): string | null {
+  return readiness.purpose === "videos" ? null : videosBlockerOf(readiness);
 }
 
 export function ReadinessDialog({
@@ -109,13 +128,21 @@ export function ReadinessDialog({
 
   const copy = readinessCopy(purpose, product ? displayProductName(product.name) : undefined);
   const blocker = dialogBlockerOf(readiness);
+  // The videos no longer hold the CTA: what it leads to waits for them instead (owner, 2026-11-18).
+  const waiting = videosWaitOf(readiness);
+  const count = videoCountOf(readiness);
+  const where = purpose === "showcase" || purpose === "give" ? "Innovations" : "Explore marketplace";
   const ownershipRule = readiness.rules.find((r) => r.id === "ownership");
   // Shown while ownership fails at the Showcase gate, and kept (ticked) once
   // it's confirmed here, so the box doesn't vanish from under the maker.
   const [askedOwnership] = React.useState(() => purpose === "showcase" && ownershipRule?.ok === false);
   const owned = ownershipRule?.ok === true;
 
-  const [generating, setGenerating] = React.useState<{ target: VideoTarget; reviewTakeId: string | null } | null>(null);
+  const [generating, setGenerating] = React.useState<{
+    target: VideoTarget;
+    reviewTakeId: string | null;
+    fromTakeId: string | null;
+  } | null>(null);
   const [projecting, setProjecting] = React.useState(false);
   const actionRefs = React.useRef(new Map<string, HTMLButtonElement>());
   const projectActionRef = React.useRef<HTMLButtonElement | null>(null);
@@ -142,7 +169,7 @@ export function ReadinessDialog({
       }
     }
     if (projectVideo && lastProject !== projectKey) {
-      const line = projectStateLine(projectVideo, readiness.counts.total);
+      const line = projectStateLine(projectVideo);
       if (line) lines.push(line);
     }
     setSeen(stateKey);
@@ -152,11 +179,13 @@ export function ReadinessDialog({
   }
 
   const productById = React.useMemo(() => new Map(view.products.map((p) => [p.id, p])), [view.products]);
-  const openGenerate = (row: ProductReadiness) => {
+  const openGenerate = (row: ProductReadiness, replace = false) => {
     const p = productById.get(row.productId) ?? (product?.id === row.productId ? product : undefined);
     const v = row.video;
     const waiting = v.state === "review" ? v.take : v.state === "ready" ? v.review : undefined;
-    if (p) setGenerating({ target: videoTargetOf(project, p), reviewTakeId: waiting?.id ?? null });
+    // Replace opens the form from the take in use, as Regenerate does; it stays in use meanwhile.
+    const from = replace && v.state === "ready" ? v.take.id : null;
+    if (p) setGenerating({ target: videoTargetOf(project, p), reviewTakeId: from ? null : (waiting?.id ?? null), fromTakeId: from });
   };
   // Something renders: closing this is safe, and the note says so.
   const rendering =
@@ -209,6 +238,9 @@ export function ReadinessDialog({
                 {blocker ?? extraBlocker}
               </p>
             )}
+            {!blocker && !extraBlocker && waiting && (
+              <p className="text-right text-sm text-text-secondary">{heldCountLine(count.ready, count.total)}</p>
+            )}
           </div>
         }
       >
@@ -234,6 +266,7 @@ export function ReadinessDialog({
                     else actionRefs.current.delete(p.productId);
                   }}
                   onAction={() => openGenerate(p)}
+                  onReplace={() => openGenerate(p, true)}
                 />
               ))}
             </ul>
@@ -261,13 +294,22 @@ export function ReadinessDialog({
             </section>
           )}
 
-          {rendering && (
-            <p className="flex items-start gap-3 rounded-lg bg-bg-surface-raised px-6 py-4 text-sm text-text-secondary">
-              <span className="mt-[2px]">
+          {waiting && !blocker ? (
+            <p className="flex items-start gap-3 rounded-lg border border-solid border-[var(--color-border-brand)] bg-bg-brand-subtle px-6 py-4 text-md text-text-primary">
+              <span className="mt-[3px]">
                 <StatusGlyph icon="info" tone="brand" size={16} />
               </span>
-              Renders keep going if you close this. Their progress shows on the Review step and in the corner.
+              {heldNoteOf(where, count.total)}
             </p>
+          ) : (
+            rendering && (
+              <p className="flex items-start gap-3 rounded-lg bg-bg-surface-raised px-6 py-4 text-sm text-text-secondary">
+                <span className="mt-[2px]">
+                  <StatusGlyph icon="info" tone="brand" size={16} />
+                </span>
+                Renders keep going if you close this. Their progress shows in Videos, in the corner.
+              </p>
+            )
           )}
 
           {askedOwnership && (
@@ -301,6 +343,7 @@ export function ReadinessDialog({
         open={generating !== null}
         target={generating?.target ?? null}
         reviewTakeId={generating?.reviewTakeId ?? null}
+        fromTakeId={generating?.fromTakeId ?? null}
         back={{ label: `Back to ${copy.title}`, onBack: () => setGenerating(null) }}
         onClose={() => setGenerating(null)}
       />
@@ -319,14 +362,18 @@ function ReadinessRow({
   row,
   actionRef,
   onAction,
+  onReplace,
 }: {
   row: ProductReadiness;
   actionRef: (el: HTMLButtonElement | null) => void;
   onAction: () => void;
+  onReplace: () => void;
 }) {
   const name = displayProductName(row.name);
   const copy = statusCopy(row.video);
   const action = actionLabel(copy.action);
+  // Settled and in use: no take renders beside it and none waits for review.
+  const replaceable = !action && row.video.state === "ready" && !row.video.next;
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-4 px-6 py-5">
       <RowThumb row={row} />
@@ -353,6 +400,24 @@ function ReadinessRow({
           }}
         >
           {action}
+        </Button>
+      )}
+      {/* Not an actionRef: the CTA's "fix this first" focus never lands on a ready row. */}
+      {replaceable && (
+        <Button
+          type="button"
+          hierarchy="ghost"
+          size="md"
+          aria-haspopup="dialog"
+          aria-label={`${REPLACE_LABEL} ${name} video`}
+          className={cn("max-sm:w-full", TAP)}
+          onClick={(e) => {
+            // Safari doesn't focus a clicked button; the gate returns focus here.
+            e.currentTarget.focus();
+            onReplace();
+          }}
+        >
+          {REPLACE_LABEL}
         </Button>
       )}
     </li>

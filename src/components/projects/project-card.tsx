@@ -11,6 +11,8 @@
 // The card shows three things — the status chip, the title, one line — and a
 // hint at its foot. It has no button: the whole card is one link to the
 // project (the title's link stretched over it), and the hint is plain text.
+// While a video renders for the project, the hint is `renderHintOf()`'s line,
+// read live from the corner toast's own jobs and clock.
 // The source, the version and the status line live on the project page.
 //
 // Grid vs. row (LST-56, LST-57) is one DOM tree that repaints itself via a
@@ -33,8 +35,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, StateCard } from "@/components/ideeza";
+import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { StatusChip, ICONS } from "./status-chip";
-import { cardText, type IconName, type ProjectSummary, type ListQuery } from "@/lib/manual/project-summary";
+import { HeldChip } from "@/components/video-jobs/held-block";
+import { heldOf, useHeld } from "@/lib/market/held";
+import { useProjectVideos } from "@/lib/video/store";
+import { cardText, renderHintOf, type IconName, type ProjectSummary, type ListQuery } from "@/lib/manual/project-summary";
+import { cn } from "@/lib/utils";
 
 // ───────────────────────── the card ─────────────────────────
 
@@ -56,7 +63,16 @@ export function ProjectCard({
   const [imgOk, setImgOk] = React.useState(true);
   const hasCover = Boolean(summary.cover);
   const text = cardText(summary, now);
-  const chip = <StatusChip status={summary.status} word={text.chip.word} showcased={text.chip.badge !== null} />;
+  // The render clock ticks every 500 ms while something renders; the list's minute clock can't.
+  const { jobs, now: renderNow } = useVideoJobs();
+  const renderHint = renderHintOf(summary.id, jobs, renderNow);
+  // Signed while videos were still being made (owner, 2026-11-18, D8): it says so until it's live.
+  const { store: held } = useHeld();
+  const waiting = heldOf(held, summary.id).length > 0;
+  const { record } = useProjectVideos(waiting ? summary.id : null);
+  const toReview = Object.values(record?.products ?? {}).filter((v) => v.takes.some((t) => t.toReview && t.readyAt && !t.failure)).length;
+  const waitingHint = !waiting ? null : toReview > 0 ? `Next: review ${toReview} ${toReview === 1 ? "video" : "videos"}` : "Waiting for videos";
+  const chip = waiting ? <HeldChip /> : <StatusChip status={summary.status} word={text.chip.word} showcased={text.chip.badge !== null} />;
 
   return (
     <article className="relative flex h-full flex-col gap-[10px] overflow-hidden rounded-[12px] border border-solid border-border bg-bg-surface p-[10px] transition-colors duration-normal ease-decelerate hover:border-border-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-bg-page motion-reduce:transition-none [@container(min-width:560px)]:gap-0 [@container(min-width:560px)]:p-0">
@@ -116,7 +132,9 @@ export function ProjectCard({
 
       {/* The hint: text, not a control. mt-auto keeps it on the card's floor, so a row's hints line up. */}
       <p className="mt-auto flex min-w-0 items-center gap-[6px] text-md font-medium text-text-secondary [@container(max-width:559px)]:pl-[108px] [@container(min-width:560px)]:px-[14px] [@container(min-width:560px)]:pb-[14px] [@container(min-width:560px)]:pt-[12px]">
-        <span className="truncate">{text.hint}</span>
+        <span className={cn("truncate", renderHint && "tabular-nums", waitingHint && !renderHint && "text-text-warning")}>
+          {renderHint ?? waitingHint ?? text.hint}
+        </span>
         <Icon icon={ArrowRight02Icon} size={14} className="shrink-0" />
       </p>
     </article>

@@ -11,6 +11,8 @@
 // - Three pack cards — Starter, Pro (most popular), Power: the price (struck
 //   through when a plan discount applies), base, bonus and total, Purchase
 //   now, and under a hairline what a plan saves, with Compare plans.
+// - Redeem a code (redeem-code.tsx; owner, 2026-11-16, not in Figma): a code's
+//   free credits straight into the balance.
 // - Custom amount: at least 50 credits at $0.10 each, the price and the
 //   rate (and your discount), Purchase credits; when a pack gives as many for
 //   less, "Better deal available!" with Switch to pack.
@@ -45,6 +47,7 @@ import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { planOf } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { CreditAlertsCard } from "./credit-alerts";
+import { RedeemCodeCard } from "./redeem-code";
 import { PLAN_CARDS } from "./pricing-frame";
 
 const pct = (d: number) => `${Math.round(d * 100)}%`;
@@ -162,6 +165,8 @@ export function CreditsPanel() {
         })}
       </ul>
 
+      <RedeemCodeCard />
+
       <CustomAmount discount={discount} />
 
       <CreditAlertsCard />
@@ -266,6 +271,7 @@ function lotName(e: CreditEntry | undefined): string {
   if (e.reason === "purchase") return e.pack ? `${e.pack} pack` : "Custom credit";
   if (e.reason === "seed") return "Starting balance";
   if (e.reason === "grant") return "Plan credits";
+  if (e.reason === "redeem") return `Code ${e.code ?? ""}`.trimEnd();
   return "Top up";
 }
 

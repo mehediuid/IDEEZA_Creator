@@ -374,8 +374,21 @@ test("featuredVideoOf: no record, or nothing in use, gives null", () => {
 
 const JOIN = { intro: ["Kit", "One kit"], cuts: [{ productId: "prd_b", takeId: "t_b", fromMs: 5_000, ms: 5_000, label: "B" }], outro: "Built with IDEEZA" };
 
-test("featuredVideoOf: the project video comes first when there is one", () => {
+test("featuredVideoOf: with one product its video stands for the project, never a project video left over (owner, 2026-11-17)", () => {
   const products = [{ id: "prd_b", dropped: null }];
+  const video = {
+    version: 1,
+    projectId: "p-x",
+    products: {
+      prd_b: { takes: [{ id: "t_b", productId: "prd_b", n: 1, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: 0, readyAt: 0, clip: CLIP }], inUseId: "t_b" },
+      project: { takes: [{ id: "t_p", productId: "project", n: 1, prompt: "", lines: ["Kit", "One kit", "Built with IDEEZA"], quality: "low", source: null, createdAt: 0, readyAt: 0, clip: CLIP, join: JOIN }], inUseId: "t_p" },
+    },
+  };
+  assert.equal(featuredVideoOf(video, products).id, "t_b");
+});
+
+test("featuredVideoOf: the project video comes first when there is one (two or more products)", () => {
+  const products = [{ id: "prd_b", dropped: null }, { id: "prd_c", dropped: null }];
   const video = {
     version: 1,
     projectId: "p-x",

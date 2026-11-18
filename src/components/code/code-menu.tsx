@@ -20,6 +20,8 @@ type MenuItem = {
   run?: () => void;
   shortcut?: string;
   divider?: boolean;
+  /** Nothing behind it yet: the row is greyed and `note` says why. */
+  note?: string;
 };
 
 const MENUS: Record<string, MenuItem[]> = {
@@ -33,12 +35,12 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "Duplicate", action: "edit:duplicate", shortcut: "⌘D" },
     { label: "Delete", action: "edit:delete", shortcut: "⌫" },
     { label: "", divider: true },
-    { label: "Find", action: "edit:find", shortcut: "⌘F" },
+    { label: "Find", shortcut: "⌘F", note: "Find isn't built yet." },
     { label: "Select All", action: "edit:selectAll", shortcut: "⌘A" },
   ],
   Settings: [
     { label: "Toggle Grid", action: "settings:toggleGrid" },
-    { label: "Toggle Trashcan", action: "settings:toggleTrashcan" },
+    { label: "Toggle Trashcan", note: "Trashcan isn't built yet." },
     { label: "", divider: true },
     { label: "Export Workspace…", action: "settings:exportXml" },
     { label: "Import Workspace…", action: "settings:importXml" },
@@ -46,18 +48,14 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "Clear Workspace", action: "settings:clearWorkspace" },
   ],
   Help: [
-    { label: "Documentation", action: "help:docs" },
-    {
-      label: "Keyboard Shortcuts",
-      action: "help:shortcuts",
-      shortcut: "⌘K ⌘S",
-    },
+    { label: "Documentation", note: "Documentation isn't built yet." },
+    { label: "Keyboard Shortcuts", shortcut: "⌘K ⌘S", note: "Keyboard shortcuts list isn't built yet." },
     { label: "Tutorials", run: () => openTutorialTab("/tutorials/code-tech/firmware-code") },
     { label: "Tour of this editor", run: () => startTourChapter("editors") },
     { label: "Tour Guide…", run: () => openTourGuide(null) },
     { label: "", divider: true },
     { label: "Report a problem…", run: openReportProblem },
-    { label: "About IDEEZA Code", action: "help:about" },
+    { label: "About IDEEZA Code", note: "About page isn't built yet." },
   ],
 };
 
@@ -184,8 +182,11 @@ function MenuLabel({
               <div
                 key={it.label}
                 role="menuitem"
-                className="ix-menu"
+                aria-disabled={it.note ? true : undefined}
+                title={it.note}
+                className={it.note ? undefined : "ix-menu"}
                 onClick={() => {
+                  if (it.note) return;
                   if (it.run) it.run();
                   else if (it.action) dispatchCodeAction(it.action);
                   onSelect();
@@ -195,8 +196,9 @@ function MenuLabel({
                   justifyContent: "space-between",
                   padding: "var(--spacing-2) var(--spacing-4)",
                   fontSize: "var(--font-size-sm)",
-                  cursor: "pointer",
-                  color: C.text,
+                  cursor: it.note ? "default" : "pointer",
+                  color: it.note ? "var(--color-text-tertiary)" : C.text,
+                  opacity: it.note ? 0.45 : 1,
                 }}
               >
                 <span>{it.label}</span>

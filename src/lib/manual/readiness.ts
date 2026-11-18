@@ -12,7 +12,7 @@ import type { License } from "../brief/types";
 import type { StoredDraft } from "../brief/project-brief";
 import { etaLabel, progressOf, type VideoJob } from "../video/jobs";
 import { productVideoStatus } from "../video/product-video";
-import { projectVideoStatusOf, type ProjectVideoStatus } from "../video/project-video";
+import { needsProjectVideo, projectVideoStatusOf, type ProjectVideoStatus } from "../video/project-video";
 import type { ProjectVideos } from "../video/types";
 import type { ManualProject } from "./projects";
 import type { ProjectProduct, ProjectView } from "./project-read";
@@ -90,8 +90,9 @@ function videosReason(
   if (counts.missing > 0) {
     const need =
       counts.missing === 1 ? "1 product still needs an AI video." : `${counts.missing} products still need an AI video.`;
-    if (!project) return need;
-    return `${need} ${project.state === "outdated" ? "Then update the project video." : "The project video comes next."}`;
+    // The project video never waits for them (owner, 2026-11-18): say where it stands beside them.
+    const beside = project && !project.ok ? projectVideoReason(project) : null;
+    return beside ? `${need} ${beside}` : need;
   }
   if (counts.rendering === 0) {
     return counts.review === 1 ? "Review 1 video to continue." : `Review ${counts.review} videos to continue.`;
@@ -113,11 +114,12 @@ function videosReason(
 function projectVideoReason(project: ProjectVideoStatus): string | null {
   switch (project.state) {
     case "ready":
+    case "single":
       return null;
     case "waiting":
-      return "The project video is made once every product has its video.";
+      return "The project video isn't made yet.";
     case "make":
-      return "Every product has its video. Make the project video to continue.";
+      return "The project video isn't made yet.";
     case "review":
       return "Review the project video to continue.";
     case "rendering": {
@@ -195,11 +197,16 @@ export function readinessOf(facts: ReadinessFacts, purpose: ReadinessPurpose): R
   const review = products.filter((p) => p.video.state === "review").length;
   const missing = total - ready - rendering - review;
   const counts = { total, ready, rendering, review, missing };
-  const project = RULES_OF[purpose].includes("projectVideo")
+  // The project video is asked only of two or more current products; with one, its video is the
+  // project's (owner, 2026-11-17).
+  const asksProject = RULES_OF[purpose].includes("projectVideo") && needsProjectVideo(facts.products);
+  const project = asksProject
     ? projectVideoStatusOf({ products: facts.products, videos: facts.videos, jobs: facts.jobs, now: facts.now })
     : null;
 
-  const rules = RULES_OF[purpose].map((id) => buildRule(id, purpose, facts, products, counts, project));
+  const rules = RULES_OF[purpose]
+    .filter((id) => id !== "projectVideo" || asksProject)
+    .map((id) => buildRule(id, purpose, facts, products, counts, project));
   const failing = rules.filter((r) => !r.ok);
 
   return {
@@ -223,6 +230,30 @@ export function videoCountOf(r: Readiness): { ready: number; total: number } {
 /** The first thing the videos still wait for, product videos before the project video. */
 export function videosBlockerOf(r: Readiness): string | null {
   return r.rules.find((x) => !x.ok && (x.id === "videos" || x.id === "projectVideo"))?.reason ?? null;
+}
+
+/** The videos that haven't been started (owner, 2026-11-18, second word): a product with no video
+ *  yet or whose render failed, and a project video not made, failed or out of date with no update
+ *  rendering. A video rendering or waiting for review counts as started. */
+export function videosNotStartedOf(r: Readiness): string[] {
+  const out = r.products
+    .filter((p) => p.video.state === "none" || p.video.state === "failed")
+    .map((p) => (p.name.trim() ? p.name : "Not named yet"));
+  const pv = r.project;
+  if (pv && (pv.state === "make" || pv.state === "failed" || pv.state === "waiting" || pv.state === "outdated")) out.push("the project video");
+  return out;
+}
+
+/** Owner, 2026-11-18 (second word): a maker moves on — lists, sells copies, relists, shares — only
+ *  once every video it needs is in generation. What's still rendering or waiting for review then
+ *  holds what was signed off the marketplace and Innovations (lib/market/held.ts); a video never
+ *  started holds the maker here instead. Null when every one has started. */
+export function videosStartBlockerOf(r: Readiness): string | null {
+  const names = videosNotStartedOf(r);
+  if (names.length === 0) return null;
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  const first = list.charAt(0).toUpperCase() + list.slice(1);
+  return `Start every video first: ${first} ${names.length === 1 ? "hasn't" : "haven't"} started yet.`;
 }
 
 /** Assembles `ReadinessFacts` from the page's own derivation. `view` is the

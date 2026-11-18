@@ -16,7 +16,7 @@ import * as React from "react";
 import { parseStored, readStoredKey, storedUnreadable, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
 import { readProfileFields, saveProfile } from "../people/profile-store";
 import { countryCodeOf, countryNameOf } from "./countries";
-import { enterWork, parkWork } from "./work-vault";
+import { enterWork, isWorkKey, parkWork, parkedPrefix } from "./work-vault";
 import { ZONE_COUNTRIES } from "./zone-countries";
 
 export const ACCOUNTS_KEY = "ideeza:accounts";
@@ -177,7 +177,13 @@ export function safeNext(raw: string | null | undefined): string {
  *  landing page (/landing) and the Events pages (/events, /events/<slug>).
  *  Every other page needs you signed in. */
 export function isOpenPath(pathname: string): boolean {
-  return /^\/(sign-up|sign-in|landing|events)(\/|$)/.test(pathname);
+  return /^\/(sign-up|sign-in|landing|events|hackathons)(\/|$)/.test(pathname);
+}
+
+/** The mobile prototype (/m) runs its own way in: Welcome, guest Feed and its
+ *  own Sign in, so the web's gate leaves its pages alone. */
+export function isMobilePath(pathname: string): boolean {
+  return /^\/m(\/|$)/.test(pathname);
 }
 
 /** The one question is asked once, right after verifying, when the link didn't say. */
@@ -392,6 +398,102 @@ export async function createAccount(input: SignUpInput, utmSource: string, now: 
   return writeStoredKey(VERIFY_KEY, { v: 1, email, next: safeNext(next) }).ok ? "ok" : "refused";
 }
 
+/** Google or Facebook vouched for this email (the mobile prototype's
+ *  demo provider sheet stands in for theirs): its account is signed in, and
+ *  an account that has none is made, verified — the provider proved the email —
+ *  with a password nobody knows, until one is added in Sign-in & security. */
+export async function providerSignIn(
+  email: string,
+  name: { first: string; last: string },
+  now: number,
+  utmSource = "",
+): Promise<"in" | "new" | "refused"> {
+  const e = normalizeEmail(email);
+  if (!isEmail(e)) return "refused";
+  const found = accountOf(readAccounts(), e);
+  if (found) {
+    if (found.verifiedAt === null && !saveAccount({ ...found, verifiedAt: now }).ok) return "refused";
+    await comeIn(e, found.verifiedAt === null);
+    return startSession(e, now).ok ? "in" : "refused";
+  }
+  const salt = newSalt();
+  const source = sourceFromUtm(utmSource);
+  const saved = saveAccount({
+    v: 1,
+    firstName: str(name.first, NAME_PART_MAX),
+    lastName: str(name.last, NAME_PART_MAX),
+    email: e,
+    passwordHash: await hashPassword(newSalt(), salt),
+    salt,
+    birthDate: "",
+    consentAt: now,
+    createdAt: now,
+    verifiedAt: now,
+    source,
+    sourceVia: source ? "link" : "",
+    sourceOther: "",
+    sourceSkipped: false,
+    nudgeClosed: false,
+    country: deviceCountry(),
+  });
+  if (!saved.ok) return "refused";
+  await comeIn(e, true);
+  return startSession(e, now).ok ? "new" : "refused";
+}
+
+/** Whether `password` is the account's password now (Reset: "That's your current password"). */
+export async function isCurrentPassword(email: string, password: string): Promise<boolean> {
+  const account = accountOf(readAccounts(), email);
+  return !!account && (await hashPassword(password, account.salt)) === account.passwordHash;
+}
+
+/** A new password for the account, nothing else changed: the phone's Change password and Add a
+ *  password (Settings › Sign-in & security). `problem` is the rules it is held to. */
+export async function setAccountPassword(email: string, password: string, problem: (password: string) => string = passwordProblem): Promise<WriteResult> {
+  const account = accountOf(readAccounts(), email);
+  if (!account || problem(password)) return { ok: false };
+  const salt = newSalt();
+  return saveAccount({ ...account, salt, passwordHash: await hashPassword(password, salt) });
+}
+
+export type EmailChange = "ok" | "exists" | "invalid" | "refused";
+
+/** The signed-in account moves to a new email (its code was checked): the account and the session
+ *  follow it. Refused when another account has the email. */
+export function changeAccountEmail(newEmail: string): EmailChange {
+  const account = readCurrent();
+  const e = normalizeEmail(newEmail);
+  if (!account || !isEmail(e)) return "invalid";
+  if (e === account.email) return "ok";
+  const all = readAccounts();
+  if (accountOf(all, e)) return "exists";
+  if (!writeAccounts(all.map((a) => (a.email === account.email ? { ...a, email: e } : a))).ok) return "refused";
+  const session = readSession();
+  return writeStoredKey(SESSION_KEY, { v: 1, email: e, at: session?.at ?? Date.now() } satisfies Session).ok ? "ok" : "refused";
+}
+
+/** Deleted for good (the 30 days after Delete account are over): the account, its parked work and
+ *  its session go. */
+export function removeAccount(email: string): WriteResult {
+  const e = normalizeEmail(email);
+  const saved = writeAccounts(readAccounts().filter((a) => a.email !== e));
+  if (!saved.ok) return saved;
+  const prefix = parkedPrefix(e);
+  const theirs = readSession()?.email === e;
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      // Their parked work, and the work out now when they are the one signed in.
+      if (k && (k.startsWith(prefix) || (theirs && isWorkKey(k)))) keys.push(k);
+    }
+    for (const k of keys) window.localStorage.removeItem(k);
+  } catch {
+    // Storage blocked: the parked work stays, unreadable without the account.
+  }
+  return theirs ? writeStoredKey(SESSION_KEY, null) : { ok: true };
+}
+
 /** The verify link: marks the waiting account verified, signs it in (a new
  *  account with nothing yet), and fills your profile's name and country where
  *  they are still empty. Reload the page after it. */
@@ -447,10 +549,16 @@ export async function signOut(): Promise<WriteResult> {
 }
 
 /** The reset link: a new password for that email's account, and you're signed
- *  in. Opening the link proves the email, so it counts as verified. */
-export async function resetPassword(email: string, password: string, now: number): Promise<WriteResult> {
+ *  in. Opening the link proves the email, so it counts as verified. `problem`
+ *  is the rules the password is held to. */
+export async function resetPassword(
+  email: string,
+  password: string,
+  now: number,
+  problem: (password: string) => string = passwordProblem,
+): Promise<WriteResult> {
   const account = accountOf(readAccounts(), email);
-  if (!account || passwordProblem(password)) return { ok: false };
+  if (!account || problem(password)) return { ok: false };
   const salt = newSalt();
   const saved = saveAccount({ ...account, salt, passwordHash: await hashPassword(password, salt), verifiedAt: account.verifiedAt ?? now });
   if (!saved.ok) return saved;
@@ -515,6 +623,7 @@ export function useAuth(): {
 /** Runs in <head> before the first paint, so no page flashes before the
  *  gate: the same rule as `currentAccount` and `signedOutPath`. A signed-out
  *  visitor to Home's own address (nothing but utm_ tags) sees the landing page;
- *  to any other page but the open ones (`isOpenPath`), Sign in, or Sign up when
- *  this browser has no account, carrying the page they opened (`next`). */
-export const AUTH_PREPAINT = `(function(){try{var p=location.pathname;if(/^\\/(sign-up|sign-in|landing|events)(\\/|$)/.test(p))return;var a=JSON.parse(localStorage.getItem("${ACCOUNTS_KEY}")||"[]"),s=JSON.parse(localStorage.getItem("${SESSION_KEY}")||"null");if(!Array.isArray(a))a=[];var e=s&&typeof s.email==="string"?s.email.trim().toLowerCase():"";for(var i=0;i<a.length;i++)if(a[i]&&e&&a[i].email===e&&a[i].verifiedAt)return;document.documentElement.style.visibility="hidden";var q=location.search,t=!q||q.slice(1).split("&").every(function(k){return k.indexOf("utm_")===0});location.replace(p==="/"&&t?"/landing"+q:(a.length?"/sign-in":"/sign-up")+"?next="+encodeURIComponent(p+q));}catch(x){}})();`;
+ *  to any other page but the open ones (`isOpenPath`) and the mobile
+ *  prototype's (`isMobilePath`), Sign in, or Sign up when this browser has no
+ *  account, carrying the page they opened (`next`). */
+export const AUTH_PREPAINT = `(function(){try{var p=location.pathname;if(/^\\/(sign-up|sign-in|landing|events|hackathons|m)(\\/|$)/.test(p))return;var a=JSON.parse(localStorage.getItem("${ACCOUNTS_KEY}")||"[]"),s=JSON.parse(localStorage.getItem("${SESSION_KEY}")||"null");if(!Array.isArray(a))a=[];var e=s&&typeof s.email==="string"?s.email.trim().toLowerCase():"";for(var i=0;i<a.length;i++)if(a[i]&&e&&a[i].email===e&&a[i].verifiedAt)return;document.documentElement.style.visibility="hidden";var q=location.search,t=!q||q.slice(1).split("&").every(function(k){return k.indexOf("utm_")===0});location.replace(p==="/"&&t?"/landing"+q:(a.length?"/sign-in":"/sign-up")+"?next="+encodeURIComponent(p+q));}catch(x){}})();`;

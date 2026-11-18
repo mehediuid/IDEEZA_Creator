@@ -99,7 +99,15 @@ test("a grant on the ledger: a lot that expires with its period, spent before bo
   assert.equal(s.balance, 400);
   assert.equal(C.grantState(s, g), s); // once
   assert.equal(C.describeEntry(s.ledger.at(-1)), "+300 Builder plan credits");
-  s = C.chargeState(s, "b1", 4).state;
+  // chargeState stamps the charge with the clock: hold it inside the grant's period, so the test
+  // doesn't start failing once the real date passes it (it did on 2026-11-14).
+  const realNow = Date.now;
+  Date.now = () => T0 + DAY;
+  try {
+    s = C.chargeState(s, "b1", 4).state;
+  } finally {
+    Date.now = realNow;
+  }
   assert.deepEqual(L.lotsOf(s.ledger).map((l) => l.remaining), [100, 296]); // the grant expires first
   assert.equal(C.expireState(s, addMonths(T0, 1) + DAY).balance, 100);
 });

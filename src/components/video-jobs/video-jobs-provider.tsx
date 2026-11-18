@@ -67,6 +67,7 @@ import {
   type VideoQuality,
 } from "@/lib/video/types";
 import type { Storyboard } from "@/lib/video/storyboard";
+import { notifyBrowser } from "@/lib/video/notify-pref";
 import { PROJECT_VIDEO_TITLE, renderTitle } from "@/lib/video/video-copy";
 
 export {
@@ -217,13 +218,9 @@ function takeOf(j: VideoJob) {
   return readProjectVideos(j.projectId)?.products[j.productId]?.takes.find((t) => t.id === j.id);
 }
 
+/** The job's own tick (older takes), or the one switch for every video (owner, 2026-11-18, D5). */
 function notifyReady(j: VideoJob) {
-  if (!j.browserNotify || typeof window === "undefined" || !("Notification" in window) || !document.hidden) return;
-  try {
-    new Notification("Your IDEEZA video is ready", {
-      body: j.title ? `${j.title} — tap to review.` : "Tap to review.",
-    });
-  } catch {}
+  notifyBrowser("Your IDEEZA video is ready", j.title ? `${j.title} — tap to review.` : "Tap to review.", j.browserNotify);
 }
 
 export function VideoJobsProvider({ children }: { children: React.ReactNode }) {

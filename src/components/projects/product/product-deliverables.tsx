@@ -12,7 +12,9 @@
 // No review controls live here (COR-36): no Retry, Save, Refine or spec edit.
 // The one thing a panel lets you take away is its file — the firmware
 // source, the parts list or the netlist, made from this product's own parts
-// in this browser — and only for a viewer `DeliverablesAccess` lets through:
+// in this browser, and on the 3D Module tab the generated model (.glb) when
+// the build has one of its own (never the bundled sample mesh) — and only for
+// a viewer `DeliverablesAccess` lets through:
 // the owner, a contributor, a demo buyer who holds a share (O12,
 // P2-MARKETPLACE-21). Everyone else reads "Firmware and downloads come with a
 // purchase." in its place.
@@ -155,14 +157,14 @@ function Covers({
           ))}
         </ul>
       </section>
-      <Downloads kind={kind} product={product} ready={ready} />
+      <Downloads kind={kind} job={job} product={product} ready={ready} />
     </div>
   );
 }
 
 // ───────────────────────── downloads ─────────────────────────
 
-type DownloadFile = { label: string; filename: string; type: string; text: () => string };
+export type DownloadFile = { label: string; filename: string; type: string; text: () => string };
 
 function fileSlug(title: string): string {
   return (
@@ -182,7 +184,7 @@ function csv(rows: (string | number)[][]): string {
 }
 
 /** The piece's file, made from this product's own parts — the same builders the previews draw from. */
-function fileFor(kind: BuildItemKind, product: ArtifactSource): DownloadFile | null {
+export function fileFor(kind: BuildItemKind, product: ArtifactSource): DownloadFile | null {
   const base = fileSlug(product.title);
   switch (kind) {
     case "code": {
@@ -216,38 +218,83 @@ function fileFor(kind: BuildItemKind, product: ArtifactSource): DownloadFile | n
   }
 }
 
-function save(file: DownloadFile) {
-  const url = URL.createObjectURL(new Blob([file.text()], { type: file.type }));
+export function save(file: DownloadFile) {
+  saveBlob(new Blob([file.text()], { type: file.type }), file.filename);
+}
+
+/** Hands `blob` to the browser as a download named `filename`. */
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = file.filename;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-/** The panel's file, or — for a viewer who may not take it — where the files come from. */
-function Downloads({ kind, product, ready }: { kind: BuildItemKind; product: BuildProduct; ready: boolean }) {
+/** The build's generated model, when this product wears it: only the primary does (ModelTab),
+ *  and the bundled sample mesh isn't a model of this product. */
+function modelFileOf(job: BuildJob, product: BuildProduct): { url: string; filename: string } | null {
+  const url = job.modelGlbUrl;
+  if (product.id !== "primary" || !url || isSampleModel(url)) return null;
+  return { url, filename: `${fileSlug(product.title)}-3d-model.glb` };
+}
+
+const BUTTON = "self-start [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+
+/** The panel's files, or — for a viewer who may not take them — where the files come from. */
+function Downloads({ kind, job, product, ready }: { kind: BuildItemKind; job: BuildJob; product: BuildProduct; ready: boolean }) {
   const allowed = React.useContext(DeliverablesAccess);
   const id = React.useId();
+  const [model, setModel] = React.useState<"idle" | "busy" | "failed">("idle");
   const file = allowed && ready ? fileFor(kind, product) : null;
-  if (allowed && !file) return null;
+  const glb = allowed && ready && kind === "3d" ? modelFileOf(job, product) : null;
+  if (allowed && !file && !glb) return null;
+
+  const downloadModel = async (target: { url: string; filename: string }) => {
+    setModel("busy");
+    try {
+      const res = await fetch(target.url);
+      if (!res.ok) throw new Error(String(res.status));
+      saveBlob(await res.blob(), target.filename);
+      setModel("idle");
+    } catch {
+      setModel("failed");
+    }
+  };
+
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
       <h3 id={id} className="text-md font-semibold text-text-primary">
         Downloads
       </h3>
-      {file ? (
-        <Button
-          type="button"
-          hierarchy="secondary"
-          size="md"
-          onClick={() => save(file)}
-          className="self-start [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
-        >
-          {file.label}
-        </Button>
+      {file || glb ? (
+        <>
+          {file && (
+            <Button type="button" hierarchy="secondary" size="md" onClick={() => save(file)} className={BUTTON}>
+              {file.label}
+            </Button>
+          )}
+          {glb && (
+            <Button
+              type="button"
+              hierarchy="secondary"
+              size="md"
+              loading={model === "busy"}
+              onClick={() => {
+                if (model !== "busy") void downloadModel(glb);
+              }}
+              className={BUTTON}
+            >
+              Download 3D model (.glb)
+            </Button>
+          )}
+          <p aria-live="polite" className="text-md text-text-error empty:hidden">
+            {model === "failed" ? "The 3D model couldn't be downloaded. Try again." : ""}
+          </p>
+        </>
       ) : (
         <p className="text-md text-text-secondary">Firmware and downloads come with a purchase.</p>
       )}

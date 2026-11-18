@@ -16,7 +16,10 @@
 // the CSS border adds to the box, and `cn` drops any line height written
 // before the size's `text-[length:…]`. For the same reason the side padding
 // is A01's (12 · 14 · 16 · 20 · 24) less the border, so the width matches
-// Figma too. Type is A01's Label style per size (MD · LG · LG · XL · XL);
+// Figma too. (XL and 2XL read their side padding through --btn-px-xl /
+// --btn-px-2xl when an ancestor sets them: the mobile prototype does, so its
+// buttons keep the default 20 / 24 while its spacing tokens take phone values;
+// unset, they are spacing/10 and spacing/12 as always.) Type is A01's Label style per size (MD · LG · LG · XL · XL);
 // the line height sits after the font size. Icon slots are 14 · 16 · 18 · 20 ·
 // 24 beside a label and 16 · 18 · 20 · 22 · 24 alone; the spinner is 16.
 //
@@ -58,8 +61,8 @@ const buttonVariants = cva(
         sm: "h-[32px] gap-[var(--spacing-3)] px-[calc(var(--spacing-6)_-_var(--border-width-1-5))] rounded-[var(--radius-lg)] text-[length:var(--font-size-sm)] leading-xs [--btn-icon-size:14px]",
         md: "h-[36px] gap-[var(--spacing-3)] px-[calc(var(--spacing-7)_-_var(--border-width-1-5))] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)] leading-md [--btn-icon-size:16px]",
         lg: "h-[40px] gap-[var(--spacing-3)] px-[calc(var(--spacing-8)_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-md)] leading-md [--btn-icon-size:18px]",
-        xl: "h-[44px] gap-[var(--spacing-4)] px-[calc(var(--spacing-10)_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-lg)] leading-lg [--btn-icon-size:20px]",
-        "2xl": "h-[48px] gap-[var(--spacing-4)] px-[calc(var(--spacing-12)_-_var(--border-width-1-5))] rounded-[var(--radius-2xl)] text-[length:var(--font-size-lg)] leading-lg [--btn-icon-size:24px]",
+        xl: "h-[44px] gap-[var(--spacing-4)] px-[calc(var(--btn-px-xl,var(--spacing-10))_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-lg)] leading-lg [--btn-icon-size:20px]",
+        "2xl": "h-[48px] gap-[var(--spacing-4)] px-[calc(var(--btn-px-2xl,var(--spacing-12))_-_var(--border-width-1-5))] rounded-[var(--radius-2xl)] text-[length:var(--font-size-lg)] leading-lg [--btn-icon-size:24px]",
       },
       iconOnly: {
         true: "px-0 py-0 aspect-square",

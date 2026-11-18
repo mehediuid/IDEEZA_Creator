@@ -2,8 +2,10 @@
 
 // The Earn tabs' one visual system (owner, 2026-10-11: the area looked messy),
 // so every tab reads the same:
-// - one column on the page frame's left edge, at most the layout's narrow
-//   column (EARN_COLUMN, --layout-content-narrow);
+// - the header and the tabs across the page frame; a tab's body in one
+//   column on the frame's left edge, at most the layout's narrow column
+//   (EARN_COLUMN, --layout-content-narrow), except Sell, the frame with its
+//   rail (the Sell desk, owner 2026-11-18);
 // - one card (EARN_CARD): the same radius, border, padding and width;
 // - one heading scale: an h2 per section, an h3 inside one;
 // - one rhythm: 32 px between sections, 16 px between a section's blocks,

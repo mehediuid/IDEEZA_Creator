@@ -5,18 +5,21 @@
 // the gateway to Sketch Mode; the rest dispatch ThreeActions.
 
 import { C } from "@/lib/pcb/colors";
-import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
+import { dispatchThreeAction, THREE_NOT_BUILT, type ThreeAction } from "./three-menu-bar";
 import { useSettings } from "@/lib/settings/use-settings";
 
-type Tool = { id: ThreeAction | "sketch"; title: string; path: string; fill?: boolean };
+/** `note`: nothing behind the tool yet — greyed, and the tooltip says why. */
+type Tool = { id: ThreeAction | "sketch"; title: string; path: string; fill?: boolean; note?: string };
 
 // Sketch is a special toolbar entry — labelled, violet-tinted — that flips the
 // app into Sketch Mode rather than dispatching a one-shot operation.
 const SKETCH: Tool = { id: "sketch", title: "Sketch", path: "M3 17l6-6 4 4 8-8 M14 7h6v6", fill: false };
 
 const TOOLS: Tool[] = [
-  { id: "xform:move", title: "Pan (hand)", path: "M9 11V5a2 2 0 1 1 4 0v6 M13 11V4a2 2 0 1 1 4 0v8 M17 12V7a2 2 0 1 1 4 0v8a7 7 0 0 1-7 7h-3a7 7 0 0 1-6-4l-3-6c-.6-1.2-.2-2.7 1-3.3 1.1-.5 2.4-.1 3 1l2 4" },
-  { id: "xform:rotate", title: "Pointer / select", path: "M3 3l8 16 2-7 7-2z" },
+  // The hand opened the move gizmo and the pointer the rotate gizmo. The pointer
+  // is now select (no gizmo; a click picks a shape); a pan mode doesn't exist.
+  { id: "xform:move", title: "Pan (hand)", note: "Pan tool isn't built yet.", path: "M9 11V5a2 2 0 1 1 4 0v6 M13 11V4a2 2 0 1 1 4 0v8 M17 12V7a2 2 0 1 1 4 0v8a7 7 0 0 1-7 7h-3a7 7 0 0 1-6-4l-3-6c-.6-1.2-.2-2.7 1-3.3 1.1-.5 2.4-.1 3 1l2 4" },
+  { id: "xform:select", title: "Pointer / select", path: "M3 3l8 16 2-7 7-2z" },
   { id: "shape:box", title: "Box", path: "M3 7l9-4 9 4-9 4-9-4z M3 7v10l9 4 9-4V7" },
   { id: "shape:sphere", title: "Sphere", path: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c3 3 3 15 0 18 M12 3c-3 3-3 15 0 18" },
   { id: "shape:cylinder", title: "Cylinder", path: "M5 6a7 2 0 1 0 14 0 7 2 0 1 0-14 0z M5 6v12a7 2 0 0 0 14 0V6" },
@@ -39,11 +42,14 @@ const TOOLS: Tool[] = [
 ];
 
 function ToolIcon({ tool, isLabel }: { tool: Tool; isLabel?: boolean }) {
+  const note = tool.note ?? (tool.id !== "sketch" ? THREE_NOT_BUILT[tool.id] : undefined);
   return (
     <button
-      className="ix-tool"
-      onClick={() => { if (tool.id !== "sketch") dispatchThreeAction(tool.id as ThreeAction); }}
-      title={tool.title}
+      className={note ? undefined : "ix-tool"}
+      aria-disabled={note ? true : undefined}
+      aria-label={note ? `${tool.title}: ${note}` : tool.title}
+      onClick={() => { if (!note && tool.id !== "sketch") dispatchThreeAction(tool.id as ThreeAction); }}
+      title={note ?? tool.title}
       style={{
         height: 30,
         minWidth: isLabel ? undefined : 30,
@@ -56,7 +62,8 @@ function ToolIcon({ tool, isLabel }: { tool: Tool; isLabel?: boolean }) {
         alignItems: "center",
         justifyContent: "center",
         gap: "var(--spacing-2)",
-        cursor: "pointer",
+        cursor: note ? "default" : "pointer",
+        opacity: note ? 0.45 : 1,
         fontWeight: isLabel ? 600 : 500,
         fontSize: isLabel ? "var(--font-size-sm)" : undefined,
       }}

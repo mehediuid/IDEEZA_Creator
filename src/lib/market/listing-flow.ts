@@ -17,6 +17,7 @@ import { formatAmount } from "../wallet/money";
 import type { Charge, MintStatus, MintType, SummaryRow, WalletRequest } from "../wallet/types";
 import { auctionStateOf, bidsOf, timeLeftLabel, type SettleResult } from "./auction";
 import { feePercentText, payoutOf } from "./fee";
+import { AUCTION_BIDS_LINE, cancelBlockOf } from "./listing";
 import { listingInputFromBrief, listingInputFromListing, sellingSteps, type ListingInput } from "./listing-form";
 import type { Bid, Listing, ListingView, UtilityBenefit } from "./types";
 
@@ -29,6 +30,10 @@ export const MARKETPLACE_FOCUS_ID = "marketplace-first-control";
 
 export const DEMO_LINE = "Testnet demo — nothing is listed on a real blockchain.";
 export const VIDEOS_READY_LINE = "Videos · every product is ready ✓";
+/** The wallet's last line when what was signed waits for its videos (owner, 2026-11-18). */
+export const HELD_DONE_LINE = "Signed. It goes on Explore marketplace when every video is ready — we'll tell you.";
+/** Signed while a video was still being made (owner, 2026-11-18): it waits, then goes live by itself. */
+export const HELD_ANNOUNCEMENT = "Signed. Your listing goes live on Explore marketplace when every video is ready.";
 export const LOCKED_HELP = "Set when it was minted.";
 export const COLLECTION_UNKNOWN = "This mint's collection isn't known, so it can't be listed. Check it in the Brief.";
 export const STORAGE_FULL = "This browser's storage is full — the listing wasn't saved.";
@@ -266,6 +271,7 @@ export function updatedAnnouncement(l: Listing): string {
 }
 
 export const REMOVED_ANNOUNCEMENT = "Removed from the marketplace";
+export const AUCTION_CANCELLED_ANNOUNCEMENT = "Auction cancelled · off the marketplace";
 export const RELISTED_ANNOUNCEMENT = "Back on the marketplace";
 
 /** "0.05 MATIC · Buy now · 10%" / "0.02 MATIC minimum bid · Auction · 100%". */
@@ -292,7 +298,10 @@ export type MarketplaceCard =
       closeReady: boolean;
       closeHint: string | null;
       bids: number;
-      fixedNote: string;
+      /** Nobody has bid and it hasn't ended: the maker may cancel it. */
+      cancellable: boolean;
+      /** Once someone bids, why it can't be cancelled; null before that. */
+      fixedNote: string | null;
     }
   | { kind: "paused"; since: MetaPart[]; changed: string; terms: string }
   | { kind: "sold"; state: MetaPart[]; facts: CardFact[] };
@@ -375,7 +384,8 @@ export function marketplaceCardOf(view: ListingView, ctx: { bids: Bid[]; now: nu
         closeReady: ended,
         closeHint: ended ? null : `You can close it once it ends on ${formatDateTime(endsAt)}.`,
         bids: count,
-        fixedNote: "An auction can't be changed once it starts.",
+        cancellable: cancelBlockOf(l, ctx.bids, ctx.now) === null,
+        fixedNote: count > 0 ? AUCTION_BIDS_LINE : null,
       };
     }
     case "paused": {

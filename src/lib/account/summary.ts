@@ -23,7 +23,7 @@ export function creditTotals(ledger: LedgerLine[]): CreditTotals {
   let remaining = 0;
   for (const e of ledger) {
     remaining += e.delta;
-    if (e.reason === "seed" || e.reason === "topup" || e.reason === "purchase" || e.reason === "grant") total += e.delta;
+    if (e.reason === "seed" || e.reason === "topup" || e.reason === "purchase" || e.reason === "grant" || e.reason === "redeem") total += e.delta;
   }
   return { total, remaining: Math.max(0, remaining) };
 }

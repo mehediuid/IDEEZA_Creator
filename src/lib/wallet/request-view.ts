@@ -283,13 +283,25 @@ const ACTIVITY_VERB: Record<RequestPurpose, string> = {
   payoutMethod: "Signed a withdrawal method",
   buyIdz: "Bought IDZ in the presale",
   claimIdz: "Claimed presale IDZ",
+  stakeIdz: "Staked IDZ",
+  unstakeIdz: "Withdrew staked IDZ",
+  claimStakeReward: "Claimed a staking reward",
+  claimReferral: "Claimed referral rewards",
 };
+
+/** The purposes whose line names what it releases in `claims`: a presale purchase, a stake, a campaign. */
+const CLAIMING: readonly RequestPurpose[] = ["claimIdz", "unstakeIdz", "claimStakeReward", "claimReferral"];
 
 /** "Minted on chain · Car": the verb for the purpose, then the request's "Project" row (else its
  *  title). A presale purchase or claim has no project: "Bought IDZ in the presale · 34 IDZ". */
 export function activityTitleOf(req: WalletRequest): string {
   if (req.purpose === "buyIdz" && req.presale) return `${ACTIVITY_VERB.buyIdz} · ${formatAmount(req.presale.idz, "IDZ")}`;
   if (req.purpose === "claimIdz") return ACTIVITY_VERB.claimIdz;
+  if (req.purpose === "stakeIdz" && req.stake) return `${ACTIVITY_VERB.stakeIdz} · ${formatAmount(req.stake.amount, "IDZ")}`;
+  if (req.purpose === "unstakeIdz" || req.purpose === "claimStakeReward" || req.purpose === "claimReferral") {
+    const from = req.summary.find((r) => r.label === "From")?.value;
+    return from ? `${ACTIVITY_VERB[req.purpose]} · ${from}` : ACTIVITY_VERB[req.purpose];
+  }
   const project = req.summary.find((r) => r.label === "Project")?.value;
   return project ? `${ACTIVITY_VERB[req.purpose]} · ${project}` : req.title;
 }
@@ -314,12 +326,14 @@ export function activityOf(req: WalletRequest, proof: Proof, id: string, project
   if (projectId) entry.projectId = projectId;
   if (proof.txHash) entry.txHash = proof.txHash;
   if (proof.signature) entry.signature = proof.signature;
-  if (req.kind === "transaction" && req.charge && req.purpose !== "purchase") entry.charge = sumCharge(req.charge);
+  if (req.kind === "transaction" && req.charge && (req.purpose !== "purchase" || req.offMarket)) entry.charge = sumCharge(req.charge);
   if (req.purpose === "buyIdz" && req.presale) {
     const { lockMs, ...bought } = req.presale;
     entry.presale = { ...bought, unlocksAt: proof.at + lockMs };
   }
-  if (req.purpose === "claimIdz" && req.claims) entry.claims = req.claims;
+  if (CLAIMING.includes(req.purpose) && req.claims) entry.claims = req.claims;
+  if (req.purpose === "stakeIdz" && req.stake) entry.stake = { ...req.stake };
+  if (req.kind === "transaction" && req.credit && req.credit.lines.length) entry.credit = sumCharge(req.credit);
   return entry;
 }
 

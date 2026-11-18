@@ -69,6 +69,8 @@ export async function sendMessage(o: {
   teamIds?: readonly PersonId[];
   /** Ties and quiet mode for a first message's start check (Settings › Audience). */
   policy?: StartPolicy;
+  /** The message this one replies to (the phone's swipe to reply). */
+  replyTo?: string;
 }): Promise<ActionResult<{ conversationId: string }>> {
   for (const f of o.files) {
     const err = fileError(f);
@@ -134,6 +136,7 @@ export async function sendMessage(o: {
       id: newMessagesId("msg_"),
       contextId: newMessagesId("ctx_"),
       teamIds: o.teamIds,
+      ...(o.replyTo ? { replyTo: o.replyTo } : {}),
     });
     if (!sent.ok) {
       failure = sent.reason;

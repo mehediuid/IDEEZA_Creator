@@ -65,7 +65,10 @@ export function sanitizeJoin(raw: unknown): JoinPlan | null {
   const cuts: JoinCut[] = [];
   for (const c of raw.cuts) {
     if (!isObj(c) || typeof c.productId !== "string" || typeof c.takeId !== "string") return null;
-    cuts.push({ productId: c.productId, takeId: c.takeId, fromMs: num(c.fromMs), ms: num(c.ms), label: str(c.label) });
+    const cut: JoinCut = { productId: c.productId, takeId: c.takeId, fromMs: num(c.fromMs), ms: num(c.ms), label: str(c.label) };
+    if (typeof c.imageUrl === "string" || c.imageUrl === null) cut.imageUrl = c.imageUrl;
+    if (typeof c.line === "string") cut.line = c.line;
+    cuts.push(cut);
   }
   return { intro: [str(raw.intro[0]), str(raw.intro[1])], cuts, outro: raw.outro };
 }
@@ -375,10 +378,13 @@ export function migrateLegacyClip(
 }
 
 /** The video that stands for the whole project: its project video (owner, 2026-10-21), else the
- *  first current product's in-use take. */
+ *  first current product's in-use take — the only one when the project has one product. */
 export function featuredVideoOf(video: ProjectVideos | null, products: ProjectProduct[]): VideoTake | null {
   if (!video) return null;
-  const project = video.products[PROJECT_VIDEO_KEY];
+  // With one current product its video is the project's (owner, 2026-11-17): a project video left
+  // from when it had more never stands in for it.
+  const single = products.filter((p) => p.dropped === null).length === 1;
+  const project = single ? undefined : video.products[PROJECT_VIDEO_KEY];
   const own = project?.inUseId ? project.takes.find((t) => t.id === project.inUseId) : undefined;
   if (own) return own;
   for (const p of products) {

@@ -661,7 +661,6 @@ export interface PcbState {
   ctxX: string;
   ctxY: string;
   settingsOpen: boolean;
-  chatOpen: boolean;
   // 3D-view controls (session-only) — driven by the 3D top toolbar cluster and
   // consumed by the three.js viewer (camera preset/fit, projection, explode).
   pcb3d: {
@@ -1775,7 +1774,6 @@ export const initialState: PcbState = {
   ctxX: "0px",
   ctxY: "0px",
   settingsOpen: false,
-  chatOpen: false,
   pcb3d: { projection: "perspective", explode: false, preset: "iso", fitNonce: 0, presetNonce: 0 },
   settingsPage: "system",
   notif: 3,

@@ -282,15 +282,6 @@
     --layout-page-inset: var(--spacing-8);
     --layout-gutter: var(--spacing-8);
 
-    /* Radius (mobile) */
-    --radius-xs: 4px;
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 10px;
-    --radius-xl: 14px;
-    --radius-2xl: 18px;
-    --radius-3xl: 28px;
-
     /* Typography (mobile) */
     --font-size-xl: 16px;
     --font-size-2xl: 18px;
@@ -315,6 +306,22 @@
     --letter-spacing-close: -0.7px;
     --letter-spacing-near: -0.4px;
     --letter-spacing-slight: -0.2px;
+  }
+}
+
+/* Radius (mobile mode) — not inside the mobile prototype (/m, whose root is
+   #m-app): the owner's rule is that DS variable modes are never switched there,
+   so its buttons, cards and fields keep the default radius the mobile Figma
+   draws (radius/xl 12, radius/lg 8). On :root, so its portalled sheets follow. */
+@media (max-width: 767px) {
+  :root:not(:has(#m-app)) {
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 14px;
+    --radius-2xl: 18px;
+    --radius-3xl: 28px;
   }
 }
 

@@ -10,6 +10,7 @@
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import type { SceneShape } from "./three-canvas";
+import { THREE_NOT_BUILT } from "./three-menu-bar";
 
 export type PartActions = {
   copy: (id: string) => void;
@@ -24,7 +25,6 @@ export type PartActions = {
   flipHorizontal: (id: string) => void;
   flipVertical: (id: string) => void;
   lock: (id: string) => void;
-  group: () => void;
   hide: (id: string) => void;
   delete: (id: string) => void;
 };
@@ -146,7 +146,7 @@ function PartContextMenu({
   onClose: () => void;
 }) {
   type Item =
-    | { divider?: never; label: string; shortcut?: string; danger?: boolean; disabled?: boolean; run: () => void }
+    | { divider?: never; label: string; shortcut?: string; danger?: boolean; disabled?: boolean; note?: string; run: () => void }
     | { divider: true };
   const items: Item[] = [
     { label: "Copy",            shortcut: "⌘C", run: () => actions.copy(shapeId) },
@@ -164,7 +164,7 @@ function PartContextMenu({
     { label: "Flip Vertical",   shortcut: "Y",  run: () => actions.flipVertical(shapeId) },
     { divider: true },
     { label: "Lock",            shortcut: "L",  run: () => actions.lock(shapeId) },
-    { label: "Group",           shortcut: "⌘G", run: () => actions.group() },
+    { label: "Group",           shortcut: "⌘G", disabled: true, note: THREE_NOT_BUILT["xform:group"], run: () => {} },
     { label: "Delete", danger: true,            run: () => actions.delete(shapeId) },
   ];
   return (
@@ -193,6 +193,8 @@ function PartContextMenu({
         return (
           <div
             key={item.label}
+            aria-disabled={disabled || undefined}
+            title={item.note}
             onClick={() => {
               if (disabled) return;
               item.run();

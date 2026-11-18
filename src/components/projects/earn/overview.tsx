@@ -26,6 +26,7 @@ import { Badge, buttonVariants } from "@/components/ideeza";
 import { levelStepsOf, type EarnFacts, type LadderStep } from "@/lib/commerce/ladder";
 import { earnHref } from "@/lib/manual/earn-route";
 import { earnLiveFactsOf, earnNextOf, earnPathOf, type EarnPathStep } from "@/lib/manual/earn-view";
+import { videosStartBlockerOf } from "@/lib/manual/readiness";
 import { cn } from "@/lib/utils";
 import type { SlotProps } from "../details/slots";
 import { StepFix } from "./ladder/missing-steps";
@@ -129,6 +130,7 @@ export function EarnOverview({ project, view, brief, announce }: SlotProps) {
               project={project}
               brief={brief}
               announce={announce}
+              videosStarted={videosStartBlockerOf(view.videos.readiness.sell) === null}
             />
           ))}
         </ol>
@@ -146,9 +148,12 @@ function StepGroup({
   project,
   brief,
   announce,
+  videosStarted,
 }: {
   step: EarnPathStep;
   tasks: Task[];
+  /** Every video in generation (owner, 2026-11-18): the videos step then no longer holds the choice. */
+  videosStarted: boolean;
   ready: boolean;
   why: string | null;
   action: { label: string; href: string } | null;
@@ -157,7 +162,10 @@ function StepGroup({
   announce?: (message: string) => void;
 }) {
   const current = step.state === "current";
-  const firstMissing = current ? tasks.find((t) => !t.ok) : undefined;
+  // Once every video is in generation the choice opens (owner, 2026-11-18): what the maker signs then
+  // waits for any still rendering or unreviewed. A video never started still holds it.
+  const started = videosStarted;
+  const firstMissing = current ? tasks.find((t) => !t.ok && (t.id !== "videos" || !started)) : undefined;
   const canAct = current && ready && !firstMissing;
   const note = step.state === "done" ? "Done" : current ? "Now" : "Later";
 
@@ -191,7 +199,7 @@ function StepGroup({
       {step.state !== "done" && ready && (
         <ul className={cn("m-0 flex list-none flex-col gap-1 p-0", !current && "opacity-60")}>
           {tasks.map((t) => {
-            const open = t === firstMissing;
+            const open = t === firstMissing || (current && !t.ok && t.id === "videos" && started);
             return (
               <li key={t.id} className={cn("flex items-start gap-4 rounded-xl px-4 py-3", open && "bg-bg-subtle")}>
                 <TaskMark ok={t.ok} />
@@ -202,7 +210,9 @@ function StepGroup({
                   </span>
                   {open && (
                     <>
-                      <span className="text-md leading-md text-text-secondary">{t.reason}</span>
+                      <span className="text-md leading-md text-text-secondary">
+                        {t.id === "videos" && started ? `${t.reason} You don't have to wait: what you sell goes live when they're ready.` : t.reason}
+                      </span>
                       <span className="self-start">
                         <StepFix step={t} project={project} brief={brief} announce={announce} />
                       </span>

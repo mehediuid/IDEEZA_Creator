@@ -40,12 +40,14 @@ import {
   messageNotices,
   payoutNotices,
   videoNotices,
+  heldLiveNotices,
   type SharedPostInput,
 } from "@/lib/notifications/sources";
 import type { Notice } from "@/lib/notifications/types";
 import { readSettings, updateSettings, type SettingsV1 } from "@/lib/settings/prefs";
 import { useSettings } from "@/lib/settings/use-settings";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { useHeld } from "@/lib/market/held";
 
 /** The builds that need the maker, minus the one whose chat is open: it is already in front of
  *  them. The bell used to say "1 needs attention" about the very build on screen. */
@@ -146,6 +148,7 @@ export function useNotices(): NoticeFeed {
   const credits = useCredits();
   const plan = useCreatePlan();
   const video = useVideoJobs();
+  const held = useHeld();
   const shared = useSharedComments(projects);
   const reads = useNoticeReads();
   const payout = usePayout();
@@ -190,6 +193,7 @@ export function useNotices(): NoticeFeed {
           })
         : []),
       ...(video.hydrated ? videoNotices(video.jobs) : []),
+      ...(held.hydrated ? heldLiveNotices(held.store.live) : []),
       ...commentNotices(shared, POST_ME.id, (id) => personOf(id).name),
       ...(payout ? payoutNotices(payout.methodLog) : []),
     ];
@@ -222,6 +226,8 @@ export function useNotices(): NoticeFeed {
     settings.credits.expiryReminderDays,
     video.hydrated,
     video.jobs,
+    held.hydrated,
+    held.store.live,
     shared,
     payout,
   ]);

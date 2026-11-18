@@ -424,8 +424,8 @@ test("sellChecksOf: the product's video rule with its fix; ownership points at t
   assert.equal(ticked.checks[1].detail, "Saved when you sell.");
 });
 
-const PRODUCT_REASON = "1 product still needs an AI video. The project video comes next.";
-const PROJECT_REASON = "Every product has its video. Make the project video to continue.";
+const PRODUCT_REASON = "1 product still needs an AI video. The project video isn't made yet.";
+const PROJECT_REASON = "The project video isn't made yet.";
 const rule = (id, ok, reason = null) => ({ id, ok, fixedIn: "brief", reason: ok ? null : reason });
 
 test("sellVideoOf: one product's video for an edition, with no project video", () => {
@@ -467,15 +467,17 @@ test("sellChecksOf: the whole project fails while only the project video is miss
 
 test("sellVideoOf over the real readiness: sell asks the project video, an edition doesn't", () => {
   const product = { id: "prd_a", name: "Rider", description: "", dropped: null, built: null };
+  const second = { id: "prd_b", name: "Dock", description: "", dropped: null, built: null };
   const take = { id: "take_a", productId: "prd_a", n: 1, prompt: "", lines: ["a", "b", "c"], quality: "low", source: null, createdAt: 1, readyAt: 2 };
-  const videos = { version: 1, projectId: "proj_1", products: { prd_a: { takes: [take], inUseId: "take_a" } } };
-  const facts = { products: [product], videos, jobs: [], now: 10, status: "private", ownershipConfirmed: true, license: null };
+  const takeB = { ...take, id: "take_b", productId: "prd_b" };
+  const videos = { version: 1, projectId: "proj_1", products: { prd_a: { takes: [take], inUseId: "take_a" }, prd_b: { takes: [takeB], inUseId: "take_b" } } };
+  const facts = { products: [product, second], videos, jobs: [], now: 10, status: "private", ownershipConfirmed: true, license: null };
   const sell = sellVideoOf(readinessOf(facts, "sell"));
   assert.deepEqual([sell.ok, sell.project, sell.reason], [false, true, PROJECT_REASON]);
   const edition = sellVideoOf(readinessOf({ ...facts, product }, "edition"));
   assert.deepEqual([edition.ok, edition.project], [true, false]);
   // With the project video made from that take, the whole project passes.
-  const join = { intro: ["Car", ""], cuts: [{ productId: "prd_a", takeId: "take_a", fromMs: 0, ms: 10000, label: "Rider" }], outro: "Built with IDEEZA" };
+  const join = { intro: ["Car", ""], cuts: [{ productId: "prd_a", takeId: "take_a", fromMs: 0, ms: 7500, label: "Rider" }, { productId: "prd_b", takeId: "take_b", fromMs: 0, ms: 7500, label: "Dock" }], outro: "Built with IDEEZA" };
   const own = { ...take, id: "take_p", productId: PROJECT_VIDEO_KEY, join };
   const both = { ...videos, products: { ...videos.products, [PROJECT_VIDEO_KEY]: { takes: [own], inUseId: "take_p" } } };
   assert.equal(sellVideoOf(readinessOf({ ...facts, videos: both }, "sell")).ok, true);
@@ -542,4 +544,26 @@ test("withShipPlan stores the trimmed note per product, capped, and leaves the o
   assert.deepEqual(next.physical.prd_2, before.physical.prd_2);
   assert.equal(before.physical.prd_1, undefined);
   assert.equal(withShipPlan(before, "prd_1", "x".repeat(NOTE_MAX + 50), 1).physical.prd_1.note.length, NOTE_MAX);
+});
+
+test("sellVideoOf: one product's video is the project's — no project video row (owner, 2026-11-17)", () => {
+  const product = { id: "prd_a", name: "Rider", description: "", dropped: null, built: null };
+  const take = { id: "take_a", productId: "prd_a", n: 1, prompt: "", lines: ["a", "b", "c"], quality: "low", source: null, createdAt: 1, readyAt: 2 };
+  const videos = { version: 1, projectId: "proj_1", products: { prd_a: { takes: [take], inUseId: "take_a" } } };
+  const sell = sellVideoOf(readinessOf({ products: [product], videos, jobs: [], now: 10, status: "private", ownershipConfirmed: true, license: null }, "sell"));
+  assert.deepEqual([sell.ok, sell.project], [true, false]);
+});
+
+test("sellChecksOf on the web (owner, 2026-11-18): a video in generation waits; one never started still holds Sign and sell", () => {
+  const rendering = sellChecksOf(checks({ video: { ok: false, reason: "Waiting for 1 video to finish — about 4 min left." }, holdVideos: true, notStarted: null }));
+  assert.equal(rendering.ok, true, "every video started: the copies are signed now and wait");
+  assert.equal(rendering.videosWait, "Waiting for 1 video to finish — about 4 min left.");
+  const missing = sellChecksOf(
+    checks({ video: { ok: false, reason: "1 product still needs an AI video." }, holdVideos: true, notStarted: "Start every video first: Rider hasn't started yet." }),
+  );
+  assert.equal(missing.ok, false);
+  assert.equal(missing.blocker, "Start every video first: Rider hasn't started yet.");
+  assert.equal(missing.videosWait, null);
+  // The phone keeps the old gate: without holdVideos any video still missing holds it.
+  assert.equal(sellChecksOf(checks({ video: { ok: false, reason: "Waiting" } })).ok, false);
 });

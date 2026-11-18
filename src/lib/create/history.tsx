@@ -98,6 +98,10 @@ export type ChatTurn =
       id: string;
       role: "user";
       text: string;
+      /** The inspiration image sent with the idea (inspiration.ts), and its
+       *  file name, which is what the chat shows beside it. */
+      image?: string;
+      imageName?: string;
       ts: number;
     }
   | {
@@ -209,6 +213,9 @@ export type ChatSession = {
   /** Quality picked on Home with the idea; every concept render in this
    *  chat uses it. Absent on chats from before the choice: Medium. */
   quality?: RenderQuality;
+  /** The inspiration image given with the idea on Home (inspiration.ts):
+   *  the main product's fresh concepts are drawn from it. */
+  inspiration?: string;
 };
 
 export type BuildItemKind = "3d" | "pcb" | "code" | "assembly" | "wiring" | "parts";
@@ -401,7 +408,7 @@ export const BUILD_ESTIMATE_MIN = 1;
 // ─────────────────────────── storage ───────────────────────────────
 
 const CHATS_KEY = "ideeza:create:chats";
-const BUILDS_KEY = "ideeza:create:builds";
+export const BUILDS_KEY = "ideeza:create:builds";
 
 function loadJSON<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -780,7 +787,10 @@ type Ctx = {
   // Chat ops
   /** `addTo`: the project Home's "Adding to {project}" names (P2-TABS-29) —
    *  the setup question opens on it. */
-  createChat: (initialPrompt: string, opts?: { addTo?: string; quality?: RenderQuality }) => ChatSession;
+  createChat: (
+    initialPrompt: string,
+    opts?: { addTo?: string; quality?: RenderQuality; inspiration?: string; inspirationName?: string },
+  ) => ChatSession;
   appendUserTurn: (chatId: string, text: string) => void;
   appendAssistantTurn: (
     chatId: string,
@@ -878,6 +888,10 @@ type Ctx = {
     productId: string,
     picks: { kind: BuildItemKind; quality: PieceQuality; optimize: boolean }[],
   ) => void;
+  /** Adds a product the maker left out of a build to it, from its drawn
+   *  concept (no new drawing): its own pieces, booked now. The caller charges
+   *  it (its own charge, not the build's); this adds its cost to the build's. */
+  addBuildProduct: (buildId: string, product: Omit<BuildProduct, "items">, pick?: PiecePick) => void;
   // Whole-build retry, after a system failure took the job down.
   retryBuild: (buildId: string) => void;
   // Part 4 §4.6 — cancellation is a queued-only action, and a no-op on
@@ -976,7 +990,10 @@ export function CreateHistoryProvider({
   }, [builds, hydrated]);
 
   // ── Chat ops ──────────────────────────────────────────────────
-  const createChat = React.useCallback((initialPrompt: string, opts?: { addTo?: string; quality?: RenderQuality }) => {
+  const createChat = React.useCallback((
+    initialPrompt: string,
+    opts?: { addTo?: string; quality?: RenderQuality; inspiration?: string; inspirationName?: string },
+  ) => {
     const now = Date.now();
     const addTo = opts?.addTo?.trim();
     const id = makeId("chat");
@@ -984,7 +1001,15 @@ export function CreateHistoryProvider({
       id,
       title: deriveTitle(initialPrompt),
       turns: [
-        { id: makeId("turn"), role: "user", text: initialPrompt, ts: now },
+        {
+          id: makeId("turn"),
+          role: "user",
+          text: initialPrompt,
+          ...(opts?.inspiration
+            ? { image: opts.inspiration, ...(opts.inspirationName ? { imageName: opts.inspirationName } : null) }
+            : null),
+          ts: now,
+        },
         // Questions, not a render. The first image costs a credit and is
         // shaped by the answers, so it waits for them.
         {
@@ -1000,6 +1025,7 @@ export function CreateHistoryProvider({
       createdAt: now,
       updatedAt: now,
       ...(opts?.quality ? { quality: opts.quality } : null),
+      ...(opts?.inspiration ? { inspiration: opts.inspiration } : null),
     };
     setChats((arr) => [session, ...arr]);
     return session;
@@ -1639,6 +1665,33 @@ export function CreateHistoryProvider({
     [],
   );
 
+  const addBuildProduct = React.useCallback(
+    (buildId: string, product: Omit<BuildProduct, "items">, pick?: PiecePick) => {
+      const now = Date.now();
+      const busy = buildsRef.current.some((b) => isWorkingBuild(b) && b.id !== buildId);
+      const added = pickCost(pick ?? cleanPick(undefined));
+      setBuilds((arr) =>
+        arr.map((b) => {
+          if (b.id !== buildId) return b;
+          // Already in this build: nothing to add, nothing to book twice.
+          if (b.companions?.some((c) => c.id === product.id)) return b;
+          return {
+            ...b,
+            // Its own run: the clock (and the overrun check) starts now, not
+            // when the rest of the build first started.
+            ...(busy ? { status: "queued" as const, startedAt: undefined } : { status: "running" as const, startedAt: now }),
+            endedAt: undefined,
+            cost: jobCost(b) + added,
+            companions: [...(b.companions ?? []), { ...product, items: itemsFor(pick, busy) }],
+            updatedAt: now,
+            attentionDismissedAt: undefined,
+          };
+        }),
+      );
+    },
+    [],
+  );
+
   // Part 4 §4.6 — "allowed only in Queued state". Once generation has
   // started it is unavailable, because cancel-then-refund would be the
   // farming loop the spec warns about. The guard is inside the updater so
@@ -1941,6 +1994,7 @@ export function CreateHistoryProvider({
     updateBuildItem,
     retryBuildItem,
     addBuildPieces,
+    addBuildProduct,
     retryBuild,
     cancelBuild,
     failBuildSystem,

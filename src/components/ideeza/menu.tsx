@@ -208,7 +208,9 @@ export function Menu({ items, label, trigger, align = "start", className }: Menu
               tabIndex={-1}
               onKeyDown={onPanelKey}
               className={cn(
-                "fixed left-0 top-0 z-popover flex w-max min-w-[240px] max-w-[calc(100vw-16px)] flex-col gap-1 overflow-y-auto rounded-xl border border-solid border-border-subtle bg-bg-surface p-2 shadow-2 outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-fast",
+                // transition-none: `duration-fast` alone times every property, so the move from left-0 top-0
+                // to the trigger (placed after a measure) flew in from the corner (owner, 2026-11-16).
+                "fixed left-0 top-0 z-popover flex w-max min-w-[240px] max-w-[calc(100vw-16px)] flex-col gap-1 overflow-y-auto rounded-xl border border-solid border-border-subtle bg-bg-surface p-2 shadow-2 outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-fast transition-none",
                 className,
               )}
             >

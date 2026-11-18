@@ -139,7 +139,7 @@ test("filters: by network (the starting row has none, so it shows only under eve
   assert.equal(idz.filterIdzLedger(rows, { network: "baseSepolia", type: "all" }).length, 2);
   assert.equal(idz.filterIdzLedger(rows, { network: "mumbai", type: "all" }).length, 0);
   assert.deepEqual(idz.filterIdzLedger(rows, { network: "all", type: "reward" }).map((r) => r.id), ["seed"]);
-  assert.deepEqual(idz.TRANSFER_TYPES.map((t) => t.label), ["Reward", "Project Create", "Credits", "Buy", "Claim"]);
+  assert.deepEqual(idz.TRANSFER_TYPES.map((t) => t.label), ["Reward", "Project Create", "Credits", "Buy", "Claim", "Stake", "Withdraw"]);
 });
 
 test("a confirmed request now records its purpose, and a stored purpose survives a reload", () => {

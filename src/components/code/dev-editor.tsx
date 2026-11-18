@@ -18,6 +18,7 @@ import { editorDocKey } from "@/lib/manual/editor-scope";
 import { readSettings } from "@/lib/settings/prefs";
 import { useSettings } from "@/lib/settings/use-settings";
 import { saveNow, writeReported } from "@/lib/manual/save-status";
+import { downloadBlob } from "@/lib/pcb/exporters";
 
 // Monaco needs the browser — dynamic-import with ssr disabled.
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.default), {
@@ -32,7 +33,9 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.
 // FileEntry, DEFAULT_FILES and langForFile live in lib/code/files.ts, with
 // the build's firmware as a file (BUILDLOAD P2-BUILDLOAD-4).
 
-const MENU_DEFS: Record<string, { label: string; shortcut?: string; action: string }[]> = {
+// A row with a `note` has nothing behind it yet: it is greyed and the note says why.
+const RUN_NOTE = "Running code isn't built yet.";
+const MENU_DEFS: Record<string, { label: string; shortcut?: string; action: string; note?: string }[]> = {
   File: [
     { label: "New File", shortcut: "⌘N", action: "newFile" },
     { label: "Open…", shortcut: "⌘O", action: "open" },
@@ -67,17 +70,17 @@ const MENU_DEFS: Record<string, { label: string; shortcut?: string; action: stri
     { label: "Reset Zoom", shortcut: "⌘0", action: "resetZoom" },
   ],
   Go: [
-    { label: "Go to File…", shortcut: "⌘P", action: "goToFile" },
+    { label: "Go to File…", shortcut: "⌘P", action: "goToFile", note: "Go to File isn't built yet." },
     { label: "Go to Symbol", shortcut: "⇧⌘O", action: "goToSymbol" },
     { label: "Go to Line", shortcut: "⌃G", action: "goToLine" },
     { label: "Next Tab", shortcut: "⌃⇥", action: "nextTab" },
     { label: "Previous Tab", shortcut: "⌃⇧⇥", action: "prevTab" },
   ],
   Run: [
-    { label: "Run File", shortcut: "F5", action: "runFile" },
-    { label: "Run Selection", action: "runSelection" },
-    { label: "Stop", shortcut: "⇧F5", action: "stop" },
-    { label: "Debug", action: "debug" },
+    { label: "Run File", shortcut: "F5", action: "runFile", note: RUN_NOTE },
+    { label: "Run Selection", action: "runSelection", note: RUN_NOTE },
+    { label: "Stop", shortcut: "⇧F5", action: "stop", note: RUN_NOTE },
+    { label: "Debug", action: "debug", note: "Debugging isn't built yet." },
   ],
   Terminal: [
     { label: "New Terminal", shortcut: "⌃⇧`", action: "newTerminal" },
@@ -85,10 +88,10 @@ const MENU_DEFS: Record<string, { label: string; shortcut?: string; action: stri
     { label: "Kill Terminal", action: "killTerminal" },
   ],
   Help: [
-    { label: "Welcome", action: "welcome" },
-    { label: "Documentation", action: "docs" },
-    { label: "Keyboard Shortcuts", shortcut: "⌘K ⌘S", action: "shortcuts" },
-    { label: "About IDEEZA Code", action: "about" },
+    { label: "Welcome", action: "welcome", note: "Welcome page isn't built yet." },
+    { label: "Documentation", action: "docs", note: "Documentation isn't built yet." },
+    { label: "Keyboard Shortcuts", shortcut: "⌘K ⌘S", action: "shortcuts", note: "Keyboard shortcuts list isn't built yet." },
+    { label: "About IDEEZA Code", action: "about", note: "About page isn't built yet." },
   ],
 };
 
@@ -149,15 +152,18 @@ function MenuButton({
           {items.map((it) => (
             <div
               key={it.label}
-              onClick={() => onAction(it.action)}
-              className="ix-menu"
+              aria-disabled={it.note ? true : undefined}
+              title={it.note}
+              onClick={it.note ? undefined : () => onAction(it.action)}
+              className={it.note ? undefined : "ix-menu"}
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 padding: "var(--spacing-2) var(--spacing-4)",
                 fontSize: "var(--font-size-sm)",
-                cursor: "pointer",
-                color: C.text,
+                cursor: it.note ? "default" : "pointer",
+                color: it.note ? "var(--color-text-tertiary)" : C.text,
+                opacity: it.note ? 0.45 : 1,
               }}
             >
               <span>{it.label}</span>
@@ -317,27 +323,49 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
     openFile(name);
   };
 
-  const runFile = () => {
-    if (!activeFile) return;
-    setTerminal((t) => [...t, { kind: "in", text: `> run ${activeFile.name}` }, { kind: "out", text: `[${new Date().toLocaleTimeString()}] executing ${activeFile.name}…` }, { kind: "out", text: "Done." }, { kind: "out", text: "" }]);
-    setShowTerminal(true);
+  // File ▸ Open… reads a text file from the computer into a new file here.
+  const openFromDisk = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.onchange = () => {
+      const f = input.files?.[0];
+      if (!f) return;
+      void f.text().then((content) => {
+        if (files.some((x) => x.name === f.name)) {
+          setTerminal((t) => [...t, { kind: "out", text: `${f.name} is already a file in this product.` }, { kind: "out", text: "" }]);
+          return;
+        }
+        setFiles((fs) => [...fs, { name: f.name, language: langForFile(f.name), content }]);
+        openFile(f.name);
+      });
+    };
+    input.click();
   };
 
   const runMenu = (action: string) => {
     setOpenMenu(null);
-    type EditorWithActions = { getAction(id: string): { run: () => void } | null; trigger(s: string, id: string, p?: unknown): void };
+    type EditorWithActions = { focus(): void; trigger(s: string, id: string, p?: unknown): void };
     const ed = editorRef.current as EditorWithActions | null;
-    const trigger = (id: string) => ed?.getAction(id)?.run();
+    // `trigger` runs an editor action or a command (undo, redo, the clipboard and
+    // select-all are commands, which `getAction` never finds), on the focused editor.
+    const trigger = (id: string) => {
+      if (!ed) return;
+      ed.focus();
+      ed.trigger("menu", id, null);
+    };
     switch (action) {
       case "newFile": newFile(); return;
-      case "save": {
+      case "open": openFromDisk(); return;
+      case "save":
+      case "saveAll": {
         // The file saves as it is typed; Save writes the whole product now, as Ctrl+S does.
         const ok = saveNow();
-        setTerminal((t) => [...t, { kind: "out", text: ok ? `Saved ${activeName}.` : `Couldn't save ${activeName}: this browser's storage is full or blocked.` }, { kind: "out", text: "" }]);
+        const what = action === "save" ? activeName : `${files.length} files`;
+        setTerminal((t) => [...t, { kind: "out", text: ok ? `Saved ${what}.` : `Couldn't save ${what}: this browser's storage is full or blocked.` }, { kind: "out", text: "" }]);
         return;
       }
-      case "saveAll": setTerminal((t) => [...t, { kind: "out", text: `Saved ${files.length} files.` }, { kind: "out", text: "" }]); return;
       case "closeTab": if (activeFile) closeTab(activeFile.name); return;
+      case "export": if (activeFile) downloadBlob(activeFile.name, activeFile.content, "text/plain;charset=utf-8"); return;
       case "undo": trigger("undo"); return;
       case "redo": trigger("redo"); return;
       case "cut": trigger("editor.action.clipboardCutAction"); return;
@@ -356,22 +384,13 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
       case "zoomIn": trigger("editor.action.fontZoomIn"); return;
       case "zoomOut": trigger("editor.action.fontZoomOut"); return;
       case "resetZoom": trigger("editor.action.fontZoomReset"); return;
-      case "goToFile": trigger("workbench.action.quickOpen"); return;
-      case "goToSymbol": trigger("editor.action.gotoSymbol"); return;
+      case "goToSymbol": trigger("editor.action.quickOutline"); return;
       case "goToLine": trigger("editor.action.gotoLine"); return;
       case "nextTab": { const i = openTabs.indexOf(activeName); if (i >= 0 && i < openTabs.length - 1) setActiveName(openTabs[i + 1]); return; }
       case "prevTab": { const i = openTabs.indexOf(activeName); if (i > 0) setActiveName(openTabs[i - 1]); return; }
-      case "runFile": runFile(); return;
-      case "stop": setTerminal((t) => [...t, { kind: "out", text: "[stopped]" }, { kind: "out", text: "" }]); return;
       case "newTerminal": setShowTerminal(true); setTerminal((t) => [...t, { kind: "out", text: "[new terminal session]" }, { kind: "out", text: "" }]); return;
       case "clearTerminal": setTerminal([]); return;
       case "killTerminal": setShowTerminal(false); return;
-      case "welcome":
-      case "docs":
-      case "shortcuts":
-      case "about":
-        setTerminal((t) => [...t, { kind: "out", text: `[${action}] — not implemented in this preview.` }, { kind: "out", text: "" }]);
-        return;
       default: return;
     }
   };
@@ -391,13 +410,11 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
       return;
     }
     if (cmd === "help") {
-      setTerminal((t) => [...t, { kind: "out", text: "Built-ins: ls, dir, cat <file>, clear, help, run <file>" }, { kind: "out", text: "" }]);
+      setTerminal((t) => [...t, { kind: "out", text: "Built-ins: ls, dir, cat <file>, clear, help" }, { kind: "out", text: "" }]);
       return;
     }
-    if (cmd.startsWith("run ")) {
-      const name = cmd.split(/\s+/)[1];
-      const f = files.find((x) => x.name === name);
-      setTerminal((t) => [...t, { kind: "out", text: f ? `[executing ${name}…]` : `${name}: No such file` }, { kind: "out", text: "" }]);
+    if (cmd === "run" || cmd.startsWith("run ")) {
+      setTerminal((t) => [...t, { kind: "out", text: RUN_NOTE }, { kind: "out", text: "" }]);
       return;
     }
     setTerminal((t) => [...t, { kind: "out", text: `'${cmd.split(" ")[0]}' is not recognized as a command.` }, { kind: "out", text: "" }]);
@@ -514,9 +531,10 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
               </svg>
             </button>
             <button
-              onClick={runFile}
-              title="Run File"
-              style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "var(--color-green-600)" }}
+              disabled
+              title={RUN_NOTE}
+              aria-label={`Run File: ${RUN_NOTE}`}
+              style={{ background: "transparent", border: "none", padding: 4, cursor: "not-allowed", color: "var(--color-green-600)", opacity: 0.45 }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 21,12 5,21" /></svg>
             </button>
@@ -675,7 +693,7 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
               <div style={{ borderTop: "var(--border-width-1) solid var(--color-border-subtle)", background: "var(--color-bg-surface)", maxHeight: 180, display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-2) var(--spacing-5)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
                   <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: C.text, borderBottom: `2px solid ${C.primary}`, paddingBottom: 4 }}>Terminal</span>
-                  <span style={{ fontSize: "var(--font-size-sm)", color: C.body, cursor: "pointer" }}>Output</span>
+                  <span aria-disabled title="Output panel isn't built yet." style={{ fontSize: "var(--font-size-sm)", color: C.body, cursor: "default" }}>Output</span>
                   <span style={{ marginLeft: "auto", color: "var(--color-text-tertiary)", cursor: "pointer" }} onClick={() => setShowTerminal(false)}>×</span>
                 </div>
                 <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-3) var(--spacing-5)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: "var(--font-size-xs)", color: C.body, lineHeight: 1.7 }}>

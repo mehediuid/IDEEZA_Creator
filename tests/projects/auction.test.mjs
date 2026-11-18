@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { auctionStateOf, bidsOf, makeBid, settleAuction, timeLeftLabel, validateBid } = await import(
+const { auctionStateOf, bidsOf, makeBid, outbidOf, settleAuction, timeLeftLabel, validateBid } = await import(
   "../../.tmp-test/lib/market/auction.js"
 );
 const { toMicros } = await import("../../.tmp-test/lib/wallet/money.js");
@@ -140,4 +140,34 @@ test("settleAuction: a bid availableOf refuses is skipped, not disqualifying the
   const result = settleAuction(listing, bids, 100_000, (b) => b.id !== "bid_top");
   assert.equal(result.kind, "sale");
   assert.equal(result.bid.id, "bid_next");
+});
+
+test("outbidOf: the buyer led, then a later, higher bid passed theirs", () => {
+  const bids = [
+    bid({ id: "bid_mira", bidderId: "buyer-mira", amount: "0.03", at: 2 }),
+    bid({ id: "bid_leo", bidderId: "buyer-leo", amount: "0.04", at: 3 }),
+    bid({ id: "bid_sam", bidderId: "buyer-sam", amount: "0.05", at: 4 }),
+  ];
+  const out = outbidOf("lst_1", bids, "buyer-mira");
+  assert.equal(out.top.id, "bid_sam", "the bid that leads now");
+  assert.equal(out.mine.id, "bid_mira", "the buyer's best, whose hold went back");
+  assert.equal(outbidOf("lst_1", bids, "buyer-sam"), null, "the leader isn't outbid");
+  assert.equal(outbidOf("lst_1", bids, "buyer-x"), null, "never bid");
+  assert.equal(outbidOf("lst_other", bids, "buyer-mira"), null, "another listing");
+});
+
+test("outbidOf: a buyer who bids again and leads isn't outbid; a bid that never led isn't either", () => {
+  const back = [
+    bid({ id: "bid_m1", bidderId: "buyer-mira", amount: "0.03", at: 2 }),
+    bid({ id: "bid_l1", bidderId: "buyer-leo", amount: "0.04", at: 3 }),
+    bid({ id: "bid_m2", bidderId: "buyer-mira", amount: "0.06", at: 4 }),
+  ];
+  assert.equal(outbidOf("lst_1", back, "buyer-mira"), null);
+  assert.equal(outbidOf("lst_1", back, "buyer-leo").mine.id, "bid_l1");
+  // An earlier bid as high as the buyer's means theirs never led.
+  const never = [
+    bid({ id: "bid_leo", bidderId: "buyer-leo", amount: "0.05", at: 1 }),
+    bid({ id: "bid_mira", bidderId: "buyer-mira", amount: "0.05", at: 2 }),
+  ];
+  assert.equal(outbidOf("lst_1", never, "buyer-mira"), null);
 });

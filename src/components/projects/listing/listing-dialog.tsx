@@ -22,10 +22,13 @@
 // - Busy: the CTA reads "Listing…" / "Updating…", and the wallet dialog on
 //   top owns the keyboard. Cancelled in the wallet: back here, nothing
 //   written. A refused write: this dialog stays open and says why.
+// - Closing (Cancel, ✕, Escape, the scrim) with any field changed asks
+//   "Discard this listing?" first, in the copies sell flow's words; with
+//   nothing changed it closes at once.
 
 import * as React from "react";
 import { whenDialogsClose } from "@/components/create/use-dialog-focus";
-import { Banner, Button, ModalFrame, Spinner, TestnetDemoBadge } from "@/components/ideeza";
+import { Banner, Button, ConfirmDialog, ModalFrame, Spinner, TestnetDemoBadge } from "@/components/ideeza";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { MintCostRows, WalletFactLine, useMintShortfall } from "@/components/wallet/mint-cost";
 import { useMint } from "@/components/wallet/use-mint";
@@ -38,7 +41,9 @@ import { parseStored, readStoredKey } from "@/lib/key-store";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { listingMetadataOf, type ProjectView } from "@/lib/manual/project-read";
 import { normalizeProjects, PROJECTS_KEY, useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf, videosStartBlockerOf } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
+import { heldNoteOf } from "@/lib/video/video-copy";
 import { FEE_LABEL } from "@/lib/market/fee";
 import { createListing, editListing, listingViewOf } from "@/lib/market/listing";
 import {
@@ -47,6 +52,8 @@ import {
   MARKET_UNREADABLE,
   STORAGE_FULL,
   VIDEOS_READY_LINE,
+  HELD_ANNOUNCEMENT,
+  HELD_DONE_LINE,
   addInputOf,
   cleanBenefits,
   editRequestOf,
@@ -138,10 +145,11 @@ export function sellRecheckOf(
     now: number;
   },
 ): string | null {
+  // A video still rendering or unreviewed no longer holds a listing back (owner, 2026-11-18): it waits
+  // for it (lib/market/held.ts). A video never started still does: every one goes in first.
   const facts = readinessFactsOf(p, ctx.view, ctx.brief, readProjectVideos(p.id), ctx.jobs, ctx.now);
-  // The products' videos, then the project video (owner, 2026-10-21).
-  const videos = videosBlockerOf(readinessOf(facts, ctx.purpose));
-  if (videos) return `A video changed while this was open: ${videos}`;
+  const start = videosStartBlockerOf(readinessOf(facts, ctx.purpose));
+  if (start) return start;
   const maker = makerShareNow(p, ctx.market);
   if (ctx.percentSelling <= maker) return null;
   return maker > 0
@@ -185,6 +193,9 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
           now,
         }),
   );
+  // What the form opened with: closing asks first once anything differs from it.
+  const [opening] = React.useState(input);
+  const [discarding, setDiscarding] = React.useState(false);
   const [left, setLeft] = React.useState<ReadonlySet<ListingField>>(() => new Set());
   const [submitted, setSubmitted] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -196,6 +207,8 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
   // The latest record, for a commit that runs seconds after the press.
   const latest = React.useRef(projects);
   const latestJobs = React.useRef(jobs);
+  // A video still being made: the listing will wait for it (owner, 2026-11-18).
+  const videosWait = !editing ? videosBlockerOf(view.videos.readiness.sell) : null;
   React.useEffect(() => {
     latest.current = projects;
     latestJobs.current = jobs;
@@ -224,17 +237,19 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
   const leave = (field: ListingField) => setLeft((s) => (s.has(field) ? s : new Set(s).add(field)));
 
   const close = () => {
-    if (!busy) onClose();
+    if (busy) return;
+    if (JSON.stringify(input) !== JSON.stringify(opening)) setDiscarding(true);
+    else onClose();
   };
 
-  const runAdd = async (): Promise<{ result: RequestResult; written: Listing | null }> => {
+  const runAdd = async (): Promise<{ result: RequestResult; written: Listing | null; held: boolean }> => {
     const net = input.network!;
     const collection = input.collection;
     const chosen = input.mintingType;
     const plan = mint.plan({ projectId: project.id, intent: "sell", type: chosen, network: net, collection, current: mintStatus });
-    if (!plan) return { result: { ok: false, reason: "recheck", message: GONE }, written: null };
+    if (!plan) return { result: { ok: false, reason: "recheck", message: GONE }, written: null, held: false };
     const endsAt = input.type === "auction" ? new Date(input.endsAt).getTime() : null;
-    const req = listRequestOf({
+    const built = listRequestOf({
       projectName: project.name,
       network: net,
       collection,
@@ -243,8 +258,11 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
       endsAt,
       mintRequest: plan.request,
     });
+    // A video still being made: the wallet says it waits (owner, 2026-11-18).
+    const req = videosWait ? { ...built, doneLine: HELD_DONE_LINE } : built;
     const newMint = plan.request?.purpose === "lazyMint" || plan.request?.purpose === "instantMint";
     let written: Listing | null = null;
+    let held = false;
     const result = await request(req, {
       // Another tab may have listed it meanwhile (errata 13: the caller gates a new listing).
       recheck: () => {
@@ -285,12 +303,22 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
           { listing: () => randomId("lst_") },
         );
         if (!created.ok) return { ok: false, message: created.reason };
+        // A video still missing, rendering or unreviewed (owner, 2026-11-18): the maker signs now and
+        // the listing waits off Explore marketplace until every video is ready, then goes live by itself.
+        const waitFor = videosBlockerOf(
+          readinessOf(readinessFactsOf(p, view, brief, readProjectVideos(p.id), latestJobs.current, proof.at), "sell"),
+        );
         const prior = p.mint ?? null;
         const record = plan.request ? plan.nextRecord(proof) : null;
         // A mint that yields no record would list it as minted with nothing behind it.
         if (plan.request && !record) return { ok: false, conflict: true, message: NO_MINT_RECORD };
         if (record && !setMint(p.id, record)) return { ok: false, message: STORAGE_FULL };
-        const w = writeListings(created.listings);
+        const newListing = created.listings[created.listings.length - 1];
+        const w = waitFor
+          ? hold({ id: heldId(), projectId: p.id, kind: "main", at: proof.at, listing: newListing }).ok
+            ? ({ ok: true } as const)
+            : ({ ok: false, reason: "storage" } as const)
+          : writeListings(created.listings);
         if (!w.ok) {
           if (record) {
             if (prior) setMint(p.id, prior);
@@ -301,13 +329,14 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
         if (newMint) bumpMinted(net, collection);
         // The box ticked here is the Sell rule's ownership fix (readiness `fixedIn: "form"`).
         if (typeof p.ownerConfirmedAt !== "number") setOwnerConfirmed(p.id, proof.at);
-        written = created.listings[created.listings.length - 1];
+        written = newListing;
+        held = waitFor !== null;
         return { ok: true };
       },
       // "Use lazy mint instead" when an instant mint can't be paid: back to the form, lazy chosen.
       onUseLazy: mints && chosen === "instant" ? () => change({ mintingType: "lazy" }) : undefined,
     });
-    return { result, written };
+    return { result, written, held };
   };
 
   const runEdit = async (l: Listing): Promise<{ result: RequestResult; written: Listing | null }> => {
@@ -345,10 +374,11 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
     }
     setError(null);
     setBusy(true);
-    const { result, written } = editing ? await runEdit(editing) : await runAdd();
+    const run = editing ? { ...(await runEdit(editing)), held: false } : await runAdd();
+    const { result, written } = run;
     setBusy(false);
     if (result.ok && written) {
-      onDone(editing ? updatedAnnouncement(written) : listedAnnouncement(written));
+      onDone(editing ? updatedAnnouncement(written) : run.held ? HELD_ANNOUNCEMENT : listedAnnouncement(written));
       return;
     }
     if (!result.ok && result.reason !== "rejected") setError(result.message || STORAGE_FULL);
@@ -359,102 +389,123 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
   const summary = summaryRows(input, ctx);
 
   return (
-    <ModalFrame
-      open
-      onClose={close}
-      covered={busy}
-      size="sm"
-      initialFocus={titleRef}
-      title={
-        <span ref={titleRef} tabIndex={-1} className="outline-none">
-          {title}
-        </span>
-      }
-      description={`Main NFT · ${project.name}`}
-      footer={
-        <div className="ml-auto flex w-full flex-col items-stretch gap-3 [@media(min-width:480px)]:w-auto [@media(min-width:480px)]:items-end">
-          <div className="flex flex-col-reverse gap-4 [@media(min-width:480px)]:flex-row [@media(min-width:480px)]:justify-end">
-            <Button type="button" hierarchy="secondary" size="lg" disabled={busy} className={TAP} onClick={close}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              hierarchy="primary"
-              size="lg"
-              aria-disabled={firstReason ? true : undefined}
-              aria-describedby={firstReason ? reasonId : undefined}
-              aria-busy={busy || undefined}
-              className={cn(TAP, "aria-disabled:cursor-not-allowed aria-disabled:opacity-60")}
-              onClick={() => void submit()}
-            >
-              {busy && <Spinner size={16} />}
-              {cta}
-            </Button>
-          </div>
-          {firstReason && (
-            <p id={reasonId} className="max-w-[40ch] text-md text-text-secondary [@media(min-width:480px)]:text-right">
-              {firstReason}
-            </p>
-          )}
-        </div>
-      }
-    >
-      <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-8">
-        <p className="flex flex-wrap items-center gap-3 text-md text-text-secondary">
-          <TestnetDemoBadge />
-          {DEMO_LINE}
-        </p>
-        {error && <Banner tone="error">{error}</Banner>}
-        {!editing && <p className="text-md font-medium text-text-success">{VIDEOS_READY_LINE}</p>}
-
-        <ListingFields
-          mode={editing ? "edit" : "add"}
-          value={input}
-          onChange={change}
-          errors={shown}
-          onLeave={leave}
-          creatorPct={creatorPct}
-          mintStatus={mintStatus}
-          mintAddress={view.mint.record?.wallet.address}
-          now={now}
-          newBenefitId={() => randomId("ben_")}
-        />
-
-        {network && (
-          <div className="flex flex-col gap-6">
-            {editing ? (
-              <EditCost onChain={editing.mintingType === "instant"} network={network} />
-            ) : mintStatus === "onChain" ? (
-              <PlainCost line="Nothing to pay now — the token is already on chain. You sign the listing." />
-            ) : (
-              <MintCostRows type={input.mintingType} network={network} intent="sell" listing={listingCostRow(input)} />
+    <>
+      <ModalFrame
+        open
+        onClose={close}
+        covered={busy || discarding}
+        size="sm"
+        initialFocus={titleRef}
+        title={
+          <span ref={titleRef} tabIndex={-1} className="outline-none">
+            {title}
+          </span>
+        }
+        description={`Main NFT · ${project.name}`}
+        footer={
+          <div className="ml-auto flex w-full flex-col items-stretch gap-3 [@media(min-width:480px)]:w-auto [@media(min-width:480px)]:items-end">
+            <div className="flex flex-col-reverse gap-4 [@media(min-width:480px)]:flex-row [@media(min-width:480px)]:justify-end">
+              <Button type="button" hierarchy="secondary" size="lg" disabled={busy} className={TAP} onClick={close}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                hierarchy="primary"
+                size="lg"
+                aria-disabled={firstReason ? true : undefined}
+                aria-describedby={firstReason ? reasonId : undefined}
+                aria-busy={busy || undefined}
+                className={cn(TAP, "aria-disabled:cursor-not-allowed aria-disabled:opacity-60")}
+                onClick={() => void submit()}
+              >
+                {busy && <Spinner size={16} />}
+                {cta}
+              </Button>
+            </div>
+            {firstReason && (
+              <p id={reasonId} className="max-w-[40ch] text-md text-text-secondary [@media(min-width:480px)]:text-right">
+                {firstReason}
+              </p>
             )}
-            <WalletFactLine
-              type={(editing ? editing.mintingType === "instant" : mints && input.mintingType === "instant") ? "instant" : "lazy"}
-              network={network}
-            />
           </div>
-        )}
-
-        <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
+        }
+      >
+        <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-8">
+          <p className="flex flex-wrap items-center gap-3 text-md text-text-secondary">
             <TestnetDemoBadge />
-          </div>
-          {summary.map((r, i) => (
-            <p key={i} className="text-md text-text-secondary">
-              {r.label ? (
-                <>
-                  <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>
-                </>
+            {DEMO_LINE}
+          </p>
+          {error && <Banner tone="error">{error}</Banner>}
+          {!editing &&
+            (videosWait ? (
+              <p className="rounded-lg border border-solid border-[var(--color-border-brand)] bg-bg-brand-subtle px-6 py-4 text-md text-text-primary">
+                {heldNoteOf("Explore marketplace", videoCountOf(view.videos.readiness.sell).total)}
+              </p>
+            ) : (
+              <p className="text-md font-medium text-text-success">{VIDEOS_READY_LINE}</p>
+            ))}
+
+          <ListingFields
+            mode={editing ? "edit" : "add"}
+            value={input}
+            onChange={change}
+            errors={shown}
+            onLeave={leave}
+            creatorPct={creatorPct}
+            mintStatus={mintStatus}
+            mintAddress={view.mint.record?.wallet.address}
+            now={now}
+            newBenefitId={() => randomId("ben_")}
+          />
+
+          {network && (
+            <div className="flex flex-col gap-6">
+              {editing ? (
+                <EditCost onChain={editing.mintingType === "instant"} network={network} />
+              ) : mintStatus === "onChain" ? (
+                <PlainCost line="Nothing to pay now — the token is already on chain. You sign the listing." />
               ) : (
-                r.value
+                <MintCostRows type={input.mintingType} network={network} intent="sell" listing={listingCostRow(input)} />
               )}
-            </p>
-          ))}
-        </section>
-      </div>
-    </ModalFrame>
+              <WalletFactLine
+                type={(editing ? editing.mintingType === "instant" : mints && input.mintingType === "instant") ? "instant" : "lazy"}
+                network={network}
+              />
+            </div>
+          )}
+
+          <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
+              <TestnetDemoBadge />
+            </div>
+            {summary.map((r, i) => (
+              <p key={i} className="text-md text-text-secondary">
+                {r.label ? (
+                  <>
+                    <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>
+                  </>
+                ) : (
+                  r.value
+                )}
+              </p>
+            ))}
+          </section>
+        </div>
+      </ModalFrame>
+      <ConfirmDialog
+        open={discarding}
+        title="Discard this listing?"
+        confirmLabel="Discard"
+        onCancel={() => setDiscarding(false)}
+        onConfirm={() => {
+          setDiscarding(false);
+          onClose();
+        }}
+      >
+        Nothing entered here is saved yet. Closing now throws it away.
+      </ConfirmDialog>
+    </>
   );
 }
 

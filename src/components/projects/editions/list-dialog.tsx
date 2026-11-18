@@ -37,6 +37,7 @@ import {
 import { FEE_LABEL, payoutOf } from "@/lib/market/fee";
 import { EXTENDED_BELOW, PRICE_LABEL } from "@/lib/market/sell-flow";
 import { readMarketNow } from "@/lib/market/market-store";
+import { hold, heldId } from "@/lib/market/held";
 import type { EditionTrack, Listing } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
@@ -314,6 +315,8 @@ export function ListDialog({
   chain,
   main,
   askOwner,
+  holdFor,
+  scope,
   onClose,
   onDone,
 }: {
@@ -326,6 +329,11 @@ export function ListDialog({
   main: Listing | null;
   /** The project's ownership isn't confirmed yet: the Sell rule's box is part of this form. */
   askOwner: boolean;
+  /** What a video still being made holds, read at signing (owner, 2026-11-18): set, the copies'
+   *  listing waits off Explore marketplace, then goes live by itself. */
+  holdFor?: () => string | null;
+  /** The copies' scope (a product, or `PROJECT_SCOPE`), for the held item. */
+  scope?: string;
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
@@ -369,7 +377,7 @@ export function ListDialog({
       return;
     }
     const terms = termsOf(input);
-    const req = listRequestOf({
+    const built = listRequestOf({
       track,
       projectName,
       productName,
@@ -378,12 +386,21 @@ export function ListDialog({
       collection: chain.collection,
       editing: false,
     });
+    const req = holdFor?.() ? { ...built, doneLine: "Signed. These copies go on Explore marketplace when every video is ready." } : built;
     setBusy(true);
+    let held = false;
     const result = await request(req, {
       recheck: () => lockGateNow(project),
       commit: (proof) => {
         const gate = lockGateNow(project);
         if (gate) return { ok: false, message: gate };
+        if (holdFor?.()) {
+          const h = hold({ id: heldId(), projectId, kind: "copies", at: proof.at, trackId: track.id, scope: scope ?? track.productId, kindOfCopy: track.kind, terms });
+          if (!h.ok) return { ok: false, message: "This browser's storage is full — nothing was saved." };
+          held = true;
+          if (askOwner) setOwnerConfirmed(projectId, proof.at);
+          return { ok: true };
+        }
         const w = writeTracks(projectId, (tracks) => listTrack(tracks, track.id, terms, proof.at));
         if (!w.ok) return { ok: false, message: w.message };
         // The box ticked here is the Sell rule's ownership fix (readiness `fixedIn: "form"`).
@@ -393,7 +410,7 @@ export function ListDialog({
     });
     setBusy(false);
     if (result.ok) {
-      onDone(req.doneLine);
+      onDone(held ? "Signed. These copies go on Explore marketplace when every video is ready." : req.doneLine);
       return;
     }
     const failed = failureCopy(result);

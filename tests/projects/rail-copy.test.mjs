@@ -386,7 +386,7 @@ test("the share row names the project video once the product videos are in place
     ok: projectOk,
     rules: [
       { id: "videos", ok: true, fixedIn: "gate", reason: null },
-      { id: "projectVideo", ok: projectOk, fixedIn: "gate", reason: projectOk ? null : "Every product has its video. Make the project video to continue." },
+      { id: "projectVideo", ok: projectOk, fixedIn: "gate", reason: projectOk ? null : "The project video isn't made yet." },
     ],
     products: [{ productId: "p1", name: "Rover", thumb: null, video: { state: "ready" } }],
     counts: { total: 1, ready: 1, rendering: 0, missing: 0 },

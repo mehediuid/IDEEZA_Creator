@@ -21,6 +21,7 @@ import {
   type Intent,
 } from "./types";
 import type { Readiness, ReadinessPurpose } from "../manual/p2-types";
+import { videosStartBlockerOf } from "../manual/readiness";
 import type { ProjectStatus } from "../manual/project-summary";
 import { listingInputFromBrief, listingProblems } from "../market/listing-form";
 import { sharePostBlocker } from "../manual/share-post";
@@ -255,8 +256,19 @@ export function reviewMissing(f: {
   details: string | null;
   shortfall: string | null;
   readiness: Readiness | null;
+  /** The web's mint (owner, 2026-11-18): once every video is in generation the sign button opens —
+   *  the listing and the post wait for any still rendering or unreviewed (lib/market/held.ts). A
+   *  video never started still shuts it. The phone's mint keeps the old gate for now. */
+  holdVideos?: boolean;
 }): string | null {
   if (f.details) return f.details;
   if (f.intent !== "save" && f.shortfall) return f.shortfall;
+  if (f.holdVideos) {
+    // Every video in generation first (owner, 2026-11-18, second word); still rendering or waiting
+    // for review is fine — the listing or post then waits for them.
+    const start = f.readiness ? videosStartBlockerOf(f.readiness) : null;
+    if (start) return start;
+    return f.readiness?.rules.find((r) => !r.ok && r.id !== "videos" && r.id !== "projectVideo")?.reason ?? null;
+  }
   return f.readiness?.blocker ?? null;
 }

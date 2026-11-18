@@ -18,11 +18,14 @@
 //   when a gate (Draft, Given, sold in full, an unknown collection) stops it,
 //   so the cards are absent then. Every button is quiet (C16).
 // - `EditionBlock` — the product page's rail block "Marketplace" for anyone
-//   else (a preview, a demo buyer): the Testnet demo badge, a tablist
-//   "Physical NFT · Virtual NFT", and only the tracks buyers can see,
-//   read-only, with a link to the project on Explore marketplace. Absent
-//   when there are none, once the project is sold in full, and for the owner,
-//   who manages editions in Earn.
+//   else (a preview, a demo buyer): this product's own copies only, never its
+//   project's offers (owner, 2026-11-15: "the product page shows that
+//   product's things — its Physical and Virtual — never everything mixed"),
+//   as the project page's box does them: tabs Physical NFT · Virtual NFT (a
+//   lone kind is a chip), and one buy box per tab (copy-panel.tsx), where a
+//   demo buyer buys; a preview reads it with no button, and a link to Explore
+//   marketplace. Absent when the product has none on sale, once the project is
+//   sold in full, and for the owner, who manages editions in Earn.
 //
 // Every fact is the page's derivation (`view`); every write is a dialog's,
 // re-read and written once. What changed is said in the page's live region
@@ -32,17 +35,15 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Banner, Button, ConfirmDialog, TestnetDemoBadge } from "@/components/ideeza";
+import { Badge, Banner, Button, ConfirmDialog } from "@/components/ideeza";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProjectBrief } from "@/lib/brief/project-brief";
-import type { Network } from "@/lib/brief/types";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
 import {
   editionChainOf,
   editionGate,
-  KIND_WORD,
   lockedListReason,
   trackCardOf,
   tracksOf,
@@ -52,10 +53,8 @@ import {
 import { copiesSoldLineOf, KIND_LABEL, PRICE_LABEL, trackNameOf, USE_LABEL } from "@/lib/market/sell-flow";
 import type { EditionKind, EditionTrack, EditionUse, Listing } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
-import { networkLabelOf } from "@/lib/wallet/request-view";
-import { moveTab } from "@/lib/ui/tab-keys";
 import { cn } from "@/lib/utils";
-import { dialogBlockerOf, ReadinessDialog } from "../details/readiness-dialog";
+import { dialogBlockerOf, ReadinessDialog, videosWaitOf } from "../details/readiness-dialog";
 import { RailBlock, RailFact, RailFacts } from "../details/rail-block";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import type { ProductSlotProps } from "../product/product-slots";
@@ -64,14 +63,12 @@ import { focusSoon } from "../listing/listing-dialog";
 import { TAP, writeTracks } from "./create-dialog";
 import { EditDialog } from "./edit-dialog";
 import { ListDialog } from "./list-dialog";
+import { CopyPanel, heldKindOf } from "@/components/marketplace/copy-panel";
+import { OfferTabs } from "@/components/marketplace/offer-parts";
 
 const KINDS: EditionKind[] = ["physical", "virtual"];
 const USES: EditionUse[] = ["private", "commercial"];
 
-const TAB =
-  "inline-flex h-[32px] shrink-0 items-center whitespace-nowrap rounded-t-lg border-b-2 border-solid px-6 text-md font-semibold outline-none transition-colors duration-normal ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:h-[var(--touch-min)] max-md:h-[var(--touch-min)]";
-const TAB_ON = "border-text-primary bg-bg-subtle text-text-primary";
-const TAB_OFF = "border-transparent text-text-secondary hover:bg-bg-subtle hover:text-text-primary";
 const LINK =
   "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
@@ -100,69 +97,9 @@ export function EditionBlock(props: ProductSlotProps) {
   );
   if (owner || publicTracks.length === 0) return null;
   return (
-    <RailBlock title="Marketplace" meta={`${publicTracks.length} on sale`}>
+    <RailBlock title="Marketplace" meta={`${publicTracks.length} on sale`} collapsible={false}>
       <PublicBody {...props} tracks={publicTracks} />
     </RailBlock>
-  );
-}
-
-/** The block's tablist and the one panel under it. */
-function KindTabs({
-  active,
-  onSelect,
-  children,
-}: {
-  active: EditionKind;
-  onSelect: (k: EditionKind) => void;
-  children: React.ReactNode;
-}) {
-  const base = React.useId().replace(/:/g, "");
-  const tabId = (k: EditionKind) => `${base}-tab-${k}`;
-  const panelId = `${base}-panel`;
-  return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-b border-solid border-border">
-        <div
-          role="tablist"
-          aria-label="NFT editions"
-          onKeyDown={(e) => moveTab(e, KINDS, active, onSelect)}
-          className="flex flex-nowrap items-end gap-2"
-        >
-          {KINDS.map((k) => {
-            const on = k === active;
-            return (
-              <button
-                key={k}
-                id={tabId(k)}
-                type="button"
-                role="tab"
-                data-tab={k}
-                aria-selected={on}
-                aria-controls={on ? panelId : undefined}
-                tabIndex={on ? 0 : -1}
-                onClick={() => onSelect(k)}
-                className={cn(TAB, on ? TAB_ON : TAB_OFF)}
-              >
-                {KIND_WORD[k]} NFT
-              </button>
-            );
-          })}
-        </div>
-        <TestnetDemoBadge className="mb-3" />
-      </div>
-      <div id={panelId} role="tabpanel" aria-labelledby={tabId(active)} className="flex flex-col gap-6">
-        {children}
-      </div>
-    </>
-  );
-}
-
-function ChainFacts({ chain }: { chain: { network: Network; collection: string } }) {
-  return (
-    <RailFacts>
-      <RailFact label="Collection">{chain.collection}</RailFact>
-      <RailFact label="Blockchain">{networkLabelOf(chain.network)}</RailFact>
-    </RailFacts>
   );
 }
 
@@ -211,7 +148,8 @@ export function EditionTracks({
     const facts = readinessFactsOf(project, view, brief, view.videos.record, jobs, now);
     return product ? readinessOf({ ...facts, product }, "edition") : readinessOf(facts, "sell");
   };
-  const startListing = (track: EditionTrack) => open({ kind: dialogBlockerOf(readiness()) ? "gate" : "list", track });
+  // The gate first while a video is still being made: it shows them and says the copies will wait.
+  const startListing = (track: EditionTrack) => open({ kind: dialogBlockerOf(readiness()) || videosWaitOf(readiness()) ? "gate" : "list", track });
   const ownershipAsked = () => readiness().rules.some((r) => r.id === "ownership" && !r.ok);
 
   const ofKind = tracksOf(scope.id, view.editions)
@@ -278,6 +216,8 @@ export function EditionTracks({
           chain={chain}
           main={main}
           askOwner={ownershipAsked()}
+          holdFor={() => videosBlockerOf(readiness())}
+          scope={scope.id}
           onClose={() => setDialog(null)}
           onDone={(m) => done(m, `${firstControlId(d.track.id)}-edit`)}
         />
@@ -413,41 +353,33 @@ function TrackCard({
   );
 }
 
-/** A preview or a demo buyer: the tracks buyers can see, read-only (P2-TABS-24 "Who"). */
-function PublicBody({ project, view, product, viewer, tracks }: ProductSlotProps & { tracks: EditionTrack[] }) {
-  const firstKind = KINDS.find((k) => tracks.some((t) => t.kind === k)) ?? "physical";
-  const [kind, setKind] = React.useState<EditionKind>(firstKind);
-  const name = displayProductName(product.name);
-  const main: Listing | null = view.listing.kind === "none" ? null : view.listing.listing;
-  const chain = editionChainOf(view.mint.record, main, null);
-  const ofKind = tracks.filter((t) => t.kind === kind).sort((a, b) => USES.indexOf(a.use) - USES.indexOf(b.use));
+/** A preview or a demo buyer: this product's copies in the Marketplace box's tabs (P2-TABS-24 "Who"). */
+function PublicBody({ project, view, product, viewer, now, announce, tracks }: ProductSlotProps & { tracks: EditionTrack[] }) {
+  const kinds = KINDS.filter((k) => tracks.some((t) => t.kind === k));
+  const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
+  const [picked, setPicked] = React.useState<EditionKind | null>(null);
+  const kind = picked && kinds.includes(picked) ? picked : (heldKindOf(view, product.id, buyerId, kinds) ?? kinds[0]);
+  if (!kind) return null;
   return (
     <>
-      <KindTabs active={kind} onSelect={setKind}>
-        <p className="m-0 text-md leading-relaxed text-text-secondary">{helperLineOf(kind, name)}</p>
-        {chain && <ChainFacts chain={chain} />}
-        {ofKind.length ? (
-          <ul role="list" className="m-0 flex list-none flex-col gap-6 p-0">
-            {ofKind.map((t) => (
-              <li key={t.id}>
-                <section
-                  aria-label={`${USE_WORD[t.use]} ${KIND_WORD[t.kind]} NFT`}
-                  className="flex flex-col gap-5 rounded-lg border border-solid border-border p-6"
-                >
-                  <TrackHead track={t} view={view} />
-                  {t.listing && <Prices listing={t.listing} />}
-                </section>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="m-0 text-md text-text-secondary">{`No ${KIND_WORD[kind]} NFTs of ${name} are on sale.`}</p>
-        )}
-      </KindTabs>
-      <Link href={`/marketplace/${project.id}`} className={LINK}>
-        {viewer.kind === "demo-buyer" ? `Buy on ${project.name}'s page` : "View on Explore marketplace"}
-        <Icon icon={ArrowUpRight01Icon} size={14} />
-      </Link>
+      <OfferTabs tabs={kinds} active={kind} onSelect={setPicked}>
+        <CopyPanel
+          project={project}
+          view={view}
+          viewer={viewer}
+          now={now}
+          scopeId={product.id}
+          scopeName={displayProductName(product.name)}
+          kind={kind}
+          announce={announce}
+        />
+      </OfferTabs>
+      {!buyerId && (
+        <Link href={`/marketplace/${project.id}/products/${product.id}`} className={LINK}>
+          View on Explore marketplace
+          <Icon icon={ArrowUpRight01Icon} size={14} />
+        </Link>
+      )}
     </>
   );
 }

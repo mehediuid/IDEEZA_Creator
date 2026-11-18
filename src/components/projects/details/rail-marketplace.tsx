@@ -5,8 +5,10 @@
 // "Your project" card while a Main listing is live, paused or sold
 // (earn/sell.tsx). It is the one home of the listing's state and of every
 // operation on a listing that exists: Edit · Remove · View on marketplace,
-// Bidding History · Close auction, Relist. Starting a listing is the card's
-// ListingFlow.
+// Bidding History · Close auction · Cancel auction (while nobody has bid),
+// Relist. Starting a listing is the card's ListingFlow. While a buyer's
+// checkout holds the live listing, its state line reads "In checkout · a
+// buyer is paying now".
 //
 // It can hold the page's one violet (Close auction once an auction has ended,
 // Relist while paused). Once stacked (below a 1024 px page container) an
@@ -36,6 +38,8 @@ import {
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { TestnetDemoBadge } from "@/components/ideeza";
 import { can } from "@/lib/manual/permissions";
+import { IN_CHECKOUT_OWNER_LINE } from "@/lib/market/checkout-hold";
+import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import {
   LISTING_TRIGGER_ID,
   MARKETPLACE_FOCUS_ID,
@@ -48,6 +52,7 @@ import {
 import type { Listing } from "@/lib/market/types";
 import { cn } from "@/lib/utils";
 import { BiddingHistoryDialog } from "../listing/bidding-history";
+import { CancelAuctionDialog } from "../listing/cancel-auction-dialog";
 import { CloseAuctionDialog } from "../listing/close-auction-dialog";
 import { focusSoon, ListingDialog } from "../listing/listing-dialog";
 import { RelistPanel } from "../listing/relist";
@@ -56,7 +61,7 @@ import { RailFact, RailFacts, RailValue, useRailStacked } from "./rail-block";
 import type { SlotProps } from "./slots";
 import { earnHref } from "@/lib/manual/earn-route";
 
-type Dialog = "edit" | "remove" | "bids" | "close" | null;
+type Dialog = "edit" | "remove" | "bids" | "close" | "cancel" | null;
 
 const PRIMARY =
   "bg-bg-brand text-text-on-brand hover:bg-bg-brand-hover focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface";
@@ -81,6 +86,8 @@ export function ListingBody({ project, view, viewer, brief, now, announce }: Slo
   const listing: Listing | null = "listing" in view.listing ? view.listing.listing : null;
   const manage = can(viewer, "listing.manage", view.canCtx);
   const closeHintId = React.useId();
+  const holds = useCheckoutHolds();
+  const inCheckout = view.listing.kind === "live" && holds.any(view.listing.listing.id) > 0;
 
   // 40 px beside the page, 44 px once stacked or on a coarse pointer (P2-LISTING-8).
   const button = cn(
@@ -133,7 +140,7 @@ export function ListingBody({ project, view, viewer, brief, now, announce }: Slo
 
   return (
     <>
-      <StateRow card={card} />
+      <StateRow card={card} inCheckout={inCheckout} />
 
       {card.kind === "none" && (
         <div className="flex flex-col gap-2">
@@ -177,7 +184,12 @@ export function ListingBody({ project, view, viewer, brief, now, announce }: Slo
           <Facts facts={card.facts} />
           {marketLink(true)}
           {!stacked && auctionActions}
-          <p className="m-0 text-sm text-text-tertiary">{card.fixedNote}</p>
+          {manage && card.cancellable && (
+            <button type="button" onClick={() => setDialog("cancel")} className={cn(button, QUIET, "self-start")}>
+              Cancel auction
+            </button>
+          )}
+          {card.fixedNote && <p className="m-0 text-sm text-text-tertiary">{card.fixedNote}</p>}
         </>
       )}
 
@@ -248,6 +260,14 @@ export function ListingBody({ project, view, viewer, brief, now, announce }: Slo
           onDone={(m) => done(m, LISTING_TRIGGER_ID)}
         />
       )}
+      {dialog === "cancel" && listing && (
+        <CancelAuctionDialog
+          projectName={project.name}
+          listing={listing}
+          onClose={closeDialog}
+          onDone={(m) => done(m, LISTING_TRIGGER_ID)}
+        />
+      )}
       {dialog === "bids" && listing && (
         <BiddingHistoryDialog projectName={project.name} listing={listing} bids={view.bids} onClose={closeDialog} />
       )}
@@ -283,11 +303,11 @@ const STATE_ICON: Partial<Record<MarketplaceCard["kind"], IconValue>> = {
 };
 
 /** The card's first line — its state beside its glyph, the auction's time pill — and the demo badge. */
-function StateRow({ card }: { card: MarketplaceCard }) {
+function StateRow({ card, inCheckout }: { card: MarketplaceCard; inCheckout: boolean }) {
   const icon = STATE_ICON[card.kind];
   const state =
     card.kind === "buyNow" || card.kind === "auction" ? (
-      card.state
+      inCheckout ? IN_CHECKOUT_OWNER_LINE : card.state
     ) : card.kind === "paused" ? (
       <RailValue parts={card.since} />
     ) : card.kind === "sold" ? (
