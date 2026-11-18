@@ -39,6 +39,9 @@ import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
 import { outcomeView } from "@/lib/manual/rail-copy";
 import { shareAnnouncement } from "@/lib/manual/showcase-copy";
+import { videosBlockerOf } from "@/lib/manual/readiness";
+import { hold, heldId, heldOf, useHeld } from "@/lib/market/held";
+import { openVideosPanel } from "@/components/video-jobs/videos-panel-store";
 import { mineSlugOf, postHref } from "@/lib/innovations/slug";
 import { cn } from "@/lib/utils";
 import { ShareDialog } from "../share-dialog";
@@ -89,6 +92,9 @@ export function ProjectMenu({
   // Always the share dialog: the videos, then the post's story and status (owner, 2026-10-12).
   // Once shared, the post's own controls (Edit post, Stop sharing) live on the post (plan D8).
   const share = () => setLayer("share");
+  // A post signed while its videos were still being made waits for them (owner, 2026-11-18).
+  const { store: held } = useHeld();
+  const waitingShare = heldOf(held, project.id).some((i) => i.kind === "share");
 
   const items: Item[][] = [
     [
@@ -106,9 +112,13 @@ export function ProjectMenu({
               : {
                   id: "share",
                   label: "Share to Innovations",
-                  sub: shareCopy ? "Show it on the Innovations page" : "Mint it first · Go to mint",
+                  sub: waitingShare
+                    ? "Waiting for videos · goes live when they're ready"
+                    : shareCopy
+                      ? "Show it on the Innovations page"
+                      : "Mint it first · Go to mint",
                   icon: News01Icon,
-                  run: shareCopy ? share : () => router.push(earnMintHref(project.id, "save")),
+                  run: waitingShare ? () => openVideosPanel(project.id) : shareCopy ? share : () => router.push(earnMintHref(project.id, "save")),
                 },
           ]
         : []),
@@ -224,8 +234,14 @@ export function ProjectMenu({
           view={view}
           brief={brief}
           onShared={(post) => {
-            setShowcase(project.id, true, undefined, post);
-            announce(shareAnnouncement(true, project.name));
+            if (videosBlockerOf(view.videos.readiness.showcase)) {
+              // A video still being made: the post waits off Innovations, then goes live by itself.
+              hold({ id: heldId(), projectId: project.id, kind: "share", at: Date.now(), story: post.story });
+              announce("Your post goes on Innovations when every video is ready.");
+            } else {
+              setShowcase(project.id, true, undefined, post);
+              announce(shareAnnouncement(true, project.name));
+            }
             setLayer(null);
           }}
           onClose={() => {

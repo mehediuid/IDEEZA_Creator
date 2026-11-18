@@ -1,8 +1,10 @@
 // The project video (owner, 2026-10-21; docs/superpowers/specs/2026-10-21-project-video-design.md):
-// one video for the whole project, joined from its products' videos — an intro card, each current
-// product's cut in order, an outro card. It can be made once every current product has a ready
-// video, and the whole project's share, sale, gift and relist wait for it (readiness
-// `projectVideo`). It is stored like a product's video, under `PROJECT_VIDEO_KEY`.
+// one video for the whole project — an intro card, one scene for each current product in order,
+// an outro card. Since 2026-11-18 (owner: a maker never waits on a render) each scene is drawn
+// from the product itself — its concept image and a line from its prompt and spec — so the
+// project video can be made at any time, beside the product videos, never after them. The whole
+// project's share, sale, gift and relist go live once it is in use (readiness `projectVideo`). It
+// is stored like a product's video, under `PROJECT_VIDEO_KEY`.
 //
 // Only a project with two or more current products has one (owner, 2026-11-17): with a single
 // product, that product's video is the project's video too — on the project page, the marketplace
@@ -86,37 +88,52 @@ function readyTakeOf(videos: ProjectVideos | null, id: string, jobs: VideoJob[],
   return status.state === "ready" ? status.take : null;
 }
 
-/** The plan a Make project video starts from: the products in the order given, each cut from the
- *  end of its ready clip, where its title shows. Null while any of them has no ready video. */
+/** A scene's line from what the product is: the first sentence of its prompt or description. */
+export function sceneLineOf(text: string): string {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (!t) return "";
+  const end = t.search(/[.!?](\s|$)/);
+  return line(end > 0 ? t.slice(0, end + 1) : t);
+}
+
+/** The storyboard a Make project video starts from (owner, 2026-11-18): the products in the order
+ *  given, each one scene drawn from its concept image with a line from its prompt or spec. It
+ *  needs no product video, so it is ready as soon as there are products. `videos`, `jobs` and
+ *  `now` are no longer read; they stay so older callers keep compiling. */
 export function defaultJoinPlan(input: {
   projectName: string;
   description: string;
-  products: { id: string; name: string }[];
-  videos: ProjectVideos | null;
+  products: { id: string; name: string; imageUrl?: string | null; line?: string }[];
+  videos?: ProjectVideos | null;
   jobs?: VideoJob[];
   now?: number;
 }): JoinPlan | null {
   if (input.products.length === 0) return null;
   const ms = cutMs(input.products.length);
-  const cuts: JoinPlan["cuts"] = [];
-  for (const p of input.products) {
-    const take = readyTakeOf(input.videos, p.id, input.jobs ?? [], input.now ?? 0);
-    if (!take) return null;
-    const duration = take.clip?.durationMs || CUT_MAX_MS;
-    const len = Math.min(ms, duration);
-    cuts.push({ productId: p.id, takeId: take.id, fromMs: Math.max(0, duration - len), ms: len, label: line(nameOf(p.name)) });
-  }
+  const cuts: JoinPlan["cuts"] = input.products.map((p) => ({
+    productId: p.id,
+    takeId: "",
+    fromMs: 0,
+    ms,
+    label: line(nameOf(p.name)),
+    imageUrl: p.imageUrl ?? null,
+    line: sceneLineOf(p.line ?? ""),
+  }));
   return { intro: [line(input.projectName), line(input.description)], cuts, outro: OUTRO_LINE };
 }
 
-/** A saved draft laid over a fresh plan: the draft's intro, outro, order and labels where its
- *  products are still there (new ones go last), with the fresh plan's takes and lengths. */
+/** A saved draft laid over a fresh plan: the draft's intro, outro, order, labels and lines where
+ *  its products are still there (new ones go last), with the fresh plan's images and lengths. */
 export function mergeJoinDraft(draft: JoinPlan | undefined, fresh: JoinPlan): JoinPlan {
   if (!draft) return fresh;
   const freshById = new Map(fresh.cuts.map((c) => [c.productId, c]));
   const kept = draft.cuts
     .filter((c) => freshById.has(c.productId))
-    .map((c) => ({ ...freshById.get(c.productId)!, label: c.label }));
+    .map((c) => {
+      const f = freshById.get(c.productId)!;
+      // A draft from before 2026-11-18 has no line: the fresh one stands in.
+      return { ...f, label: c.label, line: typeof c.line === "string" ? c.line : f.line };
+    });
   const keptIds = new Set(kept.map((c) => c.productId));
   const added = fresh.cuts.filter((c) => !keptIds.has(c.productId));
   return { intro: draft.intro, cuts: [...kept, ...added], outro: draft.outro };
@@ -161,7 +178,6 @@ export function projectVideoStatusOf(input: {
   const current = input.products.filter((p) => p.dropped === null);
   const total = current.length;
   const ready = current.filter((p) => readyTakeOf(videos, p.id, jobs, now) !== null).length;
-  const productsReady = total > 0 && ready === total;
 
   const video = productVideoStatus(videos?.products[PROJECT_VIDEO_KEY], jobs, now);
   if (total === 1) {
@@ -183,8 +199,10 @@ export function projectVideoStatusOf(input: {
     const inTake = new Set(cuts.map((c) => c.productId));
     missing = current.filter((p) => !inTake.has(p.id)).map((p) => nameOf(p.name));
     extra = cuts.filter((c) => !currentIds.has(c.productId)).map((c) => names.get(c.productId) ?? c.label);
+    // Only a take from before 2026-11-18 cut the products' own clips; a scene drawn from the
+    // product can't go stale that way.
     older = cuts
-      .filter((c) => currentIds.has(c.productId))
+      .filter((c) => c.takeId !== "" && currentIds.has(c.productId))
       .filter((c) => {
         const take = readyTakeOf(videos, c.productId, jobs, now);
         return take !== null && take.id !== c.takeId;
@@ -199,8 +217,9 @@ export function projectVideoStatusOf(input: {
   else if (renderingNow) state = "rendering";
   else if (review) state = "review";
   else if (inUse) state = "outdated";
-  else if (video.state === "failed" && productsReady) state = "failed";
-  else state = productsReady ? "make" : "waiting";
+  else if (video.state === "failed") state = "failed";
+  // Never "waiting" since 2026-11-18: it is drawn from the products, not cut from their videos.
+  else state = "make";
 
   const lengthMs = inUse ? inUse.clip?.durationMs || (inUse.join ? joinLengthMs(inUse.join) : null) : null;
   return { state, ok: fresh, video, ready, total, missing, extra, older, lengthMs, review, face: inUse };

@@ -424,8 +424,8 @@ test("sellChecksOf: the product's video rule with its fix; ownership points at t
   assert.equal(ticked.checks[1].detail, "Saved when you sell.");
 });
 
-const PRODUCT_REASON = "1 product still needs an AI video. The project video comes next.";
-const PROJECT_REASON = "Every product has its video. Make the project video to continue.";
+const PRODUCT_REASON = "1 product still needs an AI video. The project video isn't made yet.";
+const PROJECT_REASON = "The project video isn't made yet.";
 const rule = (id, ok, reason = null) => ({ id, ok, fixedIn: "brief", reason: ok ? null : reason });
 
 test("sellVideoOf: one product's video for an edition, with no project video", () => {
@@ -552,4 +552,18 @@ test("sellVideoOf: one product's video is the project's — no project video row
   const videos = { version: 1, projectId: "proj_1", products: { prd_a: { takes: [take], inUseId: "take_a" } } };
   const sell = sellVideoOf(readinessOf({ products: [product], videos, jobs: [], now: 10, status: "private", ownershipConfirmed: true, license: null }, "sell"));
   assert.deepEqual([sell.ok, sell.project], [true, false]);
+});
+
+test("sellChecksOf on the web (owner, 2026-11-18): a video in generation waits; one never started still holds Sign and sell", () => {
+  const rendering = sellChecksOf(checks({ video: { ok: false, reason: "Waiting for 1 video to finish — about 4 min left." }, holdVideos: true, notStarted: null }));
+  assert.equal(rendering.ok, true, "every video started: the copies are signed now and wait");
+  assert.equal(rendering.videosWait, "Waiting for 1 video to finish — about 4 min left.");
+  const missing = sellChecksOf(
+    checks({ video: { ok: false, reason: "1 product still needs an AI video." }, holdVideos: true, notStarted: "Start every video first: Rider hasn't started yet." }),
+  );
+  assert.equal(missing.ok, false);
+  assert.equal(missing.blocker, "Start every video first: Rider hasn't started yet.");
+  assert.equal(missing.videosWait, null);
+  // The phone keeps the old gate: without holdVideos any video still missing holds it.
+  assert.equal(sellChecksOf(checks({ video: { ok: false, reason: "Waiting" } })).ok, false);
 });

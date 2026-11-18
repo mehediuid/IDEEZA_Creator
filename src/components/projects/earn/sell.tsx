@@ -42,6 +42,9 @@ import { editionChainOf } from "@/lib/market/editions";
 import { copyTileOf, defaultTileOf, deskCaptionOf, deskProductsOf, mainTileOf, tileKeyOf, type DeskTile } from "@/lib/market/sell-desk";
 import { MAIN_SALE_DETAIL, MAIN_SALE_NOTE, copyRowStateOf } from "@/lib/market/sell-flow";
 import { PROJECT_SCOPE, type EditionKind } from "@/lib/market/types";
+import { HELD_CHIP, heldOf, useHeld, type HeldCopies, type HeldMain } from "@/lib/market/held";
+import { videoCountOf } from "@/lib/manual/readiness";
+import { formatAmount } from "@/lib/wallet/money";
 import { addAmounts } from "@/lib/wallet/money";
 import { RailStackScope, useRailStacked } from "../details/rail-block";
 import { MintDetails } from "../details/rail-outcome";
@@ -112,7 +115,23 @@ function useDesk(props: SlotProps): Desk {
     sales: view.sales,
     inCheckout,
   });
-  const mainTile: DeskTile = missing ? { ...mainFacts, hint: missing === 1 ? "1 step before listing" : `${missing} steps before listing` } : mainFacts;
+  // Signed while videos were still being made (owner, 2026-11-18): the tile says it waits, with its price.
+  const { store: heldStore } = useHeld();
+  const waiting = heldOf(heldStore, project.id);
+  const waitingMain = waiting.find((i): i is HeldMain => i.kind === "main");
+  const sellCount = videoCountOf(view.videos.readiness.sell);
+  const mainTile: DeskTile = waitingMain
+    ? {
+        ...mainFacts,
+        chip: { label: HELD_CHIP, tone: "warning" },
+        price: waitingMain.listing.price ? formatAmount(waitingMain.listing.price, waitingMain.listing.token) : null,
+        uses: `${waitingMain.listing.type === "auction" ? "Auction" : "Buy now"} · ${waitingMain.listing.percentSelling}% of the project`,
+        hint: `${sellCount.ready} of ${sellCount.total} videos ready`,
+        attention: 95,
+      }
+    : missing
+      ? { ...mainFacts, hint: missing === 1 ? "1 step before listing" : `${missing} steps before listing` }
+      : mainFacts;
 
   const mainListing = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, mainListing, view.mint.status === "legacy" && stored ? stored.state : null);
@@ -136,7 +155,11 @@ function useDesk(props: SlotProps): Desk {
         tracks: view.editions,
         sales: view.sales,
       });
-      const tile = copyTileOf({ projectId: project.id, scope: scope.id, kind, state, tracks: view.editions, sales: view.sales });
+      const facts = copyTileOf({ projectId: project.id, scope: scope.id, kind, state, tracks: view.editions, sales: view.sales });
+      const held = waiting.find((i): i is HeldCopies => i.kind === "copies" && i.scope === scope.id && i.kindOfCopy === kind);
+      const tile: DeskTile = held
+        ? { ...facts, chip: { label: HELD_CHIP, tone: "warning" }, price: formatAmount(held.terms.regular, held.terms.token), hint: "Goes live when its videos are ready", attention: 94 }
+        : facts;
       copies.set(tile.key, { tile, state, scope, kind });
     }
   }

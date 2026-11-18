@@ -413,7 +413,7 @@ test("relistChecklist: the project video has its own row after the products' vid
     ok: projectOk,
     rules: [
       { id: "videos", ok: true, fixedIn: "gate", reason: null },
-      { id: "projectVideo", ok: projectOk, fixedIn: "gate", reason: projectOk ? null : "Every product has its video. Make the project video to continue." },
+      { id: "projectVideo", ok: projectOk, fixedIn: "gate", reason: projectOk ? null : "The project video isn't made yet." },
       { id: "ownership", ok: true, fixedIn: "form", reason: null },
     ],
     products: [],

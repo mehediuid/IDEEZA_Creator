@@ -66,6 +66,10 @@ import { ProjectMenu } from "./project-menu";
 import { PublishDialog } from "./publish-dialog";
 import type { ProjectSlots, SlotProps } from "./slots";
 import { ProjectTitle } from "./title-editor";
+import { HeldChip } from "@/components/video-jobs/held-block";
+import { openVideosPanel } from "@/components/video-jobs/videos-panel-store";
+import { heldLabelOf, heldOf, useHeld } from "@/lib/market/held";
+import { videoCountOf } from "@/lib/manual/readiness";
 
 /** Preview as buyer's id (PPL-5). The button lives in Earn's header now; Exit preview still
  *  hands focus to it when it is on the page, else to the h1. */
@@ -183,6 +187,13 @@ export function ProjectHeader({
   // Publish (owner, 2026-10-12): how a Draft or a Private project goes out, chosen here once.
   const publishOptions = menu && view.lock === null ? publishOptionsOf(summary.status, brief?.state.mintedAt != null) : null;
   const [publishing, setPublishing] = React.useState(false);
+  // What the maker signed while videos were still being made (owner, 2026-11-18).
+  const { store: heldStore } = useHeld();
+  const waiting = owner ? heldOf(heldStore, project.id) : [];
+  const waitCount = videoCountOf(view.videos.readiness.sell);
+  const waitingLine = `${[...new Set(waiting.map(heldLabelOf))].join(", ")} · goes live when ${
+    waitCount.total === 1 ? "the video is" : `all ${waitCount.total} videos are`
+  } ready · ${waitCount.ready} of ${waitCount.total} ·`;
   const publishLine = !publishOptions
     ? null
     : publishOptions.length === 3
@@ -200,6 +211,7 @@ export function ProjectHeader({
               <ProjectTitle project={project} titleRef={titleRef} />
             </div>
             {engineering && owner && <StatusChip status={summary.status} word={text.chip.word} />}
+            {engineering && owner && waiting.length > 0 && <HeldChip />}
             {engineering && text.chip.badge && (owner ? <SharedPostChip project={project} /> : <ShowcaseChip />)}
             {parts?.titleRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
             {role && (
@@ -308,10 +320,24 @@ export function ProjectHeader({
                 <ProjectMenu {...slotProps} canEdit={canEdit} onEdit={() => edit.open()} triggerRef={menuRef} />
               )}
             </div>
-            {(publishLine ?? earn?.sub) && (
-              <span id={earnFactId} className="text-sm text-text-secondary">
-                {publishLine ?? earn?.sub}
+            {waiting.length > 0 ? (
+              // Signed while videos were still being made (owner, 2026-11-18): when it goes live.
+              <span id={earnFactId} className="flex flex-wrap items-center gap-x-2 text-md font-semibold text-text-warning">
+                {waitingLine}
+                <button
+                  type="button"
+                  onClick={() => openVideosPanel(project.id)}
+                  className="rounded-md font-semibold text-text-link underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  Review videos
+                </button>
               </span>
+            ) : (
+              (publishLine ?? earn?.sub) && (
+                <span id={earnFactId} className="text-sm text-text-secondary">
+                  {publishLine ?? earn?.sub}
+                </span>
+              )
             )}
           </div>
         )}

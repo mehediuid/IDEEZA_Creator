@@ -45,6 +45,8 @@ import type { SlotProps } from "../../details/slots";
 import { EditionTracks, type CopyScope } from "../../editions/edition-block";
 import { focusSoon } from "../../listing/listing-dialog";
 import { ListingFlow } from "../../listing/listing-flow";
+import { HeldBlock } from "@/components/video-jobs/held-block";
+import { heldOf, useHeld } from "@/lib/market/held";
 import { NftActivityLine } from "../nft-activity";
 import { EARN_LINK, TAP } from "../surface";
 import { DeskChip, KIND_NAME, KindDot, SoldMeter } from "./board";
@@ -235,9 +237,12 @@ export function MainPanel(props: SlotProps & { desk: MainDesk }) {
   const locked = view.lock !== null;
   const mainSale = view.customers.mainSale;
   const pct = tile.meter?.sold ?? 0;
+  // Signed and waiting for its videos (owner, 2026-11-18): the head says so, ListingFlow shows it.
+  const { store: heldStore } = useHeld();
+  const waiting = heldOf(heldStore, project.id).some((i) => i.kind === "main");
   return (
     <>
-      <Head kind="main" title={project.name} sub={MAIN_SUB} chip={tile.chip} lines={[state.line]} />
+      <Head kind="main" title={project.name} sub={MAIN_SUB} chip={tile.chip} lines={[waiting ? "Signed · goes live when its videos are ready" : state.line]} />
 
       {locked && mainSale ? (
         <div className={SECTION}>
@@ -277,11 +282,13 @@ export function MainPanel(props: SlotProps & { desk: MainDesk }) {
         </div>
       ) : state.action === "list" && listing ? (
         <div className={SECTION}>
-          <p className={NOTE}>
-            {pct > 0
-              ? `${pct}% is sold. Put more of it on sale, at a fixed price or as an auction.`
-              : "Put it on Explore marketplace at a fixed price or as an auction, all of it or a share."}
-          </p>
+          {!waiting && (
+            <p className={NOTE}>
+              {pct > 0
+                ? `${pct}% is sold. Put more of it on sale, at a fixed price or as an auction.`
+                : "Put it on Explore marketplace at a fixed price or as an auction, all of it or a share."}
+            </p>
+          )}
           <ListingFlow {...props} action={listing} label={pct > 0 ? undefined : "Sell the Main NFT"} violet className={BIG} />
         </div>
       ) : state.action === "manage" ? (
@@ -322,12 +329,21 @@ export function CopyPanel(props: SlotProps & { desk: CopyDesk }) {
     setNote(null);
     setDialog({ use });
   };
+  // Signed while a video was still being made (owner, 2026-11-18): waiting, not for sale yet.
+  const { store: held } = useHeld();
+  const waiting = heldOf(held, project.id).find((i) => i.kind === "copies" && i.scope === scope.id && i.kindOfCopy === kind);
 
   return (
     <>
       <Head kind={kind} title={title} sub={DESK_KIND_LINE[kind]} chip={tile.chip} lines={lines} />
 
-      {state.kind === "sell" && (
+      {waiting && (
+        <div className={SECTION}>
+          <HeldBlock item={waiting} projectId={project.id} products={view.products} onCancelled={announce} />
+        </div>
+      )}
+
+      {state.kind === "sell" && !waiting && (
         <div className={SECTION}>
           <p className={NOTE}>
             {kind === "physical"

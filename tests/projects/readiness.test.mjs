@@ -95,13 +95,13 @@ test("missing beats rendering: any product with no video at all reports missing,
     jobs: [renderingJob("t_b", 45)],
   });
   const rule = readinessOf(f, "sell").rules.find((x) => x.id === "videos");
-  assert.equal(rule.reason, "1 product still needs an AI video. The project video comes next.");
+  assert.equal(rule.reason, "1 product still needs an AI video. The project video isn't made yet.");
 });
 
 test("missing pluralises", () => {
   const f = facts({ products: [product("a", "A"), product("b", "B")], videos: {} });
   const rule = readinessOf(f, "sell").rules.find((x) => x.id === "videos");
-  assert.equal(rule.reason, "2 products still need an AI video. The project video comes next.");
+  assert.equal(rule.reason, "2 products still need an AI video. The project video isn't made yet.");
 });
 
 test("adding a dropped product without a video changes nothing", () => {
@@ -251,7 +251,7 @@ test("every product video ready but no project video: sell is blocked with the m
   const r = readinessOf(f, "sell");
   assert.equal(r.ok, false);
   assert.equal(r.rules.find((x) => x.id === "videos").ok, true);
-  assert.equal(r.blocker, "Every product has its video. Make the project video to continue.");
+  assert.equal(r.blocker, "The project video isn't made yet.");
   assert.equal(r.project.state, "make");
   assert.deepEqual(videoCountOf(r), { ready: 2, total: 3 });
 });
@@ -264,11 +264,11 @@ test("with the project video made, sell passes and the count is N+1 of N+1", () 
   assert.equal(videosBlockerOf(r), null);
 });
 
-test("a product added after the project video: its video first, then update", () => {
+test("a product added after the project video: both are said, side by side — neither waits (owner, 2026-11-18)", () => {
   const products = [product("a", "A"), product("b", "B")];
   const videos = { a: readyVideo("t_a"), project: projectVideo(["a", "t_a"]) };
   const r = readinessOf(facts({ products, videos }), "sell");
-  assert.equal(r.blocker, "1 product still needs an AI video. Then update the project video.");
+  assert.equal(r.blocker, "1 product still needs an AI video. The project video is missing B. Update it to continue.");
   const later = readinessOf(facts({ products, videos: { ...videos, b: readyVideo("t_b") } }), "sell");
   assert.equal(later.blocker, "The project video is missing B. Update it to continue.");
   assert.equal(videosBlockerOf(later), later.blocker);
@@ -334,4 +334,39 @@ test("a second product added: the project video is asked again", () => {
   const r = readinessOf(facts({ products: [product("a", "A"), product("b", "B")], videos: { a: readyVideo("t_a"), b: readyVideo("t_b") } }), "sell");
   assert.equal(r.project.state, "make");
   assert.deepEqual(videoCountOf(r), { ready: 2, total: 3 });
+});
+
+// ─────────────────────────── every video started first (owner, 2026-11-18, second word) ───────────────────────────
+
+test("videosStartBlockerOf: a video never started holds the maker; rendering or unreviewed doesn't", async () => {
+  const { videosStartBlockerOf, videosNotStartedOf } = await import("../../.tmp-test/lib/manual/readiness.js");
+  const abc = [product("a", "PlantPal"), product("b", "WaveLight"), product("c", "LogTag")];
+  // b renders, a waits for review, c and the project video were never started.
+  const some = readinessOf(
+    facts({ products: abc, videos: { a: reviewVideo("t_a"), b: renderingVideo("t_b") }, jobs: [renderingJob("t_b", 45)] }),
+    "sell",
+  );
+  assert.deepEqual(videosNotStartedOf(some), ["LogTag", "the project video"]);
+  assert.equal(videosStartBlockerOf(some), "Start every video first: LogTag and the project video haven't started yet.");
+  // One left.
+  const one = readinessOf(facts({ products: [product("a", "PlantPal")], videos: {} }), "sell");
+  assert.equal(videosStartBlockerOf(one), "Start every video first: PlantPal hasn't started yet.");
+  // Every one in generation, none finished: the maker may go on — what they sign waits.
+  const p = { takes: [pendingTake("t_p")], inUseId: null };
+  const all = readinessOf(
+    facts({
+      products: abc,
+      videos: { a: reviewVideo("t_a"), b: renderingVideo("t_b"), c: renderingVideo("t_c"), project: p },
+      jobs: [renderingJob("t_b", 45), renderingJob("t_c", 45), renderingJob("t_p", 45)],
+    }),
+    "sell",
+  );
+  assert.equal(videosStartBlockerOf(all), null);
+  assert.equal(all.ok, false, "still not live: the videos aren't all chosen");
+  // A failed render isn't in generation any more.
+  const failed = readinessOf(
+    facts({ products: [product("a", "PlantPal")], videos: { a: { takes: [{ ...pendingTake("t_a"), failure: { kind: "encode", at: NOW } }], inUseId: null } } }),
+    "sell",
+  );
+  assert.equal(videosStartBlockerOf(failed), "Start every video first: PlantPal hasn't started yet.");
 });

@@ -30,6 +30,10 @@ export const MARKETPLACE_FOCUS_ID = "marketplace-first-control";
 
 export const DEMO_LINE = "Testnet demo — nothing is listed on a real blockchain.";
 export const VIDEOS_READY_LINE = "Videos · every product is ready ✓";
+/** The wallet's last line when what was signed waits for its videos (owner, 2026-11-18). */
+export const HELD_DONE_LINE = "Signed. It goes on Explore marketplace when every video is ready — we'll tell you.";
+/** Signed while a video was still being made (owner, 2026-11-18): it waits, then goes live by itself. */
+export const HELD_ANNOUNCEMENT = "Signed. Your listing goes live on Explore marketplace when every video is ready.";
 export const LOCKED_HELP = "Set when it was minted.";
 export const COLLECTION_UNKNOWN = "This mint's collection isn't known, so it can't be listed. Check it in the Brief.";
 export const STORAGE_FULL = "This browser's storage is full — the listing wasn't saved.";

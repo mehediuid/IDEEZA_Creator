@@ -307,11 +307,11 @@ test("reviewMissing: details first, then the wallet (never for a Save), then the
   assert.equal(reviewMissing({ intent: "save", details: null, shortfall: "Not enough MATIC", readiness: null }), null);
   assert.equal(
     reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1"]) }),
-    "1 product still needs an AI video. The project video comes next.",
+    "1 product still needs an AI video. The project video isn't made yet.",
   );
   assert.equal(
     reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1", "p2"]) }),
-    "Every product has its video. Make the project video to continue.",
+    "The project video isn't made yet.",
   );
   assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1", "p2", "project"]) }), null);
   // A Save runs no gate, posted to Innovations or not: the mint never waits for videos (owner, 2026-10-12).
@@ -341,4 +341,26 @@ test("Publish (owner, 2026-10-12): a Draft keeps it private, gives or sells; a P
   assert.equal(publishIntentOf("give"), "give");
   assert.equal(publishIntentOf("bogus"), null);
   assert.equal(publishIntentOf(null), null);
+});
+
+test("reviewMissing with holdVideos (web, owner 2026-11-18): every video started opens Sign; one never started keeps it shut", () => {
+  const rules = (videos, start) => ({
+    purpose: "sell",
+    ok: false,
+    rules: [{ id: "videos", ok: false, fixedIn: "brief", reason: videos }],
+    products: start
+      ? [{ productId: "a", name: "Rider", thumb: null, video: { state: "none" } }]
+      : [{ productId: "a", name: "Rider", thumb: null, video: { state: "review", take: {} } }],
+    counts: { total: 1, ready: 0, rendering: 0, review: start ? 0 : 1, missing: start ? 1 : 0 },
+    project: null,
+    blocker: videos,
+    gateBlocker: null,
+  });
+  assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: rules("Review 1 video to continue.", false), holdVideos: true }), null);
+  assert.equal(
+    reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: rules("1 product still needs an AI video.", true), holdVideos: true }),
+    "Start every video first: Rider hasn't started yet.",
+  );
+  // The phone's mint keeps the old gate.
+  assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: rules("Review 1 video to continue.", false) }), "Review 1 video to continue.");
 });

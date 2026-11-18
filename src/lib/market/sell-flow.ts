@@ -359,7 +359,14 @@ export function sellChecksOf(f: {
   video: SellVideo;
   ownershipConfirmed: boolean;
   draft: SellDraft;
-}): { ok: boolean; checks: SellCheck[]; blocker: string | null } {
+  /** The web (owner, 2026-11-18): a video still being made doesn't stop Sign and sell — the copies'
+   *  listing waits off Explore marketplace for it (lib/market/held.ts). The row stays, as a note
+   *  with its fix; it no longer counts against `ok`. */
+  holdVideos?: boolean;
+  /** Why a video was never started (owner, 2026-11-18, second word): then the video row still holds
+   *  Sign and sell, with this as its line — every video goes in before the maker moves on. */
+  notStarted?: string | null;
+}): { ok: boolean; checks: SellCheck[]; blocker: string | null; videosWait: string | null } {
   const checks: SellCheck[] = [];
   if (f.video.project) {
     // Fixed where it is missing: a product's video in Generate, the project video in Make videos.
@@ -394,8 +401,20 @@ export function sellChecksOf(f: {
           },
     );
   }
-  const failing = checks.find((c) => !c.ok);
-  return { ok: !failing, checks, blocker: failing ? (failing.detail ?? failing.title) : null };
+  const started = !f.notStarted;
+  if (f.holdVideos && !started) {
+    const v = checks.find((c) => c.id === "video");
+    if (v && !v.ok) v.detail = f.notStarted ?? v.detail;
+  }
+  const counts = (c: SellCheck) => !(f.holdVideos && started && c.id === "video");
+  const failing = checks.find((c) => !c.ok && counts(c));
+  const video = checks.find((c) => c.id === "video" && !c.ok);
+  return {
+    ok: !failing,
+    checks,
+    blocker: failing ? (failing.detail ?? failing.title) : null,
+    videosWait: f.holdVideos && started && video ? (video.detail ?? video.title) : null,
+  };
 }
 
 // ───────────────────────── Review ─────────────────────────

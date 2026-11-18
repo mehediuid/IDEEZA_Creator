@@ -392,6 +392,29 @@ export function videoNotices(jobs: readonly VideoInput[]): Notice[] {
   return out;
 }
 
+// ─────────────────────────── held listings and shares ───────────────────────────
+
+export type HeldLiveInput = { id: string; projectId: string; projectName: string; kind: "main" | "copies" | "share" | "relist"; at: number };
+
+/** What a maker signed while its videos were still being made, live now that every one is ready
+ *  (owner, 2026-11-18): the Main listing, a copy track, a relist, or the Innovations post. */
+export function heldLiveNotices(live: readonly HeldLiveInput[]): Notice[] {
+  return live.map((l) => {
+    const name = l.projectName.trim() || "Your project";
+    const share = l.kind === "share";
+    return {
+      id: `held:${l.id}`,
+      kind: "product",
+      tag: share ? "Innovations · Live" : "Marketplace · Live",
+      title: share ? `${name} is live on Innovations` : `${name} is live on Explore marketplace`,
+      body: "Every video is ready, so it went live by itself.",
+      href: share ? `/projects/${encodeURIComponent(l.projectId)}` : `/projects/${encodeURIComponent(l.projectId)}/earn/sell`,
+      at: l.at,
+      projectId: l.projectId,
+    };
+  });
+}
+
 // ─────────────────────────── comments ───────────────────────────
 
 export type SharedPostInput = { projectId: string; projectName: string; slug: string; comments: readonly PostComment[] };

@@ -37,6 +37,9 @@ import { Icon } from "@/components/dashboard/icon";
 import { Button, StateCard } from "@/components/ideeza";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { StatusChip, ICONS } from "./status-chip";
+import { HeldChip } from "@/components/video-jobs/held-block";
+import { heldOf, useHeld } from "@/lib/market/held";
+import { useProjectVideos } from "@/lib/video/store";
 import { cardText, renderHintOf, type IconName, type ProjectSummary, type ListQuery } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +66,13 @@ export function ProjectCard({
   // The render clock ticks every 500 ms while something renders; the list's minute clock can't.
   const { jobs, now: renderNow } = useVideoJobs();
   const renderHint = renderHintOf(summary.id, jobs, renderNow);
-  const chip = <StatusChip status={summary.status} word={text.chip.word} showcased={text.chip.badge !== null} />;
+  // Signed while videos were still being made (owner, 2026-11-18, D8): it says so until it's live.
+  const { store: held } = useHeld();
+  const waiting = heldOf(held, summary.id).length > 0;
+  const { record } = useProjectVideos(waiting ? summary.id : null);
+  const toReview = Object.values(record?.products ?? {}).filter((v) => v.takes.some((t) => t.toReview && t.readyAt && !t.failure)).length;
+  const waitingHint = !waiting ? null : toReview > 0 ? `Next: review ${toReview} ${toReview === 1 ? "video" : "videos"}` : "Waiting for videos";
+  const chip = waiting ? <HeldChip /> : <StatusChip status={summary.status} word={text.chip.word} showcased={text.chip.badge !== null} />;
 
   return (
     <article className="relative flex h-full flex-col gap-[10px] overflow-hidden rounded-[12px] border border-solid border-border bg-bg-surface p-[10px] transition-colors duration-normal ease-decelerate hover:border-border-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-bg-page motion-reduce:transition-none [@container(min-width:560px)]:gap-0 [@container(min-width:560px)]:p-0">
@@ -123,7 +132,9 @@ export function ProjectCard({
 
       {/* The hint: text, not a control. mt-auto keeps it on the card's floor, so a row's hints line up. */}
       <p className="mt-auto flex min-w-0 items-center gap-[6px] text-md font-medium text-text-secondary [@container(max-width:559px)]:pl-[108px] [@container(min-width:560px)]:px-[14px] [@container(min-width:560px)]:pb-[14px] [@container(min-width:560px)]:pt-[12px]">
-        <span className={cn("truncate", renderHint && "tabular-nums")}>{renderHint ?? text.hint}</span>
+        <span className={cn("truncate", renderHint && "tabular-nums", waitingHint && !renderHint && "text-text-warning")}>
+          {renderHint ?? waitingHint ?? text.hint}
+        </span>
         <Icon icon={ArrowRight02Icon} size={14} className="shrink-0" />
       </p>
     </article>
