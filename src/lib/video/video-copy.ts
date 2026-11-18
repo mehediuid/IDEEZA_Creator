@@ -220,6 +220,9 @@ export function moreToastsLine(n: number): string {
 
 export const PROJECT_VIDEO_TITLE = "Project video";
 export const PROJECT_GROUP_META = "Made from your product videos";
+/** Owner, 2026-11-17: one product, one video. */
+export const SINGLE_PRODUCT_NOTE =
+  "This project has one product, so its video is the project video too. Add another product and a project video is made from both.";
 export const PROJECT_HONESTY =
   "Made in this browser from your product videos, silent for now. The intro, order, lines and sound are kept with the video for the AI video model.";
 /** PROJECT_HONESTY for someone who isn't the maker. */
@@ -248,6 +251,16 @@ export type ProjectRowCopy = {
 export function projectRowCopy(s: ProjectVideoStatus): ProjectRowCopy {
   const v = s.video;
   switch (s.state) {
+    case "single":
+      // Never a row of its own: the one product's video is the project's (owner, 2026-11-17).
+      return {
+        text: s.face ? "Its product's video is the project video" : "Its product's video will be the project video",
+        sub: null,
+        tone: "neutral",
+        icon: "info",
+        action: null,
+        progress: null,
+      };
     case "waiting":
       return {
         text: s.total === 1 ? "Opens when your product video is ready" : `Opens when every product has a video · ${s.ready} of ${s.total} ready`,
@@ -356,6 +369,7 @@ export function projectStateLine(s: ProjectVideoStatus, productCount: number): s
     case "failed":
       return "Project video render failed.";
     case "waiting":
+    case "single":
       return null;
   }
 }

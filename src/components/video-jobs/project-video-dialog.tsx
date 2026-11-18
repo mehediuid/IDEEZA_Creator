@@ -15,6 +15,8 @@
 //   over each visit's fresh takes and lengths (`mergeJoinDraft`).
 // - Generate project video starts the render and closes; the row shows its progress. Opened while
 //   a render runs it shows that render; opened before every product has its video it says so.
+// - A project with one product has no project video (owner, 2026-11-17): opened there, it says
+//   so — that product's video is the project's — and offers Close.
 // - Review (owner, 2026-10-21): opened on a finished take nobody chose yet, it shows that take
 //   first — "Is this the video you want?" — with Use this video, Make another take (the same
 //   scenes and order), Change scenes (the editor, from that take's plan) and Decide later. A take
@@ -47,6 +49,7 @@ import {
   LINE_MAX,
   PROJECT_HONESTY,
   PROJECT_VIDEO_TITLE,
+  SINGLE_PRODUCT_NOTE,
   RENDER_KEEPS_RUNNING,
   projectRowCopy,
   stageLine,
@@ -257,6 +260,16 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
   if (!ready) {
     body = <div aria-busy="true" className="h-[240px] rounded-lg bg-bg-subtle motion-safe:animate-pulse" />;
     footer = null;
+  } else if (status.state === "single") {
+    // One product: there is no project video to make; its video is the project's (owner, 2026-11-17).
+    body = <Banner tone="info">{SINGLE_PRODUCT_NOTE}</Banner>;
+    footer = (
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
+        <Button ref={primaryRef} type="button" hierarchy="primary" size="lg" className={TAP} onClick={onClose}>
+          Close
+        </Button>
+      </div>
+    );
   } else if (reviewTake) {
     body = (
       <div className="flex flex-col gap-6 [container-type:inline-size]">

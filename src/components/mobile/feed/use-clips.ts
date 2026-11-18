@@ -113,7 +113,8 @@ export function useMineClips(): { hydrated: boolean; clips: FeedClip[] } {
       };
       const title = p.name.trim() || "Untitled project";
       const list: MineVideo[] = [];
-      const own = takeOf(PROJECT_VIDEO_KEY);
+      // A project video only stands for two or more products; one product's video is the project's.
+      const own = products.length >= 2 ? takeOf(PROJECT_VIDEO_KEY) : null;
       if (own) list.push({ productId: null, name: title, summary: "", takeId: own, poster: null });
       for (const x of products) {
         const take = takeOf(x.id);

@@ -141,7 +141,8 @@ function useProjectVideoState() {
 /** The Media screen's one primary: the project video's action, when it has one. */
 export function MediaBar() {
   const { owner, current, actionText, actionHref } = useProjectVideoState();
-  if (!owner || current.length === 0 || !actionText) return null;
+  // One product: its video is the project's, so there is nothing to make here (owner, 2026-11-17).
+  if (!owner || current.length < 2 || !actionText) return null;
   return (
     <BottomBar className="pt-8">
       <Link href={actionHref} className={cn(buttonVariants({ size: "xl" }), "w-full")}>
@@ -159,7 +160,8 @@ function ProjectVideoSection() {
   const [sheet, setSheet] = React.useState<"takes" | "scenes" | null>(null);
   const [playingId, setPlayingId] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState<VideoTake | null>(null);
-  if (current.length === 0) return null;
+  // One product: its video (under Product videos) is the project's (owner, 2026-11-17).
+  if (current.length < 2) return null;
 
   const playing = (playingId && takes.find((t) => t.id === playingId && t.readyAt && !t.failure)) || inUse;
   const showRow = !inUse || status.state !== "ready" || copy.action !== null;

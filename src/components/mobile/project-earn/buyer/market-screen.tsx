@@ -335,15 +335,19 @@ function MarketReady({ data }: { data: Ready }) {
   );
 }
 
-/** The clip the Feed plays for this project (feed/use-clips.ts): the project video in use, else the
- *  first product's; the cover while it loads, or when its file isn't in this browser. */
+/** The clip the Feed plays for this project (feed/use-clips.ts): the project video in use (two or
+ *  more products), else the first product's; the cover while it loads, or when its file isn't in
+ *  this browser. */
 function ListingHero({ project, view }: { project: ManualProject; view: Ready["view"] }) {
   const { record } = useProjectVideos(project.id);
   const takeOf = (key: string) => {
     const pv = record?.products[key];
     return pv?.inUseId && pv.takes.some((t) => t.id === pv.inUseId) ? pv.inUseId : null;
   };
-  const take = takeOf(PROJECT_VIDEO_KEY) ?? view.products.filter((p) => p.dropped === null).map((p) => takeOf(p.id)).find((t) => t !== null) ?? null;
+  const current = view.products.filter((p) => p.dropped === null);
+  // One product: its video is the project's (owner, 2026-11-17).
+  const own = current.length >= 2 ? takeOf(PROJECT_VIDEO_KEY) : null;
+  const take = own ?? current.map((p) => takeOf(p.id)).find((t) => t !== null) ?? null;
   const clip = useClipUrl(take);
   const src = take && clip.state === "ready" ? clip.url : null;
   return (

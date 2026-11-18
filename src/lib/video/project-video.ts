@@ -4,6 +4,10 @@
 // video, and the whole project's share, sale, gift and relist wait for it (readiness
 // `projectVideo`). It is stored like a product's video, under `PROJECT_VIDEO_KEY`.
 //
+// Only a project with two or more current products has one (owner, 2026-11-17): with a single
+// product, that product's video is the project's video too — on the project page, the marketplace
+// and Innovations — and nothing more is asked. Adding a second product asks for the project video.
+//
 // Pure, relative imports only.
 
 import type { ProjectProduct } from "../manual/project-read";
@@ -20,6 +24,12 @@ const CUT_MAX_MS = 10_000;
 const LINE_MAX = 60;
 
 export const isProjectKey = (id: string | null | undefined): boolean => id === PROJECT_VIDEO_KEY;
+
+/** Two or more current products: the project gets its own video, joined from theirs. With one, that
+ *  product's video stands for the project (owner, 2026-11-17). */
+export function needsProjectVideo(products: readonly { dropped: unknown }[]): boolean {
+  return products.filter((p) => p.dropped === null).length >= 2;
+}
 
 /** Each product's share (D6): about 15 s split between them, at most 10 s and at least 2 s each. */
 export function cutMs(n: number): number {
@@ -112,7 +122,8 @@ export function mergeJoinDraft(draft: JoinPlan | undefined, fresh: JoinPlan): Jo
   return { intro: draft.intro, cuts: [...kept, ...added], outro: draft.outro };
 }
 
-export type ProjectVideoState = "waiting" | "make" | "rendering" | "review" | "ready" | "outdated" | "failed";
+/** `single`: one current product, whose video is the project's — no project video is made or asked. */
+export type ProjectVideoState = "single" | "waiting" | "make" | "rendering" | "review" | "ready" | "outdated" | "failed";
 
 export type ProjectVideoStatus = {
   state: ProjectVideoState;
@@ -134,6 +145,9 @@ export type ProjectVideoStatus = {
   /** A finished take waiting for the maker's word (owner, 2026-10-21): alone (state "review"),
    *  or beside an up-to-date one in use (state "ready"). */
   review: VideoTake | null;
+  /** The video that stands for the whole project: the project video in use, or with one product,
+   *  that product's video in use. Null while there is none. */
+  face: VideoTake | null;
 };
 
 /** One state for every surface (spec, "Rows and copy"). */
@@ -150,6 +164,12 @@ export function projectVideoStatusOf(input: {
   const productsReady = total > 0 && ready === total;
 
   const video = productVideoStatus(videos?.products[PROJECT_VIDEO_KEY], jobs, now);
+  if (total === 1) {
+    // One product: its video is the project's (owner, 2026-11-17).
+    const face = readyTakeOf(videos, current[0].id, jobs, now);
+    const lengthMs = face?.clip?.durationMs || null;
+    return { state: "single", ok: face !== null, video, ready, total, missing: [], extra: [], older: [], lengthMs, review: null, face };
+  }
   const inUse = video.state === "ready" ? video.take : null;
   const review = video.state === "review" ? video.take : video.state === "ready" ? (video.review ?? null) : null;
   const names = new Map(input.products.map((p) => [p.id, nameOf(p.name)]));
@@ -183,7 +203,7 @@ export function projectVideoStatusOf(input: {
   else state = productsReady ? "make" : "waiting";
 
   const lengthMs = inUse ? inUse.clip?.durationMs || (inUse.join ? joinLengthMs(inUse.join) : null) : null;
-  return { state, ok: fresh, video, ready, total, missing, extra, older, lengthMs, review };
+  return { state, ok: fresh, video, ready, total, missing, extra, older, lengthMs, review, face: inUse };
 }
 
 function seconds(ms: number): string {

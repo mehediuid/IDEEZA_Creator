@@ -119,9 +119,30 @@ test("waiting: a product still has no video, and no project take yet", () => {
   assert.equal(projectRowCopy(s).action, null);
 });
 
-test("waiting on one product says so in its own words", () => {
-  const s = status([THREE[0]], {});
-  assert.equal(projectRowCopy(s).text, "Opens when your product video is ready");
+test("one product: no project video — its video is the project's (owner, 2026-11-17)", () => {
+  const none = status([THREE[0]], {});
+  assert.equal(none.state, "single");
+  assert.equal(none.face, null);
+  assert.equal(projectRowCopy(none).action, null);
+  assert.equal(projectStateLine(none, 1), null);
+  const used = status([THREE[0]], { rc: ready("t_rc", "rc") });
+  assert.equal(used.state, "single");
+  assert.equal(used.ok, true);
+  assert.equal(used.face.id, "t_rc");
+  assert.equal(used.lengthMs, 10_000);
+  // A project video left from when it had more products is never used for one.
+  const leftover = status([THREE[0], { ...THREE[1], dropped: { lastIn: 1, current: 2 } }], {
+    rc: ready("t_rc", "rc"),
+    [PROJECT_VIDEO_KEY]: { takes: [take("t_p", PROJECT_VIDEO_KEY, { join: plan([["rc", "t_rc"], ["bp", "t_bp"]]) })], inUseId: "t_p" },
+  });
+  assert.equal(leftover.state, "single");
+  assert.equal(leftover.face.id, "t_rc");
+});
+
+test("a second product asks for the project video", () => {
+  const s = status([THREE[0], THREE[1]], { rc: ready("t_rc", "rc"), bp: ready("t_bp", "bp") });
+  assert.equal(s.state, "make");
+  assert.equal(projectStateLine(s, 2), "All 2 product videos are ready. You can make the project video now.");
 });
 
 test("make: every product ready, no project take", () => {

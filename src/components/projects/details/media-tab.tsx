@@ -290,7 +290,8 @@ function ProjectVideoSection({
   const sectionRef = React.useRef<HTMLDivElement>(null);
 
   const current = currentProductsOf(products);
-  if (!hydrated || !jobsHydrated || current.length === 0) return null;
+  // One product: its video (in the Product videos below) is the project's (owner, 2026-11-17).
+  if (!hydrated || !jobsHydrated || current.length < 2) return null;
 
   const status = projectVideoStatusOf({ products, videos: record, jobs, now });
   const copy = projectRowCopy(status);
