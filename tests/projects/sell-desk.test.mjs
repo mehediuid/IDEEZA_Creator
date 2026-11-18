@@ -15,6 +15,7 @@ const {
   mainTileOf,
   marketHrefOf,
   priceRangeOf,
+  productCopiesLineOf,
   tileKeyOf,
 } = await import("../../.tmp-test/lib/market/sell-desk.js");
 const { PROJECT_SCOPE } = await import("../../.tmp-test/lib/market/types.js");
@@ -191,4 +192,27 @@ test("the panel's words and the marketplace address", () => {
   assert.equal(DESK_KIND_LINE.main, "The project itself · whole project only");
   assert.equal(marketHrefOf("p 1", PROJECT_SCOPE, "virtual"), "/marketplace/p%201?nft=virtual");
   assert.equal(marketHrefOf("p1", "prd_x", "physical"), "/marketplace/p1/products/prd_x");
+});
+
+test("productCopiesLineOf: the product page's line under Earn (owner, 2026-11-18)", () => {
+  const base = { productId: "prd_a", onlyProduct: false, tracks: [], sales: [], locked: false, waiting: false };
+  assert.equal(productCopiesLineOf(base), "Not selling copies yet");
+  // Another product's copies and the whole project's copies aren't this product's.
+  const others = [track("o", "prd_b", "physical", "private", 5, "0.01"), track("w", PROJECT_SCOPE, "virtual", "private", 5, "0.01")];
+  assert.equal(productCopiesLineOf({ ...base, tracks: others }), "Not selling copies yet");
+  const phys = track("pa", "prd_a", "physical", "private", 2, "0.03");
+  assert.equal(productCopiesLineOf({ ...base, tracks: [phys] }), "Physical copies on sale");
+  const virt = track("va", "prd_a", "virtual", "commercial", 10, "0.02");
+  assert.equal(productCopiesLineOf({ ...base, tracks: [phys, virt], sales: [sale("va", "0.02", "b1", 5, "virtual")] }), "Physical and Virtual copies on sale · 1 sold");
+  // Physical sold out, Virtual not listed: sold out, with what sold.
+  const two = [sale("pa", "0.03", "b1", 5), sale("pa", "0.03", "b2", 6)];
+  assert.equal(productCopiesLineOf({ ...base, tracks: [phys], sales: two }), "Sold out · 2 sold");
+  // A listing taken down after a sale: what sold, nothing on sale.
+  const down = { ...phys, listing: null };
+  assert.equal(productCopiesLineOf({ ...base, tracks: [down], sales: [sale("pa", "0.03", "b1", 5)] }), "1 copy sold");
+  // The only product: the whole project's copies are its own.
+  const whole = track("wa", PROJECT_SCOPE, "virtual", "private", 5, "0.01");
+  assert.equal(productCopiesLineOf({ ...base, onlyProduct: true, tracks: [whole] }), "Virtual copies on sale");
+  assert.equal(productCopiesLineOf({ ...base, tracks: [phys], waiting: true }), "Copies wait for videos");
+  assert.equal(productCopiesLineOf({ ...base, tracks: [phys], locked: true }), "Sold in full");
 });

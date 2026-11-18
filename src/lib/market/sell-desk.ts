@@ -210,6 +210,39 @@ export function mainTileOf(f: {
   };
 }
 
+/**
+ * The product page's line under its Earn button (owner, 2026-11-18): this product's copies in a few
+ * words — "Physical copies on sale · 3 sold", "Sold out · 50 sold", "Not selling copies yet". A
+ * product sells copies only (selling-rules); in a one-product project the project's copies are that
+ * product's (D3), so they count too. A copies listing signed while its videos render reads
+ * "Copies wait for videos"; a project sold in full, "Sold in full".
+ */
+export function productCopiesLineOf(f: {
+  productId: string;
+  /** The project's only current product: the whole project's copies are its own. */
+  onlyProduct: boolean;
+  tracks: readonly EditionTrack[];
+  sales: readonly Sale[];
+  /** Sold in full: no copy sells any more. */
+  locked: boolean;
+  /** A copies listing of this product waits for its videos (lib/market/held.ts). */
+  waiting: boolean;
+}): string {
+  if (f.locked) return "Sold in full";
+  const mine = f.tracks.filter((t) => t.productId === f.productId || (f.onlyProduct && t.productId === PROJECT_SCOPE));
+  const ids = new Set(mine.map((t) => t.id));
+  const sold = f.sales.filter((s) => s.item.nft !== "main" && ids.has(s.item.trackId)).length;
+  const soldPart = sold > 0 ? `${sold} sold` : null;
+  const join = (lead: string) => (soldPart ? `${lead} · ${soldPart}` : lead);
+  if (f.waiting) return join("Copies wait for videos");
+  const live = mine.filter((t) => t.listing !== null && soldOf(t.id, [...f.sales]) < t.supply.total);
+  const kinds = new Set(live.map((t) => t.kind));
+  if (kinds.size === 2) return join("Physical and Virtual copies on sale");
+  if (kinds.size === 1) return join(`${kinds.has("physical") ? "Physical" : "Virtual"} copies on sale`);
+  if (mine.some((t) => t.listing !== null) && sold > 0) return join("Sold out");
+  return sold > 0 ? `${sold} ${sold === 1 ? "copy" : "copies"} sold` : "Not selling copies yet";
+}
+
 /** D5: the tile open on arrival. A hash (`#copies`, `#editions-<product>`) asks for a product's copies. */
 export function defaultTileOf(tiles: readonly DeskTile[], hash = ""): string | null {
   if (!tiles.length) return null;

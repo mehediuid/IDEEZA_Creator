@@ -9,8 +9,10 @@
 //   ready", or the unbuilt line), the description — the maker's words on the
 //   current version, the build's frozen ones on an older version (H-7) — or,
 //   for the owner, "Add a description"; beside them ★ Open in editor (the
-//   page's one violet, C16) and the ⋯ menu (product-menu.tsx: Edit name and
-//   description, Open chat, Delete product); then the lock line and the
+//   page's one violet, C16), Earn (owner, 2026-11-18: Earn › Sell on this
+//   product's copies, with their line under the buttons) and the ⋯ menu
+//   (product-menu.tsx: Edit name and description, Open chat, Delete
+//   product); then the lock line and the
 //   version notice; then the tab strip and its panel (product-tabs.tsx);
 // - the rail: the Marketplace block (T27, the buyer's side only since Build
 //   and Earn P0), Specs and Build check (product-facts.tsx), then the Editor
@@ -41,7 +43,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Add01Icon, CpuIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Coins01Icon, CpuIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { LeaveButton } from "@/components/create/leave-button";
 import { partChangesOf, partChangesText } from "@/lib/create/build-artifacts";
@@ -50,6 +52,11 @@ import { productsOf, useCreateHistory } from "@/lib/create/history";
 import { isLeftOut } from "@/lib/create/pieces";
 import { AddPiecesDialog } from "@/components/create/add-pieces-dialog";
 import { openInEditorOf } from "@/lib/manual/editor-scope";
+import { productEarnHref } from "@/lib/manual/earn-route";
+import { EARN_LABEL } from "@/lib/manual/earn-view";
+import { heldOf, useHeld } from "@/lib/market/held";
+import { productCopiesLineOf } from "@/lib/market/sell-desk";
+import { PROJECT_SCOPE } from "@/lib/market/types";
 import { can } from "@/lib/manual/permissions";
 import { productPiecesOf, productVersionView, withQuery, type ProductVersionView } from "@/lib/manual/product-page";
 import { displayProductName } from "@/lib/manual/products-tab-view";
@@ -121,6 +128,11 @@ export function ProductPage({
 
 const NO_SEED: CommentSeed = () => [];
 
+/** The project header's button size: sharing the row with ⋯ and 44 px tall at phone width, their own
+ *  width from a 480 px header, 40 px tall once the actions sit beside the title (720 px). */
+const HEADER_BUTTON =
+  "h-[44px] min-w-0 flex-1 justify-center [@container(min-width:480px)]:flex-none [@container(min-width:720px)]:h-[40px]";
+
 function ProductPageBody({ id, productId, context }: { id: string; productId: string; context: ProjectPageContext }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -130,6 +142,10 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   const { chats } = useCreateHistory();
   const { selectEditorScope } = useManualProjects();
   const [leaving, setLeaving] = React.useState(false);
+  // Earn (owner, 2026-11-18): the product's way to its copies on Earn › Sell, with their line.
+  const [earning, setEarning] = React.useState(false);
+  const earnLineId = React.useId();
+  const { store: heldStore } = useHeld();
   // "Add the rest" — every piece the build left out, in one dialog.
   const [addingAll, setAddingAll] = React.useState(false);
 
@@ -243,6 +259,21 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   // The chat this version was built in, while this browser has it: the build is changed there.
   const chat = ownerFacts && job ? (chats.find((c) => c.id === job.chatId) ?? null) : null;
   const image = bp?.conceptImageUrl || null;
+  // Earn (owner, 2026-11-18: "from a product page you can't get to earning"): the owner's own page,
+  // like the project page's Earn. It opens Earn › Sell on this product's copies, and the line under
+  // it says how they sell. Never on Explore marketplace, an Innovations post or a preview.
+  const earn = (() => {
+    if (!ownerFacts || context !== "project") return null;
+    const current = view.products.filter((p) => p.dropped === null);
+    const onlyProduct = current.length === 1 && current[0].id === product.id;
+    const waiting = heldOf(heldStore, project.id).some(
+      (i) => i.kind === "copies" && (i.scope === product.id || (onlyProduct && i.scope === PROJECT_SCOPE)),
+    );
+    return {
+      href: productEarnHref(project.id, product.id),
+      line: productCopiesLineOf({ productId: product.id, onlyProduct, tracks: view.editions, sales: view.sales, locked: view.lock !== null, waiting }),
+    };
+  })();
   const meta: React.ReactNode = market ? (
     // A buyer reads what this product belongs to and who made it; how it was built is the maker's.
     <>
@@ -345,30 +376,59 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                 </div>
 
                 {(editor || ownerFacts) && (
-                  <div data-header-actions className="flex shrink-0 items-center gap-3">
-                    {editor && (
-                      <LeaveButton
-                        data-tour="product-editor"
-                        tone="primary"
-                        busy={leaving}
-                        blocked={leaving}
-                        onClick={() => {
-                          setLeaving(true);
-                          selectEditorScope(project.id, product.id);
-                          router.push(editor.href);
-                        }}
-                        icon={CpuIcon}
-                        className="h-[44px] min-w-0 flex-1 justify-center [@container(min-width:480px)]:flex-none [@container(min-width:720px)]:h-[40px]"
-                      >
-                        {editor.label}
-                      </LeaveButton>
-                    )}
-                    {ownerFacts && !market && (
-                      <ProductMenu
-                        slot={slot}
-                        chat={chat ? { title: chat.title.trim() || "Untitled chat", href: `/chat/${chat.id}` } : null}
-                        onEdit={canEditDetails ? edit.open : null}
-                      />
+                  // The project header's arrangement: the buttons, then Earn's line under them (right-aligned
+                  // once the actions sit beside the title).
+                  <div
+                    data-header-actions
+                    className="flex shrink-0 flex-col gap-2 [@container(min-width:480px)]:flex-row [@container(min-width:480px)]:items-center [@container(min-width:480px)]:gap-4 [@container(min-width:720px)]:flex-col [@container(min-width:720px)]:items-end [@container(min-width:720px)]:gap-2"
+                  >
+                    <div className="flex items-center gap-3">
+                      {editor && (
+                        <LeaveButton
+                          data-tour="product-editor"
+                          tone="primary"
+                          busy={leaving}
+                          blocked={leaving || earning}
+                          onClick={() => {
+                            setLeaving(true);
+                            selectEditorScope(project.id, product.id);
+                            router.push(editor.href);
+                          }}
+                          icon={CpuIcon}
+                          className={HEADER_BUTTON}
+                        >
+                          {editor.label}
+                        </LeaveButton>
+                      )}
+                      {earn && (
+                        <LeaveButton
+                          data-tour="product-earn"
+                          tone={editor ? "quiet" : "primary"}
+                          busy={earning}
+                          blocked={leaving || earning}
+                          onClick={() => {
+                            setEarning(true);
+                            router.push(earn.href);
+                          }}
+                          icon={Coins01Icon}
+                          className={HEADER_BUTTON}
+                          aria-describedby={earnLineId}
+                        >
+                          {EARN_LABEL}
+                        </LeaveButton>
+                      )}
+                      {ownerFacts && !market && (
+                        <ProductMenu
+                          slot={slot}
+                          chat={chat ? { title: chat.title.trim() || "Untitled chat", href: `/chat/${chat.id}` } : null}
+                          onEdit={canEditDetails ? edit.open : null}
+                        />
+                      )}
+                    </div>
+                    {earn && (
+                      <span id={earnLineId} className="text-sm text-text-secondary">
+                        {earn.line}
+                      </span>
                     )}
                   </div>
                 )}
