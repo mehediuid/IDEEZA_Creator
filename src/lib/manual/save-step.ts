@@ -280,7 +280,7 @@ export const PUBLISH_LINE = "When it’s ready, publish it from the project page
  */
 export function savedNoticeOf(
   kind: SavedKind,
-  f: { name: string; product: string; version: number; draft: boolean },
+  f: { name: string; product: string; version: number; draft: boolean; many?: boolean },
 ): SavedNotice {
   const draft = kind === "new" || f.draft;
   const body = draft ? `${f.name} is in My projects. Only you can see it.` : `${f.name} is in My projects.`;
@@ -296,7 +296,7 @@ export function savedNoticeOf(
     case "new":
       return { title: "Saved as a draft", body, publishLine };
     case "join":
-      return { title: `${f.product} was added to ${f.name}`, body, publishLine };
+      return { title: `${f.product} ${f.many ? "were" : "was"} added to ${f.name}`, body, publishLine };
     case "version":
       return { title: `Saved as version ${f.version}`, body, publishLine };
   }

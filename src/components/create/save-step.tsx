@@ -44,7 +44,6 @@ import {
 } from "@/components/projects/project-details-fields";
 import { useStoreWrite } from "@/components/projects/details/use-store-write";
 import { ProjectRow, SavedDialog } from "@/components/projects/saved-dialog";
-import { ProjectLimitCard, useProjectRoom } from "@/components/projects/project-limit";
 import { useProjectBrief } from "@/lib/brief/project-brief";
 import { useCreateHistory, type BuildJob } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
@@ -243,8 +242,9 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const choices = React.useMemo(() => coverChoicesOf(job), [job]);
 
   // ── the plan's allowance (upgrade plan C5) ──
-  const room = useProjectRoom();
-  const newBlocked = kind === "new" && room.full;
+  // Save never waits on it. The project question and the build gate (concept-chat.tsx) check the
+  // plan's projects before any credit moves, so a build that was paid for always saves — and so
+  // does a chat answered before the allowance existed (create-flow study D5).
   const switchToJoin = () => {
     setRefusal(null);
     // The project that went is out of the list; the maker picks another.
@@ -344,15 +344,6 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const submit = () => {
     if (busy.current || saving) return;
     setRefusal(null);
-    if (kind === "new" && room.full) {
-      // Upgrade plan decision 2: a new project past the plan's allowance waits; joining doesn't.
-      setRefusal(
-        room.pitch
-          ? `To save it as a new project, upgrade to ${room.pitch.name} or make room in My projects. Or add it to a project you have.`
-          : "To save it as a new project, make room in My projects. Or add it to a project you have.",
-      );
-      return;
-    }
     if (kind === "new") {
       const check = checkSaveDraft(draft, otherNames);
       if (!check.ok) {
@@ -398,9 +389,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
     kind === "new" ? "Save project" : kind === "version" ? `Save version ${n}` : joinTarget ? `Add to ${joinTarget.name}` : "Add to a project";
   const description =
     kind === "new"
-      ? newBlocked
-        ? "Your build is safe here. Upgrade to save it as a new project, or add it to one you have."
-        : "Name it and say what it's for. You can change both later on the project page."
+      ? "Name it and say what it's for. You can change both later on the project page."
       : kind === "version" && version
         ? `This is a rebuild in the chat “${version.chatTitle}”, so it becomes version ${n} of ${version.project.name}. Version ${n - 1} stays in the project's history.`
         : joinTarget
@@ -441,6 +430,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
         project={project}
         kind={saved.kind}
         product={single ? product : joinNames}
+        many={!single}
         version={n}
         savedAt={saved.at}
         stayLabel={getChat(job.chatId) ? "Back to chat" : "Back to the build"}
@@ -483,8 +473,6 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
                 size="lg"
                 onClick={submit}
                 aria-busy={saving || undefined}
-                // Every project slot in use: the card says why, so the button takes the DS disabled look.
-                disabled={newBlocked || undefined}
                 aria-disabled={saving || blocked !== null || undefined}
                 aria-describedby={reason ? reasonId : undefined}
                 className={cn(
@@ -517,11 +505,8 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
         <div className="flex flex-col gap-10 [container-type:inline-size]">
           {gone && <Banner tone="attention">{gone}</Banner>}
           {kind === "new" && info.broken && <Banner tone="attention">{info.broken}</Banner>}
-          {/* Upgrade plan C5: with every project slot in use, the card takes the new
-              project's fields' place; adding it to a project you have stays one press away. */}
-          {newBlocked && <ProjectLimitCard onUseExisting={canJoin ? switchToJoin : undefined} useExistingLabel="Add it to a project I have" />}
 
-          {kind === "new" && !newBlocked && (
+          {kind === "new" && (
             <>
               <ProjectDetailsFields
                 ref={fieldsRef}

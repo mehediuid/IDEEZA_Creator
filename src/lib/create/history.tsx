@@ -69,11 +69,11 @@ export type ConceptFailReason =
  *  get wrong, and asking them first means the first image is already the
  *  right image. Nothing is charged until this turn is answered. */
 export type SetupAnswer = {
-  /** An existing project, when the build is one product and the maker
-   *  picked one. Empty when they are making a new project. */
+  /** An existing project the maker picked — for one product or several
+   *  (create-flow study D3). Empty when they are making a new project. */
   projectId: string;
   /** The name for a new project. §4.4.8 puts every product of a system in
-   *  one project, so a multi-product build always takes this path. */
+   *  one project — a new one, or one the maker already has. */
   projectName: string;
   /** companionId of every additional product the maker ticked. */
   picked: string[];
@@ -837,6 +837,9 @@ type Ctx = {
   dropSetupPick: (chatId: string, turnId: string, companionId: string) => void;
   /** In or out of the next build, for a product that stays in the project. */
   setSetupLeftOut: (chatId: string, turnId: string, companionId: string, out: boolean) => void;
+  /** The project the answered question points at, changed after the fact — the build gate's
+   *  "Use a project I have" when the plan's projects are all in use. One product or several. */
+  setSetupProject: (chatId: string, turnId: string, projectId: string) => void;
   /** The concept as read back — parts and spec hints — kept on its turn. */
   setTurnConcept: (chatId: string, turnId: string, concept: ConceptSummary) => void;
   /** The maker's spec edits for one product, on the answered question. */
@@ -1301,6 +1304,12 @@ export function CreateHistoryProvider({
         const rest = (a.leftOut ?? []).filter((id) => id !== companionId);
         return { ...a, leftOut: out ? [...rest, companionId] : rest };
       }),
+    [patchSetupAnswer],
+  );
+
+  const setSetupProject = React.useCallback(
+    (chatId: string, turnId: string, projectId: string) =>
+      patchSetupAnswer(chatId, turnId, (a) => ({ ...a, projectId, projectName: "" })),
     [patchSetupAnswer],
   );
 
@@ -1984,6 +1993,7 @@ export function CreateHistoryProvider({
     addSetupProduct,
     dropSetupPick,
     setSetupLeftOut,
+    setSetupProject,
     setTurnConcept,
     setSpecEdits,
     setPieces,

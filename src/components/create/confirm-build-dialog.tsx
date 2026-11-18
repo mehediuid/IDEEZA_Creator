@@ -34,6 +34,8 @@ import { aboutTime } from "@/lib/create/pieces";
 import { useDialogFocus } from "./use-dialog-focus";
 import { BuyCreditsButton, useBuyCredits } from "@/components/credits/buy-credits";
 import { CreditBadge } from "@/components/credits/credit-badge";
+import { SelectMenu } from "@/components/ideeza";
+import { ProjectLimitCard } from "@/components/projects/project-limit";
 import { BUILD_ESTIMATE_MIN } from "@/lib/create/history";
 import {
   describeFallback,
@@ -134,6 +136,7 @@ export function ConfirmBuildDialog({
   onCancel,
   onConfirm,
   submitting,
+  projectLimit = null,
 }: {
   open: boolean;
   /** The concept this build comes from — the cache key for its summary. */
@@ -176,6 +179,14 @@ export function ConfirmBuildDialog({
   onCancel: () => void;
   onConfirm: (concept: ConceptSummary) => void;
   submitting: boolean;
+  /** Set when this build would make a new project and every project on the plan is in use
+   *  (upgrade plan C5 at the gate): the plan's card takes the build's place before any credit
+   *  moves, with Upgrade, a project the maker has (`onUse` points the build at it, and the gate
+   *  goes on as usual), or making room. */
+  projectLimit?: {
+    projects: { id: string; name: string; detail?: string }[];
+    onUse: (projectId: string) => void;
+  } | null;
 }) {
   const { hydrated: creditsHydrated, balance } = useCredits();
   // Buy credits opens over the gate when the balance falls short; while it
@@ -185,6 +196,9 @@ export function ConfirmBuildDialog({
   // Focus in on open, held inside while open, back to the build button on
   // close — focus used to stay on <body> with the page behind still tabbable.
   useDialogFocus(open && !buying, panelRef);
+  // "Use a project I have" swaps the card for the chooser.
+  const [picking, setPicking] = React.useState(false);
+  const pickerRef = React.useRef<HTMLDivElement>(null);
   const [resolved, setResolved] = React.useState<{
     turnId: string;
     concept: ConceptSummary;
@@ -225,9 +239,13 @@ export function ConfirmBuildDialog({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onCancel, buying]);
 
-  if (!open) return null;
+  if (!open) {
+    if (picking) setPicking(false);
+    return null;
+  }
 
   const cost = pickedCost ?? buildCost(products);
+  const limited = projectLimit !== null;
   // The rendered balance rather than canAfford(): the credits provider
   // refreshes that ref in its own effect, which runs after ours, so it
   // reads a render behind here (chat-thread.tsx reads it the same way).
@@ -273,13 +291,49 @@ export function ConfirmBuildDialog({
             {productNames.length === products
               ? new Intl.ListFormat("en", { type: "conjunction" }).format(productNames)
               : `${concept.title}${products > 1 ? ` and ${products - 1} more` : ""}`}
-            . The build runs in
-            the background — you can leave, and we&apos;ll tell you when each
-            piece is ready.
+            {limited
+              ? ` would start a new project, and every project on your plan is in use. Nothing has been charged.`
+              : <>
+                  . The build runs in
+                  the background — you can leave, and we&apos;ll tell you when each
+                  piece is ready.
+                </>}
           </p>
         </div>
 
-        {specLines.length > 0 && (
+        {/* Every project slot in use (upgrade plan C5 at the gate): the plan's card takes the
+            build's place — never a warning under a Build that only says no. */}
+        {projectLimit &&
+          (picking ? (
+            <div ref={pickerRef} className="flex flex-col gap-[6px]">
+              <span className="text-sm font-medium text-text-primary">Build it into</span>
+              <SelectMenu
+                placeholder="Choose a project"
+                ariaLabel="Project"
+                value={null}
+                onChange={(id) => {
+                  setPicking(false);
+                  projectLimit.onUse(id);
+                }}
+                options={projectLimit.projects.map((p) => ({ value: p.id, label: p.name, sub: p.detail }))}
+              />
+            </div>
+          ) : (
+            <ProjectLimitCard
+              onUseExisting={
+                projectLimit.projects.length > 0
+                  ? () => {
+                      setPicking(true);
+                      window.requestAnimationFrame(() =>
+                        pickerRef.current?.querySelector<HTMLElement>("[role=combobox]")?.click(),
+                      );
+                    }
+                  : undefined
+              }
+            />
+          ))}
+
+        {!limited && specLines.length > 0 && (
           <ul role="list" aria-label="What each product will be" className="flex flex-col gap-[6px]">
             {/* By position: two products can read the same line. */}
             {specLines.map((line, i) => (
@@ -293,7 +347,7 @@ export function ConfirmBuildDialog({
         {/* What each product's build makes, from its What to build, with the
             way back to that panel — the one surface every maker passes
             through before paying (owner, 2026-10-22). */}
-        {pieces.length > 0 && (
+        {!limited && pieces.length > 0 && (
           <ul role="list" aria-label="What each product gets" className="flex flex-col gap-[8px]">
             {pieces.map((p) => (
               <li key={p.productId} className="flex flex-col gap-[4px] rounded-xl bg-bg-surface-raised px-[14px] py-[12px]">
@@ -326,92 +380,96 @@ export function ConfirmBuildDialog({
 
         {/* §4.5 — both of these are on screen before any money moves. They
             are what stops a Draft result becoming a refund dispute. */}
-        <div className="flex flex-col gap-[8px] rounded-xl bg-bg-subtle p-[14px]">
-          <p className="text-sm leading-relaxed text-text-secondary">
-            Your concept images are a visual reference. The engineered output
-            may differ from them.
-          </p>
-          <p className="text-sm leading-relaxed text-text-secondary">
-            Automated design rule checks run on completion. If issues are
-            found, you&apos;ll still receive the full output with a{" "}
-            <strong className="font-semibold text-text-primary">Draft</strong>{" "}
-            label and a list of what needs review.
-          </p>
-        </div>
+        {!limited && (
+          <>
+            <div className="flex flex-col gap-[8px] rounded-xl bg-bg-subtle p-[14px]">
+              <p className="text-sm leading-relaxed text-text-secondary">
+                Your concept images are a visual reference. The engineered output
+                may differ from them.
+              </p>
+              <p className="text-sm leading-relaxed text-text-secondary">
+                Automated design rule checks run on completion. If issues are
+                found, you&apos;ll still receive the full output with a{" "}
+                <strong className="font-semibold text-text-primary">Draft</strong>{" "}
+                label and a list of what needs review.
+              </p>
+            </div>
 
-        <div className="flex flex-wrap gap-[8px]">
-          {/* The balance on both sides of the spend, so the maker sees what
-              they have and what they will have. The price itself is on Build. */}
-          <Chip icon={Coins01Icon}>
-            {creditsHydrated
-              ? shortOnCredits
-                ? `You have ${balance} — ${cost - balance} short`
-                : `You have ${balance} → ${balance - cost} after`
-              : `${cost} credits`}
-          </Chip>
-          <Chip icon={InformationCircleIcon}>
-            {seconds ? aboutTime(seconds).replace(/^about/, "About") : TIME_CHIP}
-          </Chip>
-        </div>
+            <div className="flex flex-wrap gap-[8px]">
+              {/* The balance on both sides of the spend, so the maker sees what
+                  they have and what they will have. The price itself is on Build. */}
+              <Chip icon={Coins01Icon}>
+                {creditsHydrated
+                  ? shortOnCredits
+                    ? `You have ${balance} — ${cost - balance} short`
+                    : `You have ${balance} → ${balance - cost} after`
+                  : `${cost} credits`}
+              </Chip>
+              <Chip icon={InformationCircleIcon}>
+                {seconds ? aboutTime(seconds).replace(/^about/, "About") : TIME_CHIP}
+              </Chip>
+            </div>
 
-        <div className="flex items-center gap-[12px] border-t border-solid border-border pt-[16px]">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="ml-auto inline-flex h-[40px] items-center rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-md font-semibold text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            Cancel
-          </button>
-          {/* Short of credits: the way on is right here, not a greyed Build
-              that only says no. The balance updates in place, so Build
-              wakes up as soon as the credits cover it. */}
-          {shortOnCredits && (
-            <BuyCreditsButton
-              need={cost}
-              className="inline-flex h-[40px] items-center rounded-lg border border-solid border-border-brand bg-bg-surface px-[14px] text-md font-semibold text-text-brand outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              Buy credits
-            </BuyCreditsButton>
-          )}
-          {/* Busy is a spinner, not a word swap. Confirming reads each
-              product's concept back before the build can be booked, which is
-              a round-trip per product, and "Generate" quietly becoming
-              "Starting…" in the same violet button was easy to miss — people
-              pressed it again believing they had missed it. It keeps the
-              brand fill (this is still the primary action, now under way),
-              dims, takes the wait cursor and turns. */}
-          <button
-            type="button"
-            data-testid="gate-confirm"
-            disabled={blocked}
-            aria-busy={submitting}
-            title={
-              shortOnCredits
-                ? "Not enough credits"
-                : submitting
-                  ? "Booking the build…"
-                  : undefined
-            }
-            onClick={() => onConfirm(concept)}
-            className={
-              shortOnCredits
-                ? "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
-                : submitting
-                  ? "inline-flex h-[40px] cursor-wait items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand opacity-80"
-                  : "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-            }
-          >
-            <span
-              aria-hidden
-              className={submitting ? "inline-flex motion-safe:animate-spin" : "inline-flex"}
-            >
-              <Icon icon={submitting ? Refresh01Icon : FlashIcon} size={16} />
-            </span>
-            {submitting ? "Starting…" : "Build"}
-            {/* The price on the button that pays it, like the Build line's. */}
-            {!submitting && <CreditBadge credits={cost} onBrand={!shortOnCredits} />}
-          </button>
-        </div>
+            <div className="flex items-center gap-[12px] border-t border-solid border-border pt-[16px]">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="ml-auto inline-flex h-[40px] items-center rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-md font-semibold text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                Cancel
+              </button>
+              {/* Short of credits: the way on is right here, not a greyed Build
+                  that only says no. The balance updates in place, so Build
+                  wakes up as soon as the credits cover it. */}
+              {shortOnCredits && (
+                <BuyCreditsButton
+                  need={cost}
+                  className="inline-flex h-[40px] items-center rounded-lg border border-solid border-border-brand bg-bg-surface px-[14px] text-md font-semibold text-text-brand outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  Buy credits
+                </BuyCreditsButton>
+              )}
+              {/* Busy is a spinner, not a word swap. Confirming reads each
+                  product's concept back before the build can be booked, which is
+                  a round-trip per product, and "Generate" quietly becoming
+                  "Starting…" in the same violet button was easy to miss — people
+                  pressed it again believing they had missed it. It keeps the
+                  brand fill (this is still the primary action, now under way),
+                  dims, takes the wait cursor and turns. */}
+              <button
+                type="button"
+                data-testid="gate-confirm"
+                disabled={blocked}
+                aria-busy={submitting}
+                title={
+                  shortOnCredits
+                    ? "Not enough credits"
+                    : submitting
+                      ? "Booking the build…"
+                      : undefined
+                }
+                onClick={() => onConfirm(concept)}
+                className={
+                  shortOnCredits
+                    ? "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
+                    : submitting
+                      ? "inline-flex h-[40px] cursor-wait items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand opacity-80"
+                      : "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                }
+              >
+                <span
+                  aria-hidden
+                  className={submitting ? "inline-flex motion-safe:animate-spin" : "inline-flex"}
+                >
+                  <Icon icon={submitting ? Refresh01Icon : FlashIcon} size={16} />
+                </span>
+                {submitting ? "Starting…" : "Build"}
+                {/* The price on the button that pays it, like the Build line's. */}
+                {!submitting && <CreditBadge credits={cost} onBrand={!shortOnCredits} />}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

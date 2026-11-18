@@ -388,6 +388,7 @@ describe("savedNoticeOf", () => {
   });
   it("join and version name what they did", () => {
     assert.equal(savedNoticeOf("join", f).title, "Remote was added to Car");
+    assert.equal(savedNoticeOf("join", { ...f, product: "Remote and Charger", many: true }).title, "Remote and Charger were added to Car");
     assert.equal(savedNoticeOf("version", f).title, "Saved as version 2");
     assert.equal(savedNoticeOf("version", { ...f, draft: false }).publishLine, null);
   });

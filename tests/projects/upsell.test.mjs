@@ -3,6 +3,7 @@
 // may show (one a day, ✕ = 7 days, once-only, every 30 days).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 const U = await import("../../.tmp-test/lib/create/upsell.js");
 const N = await import("../../.tmp-test/lib/account/nudges.js");
@@ -70,6 +71,29 @@ test("C5: the demo projects every account starts with take no plan slot", async 
   assert.ok(D.DEMO_PROJECT_IDS.length > U.projectRoom("free", 0).allowed, "more demos than Free slots");
   for (const id of D.DEMO_PROJECT_IDS) assert.equal(U.takesPlanSlot(id), false, id);
   assert.equal(U.takesPlanSlot("proj_abc123"), true);
+});
+
+test("C5 at the build gate: only a build that would make a new project checks the plan's projects", () => {
+  const have = ["proj_a", "proj_b"];
+  assert.equal(U.buildMakesNewProject("", have, []), true, "a new project, nothing saved yet");
+  assert.equal(U.buildMakesNewProject("proj_a", have, []), false, "joining a project you have takes no slot");
+  assert.equal(U.buildMakesNewProject("proj_gone", have, []), true, "the chosen project is gone: Save makes a new one");
+  assert.equal(U.buildMakesNewProject("", have, [undefined, "proj_b"]), false, "a rebuild of a saved chat is a version");
+  assert.equal(U.buildMakesNewProject("", have, ["proj_gone"]), true, "the chat's project was deleted");
+});
+
+test("C5: the plan's projects are checked at the question and the build gate, never at Save", () => {
+  const src = (p) => readFileSync(new URL(`../../src/${p}`, import.meta.url), "utf8");
+  const save = src("components/create/save-step.tsx");
+  assert.ok(!/useProjectRoom|ProjectLimitCard/.test(save), "Save never waits on the plan's projects");
+  const chat = src("components/create/concept-chat.tsx");
+  assert.match(chat, /projectLimit=\{gateLimit\}/);
+  assert.match(chat, /room\.full && gateNeedsRoom/);
+  const gate = src("components/create/confirm-build-dialog.tsx");
+  assert.match(gate, /<ProjectLimitCard/);
+  assert.match(gate, /\{!limited && \(/, "the Build button and the spend lines go while the card shows");
+  const setup = src("components/create/setup-turn.tsx");
+  assert.match(setup, /const choosing = !multi \|\| addTo !== null \|\| projects\.length > 0;/, "several products may go into a project you have");
 });
 
 test("one capped card a day across the app; the same card keeps showing that day", () => {

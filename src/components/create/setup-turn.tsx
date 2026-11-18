@@ -69,7 +69,7 @@ export function SetupTurn({
   productName?: string;
   productSummary?: string;
   answer?: SetupAnswer;
-  /** Existing projects a single-product build could join. */
+  /** Existing projects the build could join — one product or several (create-flow study D3). */
   projects: SetupProject[];
   onAnswer: (answer: SetupAnswer) => void;
 }) {
@@ -131,9 +131,10 @@ export function SetupTurn({
     return <AnsweredCard answer={answer} companions={companions} projects={projects} />;
   }
 
-  // More than one product means one project holding all of them, so there is
-  // nothing to choose between — only a name to give. With a single product
-  // the build can join a project that already exists.
+  // More than one product means one project holding all of them (§4.4.8) — a
+  // new one, or one the maker already has (create-flow study D3: with every
+  // project slot in use, a system must still be able to go into a project
+  // the maker has, instead of meeting only Upgrade).
   const extra = companions.filter((c) => picked.has(c.id));
   const multi = extra.length > 0;
 
@@ -197,9 +198,10 @@ export function SetupTurn({
     );
   }
 
-  // Several products without a project to add to name one new project (§4.4.8); otherwise the
-  // question is which project — the one this chat was started from, unless the maker picks another.
-  const choosing = !multi || addTo !== null;
+  // With no project to pick from, several products only need a name for their new project;
+  // otherwise the question is which project — the one this chat was started from, unless the
+  // maker picks another.
+  const choosing = !multi || addTo !== null || projects.length > 0;
   const newChosen = choosing ? projectId === "" && projectName !== "" : true;
   const newBlocked = room.full && newChosen;
   const ready =
@@ -229,6 +231,8 @@ export function SetupTurn({
           multi
             ? addTo
               ? `You're adding ${extra.length + 1} products to ${addTo.name}. You can pick another project, or start a new one.`
+              : choosing
+              ? `${extra.length + 1} products belong together, so they go in one project: one you have, or a new one.`
               : `${extra.length + 1} products belong together, so they go in one new project.`
             : addTo
               ? `You're adding a product to ${addTo.name}. You can pick another project, or start a new one.`

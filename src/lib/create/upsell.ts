@@ -110,5 +110,19 @@ export function projectRoom(tier: PlanTier, held: number): { allowed: number; he
   return { allowed, held, full: held >= allowed };
 }
 
+/** C5 at the build gate (create-flow study O1+): whether booking this chat's build now would need
+ *  a new project — the setup question chose none, or one no longer here, and no build of the chat
+ *  is in a project yet (a rebuild of a saved chat becomes that project's next version). The gate
+ *  checks the plan's projects only then, before the credits move; Save never checks. */
+export function buildMakesNewProject(
+  choiceId: string,
+  projectIds: readonly string[],
+  chatBuildProjectIds: readonly (string | undefined)[],
+): boolean {
+  const here = new Set(projectIds);
+  if (chatBuildProjectIds.some((id) => id !== undefined && here.has(id))) return false;
+  return choiceId === "" || !here.has(choiceId);
+}
+
 /** F2 — the code offered once the welcome offer has ended unused (decision 6). */
 export const RETURN_COUPON = "MAKER20";
