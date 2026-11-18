@@ -33,7 +33,8 @@ import {
   type FailReason,
   type RenderJob,
 } from "@/lib/create/image-gen";
-import { put, readMeta } from "@/lib/create/image-store";
+import { idFromUrl, put, read, readMeta } from "@/lib/create/image-store";
+import { INSPIRATION_PROVIDER } from "@/lib/create/inspiration";
 import { cleanQuality } from "@/lib/create/quality";
 
 export const runtime = "nodejs";
@@ -139,6 +140,18 @@ function decodeJob(token: string): RenderJob | null {
   }
 }
 
+/** An inspiration's bytes, or nothing: a missing one draws from the prompt
+ *  alone rather than failing a render the maker is paying for. */
+async function inspirationBytes(url: unknown): Promise<Uint8Array | undefined> {
+  if (typeof url !== "string") return undefined;
+  const id = idFromUrl(url);
+  if (!id) return undefined;
+  const meta = await readMeta(url).catch(() => null);
+  if (meta?.provider !== INSPIRATION_PROVIDER) return undefined;
+  const image = await read(id).catch(() => null);
+  return image?.bytes;
+}
+
 export async function POST(req: Request) {
   let body: unknown;
   try {
@@ -152,6 +165,7 @@ export async function POST(req: Request) {
     parentImageUrl?: unknown;
     pool?: unknown;
     quality?: unknown;
+    inspiration?: unknown;
   };
   const volunteerPool = obj.pool !== "off";
   // The chat's Quality, from Home. Anything else renders at Medium.
@@ -166,6 +180,10 @@ export async function POST(req: Request) {
   if (!prompt) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
+  // The maker's inspiration image, by its URL in our own store — only one
+  // the inspiration route kept, never a concept or anything off-site. A
+  // refine evolves its parent, so it takes none.
+  const source = kind === "fresh" ? await inspirationBytes(obj.inspiration) : undefined;
   if (kind === "refine" && !parentImageUrl) {
     return NextResponse.json(
       { error: "parentImageUrl is required for refine" },
@@ -202,7 +220,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const job = await startRender(finalPrompt, seed, { volunteerPool, quality });
+    const job = await startRender(finalPrompt, seed, { volunteerPool, quality, source });
     return NextResponse.json({ job: encodeJob(job) });
   } catch (err) {
     return failed(err);

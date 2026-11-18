@@ -27,6 +27,7 @@
 // when this deployment has a token, and is refused ("pool-off") when not.
 
 import { HORDE_STEPS, POLLINATIONS_SIZE, cleanQuality, type RenderQuality } from "./quality";
+import { INSPIRATION_STRENGTH } from "./inspiration";
 
 export type Rendered = {
   bytes: Uint8Array;
@@ -89,7 +90,14 @@ export type RenderProgress =
 
 /** What the person asked for. `volunteerPool: false` keeps the request off
  *  the AI Horde (Settings › AI & your data › Use the volunteer GPU pool). */
-export type RenderOptions = { volunteerPool?: boolean; quality?: RenderQuality };
+export type RenderOptions = {
+  volunteerPool?: boolean;
+  quality?: RenderQuality;
+  /** The maker's inspiration image (inspiration.ts): the render starts from
+   *  it, img2img. Only the horde takes one; Pollinations draws from the
+   *  prompt alone, as it always did. */
+  source?: Uint8Array;
+};
 
 /** Hand the work to the provider and return at once. The caller polls. */
 export function startRender(prompt: string, seed: string, opts: RenderOptions = {}): Promise<RenderJob> {
@@ -98,7 +106,7 @@ export function startRender(prompt: string, seed: string, opts: RenderOptions = 
   if (opts.volunteerPool === false) {
     return Promise.reject(new RenderError("pool-off", "the volunteer pool is off and no other image service is set up"));
   }
-  return hordeStart(prompt, seed, quality);
+  return hordeStart(prompt, seed, quality, opts.source);
 }
 
 /** Has it landed? Throws RenderError when it never will. */
@@ -270,7 +278,7 @@ async function hordeFetch(
   }
 }
 
-function submitBody(prompt: string, seed: string, w: number, h: number, steps: number) {
+function submitBody(prompt: string, seed: string, w: number, h: number, steps: number, source?: string) {
   return JSON.stringify({
     prompt: enhance(prompt),
     models: MODELS,
@@ -283,6 +291,9 @@ function submitBody(prompt: string, seed: string, w: number, h: number, steps: n
     // horde refuses even a 512px job with 403 KudosUpfront, because it
     // then has to reserve the kudos up front.
     slow_workers: true,
+    // An inspiration image: the render starts from it. Sent inline, base64,
+    // because the stored copy sits behind our own private route.
+    ...(source ? { source_image: source, source_processing: "img2img" } : null),
     params: {
       width: w,
       height: h,
@@ -292,6 +303,7 @@ function submitBody(prompt: string, seed: string, w: number, h: number, steps: n
       karras: true,
       sampler_name: "k_euler_a",
       seed,
+      ...(source ? { denoising_strength: INSPIRATION_STRENGTH } : null),
     },
   });
 }
@@ -303,19 +315,25 @@ function submitBody(prompt: string, seed: string, w: number, h: number, steps: n
 const SUBMIT_ATTEMPTS = 4;
 const SUBMIT_BACKOFF_MS = 900;
 
-async function hordeStart(prompt: string, seed: string, quality: RenderQuality): Promise<RenderJob> {
+async function hordeStart(
+  prompt: string,
+  seed: string,
+  quality: RenderQuality,
+  sourceBytes?: Uint8Array,
+): Promise<RenderJob> {
   const steps = HORDE_STEPS[quality];
+  const source = sourceBytes ? Buffer.from(sourceBytes).toString("base64") : undefined;
   let res: Response;
   try {
     res = await hordeFetch("/generate/async", {
       method: "POST",
-      body: submitBody(prompt, seed, WIDTH, HEIGHT, steps),
+      body: submitBody(prompt, seed, WIDTH, HEIGHT, steps, source),
     });
     for (let attempt = 1; attempt < SUBMIT_ATTEMPTS && res.status === 429; attempt += 1) {
       await sleep(SUBMIT_BACKOFF_MS * attempt);
       res = await hordeFetch("/generate/async", {
         method: "POST",
-        body: submitBody(prompt, seed, WIDTH, HEIGHT, steps),
+        body: submitBody(prompt, seed, WIDTH, HEIGHT, steps, source),
       });
     }
     if (res.status === 403) {
@@ -326,7 +344,7 @@ async function hordeStart(prompt: string, seed: string, quality: RenderQuality):
       if (/KudosUpfront/i.test(body)) {
         res = await hordeFetch("/generate/async", {
           method: "POST",
-          body: submitBody(prompt, seed, FALLBACK_WIDTH, FALLBACK_HEIGHT, steps),
+          body: submitBody(prompt, seed, FALLBACK_WIDTH, FALLBACK_HEIGHT, steps, source),
         });
       } else {
         throw new RenderError("unreachable", body.slice(0, 200));

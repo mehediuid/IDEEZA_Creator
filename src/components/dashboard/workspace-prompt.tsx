@@ -24,6 +24,8 @@ import {
 } from "@/lib/create/history";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
+import { pickProblem } from "@/lib/create/inspiration";
+import { shrinkInspiration, uploadInspiration } from "@/lib/create/inspiration-client";
 import { formatCount, PROJECTS, type Project } from "@/lib/feed";
 import { MintedBadge } from "@/components/newsfeed/minted-badge";
 import { BuildManuallyInfo } from "./build-manually-info";
@@ -31,7 +33,7 @@ import { ProjectInfoModal } from "./project-info-modal";
 import { HeroGlow } from "./hero-glow";
 import { DELIVERABLE_ICON } from "./deliverable-icon";
 import { SourceNudge } from "@/components/auth/source-picker";
-import { PromptCard, useLastQuality } from "./prompt-card";
+import { PromptCard, useLastQuality, type InspirationPick } from "./prompt-card";
 import { Icon } from "./icon";
 
 type Mode = "ai" | "manual";
@@ -106,6 +108,29 @@ export function WorkspacePrompt() {
   // uses it, and each product is built at it unless its card changes it
   // (lib/create/quality.ts). The next idea starts at the one picked last.
   const [quality, setQuality] = useLastQuality();
+  // The inspiration image (lib/create/inspiration.ts), shrunk in the page and
+  // kept here until Generate stores it with the idea.
+  const [inspiration, setInspiration] = React.useState<InspirationPick | null>(null);
+  const [imageError, setImageError] = React.useState<string | null>(null);
+  const takeImage = React.useCallback(async (file: File) => {
+    const problem = pickProblem(file);
+    if (problem) {
+      setImageError(problem);
+      return;
+    }
+    try {
+      const dataUrl = await shrinkInspiration(file);
+      setInspiration({ dataUrl, name: file.name || "Pasted image" });
+      setImageError(null);
+    } catch {
+      setImageError("We couldn't open that picture — try a JPG or PNG.");
+    }
+  }, []);
+  const dropImage = React.useCallback(() => {
+    setInspiration(null);
+    setImageError(null);
+    requestAnimationFrame(() => taRef.current?.focus());
+  }, []);
   const [refining, setRefining] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   // Manual-mode modal lives at this level so a click on "Create
@@ -150,8 +175,25 @@ export function WorkspacePrompt() {
     // component unmounts on the navigation, so there is nothing to clear;
     // if the push throws, the catch hands the control back.
     setSubmitting(true);
+    // The picture goes up first, so the chat opens already holding it; if it
+    // can't be kept, the idea waits here with the reason rather than
+    // opening without what the maker asked for.
+    let inspirationUrl: string | undefined;
+    if (inspiration) {
+      const up = await uploadInspiration(inspiration.dataUrl);
+      if ("error" in up) {
+        setImageError(up.error);
+        setSubmitting(false);
+        return;
+      }
+      inspirationUrl = up.url;
+    }
     try {
-      const session = createChat(trimmed, { quality, ...(addTo ? { addTo: addTo.id } : null) });
+      const session = createChat(trimmed, {
+        quality,
+        ...(inspirationUrl && inspiration ? { inspiration: inspirationUrl, inspirationName: inspiration.name } : null),
+        ...(addTo ? { addTo: addTo.id } : null),
+      });
       router.push(`/chat/${session.id}`);
     } catch {
       setSubmitting(false);
@@ -252,6 +294,10 @@ export function WorkspacePrompt() {
               canRender={canRender}
               quality={quality}
               onQuality={setQuality}
+              inspiration={inspiration}
+              onImage={takeImage}
+              onDropImage={dropImage}
+              imageError={imageError}
             />
           ) : (
             <BuildManuallyInfo onCreate={() => setProjectModalOpen(true)} />

@@ -3,9 +3,19 @@
 // The regular AI chat box: the idea, voice input, Quality (Low / Medium / High, remembered), Enhance and Generate.
 // Home's WorkspacePrompt holds it, and so does a project page's "Add a product › Build with AI" (owner,
 // 2026-11-16: "why isn't our regular AI chat box there?"), so both start a chat the same way.
+// The inspiration image (owner, 2026-11-01) is Home's only: the card shows its button, paste and drop
+// when the caller passes `onImage`.
 
 import * as React from "react";
-import { AiMagicIcon, MagicWand01Icon, Mic01Icon, Refresh01Icon, SparklesIcon } from "@hugeicons/core-free-icons";
+import {
+  AiMagicIcon,
+  Cancel01Icon,
+  ImageAdd01Icon,
+  MagicWand01Icon,
+  Mic01Icon,
+  Refresh01Icon,
+  SparklesIcon,
+} from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_QUALITY,
@@ -16,11 +26,15 @@ import {
 } from "@/lib/create/quality";
 import { creditsLabel, defaultPick, pickCost } from "@/lib/create/pieces";
 import { QualityMenu } from "@/components/create/quality-menu";
+import { INSPIRATION_TYPES } from "@/lib/create/inspiration";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
 import { Icon, type IconValue } from "./icon";
 
 type Mode = "ai" | "manual";
+
+/** An inspiration image picked in the page, before Generate uploads it. */
+export type InspirationPick = { dataUrl: string; name: string };
 
 // The Quality picked last, read where the browser keeps it. The server has
 // no store, so it draws Medium and the client takes over on hydration; a
@@ -73,6 +87,12 @@ export const PromptCard = React.forwardRef<
     sendLabel?: string;
     /** Why Generate waits while the box is empty. */
     emptyHint?: string;
+    /** The inspiration image, as it will go with the idea. */
+    inspiration?: InspirationPick | null;
+    /** Takes a picked, pasted or dropped picture. Without it the card has no image button. */
+    onImage?: (file: File) => void;
+    onDropImage?: () => void;
+    imageError?: string | null;
   }
 >(function PromptCard(
   {
@@ -91,10 +111,17 @@ export const PromptCard = React.forwardRef<
     label = "Describe your electronics project",
     sendLabel = "Generate project",
     emptyHint = "describe your project first",
+    inspiration = null,
+    onImage,
+    onDropImage,
+    imageError = null,
   },
   ref,
 ) {
   const localRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const fileRef = React.useRef<HTMLInputElement | null>(null);
+  const [dragging, setDragging] = React.useState(false);
+  const takesImages = mode === "ai" && !!onImage;
   // No dep array on purpose. The listening view below replaces this
   // whole card, so the textarea is unmounted and remounted once per
   // dictation; a handle computed only at mount would hand the parent a
@@ -189,7 +216,69 @@ export const PromptCard = React.forwardRef<
     <div>
       {/* Focus shows: the brand border the chat composer already wears. It
           was border → border, which changed nothing. */}
-      <div className="rounded-2xl border border-border bg-bg-surface focus-within:border-border-brand">
+      {/* A picture can also be dropped on the card or pasted into the box —
+          the brand border says a drop will land. */}
+      <div
+        className={cn(
+          "rounded-2xl border bg-bg-surface focus-within:border-border-brand",
+          dragging ? "border-dashed border-border-brand" : "border-border",
+        )}
+        onDragOver={
+          takesImages
+            ? (e) => {
+                if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+                e.preventDefault();
+                setDragging(true);
+              }
+            : undefined
+        }
+        onDragLeave={
+          takesImages
+            ? (e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+              }
+            : undefined
+        }
+        onDrop={
+          takesImages
+            ? (e) => {
+                const file =
+                  Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/")) ?? e.dataTransfer.files[0];
+                setDragging(false);
+                if (!file) return;
+                e.preventDefault();
+                onImage?.(file);
+              }
+            : undefined
+        }
+      >
+        {/* The picture going with the idea, small: a thumbnail, its own file
+            name and the way to take it off (owner, 2026-11-01: no title or
+            explanation beside it). */}
+        {takesImages && inspiration && (
+          <div className="px-[20px] pt-[16px]">
+            <div className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-solid border-border py-[4px] pl-[4px] pr-[2px]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a data URL made in this page */}
+              <img
+                src={inspiration.dataUrl}
+                alt="Your inspiration image"
+                width={32}
+                height={24}
+                className="h-[24px] w-[32px] shrink-0 rounded-sm object-cover"
+              />
+              <span className="min-w-0 truncate text-sm text-text-secondary">{inspiration.name}</span>
+              <button
+                type="button"
+                onClick={onDropImage}
+                aria-label={`Remove ${inspiration.name}`}
+                title="Remove"
+                className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+              >
+                <Icon icon={Cancel01Icon} size={14} />
+              </button>
+            </div>
+          </div>
+        )}
         <label htmlFor={id} className="sr-only">
           {label}
         </label>
@@ -199,6 +288,17 @@ export const PromptCard = React.forwardRef<
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKey}
+          onPaste={
+            takesImages
+              ? (e) => {
+                  // A pasted picture is an inspiration image; pasted text stays text.
+                  const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+                  if (!file) return;
+                  e.preventDefault();
+                  onImage?.(file);
+                }
+              : undefined
+          }
           placeholder={placeholder}
           rows={3}
           className="block w-full resize-none bg-transparent px-[20px] pt-[20px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
@@ -208,9 +308,9 @@ export const PromptCard = React.forwardRef<
             than the card, so Enhance and Generate take a second line, still
             at the right. On anything wider it is the one row it always was. */}
         <div className="flex flex-wrap items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
-          {/* No attach button: it was permanently disabled — the picked file
-              was never sent to the generator — so it offered nothing but a
-              reason. It comes back when an image can go with the prompt. */}
+          {/* The attach button is back now that the picture goes with the
+              prompt: the main product's concept is drawn from it (owner,
+              2026-11-01). It was taken out while the file went nowhere. */}
           <div className="flex shrink-0 items-center gap-[4px]">
             <ToolbarIconButton
               ariaLabel={
@@ -222,6 +322,28 @@ export const PromptCard = React.forwardRef<
               icon={Mic01Icon}
               disabled={!voice.supported}
             />
+            {takesImages && (
+              <>
+                <ToolbarIconButton
+                  ariaLabel={inspiration ? "Change the inspiration image" : "Add an inspiration image"}
+                  onClick={() => fileRef.current?.click()}
+                  icon={ImageAdd01Icon}
+                />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept={INSPIRATION_TYPES.join(",")}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) onImage?.(file);
+                  }}
+                />
+              </>
+            )}
             {mode === "ai" && (
               <QualityMenu value={quality} onChange={onQuality} variant="toolbar" price={buildPrice} />
             )}
@@ -257,10 +379,10 @@ export const PromptCard = React.forwardRef<
         role="status"
         className={cn(
           "px-[4px] text-sm text-text-error",
-          voiceError && "mt-[10px]",
+          (voiceError || imageError) && "mt-[10px]",
         )}
       >
-        {voiceError}
+        {voiceError ?? imageError}
       </p>
     </div>
   );
