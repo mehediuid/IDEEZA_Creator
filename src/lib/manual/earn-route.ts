@@ -45,6 +45,14 @@ export function earnHref(projectId: string, place: EarnPlace = "overview", query
   return base + qs + (isEarnSection(place) ? "" : `#${place}`);
 }
 
+/** A product's way into Earn (owner, 2026-11-18: "from a product page you can't get to
+ *  earning"): Earn › Sell on that product's row, its copies open in the item panel
+ *  (`#editions-<product>`, `defaultTileOf`). A one-product project has no product row, so
+ *  the desk opens on the project's copies, which are that product's. */
+export function productEarnHref(projectId: string, productId: string): string {
+  return `${earnHref(projectId, "sell")}#editions-${encodeURIComponent(productId)}`;
+}
+
 /** The section addresses before the four tabs, and the part each one is now. */
 const MOVED_SECTIONS: Readonly<Record<string, EarnPart>> = {
   editions: "copies",

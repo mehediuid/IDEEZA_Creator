@@ -27,6 +27,7 @@ import {
   earnMintHref,
   earnSectionRedirectOf,
   isEarnSection,
+  productEarnHref,
 } from "../../.tmp-test/lib/manual/earn-route.js";
 import { EMPTY_MARKET, NO_SHARE_TO_SELL, projectSummary } from "../../.tmp-test/lib/manual/project-summary.js";
 import { normalizeBrief, normalizeStep } from "../../.tmp-test/lib/brief/types.js";
@@ -49,6 +50,11 @@ test("four tabs, in order: Overview · Sell · Business plan · Money", () => {
   assert.deepEqual([...EARN_SECTIONS], ["overview", "sell", "plan", "money"]);
   assert.deepEqual(EARN_SECTIONS.map((s) => EARN_SECTION_LABEL[s]), ["Overview", "Sell", "Business plan", "Money"]);
   for (const old of ["editions", "splits", "customers", "rights"]) assert.equal(isEarnSection(old), false, old);
+});
+
+test("a product's Earn opens Earn › Sell on that product's copies (owner, 2026-11-18)", () => {
+  assert.equal(productEarnHref("proj_car", "prd_wheel"), "/projects/proj_car/earn/sell#editions-prd_wheel");
+  assert.equal(productEarnHref("p 1", "prd x"), "/projects/p%201/earn/sell#editions-prd%20x");
 });
 
 test("a tab's address is its path; a part of a tab adds its id as the hash, after any query", () => {
