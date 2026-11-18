@@ -293,12 +293,25 @@ export function deskTitleOf(kind: DeskKind, scopeName: string | null, projectNam
   return `${word} copies of ${scopeName ?? "the whole project"}`;
 }
 
-/** What each column holds, in a line (the full rule cards are in "How selling works"). */
+/** What each kind holds, in a line: the item panel's and the drawer's head (the full rule cards are in "How selling works"). */
 export const DESK_KIND_LINE: Record<DeskKind, string> = {
   main: "The project itself · whole project only",
   physical: "A built unit you make and ship",
   virtual: "The design files with a licence",
 };
+
+/** What each kind is, in a line on its tile (owner, 2026-11-18: testers could not tell the tiles apart,
+ *  so each tile names its type and says what it is; "whole project only" is the board's shape). */
+export const DESK_KIND_PLAIN: Record<DeskKind, string> = {
+  main: "The project itself",
+  physical: DESK_KIND_LINE.physical,
+  virtual: DESK_KIND_LINE.virtual,
+};
+
+/** A product's Main slot: products have no Main NFT. The first product's slot says why, the rest only name it. */
+export const NO_MAIN_TITLE = "No Main NFT";
+export const NO_MAIN_WHY = "Products sell copies only. The Main NFT is the whole project, above.";
+export const NO_MAIN_SHORT = "Copies only";
 
 /** Where buyers see a tile: the project's marketplace page on that tab, or a product's page. */
 export function marketHrefOf(projectId: string, scope: string, kind: DeskKind): string {

@@ -4,39 +4,81 @@
 // recommendation): what the project sells, at a glance.
 // - "How selling works" (D2): the three rule cards and their lead, word for
 //   word, behind one disclosure beside the heading, as the phone keeps them
-//   behind ⓘ. Each column's head says its rule in a line.
+//   behind ⓘ.
 // - The board: a row for the whole project and one per product (D3: a
 //   one-product project has one row), a column for Main, Physical and
 //   Virtual, in two labelled groups (owner, 2026-11-18): "Whole project" and
 //   "One product at a time · n products — Products sell copies only, not a
-//   Main NFT." A product's Main cell is empty, so the rule shows in the
-//   board's shape.
-// - A tile is the row's state in a chip, its price, how much has sold (a
-//   meter) and what it earned (D6). A tile only picks (aria-pressed); every
-//   control for it is in the item panel (D4).
+//   Main NFT." A product's Main slot says "No Main NFT" (the first product's
+//   says why), so the rule shows in the board's shape and in words.
+// - A tile names its type first (owner, 2026-11-18: testers could not tell
+//   Main, Physical and Virtual apart when only the columns' heads named them):
+//   the kind's mark (the phone's icon), its name and what it is; then its
+//   state in a chip beside the price, how much has sold (a meter) and what it
+//   earned (D6). No column heads: each tile says it. A tile only picks
+//   (aria-pressed); every control for it is in the item panel (D4).
 // - Before the mint (D10) one band stands in for the tiles: one mint first,
 //   then each sells on its own.
-// - The board's container query: from 720 px the row's name sits beside its
-//   tiles; narrower, above them; under 480 px the tiles stack and say their kind.
+// - The board's container query: from 960 px the row's name sits beside its
+//   tiles; narrower, above them; under 480 px the tiles stack.
 // Sizes and colours are the DS's: body 14, captions 12, the header pill's chip.
 
 import * as React from "react";
 import { InformationCircleIcon, LockIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, TestnetDemoBadge, type BadgeTone } from "@/components/ideeza";
+import { KIND_ICON } from "@/components/marketplace/kind-icon";
 import { payoutLinesText } from "@/lib/commerce/payout";
-import { DESK_KIND_LINE, DESK_KINDS, type DeskKind, type DeskTile, type DeskTone } from "@/lib/market/sell-desk";
+import {
+  DESK_KIND_PLAIN,
+  DESK_KINDS,
+  NO_MAIN_SHORT,
+  NO_MAIN_TITLE,
+  NO_MAIN_WHY,
+  type DeskKind,
+  type DeskTile,
+  type DeskTone,
+} from "@/lib/market/sell-desk";
 import { SELL_RULES, SELL_RULES_LEAD } from "@/lib/market/sell-flow";
 import { cn } from "@/lib/utils";
 import { EARN_H2, EARN_LEAD } from "../surface";
 
-const DOT: Record<DeskKind, string> = { main: "bg-bg-brand", physical: "bg-bg-warning", virtual: "bg-bg-info" };
 export const KIND_NAME: Record<DeskKind, string> = { main: "Main NFT", physical: "Physical NFT", virtual: "Virtual NFT" };
 const TONE: Record<DeskTone, BadgeTone> = { success: "success", brand: "brand", neutral: "neutral", warning: "warning", info: "info" };
+/** A kind's mark: its tinted square and icon colour, the DS's subtle fills and icon inks. */
+const MARK: Record<DeskKind, string> = {
+  main: "bg-bg-brand-subtle text-[color:var(--color-icon-brand)]",
+  physical: "bg-bg-warning-subtle text-[color:var(--color-icon-warning)]",
+  virtual: "bg-bg-info-subtle text-[color:var(--color-icon-info)]",
+};
 
-/** A kind's dot: colour helps, the word beside it carries the meaning. */
-export function KindDot({ kind }: { kind: DeskKind }) {
-  return <span aria-hidden className={cn("inline-block size-[10px] shrink-0 rounded-full", DOT[kind])} />;
+/** A kind's mark: the phone's icon for it in a tinted square. The icon and colour help; the name beside it carries the meaning. */
+export function KindMark({ kind, size = "md", off = false }: { kind: DeskKind; size?: "sm" | "md"; off?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center",
+        size === "md" ? "size-[32px] rounded-lg" : "size-[24px] rounded-md",
+        off ? "bg-bg-subtle text-[color:var(--color-icon-secondary)]" : MARK[kind],
+      )}
+    >
+      <Icon icon={KIND_ICON[kind]} size={size === "md" ? 18 : 14} />
+    </span>
+  );
+}
+
+/** The tile's (and the No Main slot's) head: the kind's mark, its name and what it is. */
+function KindHead({ kind, title, line, off = false }: { kind: DeskKind; title: string; line: string; off?: boolean }) {
+  return (
+    <span className="flex min-w-0 items-start gap-5">
+      <KindMark kind={kind} off={off} />
+      <span className="flex min-w-0 flex-col">
+        <span className={cn("text-md font-semibold leading-md", off ? "text-text-secondary" : "text-text-primary")}>{title}</span>
+        <span className="text-sm leading-sm text-text-tertiary">{line}</span>
+      </span>
+    </span>
+  );
 }
 
 /** The tile's state, as the header's status pill is drawn (12 px, semibold). */
@@ -130,8 +172,8 @@ export function SellBoard({
           <ul className="m-0 grid list-none grid-cols-1 gap-6 p-0 [@container(min-width:640px)]:grid-cols-3">
             {SELL_RULES.map((r) => (
               <li key={r.id} className="flex min-w-0 flex-col gap-2">
-                <span className="flex items-center gap-3 text-md font-semibold leading-md text-text-primary">
-                  <KindDot kind={r.id} />
+                <span className="flex items-center gap-4 text-md font-semibold leading-md text-text-primary">
+                  <KindMark kind={r.id} size="sm" />
                   {r.title}
                 </span>
                 <span className="text-md leading-md text-text-secondary">{r.line}</span>
@@ -161,18 +203,6 @@ export function SellBoard({
       )}
 
       <div className="min-w-0 rounded-2xl border border-solid border-border bg-bg-surface px-8 py-2 [container-type:inline-size] [@container(min-width:640px)]:px-12">
-        <div role="presentation" className={cn(ROW, "hidden py-6 [@container(min-width:480px)]:grid")}>
-          <span className="hidden [@container(min-width:720px)]:block" />
-          {DESK_KINDS.map((k) => (
-            <span key={k} className="flex min-w-0 flex-col gap-1">
-              <span className="flex items-center gap-3 text-md font-semibold leading-md text-text-primary">
-                <KindDot kind={k} />
-                {KIND_NAME[k]}
-              </span>
-              <span className="text-sm leading-sm text-text-tertiary">{DESK_KIND_LINE[k]}</span>
-            </span>
-          ))}
-        </div>
         {rows.map((row, i) => (
           <React.Fragment key={row.scope}>
             {i === 0 && <GroupBand title="Whole project" lead="The Main NFT, and copies of everything in it." />}
@@ -194,7 +224,7 @@ export function SellBoard({
                   aria-pressed={draft.selected}
                   onClick={() => onSelect("draft")}
                   className={cn(
-                    "col-span-full grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-7 gap-y-1 rounded-xl border border-dashed border-border-strong bg-transparent px-9 py-8 text-left outline-none transition-colors duration-fast hover:border-text-tertiary focus-visible:ring-2 focus-visible:ring-border-focus [@container(min-width:720px)]:col-span-3",
+                    "col-span-full grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-7 gap-y-1 rounded-xl border border-dashed border-border-strong bg-transparent px-9 py-8 text-left outline-none transition-colors duration-fast hover:border-text-tertiary focus-visible:ring-2 focus-visible:ring-border-focus [@container(min-width:960px)]:col-span-3",
                     draft.selected && "border-solid border-border-brand bg-bg-brand-subtle",
                   )}
                 >
@@ -209,7 +239,7 @@ export function SellBoard({
               ) : (
                 DESK_KINDS.map((k) => {
                   const tile = row.tiles[k];
-                  if (!tile) return <EmptyMain key={k} />;
+                  if (!tile) return <NoMain key={k} first={i === 1} />;
                   return <Tile key={k} tile={tile} rowName={row.name} selected={selected === tile.key} onSelect={onSelect} opens={opens} />;
                 })
               )}
@@ -221,14 +251,15 @@ export function SellBoard({
   );
 }
 
-/** The board's grid: from 720 px the row's name beside its three tiles, narrower above them, under 480 px one column. */
+/** The board's grid: from 960 px the row's name beside its three tiles (a tile needs ~240 px for its name, line,
+ *  price and chip on their own lines), narrower above them, under 480 px one column. */
 const ROW =
-  "grid min-w-0 grid-cols-1 gap-6 [@container(min-width:480px)]:grid-cols-3 [@container(min-width:720px)]:grid-cols-[176px_repeat(3,minmax(0,1fr))]";
+  "grid min-w-0 grid-cols-1 gap-6 [@container(min-width:480px)]:grid-cols-3 [@container(min-width:960px)]:grid-cols-[176px_repeat(3,minmax(0,1fr))]";
 
 function ScopeCell({ row }: { row: BoardRow }) {
   const [imgOk, setImgOk] = React.useState(true);
   return (
-    <div className="col-span-full flex min-w-0 items-start gap-6 [@container(min-width:720px)]:col-span-1">
+    <div className="col-span-full flex min-w-0 items-start gap-6 [@container(min-width:960px)]:col-span-1">
       <span className="inline-flex size-[56px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-solid border-border-subtle bg-bg-subtle text-lg font-semibold text-text-brand">
         {row.cover && imgOk ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -264,11 +295,17 @@ function GroupBand({ title, lead, count }: { title: string; lead: string; count?
   );
 }
 
-/** A product's Main cell: empty — its band says products sell copies only. */
-function EmptyMain() {
+/** A product's Main slot: "No Main NFT". The first product's says why; the rest only name it, and under
+ *  480 px (tiles stacked, nothing to line up) only the first shows. */
+function NoMain({ first }: { first: boolean }) {
   return (
-    <span className="hidden min-h-[112px] items-center justify-center rounded-xl border border-dashed border-border px-6 text-center text-sm leading-sm text-text-tertiary [@container(min-width:480px)]:flex">
-      <span aria-label="No Main NFT">—</span>
+    <span
+      className={cn(
+        "min-w-0 flex-col rounded-xl border border-dashed border-border-strong px-7 py-6 [@container(min-width:480px)]:min-h-[112px]",
+        first ? "flex" : "hidden [@container(min-width:480px)]:flex",
+      )}
+    >
+      <KindHead kind="main" title={NO_MAIN_TITLE} line={first ? NO_MAIN_WHY : NO_MAIN_SHORT} off />
     </span>
   );
 }
@@ -318,22 +355,18 @@ function Tile({
         selected && "border-border-brand bg-bg-brand-subtle hover:border-border-brand",
       )}
     >
-      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="hidden items-center gap-2 text-sm font-semibold text-text-primary [@container(max-width:479px)]:inline-flex">
-          <KindDot kind={tile.kind} />
-          {KIND_NAME[tile.kind]}
-        </span>
+      <KindHead kind={tile.kind} title={KIND_NAME[tile.kind]} line={DESK_KIND_PLAIN[tile.kind]} />
+      <span className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        {tile.price ? (
+          <span className="min-w-0 break-words text-lg font-semibold leading-lg text-text-primary tabular-nums">{tile.price}</span>
+        ) : (
+          <span className="text-md leading-md text-text-tertiary">{noPriceOf(tile)}</span>
+        )}
         <DeskChip chip={tile.chip} />
-        {tile.uses && <span className="text-sm leading-sm text-text-tertiary">{tile.uses}</span>}
       </span>
-      {tile.price ? (
-        <span className="break-words text-lg font-semibold leading-lg text-text-primary tabular-nums">{tile.price}</span>
-      ) : (
-        <span className="text-md leading-md text-text-tertiary">{noPriceOf(tile)}</span>
-      )}
       {tile.meter && <SoldMeter meter={tile.meter} label={meterLabel} />}
       <span className="mt-auto flex min-w-0 flex-wrap justify-between gap-x-4 text-sm leading-sm text-text-tertiary tabular-nums">
-        <span>{tile.soldLine ?? ""}</span>
+        <span>{[tile.soldLine, tile.uses].filter(Boolean).join(" · ")}</span>
         {earned ? (
           <span className="font-semibold text-text-success">{earned}</span>
         ) : tile.hint ? (

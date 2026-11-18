@@ -53,7 +53,7 @@ import type { CopyScope } from "../editions/edition-block";
 import { useCommitGate } from "./ladder/level-check";
 import { earnSourceOf } from "./ladder/use-earn-facts";
 import { EARN_LINK } from "./surface";
-import { SellBoard, type BoardRow } from "./sell/board";
+import { KindMark, SellBoard, type BoardRow } from "./sell/board";
 import { CopyPanel, DraftPanel, MainPanel, PanelFrame, PanelInDrawer, panelHeadOf, type CopyDesk, type MainDesk } from "./sell/item-panel";
 
 const COPY_KINDS: EditionKind[] = ["physical", "virtual"];
@@ -273,6 +273,16 @@ function SellDesk(props: SlotProps) {
     selected === "draft" ? { kind: "draft" } : copy ? { kind: copy.kind, scopeName: copy.scope.product ? copy.scope.name : null } : { kind: "main", scopeName: null },
     project.name,
   );
+  // The drawer's line carries the kind's mark too, as the tile and the rail's head do.
+  const headKind = selected === "draft" ? null : copy ? copy.kind : "main";
+  const headLine = headKind ? (
+    <span className="flex min-w-0 items-start gap-4">
+      <KindMark kind={headKind} size="sm" />
+      <span className="min-w-0">{head.description}</span>
+    </span>
+  ) : (
+    head.description
+  );
 
   return (
     <div className={WITH_RAIL}>
@@ -314,7 +324,7 @@ function SellDesk(props: SlotProps) {
       </div>
 
       {narrow ? (
-        <ItemDrawer open={open} onClose={() => setDrawer(false)} title={head.title} description={head.description}>
+        <ItemDrawer open={open} onClose={() => setDrawer(false)} title={head.title} description={headLine}>
           {panel}
         </ItemDrawer>
       ) : (
@@ -337,7 +347,7 @@ function ItemDrawer({
   open: boolean;
   onClose: () => void;
   title: string;
-  description: string;
+  description: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [covered, setCovered] = React.useState(false);
