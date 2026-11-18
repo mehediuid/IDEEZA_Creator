@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-029](#cl-029-innovations-post-the-story-page-with-an-on-marketplace-card) | Innovations post: the story page with an On Marketplace card | 13 Oct 2026 | [PR-9662](https://ideeza.atlassian.net/browse/PR-9662) | Not started |
 | [CL-028](#cl-028-earn--sell-one-board-for-everything-you-sell) | Earn › Sell: one board for everything you sell | 18 Nov 2026 | [PR-9660](https://ideeza.atlassian.net/browse/PR-9660) | Not started |
 | [CL-027](#cl-027-an-inspiration-image-with-the-idea-home-and-add-a-product) | An inspiration image with the idea (Home and Add a product) | 18 Nov 2026 | [PR-9658](https://ideeza.atlassian.net/browse/PR-9658) | Not started |
 | [CL-026](#cl-026-the-projects-earn-button-opens-earns-overview) | The project's Earn button opens Earn's Overview | 18 Nov 2026 | Not created yet | Not started |
@@ -56,6 +57,59 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-029 Innovations post: the story page with an On Marketplace card
+
+**In the prototype:** 13 October 2026 (written into this changelog on 18 November 2026) · **Jira:** [PR-9662](https://ideeza.atlassian.net/browse/PR-9662) · **Production:** Not started
+
+**Screen:** Innovations › a post, `/innovations/<post>`, and a product of the post, `/innovations/<post>/products/<product>`. The post is where a shared project is shown, learned from and talked about. Buying happens only on its Marketplace page ([CL-018](#cl-018-marketplace-details-a-shop-page-with-one-buy-box)).
+
+### What to build
+
+**The page**
+- [ ] A reading page: the media and the story on the left, a rail on the right that stays in view. At phone width one column, with a bar stuck to the bottom: Appreciate · Save · Comments · Copy link.
+- [ ] Media first, and it opens on a video: the project video when there is one, then each product's video in product order, then the cover and concept pictures. Thumbnails show a play badge and the length; pictures open in a lightbox; nothing autoplays.
+- [ ] Under the media: the title with the status chip and the **Minted** chip, then "{category} · {n} product · {n} parts · Shared {date}".
+- [ ] The maker's story, **About this project**, and **What's inside**: each product with what is open, and the PCB, firmware and wiring marked as coming with a copy.
+- [ ] **Activity**: a small path of what was logged, oldest first, the current step ringed (up to six dots, older ones folded into "+n earlier"), then the current entry with its age, description and proof, and **Earlier (n)** opening the rest. The status chip by the title is the current entry's short name.
+- [ ] The ⋯ menu: **Copy link** and **Report post**.
+- [ ] Loading keeps the page's shape. An unknown address reads "We couldn't find this post".
+
+**The rail**
+- [ ] The maker: avatar, name, "{n} projects on Innovations", **Follow** and **Message** (opens a conversation about the post; not on your own post).
+- [ ] **Appreciate · {n}** (the page's one primary button), Save and Share (copy link), then "{n} appreciations · {n} views · {n} comments".
+- [ ] **On Marketplace**, only while something of the project is for sale: one row per offer with its price. "Whole project (Main NFT)" (", auction" for an auction, showing its buy-now price, else its starting bid), "Physical copy" and "Virtual copy" (" of {product}" for a product's own copies). Then **View on Marketplace** (to the project's marketplace page) and the line "Buying and bids happen on the Marketplace page." There is no Buy or Bid on the post.
+- [ ] **About**: only the rows that have a value: Category, Products, Parts, Network, Created, Updated, License, Minted on.
+- [ ] **More from {maker}**: their other posts.
+
+**Comments and replies**
+- [ ] "{n} Comments" (every comment and reply a visitor can see) with Top · Newest · Oldest.
+- [ ] A comment, a reply and a nested reply with the connector line; View n replies · Load n more replies · Hide replies; ten comments a page; See more on long ones; a photo per comment; Reply · ♥ · ⋯.
+- [ ] The ⋯ by role: your own comment Edit · Copy link · Delete (confirmed, then Undo; one with replies stays as "Comment deleted"); someone else's Copy link · Report (with a reason); on the maker's own post also Hide ("Hidden by the maker", Unhide any time) and Delete.
+- [ ] The composer under the thread: link, photo, @mention and **Post**; Enter sends. Typing "@" offers the people in the conversation.
+- [ ] On the maker's own post, a comment that uses one of the maker's hidden words (Settings › Blocking) reads "Hidden: it uses a word you hide" to the maker and "Hidden by the maker" to everyone else.
+
+**The maker's own post**
+- [ ] A bar on top: "This is your post. Visitors see it exactly like this, without this bar." with **Edit post** (the story), **Stop sharing** (confirmed; comments are kept) and **Open project**. Once unshared it reads Not shared, with **Share again**.
+
+**A product of the post**
+- [ ] The breadcrumb from Innovations, the post's product switcher and the way to its comments. Media first (the product's video, then its picture); 3D model and parts open; PCB, firmware code and wiring locked, each saying what a copy includes with the Marketplace prices, or "Not for sale right now".
+
+Demo stand-ins (prototype only): the sample posts, their makers and their conversation; reactions, saves and comments are kept in this browser.
+
+### Design
+
+- DS **M100 Comments** (Figma `3799:842`) for the thread. The rail's cards are the page's cards; **Appreciate** is the one primary button; **View on Marketplace** is a secondary lg button, full width.
+
+### Before → After
+
+On main since 13 October 2026, so there is no Before.
+
+| After | After |
+| --- | --- |
+| ![After: a post with its media, the maker and the On Marketplace card](docs/changelog/2026-11-18-innovations-post-after.png) | ![After: comments and replies beside the rail's On Marketplace, About and More from the maker](docs/changelog/2026-11-18-innovations-post-comments-after.png) |
 
 ---
 
