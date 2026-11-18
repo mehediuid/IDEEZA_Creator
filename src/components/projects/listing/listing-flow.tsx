@@ -29,7 +29,9 @@ import { LISTING_TRIGGER_ID, MARKETPLACE_FOCUS_ID } from "@/lib/market/listing-f
 import { cn } from "@/lib/utils";
 import { LevelCheck, useCommitGate } from "../earn/ladder/level-check";
 import { earnSourceOf } from "../earn/ladder/use-earn-facts";
-import { dialogBlockerOf, ReadinessDialog } from "../details/readiness-dialog";
+import { dialogBlockerOf, ReadinessDialog, videosWaitOf } from "../details/readiness-dialog";
+import { HeldBlock } from "@/components/video-jobs/held-block";
+import { heldOf, useHeld } from "@/lib/market/held";
 import type { ActionSlotProps } from "../details/slots";
 import { focusSoon, ListingDialog } from "./listing-dialog";
 
@@ -66,10 +68,15 @@ export function ListingFlow({
   const steps = !blocked && !ladder.ok;
   const reasonId = React.useId();
 
+  // The gate opens first while a video is still being made: its rows, their progress and the note
+  // that the listing will wait for them (owner, 2026-11-18). It never holds the listing back.
   const firstStep = React.useCallback(
-    (): Open => (dialogBlockerOf(view.videos.readiness.sell) ? "gate" : "form"),
+    (): Open => (dialogBlockerOf(view.videos.readiness.sell) || videosWaitOf(view.videos.readiness.sell) ? "gate" : "form"),
     [view.videos.readiness.sell],
   );
+  // A listing already signed and waiting for its videos stands in for the button.
+  const { store: held } = useHeld();
+  const waitingMain = heldOf(held, project.id).find((i) => i.kind === "main");
   // `?list=1` opens the flow once, on arrival.
   const [open, setOpen] = React.useState<Open>(() => (!blocked && search.get("list") === "1" ? firstStep() : null));
 
@@ -86,6 +93,10 @@ export function ListingFlow({
     setOpen(null);
     focusSoon(LISTING_TRIGGER_ID);
   };
+
+  if (waitingMain) {
+    return <HeldBlock item={waitingMain} projectId={project.id} products={view.products} onCancelled={announce} className={className} />;
+  }
 
   return (
     <>

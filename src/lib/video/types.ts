@@ -35,8 +35,22 @@ export const VIDEOS_KEY = (projectId: string) => `ideeza:video:${projectId}`;
  *  ids are `prd_…` (or the legacy `p1`), so it never collides with one. */
 export const PROJECT_VIDEO_KEY = "project";
 
-/** One product's part of a project video: which of its takes, and which stretch of it. */
-export type JoinCut = { productId: string; takeId: string; fromMs: number; ms: number; label: string };
+/** One product's scene in a project video. Since 2026-11-18 (owner: the project video never waits
+ *  for the product videos) a scene is drawn from the product itself: its concept image and a line
+ *  from its prompt and spec, and `takeId` is "". A take made before then cut a stretch of the
+ *  product's own clip (`takeId`, `fromMs`); those still play and re-render as they were. */
+export type JoinCut = {
+  productId: string;
+  takeId: string;
+  fromMs: number;
+  ms: number;
+  /** The chapter label, top left: the product's name. */
+  label: string;
+  /** The product's concept image (a scene drawn from the product). */
+  imageUrl?: string | null;
+  /** The scene's on-screen line, from the product's prompt and spec. */
+  line?: string;
+};
 /** What a project video take is made of: an intro card, the products' cuts in order, an outro card. */
 export type JoinPlan = { intro: [string, string]; cuts: JoinCut[]; outro: string };
 

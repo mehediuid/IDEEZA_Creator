@@ -40,7 +40,7 @@ import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProjectBrief } from "@/lib/brief/project-brief";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
 import {
   editionChainOf,
   editionGate,
@@ -54,7 +54,7 @@ import { copiesSoldLineOf, KIND_LABEL, PRICE_LABEL, trackNameOf, USE_LABEL } fro
 import type { EditionKind, EditionTrack, EditionUse, Listing } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
 import { cn } from "@/lib/utils";
-import { dialogBlockerOf, ReadinessDialog } from "../details/readiness-dialog";
+import { dialogBlockerOf, ReadinessDialog, videosWaitOf } from "../details/readiness-dialog";
 import { RailBlock, RailFact, RailFacts } from "../details/rail-block";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import type { ProductSlotProps } from "../product/product-slots";
@@ -148,7 +148,8 @@ export function EditionTracks({
     const facts = readinessFactsOf(project, view, brief, view.videos.record, jobs, now);
     return product ? readinessOf({ ...facts, product }, "edition") : readinessOf(facts, "sell");
   };
-  const startListing = (track: EditionTrack) => open({ kind: dialogBlockerOf(readiness()) ? "gate" : "list", track });
+  // The gate first while a video is still being made: it shows them and says the copies will wait.
+  const startListing = (track: EditionTrack) => open({ kind: dialogBlockerOf(readiness()) || videosWaitOf(readiness()) ? "gate" : "list", track });
   const ownershipAsked = () => readiness().rules.some((r) => r.id === "ownership" && !r.ok);
 
   const ofKind = tracksOf(scope.id, view.editions)
@@ -215,6 +216,8 @@ export function EditionTracks({
           chain={chain}
           main={main}
           askOwner={ownershipAsked()}
+          holdFor={() => videosBlockerOf(readiness())}
+          scope={scope.id}
           onClose={() => setDialog(null)}
           onDone={(m) => done(m, `${firstControlId(d.track.id)}-edit`)}
         />

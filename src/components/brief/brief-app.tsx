@@ -54,9 +54,10 @@ import { ownershipOf } from "@/lib/manual/ownership";
 import type { Readiness } from "@/lib/manual/p2-types";
 import { buildsOf, listingMetadataOf, productRowsOf, productsOfProject, type ProjectProduct } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { currentProductsOf, readinessOf, type ReadinessFacts } from "@/lib/manual/readiness";
+import { currentProductsOf, readinessOf, videosBlockerOf, type ReadinessFacts } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
 import { createListing, listingViewOf } from "@/lib/market/listing";
-import { cleanBenefits, listRequestOf, listedMintingType } from "@/lib/market/listing-flow";
+import { cleanBenefits, HELD_DONE_LINE, listRequestOf, listedMintingType } from "@/lib/market/listing-flow";
 import { listingInputFromBrief, type ListingInput } from "@/lib/market/listing-form";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import { mainSalesOf, randomId } from "@/lib/market/sales";
@@ -236,7 +237,7 @@ export function BriefApp({ projectId }: { projectId: string }) {
   const gated = gate.gated ? gate.readiness : null;
   const detailsReason = detailsMissing(state, { now, creatorPct, readiness: gated });
   const reviewReason = state.intent
-    ? reviewMissing({ intent: state.intent, details: detailsReason, shortfall: shortfall?.missing ?? null, readiness: gated })
+    ? reviewMissing({ intent: state.intent, details: detailsReason, shortfall: shortfall?.missing ?? null, readiness: gated, holdVideos: true })
     : null;
 
   // The commit (P2-MINT-6, P2-LISTING-22; spec §3.9): ONE wallet request, and
@@ -278,6 +279,8 @@ export function BriefApp({ projectId }: { projectId: string }) {
             mintRequest: plan.request,
           })
         : plan.request;
+      // A video still being made: the listing waits, and the wallet says so (owner, 2026-11-18).
+      if (req && terms && purpose && videosBlockerOf(gate.readiness)) req.doneLine = HELD_DONE_LINE;
       const newMint = plan.request?.purpose === "lazyMint" || plan.request?.purpose === "instantMint";
       let mintedAt: number | null = null;
 
@@ -304,7 +307,23 @@ export function BriefApp({ projectId }: { projectId: string }) {
         // 1. The MintRecord.
         if (record && !normalizeMintRecord(record)) return { ok: false, message: RECORD_INCOMPLETE };
         if (record && !setMint(cur.id, record)) return { ok: false, message: STORAGE_FAILED };
-        // 2. The listing (Sell). Refused: the record goes back to what it was.
+        // 2. The listing (Sell). Refused: the record goes back to what it was. A video still being
+        //    made (owner, 2026-11-18): the mint happens now and the listing waits off Explore
+        //    marketplace until every video is ready, then goes live by itself (lib/market/held.ts).
+        const videosWait = purpose
+          ? videosBlockerOf(readinessOf(factsOf(s, { videos: readProjectVideos(cur.id), jobs: jobsRef.current, now: at }), purpose))
+          : null;
+        if (listings && videosWait) {
+          const made = listings[listings.length - 1];
+          if (!hold({ id: heldId(), projectId: cur.id, kind: "main", at, listing: made }).ok) {
+            if (record) {
+              if (prior) setMint(cur.id, prior);
+              else updateProject(cur.id, { mint: undefined });
+            }
+            return { ok: false, message: refusedCopy("storage") };
+          }
+          listings = null;
+        }
         if (listings) {
           const wrote = writeListings(listings);
           if (!wrote.ok) {
@@ -333,6 +352,9 @@ export function BriefApp({ projectId }: { projectId: string }) {
         ).rules.every((r) => r.ok);
         if (s.shareToNewsfeed && shareReady && cur.showcasedAt == null) {
           setShowcase(cur.id, true, at, { story: s.story.trim() });
+        } else if (s.shareToNewsfeed && !shareReady && cur.showcasedAt == null) {
+          // Not silently dropped any more (owner, 2026-11-18): the post waits for the videos.
+          hold({ id: heldId(), projectId: cur.id, kind: "share", at, story: s.story.trim() });
         }
         mintedAt = at;
         return { ok: true };
@@ -358,7 +380,9 @@ export function BriefApp({ projectId }: { projectId: string }) {
                 factsOf(s, { videos: readProjectVideos(p.id), jobs: jobsRef.current, now: Date.now() }),
                 purpose,
               );
-              if (!fresh.ok) return fresh.blocker;
+              // The videos no longer stop it (owner, 2026-11-18): what they hold waits for them.
+              const other = fresh.rules.find((r) => !r.ok && r.id !== "videos" && r.id !== "projectVideo");
+              if (other) return other.reason;
             }
             return null;
           },

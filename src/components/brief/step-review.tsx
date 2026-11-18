@@ -44,7 +44,7 @@ import { commitCtaLabel } from "@/lib/wallet/mint";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import type { MintType } from "@/lib/wallet/types";
 import { videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
-import { PROJECT_GROUP_META, PROJECT_VIDEO_TITLE, readyCountLine, statusCopy } from "@/lib/video/video-copy";
+import { PROJECT_GROUP_META, PROJECT_VIDEO_TITLE, heldNoteOf, readyCountLine, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import { LevelCheck, useCommitCheck } from "@/components/projects/earn/ladder/level-check";
@@ -166,7 +166,9 @@ export function StepReview({
   const counts = readiness.counts;
   const videoCount = videoCountOf(readiness);
   const videosBlocker = videosBlockerOf(readiness);
-  const videosLine = !gated ? VIDEOS_OPTIONAL : (videosBlocker ?? VIDEOS_READY);
+  // A video still being made never stops the signature (owner, 2026-11-18): the listing or post waits.
+  const waitWhere = intent === "sell" ? "Explore marketplace" : "Innovations";
+  const videosLine = !gated ? VIDEOS_OPTIONAL : videosBlocker ? `${videosBlocker} ${heldNoteOf(waitWhere, videoCount.total)}` : VIDEOS_READY;
 
   return (
     <BriefCard
@@ -223,7 +225,16 @@ export function StepReview({
               </ProjectVideoList>
             </>
           ) : null}
-          <p className="m-0 text-md text-text-secondary">{videosLine}</p>
+          <p
+            className={cn(
+              "m-0 text-md",
+              gated && videosBlocker
+                ? "rounded-lg border border-solid border-[var(--color-border-brand)] bg-bg-brand-subtle px-6 py-4 text-text-primary"
+                : "text-text-secondary",
+            )}
+          >
+            {videosLine}
+          </p>
           {videosBlocker ? (
             // The videos open over the review: the maker never leaves the mint (owner, 2026-10-12).
             <MakeVideosButton projectId={project.id} label={MAKE_VIDEOS} className={cn(TAP, "self-start")} />

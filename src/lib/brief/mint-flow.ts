@@ -255,8 +255,12 @@ export function reviewMissing(f: {
   details: string | null;
   shortfall: string | null;
   readiness: Readiness | null;
+  /** The web's mint (owner, 2026-11-18): the videos don't shut the sign button — the listing and the
+   *  post wait for them instead (lib/market/held.ts). The phone's mint keeps the old gate for now. */
+  holdVideos?: boolean;
 }): string | null {
   if (f.details) return f.details;
   if (f.intent !== "save" && f.shortfall) return f.shortfall;
+  if (f.holdVideos) return f.readiness?.rules.find((r) => !r.ok && r.id !== "videos" && r.id !== "projectVideo")?.reason ?? null;
   return f.readiness?.blocker ?? null;
 }

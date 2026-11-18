@@ -424,8 +424,8 @@ test("sellChecksOf: the product's video rule with its fix; ownership points at t
   assert.equal(ticked.checks[1].detail, "Saved when you sell.");
 });
 
-const PRODUCT_REASON = "1 product still needs an AI video. The project video comes next.";
-const PROJECT_REASON = "Every product has its video. Make the project video to continue.";
+const PRODUCT_REASON = "1 product still needs an AI video. The project video isn't made yet.";
+const PROJECT_REASON = "The project video isn't made yet.";
 const rule = (id, ok, reason = null) => ({ id, ok, fixedIn: "brief", reason: ok ? null : reason });
 
 test("sellVideoOf: one product's video for an edition, with no project video", () => {

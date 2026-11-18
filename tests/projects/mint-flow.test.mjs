@@ -307,11 +307,11 @@ test("reviewMissing: details first, then the wallet (never for a Save), then the
   assert.equal(reviewMissing({ intent: "save", details: null, shortfall: "Not enough MATIC", readiness: null }), null);
   assert.equal(
     reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1"]) }),
-    "1 product still needs an AI video. The project video comes next.",
+    "1 product still needs an AI video. The project video isn't made yet.",
   );
   assert.equal(
     reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1", "p2"]) }),
-    "Every product has its video. Make the project video to continue.",
+    "The project video isn't made yet.",
   );
   assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1", "p2", "project"]) }), null);
   // A Save runs no gate, posted to Innovations or not: the mint never waits for videos (owner, 2026-10-12).

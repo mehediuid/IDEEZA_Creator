@@ -1,10 +1,13 @@
-// The project video (owner, 2026-10-21; docs/superpowers/specs/2026-10-21-project-video-design.md):
-// joined from the product videos, made once every current product has one.
+// The project video (owner, 2026-10-21; docs/superpowers/specs/2026-10-21-project-video-design.md).
+// Since 2026-11-18 (owner: a maker never waits on a render) each scene is drawn from the product
+// itself — its image and a line from its prompt or spec — so it can be made at any time, never after
+// the product videos. Takes made before then (cut from the products' clips) still read as they did.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { cutMs, joinLengthMs, defaultJoinPlan, mergeJoinDraft, projectVideoStatusOf, describeJoin, isProjectKey } =
+const { cutMs, joinLengthMs, defaultJoinPlan, mergeJoinDraft, projectVideoStatusOf, describeJoin, isProjectKey, sceneLineOf } =
   await import("../../.tmp-test/lib/video/project-video.js");
+const { nextVideoOf } = await import("../../.tmp-test/lib/video/next-video.js");
 const { projectRowCopy, projectActionLabel, projectStateLine } = await import("../../.tmp-test/lib/video/video-copy.js");
 const { PROJECT_VIDEO_KEY } = await import("../../.tmp-test/lib/video/types.js");
 
@@ -59,24 +62,37 @@ test("isProjectKey: only the reserved key", () => {
 
 // ─────────────────────────── the default plan ───────────────────────────
 
-test("defaultJoinPlan: null while any product has no ready video", () => {
+test("defaultJoinPlan: never waits for a product video — only for products (owner, 2026-11-18)", () => {
   const videos = record({ rc: ready("t_rc", "rc"), bp: { takes: [take("t_bp", "bp", { pending: true })], inUseId: null } });
-  assert.equal(defaultJoinPlan({ projectName: "Kit", description: "", products: THREE, videos }), null);
+  assert.notEqual(defaultJoinPlan({ projectName: "Kit", description: "", products: THREE, videos }), null);
+  assert.notEqual(defaultJoinPlan({ projectName: "Kit", description: "", products: THREE }), null);
   assert.equal(defaultJoinPlan({ projectName: "Kit", description: "", products: [], videos: record(allReady) }), null);
 });
 
-test("defaultJoinPlan: each product cut from the end of its in-use clip, in the order given", () => {
-  const p = defaultJoinPlan({ projectName: "Smart Drone Kit", description: "One kit to fly", products: [THREE[2], THREE[0], THREE[1]], videos: record(allReady) });
+test("defaultJoinPlan: one scene per product from its image and line, in the order given", () => {
+  const withArt = [
+    { ...THREE[2], imageUrl: "/cs.png", line: "Charges every part overnight. Then flies." },
+    { ...THREE[0], imageUrl: null, line: "" },
+    { ...THREE[1], line: "Two hours in the air" },
+  ];
+  const p = defaultJoinPlan({ projectName: "Smart Drone Kit", description: "One kit to fly", products: withArt });
   assert.deepEqual(p.intro, ["Smart Drone Kit", "One kit to fly"]);
   assert.equal(p.outro, "Built with IDEEZA");
   assert.deepEqual(
-    p.cuts.map((c) => [c.productId, c.takeId, c.fromMs, c.ms, c.label]),
+    p.cuts.map((c) => [c.productId, c.takeId, c.fromMs, c.ms, c.label, c.imageUrl, c.line]),
     [
-      ["cs", "t_cs", 5_000, 5_000, "Charging Station"],
-      ["rc", "t_rc", 5_000, 5_000, "Remote Controller"],
-      ["bp", "t_bp", 5_000, 5_000, "Battery Pack"],
+      ["cs", "", 0, 5_000, "Charging Station", "/cs.png", "Charges every part overnight."],
+      ["rc", "", 0, 5_000, "Remote Controller", null, ""],
+      ["bp", "", 0, 5_000, "Battery Pack", null, "Two hours in the air"],
     ],
   );
+});
+
+test("sceneLineOf: the first sentence, one line of at most 60", () => {
+  assert.equal(sceneLineOf("  A pot that waters itself.   It pings you. "), "A pot that waters itself.");
+  assert.equal(sceneLineOf("No full stop here"), "No full stop here");
+  assert.equal(sceneLineOf(""), "");
+  assert.equal(sceneLineOf("y".repeat(90)).length, 60);
 });
 
 test("defaultJoinPlan: a single product gets its whole clip; long lines are cut to 60", () => {
@@ -102,21 +118,24 @@ test("mergeJoinDraft: keeps the draft's words, order and labels; new products go
   assert.deepEqual(m.intro, ["My kit", "Mine"]);
   assert.equal(m.outro, "Bye");
   assert.deepEqual(m.cuts.map((c) => [c.productId, c.takeId, c.label]), [
-    ["cs", "t_cs", "Charger"],
-    ["rc", "t_rc", "Controller"],
-    ["bp", "t_bp", "Battery Pack"],
+    ["cs", "", "Charger"],
+    ["rc", "", "Controller"],
+    ["bp", "", "Battery Pack"],
   ]);
+  // A draft line is kept; a draft from before lines existed takes the fresh one.
+  const lined = mergeJoinDraft({ ...draft, cuts: [{ ...draft.cuts[0], line: "Mine" }] }, { ...fresh, cuts: fresh.cuts.map((c) => ({ ...c, line: "Fresh" })) });
+  assert.deepEqual(lined.cuts.map((c) => c.line), ["Mine", "Fresh", "Fresh"]);
 });
 
 // ─────────────────────────── the state table ───────────────────────────
 
-test("waiting: a product still has no video, and no project take yet", () => {
+test("make from the start: a product still has no video, and the project video can start anyway", () => {
   const s = status(THREE, { rc: ready("t_rc", "rc") });
-  assert.equal(s.state, "waiting");
+  assert.equal(s.state, "make");
   assert.equal(s.ok, false);
   assert.deepEqual([s.ready, s.total], [1, 3]);
-  assert.equal(projectRowCopy(s).text, "Opens when every product has a video · 1 of 3 ready");
-  assert.equal(projectRowCopy(s).action, null);
+  assert.equal(projectRowCopy(s).text, "No project video yet · it can start now");
+  assert.equal(projectActionLabel(projectRowCopy(s).action), "Make project video");
 });
 
 test("one product: no project video — its video is the project's (owner, 2026-11-17)", () => {
@@ -142,14 +161,15 @@ test("one product: no project video — its video is the project's (owner, 2026-
 test("a second product asks for the project video", () => {
   const s = status([THREE[0], THREE[1]], { rc: ready("t_rc", "rc"), bp: ready("t_bp", "bp") });
   assert.equal(s.state, "make");
-  assert.equal(projectStateLine(s, 2), "All 2 product videos are ready. You can make the project video now.");
+  // Nothing to announce: it could be made all along.
+  assert.equal(projectStateLine(s), null);
 });
 
 test("make: every product ready, no project take", () => {
   const s = status(THREE, allReady);
   assert.equal(s.state, "make");
   assert.equal(projectActionLabel(projectRowCopy(s).action), "Make project video");
-  assert.equal(projectStateLine(s, 3), "All 3 product videos are ready. You can make the project video now.");
+  assert.equal(projectStateLine(s), null);
 });
 
 test("rendering: the first take is in flight", () => {
@@ -180,19 +200,17 @@ test("ready, made from an older take: a note and Update, never a block (D5)", ()
   assert.equal(projectActionLabel(c.action), "Update");
 });
 
-test("outdated: a product added after — blocks; asks for its video first, then Update", () => {
+test("outdated: a product added after — blocks, and Update is offered at once (owner, 2026-11-18)", () => {
   const j = plan([["rc", "t_rc"], ["bp", "t_bp"], ["cs", "t_cs"]]);
   const four = [...THREE, product("pg", "Propeller Guard Set")];
   const proj = { [PROJECT_VIDEO_KEY]: { takes: [take("t_p", PROJECT_VIDEO_KEY, { join: j })], inUseId: "t_p" } };
-  const waiting = status(four, { ...allReady, ...proj });
-  assert.equal(waiting.state, "outdated");
-  assert.equal(waiting.ok, false);
-  assert.deepEqual(waiting.missing, ["Propeller Guard Set"]);
-  assert.equal(projectRowCopy(waiting).text, "Propeller Guard Set isn't in it yet. Finish its video first.");
-  assert.equal(projectRowCopy(waiting).action, null);
-  const canUpdate = status(four, { ...allReady, pg: ready("t_pg", "pg"), ...proj });
-  assert.equal(projectRowCopy(canUpdate).text, "Propeller Guard Set isn't in it yet.");
-  assert.equal(projectActionLabel(projectRowCopy(canUpdate).action), "Update project video");
+  const s = status(four, { ...allReady, ...proj });
+  assert.equal(s.state, "outdated");
+  assert.equal(s.ok, false);
+  assert.deepEqual(s.missing, ["Propeller Guard Set"]);
+  // Its own video isn't needed first: the project video draws it from the product.
+  assert.equal(projectRowCopy(s).text, "Propeller Guard Set isn't in it yet.");
+  assert.equal(projectActionLabel(projectRowCopy(s).action), "Update project video");
 });
 
 test("outdated: a product dropped since — it still shows it", () => {
@@ -211,9 +229,36 @@ test("failed: the first take failed with every product ready → Try again", () 
   assert.equal(projectRowCopy(s).sub, "The video couldn't be made. Try again.");
 });
 
-test("a failed take with a product missing reads as waiting", () => {
+test("a failed take with a product missing reads as failed — Try again needs no product video", () => {
   const s = status(THREE, { rc: ready("t_rc", "rc"), [PROJECT_VIDEO_KEY]: { takes: [take("t_p", PROJECT_VIDEO_KEY, { pending: true, failure: "encode" })], inUseId: null } });
-  assert.equal(s.state, "waiting");
+  assert.equal(s.state, "failed");
+});
+
+test("a scene drawn from the product never reads as made from an older video", () => {
+  const drawn = { intro: ["Kit", ""], cuts: THREE.map((p) => ({ productId: p.id, takeId: "", fromMs: 0, ms: 5_000, label: p.name })), outro: "Built with IDEEZA" };
+  const s = status(THREE, { ...allReady, [PROJECT_VIDEO_KEY]: { takes: [take("t_p", PROJECT_VIDEO_KEY, { join: drawn })], inUseId: "t_p" } });
+  assert.equal(s.state, "ready");
+  assert.deepEqual(s.older, []);
+});
+
+// ─────────────────────────── Next video (owner, 2026-11-18) ───────────────────────────
+
+test("nextVideoOf: the next product without a video, then the project video, then none", () => {
+  const next = (videos, after, jobs = []) => nextVideoOf({ products: THREE, videos: record(videos), jobs, now: NOW, after });
+  // After the first, the next product with no video.
+  assert.deepEqual(next({ rc: { takes: [take("t_rc", "rc", { pending: true })], inUseId: null } }, "rc", [job("t_rc")]), { productId: "bp", name: "Battery Pack" });
+  // From the middle it goes round to the top.
+  assert.deepEqual(next({}, "cs"), { productId: "rc", name: "Remote Controller" });
+  // Every product started: the project video.
+  const started = { rc: ready("t_rc", "rc"), bp: ready("t_bp", "bp"), cs: { takes: [take("t_cs", "cs", { pending: true })], inUseId: null } };
+  assert.deepEqual(next(started, "cs", [job("t_cs")]), { productId: PROJECT_VIDEO_KEY, name: "Project video" });
+  // The project video rendering too: nothing left to start.
+  const all = { ...started, [PROJECT_VIDEO_KEY]: { takes: [take("t_p", PROJECT_VIDEO_KEY, { pending: true })], inUseId: null } };
+  assert.equal(next(all, "cs", [job("t_cs"), job("t_p")]), null);
+  // After the project video, only products count.
+  assert.equal(next(all, PROJECT_VIDEO_KEY, [job("t_cs"), job("t_p")]), null);
+  // One product: no project video to offer.
+  assert.equal(nextVideoOf({ products: [THREE[0]], videos: record({ rc: ready("t_rc", "rc") }), jobs: [], now: NOW, after: "rc" }), null);
 });
 
 test("an update in flight over a fresh take keeps it ready; over an outdated one it reads rendering", () => {

@@ -3,6 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { VideoJobsProvider } from "@/components/video-jobs/video-jobs-provider";
 import { GlobalRenderIndicator } from "@/components/video-jobs/global-render-indicator";
+import { HeldPublisher } from "@/components/video-jobs/held-publisher";
 import { ProductFlowProvider } from "@/components/product-flow/product-flow-provider";
 import { PcbProvider } from "@/lib/pcb/store";
 import { CreateHistoryProvider } from "@/lib/create/history";
@@ -15,6 +16,7 @@ import { WalletProvider } from "@/components/wallet/wallet-provider";
 import { BuyCreditsProvider } from "@/components/credits/buy-credits";
 import { VideosDialogHost } from "@/components/projects/make-videos";
 import { ProjectVideoDialogHost } from "@/components/video-jobs/project-video-dialog";
+import { VideoFlowHost } from "@/components/video-jobs/video-flow-host";
 import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
 import { ReportProblemHost } from "@/components/support/report-problem";
@@ -162,6 +164,7 @@ export default function RootLayout({
                                   openProjectVideoDialog() from a toast or a
                                   render's Try again, on any page. */}
                               <ProjectVideoDialogHost />
+                              <VideoFlowHost />
                               {/* Report a problem: one dialog for every page,
                                   editors included, since they sit outside
                                   the app shell. Opened by
@@ -192,6 +195,8 @@ export default function RootLayout({
                           {/* The plan's credits for each monthly period. */}
                           <PlanCredits />
                           <GlobalRenderIndicator />
+                          {/* Puts what the maker signed live once its videos are ready (lib/market/held.ts). */}
+                          <HeldPublisher />
                           <PlanRunner />
                         </CreateHistoryProvider>
                       </CreditsProvider>

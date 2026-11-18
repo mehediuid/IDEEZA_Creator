@@ -45,7 +45,7 @@ import type { ProductReadiness, Readiness, ReadinessPurpose } from "@/lib/manual
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
 import { useProjectVideos } from "@/lib/video/store";
 import {
   PROJECT_GROUP_META,
@@ -53,6 +53,8 @@ import {
   REPLACE_LABEL,
   actionLabel,
   projectStateLine,
+  heldCountLine,
+  heldNoteOf,
   readinessCopy,
   readyCountLine,
   stateChangeLine,
@@ -78,14 +80,23 @@ export type ReadinessDialogProps = {
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
-/** What this dialog can fix, so what its CTA waits on: the videos and the
- *  project video (every purpose — they're the rows here) and any rule marked
- *  fixed in the gate. */
+/** What holds this dialog's CTA. Since 2026-11-18 (owner: a maker never waits on a render) the
+ *  videos don't: what the maker signs waits off the marketplace and Innovations until they're ready
+ *  (lib/market/held.ts). Only a rule fixed in the gate itself (Showcase's ownership box) holds it —
+ *  and the videos alone, for the Videos dialog, whose only point is the videos. */
 export function dialogBlockerOf(readiness: Readiness): string | null {
+  const videos = readiness.purpose === "videos";
   return (
-    readiness.rules.find((r) => !r.ok && (r.fixedIn === "gate" || r.id === "videos" || r.id === "projectVideo"))?.reason ??
-    null
+    readiness.rules.find(
+      (r) => !r.ok && (videos ? r.id === "videos" || r.id === "projectVideo" : r.fixedIn === "gate" && r.id !== "videos" && r.id !== "projectVideo"),
+    )?.reason ?? null
   );
+}
+
+/** Opening this dialog first still helps while videos are missing: their rows, their progress and
+ *  the note that the listing or post will wait for them. */
+export function videosWaitOf(readiness: Readiness): string | null {
+  return readiness.purpose === "videos" ? null : videosBlockerOf(readiness);
 }
 
 export function ReadinessDialog({
@@ -113,6 +124,10 @@ export function ReadinessDialog({
 
   const copy = readinessCopy(purpose, product ? displayProductName(product.name) : undefined);
   const blocker = dialogBlockerOf(readiness);
+  // The videos no longer hold the CTA: what it leads to waits for them instead (owner, 2026-11-18).
+  const waiting = videosWaitOf(readiness);
+  const count = videoCountOf(readiness);
+  const where = purpose === "showcase" || purpose === "give" ? "Innovations" : "Explore marketplace";
   const ownershipRule = readiness.rules.find((r) => r.id === "ownership");
   // Shown while ownership fails at the Showcase gate, and kept (ticked) once
   // it's confirmed here, so the box doesn't vanish from under the maker.
@@ -150,7 +165,7 @@ export function ReadinessDialog({
       }
     }
     if (projectVideo && lastProject !== projectKey) {
-      const line = projectStateLine(projectVideo, readiness.counts.total);
+      const line = projectStateLine(projectVideo);
       if (line) lines.push(line);
     }
     setSeen(stateKey);
@@ -219,6 +234,9 @@ export function ReadinessDialog({
                 {blocker ?? extraBlocker}
               </p>
             )}
+            {!blocker && !extraBlocker && waiting && (
+              <p className="text-right text-sm text-text-secondary">{heldCountLine(count.ready, count.total)}</p>
+            )}
           </div>
         }
       >
@@ -272,13 +290,22 @@ export function ReadinessDialog({
             </section>
           )}
 
-          {rendering && (
-            <p className="flex items-start gap-3 rounded-lg bg-bg-surface-raised px-6 py-4 text-sm text-text-secondary">
-              <span className="mt-[2px]">
+          {waiting ? (
+            <p className="flex items-start gap-3 rounded-lg border border-solid border-[var(--color-border-brand)] bg-bg-brand-subtle px-6 py-4 text-md text-text-primary">
+              <span className="mt-[3px]">
                 <StatusGlyph icon="info" tone="brand" size={16} />
               </span>
-              Renders keep going if you close this. Their progress shows on the Review step and in the corner.
+              {heldNoteOf(where, count.total)}
             </p>
+          ) : (
+            rendering && (
+              <p className="flex items-start gap-3 rounded-lg bg-bg-surface-raised px-6 py-4 text-sm text-text-secondary">
+                <span className="mt-[2px]">
+                  <StatusGlyph icon="info" tone="brand" size={16} />
+                </span>
+                Renders keep going if you close this. Their progress shows in Videos, in the corner.
+              </p>
+            )
           )}
 
           {askedOwnership && (

@@ -65,7 +65,10 @@ export function sanitizeJoin(raw: unknown): JoinPlan | null {
   const cuts: JoinCut[] = [];
   for (const c of raw.cuts) {
     if (!isObj(c) || typeof c.productId !== "string" || typeof c.takeId !== "string") return null;
-    cuts.push({ productId: c.productId, takeId: c.takeId, fromMs: num(c.fromMs), ms: num(c.ms), label: str(c.label) });
+    const cut: JoinCut = { productId: c.productId, takeId: c.takeId, fromMs: num(c.fromMs), ms: num(c.ms), label: str(c.label) };
+    if (typeof c.imageUrl === "string" || c.imageUrl === null) cut.imageUrl = c.imageUrl;
+    if (typeof c.line === "string") cut.line = c.line;
+    cuts.push(cut);
   }
   return { intro: [str(raw.intro[0]), str(raw.intro[1])], cuts, outro: raw.outro };
 }

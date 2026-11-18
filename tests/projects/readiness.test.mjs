@@ -95,13 +95,13 @@ test("missing beats rendering: any product with no video at all reports missing,
     jobs: [renderingJob("t_b", 45)],
   });
   const rule = readinessOf(f, "sell").rules.find((x) => x.id === "videos");
-  assert.equal(rule.reason, "1 product still needs an AI video. The project video comes next.");
+  assert.equal(rule.reason, "1 product still needs an AI video. The project video isn't made yet.");
 });
 
 test("missing pluralises", () => {
   const f = facts({ products: [product("a", "A"), product("b", "B")], videos: {} });
   const rule = readinessOf(f, "sell").rules.find((x) => x.id === "videos");
-  assert.equal(rule.reason, "2 products still need an AI video. The project video comes next.");
+  assert.equal(rule.reason, "2 products still need an AI video. The project video isn't made yet.");
 });
 
 test("adding a dropped product without a video changes nothing", () => {
@@ -251,7 +251,7 @@ test("every product video ready but no project video: sell is blocked with the m
   const r = readinessOf(f, "sell");
   assert.equal(r.ok, false);
   assert.equal(r.rules.find((x) => x.id === "videos").ok, true);
-  assert.equal(r.blocker, "Every product has its video. Make the project video to continue.");
+  assert.equal(r.blocker, "The project video isn't made yet.");
   assert.equal(r.project.state, "make");
   assert.deepEqual(videoCountOf(r), { ready: 2, total: 3 });
 });
@@ -264,11 +264,11 @@ test("with the project video made, sell passes and the count is N+1 of N+1", () 
   assert.equal(videosBlockerOf(r), null);
 });
 
-test("a product added after the project video: its video first, then update", () => {
+test("a product added after the project video: both are said, side by side — neither waits (owner, 2026-11-18)", () => {
   const products = [product("a", "A"), product("b", "B")];
   const videos = { a: readyVideo("t_a"), project: projectVideo(["a", "t_a"]) };
   const r = readinessOf(facts({ products, videos }), "sell");
-  assert.equal(r.blocker, "1 product still needs an AI video. Then update the project video.");
+  assert.equal(r.blocker, "1 product still needs an AI video. The project video is missing B. Update it to continue.");
   const later = readinessOf(facts({ products, videos: { ...videos, b: readyVideo("t_b") } }), "sell");
   assert.equal(later.blocker, "The project video is missing B. Update it to continue.");
   assert.equal(videosBlockerOf(later), later.blocker);

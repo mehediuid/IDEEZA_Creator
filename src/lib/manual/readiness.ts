@@ -90,8 +90,9 @@ function videosReason(
   if (counts.missing > 0) {
     const need =
       counts.missing === 1 ? "1 product still needs an AI video." : `${counts.missing} products still need an AI video.`;
-    if (!project) return need;
-    return `${need} ${project.state === "outdated" ? "Then update the project video." : "The project video comes next."}`;
+    // The project video never waits for them (owner, 2026-11-18): say where it stands beside them.
+    const beside = project && !project.ok ? projectVideoReason(project) : null;
+    return beside ? `${need} ${beside}` : need;
   }
   if (counts.rendering === 0) {
     return counts.review === 1 ? "Review 1 video to continue." : `Review ${counts.review} videos to continue.`;
@@ -116,9 +117,9 @@ function projectVideoReason(project: ProjectVideoStatus): string | null {
     case "single":
       return null;
     case "waiting":
-      return "The project video is made once every product has its video.";
+      return "The project video isn't made yet.";
     case "make":
-      return "Every product has its video. Make the project video to continue.";
+      return "The project video isn't made yet.";
     case "review":
       return "Review the project video to continue.";
     case "rendering": {

@@ -17,9 +17,12 @@
 // - Neither: `unsupported`.
 //
 // The project video (`renderJoin`, owner 2026-10-21) goes through the same two
-// encoders: an intro card, each product's stored clip cut in order (seeked
-// frame by frame, with a chapter label top left), an outro card, 250 ms
-// cross-fades between them (`joinFrameAt`, lib/video/project-video.ts).
+// encoders: an intro card, one scene per product in order (with a chapter
+// label top left), an outro card, 250 ms cross-fades between them
+// (`joinFrameAt`, lib/video/project-video.ts). Since 2026-11-18 a scene is
+// drawn from the product's concept image, slowly pushing in, with its line
+// at the foot — so it never waits for the product videos. A take from before
+// then cuts the product's stored clip (seeked frame by frame) as it did.
 //
 // Browser-only.
 
@@ -420,11 +423,14 @@ function sourceReady(v: HTMLVideoElement, signal?: AbortSignal): Promise<void> {
   });
 }
 
+/** A scene's source: the product's stored clip (a take from before 2026-11-18) or its image. */
+type SceneSource = { video: HTMLVideoElement } | { image: HTMLImageElement | null };
+
 function makeJoinPainter(
   kit: Kit,
   plan: JoinPlan,
   projectName: string,
-  videos: HTMLVideoElement[],
+  sources: SceneSource[],
   signal?: AbortSignal,
 ): Painter {
   const { ctx, W, H, k, theme, font, fillGradient, wrap, scrim } = kit;
@@ -491,9 +497,41 @@ function makeJoinPainter(
     ctx.restore();
   };
 
+  /** A scene drawn from the product: its image pushing in slowly, its line at the foot. */
+  const still = (seg: JoinSegment, img: HTMLImageElement | null) => {
+    const c = plan.cuts[seg.index];
+    const p = c.ms > 0 ? Math.min(1, seg.localMs / c.ms) : 0;
+    if (img && img.naturalWidth && img.naturalHeight) {
+      ctx.fillStyle = theme.overlay || "black";
+      ctx.fillRect(0, 0, W, H);
+      const s = Math.max(W / img.naturalWidth, H / img.naturalHeight) * (1.04 + 0.06 * p);
+      const dw = img.naturalWidth * s;
+      const dh = img.naturalHeight * s;
+      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    } else {
+      fillGradient(theme.brand);
+    }
+    chapter(c.label);
+    const text = (c.line ?? "").trim();
+    if (!text) return;
+    ctx.save();
+    ctx.font = font(600, 22);
+    const lines = wrap(text, W - 96 * k, 2);
+    const lh = 30 * k;
+    const h = lines.length * lh + 24 * k;
+    scrim(0, H - h - 24 * k, W, h + 24 * k, 0.55 * ctx.globalAlpha);
+    ctx.fillStyle = theme.white;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, H - h - 12 * k + lh * (i + 0.5) + 12 * k));
+    ctx.restore();
+  };
+
   const cut = async (seg: JoinSegment) => {
     const c = plan.cuts[seg.index];
-    const v = videos[seg.index];
+    const src = sources[seg.index];
+    if (!("video" in src)) return still(seg, src.image);
+    const v = src.video;
     // The middle of the frame's slot, so float rounding never lands on the frame before.
     await seek(v, (c.fromMs + seg.localMs) / 1000 + 0.5 / FPS);
     ctx.fillStyle = theme.overlay || "black";
@@ -870,8 +908,16 @@ export async function renderJoin(input: JoinInput, opts: { signal?: AbortSignal 
   const { width, height } = VIDEO_QUALITY[input.quality];
   const urls: string[] = [];
   const videos: HTMLVideoElement[] = [];
+  const sources: SceneSource[] = [];
   try {
     for (const cut of plan.cuts) {
+      if (!cut.takeId) {
+        // Drawn from the product (owner, 2026-11-18): an image that won't load leaves the gradient.
+        const loaded = await loadImage(cut.imageUrl ?? null);
+        checkAbort(opts.signal);
+        sources.push({ image: loaded && !taints(loaded) ? loaded : null });
+        continue;
+      }
       const rec = await getClip(cut.takeId);
       checkAbort(opts.signal);
       if (!rec) throw new ClipRenderError("encode", `no clip for ${cut.label}`);
@@ -879,13 +925,14 @@ export async function renderJoin(input: JoinInput, opts: { signal?: AbortSignal 
       urls.push(url);
       const video = sourceVideo(url);
       videos.push(video);
+      sources.push({ video });
       await sourceReady(video, opts.signal);
     }
 
     const theme = await themeWithFonts([700, 600, 500]);
     checkAbort(opts.signal);
     const { canvas, kit } = canvasFor(width, height, theme);
-    const paint = makeJoinPainter(kit, plan, input.projectName, videos, opts.signal);
+    const paint = makeJoinPainter(kit, plan, input.projectName, sources, opts.signal);
     const timing = { seconds: joinLengthMs(plan) / 1000, posterSec: INTRO_MS / 1000 + POSTER_SEC };
     const out = await encode(canvas, paint, timing, opts.signal);
     return { ...out, width, height, usedImage: true };

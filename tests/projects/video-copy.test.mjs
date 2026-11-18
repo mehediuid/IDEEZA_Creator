@@ -76,21 +76,38 @@ test("lines: meta, take label, stage line, title", () => {
   assert.equal(copy.renderTitle("Rider", "Car"), "Rider · Car");
 });
 
-test("readinessCopy: P2-VIDEO-14's table with relist and edition", () => {
+test("readinessCopy: P2-VIDEO-14's table with relist and edition — the videos no longer hold it (owner, 2026-11-18)", () => {
   assert.deepEqual(copy.readinessCopy("showcase"), {
     title: "Share to Innovations",
-    info: "Every product needs an AI video, and the post needs your story.",
+    info: "The post needs your story. Every product needs an AI video before others see it — you can share now, and it waits off Innovations until they're ready.",
     cta: "Share to Innovations",
   });
   assert.equal(copy.readinessCopy("sell").cta, "Continue to listing");
   assert.equal(copy.readinessCopy("sell").title, "Add to marketplace");
+  assert.equal(
+    copy.readinessCopy("sell").info,
+    "Every product needs an AI video before buyers see it. You can list now: it stays off Explore marketplace until they're ready.",
+  );
   assert.equal(copy.readinessCopy("give").title, "Give to community");
-  assert.equal(copy.readinessCopy("relist").info, "To relist, every product needs an AI video.");
+  assert.equal(
+    copy.readinessCopy("relist").info,
+    "Every product needs an AI video before buyers see it. You can relist now: it stays off Explore marketplace until they're ready.",
+  );
   assert.deepEqual(copy.readinessCopy("edition", "Rider"), {
     title: "Add Rider NFTs to the marketplace",
-    info: "Rider needs an AI video first.",
+    info: "Rider needs an AI video before buyers see these. You can list them now: they wait until it's ready.",
     cta: "Continue",
   });
+});
+
+test("held lines: what waits for the videos, and when it goes live (owner, 2026-11-18)", () => {
+  assert.equal(
+    copy.heldNoteOf("Explore marketplace", 4),
+    "You don't have to wait. It stays off Explore marketplace until all 4 videos are ready, then goes live by itself. We'll tell you when it does.",
+  );
+  assert.equal(copy.heldNoteOf("Innovations", 1), "You don't have to wait. It stays off Innovations until the video is ready, then goes live by itself. We'll tell you when it does.");
+  assert.equal(copy.heldCountLine(2, 4), "Goes live when all 4 videos are ready · 2 of 4 now");
+  assert.equal(copy.heldCountLine(0, 1), "Goes live when the video is ready · 0 of 1 now");
 });
 
 test("counts and state changes", () => {

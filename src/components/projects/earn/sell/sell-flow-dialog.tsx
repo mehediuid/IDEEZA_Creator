@@ -38,7 +38,9 @@ import { useProjectBrief } from "@/lib/brief/project-brief";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { heldNoteOf } from "@/lib/video/video-copy";
+import { hold, heldId } from "@/lib/market/held";
 import { canCreate, createTrack, editionChainOf, listTrack, USE_WORD, wholeNumberOf, type TrackTerms } from "@/lib/market/editions";
 import { readEditions, useEditions } from "@/lib/market/editions-store";
 import {
@@ -64,7 +66,7 @@ import {
   type SellStep,
 } from "@/lib/market/sell-flow";
 import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
-import { useProjectVideos } from "@/lib/video/store";
+import { readProjectVideos, useProjectVideos } from "@/lib/video/store";
 import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import { cn } from "@/lib/utils";
@@ -121,6 +123,11 @@ export function SellFlowDialog({
   const brief = useProjectBrief(project.id) ?? null;
   const { record: videos } = useProjectVideos(project.id);
   const { jobs, now } = useVideoJobs();
+  // The latest jobs, for the commit's video read seconds after the press.
+  const latestJobs = React.useRef(jobs);
+  React.useEffect(() => {
+    latestJobs.current = jobs;
+  }, [jobs]);
   const { record: tracks } = useEditions(project.id);
   const terms = useSellTerms(project.id);
 
@@ -173,6 +180,7 @@ export function SellFlowDialog({
     video: sellVideoOf(scopeReadiness),
     ownershipConfirmed: facts.ownershipConfirmed,
     draft,
+    holdVideos: true,
   });
   const state = draft.use ? trackStateOf(tracks, productId, kind, draft.use) : { kind: "new" as const };
   const index = SELL_STEPS.indexOf(step);
@@ -292,7 +300,7 @@ export function SellFlowDialog({
 
     const t = effectiveTermsOf(draft);
     const listing: TrackTerms = { token: draft.token as TrackTerms["token"], regular: t.regular, extended: t.extended, royaltyPct: t.royaltyPct };
-    const req = listRequestOf({
+    const built = listRequestOf({
       track,
       projectName: project.name,
       productName,
@@ -301,8 +309,11 @@ export function SellFlowDialog({
       collection: chain.collection,
       editing: false,
     });
+    // A video still being made: the copies' listing waits, and the wallet says so (owner, 2026-11-18).
+    const req = readiness.videosWait ? { ...built, doneLine: "Signed. These copies go on Explore marketplace when every video is ready." } : built;
     const confirmOwner = askOwner && draft.owner;
     const note = draft.note;
+    let heldCopies = false;
     const result = await request(req, {
       recheck: () => lockGateNow(project),
       commit: (proof) => {
@@ -312,8 +323,18 @@ export function SellFlowDialog({
           const s = writeShipPlan(project.id, productId, note, proof.at);
           if (!s.ok) return s;
         }
-        const w = writeTracks(project.id, (all) => listTrack(all, track.id, listing, proof.at));
-        if (!w.ok) return { ok: false, message: w.message };
+        // A video still being made (owner, 2026-11-18): the copies are made now and their listing
+        // waits off Explore marketplace until it's ready, then goes live by itself.
+        const fresh = readinessFactsOf(project, view, brief, readProjectVideos(project.id), latestJobs.current, proof.at);
+        const waitFor = videosBlockerOf(product ? readinessOf({ ...fresh, product }, "edition") : readinessOf(fresh, "sell"));
+        if (waitFor) {
+          const h = hold({ id: heldId(), projectId: project.id, kind: "copies", at: proof.at, trackId: track.id, scope: productId, kindOfCopy: sellKind, terms: listing });
+          if (!h.ok) return { ok: false, message: "This browser's storage is full — nothing was saved." };
+          heldCopies = true;
+        } else {
+          const w = writeTracks(project.id, (all) => listTrack(all, track.id, listing, proof.at));
+          if (!w.ok) return { ok: false, message: w.message };
+        }
         // The box ticked on Review is the Sell rule's ownership fix (readiness `fixedIn: "form"`).
         if (confirmOwner) setOwnerConfirmed(project.id, proof.at);
         return { ok: true };
@@ -322,7 +343,12 @@ export function SellFlowDialog({
     setBusy(false);
     if (result.ok) {
       const n = track.supply.total;
-      onDone(`On sale: ${n} ${KIND_LABEL[sellKind]} ${n === 1 ? "copy" : "copies"} of ${what} at ${formatAmount(listing.regular, listing.token)}.`, track);
+      onDone(
+        heldCopies
+          ? `Signed: ${n} ${KIND_LABEL[sellKind]} ${n === 1 ? "copy" : "copies"} of ${what}. They go on Explore marketplace when every video is ready.`
+          : `On sale: ${n} ${KIND_LABEL[sellKind]} ${n === 1 ? "copy" : "copies"} of ${what} at ${formatAmount(listing.regular, listing.token)}.`,
+        track,
+      );
       return;
     }
     const failed = failureCopy(result);
@@ -378,6 +404,11 @@ export function SellFlowDialog({
           }}
           askOwner={askOwner}
         >
+          {readiness.videosWait && (
+            <p className="m-0 rounded-lg border border-solid border-[var(--color-border-brand)] bg-bg-brand-subtle px-6 py-4 text-md text-text-primary">
+              {heldNoteOf("Explore marketplace", videoCountOf(scopeReadiness).total)}
+            </p>
+          )}
           {!ladder.ok && (
             <LevelCheck
               check={ladder}

@@ -307,8 +307,11 @@ test("a Sell commit writes the MintRecord, then the listing, then the draft's mi
   // A reject or a failure writes nothing and says why (P2-MINT-6).
   assert.match(app, /"Not minted — you rejected it in your wallet\. Nothing was charged\."/);
   assert.match(app, /`Not minted — \$\{reason\} Nothing was charged\.`/);
-  // The readiness gate is checked again just before confirming: a rendering video never counts.
-  assert.match(commit, /recheck: \(\) => \{[\s\S]*readinessOf\([\s\S]*if \(!fresh\.ok\) return fresh\.blocker;/);
+  // The readiness gate is checked again just before confirming — but since 2026-11-18 (owner: a
+  // maker never waits on a render) only what isn't a video stops it; a video still being made holds
+  // the listing off the marketplace instead (lib/market/held.ts), and the mint happens now.
+  assert.match(commit, /recheck: \(\) => \{[\s\S]*readinessOf\([\s\S]*const other = fresh\.rules\.find\(\(r\) => !r\.ok && r\.id !== "videos" && r\.id !== "projectVideo"\);/);
+  assert.match(writes, /if \(listings && videosWait\) \{[\s\S]*hold\(\{ id: heldId\(\), projectId: cur\.id, kind: "main", at, listing: made \}\)/);
 });
 
 test("the mint showcases at the mint time itself: one moment for mintedAt and showcasedAt (COR-105)", () => {

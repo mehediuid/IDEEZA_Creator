@@ -1,7 +1,10 @@
 "use client";
 
 // The Project video dialog (owner, 2026-10-21; docs/superpowers/specs/2026-10-21-project-video-design.md,
-// D1, D6–D8). It makes the one video for the whole project from its products' in-use videos.
+// D1, D6–D8). It makes the one video for the whole project. Since 2026-11-18 (owner: a maker never
+// waits on a render) its storyboard is drafted from the products themselves — each product one scene
+// from its concept image and a line from its prompt and spec — so it can be made at any time, while
+// the product videos still render; it never waits for them.
 // Opened from the project row's Make / Update / Try again (the readiness dialog, ← Back to it),
 // from the Media tab's Regenerate, and from anywhere through `openProjectVideoDialog`.
 //
@@ -13,8 +16,9 @@
 //   honesty line: it is made in this browser and silent for now.
 // - What the maker sets is kept as the project video's draft (400 ms after the last edit), laid
 //   over each visit's fresh takes and lengths (`mergeJoinDraft`).
-// - Generate project video starts the render and closes; the row shows its progress. Opened while
-//   a render runs it shows that render; opened before every product has its video it says so.
+// - Generate project video starts the render and shows it running, with "Next video" when another
+//   of the project's videos hasn't started (owner, 2026-11-18). Opened while a render runs it shows
+//   that render.
 // - A project with one product has no project video (owner, 2026-11-17): opened there, it says
 //   so — that product's video is the project's — and offers Close.
 // - Review (owner, 2026-10-21): opened on a finished take nobody chose yet, it shows that take
@@ -25,7 +29,7 @@
 import * as React from "react";
 import { ArrowDown01Icon, ArrowLeft01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Banner, Button, IconButton, ModalFrame, ProgressBar, TextInput } from "@/components/ideeza";
+import { Banner, Button, Checkbox, IconButton, ModalFrame, ProgressBar, TextInput } from "@/components/ideeza";
 import { useCreateHistory } from "@/lib/create/history";
 import { useCreatePlan } from "@/lib/create/plan";
 import { buildsOf, productsOfProject, type ProjectProduct } from "@/lib/manual/project-read";
@@ -43,6 +47,8 @@ import {
   mergeJoinDraft,
   projectVideoStatusOf,
 } from "@/lib/video/project-video";
+import { nextVideoOf } from "@/lib/video/next-video";
+import { useNotifyAll, writeNotifyAll } from "@/lib/video/notify-pref";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY, qualityOpen, type JoinPlan, type OnScreenLines, type VideoQuality } from "@/lib/video/types";
 import {
@@ -57,6 +63,7 @@ import {
 import { cn } from "@/lib/utils";
 import { QualityField } from "./generate-video-dialog";
 import { VideoThumb } from "./project-video-row";
+import { openVideoFlowSoon } from "./video-flow";
 import { useVideoJobs } from "./video-jobs-provider";
 import { VideoPlayer } from "./video-player";
 
@@ -80,7 +87,7 @@ function secs(ms: number): string {
 }
 
 export function projectVideoDescription(projectName: string, productCount: number): string {
-  return `${projectName} · made from your ${productCount === 1 ? "product video" : `${productCount} product videos`}`;
+  return `${projectName} · drafted from your ${productCount === 1 ? "product" : `${productCount} products`}’ prompts and specs`;
 }
 
 export type ProjectVideoDialogProps = {
@@ -113,6 +120,8 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
   const current = React.useMemo(() => currentProductsOf(products), [products]);
   const ready = hydrated && jobsHydrated;
   const status = projectVideoStatusOf({ products, videos: record, jobs, now });
+  const next = nextVideoOf({ products, videos: record, jobs, now, after: PROJECT_VIDEO_KEY });
+  const notifyAll = useNotifyAll();
 
   // The fresh plan (the products' in-use takes, in order) under what the maker has set.
   const fresh = React.useMemo(
@@ -120,12 +129,14 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
       defaultJoinPlan({
         projectName: project.name,
         description: project.description,
-        products: current.map((p) => ({ id: p.id, name: displayProductName(p.name) })),
-        videos: record,
-        jobs,
-        now,
+        products: current.map((p) => ({
+          id: p.id,
+          name: displayProductName(p.name),
+          imageUrl: p.built?.product.conceptImageUrl || null,
+          line: p.description,
+        })),
       }),
-    [project.name, project.description, current, record, jobs, now],
+    [project.name, project.description, current],
   );
   const [edit, setEdit] = React.useState<JoinPlan | undefined>(undefined);
   const [quality, setQuality] = React.useState<VideoQuality>("low");
@@ -207,7 +218,8 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
       setError(WRITE_ERROR_MESSAGE);
       return;
     }
-    onClose();
+    // It stays open on its render, with "Next video" (owner, 2026-11-18).
+    setEditing(false);
   };
 
   // Review: a finished take waiting for the maker's word.
@@ -236,7 +248,6 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
       setError(WRITE_ERROR_MESSAGE);
       return;
     }
-    onClose();
   };
   const changeScenes = () => {
     if (!reviewTake) return;
@@ -308,17 +319,49 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
         <ProgressBar value={total} label={`${project.name} project video`} />
         <p className="text-sm text-text-secondary">{etaLabel(etaSec)} left</p>
         <p className="text-sm text-text-secondary">{RENDER_KEEPS_RUNNING}</p>
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={notifyAll}
+          onClick={() => writeNotifyAll(!notifyAll)}
+          className={cn(
+            "flex min-h-[32px] items-center gap-[10px] self-start rounded-md px-[4px] text-left text-sm font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+            TAP,
+          )}
+        >
+          <Checkbox checked={notifyAll} decorative />
+          Notify me on this browser · for every video
+        </button>
         <p className="text-sm text-text-tertiary">{PROJECT_HONESTY}</p>
       </div>
     );
     footer = (
-      <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
-        <Button type="button" hierarchy="ghost" size="lg" className={TAP} onClick={() => cancelRender(renderingTake.id)}>
-          Cancel render
-        </Button>
-        <Button ref={primaryRef} type="button" hierarchy="primary" size="lg" className={TAP} onClick={onClose}>
-          Close
-        </Button>
+      <div className="ml-auto flex flex-col items-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-6">
+          <Button type="button" hierarchy="ghost" size="lg" className={TAP} onClick={() => cancelRender(renderingTake.id)}>
+            Cancel render
+          </Button>
+          <Button ref={primaryRef} type="button" hierarchy={next ? "secondary" : "primary"} size="lg" className={TAP} onClick={onClose}>
+            Close
+          </Button>
+          {next && (
+            <Button
+              type="button"
+              hierarchy="primary"
+              size="lg"
+              className={TAP}
+              onClick={() => {
+                onClose();
+                openVideoFlowSoon(project.id, next.productId);
+              }}
+            >
+              {`Next video: ${next.name}`}
+            </Button>
+          )}
+        </div>
+        <p className="text-sm text-text-secondary">
+          {next ? "The project video keeps rendering while you set up the next one." : "Every video of this project has started."}
+        </p>
       </div>
     );
   } else if (!plan) {
@@ -382,21 +425,36 @@ function ProjectVideoDialogOpen({ project, products, onClose, back }: ProjectVid
                 key={c.productId}
                 thumb={
                   <span aria-hidden className="relative block size-[40px] overflow-hidden rounded-lg bg-bg-surface-raised">
-                    <VideoThumb takeId={c.takeId} image={imageOf.get(c.productId) ?? null} />
+                    {c.takeId ? (
+                      <VideoThumb takeId={c.takeId} image={imageOf.get(c.productId) ?? null} />
+                    ) : (
+                      <VideoThumb takeId={null} image={c.imageUrl ?? imageOf.get(c.productId) ?? null} />
+                    )}
                   </span>
                 }
                 title={name}
-                span={`${secs(c.ms)} from its video`}
+                span={c.takeId ? `${secs(c.ms)} from its video` : `${secs(c.ms)} · from its prompt and spec`}
                 actions={moves}
               >
                 <TextInput
-                  aria-label={`${name} line`}
+                  aria-label={`${name} label`}
                   maxLength={LINE_MAX}
                   value={c.label}
                   onValueChange={(t) =>
                     change({ ...plan, cuts: plan.cuts.map((x, j) => (j === i ? { ...x, label: t.slice(0, LINE_MAX) } : x)) })
                   }
                 />
+                {!c.takeId && (
+                  <TextInput
+                    aria-label={`${name} scene line`}
+                    maxLength={LINE_MAX}
+                    placeholder="What this scene says"
+                    value={c.line ?? ""}
+                    onValueChange={(t) =>
+                      change({ ...plan, cuts: plan.cuts.map((x, j) => (j === i ? { ...x, line: t.slice(0, LINE_MAX) } : x)) })
+                    }
+                  />
+                )}
               </Scene>
             );
           })}

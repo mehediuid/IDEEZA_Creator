@@ -41,7 +41,9 @@ import { parseStored, readStoredKey } from "@/lib/key-store";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { listingMetadataOf, type ProjectView } from "@/lib/manual/project-read";
 import { normalizeProjects, PROJECTS_KEY, useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
+import { heldNoteOf } from "@/lib/video/video-copy";
 import { FEE_LABEL } from "@/lib/market/fee";
 import { createListing, editListing, listingViewOf } from "@/lib/market/listing";
 import {
@@ -50,6 +52,8 @@ import {
   MARKET_UNREADABLE,
   STORAGE_FULL,
   VIDEOS_READY_LINE,
+  HELD_ANNOUNCEMENT,
+  HELD_DONE_LINE,
   addInputOf,
   cleanBenefits,
   editRequestOf,
@@ -141,10 +145,7 @@ export function sellRecheckOf(
     now: number;
   },
 ): string | null {
-  const facts = readinessFactsOf(p, ctx.view, ctx.brief, readProjectVideos(p.id), ctx.jobs, ctx.now);
-  // The products' videos, then the project video (owner, 2026-10-21).
-  const videos = videosBlockerOf(readinessOf(facts, ctx.purpose));
-  if (videos) return `A video changed while this was open: ${videos}`;
+  // The videos no longer hold a listing back (owner, 2026-11-18): it waits for them instead (lib/market/held.ts).
   const maker = makerShareNow(p, ctx.market);
   if (ctx.percentSelling <= maker) return null;
   return maker > 0
@@ -202,6 +203,8 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
   // The latest record, for a commit that runs seconds after the press.
   const latest = React.useRef(projects);
   const latestJobs = React.useRef(jobs);
+  // A video still being made: the listing will wait for it (owner, 2026-11-18).
+  const videosWait = !editing ? videosBlockerOf(view.videos.readiness.sell) : null;
   React.useEffect(() => {
     latest.current = projects;
     latestJobs.current = jobs;
@@ -235,14 +238,14 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
     else onClose();
   };
 
-  const runAdd = async (): Promise<{ result: RequestResult; written: Listing | null }> => {
+  const runAdd = async (): Promise<{ result: RequestResult; written: Listing | null; held: boolean }> => {
     const net = input.network!;
     const collection = input.collection;
     const chosen = input.mintingType;
     const plan = mint.plan({ projectId: project.id, intent: "sell", type: chosen, network: net, collection, current: mintStatus });
-    if (!plan) return { result: { ok: false, reason: "recheck", message: GONE }, written: null };
+    if (!plan) return { result: { ok: false, reason: "recheck", message: GONE }, written: null, held: false };
     const endsAt = input.type === "auction" ? new Date(input.endsAt).getTime() : null;
-    const req = listRequestOf({
+    const built = listRequestOf({
       projectName: project.name,
       network: net,
       collection,
@@ -251,8 +254,11 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
       endsAt,
       mintRequest: plan.request,
     });
+    // A video still being made: the wallet says it waits (owner, 2026-11-18).
+    const req = videosWait ? { ...built, doneLine: HELD_DONE_LINE } : built;
     const newMint = plan.request?.purpose === "lazyMint" || plan.request?.purpose === "instantMint";
     let written: Listing | null = null;
+    let held = false;
     const result = await request(req, {
       // Another tab may have listed it meanwhile (errata 13: the caller gates a new listing).
       recheck: () => {
@@ -293,12 +299,22 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
           { listing: () => randomId("lst_") },
         );
         if (!created.ok) return { ok: false, message: created.reason };
+        // A video still missing, rendering or unreviewed (owner, 2026-11-18): the maker signs now and
+        // the listing waits off Explore marketplace until every video is ready, then goes live by itself.
+        const waitFor = videosBlockerOf(
+          readinessOf(readinessFactsOf(p, view, brief, readProjectVideos(p.id), latestJobs.current, proof.at), "sell"),
+        );
         const prior = p.mint ?? null;
         const record = plan.request ? plan.nextRecord(proof) : null;
         // A mint that yields no record would list it as minted with nothing behind it.
         if (plan.request && !record) return { ok: false, conflict: true, message: NO_MINT_RECORD };
         if (record && !setMint(p.id, record)) return { ok: false, message: STORAGE_FULL };
-        const w = writeListings(created.listings);
+        const newListing = created.listings[created.listings.length - 1];
+        const w = waitFor
+          ? hold({ id: heldId(), projectId: p.id, kind: "main", at: proof.at, listing: newListing }).ok
+            ? ({ ok: true } as const)
+            : ({ ok: false, reason: "storage" } as const)
+          : writeListings(created.listings);
         if (!w.ok) {
           if (record) {
             if (prior) setMint(p.id, prior);
@@ -309,13 +325,14 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
         if (newMint) bumpMinted(net, collection);
         // The box ticked here is the Sell rule's ownership fix (readiness `fixedIn: "form"`).
         if (typeof p.ownerConfirmedAt !== "number") setOwnerConfirmed(p.id, proof.at);
-        written = created.listings[created.listings.length - 1];
+        written = newListing;
+        held = waitFor !== null;
         return { ok: true };
       },
       // "Use lazy mint instead" when an instant mint can't be paid: back to the form, lazy chosen.
       onUseLazy: mints && chosen === "instant" ? () => change({ mintingType: "lazy" }) : undefined,
     });
-    return { result, written };
+    return { result, written, held };
   };
 
   const runEdit = async (l: Listing): Promise<{ result: RequestResult; written: Listing | null }> => {
@@ -353,10 +370,11 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
     }
     setError(null);
     setBusy(true);
-    const { result, written } = editing ? await runEdit(editing) : await runAdd();
+    const run = editing ? { ...(await runEdit(editing)), held: false } : await runAdd();
+    const { result, written } = run;
     setBusy(false);
     if (result.ok && written) {
-      onDone(editing ? updatedAnnouncement(written) : listedAnnouncement(written));
+      onDone(editing ? updatedAnnouncement(written) : run.held ? HELD_ANNOUNCEMENT : listedAnnouncement(written));
       return;
     }
     if (!result.ok && result.reason !== "rejected") setError(result.message || STORAGE_FULL);
@@ -414,7 +432,14 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
             {DEMO_LINE}
           </p>
           {error && <Banner tone="error">{error}</Banner>}
-          {!editing && <p className="text-md font-medium text-text-success">{VIDEOS_READY_LINE}</p>}
+          {!editing &&
+            (videosWait ? (
+              <p className="rounded-lg border border-solid border-[var(--color-border-brand)] bg-bg-brand-subtle px-6 py-4 text-md text-text-primary">
+                {heldNoteOf("Explore marketplace", videoCountOf(view.videos.readiness.sell).total)}
+              </p>
+            ) : (
+              <p className="text-md font-medium text-text-success">{VIDEOS_READY_LINE}</p>
+            ))}
 
           <ListingFields
             mode={editing ? "edit" : "add"}

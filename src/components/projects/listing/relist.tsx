@@ -40,6 +40,9 @@ import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import type { Listing } from "@/lib/market/types";
 import { cn } from "@/lib/utils";
 import { ReadinessDialog } from "../details/readiness-dialog";
+import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
+import { readProjectVideos } from "@/lib/video/store";
 import { LevelCheck, useCommitCheck } from "../earn/ladder/level-check";
 import { earnSourceOf } from "../earn/ladder/use-earn-facts";
 import { makerShareNow, refusedCopy, sellRecheckOf } from "./listing-dialog";
@@ -103,7 +106,10 @@ export function RelistPanel({
     if (busy || !ladder.ok) return;
     setError(null);
     setBusy(true);
-    const result = await request(relistRequestOf(listing, project.name, changed), {
+    let heldRelist = false;
+    const built = relistRequestOf(listing, project.name, changed);
+    const waitingNow = videosBlockerOf(view.videos.readiness.relist) !== null;
+    const result = await request(waitingNow ? { ...built, doneLine: "Signed. It goes back on Explore marketplace when every video is ready." } : built, {
       recheck: () => {
         const m = readMarketNow();
         const cur = m.listings.find((l) => l.id === listing.id);
@@ -122,6 +128,17 @@ export function RelistPanel({
       commit: (proof) => {
         const p = latest.current.projects.find((x) => x.id === project.id) ?? project;
         const m = readMarketNow();
+        // A video still being made (owner, 2026-11-18): the relist waits off Explore marketplace,
+        // then goes live by itself.
+        const waitFor = videosBlockerOf(
+          readinessOf(readinessFactsOf(p, view, brief, readProjectVideos(p.id), latest.current.jobs, proof.at), "relist"),
+        );
+        if (waitFor) {
+          heldRelist = true;
+          return hold({ id: heldId(), projectId: p.id, kind: "relist", at: proof.at, listingId: listing.id }).ok
+            ? { ok: true }
+            : { ok: false, message: refusedCopy("storage") };
+        }
         const next = relistListing(
           m.listings,
           listing.id,
@@ -136,7 +153,7 @@ export function RelistPanel({
       },
     });
     setBusy(false);
-    if (result.ok) onDone(RELISTED_ANNOUNCEMENT);
+    if (result.ok) onDone(heldRelist ? "Signed. It goes back on Explore marketplace when every video is ready." : RELISTED_ANNOUNCEMENT);
     else if (result.reason !== "rejected") setError(result.message || refusedCopy("storage"));
   };
 

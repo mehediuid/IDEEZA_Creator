@@ -157,7 +157,8 @@ function StepGroup({
   announce?: (message: string) => void;
 }) {
   const current = step.state === "current";
-  const firstMissing = current ? tasks.find((t) => !t.ok) : undefined;
+  // The videos never hold the choice back (owner, 2026-11-18): what the maker signs waits for them.
+  const firstMissing = current ? tasks.find((t) => !t.ok && t.id !== "videos") : undefined;
   const canAct = current && ready && !firstMissing;
   const note = step.state === "done" ? "Done" : current ? "Now" : "Later";
 
@@ -191,7 +192,7 @@ function StepGroup({
       {step.state !== "done" && ready && (
         <ul className={cn("m-0 flex list-none flex-col gap-1 p-0", !current && "opacity-60")}>
           {tasks.map((t) => {
-            const open = t === firstMissing;
+            const open = t === firstMissing || (current && !t.ok && t.id === "videos");
             return (
               <li key={t.id} className={cn("flex items-start gap-4 rounded-xl px-4 py-3", open && "bg-bg-subtle")}>
                 <TaskMark ok={t.ok} />
@@ -202,7 +203,9 @@ function StepGroup({
                   </span>
                   {open && (
                     <>
-                      <span className="text-md leading-md text-text-secondary">{t.reason}</span>
+                      <span className="text-md leading-md text-text-secondary">
+                        {t.id === "videos" ? `${t.reason} You don't have to wait: what you sell goes live when they're ready.` : t.reason}
+                      </span>
                       <span className="self-start">
                         <StepFix step={t} project={project} brief={brief} announce={announce} />
                       </span>
