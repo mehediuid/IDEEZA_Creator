@@ -1,159 +1,278 @@
 "use client";
 
-// Earn › Sell, with the owner's selling rules (2026-10-11; the approved
-// sell-flow mockup):
-// - "What you can sell": three short rule cards, Main · Physical · Virtual, what
-//   each is and where it applies, under the line that each is listed on its
-//   own and copies never sell the project.
-// - "Whole project · {name}": three rows, Main NFT, Physical NFT, Virtual NFT
-//   (editions.tsx's `SellRow`), each its state in words and ONE quiet button.
-//   The Main row's Sell is the mint flow while nothing is minted, else the
-//   existing listing flow (ListingFlow, which also opens once on `?list=1`);
-//   while a Main listing is live or paused its Manage opens the listing's own
-//   controls under the row (rail-marketplace.tsx's ListingBody: Edit, Remove,
-//   Relist, Bidding history, Close auction, Cancel auction). While a buyer's
-//   checkout holds the live listing the row reads "In checkout · a buyer is
-//   paying now". A missing ladder step stands under the row in Sell's place.
-//   Then the note that selling the Main NFT sells the project, and, quiet,
-//   "Mint details".
-// - "One product at a time" (`#copies`): editions.tsx.
-// Everything asks `can(viewer, …, view.canCtx)` as before, so a project sold
-// in full reads without a write. No control here is violet: the listing's own
-// Relist or Close auction can be, as the page's one.
+// Earn › Sell, a sales desk (owner, 2026-11-18: "this page isn't in a good
+// layout, a lot of space is empty — think again from scratch"; the plan
+// https://claude.ai/artifact/KG362uZ1MZyahtgV1ygmuD, direction A with every
+// recommendation, D1–D12), over the owner's selling rules (2026-10-11):
+// - the page frame with its rail (WITH_RAIL): the board in the main column,
+//   the item panel in the 360 px rail beside it; under a 1024 px page the
+//   panel follows the board and a pick scrolls to it (D12);
+// - the board (sell/board.tsx): the whole project's row (Main, Physical,
+//   Virtual) and one row per product (Physical, Virtual; D3: a one-product
+//   project has one row), each tile its state, price, sold meter and earnings
+//   (D6), with the line over it; before the mint, one band (D10);
+// - the item panel (sell/item-panel.tsx): every control the rows had, for the
+//   tile picked (D4), with what it sold, who bought it last and what buyers
+//   see (D7, D8), and the NFT's Activity (D9);
+// - under the board, as before: the note that selling the Main NFT sells the
+//   project (left out once it has), Mint details, and "No products yet".
+// The tile open on arrival is the one waiting for the maker (D5,
+// `defaultTileOf`); `#copies` / `#editions-<product>` ask for a product's
+// copies and `?list=1` for the Main NFT, whose ListingFlow then opens once.
+// Everything asks `can(viewer, …, view.canCtx)` as before, so a project sold in
+// full reads without a write.
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { TestnetDemoBadge } from "@/components/ideeza";
-import { ListingFlow } from "@/components/projects/listing/listing-flow";
-import { earnMintHref } from "@/lib/manual/earn-route";
+import { WITH_RAIL } from "@/components/ideeza/page";
+import { useProjectBrief } from "@/lib/brief/project-brief";
+import { payoutLinesText, type PayoutLine } from "@/lib/commerce/payout";
 import { earnPairOf, mainRowStateOf } from "@/lib/manual/earn-view";
-import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import type { NextAction } from "@/lib/manual/project-summary";
-import { MAIN_SALE_DETAIL, MAIN_SALE_NOTE, SELL_RULES, SELL_RULES_LEAD } from "@/lib/market/sell-flow";
-import { cn } from "@/lib/utils";
-import { RailStackScope } from "../details/rail-block";
-import { ListingBody } from "../details/rail-marketplace";
+import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
+import { editionChainOf } from "@/lib/market/editions";
+import { copyTileOf, defaultTileOf, deskCaptionOf, deskProductsOf, mainTileOf, tileKeyOf, type DeskTile } from "@/lib/market/sell-desk";
+import { MAIN_SALE_DETAIL, MAIN_SALE_NOTE, copyRowStateOf } from "@/lib/market/sell-flow";
+import { PROJECT_SCOPE, type EditionKind } from "@/lib/market/types";
+import { addAmounts } from "@/lib/wallet/money";
 import { MintDetails } from "../details/rail-outcome";
 import type { SlotProps } from "../details/slots";
+import type { CopyScope } from "../editions/edition-block";
 import { useCommitGate } from "./ladder/level-check";
 import { earnSourceOf } from "./ladder/use-earn-facts";
-import { NftActivityLine } from "./nft-activity";
-import { COPY_KINDS, CopyRow, EarnProducts, KindDot, RowButton, RowLink, SellRow, StateLines, WHOLE_PROJECT } from "./editions";
-import { EARN_LINK, EARN_STACK, EarnBlock, TAP } from "./surface";
+import { EARN_LINK } from "./surface";
+import { SellBoard, type BoardRow } from "./sell/board";
+import { CopyPanel, DraftPanel, MainPanel, PanelFrame, type CopyDesk, type MainDesk } from "./sell/item-panel";
 
+const COPY_KINDS: EditionKind[] = ["physical", "virtual"];
+/** The listing's own gate and form ask these; the panel's "Before you can list" leaves them out. */
 const LIST_HANDLED = ["videos", "ownership"] as const;
+const PANEL_ID = "sell-item-panel";
 
-export function EarnSell(props: SlotProps) {
-  return (
-    <div className={EARN_STACK}>
-      <SellRules />
-      <WholeProject {...props} />
-      <EarnProducts {...props} />
-    </div>
-  );
+/** The whole project's copies are named "Whole project" beside the project. */
+const WHOLE_PROJECT: CopyScope = { id: PROJECT_SCOPE, name: "Whole project", product: null };
+
+type Desk = {
+  rows: BoardRow[];
+  tiles: DeskTile[];
+  main: MainDesk;
+  copies: Map<string, CopyDesk>;
+  draft: boolean;
+  caption: { value: string; label: string }[] | null;
+  /** The mint summary's link, under Mint details, when the project has one. */
+  summaryHref: string | null;
+};
+
+/** A row's earnings in one line: the same token's amounts added. */
+function rowEarned(tiles: (DeskTile | undefined)[]): string | null {
+  const out = new Map<string, PayoutLine>();
+  for (const l of tiles.flatMap((t) => t?.earned ?? [])) {
+    const k = `${l.network}:${l.token}`;
+    const prev = out.get(k);
+    out.set(k, prev ? { ...prev, amount: addAmounts(prev.amount, l.amount) } : { ...l });
+  }
+  return out.size ? payoutLinesText([...out.values()]) : null;
 }
 
-function SellRules() {
-  return (
-    <EarnBlock title="What you can sell" tour="earn-sell-rules" lead={SELL_RULES_LEAD} aside={<TestnetDemoBadge />}>
-      <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 [@container(min-width:640px)]:grid-cols-3">
-        {SELL_RULES.map((r) => (
-          <li key={r.id} className="flex min-w-0 flex-col gap-2 rounded-xl border border-solid border-border bg-bg-surface p-6">
-            <span className="flex items-center gap-3 text-md font-semibold leading-md text-text-primary">
-              <KindDot kind={r.id} />
-              {r.title}
-            </span>
-            <span className="text-md leading-md text-text-secondary">{r.line}</span>
-            <span className="mt-1 text-sm font-semibold leading-sm text-text-tertiary">{r.where}</span>
-          </li>
-        ))}
-      </ul>
-    </EarnBlock>
-  );
-}
-
-function WholeProject(props: SlotProps) {
-  const { project, view, viewer, brief, announce } = props;
-  const pair = earnPairOf(project, view.summary, brief, viewer, view.canCtx);
-  const summaryOf = [pair.first, pair.second].find((a) => a?.kind === "view-brief") ?? null;
-  const products = view.products.filter((p) => p.dropped === null).map((p) => displayProductName(p.name));
-  return (
-    <EarnBlock card title={`Whole project · ${project.name}`} lead={products.length ? products.join(" + ") : undefined}>
-      <div className="-my-6 flex flex-col divide-y divide-border">
-        <MainRow {...props} />
-        {COPY_KINDS.map((kind) => (
-          <CopyRow key={kind} {...props} kind={kind} scope={WHOLE_PROJECT} />
-        ))}
-      </div>
-      <p className="m-0 rounded-xl bg-bg-subtle px-6 py-5 text-md leading-md text-text-secondary">
-        <strong className="font-semibold text-text-primary">{MAIN_SALE_NOTE}</strong> {MAIN_SALE_DETAIL}
-      </p>
-      <MintDetails summary={view.summary} commerce={view.commerce} viewer={viewer} view={view} announce={announce}>
-        {summaryOf && (
-          <Link href={summaryOf.href} className={EARN_LINK}>
-            Open the mint summary
-            <Icon icon={ArrowRight01Icon} size={14} />
-          </Link>
-        )}
-      </MintDetails>
-    </EarnBlock>
-  );
-}
-
-/** The Main NFT's row: its state, then Sell (the mint or the listing flow) or Manage (the listing's controls). */
-function MainRow(props: SlotProps) {
+/** Every tile's facts and the rows' own states, from the page's one read. */
+function useDesk(props: SlotProps): Desk {
   const { project, view, viewer, brief } = props;
+  const stored = useProjectBrief(project.id) ?? null;
+  const holds = useCheckoutHolds();
   const pair = earnPairOf(project, view.summary, brief, viewer, view.canCtx);
   const actions = [pair.first, pair.second].filter((a): a is NextAction => a !== null);
   const listing = actions.find((a): a is Extract<NextAction, { kind: "add-to-marketplace" }> => a.kind === "add-to-marketplace") ?? null;
-  const holds = useCheckoutHolds();
-  const state = mainRowStateOf({
+  const summary = actions.find((a): a is Extract<NextAction, { kind: "view-brief" }> => a.kind === "view-brief") ?? null;
+  const inCheckout = view.listing.kind === "live" && holds.any(view.listing.listing.id) > 0;
+  const mainState = mainRowStateOf({
     status: view.summary.status,
     listing: view.listing,
     locked: view.lock !== null,
     canList: listing !== null,
     manage: can(viewer, "facts.seeOwnerOnly") && (view.listing.kind === "live" || view.listing.kind === "paused"),
-    inCheckout: view.listing.kind === "live" && holds.any(view.listing.listing.id) > 0,
+    inCheckout,
   });
-  const { check, ready } = useCommitGate("list", earnSourceOf(project, view, brief), { handled: LIST_HANDLED });
-  const steps = state.action === "list" && ready && !check.ok;
-  const [open, setOpen] = React.useState(false);
-  // A listing just written opens its controls, where focus lands (MARKETPLACE_FOCUS_ID).
-  const [seen, setSeen] = React.useState(view.listing.kind);
-  if (seen !== view.listing.kind) {
-    setSeen(view.listing.kind);
-    if (view.listing.kind === "live" || view.listing.kind === "paused") setOpen(true);
-  }
-  const stateId = "state-main";
-  const panelId = "manage-main";
+  const gate = useCommitGate("list", earnSourceOf(project, view, brief), { handled: LIST_HANDLED });
+  const missing = mainState.action === "list" && gate.ready && !gate.check.ok ? gate.check.missing.length : 0;
+  const mainFacts = mainTileOf({
+    projectId: project.id,
+    action: mainState.action,
+    status: view.summary.status,
+    locked: view.lock !== null,
+    listing: view.listing,
+    sales: view.sales,
+    inCheckout,
+  });
+  const mainTile: DeskTile = missing ? { ...mainFacts, hint: missing === 1 ? "1 step before listing" : `${missing} steps before listing` } : mainFacts;
 
-  const action =
-    state.action === "mint" ? (
-      <RowLink href={earnMintHref(project.id, "sell")} label="Sell" />
-    ) : state.action === "manage" ? (
-      <RowButton id="sell-main" label="Manage" expanded={open} controls={panelId} onClick={() => setOpen((o) => !o)} />
-    ) : state.action === "list" && listing ? (
-      // A missing ladder step stands under the row in Sell's place.
-      steps ? null : <ListingFlow {...props} action={listing} label={state.label} violet={false} className={cn("justify-center", TAP)} />
-    ) : state.action === "none" || state.action === "list" ? null : (
-      <RowButton id="sell-main" label={state.label} disabled describedBy={stateId} />
-    );
+  const mainListing = view.listing.kind === "none" ? null : view.listing.listing;
+  const chain = editionChainOf(view.mint.record, mainListing, view.mint.status === "legacy" && stored ? stored.state : null);
+  const minted = view.summary.status !== "draft" && view.mint.status !== "notMinted";
+  const products = deskProductsOf(view.products, view.editions);
+  const current = view.products.filter((p) => p.dropped === null);
+  const scopes: CopyScope[] = [WHOLE_PROJECT, ...products.map((p) => ({ id: p.id, name: displayProductName(p.name), product: p }))];
+
+  const copies = new Map<string, CopyDesk>();
+  for (const scope of scopes) {
+    for (const kind of COPY_KINDS) {
+      const state = copyRowStateOf({
+        productId: scope.id,
+        kind,
+        projectName: project.name,
+        minted,
+        given: view.summary.status === "given",
+        manage: can(viewer, "editions.manage", view.canCtx),
+        chainKnown: chain !== null,
+        dropped: scope.product !== null && scope.product.dropped !== null,
+        tracks: view.editions,
+        sales: view.sales,
+      });
+      const tile = copyTileOf({ projectId: project.id, scope: scope.id, kind, state, tracks: view.editions, sales: view.sales });
+      copies.set(tile.key, { tile, state, scope, kind });
+    }
+  }
+
+  const rows: BoardRow[] = scopes.map((scope) => {
+    const tiles: BoardRow["tiles"] = {
+      ...(scope.id === PROJECT_SCOPE ? { main: mainTile } : null),
+      physical: copies.get(tileKeyOf(scope.id, "physical"))?.tile,
+      virtual: copies.get(tileKeyOf(scope.id, "virtual"))?.tile,
+    };
+    if (scope.id === PROJECT_SCOPE) {
+      const names = current.map((p) => displayProductName(p.name));
+      return {
+        scope: scope.id,
+        name: project.name,
+        what: `Whole project · ${current.length === 1 ? "1 product" : `${current.length} products`}`,
+        // One product: the row is that product too, so it says which (D3).
+        also: products.length === 0 && names.length ? names.join(" + ") : null,
+        cover: view.summary.cover,
+        earned: rowEarned(Object.values(tiles)),
+        tiles,
+      };
+    }
+    return {
+      scope: scope.id,
+      name: scope.name,
+      what: scope.product?.dropped ? "Product · dropped by a later version" : "Product",
+      also: null,
+      cover: null,
+      earned: rowEarned(Object.values(tiles)),
+      tiles,
+    };
+  });
+
+  const tiles = [mainTile, ...[...copies.values()].map((c) => c.tile)];
+  const draft = mainState.action === "mint";
+  return {
+    rows,
+    tiles,
+    main: { tile: mainTile, state: mainState, listing },
+    copies,
+    draft,
+    caption: draft ? null : deskCaptionOf({ projectId: project.id, tiles, sales: view.sales, locked: view.lock !== null }),
+    summaryHref: summary?.href ?? null,
+  };
+}
+
+export function EarnSell(props: SlotProps) {
+  const { project, view, viewer, announce } = props;
+  const desk = useDesk(props);
+  const search = useSearchParams();
+  const listAsked = search.get("list") === "1";
+  const [picked, setPicked] = React.useState<string | null>(null);
+  // The address's hash, read once the router has written it (a client-side move from the Overview's
+  // "Sell copies of a product" sets it after this first render), and again when it changes.
+  const [hash, setHash] = React.useState("");
+  React.useEffect(() => {
+    const changed = () => {
+      setHash(window.location.hash);
+      setPicked(null);
+    };
+    const frame = requestAnimationFrame(() => setHash(window.location.hash));
+    window.addEventListener("hashchange", changed);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", changed);
+    };
+  }, [search]);
+  const boardRef = React.useRef<HTMLDivElement>(null);
+
+  const keys = new Set(desk.tiles.map((t) => t.key));
+  const fallback = desk.draft ? "draft" : listAsked ? tileKeyOf(PROJECT_SCOPE, "main") : defaultTileOf(desk.tiles, hash);
+  const selected = picked && (picked === "draft" ? desk.draft : keys.has(picked)) ? picked : fallback;
+
+  const pick = (key: string) => {
+    setPicked(key);
+    const panel = document.getElementById(PANEL_ID);
+    const board = boardRef.current;
+    // Under a 1024 px page the panel follows the board: bring it up (D12).
+    if (panel && board && panel.getBoundingClientRect().top >= board.getBoundingClientRect().bottom - 1) {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      requestAnimationFrame(() => panel.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" }));
+    }
+    const tile = desk.tiles.find((t) => t.key === key);
+    if (tile) announce(`${tile.kind === "main" ? "Main NFT" : tile.kind === "physical" ? "Physical copies" : "Virtual copies"}: ${tile.chip.label}`);
+  };
+  const back = () => {
+    boardRef.current?.scrollIntoView({ block: "start" });
+    boardRef.current?.querySelector<HTMLElement>(`[aria-pressed="true"]`)?.focus({ preventScroll: true });
+  };
+
+  const locked = view.lock !== null;
+  const copy = selected ? desk.copies.get(selected) : undefined;
 
   return (
-    <SellRow kind="main" label="Main NFT" stateId={stateId} state={<StateLines lines={[state.line]} live={state.live} />} action={action}>
-      {view.summary.status !== "draft" && view.mint.status !== "notMinted" && <NftActivityLine {...props} target={{ kind: "main" }} />}
-      {steps && listing && <ListingFlow {...props} action={listing} violet={false} className="" />}
-      {state.action === "manage" && open && (
-        <div id={panelId}>
-          <RailStackScope className="flex flex-col gap-6">
-            <ListingBody {...props} />
-          </RailStackScope>
-        </div>
-      )}
-    </SellRow>
+    <div className={WITH_RAIL}>
+      <div ref={boardRef} className="flex min-w-0 scroll-mt-10 flex-col gap-10">
+        <SellBoard
+          rows={desk.rows}
+          caption={desk.caption}
+          selected={selected}
+          onSelect={pick}
+          draft={desk.draft ? { name: project.name, selected: selected === "draft" } : null}
+          sold={locked}
+        />
+        {!locked && (
+          <p className="m-0 rounded-xl bg-bg-subtle px-12 py-8 text-md leading-md text-text-secondary">
+            <strong className="font-semibold text-text-primary">{MAIN_SALE_NOTE}</strong> {MAIN_SALE_DETAIL}
+          </p>
+        )}
+        {!desk.draft && (
+          <MintDetails summary={view.summary} commerce={view.commerce} viewer={viewer} view={view} announce={announce}>
+            {desk.summaryHref && (
+              <Link href={desk.summaryHref} className={EARN_LINK}>
+                Open the mint summary
+                <Icon icon={ArrowRight01Icon} size={14} />
+              </Link>
+            )}
+          </MintDetails>
+        )}
+        {view.products.length === 0 && (
+          <div className="flex flex-col items-start gap-4">
+            <p className="m-0 text-md leading-md text-text-secondary">No products yet. Add one to the project to sell its copies.</p>
+            <Link href={`/projects/${encodeURIComponent(project.id)}`} className={EARN_LINK}>
+              Open products
+              <Icon icon={ArrowRight01Icon} size={14} />
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <PanelFrame id={PANEL_ID} onBack={back}>
+        {selected === "draft" ? (
+          <DraftPanel project={project} />
+        ) : copy ? (
+          <CopyPanel key={selected} {...props} desk={copy} />
+        ) : (
+          <MainPanel key={selected ?? "main"} {...props} desk={desk.main} />
+        )}
+      </PanelFrame>
+    </div>
   );
 }
