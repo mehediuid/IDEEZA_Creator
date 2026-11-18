@@ -38,7 +38,7 @@ import { useProjectBrief } from "@/lib/brief/project-brief";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf, videosStartBlockerOf } from "@/lib/manual/readiness";
 import { heldNoteOf } from "@/lib/video/video-copy";
 import { hold, heldId } from "@/lib/market/held";
 import { canCreate, createTrack, editionChainOf, listTrack, USE_WORD, wholeNumberOf, type TrackTerms } from "@/lib/market/editions";
@@ -181,6 +181,7 @@ export function SellFlowDialog({
     ownershipConfirmed: facts.ownershipConfirmed,
     draft,
     holdVideos: true,
+    notStarted: videosStartBlockerOf(scopeReadiness),
   });
   const state = draft.use ? trackStateOf(tracks, productId, kind, draft.use) : { kind: "new" as const };
   const index = SELL_STEPS.indexOf(step);

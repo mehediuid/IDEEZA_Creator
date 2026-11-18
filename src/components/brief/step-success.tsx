@@ -102,8 +102,16 @@ export function StepSuccess({
   const projectLabel = projectName.trim() || PROJECT_VIDEO_TITLE;
   // Live once nothing renders any more (only a Save can arrive with a render running).
   const isLive = rendering === 0;
-  const heading = isLive ? HEADING_LIVE_BY_INTENT[intent] : "Mint complete";
-  const subline = isLive ? liveSubline(intent, ready.length > 0 || projectTake !== null) : pendingSubline();
+  // A Sell signed while its videos still render or wait for review (owner, 2026-11-18): minted, and
+  // the listing waits off the marketplace — never "Listed" until it is.
+  const { store: heldStore } = useHeld();
+  const waitingSale = intent === "sell" && projectId ? heldOf(heldStore, projectId).some((i) => i.kind === "main") : false;
+  const heading = waitingSale ? "Minted · listing waits for videos" : isLive ? HEADING_LIVE_BY_INTENT[intent] : "Mint complete";
+  const subline = waitingSale
+    ? "It goes on Explore marketplace by itself when every video is ready — we'll tell you."
+    : isLive
+      ? liveSubline(intent, ready.length > 0 || projectTake !== null)
+      : pendingSubline();
 
   // The listing as its record holds it now, so an edit from the rail shows here too.
   const listing =

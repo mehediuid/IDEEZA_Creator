@@ -232,6 +232,30 @@ export function videosBlockerOf(r: Readiness): string | null {
   return r.rules.find((x) => !x.ok && (x.id === "videos" || x.id === "projectVideo"))?.reason ?? null;
 }
 
+/** The videos that haven't been started (owner, 2026-11-18, second word): a product with no video
+ *  yet or whose render failed, and a project video not made, failed or out of date with no update
+ *  rendering. A video rendering or waiting for review counts as started. */
+export function videosNotStartedOf(r: Readiness): string[] {
+  const out = r.products
+    .filter((p) => p.video.state === "none" || p.video.state === "failed")
+    .map((p) => (p.name.trim() ? p.name : "Not named yet"));
+  const pv = r.project;
+  if (pv && (pv.state === "make" || pv.state === "failed" || pv.state === "waiting" || pv.state === "outdated")) out.push("the project video");
+  return out;
+}
+
+/** Owner, 2026-11-18 (second word): a maker moves on — lists, sells copies, relists, shares — only
+ *  once every video it needs is in generation. What's still rendering or waiting for review then
+ *  holds what was signed off the marketplace and Innovations (lib/market/held.ts); a video never
+ *  started holds the maker here instead. Null when every one has started. */
+export function videosStartBlockerOf(r: Readiness): string | null {
+  const names = videosNotStartedOf(r);
+  if (names.length === 0) return null;
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  const first = list.charAt(0).toUpperCase() + list.slice(1);
+  return `Start every video first: ${first} ${names.length === 1 ? "hasn't" : "haven't"} started yet.`;
+}
+
 /** Assembles `ReadinessFacts` from the page's own derivation. `view` is the
  *  v1 `ProjectView` (`project-read.ts`) — Phase 2 only ever adds fields to
  *  it (spec §3.7), so its pre-existing `products` reads the same way once

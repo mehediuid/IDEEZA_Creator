@@ -553,3 +553,17 @@ test("sellVideoOf: one product's video is the project's — no project video row
   const sell = sellVideoOf(readinessOf({ products: [product], videos, jobs: [], now: 10, status: "private", ownershipConfirmed: true, license: null }, "sell"));
   assert.deepEqual([sell.ok, sell.project], [true, false]);
 });
+
+test("sellChecksOf on the web (owner, 2026-11-18): a video in generation waits; one never started still holds Sign and sell", () => {
+  const rendering = sellChecksOf(checks({ video: { ok: false, reason: "Waiting for 1 video to finish — about 4 min left." }, holdVideos: true, notStarted: null }));
+  assert.equal(rendering.ok, true, "every video started: the copies are signed now and wait");
+  assert.equal(rendering.videosWait, "Waiting for 1 video to finish — about 4 min left.");
+  const missing = sellChecksOf(
+    checks({ video: { ok: false, reason: "1 product still needs an AI video." }, holdVideos: true, notStarted: "Start every video first: Rider hasn't started yet." }),
+  );
+  assert.equal(missing.ok, false);
+  assert.equal(missing.blocker, "Start every video first: Rider hasn't started yet.");
+  assert.equal(missing.videosWait, null);
+  // The phone keeps the old gate: without holdVideos any video still missing holds it.
+  assert.equal(sellChecksOf(checks({ video: { ok: false, reason: "Waiting" } })).ok, false);
+});

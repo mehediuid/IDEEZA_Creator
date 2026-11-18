@@ -79,23 +79,23 @@ test("lines: meta, take label, stage line, title", () => {
 test("readinessCopy: P2-VIDEO-14's table with relist and edition — the videos no longer hold it (owner, 2026-11-18)", () => {
   assert.deepEqual(copy.readinessCopy("showcase"), {
     title: "Share to Innovations",
-    info: "The post needs your story. Every product needs an AI video before others see it — you can share now, and it waits off Innovations until they're ready.",
+    info: "The post needs your story, and every video has to be started. You don't wait for them to finish: the post stays off Innovations until they're ready.",
     cta: "Share to Innovations",
   });
   assert.equal(copy.readinessCopy("sell").cta, "Continue to listing");
   assert.equal(copy.readinessCopy("sell").title, "Add to marketplace");
   assert.equal(
     copy.readinessCopy("sell").info,
-    "Every product needs an AI video before buyers see it. You can list now: it stays off Explore marketplace until they're ready.",
+    "Start every video first. You don't wait for them to finish: the listing stays off Explore marketplace until they're ready.",
   );
   assert.equal(copy.readinessCopy("give").title, "Give to community");
   assert.equal(
     copy.readinessCopy("relist").info,
-    "Every product needs an AI video before buyers see it. You can relist now: it stays off Explore marketplace until they're ready.",
+    "Start every video first. You don't wait for them to finish: it stays off Explore marketplace until they're ready.",
   );
   assert.deepEqual(copy.readinessCopy("edition", "Rider"), {
     title: "Add Rider NFTs to the marketplace",
-    info: "Rider needs an AI video before buyers see these. You can list them now: they wait until it's ready.",
+    info: "Start Rider's video first. You don't wait for it to finish: these wait off Explore marketplace until it's ready.",
     cta: "Continue",
   });
 });

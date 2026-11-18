@@ -45,7 +45,7 @@ import type { ProductReadiness, Readiness, ReadinessPurpose } from "@/lib/manual
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf, videosStartBlockerOf } from "@/lib/manual/readiness";
 import { useProjectVideos } from "@/lib/video/store";
 import {
   PROJECT_GROUP_META,
@@ -80,16 +80,20 @@ export type ReadinessDialogProps = {
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
-/** What holds this dialog's CTA. Since 2026-11-18 (owner: a maker never waits on a render) the
- *  videos don't: what the maker signs waits off the marketplace and Innovations until they're ready
- *  (lib/market/held.ts). Only a rule fixed in the gate itself (Showcase's ownership box) holds it —
- *  and the videos alone, for the Videos dialog, whose only point is the videos. */
+/** What holds this dialog's CTA. Since 2026-11-18 (owner: a maker never waits on a render) a video
+ *  still rendering or waiting for review doesn't: what the maker signs waits off the marketplace and
+ *  Innovations until it's ready (lib/market/held.ts). But every video has to be started first —
+ *  the maker can't move on without putting each one in generation (owner, same day). Then a rule
+ *  fixed in the gate itself (Showcase's ownership box); and the videos alone, for the Videos
+ *  dialog, whose only point is the videos. */
 export function dialogBlockerOf(readiness: Readiness): string | null {
-  const videos = readiness.purpose === "videos";
+  if (readiness.purpose === "videos") {
+    return readiness.rules.find((r) => !r.ok && (r.id === "videos" || r.id === "projectVideo"))?.reason ?? null;
+  }
   return (
-    readiness.rules.find(
-      (r) => !r.ok && (videos ? r.id === "videos" || r.id === "projectVideo" : r.fixedIn === "gate" && r.id !== "videos" && r.id !== "projectVideo"),
-    )?.reason ?? null
+    videosStartBlockerOf(readiness) ??
+    readiness.rules.find((r) => !r.ok && r.fixedIn === "gate" && r.id !== "videos" && r.id !== "projectVideo")?.reason ??
+    null
   );
 }
 
@@ -290,7 +294,7 @@ export function ReadinessDialog({
             </section>
           )}
 
-          {waiting ? (
+          {waiting && !blocker ? (
             <p className="flex items-start gap-3 rounded-lg border border-solid border-[var(--color-border-brand)] bg-bg-brand-subtle px-6 py-4 text-md text-text-primary">
               <span className="mt-[3px]">
                 <StatusGlyph icon="info" tone="brand" size={16} />

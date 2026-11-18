@@ -342,3 +342,25 @@ test("Publish (owner, 2026-10-12): a Draft keeps it private, gives or sells; a P
   assert.equal(publishIntentOf("bogus"), null);
   assert.equal(publishIntentOf(null), null);
 });
+
+test("reviewMissing with holdVideos (web, owner 2026-11-18): every video started opens Sign; one never started keeps it shut", () => {
+  const rules = (videos, start) => ({
+    purpose: "sell",
+    ok: false,
+    rules: [{ id: "videos", ok: false, fixedIn: "brief", reason: videos }],
+    products: start
+      ? [{ productId: "a", name: "Rider", thumb: null, video: { state: "none" } }]
+      : [{ productId: "a", name: "Rider", thumb: null, video: { state: "review", take: {} } }],
+    counts: { total: 1, ready: 0, rendering: 0, review: start ? 0 : 1, missing: start ? 1 : 0 },
+    project: null,
+    blocker: videos,
+    gateBlocker: null,
+  });
+  assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: rules("Review 1 video to continue.", false), holdVideos: true }), null);
+  assert.equal(
+    reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: rules("1 product still needs an AI video.", true), holdVideos: true }),
+    "Start every video first: Rider hasn't started yet.",
+  );
+  // The phone's mint keeps the old gate.
+  assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: rules("Review 1 video to continue.", false) }), "Review 1 video to continue.");
+});

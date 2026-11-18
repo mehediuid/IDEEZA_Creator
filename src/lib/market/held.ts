@@ -10,9 +10,11 @@
 // - share: the Innovations post (Share to Innovations, the mint's tick, a Give's post).
 // - relist: a paused listing to put back (Relist).
 //
-// Nothing here starts a video: each one is made storyboard first (owner, 2026-11-18), so a missing
-// one keeps its item waiting until the maker makes it (D7, D12). A failed render keeps it waiting
-// too (D11). Cancel takes an item off; nothing it held was ever live (D9).
+// Nothing here starts a video: each one is made storyboard first, and the maker can't sign until
+// every video it needs is in generation (owner, 2026-11-18, second word) — rendering or waiting for
+// review is fine, never started is not. A product added later keeps its item waiting until its
+// video is made (D12); a failed render keeps it waiting too (D11). Cancel takes an item off;
+// nothing it held was ever live (D9).
 //
 // Relative imports only.
 

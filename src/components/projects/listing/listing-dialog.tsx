@@ -41,7 +41,7 @@ import { parseStored, readStoredKey } from "@/lib/key-store";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { listingMetadataOf, type ProjectView } from "@/lib/manual/project-read";
 import { normalizeProjects, PROJECTS_KEY, useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf, videosStartBlockerOf } from "@/lib/manual/readiness";
 import { hold, heldId } from "@/lib/market/held";
 import { heldNoteOf } from "@/lib/video/video-copy";
 import { FEE_LABEL } from "@/lib/market/fee";
@@ -145,7 +145,11 @@ export function sellRecheckOf(
     now: number;
   },
 ): string | null {
-  // The videos no longer hold a listing back (owner, 2026-11-18): it waits for them instead (lib/market/held.ts).
+  // A video still rendering or unreviewed no longer holds a listing back (owner, 2026-11-18): it waits
+  // for it (lib/market/held.ts). A video never started still does: every one goes in first.
+  const facts = readinessFactsOf(p, ctx.view, ctx.brief, readProjectVideos(p.id), ctx.jobs, ctx.now);
+  const start = videosStartBlockerOf(readinessOf(facts, ctx.purpose));
+  if (start) return start;
   const maker = makerShareNow(p, ctx.market);
   if (ctx.percentSelling <= maker) return null;
   return maker > 0

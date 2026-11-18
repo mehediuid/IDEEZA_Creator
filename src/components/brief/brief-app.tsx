@@ -54,7 +54,7 @@ import { ownershipOf } from "@/lib/manual/ownership";
 import type { Readiness } from "@/lib/manual/p2-types";
 import { buildsOf, listingMetadataOf, productRowsOf, productsOfProject, type ProjectProduct } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { currentProductsOf, readinessOf, videosBlockerOf, type ReadinessFacts } from "@/lib/manual/readiness";
+import { currentProductsOf, readinessOf, videosBlockerOf, videosStartBlockerOf, type ReadinessFacts } from "@/lib/manual/readiness";
 import { hold, heldId } from "@/lib/market/held";
 import { createListing, listingViewOf } from "@/lib/market/listing";
 import { cleanBenefits, HELD_DONE_LINE, listRequestOf, listedMintingType } from "@/lib/market/listing-flow";
@@ -346,14 +346,14 @@ export function BriefApp({ projectId }: { projectId: string }) {
         // product's video is ready; a private mint never waits for them, so without them it
         // stays unshared and the success step offers Share. A project already shared keeps
         // the time it was first shown.
-        const shareReady = readinessOf(
-          factsOf(s, { videos: videosRef.current, jobs: jobsRef.current, now: at }),
-          "showcase",
-        ).rules.every((r) => r.ok);
+        const shareGate = readinessOf(factsOf(s, { videos: videosRef.current, jobs: jobsRef.current, now: at }), "showcase");
+        const shareReady = shareGate.rules.every((r) => r.ok);
+        const shareStarted = videosStartBlockerOf(shareGate) === null;
         if (s.shareToNewsfeed && shareReady && cur.showcasedAt == null) {
           setShowcase(cur.id, true, at, { story: s.story.trim() });
-        } else if (s.shareToNewsfeed && !shareReady && cur.showcasedAt == null) {
-          // Not silently dropped any more (owner, 2026-11-18): the post waits for the videos.
+        } else if (s.shareToNewsfeed && !shareReady && cur.showcasedAt == null && shareStarted) {
+          // Every video started, some still rendering or unreviewed (owner, 2026-11-18): the post
+          // waits for them. A private mint with videos never started stays unshared, as before.
           hold({ id: heldId(), projectId: cur.id, kind: "share", at, story: s.story.trim() });
         }
         mintedAt = at;
@@ -380,7 +380,10 @@ export function BriefApp({ projectId }: { projectId: string }) {
                 factsOf(s, { videos: readProjectVideos(p.id), jobs: jobsRef.current, now: Date.now() }),
                 purpose,
               );
-              // The videos no longer stop it (owner, 2026-11-18): what they hold waits for them.
+              // A video rendering or unreviewed no longer stops it (owner, 2026-11-18): what it holds
+              // waits for it. A video never started still does.
+              const start = videosStartBlockerOf(fresh);
+              if (start) return start;
               const other = fresh.rules.find((r) => !r.ok && r.id !== "videos" && r.id !== "projectVideo");
               if (other) return other.reason;
             }

@@ -147,31 +147,31 @@ export function readinessCopy(purpose: ReadinessPurpose, productName = "This pro
     case "showcase":
       return {
         title: "Share to Innovations",
-        info: "The post needs your story. Every product needs an AI video before others see it — you can share now, and it waits off Innovations until they're ready.",
+        info: "The post needs your story, and every video has to be started. You don't wait for them to finish: the post stays off Innovations until they're ready.",
         cta: "Share to Innovations",
       };
     case "sell":
       return {
         title: "Add to marketplace",
-        info: "Every product needs an AI video before buyers see it. You can list now: it stays off Explore marketplace until they're ready.",
+        info: "Start every video first. You don't wait for them to finish: the listing stays off Explore marketplace until they're ready.",
         cta: "Continue to listing",
       };
     case "give":
       return {
         title: "Give to community",
-        info: "Every product needs an AI video before others see it. You can give it now: its post waits off Innovations until they're ready.",
+        info: "Start every video first. You don't wait for them to finish: its post stays off Innovations until they're ready.",
         cta: "Continue",
       };
     case "relist":
       return {
         title: "Relist on the marketplace",
-        info: "Every product needs an AI video before buyers see it. You can relist now: it stays off Explore marketplace until they're ready.",
+        info: "Start every video first. You don't wait for them to finish: it stays off Explore marketplace until they're ready.",
         cta: "Relist",
       };
     case "edition":
       return {
         title: `Add ${productName} NFTs to the marketplace`,
-        info: `${productName} needs an AI video before buyers see these. You can list them now: they wait until it's ready.`,
+        info: `Start ${productName}'s video first. You don't wait for it to finish: these wait off Explore marketplace until it's ready.`,
         cta: "Continue",
       };
     case "videos":
