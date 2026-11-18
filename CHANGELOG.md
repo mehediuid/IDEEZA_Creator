@@ -6,6 +6,9 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-034](#cl-034-projects-per-plan-a-new-project-waits-until-theres-room) | Projects per plan: a new project waits until there's room | 18 Nov 2026 | Not created yet | Not started |
+| [CL-033](#cl-033-credit-packs-new-sizes-so-builder-and-disruptor-are-the-better-buy) | Credit packs: new sizes, so Builder and Disruptor are the better buy | 18 Nov 2026 | Not created yet | Not started |
+| [CL-032](#cl-032-upgrade-nudges-the-next-plan-shown-where-a-maker-runs-short) | Upgrade nudges: the next plan, shown where a maker runs short | 18 Nov 2026 | Not created yet | Not started |
 | [CL-031](#cl-031-earn-from-a-product-page) | Earn from a product page | 18 Nov 2026 | [PR-9675](https://ideeza.atlassian.net/browse/PR-9675) | Not started |
 | [CL-030](#cl-030-ai-videos-start-them-one-after-another-and-sell-while-they-render) | AI videos: start them one after another, and sell while they render | 18 Nov 2026 | [PR-9674](https://ideeza.atlassian.net/browse/PR-9674) | Not started |
 | [CL-029](#cl-029-innovations-post-the-story-page-with-an-on-marketplace-card) | Innovations post: the story page with an On Marketplace card | 13 Oct 2026 | [PR-9662](https://ideeza.atlassian.net/browse/PR-9662) | Not started |
@@ -59,6 +62,278 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-034 Projects per plan: a new project waits until there's room
+
+**In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** the AI chat (`/chat/<id>`, opened from Home's **Generate with AI**): its **Project** question, and the build gate (**Build this product?**) that **Build** opens; the save dialog after a build and its saved notice; the **Project Information** dialog (Home › **Build manually** › **Create Project**, and the PCB editor's **File › New › Project**); **My projects** (`/projects`); Settings › **Plan & pricing** (`/settings/plan`). Web.
+
+Every plan comes with a number of projects: Free 3, Tinkerer 5, Builder 20, Disruptor 50. It is the one plan amount that stops anything, and it stops only a new project. The maker hears it where a new project would start, before the build's credits move (at the project question, and again at Build), always with a way on: a bigger plan, a project they already have, or making room. A build that was paid for always saves.
+
+### What to build
+
+**The plan's projects**
+
+- [ ] Projects per plan: Free **3** (was 1), Tinkerer **5**, Builder **20**, Disruptor **50** (was 200).
+- [ ] Only a NEW project waits when every one is in use. Opening, changing and adding products to a project the maker has, and minting, listing and selling, never wait for it.
+- [ ] The count is the projects the maker has in My projects, whatever their state (a Draft and a project sold in full count too). What they bought (My projects › Purchased) does not count.
+- [ ] A project takes its place when it is saved. Answering the project question or booking a build holds nothing.
+- [ ] "Every one in use" means the count has reached the plan's number. A maker can be past it (after moving to a smaller plan, or after a Save, see below): nothing is removed or locked, only a new project waits.
+- [ ] The next plan named everywhere below: **Builder** from Free or Tinkerer, **Disruptor** from Builder, none on Disruptor.
+
+**The card that takes the new project's place**
+
+- [ ] One card, the same in the project question, the build gate and Project Information. It replaces the new project's fields. It is never a warning hung under a form.
+- [ ] Its top row: one folder tile per project the plan allows (at most 5 drawn; hovering a tile shows one of the maker's project names), then a dashed tile for what the next plan adds, *+17 with Builder*, and at the row's end *3 of 3 used*.
+- [ ] Heading: *All 3 of your Free projects are in use* (Tinkerer: *All 5 of your Tinkerer projects are in use*).
+- [ ] The line under it: *Builder gives you 20 projects, 300 AI credits a month and your builds go first.* From Builder: *Disruptor gives you 50 projects, 1,200 AI credits a month and 720p video.* On Disruptor: *Delete one in My projects to start another.*
+- [ ] One primary button: **Upgrade to Builder · $10.00 a month**. While the welcome offer runs (Free only, [CL-004](#cl-004-welcome-offer-50-off-the-first-payment-for-12-hours)): **Upgrade to Builder · $5.00 first month**. A maker who pays yearly sees the yearly price per month (**Upgrade to Builder · $8.00 a month**); from Builder, **Upgrade to Disruptor · $20.00 a month**. It opens that plan's checkout in Plan & pricing (monthly from Free, otherwise the cycle the maker pays by). On Disruptor there is no Upgrade.
+- [ ] Then the secondary **Use a project I have** (only when there is a project the maker can add to), then the link **Make room in My projects** (opens My projects).
+- [ ] The card looks the same in light and dark mode. At phone width the tiles, the count and the buttons wrap onto new lines, and nothing scrolls sideways.
+
+**The project question in the AI chat**
+
+- [ ] With every project in use, the chooser's **+ Start a new project** says so before it is picked: *3 of 3 used on Free · Builder gives you 20* (on Disruptor: *50 of 50 used on Disruptor*) in place of its usual line (*This product becomes its first.* / *These products become its first.*).
+- [ ] Picking it shows the card where *New project name* would be. **Use a project I have** clears the choice and opens the project list.
+- [ ] **Start drawing** waits (its grey look) and the reason takes the place of the line beside it: *Pick a project you have, or upgrade*. With no project to pick (none, or all sold in full): *Upgrade to start a new project*. Nothing is drawn or charged.
+- [ ] Picking a project the maker has makes Start drawing ready, as before. When a project frees up (one deleted, a bigger plan), the card gives way to the *New project name* field.
+- [ ] Several products can now go into a project the maker has. When they have projects, the question is *Which project are these for?* with *2 products belong together, so they go in one project: one you have, or a new one.* and the same chooser (**+ Start a new project** · *These products become its first.*, then *Existing projects*). Only a maker with no project to pick gets the name field as before: *What should the project be called?* · *2 products belong together, so they go in one new project.*
+- [ ] A chat started from a project's **Add a product** never meets the limit: the project is never asked, and whatever it builds goes into that project.
+
+**The build gate**
+
+- [ ] Pressing **Build** checks the plan's projects again, because they can fill up after the question was answered (another chat saved, a project made by hand). It checks only when this build would make a new project: the question chose **+ Start a new project** (or a project that has since been deleted), and no build of this chat is in a project yet. A rebuild in a chat whose build is saved becomes that project's next version and is never checked.
+- [ ] When the build would make a new project and every project is in use, the gate keeps its title (*Build this product?* / *Build 2 products?*) and its line reads *Desk Lamp would start a new project, and every project on your plan is in use. Nothing has been charged.* (several products: *WaveLight and PulseBand would start a new project, …*).
+- [ ] The card takes the place of everything that leads to paying: what each product will be, what each product gets, the notes on concept images and design rule checks, the balance and time chips, and **Cancel**, **Buy credits** and **Build**. ✕, Escape and a click outside still close the gate. No credit moves.
+- [ ] **Use a project I have** turns the card into *Build it into* with a project list (*Choose a project*, opening at once; each row shows the project's name and *2 products · updated Nov 18*). Picking one points this build at that project: the answered question in the chat now reads *Building 1 product in Smart Home Kit.*, and the usual gate comes back with its lines and **Build**.
+- [ ] When a project frees up while the gate is open (one deleted, a bigger plan), the usual gate comes back.
+
+**Save**
+
+- [ ] Save never checks the plan's projects. A build that was paid for always saves, as a new project too and even past the plan's number, and so does a chat whose question was answered before the limit existed. (My projects can then read *4 of 3 projects used*; new projects wait.)
+- [ ] Several products saved into a project the maker has: the dialog *Add to Smart Home Kit* · *WaveLight and PulseBand join Smart Home Kit as new products. The project's name and description stay as they are.* · **Add to project**. The saved notice's title: *WaveLight and PulseBand were added to Smart Home Kit* (one product: *WaveLight was added to Smart Home Kit*).
+
+**Project Information (Build manually)**
+
+- [ ] With every project in use, choosing **Create New Project** shows the card in place of the name and description fields. Its secondary button reads **Open a project I have** (only when there is a project to open): it puts the chooser back on *Choose Project* and moves focus to it.
+- [ ] **Create Project** takes the disabled look of the design system's button and does nothing while the card shows, in light and dark mode. Choosing a project the maker has works as before.
+
+**My projects**
+
+- [ ] Beside **New project** in the header: *2 of 3 projects used*. With every project in use: *3 of 3 projects used · Builder gives you 20*, the second part a link to Builder's checkout. On Disruptor there is no link (*50 of 50 projects used*).
+- [ ] At phone width the line and **New project** wrap; nothing scrolls sideways.
+
+**Plan & pricing**
+
+- [ ] The plan cards: *3 projects • 2 exports* (Free plan), *5 projects • 5 exports* (Tinkerer), *20 projects • 50 exports* (Builder), *50 projects • 300 exports* (Disruptor). **Compare plans** › Projects & products › Projects: 3 · 5 · 20 · 50.
+- [ ] Pricing FAQs › Disruptor plan: *1,200 AI credits a month, the fast-track queue with the shortest waits, 50 projects, 720p AI video, and 25% off credits (35% yearly).*
+- [ ] Plan & pricing counts the same projects as the limit: **Plan details** on a paid plan (*Create 20 projects*, *2/20 created*), and a move to a smaller plan (*You have 4. Free allows 3.*, *4/3 created* in the error colour, *Nothing is removed. Every project and contributor you have stays as it is.*).
+- [ ] The phone app's plan screens show the same numbers.
+
+**Prototype only:** the 4 demo projects every account gets ([CL-023](#cl-023-sample-listings-and-demo-projects-that-are-always-there)) take no place on the plan and are left out of every count here. Nothing to build.
+
+**Not in this change**
+
+- The phone app's create flow and My projects are unchanged.
+
+### Design
+
+- The card: `bg-surface`, 1 px `border`, radius `2xl`, padding 20, 20 between its parts. Folder tiles 40 × 40, radius `lg`, `bg-brand-subtle` with a `text-brand` folder icon (20). The next plan's tile: 40 tall, 1 px dashed `border-strong`, radius `lg`, padding 0 12, `text-md` (14) medium `text-tertiary`. The count *3 of 3 used*: `text-md` medium `text-secondary`, tabular numbers. Heading `text-lg` (16) semibold `text-primary`; its line `text-md` `text-secondary`.
+- Buttons: A01 Button primary md for Upgrade (the price in regular weight at 90 % opacity) and A01 secondary md for *Use a project I have* / *Open a project I have*. *Make room in My projects*: a text link, `text-md` semibold `text-link`, hover `text-link-hover`, focus ring `border-focus`. The card uses only neutral and brand tokens, so it reads the same in both themes.
+- Project question: the existing A06 dropdown (SelectMenu); the full hint is the row's muted line. Start drawing waiting: `bg-subtle` with `text-disabled`; its reason `text-sm` (12) `text-tertiary`.
+- Build gate: the existing gate dialog (440 px, `bg-surface`, radius `2xl`, `shadow-3`, padding 24). *Build it into*: `text-sm` medium `text-primary` over the A06 dropdown.
+- Project Information: M07 Modal (unchanged), **Create Project** A01 primary lg in its disabled state.
+- My projects: the line `text-md` `text-secondary`, tabular numbers; the link semibold `text-link`; **New project** stays A01 secondary md (44 px tall at phone width).
+- Plan & pricing: no new components; the usage meters are A22 Progress Bar, the value past the plan in `text-error`.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: with every project in use, + Start a new project still opens the name field and Start drawing goes ahead](docs/changelog/2026-11-18-project-limit-question-before.png) | ![After: at 3 of 3, the card takes the name field's place and Start drawing waits](docs/changelog/2026-11-18-project-limit-question-after.png) |
+| ![Before: the build gate goes straight to the spend lines and Build](docs/changelog/2026-11-18-project-limit-gate-before.png) | ![After: the build would start a new project at 3 of 3, so the card replaces the spend lines and Build, and nothing is charged](docs/changelog/2026-11-18-project-limit-gate-after.png) |
+| ![Before: New project alone in the My projects header](docs/changelog/2026-11-18-project-limit-my-projects-before.png) | ![After: 3 of 3 projects used, with Builder gives you 20, beside New project](docs/changelog/2026-11-18-project-limit-my-projects-after.png) |
+
+---
+
+## CL-033 Credit packs: new sizes, so Builder and Disruptor are the better buy
+
+**In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** Settings › Plan & pricing › **Credits** (`/settings/plan?tab=credits`), the **Buy credits** dialog, the pack checkout (`/settings/plan/checkout?pack=pro`), and every other place that lists the packs (web; the phone app reads the same list).
+
+The packs gave more credits for the money than the plans did: Pro was 550 credits for $10, while the $10 Builder plan gives 300 a month, so "get a plan for more credits" wasn't true. The owner decided (upgrade plan, 8 November 2026) that Builder and Disruptor are always the better buy per credit. The pack prices stay the same; Pro and Power now give fewer credits.
+
+### What to build
+
+**The three packs**
+
+- [ ] The packs, prices unchanged:
+
+  | Pack | Price | Before | After |
+  | --- | --- | --- | --- |
+  | Starter | $5 | 100 credits | 100 credits (unchanged) |
+  | Pro (*Most popular*) | $10 | 500 + 50 bonus = 550 credits | 180 + 20 bonus = 200 credits |
+  | Power | $20 | 1,000 + 150 bonus = 1,150 credits | 400 + 50 bonus = 450 credits |
+
+- [ ] Per credit, a pack now costs about 5¢ (Power 4.4¢). Builder is 3.3¢ ($10 for 300 a month) and Disruptor 1.7¢ ($20 for 1,200), so both are always the better buy. Before, Pro (1.8¢) and Power (1.7¢) were about as cheap as Disruptor and far cheaper than Builder.
+- [ ] Pro stays *Most popular*. The custom amount is unchanged: $0.10 a credit, at least 50.
+- [ ] The plan discounts on packs are unchanged: Builder 15% monthly and 25% yearly, Disruptor 25% and 35%. On Builder monthly the packs cost $4.25, $8.50 and $17.00.
+- [ ] Bought credits still last 12 months.
+
+**Everywhere the packs show** (one price list feeds all of them)
+
+- [ ] Plan & pricing › Credits, the three pack cards: Pro reads **Base credits** *180*, **Bonus credits** *+20*, **Total credit** *200*; Power *400*, *+50*, *450*. **Purchase now**'s accessible name: *Purchase the Pro pack, 200 credits for $10.00*.
+- [ ] The Buy credits dialog, *Choose a pack*: *Starter · $5.00 · 100 credits*, *Pro · $10.00 · 200 credits (180 + 20 bonus)*, *Power · $20.00 · 450 credits (400 + 50 bonus)*. From a shortfall it still chooses the smallest pack that covers it, and Power when none does: short by 300 credits, it now chooses Power (it was Pro).
+- [ ] The checkout page for a pack: *Credits · Pro · 200 credits (180 + 20 bonus)*.
+- [ ] **Compare plans** (*Compare credit discounts by plan*): the Pro pack's *Total credits* column reads *200*.
+- [ ] Credit alerts and limits › Auto top-up, the pack choices: *Starter pack, 100 credits for $5.00*, *Pro pack, 200 credits for $10.00*, *Power pack, 450 credits for $20.00*.
+- [ ] Custom amount › *Better deal available!*: 50 to 100 credits offer Starter, 101 to 200 offer Pro (*Get 180 credits (+20 bonus) for just $10.00 instead.* · **Switch to Pro pack**), 201 to 450 offer Power (*Get 400 credits (+50 bonus) for just $20.00 instead.* · **Switch to Power pack**), more than 450 none. Before, Pro was offered up to 550 and Power up to 1,150.
+- [ ] Billing history and the invoice of a new purchase: *Pro pack · 200 credits*.
+- [ ] Tutorials › *Plans and credits*: *Starter: 100 credits for $5.*, *Pro: 180 credits plus 20 bonus for $10.*, *Power: 400 credits plus 50 bonus for $20.*
+- [ ] The phone app's credit screens (Plans › Credits, the Buy credits sheet, Compare credit discounts, Auto top-up) show the same new sizes.
+- [ ] A pack bought before keeps what it gave: its credit history line, billing row and invoice still say 550 or 1,150.
+
+**Not in this change**
+
+- The plan row under the packs and *With Builder: $4.25* on each pack card: CL-032.
+
+### Design
+
+- No layout change: the pack cards and the dialog's pack choices keep their design; only the numbers change.
+- Figma (User Panel V2 › AI Credit Purchase) still shows 550 and 1,150: this entry wins over it, and Figma should be updated to 200 and 450.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: Pro 500 + 50 = 550 credits and Power 1,000 + 150 = 1,150 credits](docs/changelog/2026-11-18-credit-packs-before.png) | ![After: Pro 180 + 20 = 200 credits and Power 400 + 50 = 450 credits, the prices unchanged](docs/changelog/2026-11-18-credit-packs-after.png) |
+| ![Before: the Buy credits dialog offers 550 and 1,150 credits](docs/changelog/2026-11-18-upgrade-buy-credits-before.png) | ![After: the dialog offers 200 (180 + 20 bonus) and 450 (400 + 50 bonus)](docs/changelog/2026-11-18-upgrade-buy-credits-after.png) |
+
+---
+
+## CL-032 Upgrade nudges: the next plan, shown where a maker runs short
+
+**In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** the sidebar's Upgrade card and the account menu (every Creator Panel page); Home's AI box (`/`); the concept chat (`/chat/<id>`), its build bar and the finished build's review (also `/build/<jobId>`); a project's **Add a product › Build with AI** and **Team** tab (`/projects/<id>`); the **Buy credits** dialog; the video **Quality** field in Generate video and Project video; the bell; Settings › **Plan & pricing** (`/settings/plan`, Plans and Credits tabs); the PCB editor (`/pcb`). Web.
+
+A maker who ran short of credits was only told to buy credits, and a bigger plan lived on Plan & pricing alone. Now the next plan sits beside the fix, in the maker's own numbers (their credits, the day they refill, what they spent), and only where they run short. Nothing here ever stops anyone; the one limit that is enforced, a new project past the plan's projects, is CL-034.
+
+### What to build
+
+**The rules for every nudge**
+
+- [ ] The plan named is the next one up: **Builder** from Free or Tinkerer, **Disruptor** from Builder. A Disruptor maker sees no plan line, card or link anywhere.
+- [ ] A plan link opens that plan's checkout (`/settings/plan/checkout?plan=builder&cycle=monthly`): monthly from Free; on a paid plan, the cycle the maker pays by.
+- [ ] Every number is the maker's own (balance, refill day, spend, use) or the plan's real offer: Builder $10.00 a month, 300 credits, packs 15% off, builds go first; Disruptor $20.00 a month, 1,200 credits, packs 25% off, 720p video. Nothing is invented.
+- [ ] The fix comes first and the plan sits beside it, quieter: Buy credits stays the main way out.
+- [ ] No plan talk in Mint, Publish, Sell, Earn (Splits included), Innovations, Explore marketplace, while a build runs, or on the pay step and the checkout.
+- [ ] A card the app shows on its own (in this change: the first ready build card) is one a day across the app. Once one has shown today, any other waits for tomorrow; the one that showed keeps showing for the rest of that day. ✕ on such a card hides it for 7 days. Remembered per account.
+- [ ] The lines inside a moment where the maker is short (out of credits, the Buy credits dialog, the locked 720p) don't count as that card.
+
+**The sidebar's Upgrade card**
+
+- [ ] Under *Upgrade to Builder* and *300 AI credits a month, and more*, a third line with the maker's credits and the day this month's plan credits come back: *You have 18 credits · refills 8 Dec*.
+- [ ] At or under the maker's **Running low at** number (Plan & pricing › Credits › Credit alerts and limits, 8 by default) it turns semibold in the warning colour: *4 credits left · refills 8 Dec* (*1 credit left*, *0 credits left*).
+- [ ] Not shown while the balance is being read, in the collapsed sidebar (the icon only), or while the welcome offer's card stands in the Upgrade card's place (CL-004). The card stays away on Disruptor, as before.
+
+**The account menu**
+
+- [ ] Under the maker's name: *Free plan · Upgrade to Builder* (*Tinkerer plan · Upgrade to Builder*, *Builder plan · Upgrade to Disruptor*). The link opens that plan's checkout and closes the menu. On Disruptor only *Disruptor plan*.
+
+**Out of credits: Home, the chat, Add a product**
+
+- [ ] When the balance can't pay for one concept (1 credit), a centred line goes under Home's AI box (in Generate with AI) and under the concept chat's composer: *You're out of credits. They refill on 8 Dec.*, and under it, side by side, **Buy credits** (opens the Buy credits dialog in place, Starter chosen) and *Or get 300 credits every month with Builder →*.
+- [ ] In the chat it replaces *You are out of credits — top them up to draw another concept.* The send button stays off, as before.
+- [ ] On Disruptor: *You're out of credits. They refill on 8 Dec.* and **Buy credits** only.
+- [ ] Add a product › Build with AI keeps *You need 1 credit to start. You have 0.* Under it, one row in one link style: **Buy credits** (it was *Top up credits*; it opens Plan & pricing › Credits) and *Or get 300 credits every month with Builder →*.
+
+**The build bar, short of credits**
+
+- [ ] With every concept drawn and a build the balance can't pay for, the yellow box under the bar (*Not enough credits to build this*) is gone, and so is the red *· you have 4* in the bar.
+- [ ] The bar itself turns: **Buy credits** is its one filled button, beside **Build 2 products** (off, still showing its 8-credit badge). Buy credits opens the Buy credits dialog in place with the smallest pack that covers the shortfall chosen.
+- [ ] Under the buttons, one line across the bar with a warning icon: *This build costs 8 credits. You have 4, so 4 more.* and, on the right, *Or get 300 credits every month with Builder →* (no plan link on Disruptor).
+- [ ] The rail's next step (*The build costs 8 credits. You have 4. Buy credits to build.*) rings and focuses **Buy credits**.
+- [ ] Once the credits cover the build, the bar is as before: Build is live, Buy credits and the line are gone.
+- [ ] While a concept is still drawing, the bar keeps its usual line on the right (*Not enough credits — this build costs 8, you have 4*) and shows no Buy credits.
+- [ ] At phone width the two buttons stack full width, **Buy credits** on top.
+
+**The Buy credits dialog**
+
+- [ ] On *Choose a pack*, under the three packs, a row for the next plan: *Or get Builder · $10.00 a month*, then *300 credits every month · packs 15% off · your builds go first*, and **See Builder** on the right. From Builder: *Or get Disruptor · $20.00 a month* (*$16.00 a month, billed yearly* when the maker pays yearly), *1,200 credits every month · packs 25% off · 720p video*, **See Disruptor**. Not on Disruptor; not on the pay step.
+- [ ] The packs stay the quick fix: the covering pack is still chosen and **Continue** still goes on to pay for it.
+- [ ] On Free or Tinkerer, when this calendar month has 2 or more credit purchases that add up to at least the plan's monthly price (for example two Starter packs), the row adds: *You've spent $10.00 on credits this month. Builder is $10.00 with 300 credits every month.* Never shown when it isn't true.
+- [ ] When the maker's welcome offer (CL-004) ended without being used, the row adds, in green: *Use code MAKER20 for 20% off your first month.* At most once in 30 days; on the day it shows, it shows each time the dialog opens. MAKER20 is a plan coupon (CL-006): 20% off, every paid plan, until 31 Dec 2027.
+- [ ] At phone width the row stacks and **See Builder** goes under the text, full width.
+
+**720p video**
+
+- [ ] In Generate video and Project video, the locked 720p option's note reads *720p comes with the Disruptor plan.* **Get Disruptor** (it was **See plans**, to Plan & pricing). It opens Disruptor's checkout. Not shown on Disruptor, as before.
+
+**The bell**
+
+- [ ] The low-credits notice (*You have 4 credits left*, at or under the Running low at number) now says *Your low mark is 8. They refill on Dec 8. Need more now? Buy credits, or get Builder for 300 a month.* On Disruptor: *Your low mark is 8. They refill on Dec 8. Need more now? Buy credits.* It opens Plan & pricing › Credits, as before.
+- [ ] New: each month's plan credits get a notice for 7 days after they arrive, except the account's very first month. On Free: *Your 10 free credits are back* · *Want 300 a month? See Builder.*, opening Plan & pricing. On a paid plan: *Your 300 credits for this month are here*, opening Plan & pricing › Credits. Tag *Coin · Credits*.
+- [ ] New: in the welcome offer's last hour, one notice: *Your 50% off ends in less than an hour* · *Half off your first payment on any plan.*, tag *Coin · Plan*, opening Plan & pricing. It goes when the offer ends or is used.
+
+**The first ready build (Free only, once)**
+
+- [ ] On the review of the maker's first finished build, above the footer with Save: a card with *Your first build is ready.* (semibold) *You have 4 credits left. Builder gives 300 a month for $10.00.*, **See Builder** (Builder's checkout, monthly) and ✕ (*Close*).
+- [ ] Only on Free, only while that build is the maker's one ready build, never while a build runs. It shows once in the account's life: it stays for the day it first shows, then never again; ✕ closes it for good. It is the day's one card (rules above).
+
+**Plan & pricing**
+
+- [ ] Plans tab, under the lead: *Last 30 days: 12 credits · 2 projects. Tinkerer fits you.* Credits are those spent on concepts and builds in the last 30 days, less refunds; projects are the projects the maker has now (the plans' project allowances: CL-034). The plan named is the smallest whose monthly credits and projects both cover that; Disruptor when none does.
+- [ ] That plan's card gets a *Fits you* badge beside *Most popular*, only when it is above the maker's plan. When the maker's own plan covers it: *Your Free plan covers that.* and no badge. Never a plan below the maker's. With nothing used and no project, the line is left out.
+- [ ] Credits tab: on a plan without a credit discount (Free, Tinkerer), each pack card's footer reads its price with Builder, *With Builder: $4.25* (Starter), *$8.50* (Pro), *$17.00* (Power), above **Compare plans**. It was *Save up to 35% with an IDEEZA plan*. With a discount it still reads *You're saving 15% with your Builder plan*.
+
+**Exports: counted, never stopped**
+
+- [ ] Each plan's exports a month are counted: Free 2, Tinkerer 5, Builder 50, Disruptor 300. One export is one action: files written together (within 3 seconds, like Design files' schematic, PCB and 3D) count once. The month is the plan's credit month, so exports come back the day the credits do.
+- [ ] Every file the PCB editor downloads counts (Gerber zip, KiCad board, netlist, pictures, design files), and so does the Assembly editor's 3D download.
+- [ ] After each export the PCB editor's toast says *Exported. 1 of 2 exports left this month.* With none left: *Exported. You've used this month's 2 exports; they come back on 8 Dec. Builder gives 50 a month.* (on Builder *Disruptor gives 300 a month.*; on Disruptor no plan sentence). Exports made before the editor opened don't toast.
+- [ ] An export is never stopped or delayed, however many were made.
+
+**Contributors, on the project's Team tab**
+
+- [ ] For the maker who can add people, on Free: under **Open Splits** in the *Just you so far* card, or under *Add people or change shares in Splits* when people are there: *Contributors come with Tinkerer (1) and Builder (20).* **See Builder**.
+- [ ] On Tinkerer with 1 person or more: *Your Tinkerer plan includes 1 contributor. Builder has 20.* **See Builder**. On Builder with 20 or more: *Your Builder plan includes 20 contributors. Disruptor has 200.* **See Disruptor**. Otherwise, and on Disruptor, nothing.
+- [ ] Soft: adding people in Earn › Money › Splits works as before, and Splits says nothing about plans.
+
+**Light, dark and phone width**
+
+- [ ] Every part above uses theme tokens and looks the same in light and dark; the build bar has no yellow box any more (it turned mustard in dark mode).
+- [ ] At phone width nothing scrolls sideways: the out-of-credits links wrap, the plan row and the first-build card stack, the build bar's buttons stack.
+
+**Not in this change**
+
+- The phone app (`/m`) has none of these yet.
+- The new pack sizes: CL-033. The project limit (the only enforced limit): CL-034.
+
+### Design
+
+- Plan row in the Buy credits dialog and the first-build card: `bg-brand-subtle`, radius `xl`, padding 16 (the card 16/12). Row title 16 semibold `text-primary`; perks 14 `text-secondary`; the spend line 14 `text-primary`; the coupon line 14 semibold `text-success`. **See Builder** is A01 Button Outline Brand md (36 px); the card's ✕ is A02 Icon Button sm with a 16 px icon.
+- Plan links (*Or get 300 credits every month with Builder →*, *Upgrade to Builder*, *See Builder*, *Get Disruptor*): 14 semibold `text-link`, hover `text-link-hover`, focus ring `border-focus`; 12 in the account menu.
+- Out-of-credits line: centred, 14 `text-secondary`, its two links 16 px apart.
+- Build bar: **Buy credits** is A01 Button Primary lg (40 px); Build keeps its disabled look (`bg-subtle`, `text-disabled`); the line is 14 `text-primary` with the alert icon (16) in `icon-warning`.
+- Sidebar card's new line: 12 `text-secondary`; at the low mark semibold `text-warning`.
+- *Fits you*: A17 Badge success, 8 px left of the A17 Badge brand-solid *Most popular*, top right of the plan card. The usage line 14 `text-secondary`, its verdict semibold `text-primary`.
+- Bell notices: the bell's existing notice rows. Export toast: the PCB editor's existing toast.
+- No new colours or tokens. Text: body 14, captions 12.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: at 0 credits Home says nothing under the AI box, and the sidebar card has two lines](docs/changelog/2026-11-18-upgrade-home-before.png) | ![After: You're out of credits with Buy credits and the Builder line, and 0 credits left · refills 18 Dec on the sidebar card](docs/changelog/2026-11-18-upgrade-home-after.png) |
+| ![Before: a yellow Not enough credits box hangs under the build bar](docs/changelog/2026-11-18-upgrade-build-bar-before.png) | ![After: Buy credits is the bar's own button, with one line on what's missing and the Builder link](docs/changelog/2026-11-18-upgrade-build-bar-after.png) |
+| ![Before: the Buy credits dialog shows the packs only](docs/changelog/2026-11-18-upgrade-buy-credits-before.png) | ![After: the Builder row under the packs, with the MAKER20 line after the welcome offer ended unused](docs/changelog/2026-11-18-upgrade-buy-credits-after.png) |
+| ![Before: Choose a plan with no word on what fits](docs/changelog/2026-11-18-upgrade-plans-before.png) | ![After: Last 30 days: 48 credits · 3 projects. Tinkerer fits you., and the Fits you badge](docs/changelog/2026-11-18-upgrade-plans-after.png) |
+| ![Before: each pack card says Save up to 35% with an IDEEZA plan](docs/changelog/2026-11-18-credit-packs-before.png) | ![After: each pack card gives its price with Builder](docs/changelog/2026-11-18-credit-packs-after.png) |
 
 ---
 
