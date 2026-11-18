@@ -15,6 +15,7 @@ import { FootprintManager } from "@/components/pcb/footprint-manager";
 import { LeftPanel } from "@/components/pcb/left-panel";
 import { LeftRail } from "@/components/pcb/left-rail";
 import { Modals } from "@/components/pcb/modals";
+import { ExportMeter } from "@/components/pcb/export-meter";
 import { RightPanel } from "@/components/pcb/right-panel";
 import { SettingsOverlay } from "@/components/pcb/settings-overlay";
 import { Toolbar } from "@/components/pcb/toolbar";
@@ -95,6 +96,9 @@ function EditorBody() {
 
       {/* TOAST (Phase 5 — quick feedback for toolbar Save / Open / etc.) */}
       <Toast />
+
+      {/* Exports left this month, said in the toast after each export (upgrade plan C6). */}
+      <ExportMeter />
     </EditorShell>
   );
 }

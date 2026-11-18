@@ -23,6 +23,7 @@ import {
   useCreateHistory,
 } from "@/lib/create/history";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { OutOfCreditsLine } from "@/components/credits/out-of-credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import { formatCount, PROJECTS, type Project } from "@/lib/feed";
 import { MintedBadge } from "@/components/newsfeed/minted-badge";
@@ -261,6 +262,8 @@ export function WorkspacePrompt() {
           ) : (
             <BuildManuallyInfo onCreate={() => setProjectModalOpen(true)} />
           )}
+          {/* Upgrade plan C1: out of credits, said under the prompt with both ways out. */}
+          {mode === "ai" && creditsHydrated && !canRender && <OutOfCreditsLine className="mt-[12px]" />}
         </div>
 
         {/* Chips suggest prompts — only meaningful in AI mode. */}

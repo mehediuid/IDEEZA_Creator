@@ -29,6 +29,7 @@ import { useCreateHistory } from "@/lib/create/history";
 import { editorHref } from "@/lib/manual/editor-scope";
 import { PROJECT_NAME_MAX, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { CreditBadge } from "@/components/credits/credit-badge";
+import { PlanPitchLine } from "@/components/credits/plan-pitch";
 import { PromptCard, useLastQuality, type PromptImage } from "@/components/dashboard/prompt-card";
 
 type Step = "choose" | "ai" | "manual";
@@ -199,9 +200,16 @@ function BuildWithAi({ project, onBack }: { project: ManualProject; onBack: () =
         )}
       </p>
       {!canRender && (
-        <a href="/settings/plan?tab=credits" className="self-start text-md font-medium text-text-brand underline underline-offset-2">
-          Top up credits
-        </a>
+        // Upgrade plan C1: the quick fix and the next plan up, side by side, one link style.
+        <div className="flex flex-wrap items-center gap-x-[16px] gap-y-[4px]">
+          <a
+            href="/settings/plan?tab=credits"
+            className="rounded-sm text-md font-semibold leading-md text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            Buy credits
+          </a>
+          <PlanPitchLine />
+        </div>
       )}
       <StepFooter onBack={onBack} />
     </div>

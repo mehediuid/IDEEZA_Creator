@@ -54,7 +54,7 @@ export type Invoice = {
   number: string;
   ts: number;
   kind: "credits" | "plan" | "renewal";
-  /** One line for the table: "Builder plan · monthly", "Pro pack · 550 credits". */
+  /** One line for the table: "Builder plan · monthly", "Pro pack · 200 credits". */
   item: string;
   lines: InvoiceLine[];
   /** Taken off the lines, as positive dollars. */

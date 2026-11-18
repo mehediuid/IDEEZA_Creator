@@ -28,6 +28,8 @@ export type LotLine = {
   /** An `expiry` line: the lot it empties. */
   lotId?: string;
   bonus?: number;
+  /** A purchase's pack, or a grant's plan name. */
+  pack?: string;
 };
 
 export type Lot = {

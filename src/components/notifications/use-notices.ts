@@ -15,7 +15,10 @@ import { updateBlog, useBlog } from "@/lib/blog/store";
 import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
-import { planOf } from "@/lib/create/plans";
+import { creditPeriod, planOf } from "@/lib/create/plans";
+import { pitchPlan } from "@/lib/create/upsell";
+import { OFFER_MS } from "@/lib/account/welcome-offer";
+import { useWelcomeOffer } from "@/components/credits/welcome-offer";
 import { COMMENTS_KEY, decodeComments } from "@/lib/innovations/comments-store";
 import { personOf, ME as POST_ME } from "@/lib/innovations/people";
 import { mineSlugOf, postIdOfProject } from "@/lib/innovations/slug";
@@ -149,6 +152,7 @@ export function useNotices(): NoticeFeed {
   const shared = useSharedComments(projects);
   const reads = useNoticeReads();
   const payout = usePayout();
+  const offer = useWelcomeOffer();
 
   const { hydrated: historyReady, getChat } = history;
   const all = React.useMemo<Notice[]>(() => {
@@ -178,6 +182,14 @@ export function useNotices(): NoticeFeed {
                     pendingName: pending,
                   },
             now,
+            // The upgrade plan's C4, D3 and F1.
+            refillAt: creditPeriod(sub, now).end,
+            pitch: (() => {
+              const p = pitchPlan(sub.tier);
+              return p ? { name: p.name, credits: p.credits } : null;
+            })(),
+            onFree: sub.tier === "free",
+            offer: offer.live && offer.entry ? { startedAt: offer.entry.startedAt, endsAt: offer.entry.startedAt + OFFER_MS } : null,
           })
         : []),
       ...(video.hydrated ? videoNotices(video.jobs) : []),
@@ -205,6 +217,8 @@ export function useNotices(): NoticeFeed {
     credits.hydrated,
     credits.balance,
     credits.ledger,
+    offer.live,
+    offer.entry,
     plan.hydrated,
     plan.sub,
     plan.plan.name,

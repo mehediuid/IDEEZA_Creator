@@ -30,6 +30,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { EyeIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ProjectNotice } from "@/components/projects/project-notice";
+import { useProjectRoom } from "@/components/projects/project-limit";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { SearchInput, SelectMenu, buttonVariants } from "@/components/ideeza";
 import { PAGE_GRID, Page } from "@/components/ideeza/page";
@@ -493,20 +494,46 @@ export function ProjectsHeader() {
       descriptionClassName="max-w-[62ch] text-md text-text-secondary"
       actions={
         // Creation lives on Home (owner decision O11): a link, not a flow on this page.
-        <Link
-          href="/"
-          className={cn(
-            buttonVariants({ hierarchy: "secondary", size: "md" }),
-            "shrink-0 [@container(max-width:559px)]:min-h-[44px]",
-          )}
-        >
-          <span aria-hidden className="inline-flex size-[16px] shrink-0 items-center justify-center">
-            <Icon icon={PlusSignIcon} size={16} />
-          </span>
-          New project
-        </Link>
+        // Beside it, the plan's projects used (upgrade plan C5).
+        <div className="flex flex-wrap items-center justify-end gap-x-[16px] gap-y-[8px]">
+          <ProjectsUsage />
+          <Link
+            href="/"
+            className={cn(
+              buttonVariants({ hierarchy: "secondary", size: "md" }),
+              "shrink-0 [@container(max-width:559px)]:min-h-[44px]",
+            )}
+          >
+            <span aria-hidden className="inline-flex size-[16px] shrink-0 items-center justify-center">
+              <Icon icon={PlusSignIcon} size={16} />
+            </span>
+            New project
+          </Link>
+        </div>
       }
     />
+  );
+}
+
+/** "2 of 3 projects used" — and, with every slot in use, the way to more (upgrade plan C5). */
+function ProjectsUsage() {
+  const room = useProjectRoom();
+  if (!room.ready) return null;
+  return (
+    <p className="m-0 text-md leading-md tabular-nums text-text-secondary">
+      {room.held} of {room.allowed} projects used
+      {room.full && room.pitch && room.upgradeHref && (
+        <>
+          {" · "}
+          <Link
+            href={room.upgradeHref}
+            className="rounded-sm font-semibold text-text-link outline-none hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            {room.pitch.name} gives you {room.pitch.projects}
+          </Link>
+        </>
+      )}
+    </p>
   );
 }
 

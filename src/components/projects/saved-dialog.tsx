@@ -114,6 +114,7 @@ export function SavedDialog({
   project,
   kind,
   product = "",
+  many = false,
   version = 0,
   savedAt,
   stayLabel,
@@ -124,6 +125,8 @@ export function SavedDialog({
   kind: SavedKind;
   /** A join's product names, for its title. */
   product?: string;
+  /** The join holds several products ("… were added to …"). */
+  many?: boolean;
   /** A rebuild's version number, for its title. */
   version?: number;
   savedAt: number;
@@ -136,7 +139,7 @@ export function SavedDialog({
   const router = useRouter();
   const { builds } = useCreateHistory();
   const status = useStatusOf(project);
-  const notice = savedNoticeOf(kind, { name: project.name, product, version, draft: status === "draft" });
+  const notice = savedNoticeOf(kind, { name: project.name, product, version, draft: status === "draft", many });
   const primaryRef = React.useRef<HTMLButtonElement>(null);
   const time = new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const meta = `${countLabel(productRowsOf(project).length)} · Saved ${time}`;

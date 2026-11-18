@@ -48,7 +48,8 @@ import { checkoutHref } from "@/lib/create/checkout-route";
 import { OFFER_OFF, countdown } from "@/lib/account/welcome-offer";
 import { OfferMark, useWelcomeOffer } from "@/components/credits/welcome-offer";
 import { useCreatePlan } from "@/lib/create/plan";
-import { planOf } from "@/lib/create/plans";
+import { creditPeriod, planOf } from "@/lib/create/plans";
+import { useCredits } from "@/lib/create/credits";
 import { idzCompactOf } from "@/lib/wallet/idz";
 import { formatAmount } from "@/lib/wallet/money";
 import { useMakerIdz } from "@/components/balance/use-maker-idz";
@@ -551,9 +552,15 @@ function Footer({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => vo
 // Disruptor from Builder — and opens that plan's checkout, on the cycle you pay
 // by. It used to open Plan & pricing, so on that page a press did nothing at
 // all. Gone on the top plan.
+// Under it, the maker's own credits and when the month's credits come back
+// (upgrade plan B1); in the warning ink once the balance is at the low-credit
+// alert (Plan & pricing › Credit alerts and limits).
 function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
   const { hydrated, sub } = useCreatePlan();
   const offer = useWelcomeOffer();
+  const { hydrated: creditsReady, balance } = useCredits();
+  const { lowAt } = useSettings().credits;
+  const [now] = React.useState(() => Date.now());
   if (!hydrated || sub.tier === "disruptor") return null;
   if (offer.ready && offer.live && offer.entry?.closedAt !== null) return <OfferCard left={offer.left} collapsed={collapsed} onLeave={onLeave} />;
   const next = planOf(sub.tier === "builder" ? "disruptor" : "builder");
@@ -584,6 +591,17 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
         <span className="block truncate text-sm font-regular leading-sm text-text-secondary">
           {next.credits.toLocaleString("en-US")} AI credits a month, and more
         </span>
+        {creditsReady && (
+          <span
+            className={cn(
+              "mt-[4px] block truncate text-sm font-regular leading-sm",
+              balance <= lowAt ? "font-semibold text-text-warning" : "text-text-secondary",
+            )}
+          >
+            {balance <= lowAt ? `${credits(balance)} left` : `You have ${credits(balance)}`} · refills{" "}
+            {new Date(creditPeriod(sub, now).end).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+          </span>
+        )}
       </span>
       <span
         aria-hidden
@@ -594,6 +612,8 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
     </Link>
   );
 }
+
+const credits = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "credit" : "credits"}`;
 
 // The welcome offer, once its pop-up is closed (components/credits/welcome-offer.tsx): the
 // Upgrade card becomes the offer — half off the first payment, the clock running — and opens

@@ -84,8 +84,9 @@ import {
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { checkoutHref } from "@/lib/create/checkout-route";
 import { useCreatePlan } from "@/lib/create/plan";
+import { pitchCycle } from "@/lib/create/upsell";
 import { ArRecordPanel } from "./ar-record-panel";
 import { useVideoJobs } from "./video-jobs-provider";
 import { openVideoFlowSoon } from "./video-flow";
@@ -610,8 +611,12 @@ export function QualityField({
       {!qualityOpen("high", sub.tier) && (
         <p id={noteId} className="text-sm text-text-secondary">
           {HIGH_LOCKED_NOTE}{" "}
-          <Link href={PLAN_PRICING_HREF} className="font-semibold text-text-link hover:text-text-link-hover">
-            See plans
+          {/* Upgrade plan C3: straight to Disruptor's checkout, one step fewer than Plan & pricing. */}
+          <Link
+            href={checkoutHref({ kind: "plan", tier: "disruptor", cycle: pitchCycle(sub) })}
+            className="font-semibold text-text-link hover:text-text-link-hover"
+          >
+            Get Disruptor
           </Link>
         </p>
       )}

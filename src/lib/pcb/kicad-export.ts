@@ -8,6 +8,7 @@
 // (100 canvas units = 1 scene unit ≈ 25 mm).
 
 import type { CanvasObject, PcbState } from "./types";
+import { recordExport } from "../create/export-count";
 
 export const CANVAS_TO_MM = 0.25;
 
@@ -195,6 +196,7 @@ export function buildKicadPcb(doc: KicadExportDoc, projectName = "ideeza-board")
 // ── Client helpers (browser only) ───────────────────────────────────────
 
 export function downloadTextFile(filename: string, text: string) {
+  recordExport(); // the plan's exports a month (upgrade plan C6)
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -261,6 +263,7 @@ export async function exportGerberViaKicad(
       const a = document.createElement("a");
       a.href = url;
       a.download = `${opts.name || "board"}-gerbers.zip`;
+      recordExport(); // the plan's exports a month (upgrade plan C6)
       document.body.appendChild(a);
       a.click();
       a.remove();

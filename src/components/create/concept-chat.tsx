@@ -53,7 +53,10 @@ import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { RenderQuality } from "@/lib/create/quality";
 import { CreditBadge } from "@/components/credits/credit-badge";
+import { OutOfCreditsLine } from "@/components/credits/out-of-credits";
 import { useManualProjects } from "@/lib/manual/projects";
+import { useProjectRoom } from "@/components/projects/project-limit";
+import { buildMakesNewProject } from "@/lib/create/upsell";
 import { useGuards } from "@/lib/manual/use-write-guard";
 import {
   buildHolds,
@@ -343,6 +346,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     addSetupProduct,
     dropSetupPick,
     setSetupLeftOut,
+    setSetupProject,
     startBuild,
     setTurnConcept,
     setSpecEdits,
@@ -359,10 +363,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   const chat = getChat(chatId);
 
-  // The projects a single-product build could join. A multi-product build
-  // always makes a new one (§4.4.8 puts a system in one project), so this
-  // list is only ever offered for the single case. A project sold in full
-  // takes nothing (decision 12), so it isn't offered: the guards' `lockOf`.
+  // The projects a build could join, one product or several (§4.4.8 puts a
+  // system in one project — a new one or one the maker has; create-flow
+  // study D3). A project sold in full takes nothing (decision 12), so it
+  // isn't offered: the guards' `lockOf`.
   const { projects } = useManualProjects();
   const guards = useGuards();
   // A chat started from a project's "Add a product" (`/?addTo=`, P2-TABS-29)
@@ -944,6 +948,30 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     const t = chat?.turns.find((x) => x.role === "setup" && x.status === "answered" && x.answer);
     return t?.id ?? null;
   }, [chat]);
+  // The plan's projects at the build gate (upgrade plan C5, create-flow study O1+): the question
+  // checked them when it was answered, but the build is where the credits move, and projects can
+  // fill up in between (another chat saved, a project made by hand). So the gate checks again
+  // when this build would make a new project; Save never does.
+  const room = useProjectRoom();
+  const gateNeedsRoom = React.useMemo(() => {
+    const t = chat?.turns.find((x) => x.id === answeredSetupId);
+    if (!chat || t?.role !== "setup" || !t.answer) return false;
+    return buildMakesNewProject(
+      t.answer.projectId,
+      projects.map((p) => p.id),
+      builds.filter((b) => b.chatId === chat.id).map((b) => b.projectId),
+    );
+  }, [chat, answeredSetupId, projects, builds]);
+  const gateLimit = React.useMemo(
+    () =>
+      room.full && gateNeedsRoom && chat && answeredSetupId
+        ? {
+            projects: setupProjects,
+            onUse: (projectId: string) => setSetupProject(chat.id, answeredSetupId, projectId),
+          }
+        : null,
+    [room.full, gateNeedsRoom, chat, answeredSetupId, setupProjects, setSetupProject],
+  );
   const leftOutNow = React.useMemo(() => {
     const t = chat?.turns.find((x) => x.id === answeredSetupId);
     return t?.role === "setup" ? t.answer?.leftOut ?? [] : [];
@@ -2014,11 +2042,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                   : undefined
             }
           />
-          {!heldShows && (
+          {!heldShows && !canRender && <OutOfCreditsLine className="mt-[8px]" />}
+          {!heldShows && canRender && (
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
-            {!canRender
-              ? "You are out of credits — top them up to draw another concept."
-              : setupPending
+            {setupPending
                 ? "Answer the question on the canvas first — nothing is drawn or charged until you do."
                 : target.kind === "blocked"
                   ? `${target.hint}.`
@@ -2150,6 +2177,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         cost={gatePieces.length ? gatePieces.reduce((n, p) => n + pickCost(railState.picks.get(p.productId) ?? cleanPick(undefined)), 0) : undefined}
         seconds={gatePieces.length ? gatePieces.reduce((n, p) => Math.max(n, pickSeconds(railState.picks.get(p.productId) ?? cleanPick(undefined))), 0) : undefined}
         submitting={submittingBuild}
+        projectLimit={gateLimit}
         onCancel={() => setConfirmFor(null)}
         onConfirm={handleConfirmBuild}
       />

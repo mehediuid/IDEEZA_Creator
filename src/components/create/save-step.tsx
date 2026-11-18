@@ -241,6 +241,19 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const aiProducts = React.useMemo(() => describedProductsOf(job), [job]);
   const choices = React.useMemo(() => coverChoicesOf(job), [job]);
 
+  // ── the plan's allowance (upgrade plan C5) ──
+  // Save never waits on it. The project question and the build gate (concept-chat.tsx) check the
+  // plan's projects before any credit moves, so a build that was paid for always saves — and so
+  // does a chat answered before the allowance existed (create-flow study D5).
+  const switchToJoin = () => {
+    setRefusal(null);
+    // The project that went is out of the list; the maker picks another.
+    setGone(null);
+    patch({ mode: "join", joinId: null });
+    setChanging(true);
+    window.requestAnimationFrame(() => chooserRef.current?.querySelector<HTMLElement>("button")?.focus());
+  };
+
   // ── saving ──
   const busy = React.useRef(false);
   const [pending, setPending] = React.useState<{ projectId: string; revert: () => void; unpause: () => boolean } | null>(null);
@@ -417,6 +430,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
         project={project}
         kind={saved.kind}
         product={single ? product : joinNames}
+        many={!single}
         version={n}
         savedAt={saved.at}
         stayLabel={getChat(job.chatId) ? "Back to chat" : "Back to the build"}
@@ -511,16 +525,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
                     <button
                       type="button"
                       className={QUIET_TEXT_BUTTON}
-                      onClick={() => {
-                        setRefusal(null);
-                        // The project that went is out of the list; the maker picks another.
-                        setGone(null);
-                        patch({ mode: "join", joinId: null });
-                        setChanging(true);
-                        window.requestAnimationFrame(() =>
-                          chooserRef.current?.querySelector<HTMLElement>("button")?.focus(),
-                        );
-                      }}
+                      onClick={switchToJoin}
                     >
                       Add it to a project you already have instead
                     </button>

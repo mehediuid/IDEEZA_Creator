@@ -15,6 +15,7 @@ import { pourCopper, POURABLE } from "./pour";
 import { computeNets, runErc, buildNetlist, netlistText } from "./nets";
 import { runDrc, runNetClasses, runEqualLength, runPadPairs, defaultPcbDrcConfig, type PcbDrcConfig } from "./drc";
 import { downloadBlob, downloadDataUrl } from "./exporters";
+import { recordExport } from "../create/export-count";
 import { dropImportedGroup, type ImportedModel } from "./gltf-import";
 import { delCategoryOf } from "./del-objects";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
@@ -1290,6 +1291,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           const blob = new Blob([netlistText(nl)], { type: "text/plain" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
+          recordExport(); // the plan's exports a month (upgrade plan C6)
           a.href = url; a.download = "netlist.net";
           document.body.appendChild(a); a.click(); a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 1000);

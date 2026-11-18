@@ -42,6 +42,8 @@ export const COUPONS: readonly Coupon[] = [
   { code: "BUILDER5", kind: "amount", value: 5, plans: ["builder"], ends: "2027-06-30" },
   // Bigger than the welcome offer's 50%: shows a coupon winning.
   { code: "MAKER60", kind: "percent", value: 60, plans: ["tinkerer", "builder"], ends: "2027-12-31" },
+  // Offered once the welcome offer has ended unused (upgrade plan, decision 6; lib/create/upsell.ts).
+  { code: "MAKER20", kind: "percent", value: 20, plans: "all", ends: "2027-12-31" },
   // Already over: shows the "ended" message.
   { code: "LAUNCH25", kind: "percent", value: 25, plans: "all", ends: "2026-10-31" },
 ];

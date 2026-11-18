@@ -35,6 +35,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "./icon";
 import { Button, ModalFrame } from "@/components/ideeza";
+import { ProjectLimitCard, useProjectRoom } from "@/components/projects/project-limit";
 import {
   ProjectDetailsFields,
   type DetailsField,
@@ -83,11 +84,16 @@ function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
   const choiceMsgId = React.useId();
 
   const isNew = choice === NEW_SENTINEL;
+  // The plan's allowance (upgrade plan C5): a new project past it waits for a bigger plan.
+  const room = useProjectRoom();
+  const newBlocked = isNew && room.full;
   const existing = !isNew && choice ? (openable.find((p) => p.id === choice) ?? null) : null;
   const otherNames = React.useMemo(() => projects.map((p) => p.name), [projects]);
 
   const submit = () => {
     if (leaving) return;
+    // Upgrade plan decision 2: a new project past the plan's allowance waits; opening one you have doesn't.
+    if (newBlocked) return;
     if (isNew) {
       const nameCheck = checkProjectName(name, otherNames, PROJECT_NAME_MAX);
       const descCheck = checkDescription(description, PROJECT_DESC_MAX, PROJECT_DESC_COUNTER_FROM);
@@ -131,6 +137,7 @@ function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
           hierarchy="primary"
           size="lg"
           onClick={submit}
+          disabled={newBlocked}
           aria-busy={leaving || undefined}
           className="min-h-[var(--touch-min)] w-full"
         >
@@ -191,7 +198,20 @@ function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {isNew && (
+        {newBlocked && (
+          <ProjectLimitCard
+            onUseExisting={
+              openable.length > 0
+                ? () => {
+                    setChoice("");
+                    selectRef.current?.focus();
+                  }
+                : undefined
+            }
+            useExistingLabel="Open a project I have"
+          />
+        )}
+        {isNew && !newBlocked && (
           <ProjectDetailsFields
             ref={fieldsRef}
             name={name}

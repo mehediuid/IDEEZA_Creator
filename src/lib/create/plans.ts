@@ -39,10 +39,13 @@ export type Plan = {
 };
 
 export const PLANS: readonly Plan[] = [
-  { tier: "free", name: "Free", tagline: "Free forever", monthly: 0, credits: 10, queue: "Basic queue", projects: 1, exports: 2, contributors: 0 },
+  // Projects: Free 3 · Tinkerer 5 · Builder 20 · Disruptor 50 (owner, 2026-11-03), and the
+  // one allowance that is enforced — a new project past it waits for a bigger plan
+  // (upgrade plan decision 2, components/projects/project-limit.tsx).
+  { tier: "free", name: "Free", tagline: "Free forever", monthly: 0, credits: 10, queue: "Basic queue", projects: 3, exports: 2, contributors: 0 },
   { tier: "tinkerer", name: "Tinkerer", tagline: "Explore IDEEZA", monthly: 8, credits: 50, queue: "Standard queue, peak waits possible", projects: 5, exports: 5, contributors: 1 },
   { tier: "builder", name: "Builder", tagline: "For building and selling", monthly: 10, credits: 300, queue: "Priority queue", projects: 20, exports: 50, contributors: 20, popular: true },
-  { tier: "disruptor", name: "Disruptor", tagline: "For a hardware business", monthly: 20, credits: 1200, queue: "Fast-track queue, shortest waits", projects: 200, exports: 300, contributors: 200 },
+  { tier: "disruptor", name: "Disruptor", tagline: "For a hardware business", monthly: 20, credits: 1200, queue: "Fast-track queue, shortest waits", projects: 50, exports: 300, contributors: 200 },
 ];
 
 /** Annual billing takes this share off. */

@@ -63,6 +63,7 @@ import { SaveStep, useSaveMode } from "./save-step";
 import { moveTab } from "@/lib/ui/tab-keys";
 import { isLeftOut } from "@/lib/create/pieces";
 import { AddPiecesDialog, NotBuiltPanel } from "./add-pieces-dialog";
+import { FirstBuildNudge } from "@/components/credits/first-build-nudge";
 
 export function ReviewOutputs({
   job,
@@ -547,6 +548,8 @@ function ReviewPanel({
           </div>
           )}
 
+          {/* Upgrade plan D1: once, on the first build that is ready (Free only). */}
+          {!building && <FirstBuildNudge jobId={job.id} className="mx-10 mb-8" />}
           {!building && saveInfo && (
           <footer className="flex flex-wrap items-center justify-between gap-8 border-t border-solid border-border px-10 py-8">
             {/* One live region for both states, mounted with the footer: a
