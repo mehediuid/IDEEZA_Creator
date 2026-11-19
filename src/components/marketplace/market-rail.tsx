@@ -12,6 +12,7 @@
 //   "On Marketplace" card. The conversation has one home, the post.
 
 import * as React from "react";
+import { SeeWhatYouOwn } from "@/components/projects/purchased/see-what-you-own";
 import Link from "next/link";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
@@ -48,6 +49,7 @@ export function CreatorRailBlock({ project, view, viewer }: SlotProps) {
           supporting={`Made ${project.name}`}
         />
         <AskCreator projectId={project.id} sales={view.sales} buyerId={viewer.buyerId} />
+        {view.sales.some((s) => s.projectId === project.id && s.buyerId === viewer.buyerId) && <SeeWhatYouOwn projectId={project.id} />}
       </div>
     </RailBlock>
   );

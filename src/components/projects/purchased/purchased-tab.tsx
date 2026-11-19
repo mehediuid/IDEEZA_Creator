@@ -29,7 +29,7 @@ export function PurchasedTab({ purchases, buyerName }: { purchases: PurchasedPro
       <p aria-live="polite" className="m-0 text-md font-medium text-text-secondary">
         {purchases.length === 0
           ? `Nothing bought as ${buyerName} yet`
-          : `${purchases.length} ${purchases.length === 1 ? "project" : "projects"} bought from · as ${buyerName} (demo creator)`}
+          : `${purchases.length} ${purchases.length === 1 ? "project" : "projects"} bought as ${buyerName} (demo creator)`}
       </p>
       {purchases.length === 0 ? (
         <StateCard
@@ -87,7 +87,10 @@ function PurchasedCard({ p }: { p: PurchasedProject }) {
                 {p.name}
               </Link>
             </h3>
-            <p className="m-0 truncate text-lg leading-lg text-text-secondary">By {p.creator}</p>
+            <p className="m-0 truncate text-lg leading-lg text-text-secondary">
+              By {p.creator} · {p.products.length === 1 ? "1 product" : `${p.products.length} products`}
+            </p>
+            {p.products.length > 1 && <p className="m-0 truncate text-md leading-md text-text-secondary">{p.products.join(" · ")}</p>}
           </div>
           <ul role="list" aria-label="What you own" className="m-0 flex list-none flex-wrap gap-[8px] p-0">
             {cardChipsOf(p).map((c) => (

@@ -437,6 +437,8 @@ export type ProjectSummary = {
   showcase: { at: number } | null; // showcaseOf() — the badge, the eye on the card's chip and the Showcase only filter
   products: { id: string; name: string; description: string }[]; // the current version + products a later version dropped (COR-42)
   productCount: number; // products.length — never a count of builds
+  /** A project bought whole: whose it was (owner, 2026-11-19); null for one made here. */
+  boughtFrom: string | null;
   source: ProjectSource;
   next: ActionPair;
   when: { label: "Saved" | "Created"; at: number }; // latest savedAt, else createdAt (COR-10, §7)
@@ -543,6 +545,7 @@ export function projectSummary(
     showcase,
     products,
     productCount: products.length,
+    boughtFrom: p.acquired?.from ?? null,
     source,
     next: nextAction(p, {
       status,
@@ -713,7 +716,8 @@ export function renderHintOf(projectId: string, jobs: readonly VideoJob[], now: 
 export function cardText(s: ProjectSummary, now: number): CardText {
   const count = countLabel(s.productCount);
   const time = timeOf(s, formatShortDate(s.when.at, now));
-  return { chip: chipOf(s), count, time, line: `${count} · ${time.text}`, hint: hintOf(s) };
+  const lead = s.boughtFrom ? `Bought from ${s.boughtFrom} · ` : "";
+  return { chip: chipOf(s), count, time, line: `${lead}${count} · ${time.text}`, hint: hintOf(s) };
 }
 
 const LOCAL_OWNER: Viewer = { kind: "local-owner" };

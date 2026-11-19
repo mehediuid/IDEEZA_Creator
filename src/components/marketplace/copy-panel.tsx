@@ -26,6 +26,7 @@
 import * as React from "react";
 import { Button, TestnetDemoBadge } from "@/components/ideeza";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
+import { listingUnitsLine } from "@/lib/market/units";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { historyOf, labelOf } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
@@ -44,6 +45,11 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
 import { ChoiceRows, FactGrid, MoreFacts, OfferTop, WalletLine } from "./offer-parts";
 import { useEditionPurchase, type EditionTier } from "./purchase-dialog";
+import { HolderOffers } from "./holder-offers";
+import { useResales } from "@/components/projects/purchased/resales-store";
+import { ownSaleKeyOf } from "@/lib/market/purchases";
+import { holderOf } from "@/lib/market/resales";
+import { PROJECT_SCOPE } from "@/lib/market/types";
 
 const KINDS: EditionKind[] = ["physical", "virtual"];
 const USES: EditionUse[] = ["private", "commercial"];
@@ -97,6 +103,7 @@ export function CopyPanel({
   const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
   const firstOpen = offers.find((t) => !trackCardOf(t, view.sales).soldOut) ?? offers[0];
   const [pickedUse, setPickedUse] = React.useState<string | null>(null);
+  const resales = useResales();
   const main: Listing | null = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, null);
   if (!firstOpen || !chain) return null;
@@ -106,7 +113,10 @@ export function CopyPanel({
   // price), the updates come with it, as before.
   const tier: EditionTier = track.listing.regular === track.listing.extended ? "extended" : "regular";
   const price = formatAmount(track.listing.regular, track.listing.token);
-  const owned = buyerId ? view.sales.filter((s) => s.buyerId === buyerId && s.item.nft !== "main" && s.item.trackId === track.id).length : 0;
+  // Held now: a copy sold on is its new holder's (resales.ts).
+  const owned = buyerId
+    ? view.sales.filter((s) => s.item.nft !== "main" && s.item.trackId === track.id && holderOf(ownSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length
+    : 0;
   const name = `${KIND_LABEL[kind]} · ${USE_LABEL[track.use]}`;
 
   return (
@@ -114,6 +124,7 @@ export function CopyPanel({
       {/* A buyer's Testnet demo badge sits by the money (WalletLine); a preview has no wallet line. */}
       {!buyerId && <TestnetDemoBadge className="self-start" />}
       <p className="m-0 text-sm text-text-secondary">{helperLineOf(kind, scopeName)}</p>
+      {kind === "physical" && <p className="m-0 text-sm text-text-secondary">{listingUnitsLine()}</p>}
 
       <ChoiceRows
         legend="Use"
@@ -152,6 +163,7 @@ export function CopyPanel({
         />
       )}
       {buyerId && <WalletLine buyerId={buyerId} token={track.listing.token} network={chain.network} verb="buy" now={now} />}
+      {buyerId && <HolderOffers projectId={project.id} kind={kind} product={scopeId === PROJECT_SCOPE ? null : scopeName} announce={announce} />}
 
       <MoreFacts>
         <FactGrid

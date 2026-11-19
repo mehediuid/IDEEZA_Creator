@@ -19,6 +19,8 @@ import type { ProjectView } from "@/lib/manual/project-read";
 import { earnHref } from "@/lib/manual/earn-route";
 import type { ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
+import { useResales } from "@/components/projects/purchased/resales-store";
+import { perTokenText } from "@/lib/market/resale-desk";
 import { EARN_CARD, EARN_H3, EARN_LEAD, TAP } from "./surface";
 
 /** "0.975 ETH · 9.75 USDC": your share, per coin, in first-sold order. */
@@ -42,6 +44,11 @@ export function ProjectEarnings({
   );
   const usd = addAmounts("0", ...earnings.map((e) => e.netUsd));
   const coins = perCoin(earnings);
+  // Copies its buyers sold on paid the project its royalty, into the creator's demo wallet (resales.ts).
+  const resales = useResales();
+  const royalties = perTokenText(
+    resales.filter((r) => r.source === "own" && r.projectId === project.id && r.sale).map((r) => ({ amount: r.sale?.royalty ?? "0", token: r.token })),
+  );
 
   return (
     <section aria-labelledby={headingId} className={EARN_CARD}>
@@ -58,6 +65,13 @@ export function ProjectEarnings({
           <dt className="text-sm font-medium text-text-secondary">In dollars, at demo rates</dt>
           <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{formatUsd(usd)}</dd>
         </div>
+        {royalties && (
+          <div className="flex flex-col gap-1">
+            <dt className="text-sm font-medium text-text-secondary">Royalties from resales</dt>
+            <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{royalties}</dd>
+            <dd className="m-0 text-sm text-text-tertiary">Paid into your demo wallet when a buyer sells a copy on</dd>
+          </div>
+        )}
       </dl>
 
       <p className={EARN_LEAD}>
