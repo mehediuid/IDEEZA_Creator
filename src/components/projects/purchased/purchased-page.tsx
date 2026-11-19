@@ -172,7 +172,9 @@ function PurchasedBody({
   const wholeToo = p.lines.some((l) => l.kind === "main" && (l.sharePct ?? 0) >= 100);
   const [tab, setTab] = React.useState<PurchaseKind | undefined>(initialTab && held.includes(initialTab) ? initialTab : held[0]);
   const log = useUnitsLog();
-  const summary = <SummaryBlock p={p} buyer={buyer} held={held} />;
+  // You own counts every NFT held, the whole project too, so its rows do.
+  const owned = KINDS.filter((k) => p.lines.some((l) => l.kind === k));
+  const summary = <SummaryBlock p={p} buyer={buyer} held={owned} />;
   const creator = <CreatorBlock p={p} post={post} buyer={buyer} />;
   return (
     <div className={POST_PAGE}>

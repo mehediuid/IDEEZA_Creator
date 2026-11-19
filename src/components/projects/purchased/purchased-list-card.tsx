@@ -58,9 +58,9 @@ export function PurchasedListCard({ p, now }: { p: PurchasedProject; now: number
             {/* Row mode only: the chip sits beside the title. */}
             <span className="flex shrink-0 items-center [@container(min-width:560px)]:hidden">{chip}</span>
           </div>
-          <p className="mt-[4px] truncate text-md text-text-tertiary">
+          <p className="mt-[4px] line-clamp-2 text-md text-text-tertiary">
             By {p.creator} · {p.products.length === 1 ? "1 product" : `${p.products.length} products`} ·{" "}
-            <time dateTime={new Date(p.lastAt).toISOString()} title={formatDate(p.lastAt)}>
+            <time dateTime={new Date(p.lastAt).toISOString()} title={formatDate(p.lastAt)} className="whitespace-nowrap">
               Bought {formatShortDate(p.lastAt, now)}
             </time>
           </p>
@@ -69,7 +69,16 @@ export function PurchasedListCard({ p, now }: { p: PurchasedProject; now: number
 
       {/* The hint: text, not a control, on the card's floor so a row's hints line up. */}
       <p className="mt-auto flex min-w-0 items-center gap-[6px] text-md font-medium text-text-secondary [@container(max-width:559px)]:pl-[108px] [@container(min-width:560px)]:px-[14px] [@container(min-width:560px)]:pb-[14px] [@container(min-width:560px)]:pt-[12px]">
-        <span className="truncate">{purchasedHintOf(p)}</span>
+        <span className="line-clamp-2 min-w-0">
+          {purchasedHintOf(p)
+            .split(" · ")
+            .map((part, i) => (
+              <React.Fragment key={part}>
+                {i > 0 && " · "}
+                <span className="whitespace-nowrap">{part}</span>
+              </React.Fragment>
+            ))}
+        </span>
         <Icon icon={ArrowRight02Icon} size={14} className="shrink-0" />
       </p>
     </article>
