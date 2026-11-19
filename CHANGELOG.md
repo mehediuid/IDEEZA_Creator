@@ -6,6 +6,8 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase) | A whole project you bought opens as your project, with its Purchase | 19 Nov 2026 | Not created yet | Not started |
+| [CL-037](#cl-037-my-projects--all-what-you-bought-is-there-too) | My projects › All: what you bought is there too | 19 Nov 2026 | Not created yet | Not started |
 | [CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought) | Sell a bought copy on, and Earn for what you bought | 19 Nov 2026 | [PR-9716](https://ideeza.atlassian.net/browse/PR-9716) | Not started |
 | [CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft) | Purchased page: the project you bought, shown by kind of NFT | 19 Nov 2026 | [PR-9715](https://ideeza.atlassian.net/browse/PR-9715) | Not started |
 | [CL-034](#cl-034-projects-per-plan-a-new-project-waits-until-theres-room) | Projects per plan: a new project waits until there's room | 18 Nov 2026 | Not created yet | Not started |
@@ -67,6 +69,101 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 ---
 
+## CL-038 A whole project you bought opens as your project, with its Purchase
+
+**In the prototype:** 19 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screens:** the project page of a project bought whole (`/projects/<id>`), and every link that leads to it. Web app only. Together with [CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft): a whole project bought has no tab on the purchased page.
+
+A creator who buys a project's Main NFT (the whole project, 100%) owns that project. It opens as one of their projects, on its normal project page, and what they paid for it sits in one block on that page. There is no purchase page in between and no **Open the project** step.
+
+### What to build
+
+**Every way in opens the project**
+
+- [ ] These open the project page itself: its card in My projects › Purchased, its card in My projects › All, **See what you own ›** in the project's Marketplace box (Explore marketplace), and **Open your files** on its Innovations product page.
+- [ ] An old purchased-page address of a project bought whole (`/projects/purchased/<project>`) goes straight to the project page.
+- [ ] In All it shows once, as the creator's own project ([CL-037](#cl-037-my-projects--all-what-you-bought-is-there-too)).
+
+**The project page**
+
+- [ ] The normal project page, the same as for a project the creator made: the header (its line starts *Bought from {creator}*), Publish, Earn and ⋯, the Products, Media, Network and Team tabs, editing and building.
+- [ ] The rail gets a **Purchase** block, right under Activity, with the line *You bought the whole project, so it's one of yours: open it, edit it, build it and sell it again.* and these facts:
+  - *Bought from*: the creator's name, a link to the listing it was bought on;
+  - *Price paid*: *0.35 ETH*;
+  - *Bought on*: *Nov 13, 2026*;
+  - *Your share*: *100% · Main NFT*;
+  - *Token*: *#1028 · IDEEZA Creators*;
+  - *Blockchain*: *Base Sepolia (Testnet)*;
+  - *Transaction*: shortened (*0x6ace…25d0*), the full one on hover;
+  - *Bought as*: *Mira (demo creator)* with the Testnet demo badge.
+- [ ] Only the project's owner sees it; never in a preview. A project the creator made has no Purchase block.
+
+**The purchased page, when copies are held too**
+
+- [ ] The purchased page shows only the Physical and Virtual copies held: it has no Whole project tab.
+- [ ] When the whole project is held as well, Your NFTs starts with one card, *The whole project is yours too: it opens as one of your projects.*, with **Open the project**. The rail's You own still lists *Whole project · 100%* and counts it.
+
+Demo stand-ins (prototype only): Bought as, the Testnet demo badge, the test token and network.
+
+### Design
+
+- The project page as it is. The Purchase block is a rail block like About: its title, the line in `text-secondary`, then the facts list (label `text-secondary`, value `text-primary`); the creator's name as a text link (`text-link`), the transaction in Code, the DS Testnet demo badge.
+- The card on the purchased page: the page's own card (radius 2xl, 1 px `border`, `bg-surface`) with the Primary link button.
+- No new colours or tokens; light and dark.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| |
+| --- |
+| ![A whole project bought opens as the creator's project, with the Purchase block in the rail](docs/changelog/2026-11-19-bought-project-purchase-after.png) |
+
+---
+
+## CL-037 My projects › All: what you bought is there too
+
+**In the prototype:** 19 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Screen:** My projects › All (`/projects`). Web app only.
+
+All holds everything a creator has: the projects they made and the projects they bought from, in one list. Purchased stays as its own tab.
+
+### What to build
+
+- [ ] All lists the creator's own projects and every project they bought copies of, in one list: one order, one search and one set of pages (12 a page).
+- [ ] The All count is both together (*All 11*: 6 made, 5 bought from), and so is *{n} projects* above the cards.
+- [ ] A whole project bought is one of the creator's own projects ([CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase)), so it shows once, as their project, never again as a purchase.
+- [ ] Draft, Minted, Listed, Sold and **Shared only** keep only the creator's own projects. Purchased keeps only what was bought, with its own cards ([CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft)).
+- [ ] A purchase in All is drawn as the list's own card, with the same frame, cover and places as the creator's projects (a row below a 560 px wide list):
+  - the chip **Purchased** (shopping bag icon) where a project's status chip goes;
+  - the line *By {creator} · {n} products · Bought {date}* (the last purchase; the full date on hover);
+  - the hint *You own 3 NFTs · 1 for sale · 1 sold* (for sale and sold only when there are some) with the arrow;
+  - the whole card opens what was bought ([CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft)).
+- [ ] At phone width the line and the hint wrap to a second line instead of being cut; a date or one part of the hint never breaks across two lines.
+- [ ] Search finds a purchase by its name, its creator or the names of its products.
+- [ ] The sort orders both together: *Recently updated* by the last purchase or sale, *Newest to oldest* and *Oldest to newest* by the first purchase, *Name A–Z* by name.
+
+Demo stand-ins (prototype only): what was bought is the demo creator's picked in Shopping as.
+
+### Design
+
+- The list's own card (the project card): radius 12, 1 px `border`, `bg-surface`, cover 16:10 in the grid, 96 × 60 in a row; title 16 medium, the line 14 `text-tertiary`, the hint 14 medium `text-secondary`.
+- The chip: DS Badge in the brand tone with the shopping bag icon, the status chip's size (22 px).
+- No new colours or tokens; light and dark.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| |
+| --- |
+| ![All lists the creator's projects and what they bought, with the Purchased chip](docs/changelog/2026-11-19-all-tab-after.png) |
+| ![At phone width, dark: rows, the line and the hint wrap](docs/changelog/2026-11-19-all-tab-phone-after.png) |
+
+---
+
 ## CL-036 Sell a bought copy on, and Earn for what you bought
 
 **In the prototype:** 19 November 2026 · **Jira:** [PR-9716](https://ideeza.atlassian.net/browse/PR-9716) · **Production:** Not started
@@ -90,7 +187,7 @@ A creator who bought a Physical or Virtual copy can put it up for sale, change i
 
 **Earn for a purchased project**
 
-- [ ] The purchased page's header has an **Earn** button (coins icon, the quiet button) with one line beside it: *1 copy for sale · 0.0525 ETH earned from 1 sold*, *Sell a copy on, set its price, see what it earned* when nothing is for sale or sold, or *The whole project sells from its own Earn* when only the whole project is held.
+- [ ] The purchased page's header has an **Earn** button (coins icon, the quiet button) with one line beside it: *1 copy for sale · 0.0525 ETH earned from 1 sold*, or *Sell a copy on, set its price, see what it earned* when nothing is for sale or sold.
 - [ ] Earn's header: *← {project}* back to the purchased page, the Shopping as strip, the title **Earn** and one status pill: *Not selling*, *1 copy for sale* / *{n} copies for sale*, or *Sold every copy*.
 - [ ] Two tabs, **Overview** and **Sell**, drawn like a project's own Earn tabs, each with its own address.
 
@@ -104,7 +201,6 @@ A creator who bought a Physical or Virtual copy can put it up for sale, change i
 - [ ] Under the figures, one line and at most one button for the next step:
   - copies held, none for sale: *Put a copy up for sale: you set the price, and it stays yours until someone buys it.* with **Sell a copy**;
   - some for sale: *1 copy is for sale on Explore marketplace. Change a price or take one off sale on Sell.* with **Manage what's for sale**;
-  - only the whole project held: *The whole project is yours: it sells from its own Earn.* with **Open its Earn**;
   - every copy sold: *You sold every copy you had.* with **Buy another copy** while the creator still sells copies.
 - [ ] **Activity**, newest first, with the date and, where money moved, the amount (paid in grey with −, earned in green with +): *Bought #7 of 50 · Physical NFT · Business use from {creator or holder}*, *Put #1 up for sale at 0.035 ETH*, *Took #1 off sale*, *Sold #8 of 50 · Physical NFT · Business use to Sam for 0.06 ETH* (+ what it paid you), *Made 10 units with #7 of 50*. A copy you sold still shows how you got it.
 - [ ] Folded at the foot: **How selling a copy on works**, the rules above in five short lines.
@@ -186,9 +282,9 @@ A new feature, so there is no before.
 
 **In the prototype:** 19 November 2026 · **Jira:** [PR-9715](https://ideeza.atlassian.net/browse/PR-9715) · **Production:** Not started
 
-**Screen:** My projects › Purchased › a project (`/projects/purchased/<project>`), and a bought whole project in My projects. Web app only. It replaces the page in [CL-020](#cl-020-my-projects-purchased), which was never built: build this one.
+**Screen:** My projects › Purchased › a project (`/projects/purchased/<project>`). Web app only. It replaces the page in [CL-020](#cl-020-my-projects-purchased), which was never built: build this one.
 
-Each project a creator bought from has its own page. It shows the project in the marketplace page's frame and what each kind of NFT opens: the products themselves first, then the copies with their units, then the rules folded away. A whole project bought becomes the buyer's own project.
+Each project a creator bought from has its own page. It shows the project in the marketplace page's frame and what each kind of NFT opens: the products themselves first, then the copies with their units, then the rules folded away. A whole project bought is the buyer's own project and opens as one ([CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase)).
 
 ### What to build
 
@@ -205,7 +301,8 @@ Each project a creator bought from has its own page. It shows the project in the
 
 **Your NFTs**
 
-- [ ] One tab per kind held: *Whole project* (Main NFT), *Physical NFT*, *Virtual NFT*, in that order; one kind shows as a label. `?nft=physical` (or `virtual`, `main`) opens that tab.
+- [ ] One tab per kind of copy held: *Physical NFT*, then *Virtual NFT*; one kind shows as a label. `?nft=physical` (or `virtual`) opens that tab.
+- [ ] When the whole project is held too, one card comes first: *The whole project is yours too: it opens as one of your projects.* with **Open the project** ([CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase)).
 
 **A Physical NFT or Virtual NFT tab, in this order**
 
@@ -228,12 +325,9 @@ Each project a creator bought from has its own page. It shows the project in the
   - Virtual · Business use: can *Use it in ads, games, product pages and client work*, *Sell the copy; the licence goes with it*; can't *Sell or share the model file itself*, *Start new work with it after you sell the copy*.
 - [ ] Folded: **NFT details**: Collection, Blockchain, NFT type, Copies, Paid, Purchased from; *Each copy is one licence. Minted when you bought it.*
 
-**The Whole project tab (a Main NFT)**
+**A whole project bought**
 
-- [ ] *The whole project is yours* / *It's one of your projects now: open it, edit it and sell it again, as you do your own.* with **Open the project**. A share: *{n}% of the project is yours* / *You hold a share of its Main NFT: its sales and royalties are split with you.*
-- [ ] **Its products · {n}** with every piece tab and **Open in your project** on each product's Overview.
-- [ ] Folded: **What the Main NFT allows** (*Open, edit and build the project like your own*, *List it again, sell its copies and earn its royalties*; a share: *Earn {n}% of the project's sales and royalties*, can't *List or change the project on your own*) and **NFT details** (Collection, Blockchain, NFT type, Token ID, Your share, Price paid, Purchased from, Transaction, Purchased; *Minted when you bought it.*).
-- [ ] A whole project bought is the buyer's own project in My projects, with its products and builds, opened and edited like any of theirs. Its header and card say *Bought from {creator}*. It doesn't count toward the plan's projects.
+- [ ] It has no tab here: it is the buyer's own project in My projects, with its products and builds, opened and edited like any of theirs, and its purchase shows on its own page ([CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase)). Its header and card say *Bought from {creator}*. It doesn't count toward the plan's projects.
 
 **Receipts**
 
@@ -241,8 +335,8 @@ Each project a creator bought from has its own page. It shows the project in the
 
 **Elsewhere**
 
-- [ ] A project's Marketplace box says **See what you own ›** (to this page) when the buyer holds any of it.
-- [ ] On an Innovations product page, a holder of a Physical copy or the whole project sees PCB, Firmware and Wiring open: *{piece} files are yours* with **Open your files**, and no lock on those tabs (not on the maker's own post).
+- [ ] A project's Marketplace box says **See what you own ›** when the buyer holds any of it: to this page, or to the project itself when it was bought whole.
+- [ ] On an Innovations product page, a holder of a Physical copy or the whole project sees PCB, Firmware and Wiring open: *{piece} files are yours* with **Open your files** (to this page, or to the project for a whole project), and no lock on those tabs (not on the maker's own post).
 - [ ] My projects › Purchased: each card says *By {creator} · {n} products*, and with several the product names under it (*Watering Hub · Soil Probe*). The count above the cards reads *{n} projects bought as {name} (demo creator)*.
 
 Demo stand-ins (prototype only): Shopping as, the Testnet demo badge, test tokens; the pieces' files are the prototype's sample builds.
@@ -263,7 +357,6 @@ A new feature, so there is no before.
 | --- |
 | ![A Physical NFT tab: both products with every piece tab, then the copies with their units](docs/changelog/2026-11-19-purchased-page-physical-after.png) |
 | ![The Virtual NFT tab opens only the 3D model and parts, and says why](docs/changelog/2026-11-19-purchased-page-virtual-after.png) |
-| ![A whole project bought: Open the project and every product](docs/changelog/2026-11-19-purchased-page-main-after.png) |
 | ![At phone width, dark](docs/changelog/2026-11-19-purchased-page-phone-after.png) |
 
 ---
