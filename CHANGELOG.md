@@ -6,6 +6,7 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-039](#cl-039-earn--sell-every-tile-says-which-nft-it-is) | Earn › Sell: every tile says which NFT it is | 19 Nov 2026 | Not created yet | Not started |
 | [CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase) | A whole project you bought opens as your project, with its Purchase | 19 Nov 2026 | Not created yet | Not started |
 | [CL-037](#cl-037-my-projects--all-what-you-bought-is-there-too) | My projects › All: what you bought is there too | 19 Nov 2026 | Not created yet | Not started |
 | [CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought) | Sell a bought copy on, and Earn for what you bought | 19 Nov 2026 | [PR-9716](https://ideeza.atlassian.net/browse/PR-9716) | Not started |
@@ -66,6 +67,60 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-039 Earn › Sell: every tile says which NFT it is
+
+**In the prototype:** 19 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** a project's **Earn › Sell** (`/projects/<id>/earn/sell`, web): the board's tiles, a product's Main slot, the item panel's head and the drawer. This changes [CL-028](#cl-028-earn--sell-one-board-for-everything-you-sell).
+
+People trying the board could not tell which tile was the Main NFT, the Physical NFT or the Virtual NFT. Only the column heads at the top named them, far above a product's row, and every tile started with its status. Now every tile says what it is.
+
+### What to build
+
+**Tiles**
+
+- [ ] Every tile starts with its type: an icon in a small tinted square, the type's name and one line on what it is.
+  - Main NFT: crown icon, **Main NFT**, *The project itself*.
+  - Physical NFT: box icon, **Physical NFT**, *A built unit you make and ship*.
+  - Virtual NFT: file-download icon, **Virtual NFT**, *The design files with a licence*.
+- [ ] The icons are the ones the phone app's Sell rows already use for each type.
+- [ ] Under the type, one line: the price (or *No price yet*, *Not on sale*, *Mint first*) on the left and the status chip on the right.
+- [ ] Then the sold bar, then one line with what sold and the use on the left (*1 of 50 sold · 2 uses*, *0% sold · Buy now*, *0 of 50 sold · Personal use*) and what it earned on the right (*0.039 ETH*), or *Set a price ›* while not selling.
+- [ ] No column heads over the board: each tile says its type. **How selling works** still opens the three rule cards, and each card's name now has its type's icon instead of a dot.
+
+**A product's Main slot**
+
+- [ ] Where a product would have a Main NFT, a dashed slot with a grey crown icon and **No Main NFT**.
+- [ ] The first product's slot says *Products sell copies only. The Main NFT is the whole project, above.* The other products' slots say *Copies only*.
+- [ ] Under 480 px (tiles stacked), only the first product shows this slot.
+
+**Item panel and drawer**
+
+- [ ] The panel's head shows the type's icon (small) beside *Main NFT*, *Physical NFT* or *Virtual NFT*, instead of a dot.
+- [ ] Below a 1024 px wide page, the drawer's line under its title starts with the same small icon: *Virtual NFT · The design files with a licence*.
+
+**Board width**
+
+- [ ] A row's name sits beside its three tiles from a 960 px wide board (it was 720 px); narrower, above them; under 480 px the tiles stack. On a 1600 px screen with the item panel open, the names sit above the tiles, so each tile keeps its type, price and chip on their own lines.
+
+### Design
+
+- Type icon: a 32 px square, radius `lg`, the icon 18 px. In the panel's head and the drawer: a 24 px square, radius `md`, the icon 14 px.
+- Colours: Main `bg-brand-subtle` with `icon-brand`, Physical `bg-warning-subtle` with `icon-warning`, Virtual `bg-info-subtle` with `icon-info`. No Main NFT: `bg-subtle` with `icon-secondary`.
+- Icons from the DS set (Hugeicons): Crown, Delivery Box 01, File Download.
+- Type name `text-md` semibold `text-primary`, its line `text-sm` `text-tertiary`. No Main NFT's name `text-secondary`; its slot 1 px dashed `border-strong`, radius `xl`, like a tile.
+- Everything else as CL-028.
+
+### Before → After
+
+| Before | After |
+| --- | --- |
+| ![Before: only the column heads at the top name the types; every tile starts with On sale; a product's Main cell is an empty dashed box](docs/changelog/2026-11-19-sell-kinds-before.png) | ![After: every tile starts with its icon, its name and what it is; the product's Main slot says No Main NFT](docs/changelog/2026-11-19-sell-kinds-after.png) |
+| ![Before: with three products, the column heads are far above the last product's tiles](docs/changelog/2026-11-19-sell-kinds-products-before.png) | ![After: with three products, every tile names its type; the first product's slot says why there is no Main NFT, the others say Copies only](docs/changelog/2026-11-19-sell-kinds-products-after.png) |
+| | ![After: on a phone the stacked tiles keep the same head](docs/changelog/2026-11-19-sell-kinds-phone-after.png) |
 
 ---
 
@@ -829,6 +884,8 @@ On main since 13 October 2026, so there is no Before.
 ## CL-028 Earn › Sell: one board for everything you sell
 
 **In the prototype:** 18 November 2026 · **Jira:** [PR-9660](https://ideeza.atlassian.net/browse/PR-9660) · **Production:** Not started
+
+**Changed by [CL-039](#cl-039-earn--sell-every-tile-says-which-nft-it-is)** (19 November 2026): every tile names its type with an icon and a line, there are no column heads, a product's Main cell says *No Main NFT*, and a row's name sits beside its tiles from a 960 px wide board. Build those parts from CL-039.
 
 **Screen:** a project's **Earn › Sell** (`/projects/<id>/earn/sell`, web), and the header and tabs of every Earn tab.
 
