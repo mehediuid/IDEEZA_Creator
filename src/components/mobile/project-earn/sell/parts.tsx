@@ -22,14 +22,7 @@ import * as React from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import {
-  CrownIcon,
-  DeliveryBox01Icon,
-  FileDownloadIcon,
-  InformationCircleIcon,
-  LockIcon,
-  PlayIcon,
-} from "@hugeicons/core-free-icons";
+import { InformationCircleIcon, LockIcon, PlayIcon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
@@ -69,8 +62,8 @@ export const LINK_SM = cn(T.caption, "text-text-brand outline-none hover:underli
 /** A03 Link MD. */
 export const LINK_MD = cn(T.rowTitle, "text-text-brand outline-none hover:underline focus-visible:underline");
 
-/** Each sellable kind's mark: the project itself, a built unit, the design files. */
-export const KIND_ICON: Record<"main" | "physical" | "virtual", IconValue> = { main: CrownIcon, physical: DeliveryBox01Icon, virtual: FileDownloadIcon };
+/** Each sellable kind's mark: the project itself, a built unit, the design files (shared with the web's Sell board). */
+export { KIND_ICON } from "@/components/marketplace/kind-icon";
 
 /** The state's lines: one, or one per listed use. `live` reads in the success ink. */
 export function StateLines({ lines, live = false, id }: { lines: readonly string[]; live?: boolean; id?: string }) {

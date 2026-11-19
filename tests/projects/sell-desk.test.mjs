@@ -7,6 +7,10 @@ import assert from "node:assert/strict";
 const {
   ATTENTION,
   DESK_KIND_LINE,
+  DESK_KIND_PLAIN,
+  NO_MAIN_SHORT,
+  NO_MAIN_TITLE,
+  NO_MAIN_WHY,
   copyTileOf,
   defaultTileOf,
   deskCaptionOf,
@@ -215,4 +219,20 @@ test("productCopiesLineOf: the product page's line under Earn (owner, 2026-11-18
   assert.equal(productCopiesLineOf({ ...base, onlyProduct: true, tracks: [whole] }), "Virtual copies on sale");
   assert.equal(productCopiesLineOf({ ...base, tracks: [phys], waiting: true }), "Copies wait for videos");
   assert.equal(productCopiesLineOf({ ...base, tracks: [phys], locked: true }), "Sold in full");
+});
+
+test("every tile says what its type is; a product's Main slot says why it has none (owner, 2026-11-18)", () => {
+  // Testers could not tell the tiles apart when only the column heads named them: each kind has its line.
+  assert.deepEqual(DESK_KIND_PLAIN, {
+    main: "The project itself",
+    physical: "A built unit you make and ship",
+    virtual: "The design files with a licence",
+  });
+  // Copies say the same as the item panel's head; the Main drops "whole project only", the board's shape says it.
+  assert.equal(DESK_KIND_PLAIN.physical, DESK_KIND_LINE.physical);
+  assert.equal(DESK_KIND_PLAIN.virtual, DESK_KIND_LINE.virtual);
+  assert.ok(DESK_KIND_LINE.main.startsWith(DESK_KIND_PLAIN.main));
+  assert.equal(NO_MAIN_TITLE, "No Main NFT");
+  assert.match(NO_MAIN_WHY, /^Products sell copies only\./);
+  assert.equal(NO_MAIN_SHORT, "Copies only");
 });

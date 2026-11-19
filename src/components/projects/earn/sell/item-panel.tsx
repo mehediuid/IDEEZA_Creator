@@ -49,7 +49,7 @@ import { HeldBlock } from "@/components/video-jobs/held-block";
 import { heldOf, useHeld } from "@/lib/market/held";
 import { NftActivityLine } from "../nft-activity";
 import { EARN_LINK, TAP } from "../surface";
-import { DeskChip, KIND_NAME, KindDot, SoldMeter } from "./board";
+import { DeskChip, KIND_NAME, KindMark, SoldMeter } from "./board";
 import { SellFlowDialog } from "./sell-flow-dialog";
 
 const SECTION = "flex min-w-0 flex-col gap-6 px-10 py-9";
@@ -102,8 +102,8 @@ function Head({ kind, title, sub, chip, lines }: { kind: DeskKind; title: string
   return (
     <div className={SECTION}>
       <div className={cn("flex min-w-0 flex-col gap-2", inDrawer && "hidden")}>
-        <span className="flex items-center gap-3 text-sm font-semibold leading-sm text-text-tertiary">
-          <KindDot kind={kind} />
+        <span className="flex items-center gap-4 text-sm font-semibold leading-sm text-text-tertiary">
+          <KindMark kind={kind} size="sm" />
           {KIND_NAME[kind]}
         </span>
         <h3 className="m-0 break-words text-xl font-semibold leading-xl text-text-primary">{title}</h3>
