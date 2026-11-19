@@ -73,7 +73,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 **Screens:** a purchased project's page (`/projects/purchased/<project>`); its **Earn** (`/projects/purchased/<project>/earn`, Overview) and **Earn › Sell** (`/projects/purchased/<project>/earn/sell`); the Physical NFT and Virtual NFT tabs of a project's Marketplace box (`/marketplace/<project>`); the creator's own **Earn › Money** (`/projects/<id>/earn/money`). Web app only.
 
-Someone who bought a Physical or Virtual copy had no way to sell it again. Now they can put it up for sale, change its price or take it off sale, and another creator can buy it from them. A project you bought copies of also gets its own **Earn**, built like a project's own Earn, where you see what the copies earned and sell them.
+A creator who bought a Physical or Virtual copy can put it up for sale, change its price or take it off sale, and another creator can buy it from them. Each project they bought copies of has its own **Earn**, built like a project's own Earn, where they see what the copies earned and sell them.
 
 ### What to build
 
@@ -168,15 +168,17 @@ Demo stand-ins (prototype only): the buyer and seller are the demo creators pick
 - From holders: rows in 1 px `border` radius xl, the number in Code, **Buy** Secondary md (the creator's Buy now stays the tab's one violet).
 - Amounts: tabular figures; earned in `text-success` with +, paid in `text-secondary` with −. Light and dark.
 
-### Before → After
+### Screenshots
 
-| Before | After |
-| --- | --- |
-| ![Before: a copy tab sold only the creator's new copies](docs/changelog/2026-11-19-resale-market-before.png) | ![After: From holders under the creator's Buy now, with Leo's copy and Buy](docs/changelog/2026-11-19-resale-holders-after.png) |
-| | ![After: the purchased page with Earn and its line, For sale and Earned selling on in the summary](docs/changelog/2026-11-19-resale-purchased-after.png) |
-| | ![After: Earn › Overview with what the copies earned, the next step and the activity](docs/changelog/2026-11-19-resale-earn-overview-after.png) |
-| | ![After: Earn › Sell, the board of copies and Sell this copy in the panel, with the live split](docs/changelog/2026-11-19-resale-earn-sell-after.png) |
-| | ![After: at phone width the panel opens as a drawer](docs/changelog/2026-11-19-resale-sell-phone-after.png) |
+A new feature, so there is no before.
+
+| |
+| --- |
+| ![The purchased page with Earn and its line, For sale and Earned selling on in the summary](docs/changelog/2026-11-19-resale-purchased-after.png) |
+| ![Earn › Overview with what the copies earned, the next step and the activity](docs/changelog/2026-11-19-resale-earn-overview-after.png) |
+| ![Earn › Sell, the board of copies and Sell this copy in the panel, with the live split](docs/changelog/2026-11-19-resale-earn-sell-after.png) |
+| ![From holders under the creator's Buy now, with Leo's copy and Buy](docs/changelog/2026-11-19-resale-holders-after.png) |
+| ![At phone width the panel opens as a drawer](docs/changelog/2026-11-19-resale-sell-phone-after.png) |
 
 ---
 
@@ -184,9 +186,9 @@ Demo stand-ins (prototype only): the buyer and seller are the demo creators pick
 
 **In the prototype:** 19 November 2026 · **Jira:** [PR-9715](https://ideeza.atlassian.net/browse/PR-9715) · **Production:** Not started
 
-**Screen:** My projects › Purchased › a project (`/projects/purchased/<project>`), and a bought whole project in My projects. Web app only. Changes [CL-020](#cl-020-my-projects-purchased).
+**Screen:** My projects › Purchased › a project (`/projects/purchased/<project>`), and a bought whole project in My projects. Web app only. It replaces the page in [CL-020](#cl-020-my-projects-purchased), which was never built: build this one.
 
-The purchased page used to list what was owned in plain cards. Now it shows the project the buyer bought, in the marketplace page's frame, and what each kind of NFT opens: the products themselves first, then the copies with their units, then the rules folded away. A whole project bought becomes the buyer's own project.
+Each project a creator bought from has its own page. It shows the project in the marketplace page's frame and what each kind of NFT opens: the products themselves first, then the copies with their units, then the rules folded away. A whole project bought becomes the buyer's own project.
 
 ### What to build
 
@@ -253,14 +255,16 @@ Demo stand-ins (prototype only): Shopping as, the Testnet demo badge, test token
 - Folds: the Marketplace box's *NFT details* disclosure, with its title. Rules: tick in `text-success`, cross in `text-error`.
 - No new colours or tokens; light and dark.
 
-### Before → After
+### Screenshots
 
-| Before | After |
-| --- | --- |
-| ![Before: what was owned in plain cards, a files list with nothing to open](docs/changelog/2026-11-19-purchased-page-before.png) | ![After: a Physical NFT tab: both products with every piece tab, then the copies with their units](docs/changelog/2026-11-19-purchased-page-physical-after.png) |
-| | ![After: the Virtual NFT tab opens only the 3D model and parts, and says why](docs/changelog/2026-11-19-purchased-page-virtual-after.png) |
-| | ![After: a whole project bought: Open the project and every product](docs/changelog/2026-11-19-purchased-page-main-after.png) |
-| | ![After: at phone width, dark](docs/changelog/2026-11-19-purchased-page-phone-after.png) |
+A new feature, so there is no before.
+
+| |
+| --- |
+| ![A Physical NFT tab: both products with every piece tab, then the copies with their units](docs/changelog/2026-11-19-purchased-page-physical-after.png) |
+| ![The Virtual NFT tab opens only the 3D model and parts, and says why](docs/changelog/2026-11-19-purchased-page-virtual-after.png) |
+| ![A whole project bought: Open the project and every product](docs/changelog/2026-11-19-purchased-page-main-after.png) |
+| ![At phone width, dark](docs/changelog/2026-11-19-purchased-page-phone-after.png) |
 
 ---
 
@@ -1075,7 +1079,7 @@ No screenshot: the change is motion only. At rest the menu looks the same as bef
 
 **In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
 
-**Changed by [CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft) and [CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought)** (19 November 2026): the purchased page is now the project by kind of NFT, and a copy can be sold on. Build those; the page below is how it was.
+**Changed by [CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft) and [CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought)** (19 November 2026): the purchased page is the project by kind of NFT, and a copy can be sold on. Build those instead; this page was never built.
 
 **Screen:** My projects › **Purchased** (`/projects?tab=purchased`) and a page for each project bought from (`/projects/purchased/<project>`). Web app only.
 
