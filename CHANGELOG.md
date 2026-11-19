@@ -6,8 +6,8 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
-| [CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought) | Sell a bought copy on, and Earn for what you bought | 19 Nov 2026 | Not created yet | Not started |
-| [CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft) | Purchased page: the project you bought, shown by kind of NFT | 19 Nov 2026 | Not created yet | Not started |
+| [CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought) | Sell a bought copy on, and Earn for what you bought | 19 Nov 2026 | [PR-9716](https://ideeza.atlassian.net/browse/PR-9716) | Not started |
+| [CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft) | Purchased page: the project you bought, shown by kind of NFT | 19 Nov 2026 | [PR-9715](https://ideeza.atlassian.net/browse/PR-9715) | Not started |
 | [CL-034](#cl-034-projects-per-plan-a-new-project-waits-until-theres-room) | Projects per plan: a new project waits until there's room | 18 Nov 2026 | Not created yet | Not started |
 | [CL-033](#cl-033-credit-packs-new-sizes-so-builder-and-disruptor-are-the-better-buy) | Credit packs: new sizes, so Builder and Disruptor are the better buy | 18 Nov 2026 | Not created yet | Not started |
 | [CL-032](#cl-032-upgrade-nudges-the-next-plan-shown-where-a-maker-runs-short) | Upgrade nudges: the next plan, shown where a maker runs short | 18 Nov 2026 | Not created yet | Not started |
@@ -69,7 +69,7 @@ docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 
 ## CL-036 Sell a bought copy on, and Earn for what you bought
 
-**In the prototype:** 19 November 2026 · **Jira:** not created yet · **Production:** Not started
+**In the prototype:** 19 November 2026 · **Jira:** [PR-9716](https://ideeza.atlassian.net/browse/PR-9716) · **Production:** Not started
 
 **Screens:** a purchased project's page (`/projects/purchased/<project>`); its **Earn** (`/projects/purchased/<project>/earn`, Overview) and **Earn › Sell** (`/projects/purchased/<project>/earn/sell`); the Physical NFT and Virtual NFT tabs of a project's Marketplace box (`/marketplace/<project>`); the creator's own **Earn › Money** (`/projects/<id>/earn/money`). Web app only.
 
@@ -182,7 +182,7 @@ Demo stand-ins (prototype only): the buyer and seller are the demo creators pick
 
 ## CL-035 Purchased page: the project you bought, shown by kind of NFT
 
-**In the prototype:** 19 November 2026 · **Jira:** not created yet · **Production:** Not started
+**In the prototype:** 19 November 2026 · **Jira:** [PR-9715](https://ideeza.atlassian.net/browse/PR-9715) · **Production:** Not started
 
 **Screen:** My projects › Purchased › a project (`/projects/purchased/<project>`), and a bought whole project in My projects. Web app only. Changes [CL-020](#cl-020-my-projects-purchased).
 
