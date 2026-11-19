@@ -17,6 +17,11 @@
 // one card per project (purchased/purchased-tab.tsx), `?tab=purchased`; it is
 // not an outcome of the maker's own projects, so it lives beside the list's
 // tabs, not in its query (project-list.ts, which the phone shares, is untouched).
+// All holds everything (owner, 2026-11-19: "All should have everything — why are
+// the purchased ones somewhere else?"): the purchases join the maker's projects
+// in All's order, search and pages (all-tab.ts), each in the list's own card frame
+// with a Purchased chip (purchased/purchased-list-card.tsx); the outcome tabs and
+// Shared only stay the maker's own.
 //
 // The view lives in the URL (LST-28): tab, q, sort, showcase and page, written
 // with replaceState and defaults left out; an old tab=private|given|showcase
@@ -46,7 +51,6 @@ import {
   LIST_TABS,
   SORT_OPTIONS,
   countLine,
-  filterProjects,
   listQueryString,
   parseListQuery,
   searchInUrl,
@@ -56,6 +60,7 @@ import {
   type ListTab,
 } from "@/lib/manual/project-list";
 import { useManualProjects } from "@/lib/manual/projects";
+import { allTabOf } from "./all-tab";
 import { cn } from "@/lib/utils";
 import {
   ProjectCard,
@@ -67,6 +72,7 @@ import {
 } from "./project-card";
 import { Pagination } from "./pagination";
 import { PurchasedTab } from "./purchased/purchased-tab";
+import { PurchasedListCard } from "./purchased/purchased-list-card";
 import { usePurchased } from "./purchased/use-purchased";
 import { motionReduced } from "@/lib/settings/appearance";
 
@@ -265,7 +271,11 @@ export function MyProjects() {
         : null,
     [drafts, projects, builds, jobs, now, market],
   );
-  const result = React.useMemo(() => (items ? filterProjects(items, view) : null), [items, view]);
+  // All lists the purchases too, so the list waits for them as for the other stores.
+  const result = React.useMemo(
+    () => (items && bought.ready ? allTabOf(items, bought.purchases, view) : null),
+    [items, bought.ready, bought.purchases, view],
+  );
 
   // Back to this view puts the scroll offset back, once the cards are there.
   const restored = React.useRef(false);
@@ -316,7 +326,7 @@ export function MyProjects() {
   };
 
   const tabLabel = LIST_TABS.find((t) => t.id === view.tab)?.label ?? "All";
-  const noProjects = result !== null && result.total === 0 && bought.ready && bought.purchases.length === 0;
+  const noProjects = result !== null && result.total === 0 && bought.purchases.length === 0;
   const openPurchased = () => {
     urlSearch.current = `?tab=${PURCHASED}`;
     window.history.replaceState(null, "", `${pathname}?tab=${PURCHASED}`);
@@ -419,7 +429,7 @@ export function MyProjects() {
                 // LST-51: six skeleton cards, the tab/search/sort chrome above
                 // still present (counts read "—" until it too has hydrated).
                 <ProjectsSkeleton className="mt-8" />
-              ) : result.rows.length === 0 ? (
+              ) : result.entries.length === 0 ? (
                 // LST-53 when the outcome tab itself holds nothing; else the search
                 // emptied it (LST-54); else the Showcase filter did.
                 view.tab !== "all" && result.counts[view.tab] === 0 ? (
@@ -452,16 +462,22 @@ export function MyProjects() {
               ) : (
                 <>
                   <ul role="list" className={cn(CARD_GRID, "mt-8")}>
-                    {result.rows.map((row) => (
-                      <li key={row.project.id}>
-                        <ProjectCard
-                          summary={row.summary}
-                          matchedProductName={row.via}
-                          now={now}
-                          onBeforeNavigate={() => selectProject(row.project.id)}
-                        />
-                      </li>
-                    ))}
+                    {result.entries.map((e) =>
+                      e.kind === "own" ? (
+                        <li key={e.key}>
+                          <ProjectCard
+                            summary={e.row.summary}
+                            matchedProductName={e.row.via}
+                            now={now}
+                            onBeforeNavigate={() => selectProject(e.row.project.id)}
+                          />
+                        </li>
+                      ) : (
+                        <li key={e.key}>
+                          <PurchasedListCard p={e.bought} now={now} />
+                        </li>
+                      ),
+                    )}
                   </ul>
 
                   {result.pageCount > 1 ? (

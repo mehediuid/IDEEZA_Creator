@@ -104,7 +104,6 @@ test("how much each NFT shows: what a buyer needs first comes first (products, t
   assert.doesNotMatch(page, /GivesBlock|Included/, "no pre-purchase list on top of what is already bought");
   assert.doesNotMatch(page, /OnInnovations/, "no Innovations stats on a buyer's page");
   assert.match(page, /one unit is one set: \$\{andList\(setOf\)\}/, "a whole-project Physical copy of several products makes sets");
-  assert.match(page, /kind="main"\n\s+post=\{post\}\n\s+covered=\{post\.products\.map/, "a Main NFT shows every product in full");
-  assert.match(page, /<MoreFacts title="What the Main NFT allows">/, "and its rules folded");
-  assert.match(page, /Open in your project/);
+  // A whole project bought has no tab here: it opens as the buyer's own project, its purchase in that page's rail.
+  assert.match(page, /const held = KINDS\.filter\(\(k\) => k !== "main" && /);
 });

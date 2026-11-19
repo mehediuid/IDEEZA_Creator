@@ -42,6 +42,7 @@ import { ProductsTab } from "./products-tab";
 import { RailDetails } from "./rail-details";
 import { RailLegal } from "./rail-legal";
 import { RailLog } from "./rail-log";
+import { RailPurchase } from "./rail-purchase";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
 import { DescriptionCoachmark } from "./description-coachmark";
@@ -173,6 +174,8 @@ export const SLOTS: ProjectSlots = {
   },
   rail: {
     marketplace: MarketplaceSlot,
+    // A project bought whole: what was bought, from whom, for what (rail-purchase.tsx).
+    purchase: RailPurchase,
     details: DetailsSlot,
     legal: LegalSlot,
     versions: RailVersions,

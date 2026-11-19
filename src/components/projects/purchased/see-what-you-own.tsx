@@ -6,12 +6,17 @@
 import Link from "next/link";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { purchaseHrefOf } from "@/lib/market/purchases";
 import { cn } from "@/lib/utils";
+import { usePurchased } from "./use-purchased";
 
 export function SeeWhatYouOwn({ projectId, className }: { projectId: string; className?: string }) {
+  // A whole project bought is the buyer's project: it opens as one.
+  const { purchases } = usePurchased();
+  const p = purchases.find((x) => x.id === projectId);
   return (
     <Link
-      href={`/projects/purchased/${encodeURIComponent(projectId)}`}
+      href={p ? purchaseHrefOf(p) : `/projects/purchased/${encodeURIComponent(projectId)}`}
       className={cn(
         "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-semibold text-text-brand outline-none hover:text-text-brand focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]",
         className,

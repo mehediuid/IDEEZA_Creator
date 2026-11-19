@@ -112,8 +112,9 @@ const ORDER: Record<ListSort, (a: ListRow, b: ListRow) => number> = {
   name: byName,
 };
 
-/** The list's one pass: tab counts, then the tab, the Showcase filter and the search, the order and the page. */
-export function filterProjects(items: ListItem[], q: ListQuery): ListResult {
+/** The ordered rows a view keeps (the tab, the Showcase filter and the search), with the tab counts over every
+ *  project: the list's pass before the page. */
+export function matchRows(items: ListItem[], q: ListQuery): { counts: ListCounts; showcased: number; kept: ListRow[] } {
   const counts: ListCounts = { all: 0, draft: 0, minted: 0, listed: 0, sold: 0 };
   let showcased = 0;
   for (const { summary } of items) {
@@ -133,7 +134,13 @@ export function filterProjects(items: ListItem[], q: ListQuery): ListResult {
     if (m.hit) kept.push(m.via ? { ...item, via: m.via } : item);
   }
   kept.sort(ORDER[q.sort]);
+  return { counts, showcased, kept };
+}
 
+/** The list's one pass: tab counts, then the tab, the Showcase filter and the search, the order and the page. */
+export function filterProjects(items: ListItem[], q: ListQuery): ListResult {
+  const { counts, showcased, kept } = matchRows(items, q);
+  const needle = q.q.trim();
   const pageCount = Math.max(1, Math.ceil(kept.length / PAGE_SIZE));
   const want = Number.isInteger(q.page) && q.page >= 1 ? q.page : 1;
   const page = Math.min(want, pageCount);
