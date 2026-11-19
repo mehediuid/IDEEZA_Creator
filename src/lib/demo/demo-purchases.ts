@@ -16,8 +16,11 @@
 import { txHashOf } from "../market/purchase";
 import { makeSampleSale, offerStateOf, type SampleSale } from "../market/phone-sample-sales";
 import { copyUseBlockOf, copyUseStateOf, copyUsesOf, sampleMarketOf, type SampleUse } from "../market/sample-market";
-import type { Sale } from "../market/types";
-import { ownCopyKeyOf, sampleCopyKeyOf, type UnitsEntry } from "../market/units";
+import { PROJECT_SCOPE, type EditionTrack, type Sale } from "../market/types";
+import { copyUnitsOf, ownCopyKeyOf, sampleCopyKeyOf, unitsAllowanceOf, type UnitsEntry } from "../market/units";
+import { buyResale, holderOf, listResale, type Resale, type ResaleDraft, type ResaleUse } from "../market/resales";
+import { SAMPLE_ROYALTIES_PCT } from "../market/sample-market";
+import type { Amount } from "../wallet/types";
 import { demoAddress } from "../wallet/demo-wallet";
 import type { DemoBuyerId } from "../wallet/types";
 
@@ -114,6 +117,96 @@ export function withDemoUnits(
     }
     if (!key || !holder) continue;
     out.push({ id: d.id, copyKey: key, holder, units: d.units, at: now - d.daysAgo * DAY });
+  }
+  return out;
+}
+
+// ─────────────────────────────── copies sold on ───────────────────────────────
+
+/** A demo creator's copy put up for sale, and sold on when `soldTo` says (owner, 2026-11-19: "if I want to sell it
+ *  again, complete that flow"), so Earn, the purchased page and the marketplace's From holders always show one. */
+export type DemoResale = { id: string; saleId: string; seller: DemoBuyerId; price: Amount; daysAgo: number; soldTo?: DemoBuyerId; soldDaysAgo?: number };
+
+export const DEMO_RESALES: readonly DemoResale[] = [
+  // Mira sold her second Air quality Business copy (#8, no units made) to Sam: all 50 units went with it.
+  { id: "rsl_demo_mira_air_phys_biz_2", saleId: "ssale_demo_mira_air_phys_biz_2", seller: "buyer-mira", price: "0.06", daysAgo: 2, soldTo: "buyer-sam", soldDaysAgo: 1 },
+  // Mira's Air quality Virtual Business copy is for sale.
+  { id: "rsl_demo_mira_air_virt_biz", saleId: "ssale_demo_mira_air_virt_biz", seller: "buyer-mira", price: "0.035", daysAgo: 1 },
+  // Leo sells his watering hub Virtual Business copy: Mira sees it under From holders.
+  { id: "rsl_demo_leo_hub_virt_biz", saleId: "ssale_demo_leo_hub_virt_biz", seller: "buyer-leo", price: "0.03", daysAgo: 1 },
+  // Sam sells his Smart Plant Pot Physical Business copy (12 of 50 units made): this browser's own project.
+  { id: "rsl_demo_sam_plant_phys", saleId: "sale_demo_plant_1", seller: "buyer-sam", price: "0.05", daysAgo: 1 },
+];
+
+/** The listings (and sales on) the list lacks, each only while its seller still holds the copy and it isn't for sale
+ *  already. `ownOf` names this browser's project and its tracks. Nothing already in the list changes. */
+export function withDemoResales(
+  existing: readonly Resale[],
+  sampleSales: readonly SampleSale[],
+  ownSales: readonly Sale[],
+  log: readonly UnitsEntry[],
+  now: number,
+  ownOf: (projectId: string) => { name: string; tracks: readonly EditionTrack[] } | null,
+  add: readonly DemoResale[] = DEMO_RESALES,
+): Resale[] {
+  let out = [...existing];
+  for (const d of add) {
+    if (out.some((r) => r.id === d.id)) continue;
+    const s = sampleSales.find((x) => x.id === d.saleId);
+    const o = ownSales.find((x) => x.id === d.saleId);
+    let draft: ResaleDraft | null = null;
+    let first: DemoBuyerId | null = null;
+    if (s && s.kind !== "main" && s.serial !== null) {
+      const m = sampleMarketOf(s.projectId);
+      const use: ResaleUse = /business/i.test(s.name) ? "Business use" : "Personal use";
+      const offer = m ? copyUsesOf(m, s.kind).find((x) => x.use === use) : undefined;
+      first = s.buyerId;
+      draft = {
+        copyKey: sampleCopyKeyOf(s.projectId, s.kind, use, s.serial),
+        source: "sample",
+        projectId: s.projectId,
+        projectName: m?.post.title ?? s.projectId,
+        kind: s.kind,
+        use,
+        product: null,
+        serial: s.serial,
+        of: offer?.sold?.of ?? null,
+        token: s.token,
+        network: s.network,
+        royaltyPct: SAMPLE_ROYALTIES_PCT,
+      };
+    } else if (o && o.item.nft !== "main") {
+      const it = o.item;
+      const own = ownOf(o.projectId);
+      const track = own?.tracks.find((t) => t.id === it.trackId);
+      if (!own || !track) continue;
+      first = o.buyerId;
+      draft = {
+        copyKey: ownCopyKeyOf(o.projectId, it.trackId, it.serial),
+        source: "own",
+        projectId: o.projectId,
+        projectName: own.name,
+        kind: it.nft,
+        use: it.use === "commercial" ? "Business use" : "Personal use",
+        product: it.productId === PROJECT_SCOPE ? null : it.productName,
+        serial: it.serial,
+        of: track.supply.total,
+        token: o.token,
+        network: o.network,
+        royaltyPct: track.listing?.royaltyPct ?? 10,
+      };
+    }
+    if (!draft || !first) continue;
+    const holder = holderOf(draft.copyKey, first, out);
+    const listed = listResale(out, draft, d.seller, holder, d.price, now - d.daysAgo * DAY, d.id);
+    if (!listed.ok) continue;
+    out = listed.resales;
+    if (d.soldTo && d.soldTo !== d.seller) {
+      const left = draft.kind === "physical" ? copyUnitsOf(draft.copyKey, unitsAllowanceOf(draft.use), d.seller, log).left : null;
+      const at = now - (d.soldDaysAgo ?? 0) * DAY;
+      const sold = buyResale(out, d.id, { id: d.soldTo, address: demoAddress(d.soldTo) }, d.seller, { at, txHash: txHashOf(`${d.id}:sold`) }, left);
+      if (sold.ok) out = sold.resales;
+    }
   }
   return out;
 }

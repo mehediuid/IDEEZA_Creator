@@ -114,7 +114,9 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
   assert.match(list, /\{ id: PURCHASED, label: "Purchased", n: purchased\.count, active: purchased\.active \}/);
   assert.doesNotMatch(read("lib/manual/project-list.ts"), /purchased/i, "the list's own tabs (shared with the phone) are untouched");
   const page = read("components/projects/purchased/purchased-page.tsx");
-  for (const h of ["Your NFTs", "Receipts", "You own", "Send to manufacturing", "Sell this copy", "Open the project"]) assert.match(page, new RegExp(`>\\s*${h}\\s*<`));
+  for (const h of ["Your NFTs", "Receipts", "You own", "Send to manufacturing", "Open the project"]) assert.match(page, new RegExp(`>\\s*${h}\\s*<`));
+  assert.match(page, /\{c\.listing \? "Manage the listing" : "Sell this copy"\}/, "each copy sells on from Earn, or its listing is managed there");
+  assert.match(page, /href=\{purchasedEarnHref\(p\.id\)\}/, "Earn beside the header, as a project's own page has it");
   assert.match(page, /<OfferTabs tabs=\{held\} active=\{tab\} onSelect=\{setTab\} label="Your NFTs">/, "a tab per kind held, with everything about that kind in it");
   assert.match(page, /<ProductPiecePanel job=\{build\.job\} product=\{build\.bp\} kind=\{tab\} chatHref=\{null\} \/>/, "each product's pieces in the project's own panels");
   assert.match(page, /<DeliverablesAccess\.Provider value>/, "a holder takes the files the pieces offer, as the maker does");

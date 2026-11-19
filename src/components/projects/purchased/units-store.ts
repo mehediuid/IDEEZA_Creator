@@ -10,6 +10,11 @@ import { normalizeUnits, UNITS_KEY, type UnitsEntry } from "@/lib/market/units";
 let cache: { raw: string | null; log: UnitsEntry[] } = { raw: null, log: [] };
 const EMPTY: UnitsEntry[] = [];
 
+/** The log as stored right now (a purchase's check reads it fresh). */
+export function readUnitsLog(): UnitsEntry[] {
+  return read();
+}
+
 function read(): UnitsEntry[] {
   let raw: string | null = null;
   try {

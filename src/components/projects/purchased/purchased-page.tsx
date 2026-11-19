@@ -23,7 +23,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight01Icon, Cancel01Icon, ImageNotFound01Icon, ShoppingBag01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, Cancel01Icon, Coins01Icon, ImageNotFound01Icon, ShoppingBag01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, Button, StateCard, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import { CARD, PostImg } from "@/components/innovations/post-bits";
@@ -60,7 +60,7 @@ import {
 import { sampleMarketOf } from "@/lib/market/sample-market";
 import { copyUnitsOf, unitsLineOf, unitsOnResale, type CopyUnits, type UnitsEntry } from "@/lib/market/units";
 import { useMe } from "@/lib/people/profile-store";
-import { shortAddress } from "@/lib/wallet/demo-wallet";
+import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
 import { addAmounts, formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { Amount } from "@/lib/wallet/types";
@@ -68,6 +68,8 @@ import type { DemoBuyer } from "@/lib/wallet/identities";
 import type { Token } from "@/lib/brief/types";
 import { cn } from "@/lib/utils";
 import { useUnitsLog } from "./units-store";
+import { purchasedEarnHref } from "./earn/href";
+import { perTokenText } from "@/lib/market/resale-desk";
 import { usePurchased } from "./use-purchased";
 
 const H2 = "text-xl font-bold leading-xl text-text-primary";
@@ -156,7 +158,7 @@ function PurchasedBody({
 }: BodyProps & { post: InnovationPost; mine: MinePostFacts | null; buildOf: (i: number) => ProductBuild }) {
   const { titleRef, live } = usePageArrival(`purchased:${p.id}`, p.name, `${p.name} · Purchased · IDEEZA`);
   const held = KINDS.filter((k) => p.lines.some((l) => l.kind === k));
-  const [tab, setTab] = React.useState<PurchaseKind>(initialTab && held.includes(initialTab) ? initialTab : held[0]);
+  const [tab, setTab] = React.useState<PurchaseKind | undefined>(initialTab && held.includes(initialTab) ? initialTab : held[0]);
   const log = useUnitsLog();
   const summary = <SummaryBlock p={p} buyer={buyer} held={held} />;
   const creator = <CreatorBlock p={p} post={post} buyer={buyer} />;
@@ -176,13 +178,17 @@ function PurchasedBody({
               <h2 id="your-nfts" className={H2}>
                 Your NFTs
               </h2>
-              <OfferTabs tabs={held} active={tab} onSelect={setTab} label="Your NFTs">
-                {tab === "main" ? (
-                  <MainPanel p={p} post={post} buildOf={buildOf} />
-                ) : (
-                  <KindPanel p={p} kind={tab} post={post} buildOf={buildOf} buyer={buyer} log={log} />
-                )}
-              </OfferTabs>
+              {tab === undefined ? (
+                <SoldEvery p={p} />
+              ) : (
+                <OfferTabs tabs={held} active={tab} onSelect={setTab} label="Your NFTs">
+                  {tab === "main" ? (
+                    <MainPanel p={p} post={post} buildOf={buildOf} />
+                  ) : (
+                    <KindPanel p={p} kind={tab} post={post} buildOf={buildOf} buyer={buyer} log={log} />
+                  )}
+                </OfferTabs>
+              )}
             </section>
 
             <Receipts p={p} />
@@ -236,12 +242,49 @@ function Header({
       <p className="m-0 flex flex-wrap items-center gap-3 text-md leading-md text-text-secondary">
         Bought as {buyer.name} (demo creator) · last bought {formatDate(p.lastAt)} <TestnetDemoBadge />
       </p>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-2">
+        <Link
+          href={purchasedEarnHref(p.id)}
+          className={cn(buttonVariants({ hierarchy: "secondary", size: "md" }), "gap-3 hover:text-[color:var(--color-button-secondary-text)] max-md:min-h-[var(--touch-min)]")}
+        >
+          <Icon icon={Coins01Icon} size={16} />
+          Earn
+        </Link>
+        <span className="text-md leading-md text-text-secondary">{earnLineOf(p)}</span>
+      </div>
       {p.soldInFullTo && (
         <p className="m-0 rounded-lg bg-bg-subtle px-6 py-4 text-md leading-md text-text-primary">
           The project was sold in full to {p.soldInFullTo}. Your copies stay yours, with their units and files.
         </p>
       )}
     </header>
+  );
+}
+
+/** Earn's one line under the header: what is for sale and what selling on paid. */
+function earnLineOf(p: PurchasedProject): string {
+  const earned = perTokenText(p.sold.map((s) => ({ amount: s.payout, token: s.token })));
+  const parts = [
+    p.forSale > 0 ? `${p.forSale === 1 ? "1 copy" : `${p.forSale} copies`} for sale` : null,
+    earned ? `${earned} earned from ${p.sold.length} sold` : null,
+  ].filter(Boolean);
+  if (parts.length) return parts.join(" · ");
+  return p.count > 0 && p.lines.some((l) => l.kind !== "main") ? "Sell a copy on, set its price, see what it earned" : "The whole project sells from its own Earn";
+}
+
+/** Every copy sold on: the project stays here with what it earned. */
+function SoldEvery({ p }: { p: PurchasedProject }) {
+  return (
+    <div className={cn(CARD, "flex flex-col gap-4")}>
+      <h3 className={H3}>You sold every copy</h3>
+      <p className="m-0 text-md leading-md text-text-secondary">
+        {p.sold.length === 1 ? "Your copy is" : `All ${p.sold.length} copies are`} someone else&apos;s now, with their licence. What they paid you is in Earn, and each sale is in the receipts below.
+      </p>
+      <Link href={purchasedEarnHref(p.id)} className={cn(PRIMARY_LINK, "self-start")}>
+        See what they earned
+        <Icon icon={ArrowRight01Icon} size={16} />
+      </Link>
+    </div>
   );
 }
 
@@ -272,10 +315,24 @@ function SummaryBlock({ p, buyer, held }: { p: PurchasedProject; buyer: DemoBuye
             <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{r.value}</dd>
           </div>
         ))}
-        <div className="flex items-baseline justify-between gap-4 border-x-0 border-b-0 border-t border-solid border-border py-3">
-          <dt className="text-md text-text-secondary">Paid in all</dt>
-          <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{paidOf(p.lines)}</dd>
-        </div>
+        {p.lines.length > 0 && (
+          <div className="flex items-baseline justify-between gap-4 border-x-0 border-b-0 border-t border-solid border-border py-3">
+            <dt className="text-md text-text-secondary">Paid in all</dt>
+            <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{paidOf(p.lines)}</dd>
+          </div>
+        )}
+        {p.forSale > 0 && (
+          <div className="flex items-baseline justify-between gap-4 border-x-0 border-b-0 border-t border-solid border-border py-3">
+            <dt className="text-md text-text-secondary">For sale</dt>
+            <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{p.forSale === 1 ? "1 copy" : `${p.forSale} copies`}</dd>
+          </div>
+        )}
+        {p.sold.length > 0 && (
+          <div className="flex items-baseline justify-between gap-4 border-x-0 border-b-0 border-t border-solid border-border py-3">
+            <dt className="text-md text-text-secondary">Earned selling on</dt>
+            <dd className="m-0 text-md font-semibold tabular-nums text-text-success">{perTokenText(p.sold.map((s) => ({ amount: s.payout, token: s.token })))}</dd>
+          </div>
+        )}
       </dl>
       {p.buyable.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -288,7 +345,7 @@ function SummaryBlock({ p, buyer, held }: { p: PurchasedProject; buyer: DemoBuye
         </div>
       )}
       <p className="m-0 flex flex-wrap items-center gap-3 text-sm leading-sm text-text-secondary">
-        In {buyer.name}&apos;s demo wallet · <span className="font-mono">{shortAddress(p.lines[0].copies[0].buyerAddress)}</span>
+        In {buyer.name}&apos;s demo wallet · <span className="font-mono">{shortAddress(p.lines[0]?.copies[0]?.buyerAddress ?? demoAddress(buyer.id))}</span>
         <TestnetDemoBadge />
       </p>
     </section>
@@ -411,6 +468,7 @@ function KindPanel({
     <div className="flex flex-col gap-10">
       {covered.length > 0 && <ProductsView kind={kind} post={post} covered={covered} buildOf={buildOf} />}
       <YourCopies
+        projectId={p.id}
         kind={kind}
         lines={lines}
         buyer={buyer}
@@ -438,12 +496,14 @@ function KindPanel({
 /** Every copy of this kind, one row each with its use: what the buyer acts on (make units, sell a copy). What
  *  each use allows sits folded below, for when they look it up. */
 function YourCopies({
+  projectId,
   kind,
   lines,
   buyer,
   log,
   setOf,
 }: {
+  projectId: string;
   kind: Exclude<PurchaseKind, "main">;
   lines: PurchaseLine[];
   buyer: DemoBuyer;
@@ -477,20 +537,21 @@ function YourCopies({
               use={[l.use, l.product].filter(Boolean).join(" · ")}
               units={l.unitsPerCopy !== null ? copyUnitsOf(c.key, l.unitsPerCopy, buyer.id, log) : null}
               noteId={noteId}
+              sellHref={purchasedEarnHref(projectId, "sell", c.key)}
             />
           )),
         )}
       </ul>
-      <p id={noteId} className="m-0 text-sm leading-sm text-text-tertiary">
-        {kind === "physical"
-          ? "Sending a copy to manufacturing and selling it on come in the next step of the prototype. A sale hands the buyer the copy's units left; the units you made stay yours."
-          : "Selling a copy on comes in the next step of the prototype. A sale hands the buyer the copy and its licence."}
-      </p>
+      {kind === "physical" && (
+        <p id={noteId} className="m-0 text-sm leading-sm text-text-tertiary">
+          Sending a copy to manufacturing comes in the next step of the prototype. No units are made with a copy while it&apos;s for sale.
+        </p>
+      )}
     </section>
   );
 }
 
-function CopyRow({ copy: c, use, units, noteId }: { copy: PurchaseCopy; use: string; units: CopyUnits | null; noteId: string }) {
+function CopyRow({ copy: c, use, units, noteId, sellHref }: { copy: PurchaseCopy; use: string; units: CopyUnits | null; noteId: string; sellHref: string }) {
   const number = c.serial !== null ? `#${c.serial}${c.of !== null ? ` of ${c.of}` : ""}` : "—";
   const resale = units ? unitsOnResale(units) : null;
   return (
@@ -499,11 +560,13 @@ function CopyRow({ copy: c, use, units, noteId }: { copy: PurchaseCopy; use: str
         <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span className="font-mono text-lg tabular-nums text-text-primary">{number}</span>
           {use && <Badge tone="neutral">{use}</Badge>}
+          {c.listing && <Badge tone="brand" className="font-semibold">For sale · {formatAmount(c.listing.price, c.listing.token)}</Badge>}
         </span>
         <span className="flex items-baseline gap-4 text-md text-text-secondary">
           <span className="tabular-nums">{formatAmount(c.price, c.token)}</span>
           <time dateTime={new Date(c.at).toISOString()} className="text-sm text-text-tertiary">
-            Bought {formatDate(c.at)}
+            Bought {c.from ? `from ${c.from} ` : ""}
+            {formatDate(c.at)}
           </time>
         </span>
       </div>
@@ -534,9 +597,12 @@ function CopyRow({ copy: c, use, units, noteId }: { copy: PurchaseCopy; use: str
             Send to manufacturing
           </Button>
         )}
-        <Button type="button" hierarchy="secondary" size="md" disabled aria-describedby={noteId} className="max-md:min-h-[var(--touch-min)]">
-          Sell this copy
-        </Button>
+        <Link
+          href={sellHref}
+          className={cn(buttonVariants({ hierarchy: "secondary", size: "md" }), "hover:text-[color:var(--color-button-secondary-text)] max-md:min-h-[var(--touch-min)]")}
+        >
+          {c.listing ? "Manage the listing" : "Sell this copy"}
+        </Link>
       </div>
     </li>
   );
@@ -723,7 +789,30 @@ function Gone() {
 
 function Receipts({ p }: { p: PurchasedProject }) {
   const id = React.useId();
-  const receipts = p.lines.flatMap((l) => l.copies.map((c) => ({ line: l, copy: c }))).sort((a, b) => b.copy.at - a.copy.at);
+  type Row = { id: string; at: number; item: string; number: string; price: string; tx: string; sold: boolean };
+  const num = (serial: number | null, of: number | null) => (serial !== null ? `#${serial}${of !== null ? ` of ${of}` : ""}` : "—");
+  const receipts: Row[] = [
+    ...p.lines.flatMap((l) =>
+      l.copies.map((c) => ({
+        id: c.id,
+        at: c.at,
+        item: `${lineTitleOf(l)}${c.from ? ` · from ${c.from}` : ""}`,
+        number: num(c.serial, c.of),
+        price: formatAmount(c.price, c.token),
+        tx: c.txHash,
+        sold: false,
+      })),
+    ),
+    ...p.sold.map((s) => ({
+      id: s.id,
+      at: s.at,
+      item: `Sold to ${s.to} · ${[KIND_NAME[s.kind], s.use, s.product].filter(Boolean).join(" · ")}`,
+      number: num(s.serial, s.of),
+      price: formatAmount(s.price, s.token),
+      tx: s.txHash,
+      sold: true,
+    })),
+  ].sort((a, b) => b.at - a.at);
   return (
     <section aria-labelledby={id} className="flex flex-col gap-6">
       <h2 id={id} className={H2}>
@@ -741,18 +830,19 @@ function Receipts({ p }: { p: PurchasedProject }) {
             </tr>
           </thead>
           <tbody>
-            {receipts.map(({ line, copy }) => (
-              <tr key={copy.id} className="border-x-0 border-b-0 border-t border-solid border-border">
+            {receipts.map((r) => (
+              <tr key={r.id} className="border-x-0 border-b-0 border-t border-solid border-border">
                 <td className="py-4 pr-6 text-text-secondary">
-                  <time dateTime={new Date(copy.at).toISOString()}>{formatDateTime(copy.at)}</time>
+                  <time dateTime={new Date(r.at).toISOString()}>{formatDateTime(r.at)}</time>
                 </td>
-                <td className="py-4 pr-6 text-text-primary">{lineTitleOf(line)}</td>
-                <td className="py-4 pr-6 tabular-nums text-text-secondary">
-                  {copy.serial !== null ? `#${copy.serial}${copy.of !== null ? ` of ${copy.of}` : ""}` : "—"}
+                <td className="py-4 pr-6 text-text-primary">{r.item}</td>
+                <td className="whitespace-nowrap py-4 pr-6 tabular-nums text-text-secondary">{r.number}</td>
+                <td className={cn("whitespace-nowrap py-4 pr-6 text-right tabular-nums", r.sold ? "text-text-success" : "text-text-primary")}>
+                  {r.sold ? "+" : ""}
+                  {r.price}
                 </td>
-                <td className="py-4 pr-6 text-right tabular-nums text-text-primary">{formatAmount(copy.price, copy.token)}</td>
-                <td className="py-4 font-mono text-sm text-text-secondary" title={copy.txHash}>
-                  {copy.txHash ? shortAddress(copy.txHash) : "—"}
+                <td className="whitespace-nowrap py-4 font-mono text-sm text-text-secondary" title={r.tx}>
+                  {r.tx ? shortAddress(r.tx) : "—"}
                 </td>
               </tr>
             ))}
@@ -763,7 +853,7 @@ function Receipts({ p }: { p: PurchasedProject }) {
   );
 }
 
-function NothingBought({ buyerName }: { buyerName: string }) {
+export function NothingBought({ buyerName }: { buyerName: string }) {
   return (
     <div className={POST_PAGE}>
       <div className="flex justify-center px-8 py-40">

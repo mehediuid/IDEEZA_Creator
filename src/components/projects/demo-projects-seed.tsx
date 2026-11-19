@@ -22,7 +22,8 @@ import { commerceKey } from "@/lib/commerce/record";
 import { BUILDS_KEY } from "@/lib/create/history";
 import { notifyStores } from "@/lib/key-store";
 import { DEMO_PROJECT_IDS, DEMO_SEED_KEY, DEMO_SEED_VERSION, demoSeedOf, withDemoSales } from "@/lib/demo/demo-projects";
-import { withDemoSampleSales, withDemoUnits } from "@/lib/demo/demo-purchases";
+import { withDemoResales, withDemoSampleSales, withDemoUnits } from "@/lib/demo/demo-purchases";
+import { normalizeResales, RESALES_KEY } from "@/lib/market/resales";
 import { normalizeUnits, UNITS_KEY } from "@/lib/market/units";
 import { ACQUIRED_KEY, acquiredToPlant } from "@/lib/demo/acquired-projects";
 import { PROJECTS_KEY } from "@/lib/manual/projects";
@@ -84,6 +85,26 @@ function plantUnits(storage: Storage, now: number): boolean {
   return true;
 }
 
+/** The demo creators' copies for sale and sold on (resales.ts) the list lacks, while their sellers hold them. */
+function plantResales(storage: Storage, now: number): boolean {
+  const list = readList(storage, RESALES_KEY);
+  const sample = readList(storage, PHONE_SAMPLE_SALES_KEY);
+  const own = readList(storage, SALES_KEY);
+  const log = readList(storage, UNITS_KEY);
+  const projects = readList(storage, PROJECTS_KEY);
+  if (!list || !sample || !own || !log || !projects) return false;
+  const held = normalizeResales(list);
+  const ownOf = (projectId: string) => {
+    const p = projects.find((x) => typeof x === "object" && x !== null && (x as WithId).id === projectId) as { name?: unknown } | undefined;
+    const tracks = readList(storage, EDITIONS_KEY(projectId)) as EditionTrack[] | null;
+    return p && tracks ? { name: typeof p.name === "string" ? p.name : projectId, tracks } : null;
+  };
+  const next = withDemoResales(held, normalizeSampleSales(sample), own as Sale[], normalizeUnits(log), now, ownOf);
+  if (next.length === held.length && next.every((r, i) => r === held[i])) return false;
+  storage.setItem(RESALES_KEY, JSON.stringify(next));
+  return true;
+}
+
 /** An older planting gets what a later seed added: copy tracks it lacks, on projects still there whose copies
  *  read; the sales it lacks, while what they sold is still there; the sample purchases. Nothing the maker changed
  *  is replaced. True when it wrote. */
@@ -115,6 +136,7 @@ function topUp(storage: Storage, now: number): boolean {
     }
     if (plantSamplePurchases(storage, now)) wrote = true;
     if (plantUnits(storage, now)) wrote = true;
+    if (plantResales(storage, now)) wrote = true;
     storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
   } catch {
     return false;
@@ -146,6 +168,7 @@ export function plantDemoProjects(storage: Storage, now: number): boolean {
     }
     plantSamplePurchases(storage, now);
     plantUnits(storage, now);
+    plantResales(storage, now);
     storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
   } catch {
     // Storage full or blocked: the account simply has no demo projects this time.

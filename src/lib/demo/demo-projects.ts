@@ -45,8 +45,9 @@ export const DEMO_PROJECT_PREFIX = "proj_demo_";
 /** The seed's version: 2 added the second use of each whole-project copy; 3 the sales of every kind and the
  *  demo creators' purchases of sample listings (demo-purchases.ts); 4 the units already made with some copies
  *  (units.ts); 5 Mira's Physical copies of a two-product project; 6 its Virtual copy and a Virtual copy of
- *  another two-product project. An older planting is topped up. */
-export const DEMO_SEED_VERSION = 6;
+ *  another two-product project; 7 copies put up for sale and one sold on (resales.ts). An older planting is
+ *  topped up. */
+export const DEMO_SEED_VERSION = 7;
 
 const DAY = 86_400_000;
 const NETWORK: Network = "baseSepolia";

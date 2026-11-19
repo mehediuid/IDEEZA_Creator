@@ -17,18 +17,26 @@ import { useMarket } from "@/lib/market/market-store";
 import { ownPurchasesOf, purchasedProjectsOf, samplePurchasesOf, type PurchasedProject } from "@/lib/market/purchases";
 import type { DemoBuyer } from "@/lib/wallet/identities";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
+import { useResales } from "./resales-store";
 
 export function usePurchased(): { ready: boolean; buyer: DemoBuyer; purchases: PurchasedProject[] } {
   const { hydrated, projects } = useManualProjects();
   const { hydrated: buildsHydrated, builds } = useCreateHistory();
   const market = useMarket();
   const sampleSales = useSampleSales();
+  const resales = useResales();
   const { buyer } = useActiveBuyer();
   const me = useCreator();
   const now = useMinuteClock();
+  // This browser's projects the buyer bought from, bought a copy of from another holder, or sold a copy of on.
   const boughtIds = React.useMemo(
-    () => [...new Set(market.data.sales.filter((s) => s.buyerId === buyer.id).map((s) => s.projectId))],
-    [market.data.sales, buyer.id],
+    () => [
+      ...new Set([
+        ...market.data.sales.filter((s) => s.buyerId === buyer.id).map((s) => s.projectId),
+        ...resales.filter((r) => r.source === "own" && (r.sellerId === buyer.id || r.sale?.buyerId === buyer.id)).map((r) => r.projectId),
+      ]),
+    ],
+    [market.data.sales, resales, buyer.id],
   );
   const editions = useProjectsEditions(boughtIds);
   const ready = hydrated && buildsHydrated && market.hydrated && editions.hydrated;
@@ -39,8 +47,11 @@ export function usePurchased(): { ready: boolean; buyer: DemoBuyer; purchases: P
       const s = projectSummary(p, { builds, brief: null, videoJobs: [], now, projects, market: market.data });
       return { id: p.id, name: s.name, cover: s.cover, products: (p.products ?? []).map((x) => x.name) };
     });
-    return purchasedProjectsOf(ownPurchasesOf(market.data.sales, buyer.id, like, editions.record, me.name), samplePurchasesOf(sampleSales, buyer.id));
-  }, [projects, boughtIds, builds, now, market.data, buyer.id, editions.record, me.name, sampleSales]);
+    return purchasedProjectsOf(
+      ownPurchasesOf(market.data.sales, buyer.id, like, editions.record, me.name, resales),
+      samplePurchasesOf(sampleSales, buyer.id, resales),
+    );
+  }, [projects, boughtIds, builds, now, market.data, buyer.id, editions.record, me.name, sampleSales, resales]);
 
   return { ready, buyer, purchases };
 }
