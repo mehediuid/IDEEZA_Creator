@@ -44,6 +44,9 @@ export const DEMO_SAMPLE_BUYS: readonly DemoSampleBuy[] = [
   { id: "ssale_demo_mira_air_phys_biz_2", feedId: "p7", kind: "physical", use: "Business use", buyerId: "buyer-mira", daysAgo: 3 },
   { id: "ssale_demo_mira_pedal_virt_personal", feedId: "p10", kind: "virtual", use: "Personal use", buyerId: "buyer-mira", daysAgo: 2 },
   { id: "ssale_demo_mira_pedal_phys_personal", feedId: "p10", kind: "physical", use: "Personal use", buyerId: "buyer-mira", daysAgo: 1 },
+  // A project of two products (Watering Hub + Soil Probe): whole-project Physical copies, each unit a set of both.
+  { id: "ssale_demo_mira_hub_phys_biz", feedId: "p12", kind: "physical", use: "Business use", buyerId: "buyer-mira", daysAgo: 5 },
+  { id: "ssale_demo_mira_hub_phys_personal", feedId: "p12", kind: "physical", use: "Personal use", buyerId: "buyer-mira", daysAgo: 3 },
   // Leo and Sam: a few each, so switching who shops still shows purchases.
   { id: "ssale_demo_sam_jump_phys_biz", feedId: "p34", kind: "physical", use: "Business use", buyerId: "buyer-sam", daysAgo: 5 },
   { id: "ssale_demo_leo_hub_virt_biz", feedId: "p12", kind: "virtual", use: "Business use", buyerId: "buyer-leo", daysAgo: 3 },
@@ -82,6 +85,7 @@ export const DEMO_UNITS: readonly { id: string; saleId: string; units: number; d
   { id: "units_demo_sam_jump", saleId: "ssale_demo_sam_jump_phys_biz", units: 50, daysAgo: 3 },
   { id: "units_demo_leo_plant", saleId: "sale_demo_plant_phys_private", units: 1, daysAgo: 4 },
   { id: "units_demo_sam_plant", saleId: "sale_demo_plant_1", units: 12, daysAgo: 6 },
+  { id: "units_demo_mira_hub", saleId: "ssale_demo_mira_hub_phys_biz", units: 6, daysAgo: 2 },
 ];
 
 /** The units log with the demo orders it lacks, each on the copy its sale holds (by that copy's key). */

@@ -88,3 +88,18 @@ test("the planter makes bought projects on every start, and they take no plan sl
     assert.match(read(f), /\{kind === "physical" && <p className="m-0 text-sm text-text-secondary">\{listingUnitsLine\(\)\}<\/p>\}/, f);
   }
 });
+
+test("how much each NFT shows: Physical everything to build, Virtual the digital twin only, Main the project", () => {
+  const g = P.GIVES;
+  const has = (k, re) => g[k].gets.some((t) => re.test(t));
+  for (const re of [/^PCB/, /^Firmware/, /^Wiring/, /^Assembly/, /Units to make/]) assert.ok(has("physical", re), `physical ${re}`);
+  assert.deepEqual(g.virtual.not, ["PCB, firmware and wiring", "Assembly", "Making units"]);
+  assert.ok(has("virtual", /3D model/) && has("physical", /3D model/));
+  assert.match(g.physical.not[0], /^The project itself/);
+  assert.match(g.main.gets[0], /^The project itself, as one of your projects/);
+  const page = read("components/projects/purchased/purchased-page.tsx");
+  assert.match(page, /<GivesBlock kind=\{kind\} \/>/, "said at the top of each kind's tab");
+  assert.match(page, /each unit is one set: \$\{andList\(setOf\)\}/, "a whole-project Physical copy of several products makes sets");
+  assert.match(page, /kind="main"\n\s+post=\{post\}\n\s+covered=\{post\.products\.map/, "a Main NFT shows every product in full");
+  assert.match(page, /Open in your project/);
+});

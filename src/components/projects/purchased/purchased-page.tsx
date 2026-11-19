@@ -44,6 +44,7 @@ import type { InnovationPost, PostProduct } from "@/lib/innovations/types";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { useMarket } from "@/lib/market/market-store";
 import {
+  GIVES,
   KIND_NAME,
   LICENCE,
   lineTitleOf,
@@ -75,7 +76,16 @@ const QUIET_LINK =
 const KINDS: PurchaseKind[] = ["main", "physical", "virtual"];
 
 /** What each kind unlocks of a product, as the project's own piece panels (plan D2). */
-const PIECES_OF: Record<Exclude<PurchaseKind, "main">, { id: BuildItemKind; label: string }[]> = {
+const PHYSICAL_PIECES: { id: BuildItemKind; label: string }[] = [
+  { id: "3d", label: "3D model" },
+  { id: "pcb", label: "PCB" },
+  { id: "code", label: "Firmware" },
+  { id: "wiring", label: "Wiring" },
+  { id: "assembly", label: "Assembly" },
+  { id: "parts", label: "Parts" },
+];
+const PIECES_OF: Record<PurchaseKind, { id: BuildItemKind; label: string }[]> = {
+  main: PHYSICAL_PIECES,
   physical: [
     { id: "3d", label: "3D model" },
     { id: "pcb", label: "PCB" },
@@ -169,7 +179,7 @@ function PurchasedBody({
               </h2>
               <OfferTabs tabs={held} active={tab} onSelect={setTab} label="Your NFTs">
                 {tab === "main" ? (
-                  <MainPanel p={p} post={post} />
+                  <MainPanel p={p} post={post} buildOf={buildOf} />
                 ) : (
                   <KindPanel p={p} kind={tab} post={post} buildOf={buildOf} buyer={buyer} log={log} />
                 )}
@@ -304,7 +314,7 @@ function CreatorBlock({ p, post, buyer }: { p: PurchasedProject; post: Innovatio
 
 // ─────────────────────────────── Main: the project is yours ───────────────────────────────
 
-function MainPanel({ p, post }: { p: PurchasedProject; post: InnovationPost }) {
+function MainPanel({ p, post, buildOf }: { p: PurchasedProject; post: InnovationPost; buildOf: (i: number) => ProductBuild }) {
   const line = p.lines.find((l) => l.kind === "main") as PurchaseLine;
   const last = line.copies[line.copies.length - 1];
   const share = line.sharePct ?? 0;
@@ -344,27 +354,15 @@ function MainPanel({ p, post }: { p: PurchasedProject; post: InnovationPost }) {
       </div>
 
       {whole && post.products.length > 0 && (
-        <div className="flex flex-col gap-4">
-          <h3 className={H3}>Its products</h3>
-          <ul role="list" className="m-0 grid list-none grid-cols-1 gap-6 p-0 [@container(min-width:720px)]:grid-cols-2">
-            {post.products.map((prod, i) => (
-              <li key={prod.id}>
-                <a
-                  href={`/projects/${encodeURIComponent(projectId)}/products/${encodeURIComponent(p.source === "sample" ? `prd_bought_${p.id}_${i + 1}` : (post.products[i].build?.productId ?? prod.id))}`}
-                  className={cn(CARD, "flex items-center gap-6 no-underline outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus")}
-                >
-                  <span className="relative size-[64px] shrink-0 overflow-hidden rounded-lg bg-bg-surface-raised">
-                    {prod.image ? <PostImg src={prod.image} alt="" className="absolute inset-0 h-full w-full object-cover" fallback={<Gone />} /> : <Gone />}
-                  </span>
-                  <span className="flex min-w-0 flex-col gap-1">
-                    <span className="text-md font-semibold leading-md text-text-primary">{prod.name}</span>
-                    <span className="line-clamp-2 text-sm leading-sm text-text-secondary">{prod.summary}</span>
-                  </span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ProductsView
+          kind="main"
+          post={post}
+          covered={post.products.map((x, i) => ({ x, i }))}
+          buildOf={buildOf}
+          productHref={(i) =>
+            `/projects/${encodeURIComponent(projectId)}/products/${encodeURIComponent(p.source === "sample" ? `prd_bought_${p.id}_${i + 1}` : (post.products[i].build?.productId ?? post.products[i].id))}`
+          }
+        />
       )}
 
       <MoreFacts>
@@ -409,13 +407,15 @@ function KindPanel({
   ];
   return (
     <div className="flex flex-col gap-10">
-      <p className="m-0 text-md leading-md text-text-secondary">
-        {kind === "physical"
-          ? "A licence to build: each copy comes with the fabrication files and lets you make the units it allows."
-          : "A licence to the digital twin: each copy comes with the 3D model and its renders."}
-      </p>
+      <GivesBlock kind={kind} />
       {lines.map((l) => (
-        <UseGroup key={`${l.use}|${l.product}`} line={l} buyer={buyer} log={log} />
+        <UseGroup
+          key={`${l.use}|${l.product}`}
+          line={l}
+          buyer={buyer}
+          log={log}
+          setOf={l.product === null && post.products.length > 1 ? post.products.map((x) => x.name) : null}
+        />
       ))}
       {covered.length > 0 && <ProductsView kind={kind} post={post} covered={covered} buildOf={buildOf} />}
       <MoreFacts>
@@ -427,7 +427,7 @@ function KindPanel({
 }
 
 /** One use's copies with what that use allows: the licence beside the copies it covers. */
-function UseGroup({ line, buyer, log }: { line: PurchaseLine; buyer: DemoBuyer; log: readonly UnitsEntry[] }) {
+function UseGroup({ line, buyer, log, setOf }: { line: PurchaseLine; buyer: DemoBuyer; log: readonly UnitsEntry[]; setOf: string[] | null }) {
   const noteId = React.useId();
   const kind = line.kind as Exclude<PurchaseKind, "main">;
   const licence = LICENCE[kind][line.use ?? "Personal use"];
@@ -442,6 +442,11 @@ function UseGroup({ line, buyer, log }: { line: PurchaseLine; buyer: DemoBuyer; 
           {line.unitsPerCopy !== null && ` · ${line.unitsPerCopy} ${line.unitsPerCopy === 1 ? "unit" : "units"} per copy`}
         </span>
       </div>
+      {setOf && (
+        <p className="m-0 rounded-lg bg-bg-subtle px-6 py-4 text-md leading-md text-text-primary">
+          These copies cover the whole project, so {kind === "physical" ? `each unit is one set: ${andList(setOf)}` : `each covers every product: ${andList(setOf)}`}.
+        </p>
+      )}
       <RuleColumns licence={licence} />
       <ul role="list" className="m-0 flex list-none flex-col p-0">
         {line.copies.map((c) => (
@@ -517,11 +522,14 @@ function ProductsView({
   post,
   covered,
   buildOf,
+  productHref,
 }: {
-  kind: Exclude<PurchaseKind, "main">;
+  kind: PurchaseKind;
   post: InnovationPost;
   covered: { x: PostProduct; i: number }[];
   buildOf: (i: number) => ProductBuild;
+  /** A Main NFT's products are the buyer's: each opens in their project. */
+  productHref?: (i: number) => string;
 }) {
   const [at, setAt] = React.useState(0);
   const cur = covered[Math.min(at, covered.length - 1)];
@@ -529,7 +537,7 @@ function ProductsView({
     <section aria-labelledby="your-products" className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h3 id="your-products" className={H3}>
-          {covered.length === 1 ? "Your product" : `Your products · ${covered.length}`}
+          {kind === "main" ? (covered.length === 1 ? "Its product" : `Its products · ${covered.length}`) : covered.length === 1 ? "Your product" : `Your products · ${covered.length}`}
         </h3>
         {covered.length > 1 && (
           <div role="group" aria-label="Products" className="inline-flex max-w-full overflow-x-auto rounded-lg border border-solid border-border">
@@ -554,14 +562,33 @@ function ProductsView({
           </div>
         )}
       </div>
-      <ProductDetail key={`${kind}:${cur.x.id}`} kind={kind} product={cur.x} build={buildOf(cur.i)} postTitle={post.title} />
+      <ProductDetail
+        key={`${kind}:${cur.x.id}`}
+        kind={kind}
+        product={cur.x}
+        build={buildOf(cur.i)}
+        postTitle={post.title}
+        href={productHref ? productHref(cur.i) : null}
+      />
     </section>
   );
 }
 
 type DetailTab = "overview" | BuildItemKind;
 
-function ProductDetail({ kind, product, build, postTitle }: { kind: Exclude<PurchaseKind, "main">; product: PostProduct; build: ProductBuild; postTitle: string }) {
+function ProductDetail({
+  kind,
+  product,
+  build,
+  postTitle,
+  href,
+}: {
+  kind: PurchaseKind;
+  product: PostProduct;
+  build: ProductBuild;
+  postTitle: string;
+  href: string | null;
+}) {
   const pieces = build ? PIECES_OF[kind].filter((t) => build.bp.items.some((it) => it.kind === t.id)) : [];
   const tabs: TabDef<DetailTab>[] = [{ id: "overview", label: "Overview" }, ...pieces.map((t) => ({ id: t.id as DetailTab, label: t.label }))];
   const [tab, setTab] = React.useState<DetailTab>("overview");
@@ -582,6 +609,13 @@ function ProductDetail({ kind, product, build, postTitle }: { kind: Exclude<Purc
               <h4 className={H3}>{product.name}</h4>
               {product.summary && <p className="m-0 text-md leading-md text-text-secondary">{product.summary}</p>}
             </div>
+            {href && (
+              // A full load: a project bought this session is made when the app starts.
+              <a href={href} className={cn(PRIMARY_LINK, "self-start")}>
+                Open in your project
+                <Icon icon={ArrowRight01Icon} size={16} />
+              </a>
+            )}
             {product.specs.length > 0 && (
               <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-4">
                 {product.specs.map((s) => (
@@ -593,9 +627,11 @@ function ProductDetail({ kind, product, build, postTitle }: { kind: Exclude<Purc
               </dl>
             )}
             <p className="m-0 text-sm leading-sm text-text-secondary">
-              {kind === "physical"
-                ? `Your copy opens ${pieces.filter((t) => t.id !== "parts" && t.id !== "3d").map((t) => t.label).join(", ") || "the build"} for this product, with its 3D model and parts.`
-                : "Your copy licenses this product's 3D model; its parts are open to everyone."}
+              {kind === "main"
+                ? "It's yours: every piece is in the tabs above, and its editors open in your project."
+                : kind === "physical"
+                  ? `Your copy opens ${pieces.filter((t) => t.id !== "parts" && t.id !== "3d").map((t) => t.label).join(", ") || "the build"} for this product, with its 3D model and parts.`
+                  : "Your copy licenses this product's 3D model; its parts are open to everyone."}
             </p>
           </div>
         </div>
@@ -609,6 +645,26 @@ function ProductDetail({ kind, product, build, postTitle }: { kind: Exclude<Purc
   );
 }
 
+/** "A and B", "A, B and C". */
+function andList(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** What this kind gives its holder and what it doesn't, said first (owner: "how much a Physical NFT shows, how
+ *  much a Virtual NFT shows"). */
+function GivesBlock({ kind }: { kind: Exclude<PurchaseKind, "main"> }) {
+  const g = GIVES[kind];
+  return (
+    <section aria-label={`What your ${KIND_NAME[kind]} gives you`} className={cn(CARD, "flex flex-col gap-6")}>
+      <h3 className={H3}>What your {KIND_NAME[kind]} gives you</h3>
+      <div className="grid grid-cols-1 gap-6 [@container(min-width:560px)]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <RuleList tone="can" items={g.gets} label="Included" />
+        {g.not.length > 0 && <RuleList tone="cant" items={g.not} label="Not included" />}
+      </div>
+    </section>
+  );
+}
+
 function RuleColumns({ licence }: { licence: Licence }) {
   return (
     <div className="grid grid-cols-1 gap-6 [@container(min-width:560px)]:grid-cols-2">
@@ -618,11 +674,11 @@ function RuleColumns({ licence }: { licence: Licence }) {
   );
 }
 
-function RuleList({ tone, items }: { tone: "can" | "cant"; items: string[] }) {
+function RuleList({ tone, items, label }: { tone: "can" | "cant"; items: string[]; label?: string }) {
   const can = tone === "can";
   return (
     <div className="flex flex-col gap-3">
-      <span className={cn("text-sm font-semibold", can ? "text-text-success" : "text-text-error")}>{can ? "You can" : "You can't"}</span>
+      <span className={cn("text-sm font-semibold", can ? "text-text-success" : "text-text-error")}>{label ?? (can ? "You can" : "You can't")}</span>
       <ul role="list" className="m-0 flex list-none flex-col gap-3 p-0">
         {items.map((t) => (
           <li key={t} className="flex items-start gap-3 text-md leading-md text-text-primary">
