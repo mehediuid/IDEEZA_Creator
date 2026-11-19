@@ -17,7 +17,7 @@ import { StateCard, Tag, buttonVariants } from "@/components/ideeza";
 import { PAGE_GRID } from "@/components/ideeza/page";
 import { DemoBuyerBanner } from "@/components/marketplace/demo-buyer-banner";
 import { formatDate } from "@/lib/manual/project-summary";
-import { cardChipsOf, usesOf, type PurchasedProject } from "@/lib/market/purchases";
+import { cardChipsOf, purchaseHrefOf, usesOf, type PurchasedProject } from "@/lib/market/purchases";
 import { cn } from "@/lib/utils";
 
 export const purchasedHref = (id: string) => `/projects/purchased/${encodeURIComponent(id)}`;
@@ -80,7 +80,7 @@ function PurchasedCard({ p }: { p: PurchasedProject }) {
           <div className="flex flex-col gap-[8px]">
             <h3 className="truncate text-2xl font-semibold leading-2xl text-text-primary">
               <Link
-                href={purchasedHref(p.id)}
+                href={purchaseHrefOf(p)}
                 title={p.name}
                 className="rounded-sm outline-none after:absolute after:inset-0 after:rounded-[var(--radius-2xl)] hover:text-[color:var(--color-text-primary)] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-border-focus"
               >

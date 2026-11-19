@@ -12,9 +12,8 @@
 //     row each with its use, number, price and date, a Physical copy's units (allowance, made, left; units.ts),
 //     Send to manufacturing and Sell this copy (their flows come next: the buttons wait, and say what a sale would
 //     hand over); then, folded, what each use allows, and NFT details;
-//   · Main: the whole project is the buyer's, so it opens as their own project (owner: "full control, browse it
-//     like my private project, no downloads"): Open the project, its products, then folded what the Main NFT
-//     allows and the ownership facts;
+//   · No Main tab: a whole project bought is the buyer's own project and opens as one, its purchase shown on its
+//     page (owner, 2026-11-19: "no purchase view, then Open project"); an old link here goes straight there;
 // - Receipts;
 // - the rail: a Summary of what is held and the creator (questions about what was bought). No Innovations stats:
 //   a buyer's page is about what they own (owner).
@@ -23,6 +22,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight01Icon, Cancel01Icon, Coins01Icon, ImageNotFound01Icon, ShoppingBag01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, Button, StateCard, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
@@ -41,7 +41,7 @@ import { TabStrip, type TabDef } from "@/components/projects/details/tab-strip";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { DeliverablesAccess, ProductPiecePanel } from "@/components/projects/product/product-deliverables";
 import { productsOf, useCreateHistory, type BuildItemKind, type BuildJob, type BuildProduct } from "@/lib/create/history";
-import { acquiredIdOf, sampleBuildsOf } from "@/lib/demo/acquired-projects";
+import { sampleBuildsOf } from "@/lib/demo/acquired-projects";
 import { minePostOf } from "@/lib/innovations/mine-post";
 import type { InnovationPost, PostProduct } from "@/lib/innovations/types";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
@@ -50,7 +50,9 @@ import {
   KIND_NAME,
   LICENCE,
   lineTitleOf,
-  mainLicenceOf,
+  purchaseHrefOf,
+  wholeProjectIdOf,
+  wholeProjectOnly,
   type Licence,
   type PurchaseCopy,
   type PurchaseKind,
@@ -109,7 +111,15 @@ export function PurchasedPage({ id, initialTab = null }: { id: string; initialTa
   if (!ready) return <ProjectSkeleton />;
   const p = purchases.find((x) => x.id === id);
   if (!p) return <NothingBought buyerName={buyer.name} />;
+  // A whole project bought is the buyer's own project: an old link here opens it, as every link to it now does.
+  if (wholeProjectOnly(p)) return <OpensAsProject href={purchaseHrefOf(p)} />;
   return p.source === "sample" ? <SampleBody p={p} buyer={buyer} initialTab={initialTab} /> : <OwnBody p={p} buyer={buyer} initialTab={initialTab} />;
+}
+
+function OpensAsProject({ href }: { href: string }) {
+  const router = useRouter();
+  React.useEffect(() => router.replace(href), [router, href]);
+  return <ProjectSkeleton />;
 }
 
 type BodyProps = { p: PurchasedProject; buyer: DemoBuyer; initialTab: OfferTab | null };
@@ -157,7 +167,9 @@ function PurchasedBody({
   buildOf,
 }: BodyProps & { post: InnovationPost; mine: MinePostFacts | null; buildOf: (i: number) => ProductBuild }) {
   const { titleRef, live } = usePageArrival(`purchased:${p.id}`, p.name, `${p.name} · Purchased · IDEEZA`);
-  const held = KINDS.filter((k) => p.lines.some((l) => l.kind === k));
+  // Copies only: a whole project held is the buyer's own project, opened from its own page.
+  const held = KINDS.filter((k) => k !== "main" && p.lines.some((l) => l.kind === k));
+  const wholeToo = p.lines.some((l) => l.kind === "main" && (l.sharePct ?? 0) >= 100);
   const [tab, setTab] = React.useState<PurchaseKind | undefined>(initialTab && held.includes(initialTab) ? initialTab : held[0]);
   const log = useUnitsLog();
   const summary = <SummaryBlock p={p} buyer={buyer} held={held} />;
@@ -178,15 +190,20 @@ function PurchasedBody({
               <h2 id="your-nfts" className={H2}>
                 Your NFTs
               </h2>
-              {tab === undefined ? (
+              {wholeToo && (
+                <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-4")}>
+                  <p className="m-0 text-md leading-md text-text-primary">The whole project is yours too: it opens as one of your projects.</p>
+                  <a href={`/projects/${encodeURIComponent(wholeProjectIdOf(p))}`} className={cn(PRIMARY_LINK, "self-start")}>
+                    Open the project
+                    <Icon icon={ArrowRight01Icon} size={16} />
+                  </a>
+                </div>
+              )}
+              {tab === undefined || tab === "main" ? (
                 <SoldEvery p={p} />
               ) : (
                 <OfferTabs tabs={held} active={tab} onSelect={setTab} label="Your NFTs">
-                  {tab === "main" ? (
-                    <MainPanel p={p} post={post} buildOf={buildOf} />
-                  ) : (
-                    <KindPanel p={p} kind={tab} post={post} buildOf={buildOf} buyer={buyer} log={log} />
-                  )}
+                  <KindPanel p={p} kind={tab} post={post} buildOf={buildOf} buyer={buyer} log={log} />
                 </OfferTabs>
               )}
             </section>
@@ -364,71 +381,6 @@ function CreatorBlock({ p, post, buyer }: { p: PurchasedProject; post: Innovatio
       <p className="m-0 text-md leading-md text-text-secondary">Questions about what you bought go to {p.creator}.</p>
       <AskCreator projectId={p.id} sales={data.sales.filter((s) => s.projectId === p.id)} buyerId={buyer.id} />
     </section>
-  );
-}
-
-// ─────────────────────────────── Main: the project is yours ───────────────────────────────
-
-function MainPanel({ p, post, buildOf }: { p: PurchasedProject; post: InnovationPost; buildOf: (i: number) => ProductBuild }) {
-  const line = p.lines.find((l) => l.kind === "main") as PurchaseLine;
-  const last = line.copies[line.copies.length - 1];
-  const share = line.sharePct ?? 0;
-  const whole = share >= 100;
-  const projectId = p.source === "sample" ? acquiredIdOf(p.id) : p.id;
-  const licence = mainLicenceOf(share);
-  const facts: Fact[] = [
-    { label: "Collection", value: last.collection || "—" },
-    { label: "Blockchain", value: networkLabelOf(last.network) },
-    { label: "NFT type", value: "Main NFT" },
-    { label: "Token ID", value: last.tokenId !== null ? `#${last.tokenId}` : "Not assigned" },
-    { label: "Your share", value: `${share}%` },
-    { label: "Price paid", value: paidOf([line]) },
-    { label: "Purchased from", value: p.creator },
-    { label: "Transaction", value: last.txHash ? shortAddress(last.txHash) : "—" },
-    { label: "Purchased", value: formatDate(last.at) },
-  ];
-  return (
-    <div className="flex flex-col gap-8">
-      <div className={cn(CARD, "flex flex-col gap-6")}>
-        <div className="flex flex-col gap-2">
-          <h3 className="text-2xl font-semibold leading-2xl text-text-primary">{whole ? "The whole project is yours" : `${share}% of the project is yours`}</h3>
-          <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
-            {whole
-              ? "It's one of your projects now: open it, edit it and sell it again, as you do your own."
-              : "You hold a share of its Main NFT: its sales and royalties are split with you."}
-          </p>
-        </div>
-        {whole && (
-          // A full load: a project bought this session is made when the app starts (acquired-projects.ts).
-          <a href={`/projects/${encodeURIComponent(projectId)}`} className={cn(PRIMARY_LINK, "self-start")}>
-            Open the project
-            <Icon icon={ArrowRight01Icon} size={16} />
-          </a>
-        )}
-      </div>
-
-      {whole && post.products.length > 0 && (
-        <ProductsView
-          kind="main"
-          post={post}
-          covered={post.products.map((x, i) => ({ x, i }))}
-          buildOf={buildOf}
-          productHref={(i) =>
-            `/projects/${encodeURIComponent(projectId)}/products/${encodeURIComponent(p.source === "sample" ? `prd_bought_${p.id}_${i + 1}` : (post.products[i].build?.productId ?? post.products[i].id))}`
-          }
-        />
-      )}
-
-      <div className="flex flex-col">
-        <MoreFacts title="What the Main NFT allows">
-          <RuleColumns licence={licence} />
-        </MoreFacts>
-        <MoreFacts>
-          <FactGrid facts={facts} />
-          <p className="m-0 text-sm text-text-tertiary">Minted when you bought it.</p>
-        </MoreFacts>
-      </div>
-    </div>
   );
 }
 

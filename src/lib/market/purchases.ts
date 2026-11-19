@@ -22,6 +22,7 @@ import { addAmounts } from "../wallet/money";
 import { ownCopyKeyOf, sampleCopyKeyOf, unitsAllowanceOf } from "./units";
 import { boughtOnOf, buyerNameOf as holderNameOf, chainOf, holderOf, liveListingOf, soldByOf, type Resale, type ResaleDraft, type ResaleSale } from "./resales";
 import { DEMO_BUYERS } from "../wallet/identities";
+import { ACQUIRED_PREFIX } from "../demo/acquired-projects";
 import type { Amount, DemoBuyerId } from "../wallet/types";
 import type { SampleSale } from "./phone-sample-sales";
 import { copyUseBlockOf, copyUsesOf, SAMPLE_COLLECTION, sampleCoverOf, SAMPLE_MARKETS, type SampleUse } from "./sample-market";
@@ -468,12 +469,29 @@ export function resaleDraftOf(p: Pick<PurchasedProject, "id" | "source" | "name"
   };
 }
 
+/** The buyer holds only the whole project (100%): it is their own project, opened as one (owner, 2026-11-19: "a Main
+ *  NFT bought opens like normal project details, with the purchase shown there — no purchase view in between"). */
+export function wholeProjectOnly(p: Pick<PurchasedProject, "lines">): boolean {
+  return p.lines.length > 0 && p.lines.every((l) => l.kind === "main" && (l.sharePct ?? 0) >= 100);
+}
+
+/** The project a whole project bought opens as: a sample's own copy for the buyer (acquired-projects.ts), or this
+ *  browser's project itself. */
+export function wholeProjectIdOf(p: Pick<PurchasedProject, "id" | "source">): string {
+  return p.source === "sample" ? `${ACQUIRED_PREFIX}${p.id}` : p.id;
+}
+
+/** Where a purchase opens: a whole project bought, its project page; anything else, its purchased page. */
+export function purchaseHrefOf(p: Pick<PurchasedProject, "id" | "source" | "lines">): string {
+  return wholeProjectOnly(p) ? `/projects/${encodeURIComponent(wholeProjectIdOf(p))}` : `/projects/purchased/${encodeURIComponent(p.id)}`;
+}
+
 /** The purchased page of a project the buyer holds copies of a kind that unlocks its files (a Physical NFT or
  *  the whole project), for the Innovations product page's locked pieces; null when they hold none. */
 export function heldFilesHrefOf(purchases: readonly PurchasedProject[], projectId: string): string | null {
   const p = purchases.find((x) => x.id === projectId);
   if (!p || !p.lines.some((l) => l.kind === "physical" || l.kind === "main")) return null;
-  return `/projects/purchased/${encodeURIComponent(p.id)}`;
+  return p.lines.some((l) => l.kind === "main" && (l.sharePct ?? 0) >= 100) ? `/projects/${encodeURIComponent(wholeProjectIdOf(p))}` : purchaseHrefOf(p);
 }
 
 /** Every purchase of the buyer, newest first. */

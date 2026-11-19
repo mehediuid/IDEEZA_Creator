@@ -4,24 +4,23 @@
 // filter are about the maker's own projects, so they keep only those; Purchased keeps only the purchases.
 //
 // A whole project bought is already one of the buyer's own projects (acquired-projects.ts), so its purchase shows
-// once, as that project; a purchase that also holds copies keeps its own card for them.
+// once, as that project (its page shows the purchase); a purchase that also holds copies keeps its own card for them.
 //
 // Web only: the phone shares the list (lib/manual/project-list.ts), not this. It sits with My projects, which composes
 // the maker's projects (engineering) and the purchases (commerce); neither layer imports the other. Pure. Relative
 // imports only (node:test loads the compiled module).
 
-import { ACQUIRED_PREFIX } from "../../lib/demo/acquired-projects";
 import { matchRows, type ListCounts, type ListItem, type ListResult, type ListRow } from "../../lib/manual/project-list";
 import { PAGE_SIZE, type ListQuery } from "../../lib/manual/project-summary";
-import type { PurchasedProject } from "../../lib/market/purchases";
+import { wholeProjectIdOf, wholeProjectOnly, type PurchasedProject } from "../../lib/market/purchases";
 
 export type AllEntry = { key: string; kind: "own"; row: ListRow } | { key: string; kind: "bought"; bought: PurchasedProject };
 
 export type AllResult = Omit<ListResult, "rows"> & { entries: AllEntry[] };
 
-/** The purchases the All tab lists: not a whole project already listed as the buyer's own. */
+/** The purchases the All tab lists: not a whole project bought, which is already listed as its project. */
 export function boughtForAll(bought: readonly PurchasedProject[], ownIds: ReadonlySet<string>): PurchasedProject[] {
-  return bought.filter((p) => !(p.source === "sample" && ownIds.has(`${ACQUIRED_PREFIX}${p.id}`) && p.lines.every((l) => l.kind === "main")));
+  return bought.filter((p) => !(wholeProjectOnly(p) && ownIds.has(wholeProjectIdOf(p))));
 }
 
 /** A purchase the search finds: its name, its creator or a product's name. */

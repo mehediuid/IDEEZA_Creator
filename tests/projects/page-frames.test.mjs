@@ -140,7 +140,7 @@ test("P0: SLOTS is the engineering page — Team, and the commerce blocks only o
   for (const slot of ["MarketplaceSlot", "LegalSlot", "UtilityPillSlot"]) {
     assert.match(src, new RegExp(`function ${slot}\\(props: SlotProps\\) \\{\\s*return buyerSide\\(props\\.viewer\\) \\?`), slot);
   }
-  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "story", "details", "legal", "versions", "log"\]/);
+  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "purchase", "story", "details", "legal", "versions", "log"\]/);
   // Explore marketplace keeps reading the same slots (P2-MARKETPLACE-8).
   const market = read("components/marketplace/market-slots.tsx");
   for (const key of ["team: SLOTS.tabs.team", "details: SLOTS.rail.details", "legal: SLOTS.rail.legal", "marketplace: MarketLead"]) {

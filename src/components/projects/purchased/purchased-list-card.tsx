@@ -4,7 +4,8 @@
 // have everything"). One grid reads as one list, so it is the list's own card (project-card.tsx) — the same frame,
 // cover, title, line and hint, a row below a 560 px list — with what makes it a purchase in the card's own places:
 // the chip says Purchased, the line who made it and when it was bought, the hint what is held, for sale and sold.
-// Its one link opens the purchased page. The Purchased tab keeps its own Asset Card (purchased-tab.tsx).
+// Its one link opens the purchased page, or the project itself for a whole project bought. The Purchased tab keeps its
+// own Asset Card (purchased-tab.tsx).
 
 import * as React from "react";
 import Link from "next/link";
@@ -12,8 +13,7 @@ import { ArrowRight02Icon, CpuIcon, ImageNotFound01Icon, ShoppingBag01Icon } fro
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza";
 import { formatDate, formatShortDate } from "@/lib/manual/project-summary";
-import type { PurchasedProject } from "@/lib/market/purchases";
-import { purchasedHref } from "./purchased-tab";
+import { purchaseHrefOf, type PurchasedProject } from "@/lib/market/purchases";
 
 /** The hint on the card's floor: "You own 3 NFTs · 1 for sale · 1 sold". */
 export function purchasedHintOf(p: Pick<PurchasedProject, "count" | "forSale" | "sold">): string {
@@ -51,7 +51,7 @@ export function PurchasedListCard({ p, now }: { p: PurchasedProject; now: number
           <div className="flex flex-wrap items-start justify-between gap-[6px]">
             <h3 className="line-clamp-2 min-w-0 text-lg font-medium text-text-primary">
               {/* The card's one link: its ::after covers the whole <article>. */}
-              <Link href={purchasedHref(p.id)} title={p.name} className="outline-none after:absolute after:inset-0 hover:underline focus-visible:underline">
+              <Link href={purchaseHrefOf(p)} title={p.name} className="outline-none after:absolute after:inset-0 hover:underline focus-visible:underline">
                 {p.name}
               </Link>
             </h3>
