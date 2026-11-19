@@ -13,11 +13,13 @@
 //
 // Pure. Relative imports only (node:test loads the compiled module).
 
-import type { Token } from "../brief/types";
+import type { Network, Token } from "../brief/types";
+import { LOCKED } from "../innovations/locked-pieces";
 import { addAmounts } from "../wallet/money";
+import { DEMO_BUYERS } from "../wallet/identities";
 import type { Amount, DemoBuyerId } from "../wallet/types";
 import type { SampleSale } from "./phone-sample-sales";
-import { copyUsesOf, sampleCoverOf, SAMPLE_MARKETS, type SampleUse } from "./sample-market";
+import { copyUseBlockOf, copyUsesOf, SAMPLE_COLLECTION, sampleCoverOf, SAMPLE_MARKETS, type SampleUse } from "./sample-market";
 import { PROJECT_SCOPE, type EditionKind, type EditionTrack, type EditionUse, type Sale } from "./types";
 
 export type PurchaseKind = "main" | EditionKind;
@@ -26,30 +28,55 @@ export type PurchaseUse = SampleUse;
 export const USE_OF: Record<EditionUse, PurchaseUse> = { private: "Personal use", commercial: "Business use" };
 export const KIND_NAME: Record<PurchaseKind, string> = { main: "Whole project", physical: "Physical NFT", virtual: "Virtual NFT" };
 
-/** What each use allows — the prototype's defaults until the owner words them. */
-export const USE_RULES: Record<EditionKind, Record<PurchaseUse, string>> = {
+/** What each use allows and doesn't: one copy is one licence. The prototype's words until the owner sets them
+ *  (plan 6rPKBgwzQ6r6woYmjfE6Td, D3 + D4). */
+export type Licence = { can: string[]; cant: string[] };
+
+export const LICENCE: Record<EditionKind, Record<PurchaseUse, Licence>> = {
   physical: {
-    "Personal use": "Build it for yourself from its fabrication files. Not for sale.",
-    "Business use": "Build it and sell what you build, as many as your copies allow.",
+    "Personal use": { can: ["Build one for yourself per copy", "Change it for your own use"], cant: ["Sell what you build", "Share the files"] },
+    "Business use": {
+      can: ["Build and sell one unit per copy", "Put your brand on the units"],
+      cant: ["Sell or share the files themselves", "Build more units than your copies"],
+    },
   },
   virtual: {
-    "Personal use": "Use its 3D model and preview in your own, non-commercial work.",
-    "Business use": "Use its 3D model and preview in commercial work: ads, games, product pages.",
+    "Personal use": { can: ["Use the model and renders in your own work", "Show it in your portfolio"], cant: ["Use it in ads or paid work", "Share or sell the model file"] },
+    "Business use": { can: ["Use it in ads, games, product pages and client work"], cant: ["Sell or share the model file itself"] },
   },
 };
 
 /** What a Main NFT gives, by the share held. */
-export function mainRuleOf(sharePct: number): string {
+export function mainLicenceOf(sharePct: number): Licence {
   return sharePct >= 100
-    ? "The whole project is yours: every file, the right to list it and its royalties."
-    : `You own ${sharePct}% of the project: that share of its sales and royalties.`;
+    ? { can: ["Use every file of the project", "List it again and earn its royalties", "Sell its copies"], cant: [] }
+    : { can: [`Earn ${sharePct}% of the project's sales and royalties`], cant: ["List or change the project on your own"] };
 }
 
-/** What comes with each kind, as files. */
-export const FILES_OF: Record<PurchaseKind, string[]> = {
-  main: ["Every file of the project: PCB, code, 3D, wiring and parts"],
-  physical: ["PCB fabrication files (Gerber)", "Enclosure (STEP and STL)", "Bill of materials (CSV)", "Assembly guide (PDF)"],
-  virtual: ["3D model (GLB)", "Preview renders (PNG)"],
+/** One file a purchase gives: what it is, its format, what is inside. */
+export type PurchaseFile = { id: string; name: string; format: string; includes: string[] };
+
+const PHYSICAL_FILES: PurchaseFile[] = [
+  { id: "pcb", name: LOCKED.pcb.name, format: "Gerber · CSV", includes: LOCKED.pcb.includes },
+  { id: "code", name: LOCKED.code.name, format: "Source code", includes: LOCKED.code.includes },
+  { id: "wiring", name: LOCKED.wiring.name, format: "PDF · CSV", includes: LOCKED.wiring.includes },
+  { id: "enclosure", name: "Enclosure", format: "STEP · STL", includes: ["The case, ready to print or machine"] },
+  { id: "assembly", name: "Assembly guide", format: "PDF", includes: ["How the board, parts and case go together"] },
+];
+const VIRTUAL_FILES: PurchaseFile[] = [
+  { id: "model", name: "3D model", format: "GLB", includes: ["The product's 3D model"] },
+  { id: "renders", name: "Preview renders", format: "PNG", includes: ["Pictures of the product, ready to use"] },
+];
+
+/** What each kind unlocks, as files (plan D2): Physical builds it, Virtual is its digital twin, Main is all of it. */
+export const FILES_OF: Record<PurchaseKind, PurchaseFile[]> = {
+  main: [
+    { id: "project", name: "Every piece of the project", format: "All", includes: ["PCB, firmware, wiring, 3D and parts of every product"] },
+    ...PHYSICAL_FILES,
+    ...VIRTUAL_FILES,
+  ],
+  physical: PHYSICAL_FILES,
+  virtual: VIRTUAL_FILES,
 };
 
 export type PurchaseCopy = {
@@ -62,6 +89,12 @@ export type PurchaseCopy = {
   token: Token;
   at: number;
   txHash: string;
+  network: Network;
+  collection: string;
+  /** The Main NFT's token; null for a copy (minted when bought, it is known by its number). */
+  tokenId: number | null;
+  /** The wallet it went to. */
+  buyerAddress: string;
 };
 
 export type PurchaseLine = {
@@ -90,6 +123,10 @@ export type PurchasedProject = {
   /** How many NFTs: each copy, and the Main NFT once. */
   count: number;
   lastAt: number;
+  /** The copy kinds still on sale, so "Buy another" can lead there. */
+  buyable: EditionKind[];
+  /** The project's Main NFT went to someone else: the copies stay the buyer's. */
+  soldInFullTo: string | null;
 };
 
 const KIND_ORDER: PurchaseKind[] = ["main", "physical", "virtual"];
@@ -144,7 +181,19 @@ export function ownPurchasesOf(
   for (const s of sales) {
     if (s.buyerId !== buyerId) continue;
     const lines = byProject.get(s.projectId) ?? new Map<string, Draft>();
-    const copy: PurchaseCopy = { id: s.id, serial: null, of: null, price: s.price, token: s.token, at: s.at, txHash: s.txHash };
+    const copy: PurchaseCopy = {
+      id: s.id,
+      serial: null,
+      of: null,
+      price: s.price,
+      token: s.token,
+      at: s.at,
+      txHash: s.txHash,
+      network: s.network,
+      collection: s.collection,
+      tokenId: s.item.nft === "main" ? s.tokenId : null,
+      buyerAddress: s.buyerAddress,
+    };
     if (s.item.nft === "main") add(lines, "main", null, null, copy, s.item.sharePct);
     else {
       const it = s.item;
@@ -161,7 +210,29 @@ export function ownPurchasesOf(
   for (const [id, lines] of byProject) {
     const p = projects.find((x) => x.id === id);
     if (!p) continue;
-    out.push(projectOf({ id, source: "own", name: p.name, cover: p.cover, creator, marketHref: `/marketplace/${id}` }, lines));
+    const mainTo = sales.find((x) => x.projectId === id && x.item.nft === "main" && x.buyerId !== buyerId)?.buyerId ?? null;
+    const buyable = (["physical", "virtual"] as EditionKind[]).filter((k) =>
+      tracks.some((t) => {
+        if (t.projectId !== id || t.kind !== k || !t.listing) return false;
+        const sold = sales.filter((x) => x.item.nft !== "main" && x.item.trackId === t.id).length;
+        return sold < t.supply.total;
+      }),
+    );
+    out.push(
+      projectOf(
+        {
+          id,
+          source: "own",
+          name: p.name,
+          cover: p.cover,
+          creator,
+          marketHref: `/marketplace/${id}`,
+          buyable: mainTo ? [] : buyable,
+          soldInFullTo: mainTo ? buyerNameOf(mainTo) : null,
+        },
+        lines,
+      ),
+    );
   }
   return out;
 }
@@ -174,7 +245,19 @@ export function samplePurchasesOf(sales: readonly SampleSale[], buyerId: DemoBuy
     if (!mine.length) continue;
     const lines = new Map<string, Draft>();
     for (const s of mine) {
-      const copy: PurchaseCopy = { id: s.id, serial: s.serial, of: null, price: s.price, token: s.token, at: s.at, txHash: s.txHash };
+      const copy: PurchaseCopy = {
+        id: s.id,
+        serial: s.serial,
+        of: null,
+        price: s.price,
+        token: s.token,
+        at: s.at,
+        txHash: s.txHash,
+        network: s.network,
+        collection: SAMPLE_COLLECTION,
+        tokenId: null,
+        buyerAddress: s.buyerAddress,
+      };
       if (s.kind === "main") {
         add(lines, "main", null, null, copy, 100);
         continue;
@@ -183,14 +266,38 @@ export function samplePurchasesOf(sales: readonly SampleSale[], buyerId: DemoBuy
       const offer = copyUsesOf(m, s.kind).find((o) => o.use === use);
       add(lines, s.kind, use, null, { ...copy, of: offer?.sold?.of ?? null });
     }
+    const all = sales.filter((s) => s.projectId === m.feedId);
+    const mainTo = all.find((s) => s.kind === "main" && s.buyerId !== buyerId)?.buyerId ?? null;
+    const buyable = (["physical", "virtual"] as EditionKind[]).filter((k) => copyUsesOf(m, k).some((o) => copyUseBlockOf(o, m.feedId, sales) === null));
     out.push(
       projectOf(
-        { id: m.feedId, source: "sample", name: m.post.title, cover: sampleCoverOf(m.post), creator: m.post.creator.name, marketHref: `/marketplace/${m.feedId}` },
+        {
+          id: m.feedId,
+          source: "sample",
+          name: m.post.title,
+          cover: sampleCoverOf(m.post),
+          creator: m.post.creator.name,
+          marketHref: `/marketplace/${m.feedId}`,
+          buyable: mainTo ? [] : buyable,
+          soldInFullTo: mainTo ? buyerNameOf(mainTo) : null,
+        },
         lines,
       ),
     );
   }
   return out;
+}
+
+function buyerNameOf(id: DemoBuyerId): string {
+  return DEMO_BUYERS.find((b) => b.id === id)?.name ?? "another creator";
+}
+
+/** The purchased page of a project the buyer holds copies of a kind that unlocks its files (a Physical NFT or
+ *  the whole project), for the Innovations product page's locked pieces; null when they hold none. */
+export function heldFilesHrefOf(purchases: readonly PurchasedProject[], projectId: string): string | null {
+  const p = purchases.find((x) => x.id === projectId);
+  if (!p || !p.lines.some((l) => l.kind === "physical" || l.kind === "main")) return null;
+  return `/projects/purchased/${encodeURIComponent(p.id)}`;
 }
 
 /** Every purchase of the buyer, newest first. */

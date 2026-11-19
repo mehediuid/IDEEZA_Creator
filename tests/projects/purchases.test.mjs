@@ -55,10 +55,55 @@ test("sample purchases read their use from the sale and their supply from the us
   assert.deepEqual(P.samplePurchasesOf([s], "buyer-leo"), []);
 });
 
-test("every use held says what it allows; a Main share says its share", () => {
-  for (const k of ["physical", "virtual"]) for (const u of ["Personal use", "Business use"]) assert.ok(P.USE_RULES[k][u].length > 20);
-  assert.match(P.mainRuleOf(100), /^The whole project is yours/);
-  assert.match(P.mainRuleOf(10), /^You own 10% of the project/);
+test("every use held says what it allows and what it doesn't; one copy is one licence", () => {
+  for (const k of ["physical", "virtual"]) {
+    for (const u of ["Personal use", "Business use"]) {
+      const l = P.LICENCE[k][u];
+      assert.ok(l.can.length > 0 && l.cant.length > 0, `${k} ${u}`);
+    }
+  }
+  assert.match(P.LICENCE.physical["Personal use"].can[0], /one for yourself per copy/);
+  assert.match(P.LICENCE.physical["Business use"].can[0], /sell one unit per copy/);
+  assert.deepEqual(P.mainLicenceOf(100).cant, []);
+  assert.match(P.mainLicenceOf(10).can[0], /^Earn 10% of the project's sales/);
+});
+
+test("what each kind unlocks: Physical the locked PCB, firmware and wiring and more; Virtual the model; Main all", async () => {
+  const { LOCKED } = await import("../../.tmp-test/lib/innovations/locked-pieces.js");
+  const ids = (k) => P.FILES_OF[k].map((f) => f.id);
+  assert.deepEqual(ids("physical"), ["pcb", "code", "wiring", "enclosure", "assembly"]);
+  assert.deepEqual(ids("virtual"), ["model", "renders"]);
+  assert.deepEqual(ids("main"), ["project", ...ids("physical"), ...ids("virtual")]);
+  // The same words as the Innovations product page's locked pieces.
+  for (const id of ["pcb", "code", "wiring"]) assert.deepEqual(P.FILES_OF.physical.find((f) => f.id === id).includes, LOCKED[id].includes);
+});
+
+test("a purchase knows its chain, collection and wallet, what is still on sale, and a project sold in full", () => {
+  const tracks = [
+    { id: "t_physical_commercial", projectId: "proj_a", kind: "physical", supply: { total: 2 }, listing: { regular: "0.04" } },
+    { id: "t_virtual_private", projectId: "proj_a", kind: "virtual", supply: { total: 10 }, listing: null },
+  ];
+  const own = [sale("s1", copy("physical", "commercial", 1), T)];
+  const [p] = P.ownPurchasesOf(own, "buyer-mira", [{ id: "proj_a", name: "Lamp", cover: null }], tracks, "Maya");
+  assert.deepEqual(p.buyable, ["physical"], "one of two left; the Virtual track isn't listed");
+  assert.equal(p.soldInFullTo, null);
+  assert.deepEqual([p.lines[0].copies[0].network, p.lines[0].copies[0].collection, p.lines[0].copies[0].buyerAddress], ["baseSepolia", "C", "0x1"]);
+  const soldOut = [...own, sale("s2", copy("physical", "commercial", 2), T + 1, "0.04", "buyer-sam")];
+  assert.deepEqual(P.ownPurchasesOf(soldOut, "buyer-mira", [{ id: "proj_a", name: "Lamp", cover: null }], tracks, "Maya")[0].buyable, []);
+  const inFull = [...own, sale("s3", { nft: "main", sharePct: 100 }, T + 2, "0.2", "buyer-leo")];
+  const [q] = P.ownPurchasesOf(inFull, "buyer-mira", [{ id: "proj_a", name: "Lamp", cover: null }], tracks, "Maya");
+  assert.equal(q.soldInFullTo, "Leo");
+  assert.deepEqual(q.buyable, [], "nothing is on sale once the project is sold in full");
+});
+
+test("the files' page for the Innovations locked pieces: only for a Physical NFT or the whole project", () => {
+  const m = market.SAMPLE_MARKETS.find((x) => x.feedId === "p7");
+  const [personal] = market.copyUsesOf(m, "physical");
+  const virt = market.copyUsesOf(m, "virtual")[0];
+  const phys = sales.makeSampleSale({ id: "a", projectId: "p7", offer: personal, buyerId: "buyer-mira", buyerAddress: "0x1", serial: 1, txHash: "0xa", at: T });
+  const v = sales.makeSampleSale({ id: "b", projectId: "p7", offer: virt, buyerId: "buyer-mira", buyerAddress: "0x1", serial: 1, txHash: "0xb", at: T });
+  assert.equal(P.heldFilesHrefOf(P.samplePurchasesOf([phys], "buyer-mira"), "p7"), "/projects/purchased/p7");
+  assert.equal(P.heldFilesHrefOf(P.samplePurchasesOf([v], "buyer-mira"), "p7"), null, "a Virtual NFT doesn't unlock the PCB");
 });
 
 test("My projects has a Purchased tab beside the outcomes, and the purchased page shows own, rights, files, receipts", () => {
@@ -67,6 +112,11 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
   assert.match(list, /\{ id: PURCHASED, label: "Purchased", n: purchased\.count, active: purchased\.active \}/);
   assert.doesNotMatch(read("lib/manual/project-list.ts"), /purchased/i, "the list's own tabs (shared with the phone) are untouched");
   const page = read("components/projects/purchased/purchased-page.tsx");
-  for (const h of ["What you own", "What you can do", "Files", "Receipts"]) assert.match(page, new RegExp(`>\\s*${h}\\s*<`));
+  for (const h of ["Your NFTs", "What you can do", "Your files", "Receipts"]) assert.match(page, new RegExp(`>\\s*${h}\\s*<`));
+  assert.match(page, /<OfferTabs tabs=\{held\} active=\{tab\} onSelect=\{onTab\} label="Your NFTs">/, "the marketplace box's tabs, one per kind held");
+  assert.match(page, /<PostMediaStage post=\{post\} mine=\{mine\} \/>/, "media first, as the marketplace and Innovations pages");
+  assert.match(read("components/innovations/post-product-bits.tsx"), /Open your files/, "the locked pieces lead a holder to them");
+  assert.match(read("components/marketplace/market-rail.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} \/>/);
+  assert.match(read("components/marketplace/sample-offer-box.tsx"), /<SeeWhatYouOwn projectId=\{feedId\} \/>/);
   assert.match(page, /This testnet demo has no files to download\./, "files are named honestly, never a fake download");
 });

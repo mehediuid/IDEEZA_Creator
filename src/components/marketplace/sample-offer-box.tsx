@@ -50,6 +50,7 @@ import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
+import { SeeWhatYouOwn } from "@/components/projects/purchased/see-what-you-own";
 import { CARD } from "@/components/innovations/post-bits";
 import { readSampleSales, useSampleSales, writeSampleSales } from "@/components/mobile/project-earn/buyer/sample-sales-store";
 import { cn } from "@/lib/utils";
@@ -146,6 +147,7 @@ export function SampleOfferBox({
           />
         )}
       </OfferTabs>
+      {held.length > 0 && <SeeWhatYouOwn projectId={feedId} />}
     </section>
   );
 }

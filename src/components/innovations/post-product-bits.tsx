@@ -6,6 +6,7 @@
 // comments, and the rail's "Open to everyone" and "Questions" blocks.
 
 import * as React from "react";
+import { LOCKED, type LockedId } from "@/lib/innovations/locked-pieces";
 import Link from "next/link";
 import { ArrowRight01Icon, Comment01Icon, SquareLock02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
@@ -13,27 +14,12 @@ import { buttonVariants } from "@/components/ideeza";
 import { RailBlock } from "@/components/projects/details/rail-block";
 import { postHref, postProductHref } from "@/lib/innovations/slug";
 import { ME_ID, type InnovationPost } from "@/lib/innovations/types";
+import { usePurchased } from "@/components/projects/purchased/use-purchased";
+import { heldFilesHrefOf } from "@/lib/market/purchases";
 import { cn } from "@/lib/utils";
 import { TAP } from "./post-bits";
 
-export type LockedId = "pcb" | "code" | "wiring";
-
-const LOCKED: Record<LockedId, { title: string; includes: string[] }> = {
-  pcb: {
-    title: "PCB files come with a copy",
-    includes: ["The schematic, converted into a board layout", "The board's bill of materials", "The fab profile it was laid out for"],
-  },
-  code: {
-    title: "Firmware comes with a copy",
-    includes: ["The source code, fully commented", "The library list, pinned to versions", "The map from the code to the board's pins"],
-  },
-  wiring: {
-    title: "Wiring comes with a copy",
-    includes: ["The netlist and a pin-to-pin table", "Wire colours, harness lengths and connector pinouts", "A continuity test checklist"],
-  },
-};
-
-export const isLockedPiece = (t: string): t is LockedId => t === "pcb" || t === "code" || t === "wiring";
+export { isLockedPiece, type LockedId } from "@/lib/innovations/locked-pieces";
 
 /** The post's other products, each its own page. */
 export function ProductSwitcher({ post, current }: { post: InnovationPost; current: string }) {
@@ -69,6 +55,39 @@ export function ProductSwitcher({ post, current }: { post: InnovationPost; curre
 export function LockedPiecePanel({ post, kind }: { post: InnovationPost; kind: LockedId }) {
   const id = React.useId();
   const copy = LOCKED[kind];
+  // Whoever holds a Physical NFT (or the whole project) has these files: the way to them, not "Get a copy"
+  // (owner, 2026-11-19; plan 6rPKBgwzQ6r6woYmjfE6Td, D6).
+  const { ready, buyer, purchases } = usePurchased();
+  const projectId = post.source === "sample" ? post.id.replace(/^sample:/, "") : post.projectId;
+  // The maker's own post keeps its own words: the files are the maker's already.
+  const heldHref = ready && projectId && post.creator.id !== ME_ID ? heldFilesHrefOf(purchases, projectId) : null;
+  if (heldHref) {
+    return (
+      <section aria-labelledby={id} className="flex flex-col items-start gap-6 rounded-xl border border-solid border-border bg-bg-surface p-16 max-md:p-8">
+        <span aria-hidden className="inline-flex size-[44px] items-center justify-center rounded-xl bg-bg-success-subtle text-text-success">
+          <Icon icon={Tick02Icon} size={22} />
+        </span>
+        <h2 id={id} className="text-xl font-bold leading-xl text-text-primary">
+          {copy.name} {kind === "pcb" ? "are" : "is"} yours
+        </h2>
+        <p className="max-w-[62ch] text-md leading-relaxed text-text-secondary">
+          {buyer.name} (demo creator) holds a Physical NFT of this project, so its PCB files, firmware and wiring come with it.
+        </p>
+        <div className="flex flex-col gap-2">
+          <p className="text-md font-semibold leading-md text-text-primary">You have</p>
+          <ul className="flex list-disc flex-col gap-2 pl-8 text-md leading-relaxed text-text-secondary marker:text-text-tertiary">
+            {copy.includes.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+        <Link href={heldHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "lg" }), "hover:text-[color:var(--color-button-secondary-text)]", TAP)}>
+          Open your files
+          <Icon icon={ArrowRight01Icon} size={16} />
+        </Link>
+      </section>
+    );
+  }
   const who = post.creator.id === ME_ID ? "You share" : `${post.creator.name.split(" ")[0] || post.creator.name} shares`;
   const listing = post.listing;
   return (

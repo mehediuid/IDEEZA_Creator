@@ -59,11 +59,14 @@ export function OfferTabs<T extends OfferTab>({
   active,
   onSelect,
   children,
+  label = "What's on sale",
 }: {
   tabs: readonly T[];
   active: T;
   onSelect: (tab: T) => void;
   children: React.ReactNode;
+  /** The tab list's name for a reader: the marketplace's "What's on sale", a buyer's "Your NFTs". */
+  label?: string;
 }) {
   const base = React.useId().replace(/:/g, "");
   const tabId = (t: T) => `${base}-tab-${t}`;
@@ -82,7 +85,7 @@ export function OfferTabs<T extends OfferTab>({
     <div className="flex flex-col gap-6">
       <div
         role="tablist"
-        aria-label="What's on sale"
+        aria-label={label}
         onKeyDown={(e) => moveTab(e, tabs, active, onSelect)}
         className="flex items-end gap-1 border-b border-solid border-border"
       >
