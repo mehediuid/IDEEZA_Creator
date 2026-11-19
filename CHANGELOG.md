@@ -6,6 +6,8 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought) | Sell a bought copy on, and Earn for what you bought | 19 Nov 2026 | [PR-9716](https://ideeza.atlassian.net/browse/PR-9716) | Not started |
+| [CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft) | Purchased page: the project you bought, shown by kind of NFT | 19 Nov 2026 | [PR-9715](https://ideeza.atlassian.net/browse/PR-9715) | Not started |
 | [CL-034](#cl-034-projects-per-plan-a-new-project-waits-until-theres-room) | Projects per plan: a new project waits until there's room | 18 Nov 2026 | Not created yet | Not started |
 | [CL-033](#cl-033-credit-packs-new-sizes-so-builder-and-disruptor-are-the-better-buy) | Credit packs: new sizes, so Builder and Disruptor are the better buy | 18 Nov 2026 | Not created yet | Not started |
 | [CL-032](#cl-032-upgrade-nudges-the-next-plan-shown-where-a-maker-runs-short) | Upgrade nudges: the next plan, shown where a maker runs short | 18 Nov 2026 | Not created yet | Not started |
@@ -62,6 +64,207 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-036 Sell a bought copy on, and Earn for what you bought
+
+**In the prototype:** 19 November 2026 · **Jira:** [PR-9716](https://ideeza.atlassian.net/browse/PR-9716) · **Production:** Not started
+
+**Screens:** a purchased project's page (`/projects/purchased/<project>`); its **Earn** (`/projects/purchased/<project>/earn`, Overview) and **Earn › Sell** (`/projects/purchased/<project>/earn/sell`); the Physical NFT and Virtual NFT tabs of a project's Marketplace box (`/marketplace/<project>`); the creator's own **Earn › Money** (`/projects/<id>/earn/money`). Web app only.
+
+A creator who bought a Physical or Virtual copy can put it up for sale, change its price or take it off sale, and another creator can buy it from them. Each project they bought copies of has its own **Earn**, built like a project's own Earn, where they see what the copies earned and sell them.
+
+### What to build
+
+**The rules**
+
+- [ ] Only Physical and Virtual copies are sold on here. The Main NFT is the whole project: whoever holds it sells it from that project's own Earn, as the maker does.
+- [ ] A copy sells at one price (Buy now), in the token and on the network it was bought with. There is no auction for one copy.
+- [ ] Putting a copy up for sale is a free signature. A new price is another free signature. Taking it off sale needs nothing to sign, because a listing like this has nothing on chain.
+- [ ] While a copy is for sale it stays the holder's, in their wallet, and no units are made with it, so what a buyer gets can't change under them.
+- [ ] A sale moves the copy (its number), its licence (the same use) and its units left. The units the seller made stay theirs (and with Business use they may still sell them).
+- [ ] Out of the price come the creator's royalty (the listing's royalty, for example 10%) and IDEEZA's 2.5% fee. The rest is paid to the seller. The buyer pays the price plus the network fee.
+- [ ] A copy can be sold on any number of times. It keeps its number and its units count follows it.
+- [ ] The seller can't buy their own listing. A listing whose seller no longer holds the copy can't be bought ("The holder took this copy off sale.").
+
+**Earn for a purchased project**
+
+- [ ] The purchased page's header has an **Earn** button (coins icon, the quiet button) with one line beside it: *1 copy for sale · 0.0525 ETH earned from 1 sold*, *Sell a copy on, set its price, see what it earned* when nothing is for sale or sold, or *The whole project sells from its own Earn* when only the whole project is held.
+- [ ] Earn's header: *← {project}* back to the purchased page, the Shopping as strip, the title **Earn** and one status pill: *Not selling*, *1 copy for sale* / *{n} copies for sale*, or *Sold every copy*.
+- [ ] Two tabs, **Overview** and **Sell**, drawn like a project's own Earn tabs, each with its own address.
+
+**Overview**
+
+- [ ] **What your copies earned** (one card):
+  - *Earned from selling copies on*: the sum paid to you, per token, with *{n} sold · after royalties and fees*, or *Nothing yet*;
+  - *For sale now*: *{n} copies* with *Asking {total}*, or *None*;
+  - *You hold*: *{n} copies*, and *And the whole project* when held;
+  - *Units made*: *{made} of {allowance}*, with *With the Physical copies you hold* (only with Physical copies held).
+- [ ] Under the figures, one line and at most one button for the next step:
+  - copies held, none for sale: *Put a copy up for sale: you set the price, and it stays yours until someone buys it.* with **Sell a copy**;
+  - some for sale: *1 copy is for sale on Explore marketplace. Change a price or take one off sale on Sell.* with **Manage what's for sale**;
+  - only the whole project held: *The whole project is yours: it sells from its own Earn.* with **Open its Earn**;
+  - every copy sold: *You sold every copy you had.* with **Buy another copy** while the creator still sells copies.
+- [ ] **Activity**, newest first, with the date and, where money moved, the amount (paid in grey with −, earned in green with +): *Bought #7 of 50 · Physical NFT · Business use from {creator or holder}*, *Put #1 up for sale at 0.035 ETH*, *Took #1 off sale*, *Sold #8 of 50 · Physical NFT · Business use to Sam for 0.06 ETH* (+ what it paid you), *Made 10 units with #7 of 50*. A copy you sold still shows how you got it.
+- [ ] Folded at the foot: **How selling a copy on works**, the rules above in five short lines.
+
+**Sell**
+
+- [ ] **Your copies** with *Pick a copy to sell it, change its price or take it off sale.*
+- [ ] The board groups the copies under labelled bands: *Physical NFTs · {n}* (*Each copy sells with its licence and its units left.*), *Virtual NFTs · {n}* (*Each copy sells with its licence.*), then *Sold on · {n}* (*Copies you sold, and what they paid you.*). A band with nothing in it isn't shown.
+- [ ] Each copy is a tile: a chip (*Not for sale*, *For sale*, *Sold*), its use (and its product when it is a product's own copy), its number (*#7 of 50*), its price (*No price yet*, the asking price, or *Sold for 0.06 ETH to Sam*), and for a Physical copy a units bar with *10 of 50 units made · 40 left*. A tile not for sale says *Set a price ›*.
+- [ ] When the whole project is held too, a dashed band above the copies says *The whole project is yours* / *It sells, with its copies, from its own Earn.* with **Open its Earn**.
+- [ ] Picking a tile opens its item panel beside the board, from a 1024 px wide page; narrower, the panel opens as a side drawer and each tile says what a tap does (*Set a price ›*, *Manage ›*, *Receipt ›*). The purchased page's **Sell this copy** opens Sell on that copy (in the drawer on a narrow page).
+- [ ] No copies and no whole project: a state card *No copies to sell* with **Buy a copy** while copies are on sale.
+
+**The item panel**
+
+- [ ] Its head: the kind and use (*Physical NFT · Business use*), the number large, the chip, *A copy of {project}.* (or *A copy of the whole project: A, B.* / *A copy of {product}, from {project}.*), and for a Physical copy its units line.
+- [ ] **Not for sale: Sell this copy**
+  - **Price** with the token inside the field, filled with the creator's current price for that kind and use (else what you paid). Only digits and a point can be typed. An empty or zero price says *Enter a price above 0, with up to 6 decimals.*
+  - Under the field: *You paid 0.04 ETH* (*… to {holder}* when bought from one), *New copies from {creator}: 0.04 ETH* (or *… are sold out: holders are the only sellers*, or *{creator} isn't selling new copies of this kind*), and *Lowest from other holders: 0.03 ETH* when there is one.
+  - The split, live as the price changes: Price, *Creator's royalty (10%)* −…, *IDEEZA fee (2.5%)* −…, **You get**.
+  - *The buyer gets*: *The copy, its Business use licence and 40 units left to make.* (Virtual: *The copy and its Personal use licence.*). *Stays yours*: *The 10 units you made, and you can still sell them.*, *Nothing: you haven't made units with it.*, or for Virtual *What you made with it. You stop starting new work with it once it sells.*
+  - **List for sale**, then the wallet's signature (*Sign the listing — no fee*, showing the project, the copy, the price, what you get, and the wallet). Under the button: *Listing is a free signature. The copy stays yours, and in your wallet, until someone buys it.*
+- [ ] **For sale**
+  - The price large, *For sale on Explore marketplace since {date}* (and *· new price {date}*), the split, what the buyer gets and what stays yours.
+  - Physical: *No units are made with a copy while it's for sale, so the buyer gets exactly what this says.*
+  - **Change price**: the same field and split, **Sign the new price** (a free signature) and **Keep {price}**.
+  - **Take off sale**: asks *Take #1 off sale?* / *It leaves Explore marketplace at once. Nothing to sign, and you can list it again any time.* with **Take off sale** and **Keep it for sale**.
+  - **See it on Explore marketplace ›** to that tab.
+- [ ] **Sold: Receipt**: Sold to, On, Price, Creator's royalty, IDEEZA fee, **Paid to you**, Units handed over (Physical), Transaction; *The copy and its licence are {buyer}'s now. The payout went to your demo wallet.*
+
+**Buying from a holder (Explore marketplace)**
+
+- [ ] Each Physical NFT and Virtual NFT tab of a project's Marketplace box lists **From holders · {n}** under the creator's own Buy now: *Copies others bought and sell on. You get the copy, its licence and its units left; the creator still gets a royalty.* A product page's tabs list only that product's own copies.
+- [ ] One row per listing, cheapest first: the number and use, *Sold by {name}* and for a Physical copy its units (*12 of 50 units made · 38 left*, or *no units left*), the price and **Buy**. The section isn't shown when nobody sells one.
+- [ ] Buy opens the wallet's *Confirm purchase*: the project, the copy, *You get* (what moves), *From* (the seller), *Paying from*, and a note that the royalty and IDEEZA's fee come out of the price. Paying moves the copy to the buyer.
+- [ ] Your own listing reads *Your listing* with **Manage** (to its Earn › Sell).
+- [ ] *you own {n}* under a tab's price counts the copies you hold now, including ones bought from holders, not ones you sold.
+
+**After a sale**
+
+- [ ] The seller's purchased page: the copy leaves Your NFTs; the project stays in Purchased with what it earned (rail *Earned selling on*, the Earn line, a receipt row *Sold to Sam · …* with *+0.06 ETH*). When every copy is sold, Your NFTs says *You sold every copy* / *… someone else's now, with their licence. What they paid you is in Earn, and each sale is in the receipts below.* with **See what they earned**.
+- [ ] The buyer's purchased page: the copy is in Your NFTs with *Bought from Mira {date}*, the price they paid, its units left, and its own **Sell this copy**.
+- [ ] My projects › Purchased cards add the chips *For sale ×{n}* and *Sold ×{n}*.
+- [ ] The seller's balance goes up by what the sale paid them, and the buyer's down by the price and the network fee.
+
+**The creator's royalty**
+
+- [ ] On the creator's own project, Earn › Money's **Your earnings** card adds *Royalties from resales* with the sum per token and *Paid into your demo wallet when a buyer sells a copy on*.
+
+**Not in this change**
+
+- Selling a share of a Main NFT below 100%, an auction for a copy, units per copy set by the creator (decision open), and the phone app.
+
+Demo stand-ins (prototype only): the buyer and seller are the demo creators picked in Shopping as (Mira, Leo, Sam); the wallets, tokens and signatures are the testnet demo's.
+
+### Design
+
+- Earn: the project Earn's own frame, header, tab strip and cards (radius 2xl, 1 px `border`, `bg-surface`), H2 24 semibold; figures 20 semibold, labels 14 `text-secondary`, notes 12 `text-tertiary`.
+- Sell: the Sell desk's board, bands (`bg-subtle`, kind dot, count chip), tiles (radius xl, picked: `border-brand` + `bg-brand-subtle`), the units bar (the sold meter), the item panel frame (sticky, divided) and the DS Drawer under 1024 px.
+- Chips: DS Badge, *Not for sale* neutral, *For sale* brand, *Sold* success. The price field: DS Text Input xl with the token as its suffix. The split: a `bg-subtle` box, *You get* semibold above a hairline. Buttons: A01 Primary lg 44 px for the panel's one action, Secondary for the rest.
+- From holders: rows in 1 px `border` radius xl, the number in Code, **Buy** Secondary md (the creator's Buy now stays the tab's one violet).
+- Amounts: tabular figures; earned in `text-success` with +, paid in `text-secondary` with −. Light and dark.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| |
+| --- |
+| ![The purchased page with Earn and its line, For sale and Earned selling on in the summary](docs/changelog/2026-11-19-resale-purchased-after.png) |
+| ![Earn › Overview with what the copies earned, the next step and the activity](docs/changelog/2026-11-19-resale-earn-overview-after.png) |
+| ![Earn › Sell, the board of copies and Sell this copy in the panel, with the live split](docs/changelog/2026-11-19-resale-earn-sell-after.png) |
+| ![From holders under the creator's Buy now, with Leo's copy and Buy](docs/changelog/2026-11-19-resale-holders-after.png) |
+| ![At phone width the panel opens as a drawer](docs/changelog/2026-11-19-resale-sell-phone-after.png) |
+
+---
+
+## CL-035 Purchased page: the project you bought, shown by kind of NFT
+
+**In the prototype:** 19 November 2026 · **Jira:** [PR-9715](https://ideeza.atlassian.net/browse/PR-9715) · **Production:** Not started
+
+**Screen:** My projects › Purchased › a project (`/projects/purchased/<project>`), and a bought whole project in My projects. Web app only. It replaces the page in [CL-020](#cl-020-my-projects-purchased), which was never built: build this one.
+
+Each project a creator bought from has its own page. It shows the project in the marketplace page's frame and what each kind of NFT opens: the products themselves first, then the copies with their units, then the rules folded away. A whole project bought becomes the buyer's own project.
+
+### What to build
+
+**The frame**
+
+- [ ] Breadcrumb *My projects › Purchased › {project}*, then the Shopping as strip (prototype only).
+- [ ] The marketplace page's media first (the videos and pictures), then the header: the name with the badge **Purchased**, *By {creator} · {n} products · {category}*, *Bought as {name} (demo creator) · last bought {date}*, then **Earn** and its line ([CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought)).
+- [ ] When the project's Main NFT was sold to someone else: *The project was sold in full to {name}. Your copies stay yours, with their units and files.*
+- [ ] The rail (from 1024 px), held in view:
+  - **You own** *{n} NFTs*, a row per kind (*Physical NFT · 2 copies*, *Virtual NFT · 1 copy*, *Whole project · 100%*), *Paid in all*, *For sale* and *Earned selling on* when there are some, **Buy another {kind} ›** for each kind still on sale, and *In {name}'s demo wallet · {address}*.
+  - The creator: another creator's card (Follow, Message), or for the browser's own listing *Creator* with *Questions about what you bought go to {creator}.* and **Get creator support**.
+  - No Innovations stats on this page: it is about what the buyer owns.
+- [ ] Narrower: You own comes right after the header; the creator comes after the receipts.
+
+**Your NFTs**
+
+- [ ] One tab per kind held: *Whole project* (Main NFT), *Physical NFT*, *Virtual NFT*, in that order; one kind shows as a label. `?nft=physical` (or `virtual`, `main`) opens that tab.
+
+**A Physical NFT or Virtual NFT tab, in this order**
+
+- [ ] **Your products · {n}** (*Your product* with one): with several products, a switcher with each product's name on the right. The product picked, in one card, with tabs **Overview** and the pieces this kind opens:
+  - Physical NFT: 3D model, PCB, Firmware, Wiring, Assembly, Parts.
+  - Virtual NFT: 3D model, Parts.
+  - Only the pieces the product's build has. Each piece tab is the project's own piece panel, with its files open to the holder.
+  - Overview: the product's picture, name, summary and specs. A Virtual tab adds *Your copy licenses this product's 3D model and renders; its parts are open to everyone. Its PCB, firmware, wiring and assembly, and making units, come with a Physical NFT.*
+  - A product's own copies cover that product; the whole project's copies cover every product.
+- [ ] **Your copies · {n}** (*Your copy* with one), one card:
+  - Copies of a whole project with several products: *Each copy covers the whole project, so one unit is one set: Watering Hub and Soil Probe.* (Virtual: *Each copy covers the whole project: Watering Hub and Soil Probe.*)
+  - One row per copy: the number (*#7 of 50*), its use, *For sale · {price}* when listed, the price paid and *Bought {date}* or *Bought from {holder} {date}*.
+  - A Physical copy: a units bar, *10 of 50 units made · 40 left*, and *If you sell #7, the buyer gets the 40 units left; the 10 you made stay yours.*
+  - **Send to manufacturing** (Physical; waits, greyed, with *Sending a copy to manufacturing comes in the next step of the prototype. No units are made with a copy while it's for sale.*) and **Sell this copy** / **Manage the listing** ([CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought)).
+  - Units per copy until the creator sets them when listing (decision open): Personal use 1, Business use 50.
+- [ ] Folded: **What you can and can't do** (for each use held, *You can* / *You can't*):
+  - Physical · Personal use: can *Make the units each copy allows, for yourself*, *Change them for your own use*, *Sell the copy; the units left go with it*; can't *Sell what you make*, *Share the files*, *Make more units than the copy has left*.
+  - Physical · Business use: can *Make and sell the units each copy allows*, *Put your brand on the units*, *Sell the copy; the units left go with it*; can't *Sell or share the files themselves*, *Make more units than the copy has left*.
+  - Virtual · Personal use: can *Use the model and renders in your own work*, *Show it in your portfolio*, *Sell the copy; the licence goes with it*; can't *Use it in ads or paid work*, *Share or sell the model file*, *Start new work with it after you sell the copy*.
+  - Virtual · Business use: can *Use it in ads, games, product pages and client work*, *Sell the copy; the licence goes with it*; can't *Sell or share the model file itself*, *Start new work with it after you sell the copy*.
+- [ ] Folded: **NFT details**: Collection, Blockchain, NFT type, Copies, Paid, Purchased from; *Each copy is one licence. Minted when you bought it.*
+
+**The Whole project tab (a Main NFT)**
+
+- [ ] *The whole project is yours* / *It's one of your projects now: open it, edit it and sell it again, as you do your own.* with **Open the project**. A share: *{n}% of the project is yours* / *You hold a share of its Main NFT: its sales and royalties are split with you.*
+- [ ] **Its products · {n}** with every piece tab and **Open in your project** on each product's Overview.
+- [ ] Folded: **What the Main NFT allows** (*Open, edit and build the project like your own*, *List it again, sell its copies and earn its royalties*; a share: *Earn {n}% of the project's sales and royalties*, can't *List or change the project on your own*) and **NFT details** (Collection, Blockchain, NFT type, Token ID, Your share, Price paid, Purchased from, Transaction, Purchased; *Minted when you bought it.*).
+- [ ] A whole project bought is the buyer's own project in My projects, with its products and builds, opened and edited like any of theirs. Its header and card say *Bought from {creator}*. It doesn't count toward the plan's projects.
+
+**Receipts**
+
+- [ ] A table, newest first: Date, Item (*Physical NFT · Business use*, *… · from {holder}*, *Sold to {name} · …*), Copy, Price (a sale in green with +), Transaction (shortened, the full one on hover). Numbers and prices never wrap; the table scrolls sideways inside its card when narrow.
+
+**Elsewhere**
+
+- [ ] A project's Marketplace box says **See what you own ›** (to this page) when the buyer holds any of it.
+- [ ] On an Innovations product page, a holder of a Physical copy or the whole project sees PCB, Firmware and Wiring open: *{piece} files are yours* with **Open your files**, and no lock on those tabs (not on the maker's own post).
+- [ ] My projects › Purchased: each card says *By {creator} · {n} products*, and with several the product names under it (*Watering Hub · Soil Probe*). The count above the cards reads *{n} projects bought as {name} (demo creator)*.
+
+Demo stand-ins (prototype only): Shopping as, the Testnet demo badge, test tokens; the pieces' files are the prototype's sample builds.
+
+### Design
+
+- The marketplace page's frame: media stage, H1 36 semibold with the brand Badge, the 360 rail cards (radius 2xl, `bg-surface`, 1 px `border`).
+- Your NFTs: the Marketplace box's offer tabs. Products: the product switcher (segmented, picked `bg-brand-subtle` + `text-brand`) and the project page's tab strip; pieces in the project's own panels.
+- Copies: one card, rows divided by hairlines, the number in Code, DS Badge for the use (neutral) and *For sale* (brand), the units bar 6 px (violet 500 on `bg-subtle`); buttons A01 Secondary md, 44 px at phone width.
+- Folds: the Marketplace box's *NFT details* disclosure, with its title. Rules: tick in `text-success`, cross in `text-error`.
+- No new colours or tokens; light and dark.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| |
+| --- |
+| ![A Physical NFT tab: both products with every piece tab, then the copies with their units](docs/changelog/2026-11-19-purchased-page-physical-after.png) |
+| ![The Virtual NFT tab opens only the 3D model and parts, and says why](docs/changelog/2026-11-19-purchased-page-virtual-after.png) |
+| ![A whole project bought: Open the project and every product](docs/changelog/2026-11-19-purchased-page-main-after.png) |
+| ![At phone width, dark](docs/changelog/2026-11-19-purchased-page-phone-after.png) |
 
 ---
 
@@ -804,12 +1007,18 @@ Prototype only (nothing to build): the standings, products and the two sample ha
 
 - Explore marketplace always lists the 9 sample projects from the Innovations feed that are for sale, as other creators' listings ("By {creator}"). Each opens a shop page at `/marketplace/p<n>` with the same Marketplace box ([CL-018](#cl-018-marketplace-details-a-shop-page-with-one-buy-box)), the Creator block, About, What's inside and On Innovations. Buying one uses a demo wallet. A sample post's **View on Marketplace** opens that page.
 - Every account gets 4 demo projects in My projects, once: **Smart Plant Pot** (Listed, shared on Innovations, Main NFT on Buy now plus Physical and Virtual copies for both uses), **Gesture LED Lamp** (Sold, bought by Leo), **Heart Rate Band** (Minted) and **BLE Data Logger** (Draft).
+- Added 19 November 2026, so the purchased pages ([CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft)) and selling on ([CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought)) always have something to show (an older account gets what it lacks, never twice, and nothing it did by hand is replaced):
+  - Each demo creator holds sample purchases of every kind. Mira, who shops by default: the Sleep-stage ring whole project (so it is her own project), Air quality room sensor Physical copies for both uses and a Virtual copy, the Lo-fi guitar pedal Physical and Virtual, the two-product Smart plant watering hub Physical (both uses) and Virtual, and the two-product LoRa weather station Virtual. Leo and Sam hold others.
+  - Smart Plant Pot has copies of every kind sold to Sam, Leo and Mira.
+  - Some Physical copies already have units made (Mira 10 of 50 on her Air quality copy, 6 of 50 on the watering hub).
+  - Copies sold on: Mira sold Air quality #8 to Sam and has its Virtual copy for sale; Leo sells his watering hub Virtual copy; Sam sells his Smart Plant Pot Physical copy.
 
 ### Before → After
 
 | Before | After |
 | --- | --- |
 | — | ![After: My projects with the four demo projects](docs/changelog/2026-11-17-demo-projects-after.png) |
+| ![Before (19 Nov): Purchased empty for Mira](docs/changelog/2026-11-19-demo-purchases-before.png) | ![After (19 Nov): Purchased with six projects bought, product names on the multi-product ones](docs/changelog/2026-11-19-demo-purchases-after.png) |
 
 ---
 
@@ -869,6 +1078,8 @@ No screenshot: the change is motion only. At rest the menu looks the same as bef
 ## CL-020 My projects: Purchased
 
 **In the prototype:** 17 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Changed by [CL-035](#cl-035-purchased-page-the-project-you-bought-shown-by-kind-of-nft) and [CL-036](#cl-036-sell-a-bought-copy-on-and-earn-for-what-you-bought)** (19 November 2026): the purchased page is the project by kind of NFT, and a copy can be sold on. Build those instead; this page was never built.
 
 **Screen:** My projects › **Purchased** (`/projects?tab=purchased`) and a page for each project bought from (`/projects/purchased/<project>`). Web app only.
 

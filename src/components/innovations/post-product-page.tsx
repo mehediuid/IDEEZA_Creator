@@ -25,7 +25,7 @@ import { DeliverablesAccess, ProductPiecePanel } from "@/components/projects/pro
 import { productsOf, useCreateHistory, type BuildJob, type BuildProduct } from "@/lib/create/history";
 import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-store";
 import { postHref } from "@/lib/innovations/slug";
-import { PIECE_LABEL, type InnovationPost, type PostPiece, type PostProduct } from "@/lib/innovations/types";
+import { ME_ID, PIECE_LABEL, type InnovationPost, type PostPiece, type PostProduct } from "@/lib/innovations/types";
 import { cn } from "@/lib/utils";
 import { CARD, ImageGone, partsLabel, PostBreadcrumb, PostImg } from "./post-bits";
 import { lightboxTile, PostVideoStage } from "./post-media";
@@ -36,6 +36,8 @@ import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import { usePost, type MinePostFacts } from "./use-post";
+import { usePurchased } from "@/components/projects/purchased/use-purchased";
+import { heldFilesHrefOf } from "@/lib/market/purchases";
 
 type TabId = "media" | "3d" | "parts" | "pcb" | "code" | "wiring";
 const isLocked = (t: TabId): t is LockedId => isLockedPiece(t);
@@ -82,9 +84,13 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
   // Media leads and opens on the product's video (owner, 2026-10-13).
   if (product.video || product.image) open.push({ id: "media", label: "Media" });
   for (const k of ["3d", "parts"] as const) if (product.pieces.includes(k)) open.push({ id: k, label: PIECE_LABEL[k] });
+  // A holder of a Physical NFT (or the whole project) has these pieces: no lock on their tabs (plan D6).
+  const { ready, purchases } = usePurchased();
+  const projectId = post.source === "sample" ? post.id.replace(/^sample:/, "") : post.projectId;
+  const held = ready && projectId !== null && post.creator.id !== ME_ID && heldFilesHrefOf(purchases, projectId) !== null;
   const locked: TabDef<TabId>[] = (["pcb", "code", "wiring"] as const)
     .filter((k) => product.pieces.includes(k as PostPiece))
-    .map((k) => ({ id: k, label: PIECE_LABEL[k], icon: <Icon icon={SquareLock02Icon} size={14} /> }));
+    .map((k) => ({ id: k, label: PIECE_LABEL[k], icon: held ? undefined : <Icon icon={SquareLock02Icon} size={14} /> }));
   const first = open[0]?.id ?? locked[0]?.id ?? null;
   const [tab, setTab] = React.useState<TabId | null>(first);
 

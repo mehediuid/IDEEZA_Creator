@@ -174,6 +174,8 @@ export function ProjectHeader({
     else if (text.ownedBy?.created) lead.push(text.ownedBy.created);
     if (text.ownedBy) lead.push(`Owned by ${text.ownedBy.ownedBy}`);
   }
+  // A project bought whole says whose it was, in every view (owner, 2026-11-19).
+  if (summary.boughtFrom) lead.unshift(`Bought from ${summary.boughtFrom}`);
   const meta: MetaPart[] = engineering
     ? [{ kind: "text", text: stageLineOf(view.engineering, summary) }, ...engineeringMetaOf(summary, { label: labelOf(view.current) })]
     : market

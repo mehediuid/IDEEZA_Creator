@@ -19,6 +19,7 @@ import * as React from "react";
 import { Button } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
+import { listingUnitsLine } from "@/lib/market/units";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { formatDate } from "@/lib/manual/project-summary";
 import {
@@ -50,9 +51,14 @@ import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
+import { SeeWhatYouOwn } from "@/components/projects/purchased/see-what-you-own";
 import { CARD } from "@/components/innovations/post-bits";
 import { readSampleSales, useSampleSales, writeSampleSales } from "@/components/mobile/project-earn/buyer/sample-sales-store";
 import { cn } from "@/lib/utils";
+import { useResales } from "@/components/projects/purchased/resales-store";
+import { sampleSaleKeyOf } from "@/lib/market/purchases";
+import { holderOf } from "@/lib/market/resales";
+import { HolderOffers } from "./holder-offers";
 import { ChoiceRows, FactGrid, LegalLine, MoreFacts, OfferTabs, OfferTop, WalletLine, type OfferTab } from "./offer-parts";
 
 /** The web's words for a project sold in full (lib/market/purchase.ts). */
@@ -143,9 +149,11 @@ export function SampleOfferBox({
             busy={busy}
             now={now}
             onBuy={(o) => buy(o)}
+            announce={announce}
           />
         )}
       </OfferTabs>
+      {held.length > 0 && <SeeWhatYouOwn projectId={feedId} />}
     </section>
   );
 }
@@ -211,6 +219,7 @@ function CopyPanel({
   busy,
   now,
   onBuy,
+  announce,
 }: {
   market: SampleMarket;
   kind: EditionKind;
@@ -219,17 +228,20 @@ function CopyPanel({
   busy: string | null;
   now: number;
   onBuy: (o: UseOffer) => void;
+  announce: (message: string) => void;
 }) {
   const { feedId, post } = market;
   const uses = copyUsesOf(market, kind);
   const open = uses.find((o) => copyUseBlockOf(o, feedId, sales) === null) ?? uses[0];
   const [pickedUse, setPickedUse] = React.useState<string | null>(null);
+  const resales = useResales();
   if (!open) return null;
   const offer = uses.find((o) => o.use === pickedUse && copyUseBlockOf(o, feedId, sales) === null) ?? open;
   const state = copyUseStateOf(offer, feedId, sales);
   const blocked = copyUseBlockOf(offer, feedId, sales);
   const price = formatAmount(offer.price, offer.token);
-  const owned = state.sales.filter((s) => s.buyerId === buyerId).length;
+  // Held now: a copy sold on is its new holder's (resales.ts).
+  const owned = state.sales.filter((s) => holderOf(sampleSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length;
   const sub = [state.of !== null ? `${state.count} of ${state.of} sold` : state.count ? `${state.count} sold` : null, owned > 0 ? `you own ${owned}` : null]
     .filter(Boolean)
     .join(" · ");
@@ -237,6 +249,7 @@ function CopyPanel({
   return (
     <>
       <p className="m-0 text-sm text-text-secondary">{helperLineOf(kind, post.title)}</p>
+      {kind === "physical" && <p className="m-0 text-sm text-text-secondary">{listingUnitsLine()}</p>}
       <ChoiceRows
         legend="Use"
         value={offer.use}
@@ -255,6 +268,7 @@ function CopyPanel({
           <WalletLine buyerId={buyerId} token={offer.token} network={SAMPLE_NETWORK} verb="buy" now={now} />
         </>
       )}
+      <HolderOffers projectId={feedId} kind={kind} product={null} announce={announce} />
       <MoreFacts>
         <FactGrid
           facts={[

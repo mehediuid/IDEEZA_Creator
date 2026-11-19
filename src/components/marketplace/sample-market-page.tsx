@@ -112,7 +112,7 @@ export function SampleMarketPage({ market, initialTab = null }: { market: Sample
 }
 
 /** The mirror of the post's "On Marketplace" card: its counts, and the way to the story. */
-function OnInnovations({ post, className }: { post: InnovationPost; className?: string }) {
+export function OnInnovations({ post, className }: { post: InnovationPost; className?: string }) {
   const id = React.useId();
   const { reactions } = useReactions();
   const comments = useCommentCount(post.id, sampleSeedOf(post.id)) ?? 0;
