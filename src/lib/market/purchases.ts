@@ -16,6 +16,7 @@
 import type { Network, Token } from "../brief/types";
 import { LOCKED } from "../innovations/locked-pieces";
 import { addAmounts } from "../wallet/money";
+import { ownCopyKeyOf, sampleCopyKeyOf, unitsAllowanceOf } from "./units";
 import { DEMO_BUYERS } from "../wallet/identities";
 import type { Amount, DemoBuyerId } from "../wallet/types";
 import type { SampleSale } from "./phone-sample-sales";
@@ -34,22 +35,31 @@ export type Licence = { can: string[]; cant: string[] };
 
 export const LICENCE: Record<EditionKind, Record<PurchaseUse, Licence>> = {
   physical: {
-    "Personal use": { can: ["Build one for yourself per copy", "Change it for your own use"], cant: ["Sell what you build", "Share the files"] },
+    "Personal use": {
+      can: ["Make the units each copy allows, for yourself", "Change them for your own use", "Sell the copy; the units left go with it"],
+      cant: ["Sell what you make", "Share the files", "Make more units than the copy has left"],
+    },
     "Business use": {
-      can: ["Build and sell one unit per copy", "Put your brand on the units"],
-      cant: ["Sell or share the files themselves", "Build more units than your copies"],
+      can: ["Make and sell the units each copy allows", "Put your brand on the units", "Sell the copy; the units left go with it"],
+      cant: ["Sell or share the files themselves", "Make more units than the copy has left"],
     },
   },
   virtual: {
-    "Personal use": { can: ["Use the model and renders in your own work", "Show it in your portfolio"], cant: ["Use it in ads or paid work", "Share or sell the model file"] },
-    "Business use": { can: ["Use it in ads, games, product pages and client work"], cant: ["Sell or share the model file itself"] },
+    "Personal use": {
+      can: ["Use the model and renders in your own work", "Show it in your portfolio", "Sell the copy; the licence goes with it"],
+      cant: ["Use it in ads or paid work", "Share or sell the model file", "Start new work with it after you sell the copy"],
+    },
+    "Business use": {
+      can: ["Use it in ads, games, product pages and client work", "Sell the copy; the licence goes with it"],
+      cant: ["Sell or share the model file itself", "Start new work with it after you sell the copy"],
+    },
   },
 };
 
 /** What a Main NFT gives, by the share held. */
 export function mainLicenceOf(sharePct: number): Licence {
   return sharePct >= 100
-    ? { can: ["Use every file of the project", "List it again and earn its royalties", "Sell its copies"], cant: [] }
+    ? { can: ["Open, edit and build the project like your own", "List it again, sell its copies and earn its royalties"], cant: [] }
     : { can: [`Earn ${sharePct}% of the project's sales and royalties`], cant: ["List or change the project on your own"] };
 }
 
@@ -95,6 +105,8 @@ export type PurchaseCopy = {
   tokenId: number | null;
   /** The wallet it went to. */
   buyerAddress: string;
+  /** The copy's key, the same after it is sold again (units.ts); the Main NFT's is its sale's id. */
+  key: string;
 };
 
 export type PurchaseLine = {
@@ -108,6 +120,8 @@ export type PurchaseLine = {
   copies: PurchaseCopy[];
   /** Paid, per token: "0.08 ETH". */
   paid: { amount: Amount; token: Token }[];
+  /** A Physical copy's units allowance (units.ts); null for Virtual copies and the Main NFT. */
+  unitsPerCopy: number | null;
 };
 
 export type PurchasedProject = {
@@ -132,14 +146,19 @@ export type PurchasedProject = {
 const KIND_ORDER: PurchaseKind[] = ["main", "physical", "virtual"];
 const USE_ORDER: (PurchaseUse | null)[] = [null, "Personal use", "Business use"];
 
-type Draft = Omit<PurchaseLine, "paid">;
+type Draft = Omit<PurchaseLine, "paid" | "unitsPerCopy">;
 
 function finish(lines: Map<string, Draft>): PurchaseLine[] {
   return [...lines.values()]
     .map((l) => {
       const byToken = new Map<Token, Amount>();
       for (const c of l.copies) byToken.set(c.token, byToken.has(c.token) ? addAmounts(byToken.get(c.token) as Amount, c.price) : c.price);
-      return { ...l, copies: [...l.copies].sort((a, b) => a.at - b.at), paid: [...byToken].map(([token, amount]) => ({ amount, token })) };
+      return {
+        ...l,
+        copies: [...l.copies].sort((a, b) => a.at - b.at),
+        paid: [...byToken].map(([token, amount]) => ({ amount, token })),
+        unitsPerCopy: l.kind === "physical" ? unitsAllowanceOf(l.use) : null,
+      };
     })
     .sort(
       (a, b) =>
@@ -193,6 +212,7 @@ export function ownPurchasesOf(
       collection: s.collection,
       tokenId: s.item.nft === "main" ? s.tokenId : null,
       buyerAddress: s.buyerAddress,
+      key: s.item.nft === "main" ? s.id : ownCopyKeyOf(s.projectId, s.item.trackId, s.item.serial),
     };
     if (s.item.nft === "main") add(lines, "main", null, null, copy, s.item.sharePct);
     else {
@@ -257,6 +277,7 @@ export function samplePurchasesOf(sales: readonly SampleSale[], buyerId: DemoBuy
         collection: SAMPLE_COLLECTION,
         tokenId: null,
         buyerAddress: s.buyerAddress,
+        key: s.kind === "main" || s.serial === null ? s.id : sampleCopyKeyOf(s.projectId, s.kind, /business/i.test(s.name) ? "Business use" : "Personal use", s.serial),
       };
       if (s.kind === "main") {
         add(lines, "main", null, null, copy, 100);

@@ -26,6 +26,7 @@
 import * as React from "react";
 import { Button, TestnetDemoBadge } from "@/components/ideeza";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
+import { listingUnitsLine } from "@/lib/market/units";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { historyOf, labelOf } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
@@ -114,6 +115,7 @@ export function CopyPanel({
       {/* A buyer's Testnet demo badge sits by the money (WalletLine); a preview has no wallet line. */}
       {!buyerId && <TestnetDemoBadge className="self-start" />}
       <p className="m-0 text-sm text-text-secondary">{helperLineOf(kind, scopeName)}</p>
+      {kind === "physical" && <p className="m-0 text-sm text-text-secondary">{listingUnitsLine()}</p>}
 
       <ChoiceRows
         legend="Use"

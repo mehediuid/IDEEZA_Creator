@@ -16,6 +16,8 @@
 import { txHashOf } from "../market/purchase";
 import { makeSampleSale, offerStateOf, type SampleSale } from "../market/phone-sample-sales";
 import { copyUseBlockOf, copyUseStateOf, copyUsesOf, sampleMarketOf, type SampleUse } from "../market/sample-market";
+import type { Sale } from "../market/types";
+import { ownCopyKeyOf, sampleCopyKeyOf, type UnitsEntry } from "../market/units";
 import { demoAddress } from "../wallet/demo-wallet";
 import type { DemoBuyerId } from "../wallet/types";
 
@@ -70,4 +72,41 @@ export function withDemoSampleSales(existing: readonly SampleSale[], now: number
     sales = [...sales, makeSampleSale({ ...base, offer, serial })];
   }
   return sales;
+}
+
+/** Manufacturing already done with some demo copies (units.ts), so a copy's units read made and left: Mira made 10
+ *  of her 50 with Air quality #7; Sam made all 50 with his jump pack copy; on the Smart Plant Pot, Leo made his one
+ *  Personal-use unit and Sam 12 of 50. Keyed by the sale that holds the copy. */
+export const DEMO_UNITS: readonly { id: string; saleId: string; units: number; daysAgo: number }[] = [
+  { id: "units_demo_mira_air", saleId: "ssale_demo_mira_air_phys_biz_1", units: 10, daysAgo: 2 },
+  { id: "units_demo_sam_jump", saleId: "ssale_demo_sam_jump_phys_biz", units: 50, daysAgo: 3 },
+  { id: "units_demo_leo_plant", saleId: "sale_demo_plant_phys_private", units: 1, daysAgo: 4 },
+  { id: "units_demo_sam_plant", saleId: "sale_demo_plant_1", units: 12, daysAgo: 6 },
+];
+
+/** The units log with the demo orders it lacks, each on the copy its sale holds (by that copy's key). */
+export function withDemoUnits(
+  log: readonly UnitsEntry[],
+  sampleSales: readonly SampleSale[],
+  ownSales: readonly Sale[],
+  now: number,
+): UnitsEntry[] {
+  const out = [...log];
+  for (const d of DEMO_UNITS) {
+    if (out.some((e) => e.id === d.id)) continue;
+    const s = sampleSales.find((x) => x.id === d.saleId);
+    const o = ownSales.find((x) => x.id === d.saleId);
+    let key: string | null = null;
+    let holder: DemoBuyerId | null = null;
+    if (s && s.kind === "physical" && s.serial !== null) {
+      key = sampleCopyKeyOf(s.projectId, s.kind, /business/i.test(s.name) ? "Business use" : "Personal use", s.serial);
+      holder = s.buyerId;
+    } else if (o && o.item.nft === "physical") {
+      key = ownCopyKeyOf(o.projectId, o.item.trackId, o.item.serial);
+      holder = o.buyerId;
+    }
+    if (!key || !holder) continue;
+    out.push({ id: d.id, copyKey: key, holder, units: d.units, at: now - d.daysAgo * DAY });
+  }
+  return out;
 }

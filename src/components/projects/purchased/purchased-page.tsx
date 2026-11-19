@@ -1,32 +1,25 @@
 "use client";
 
-// One project's purchases, as the active demo creator holds them: the project unlocked (owner, 2026-11-19: "what
-// will I see for the Physical and Virtual NFTs I buy? plan it with our other details pages"; plan
-// 6rPKBgwzQ6r6woYmjfE6Td, D1–D6). It keeps the marketplace page's frame, so a buyer sees what they bought in the
-// shape they bought it in, and answers five questions in order:
-// 1. What do I own? — the Your NFTs box in the rail (under the header on a phone): a tab per kind held, as the
-//    marketplace box has, its copies by number and use, NFT details (the Purchased Summary's facts) and Buy another;
-// 2. What may I do with it? — What you can do: You can / You can't for each use held (one copy is one licence);
-// 3. How do I get and use it? — Your files: what each kind unlocks (a Physical NFT the PCB, firmware and wiring that
-//    are locked on Innovations, the enclosure and the assembly guide; a Virtual NFT the 3D model and renders; the
-//    whole project all of it), and What you'll build: each product, its specs and parts, its 3D model;
-// 4. Where is the proof? — the box's NFT details and the Receipts;
-// 5. Who helps, can I get more? — the Creator block and Buy another.
+// One project's purchases, as the active demo creator holds them: the project unlocked (owner, 2026-11-19; plan
+// 6rPKBgwzQ6r6woYmjfE6Td). The marketplace page's frame — media first, then the header — and then everything about
+// one kind of NFT in one place (v2: "the information drifts apart"):
+// - Your NFTs, a tab per kind held (as the marketplace box has):
+//   · Physical / Virtual: the copies by use, each use with what it allows and doesn't; each copy with its number,
+//     price and date, a Physical copy's units (allowance, made, left; units.ts), Send to manufacturing and Sell
+//     this copy (their flows come next: the buttons wait, and say what a sale would hand over); then the products
+//     the copies cover, one at a time, each in full: its overview and specs, and the pieces this kind unlocks in
+//     the project's own panels (Physical: 3D model, PCB, firmware, wiring, assembly, parts; Virtual: the 3D model
+//     and parts); then NFT details;
+//   · Main: the whole project is the buyer's, so it opens as their own project (owner: "full control, browse it
+//     like my private project, no downloads"): Open the project, its products, and the ownership facts;
+// - Receipts;
+// - the rail: a Summary of what is held, the creator, On Innovations.
 // The media, the products and the creator come from the project's Innovations post (a sample's own post, or this
-// browser's project read as one), so this page and the post never disagree.
+// browser's project read as one); every product's pieces come from a build (this browser's, or the sample's).
 
 import * as React from "react";
 import Link from "next/link";
-import {
-  ArrowRight01Icon,
-  Cancel01Icon,
-  Download04Icon,
-  File01Icon,
-  ImageNotFound01Icon,
-  ShoppingBag01Icon,
-  Tick02Icon,
-} from "@hugeicons/core-free-icons";
-import { ModelViewer } from "@/components/3d/model-viewer";
+import { ArrowRight01Icon, Cancel01Icon, ImageNotFound01Icon, ShoppingBag01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, Button, StateCard, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import { CARD, PostImg } from "@/components/innovations/post-bits";
@@ -41,24 +34,28 @@ import { OnInnovations } from "@/components/marketplace/sample-market-page";
 import { LiveRegion, usePageArrival } from "@/components/projects/details/arrival";
 import { Breadcrumb } from "@/components/projects/details/breadcrumb";
 import { ProjectSkeleton } from "@/components/projects/details/page-states";
+import { TabStrip, type TabDef } from "@/components/projects/details/tab-strip";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
-import { useCreateHistory } from "@/lib/create/history";
+import { DeliverablesAccess, ProductPiecePanel } from "@/components/projects/product/product-deliverables";
+import { productsOf, useCreateHistory, type BuildItemKind, type BuildJob, type BuildProduct } from "@/lib/create/history";
+import { acquiredIdOf, sampleBuildsOf } from "@/lib/demo/acquired-projects";
 import { minePostOf } from "@/lib/innovations/mine-post";
 import type { InnovationPost, PostProduct } from "@/lib/innovations/types";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { useMarket } from "@/lib/market/market-store";
 import {
-  FILES_OF,
   KIND_NAME,
   LICENCE,
   lineTitleOf,
   mainLicenceOf,
   type Licence,
+  type PurchaseCopy,
   type PurchaseKind,
   type PurchaseLine,
   type PurchasedProject,
 } from "@/lib/market/purchases";
 import { sampleMarketOf } from "@/lib/market/sample-market";
+import { copyUnitsOf, unitsLineOf, unitsOnResale, type CopyUnits, type UnitsEntry } from "@/lib/market/units";
 import { useMe } from "@/lib/people/profile-store";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
 import { addAmounts, formatAmount } from "@/lib/wallet/money";
@@ -67,17 +64,31 @@ import type { Amount } from "@/lib/wallet/types";
 import type { DemoBuyer } from "@/lib/wallet/identities";
 import type { Token } from "@/lib/brief/types";
 import { cn } from "@/lib/utils";
+import { useUnitsLog } from "./units-store";
 import { usePurchased } from "./use-purchased";
 
 const H2 = "text-xl font-bold leading-xl text-text-primary";
 const H3 = "text-lg font-semibold leading-lg text-text-primary";
-const SECONDARY_LINK = cn(buttonVariants({ hierarchy: "secondary", size: "lg" }), "h-[44px] gap-2 hover:text-[color:var(--color-button-secondary-text)]");
-const QUIET_BUTTON =
-  "self-start rounded-sm text-md font-medium text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
+const PRIMARY_LINK = cn(buttonVariants({ hierarchy: "primary", size: "lg" }), "h-[44px] gap-2 hover:text-[color:var(--color-button-primary-text)]");
+const QUIET_LINK =
+  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-semibold text-text-brand outline-none hover:text-text-brand focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
 const KINDS: PurchaseKind[] = ["main", "physical", "virtual"];
-/** Rows a group shows before "Show all". */
-const FIRST_ROWS = 3;
-const FIRST_PARTS = 6;
+
+/** What each kind unlocks of a product, as the project's own piece panels (plan D2). */
+const PIECES_OF: Record<Exclude<PurchaseKind, "main">, { id: BuildItemKind; label: string }[]> = {
+  physical: [
+    { id: "3d", label: "3D model" },
+    { id: "pcb", label: "PCB" },
+    { id: "code", label: "Firmware" },
+    { id: "wiring", label: "Wiring" },
+    { id: "assembly", label: "Assembly" },
+    { id: "parts", label: "Parts" },
+  ],
+  virtual: [
+    { id: "3d", label: "3D model" },
+    { id: "parts", label: "Parts" },
+  ],
+};
 
 export function PurchasedPage({ id, initialTab = null }: { id: string; initialTab?: OfferTab | null }) {
   const { ready, buyer, purchases } = usePurchased();
@@ -88,17 +99,25 @@ export function PurchasedPage({ id, initialTab = null }: { id: string; initialTa
 }
 
 type BodyProps = { p: PurchasedProject; buyer: DemoBuyer; initialTab: OfferTab | null };
+type ProductBuild = { job: BuildJob; bp: BuildProduct } | null;
 
 function SampleBody(props: BodyProps) {
   const m = sampleMarketOf(props.p.id);
+  const jobs = React.useMemo(() => (m ? sampleBuildsOf(m) : []), [m]);
   if (!m) return <NothingBought buyerName={props.buyer.name} />;
-  return <PurchasedBody {...props} post={m.post} mine={null} />;
+  const buildOf = (i: number): ProductBuild => {
+    const job = jobs[i];
+    const bp = job ? productsOf(job)[0] : undefined;
+    return job && bp ? { job, bp } : null;
+  };
+  return <PurchasedBody {...props} post={m.post} mine={null} buildOf={buildOf} />;
 }
 
-/** This browser's own project, read as its Innovations post (as the post page reads it). */
+/** This browser's own project, read as its Innovations post (as the post page reads it), with its own builds. */
 function OwnBody(props: BodyProps) {
   const data = useProjectPageData(props.p.id, "project");
   const me = useMe();
+  const { builds } = useCreateHistory();
   const post = React.useMemo(() => {
     if (data.state !== "ready") return null;
     const read = minePostOf(data.project, data.view);
@@ -106,14 +125,28 @@ function OwnBody(props: BodyProps) {
   }, [data, me]);
   if (data.state === "missing") return <NothingBought buyerName={props.buyer.name} />;
   if (data.state !== "ready" || !post) return <ProjectSkeleton />;
-  return <PurchasedBody {...props} post={post} mine={{ project: data.project, view: data.view, brief: data.brief }} />;
+  const buildOf = (i: number): ProductBuild => {
+    const ref = post.products[i]?.build;
+    const job = ref ? builds.find((b) => b.id === ref.buildId) : undefined;
+    const bp = job ? productsOf(job).find((x) => x.id === ref?.productId) : undefined;
+    return job && bp ? { job, bp } : null;
+  };
+  return <PurchasedBody {...props} post={post} mine={{ project: data.project, view: data.view, brief: data.brief }} buildOf={buildOf} />;
 }
 
-function PurchasedBody({ p, buyer, initialTab, post, mine }: BodyProps & { post: InnovationPost; mine: MinePostFacts | null }) {
+function PurchasedBody({
+  p,
+  buyer,
+  initialTab,
+  post,
+  mine,
+  buildOf,
+}: BodyProps & { post: InnovationPost; mine: MinePostFacts | null; buildOf: (i: number) => ProductBuild }) {
   const { titleRef, live } = usePageArrival(`purchased:${p.id}`, p.name, `${p.name} · Purchased · IDEEZA`);
   const held = KINDS.filter((k) => p.lines.some((l) => l.kind === k));
   const [tab, setTab] = React.useState<PurchaseKind>(initialTab && held.includes(initialTab) ? initialTab : held[0]);
-  const box = <YourNftsBox p={p} buyer={buyer} held={held} tab={tab} onTab={setTab} />;
+  const log = useUnitsLog();
+  const summary = <SummaryBlock p={p} buyer={buyer} held={held} />;
   const creator = <CreatorBlock p={p} post={post} buyer={buyer} />;
   return (
     <div className={POST_PAGE}>
@@ -126,19 +159,30 @@ function PurchasedBody({ p, buyer, initialTab, post, mine }: BodyProps & { post:
             <PostMediaStage post={post} mine={mine} />
             <Header p={p} post={post} buyer={buyer} titleRef={titleRef} />
             <div className={cn(NARROW_ONLY, "flex flex-col gap-8")}>
-              {box}
+              {summary}
               {creator}
             </div>
-            <WhatYouCanDo p={p} />
-            <YourFiles held={held} />
-            <WhatYoullBuild p={p} post={post} held={held} />
+
+            <section aria-labelledby="your-nfts" className="flex flex-col gap-8">
+              <h2 id="your-nfts" className={H2}>
+                Your NFTs
+              </h2>
+              <OfferTabs tabs={held} active={tab} onSelect={setTab} label="Your NFTs">
+                {tab === "main" ? (
+                  <MainPanel p={p} post={post} />
+                ) : (
+                  <KindPanel p={p} kind={tab} post={post} buildOf={buildOf} buyer={buyer} log={log} />
+                )}
+              </OfferTabs>
+            </section>
+
             <Receipts p={p} />
             {post.shared && <OnInnovations post={post} className={NARROW_ONLY} />}
           </div>
 
-          <aside aria-label="Your NFTs and the creator" className={cn(WIDE_ONLY, "min-w-0 flex-col self-stretch")}>
+          <aside aria-label="Summary and the creator" className={cn(WIDE_ONLY, "min-w-0 flex-col self-stretch")}>
             <div className="sticky top-[24px] flex flex-col gap-8">
-              {box}
+              {summary}
               {creator}
               {post.shared && <OnInnovations post={post} />}
             </div>
@@ -161,12 +205,6 @@ function Header({
   buyer: DemoBuyer;
   titleRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
-  const counts = (["physical", "virtual"] as const)
-    .map((k) => [k, p.lines.filter((l) => l.kind === k).reduce((n, l) => n + l.copies.length, 0)] as const)
-    .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${k === "physical" ? "Physical" : "Virtual"} ×${n}`);
-  const main = p.lines.find((l) => l.kind === "main");
-  const what = [main ? lineTitleOf(main) : null, ...counts].filter(Boolean).join(" · ");
   const meta = [post.products.length === 1 ? "1 product" : `${post.products.length} products`, post.category].filter(Boolean).join(" · ");
   return (
     <header className="flex flex-col gap-4">
@@ -187,156 +225,66 @@ function Header({
         {meta && <span aria-hidden> · </span>}
         {meta}
       </p>
-      <p className="m-0 text-lg font-semibold leading-lg text-text-primary">
-        You own {p.count} {p.count === 1 ? "NFT" : "NFTs"}
-        <span className="font-regular text-text-secondary">
-          {" "}
-          · {what} · last bought {formatDate(p.lastAt)}
-        </span>
-      </p>
       <p className="m-0 flex flex-wrap items-center gap-3 text-md leading-md text-text-secondary">
-        Bought as {buyer.name} (demo creator) <TestnetDemoBadge />
+        Bought as {buyer.name} (demo creator) · last bought {formatDate(p.lastAt)} <TestnetDemoBadge />
       </p>
       {p.soldInFullTo && (
         <p className="m-0 rounded-lg bg-bg-subtle px-6 py-4 text-md leading-md text-text-primary">
-          The project was sold in full to {p.soldInFullTo}. Your copies stay yours.
+          The project was sold in full to {p.soldInFullTo}. Your copies stay yours, with their units and files.
         </p>
       )}
     </header>
   );
 }
 
-// ─────────────────────────────── 1 · what you own ───────────────────────────────
+// ─────────────────────────────── the rail ───────────────────────────────
 
-function YourNftsBox({
-  p,
-  buyer,
-  held,
-  tab,
-  onTab,
-}: {
-  p: PurchasedProject;
-  buyer: DemoBuyer;
-  held: PurchaseKind[];
-  tab: PurchaseKind;
-  onTab: (k: PurchaseKind) => void;
-}) {
+function SummaryBlock({ p, buyer, held }: { p: PurchasedProject; buyer: DemoBuyer; held: PurchaseKind[] }) {
   const id = React.useId();
-  const lines = p.lines.filter((l) => l.kind === tab);
+  const rows = held.map((k) => {
+    const lines = p.lines.filter((l) => l.kind === k);
+    if (k === "main") return { k, label: KIND_NAME.main, value: `${lines[0].sharePct ?? 0}%` };
+    const n = lines.reduce((x, l) => x + l.copies.length, 0);
+    return { k, label: KIND_NAME[k], value: `${n} ${n === 1 ? "copy" : "copies"}` };
+  });
   return (
     <section aria-labelledby={id} className={cn(CARD, "flex flex-col gap-6")}>
-      <h2 id={id} className={H2}>
-        Your NFTs
-      </h2>
-      <OfferTabs tabs={held} active={tab} onSelect={onTab} label="Your NFTs">
-        {tab === "main" ? <MainPanel p={p} line={lines[0]} /> : <CopiesPanel p={p} kind={tab} lines={lines} />}
-      </OfferTabs>
+      <div className="flex flex-col gap-1">
+        <h2 id={id} className="text-md font-medium leading-md text-text-secondary">
+          You own
+        </h2>
+        <span className="text-2xl font-semibold leading-2xl tabular-nums text-text-primary">
+          {p.count} {p.count === 1 ? "NFT" : "NFTs"}
+        </span>
+      </div>
+      <dl className="m-0 flex flex-col">
+        {rows.map((r) => (
+          <div key={r.k} className="flex items-baseline justify-between gap-4 border-x-0 border-b-0 border-t border-solid border-border py-3">
+            <dt className="text-md text-text-secondary">{r.label}</dt>
+            <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{r.value}</dd>
+          </div>
+        ))}
+        <div className="flex items-baseline justify-between gap-4 border-x-0 border-b-0 border-t border-solid border-border py-3">
+          <dt className="text-md text-text-secondary">Paid in all</dt>
+          <dd className="m-0 text-md font-semibold tabular-nums text-text-primary">{paidOf(p.lines)}</dd>
+        </div>
+      </dl>
+      {p.buyable.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {p.buyable.map((k) => (
+            <Link key={k} href={`${p.marketHref}?nft=${k}`} className={QUIET_LINK}>
+              Buy another {KIND_NAME[k]}
+              <Icon icon={ArrowRight01Icon} size={16} />
+            </Link>
+          ))}
+        </div>
+      )}
       <p className="m-0 flex flex-wrap items-center gap-3 text-sm leading-sm text-text-secondary">
         In {buyer.name}&apos;s demo wallet · <span className="font-mono">{shortAddress(p.lines[0].copies[0].buyerAddress)}</span>
         <TestnetDemoBadge />
       </p>
     </section>
   );
-}
-
-function MainPanel({ p, line }: { p: PurchasedProject; line: PurchaseLine }) {
-  const last = line.copies[line.copies.length - 1];
-  const share = line.sharePct ?? 0;
-  const facts: Fact[] = [
-    { label: "Collection", value: last.collection || "—" },
-    { label: "Blockchain", value: networkLabelOf(last.network) },
-    { label: "NFT type", value: "Main NFT" },
-    { label: "Token ID", value: last.tokenId !== null ? `#${last.tokenId}` : "Not assigned" },
-    { label: "Your share", value: `${share}%` },
-    { label: "Price paid", value: paidOf([line]) },
-    { label: "Purchased from", value: p.creator },
-    { label: "Transaction", value: last.txHash ? shortAddress(last.txHash) : "—" },
-    { label: "Purchased", value: formatDate(last.at) },
-  ];
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium text-text-secondary">{share >= 100 ? "The whole project" : `${share}% of the project`}</span>
-        <span className="text-2xl font-semibold leading-2xl tabular-nums text-text-primary">{share}%</span>
-      </div>
-      <FactGrid facts={facts} />
-      <p className="m-0 text-sm text-text-tertiary">Minted when you bought it.</p>
-    </div>
-  );
-}
-
-function CopiesPanel({ p, kind, lines }: { p: PurchasedProject; kind: Exclude<PurchaseKind, "main">; lines: PurchaseLine[] }) {
-  const copies = lines.flatMap((l) => l.copies);
-  const uses = [...new Set(lines.map((l) => l.use).filter(Boolean))];
-  const first = copies[0];
-  const facts: Fact[] = [
-    { label: "Collection", value: first.collection || "—" },
-    { label: "Blockchain", value: networkLabelOf(first.network) },
-    { label: "NFT type", value: KIND_NAME[kind] },
-    { label: "Copies", value: String(copies.length) },
-    { label: "Paid", value: paidOf(lines) },
-    { label: "Purchased from", value: p.creator },
-  ];
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium text-text-secondary">{[KIND_NAME[kind], ...uses].join(" · ")}</span>
-        <span className="text-2xl font-semibold leading-2xl tabular-nums text-text-primary">
-          {copies.length} {copies.length === 1 ? "copy" : "copies"}
-        </span>
-      </div>
-      {lines.map((l) => (
-        <CopyGroup key={`${l.use}|${l.product}`} line={l} />
-      ))}
-      {p.buyable.includes(kind) && (
-        <Link href={`${p.marketHref}?nft=${kind}`} className={cn(SECONDARY_LINK, "w-full")}>
-          Buy another
-          <Icon icon={ArrowRight01Icon} size={16} />
-        </Link>
-      )}
-      <MoreFacts>
-        <FactGrid facts={facts} />
-        <p className="m-0 text-sm text-text-tertiary">Each copy is one licence. Minted when you bought it.</p>
-      </MoreFacts>
-    </div>
-  );
-}
-
-/** One use's copies, by number: three, then Show all. */
-function CopyGroup({ line }: { line: PurchaseLine }) {
-  const [all, setAll] = React.useState(false);
-  const shown = all ? line.copies : line.copies.slice(0, FIRST_ROWS);
-  const title = [line.use, line.product].filter(Boolean).join(" · ");
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-md font-semibold leading-md text-text-primary">{title}</span>
-      <ul role="list" aria-label={title} className="m-0 flex list-none flex-col p-0">
-        {shown.map((c) => (
-          <li key={c.id} className="flex items-baseline justify-between gap-4 border-x-0 border-b-0 border-t border-solid border-border py-3 text-md leading-md">
-            <span className="font-mono tabular-nums text-text-primary">{c.serial !== null ? `#${c.serial}${c.of !== null ? ` of ${c.of}` : ""}` : "—"}</span>
-            <span className="flex items-baseline gap-4 text-text-secondary">
-              <span className="tabular-nums">{formatAmount(c.price, c.token)}</span>
-              <time dateTime={new Date(c.at).toISOString()} className="text-sm text-text-tertiary">
-                {formatDate(c.at)}
-              </time>
-            </span>
-          </li>
-        ))}
-      </ul>
-      {line.copies.length > FIRST_ROWS && (
-        <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className={QUIET_BUTTON}>
-          {all ? "Show fewer" : `Show all ${line.copies.length}`}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** What was paid over these lines, per token: "0.08 ETH", "0.1 ETH + 5 USDC". */
-function paidOf(lines: PurchaseLine[]): string {
-  const byToken = new Map<Token, Amount>();
-  for (const l of lines) for (const x of l.paid) byToken.set(x.token, byToken.has(x.token) ? addAmounts(byToken.get(x.token) as Amount, x.amount) : x.amount);
-  return [...byToken].map(([token, amount]) => formatAmount(amount, token)).join(" + ");
 }
 
 function CreatorBlock({ p, post, buyer }: { p: PurchasedProject; post: InnovationPost; buyer: DemoBuyer }) {
@@ -354,35 +302,319 @@ function CreatorBlock({ p, post, buyer }: { p: PurchasedProject; post: Innovatio
   );
 }
 
-// ─────────────────────────────── 2 · what you can do ───────────────────────────────
+// ─────────────────────────────── Main: the project is yours ───────────────────────────────
 
-function WhatYouCanDo({ p }: { p: PurchasedProject }) {
-  const id = React.useId();
-  const rights = p.lines.filter((l, i, all) => all.findIndex((x) => x.kind === l.kind && x.use === l.use) === i);
+function MainPanel({ p, post }: { p: PurchasedProject; post: InnovationPost }) {
+  const line = p.lines.find((l) => l.kind === "main") as PurchaseLine;
+  const last = line.copies[line.copies.length - 1];
+  const share = line.sharePct ?? 0;
+  const whole = share >= 100;
+  const projectId = p.source === "sample" ? acquiredIdOf(p.id) : p.id;
+  const licence = mainLicenceOf(share);
+  const facts: Fact[] = [
+    { label: "Collection", value: last.collection || "—" },
+    { label: "Blockchain", value: networkLabelOf(last.network) },
+    { label: "NFT type", value: "Main NFT" },
+    { label: "Token ID", value: last.tokenId !== null ? `#${last.tokenId}` : "Not assigned" },
+    { label: "Your share", value: `${share}%` },
+    { label: "Price paid", value: paidOf([line]) },
+    { label: "Purchased from", value: p.creator },
+    { label: "Transaction", value: last.txHash ? shortAddress(last.txHash) : "—" },
+    { label: "Purchased", value: formatDate(last.at) },
+  ];
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h2 id={id} className={H2}>
-          What you can do
-        </h2>
-        <p className="m-0 text-md leading-md text-text-secondary">Each copy is one licence, for the use it was bought for.</p>
+    <div className="flex flex-col gap-8">
+      <div className={cn(CARD, "flex flex-col gap-6")}>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-2xl font-semibold leading-2xl text-text-primary">{whole ? "The whole project is yours" : `${share}% of the project is yours`}</h3>
+          <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
+            {whole
+              ? "You hold its Main NFT, so it is one of your projects now: open its products, its editors and its builds as you open your own, and list it again from Earn when you want to."
+              : "You hold a share of its Main NFT: its sales and royalties are split with you."}
+          </p>
+        </div>
+        {whole && (
+          // A full load: a project bought this session is made when the app starts (acquired-projects.ts).
+          <a href={`/projects/${encodeURIComponent(projectId)}`} className={cn(PRIMARY_LINK, "self-start")}>
+            Open the project
+            <Icon icon={ArrowRight01Icon} size={16} />
+          </a>
+        )}
+        <RuleColumns licence={licence} />
       </div>
-      <ul role="list" className="m-0 grid list-none grid-cols-1 gap-6 p-0 [@container(min-width:720px)]:grid-cols-2">
-        {rights.map((l) => {
-          const licence: Licence = l.kind === "main" ? mainLicenceOf(l.sharePct ?? 0) : LICENCE[l.kind][l.use ?? "Personal use"];
-          const title = l.kind === "main" ? lineTitleOf(l) : `${KIND_NAME[l.kind]} · ${l.use}`;
-          return (
-            <li key={`${l.kind}|${l.use}`} className={cn(CARD, "flex flex-col gap-5")}>
-              <h3 className={H3}>{title}</h3>
-              <div className="flex flex-col gap-5">
-                <RuleList tone="can" items={licence.can} />
-                {licence.cant.length > 0 && <RuleList tone="cant" items={licence.cant} />}
-              </div>
-            </li>
-          );
-        })}
+
+      {whole && post.products.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <h3 className={H3}>Its products</h3>
+          <ul role="list" className="m-0 grid list-none grid-cols-1 gap-6 p-0 [@container(min-width:720px)]:grid-cols-2">
+            {post.products.map((prod, i) => (
+              <li key={prod.id}>
+                <a
+                  href={`/projects/${encodeURIComponent(projectId)}/products/${encodeURIComponent(p.source === "sample" ? `prd_bought_${p.id}_${i + 1}` : (post.products[i].build?.productId ?? prod.id))}`}
+                  className={cn(CARD, "flex items-center gap-6 no-underline outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus")}
+                >
+                  <span className="relative size-[64px] shrink-0 overflow-hidden rounded-lg bg-bg-surface-raised">
+                    {prod.image ? <PostImg src={prod.image} alt="" className="absolute inset-0 h-full w-full object-cover" fallback={<Gone />} /> : <Gone />}
+                  </span>
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="text-md font-semibold leading-md text-text-primary">{prod.name}</span>
+                    <span className="line-clamp-2 text-sm leading-sm text-text-secondary">{prod.summary}</span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <MoreFacts>
+        <FactGrid facts={facts} />
+        <p className="m-0 text-sm text-text-tertiary">Minted when you bought it.</p>
+      </MoreFacts>
+    </div>
+  );
+}
+
+// ─────────────────────────────── Physical / Virtual ───────────────────────────────
+
+function KindPanel({
+  p,
+  kind,
+  post,
+  buildOf,
+  buyer,
+  log,
+}: {
+  p: PurchasedProject;
+  kind: Exclude<PurchaseKind, "main">;
+  post: InnovationPost;
+  buildOf: (i: number) => ProductBuild;
+  buyer: DemoBuyer;
+  log: readonly UnitsEntry[];
+}) {
+  const lines = p.lines.filter((l) => l.kind === kind);
+  const copies = lines.flatMap((l) => l.copies);
+  const first = copies[0];
+  // A product's own copies cover that product; the whole project's copies cover every product.
+  const scoped = lines.every((l) => l.product !== null);
+  const names = new Set(lines.map((l) => l.product));
+  const covered = post.products.map((x, i) => ({ x, i })).filter(({ x }) => !scoped || names.has(x.name));
+  const facts: Fact[] = [
+    { label: "Collection", value: first.collection || "—" },
+    { label: "Blockchain", value: networkLabelOf(first.network) },
+    { label: "NFT type", value: KIND_NAME[kind] },
+    { label: "Copies", value: String(copies.length) },
+    { label: "Paid", value: paidOf(lines) },
+    { label: "Purchased from", value: p.creator },
+  ];
+  return (
+    <div className="flex flex-col gap-10">
+      <p className="m-0 text-md leading-md text-text-secondary">
+        {kind === "physical"
+          ? "A licence to build: each copy comes with the fabrication files and lets you make the units it allows."
+          : "A licence to the digital twin: each copy comes with the 3D model and its renders."}
+      </p>
+      {lines.map((l) => (
+        <UseGroup key={`${l.use}|${l.product}`} line={l} buyer={buyer} log={log} />
+      ))}
+      {covered.length > 0 && <ProductsView kind={kind} post={post} covered={covered} buildOf={buildOf} />}
+      <MoreFacts>
+        <FactGrid facts={facts} />
+        <p className="m-0 text-sm text-text-tertiary">Each copy is one licence. Minted when you bought it.</p>
+      </MoreFacts>
+    </div>
+  );
+}
+
+/** One use's copies with what that use allows: the licence beside the copies it covers. */
+function UseGroup({ line, buyer, log }: { line: PurchaseLine; buyer: DemoBuyer; log: readonly UnitsEntry[] }) {
+  const noteId = React.useId();
+  const kind = line.kind as Exclude<PurchaseKind, "main">;
+  const licence = LICENCE[kind][line.use ?? "Personal use"];
+  const title = [line.use, line.product].filter(Boolean).join(" · ");
+  const n = line.copies.length;
+  return (
+    <section aria-label={`${KIND_NAME[kind]} · ${title}`} className={cn(CARD, "flex flex-col gap-8")}>
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
+        <h3 className={H3}>{title}</h3>
+        <span className="text-md tabular-nums text-text-secondary">
+          {n} {n === 1 ? "copy" : "copies"}
+          {line.unitsPerCopy !== null && ` · ${line.unitsPerCopy} ${line.unitsPerCopy === 1 ? "unit" : "units"} per copy`}
+        </span>
+      </div>
+      <RuleColumns licence={licence} />
+      <ul role="list" className="m-0 flex list-none flex-col p-0">
+        {line.copies.map((c) => (
+          <CopyRow
+            key={c.id}
+            copy={c}
+            units={line.unitsPerCopy !== null ? copyUnitsOf(c.key, line.unitsPerCopy, buyer.id, log) : null}
+            noteId={noteId}
+          />
+        ))}
       </ul>
+      <p id={noteId} className="m-0 text-sm leading-sm text-text-tertiary">
+        {kind === "physical"
+          ? "Sending a copy to manufacturing and selling it on come in the next step of the prototype. A sale hands the buyer the copy's units left; the units you made stay yours."
+          : "Selling a copy on comes in the next step of the prototype. A sale hands the buyer the copy and its licence."}
+      </p>
     </section>
+  );
+}
+
+function CopyRow({ copy: c, units, noteId }: { copy: PurchaseCopy; units: CopyUnits | null; noteId: string }) {
+  const number = c.serial !== null ? `#${c.serial}${c.of !== null ? ` of ${c.of}` : ""}` : "—";
+  const resale = units ? unitsOnResale(units) : null;
+  return (
+    <li className="flex flex-col gap-4 border-x-0 border-b-0 border-t border-solid border-border py-6 first:border-t-0 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <span className="font-mono text-lg tabular-nums text-text-primary">{number}</span>
+        <span className="flex items-baseline gap-4 text-md text-text-secondary">
+          <span className="tabular-nums">{formatAmount(c.price, c.token)}</span>
+          <time dateTime={new Date(c.at).toISOString()} className="text-sm text-text-tertiary">
+            Bought {formatDate(c.at)}
+          </time>
+        </span>
+      </div>
+      {units && (
+        <div className="flex flex-col gap-2">
+          <div
+            role="meter"
+            aria-label={`Units made with ${number}`}
+            aria-valuemin={0}
+            aria-valuemax={units.allowance}
+            aria-valuenow={units.made}
+            className="h-[6px] w-full overflow-hidden rounded-full bg-bg-subtle"
+          >
+            <div className="h-full rounded-full bg-[color:var(--color-violet-500)]" style={{ width: `${units.allowance ? (units.made / units.allowance) * 100 : 0}%` }} />
+          </div>
+          <span className="text-md tabular-nums text-text-primary">{unitsLineOf(units)}</span>
+          {resale && (
+            <span className="text-sm leading-sm text-text-secondary">
+              If you sell {number.split(" ")[0]}, the buyer gets {resale.buyerGets === 0 ? "no units" : `the ${resale.buyerGets} ${resale.buyerGets === 1 ? "unit" : "units"}`} left
+              {resale.sellerKeeps > 0 ? `; the ${resale.sellerKeeps} you made stay yours.` : "."}
+            </span>
+          )}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-4">
+        {units && (
+          <Button type="button" hierarchy="secondary" size="md" disabled aria-describedby={noteId} className="max-md:min-h-[var(--touch-min)]">
+            Send to manufacturing
+          </Button>
+        )}
+        <Button type="button" hierarchy="secondary" size="md" disabled aria-describedby={noteId} className="max-md:min-h-[var(--touch-min)]">
+          Sell this copy
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+/** The products the copies cover, one at a time, each in full with the pieces this kind unlocks. */
+function ProductsView({
+  kind,
+  post,
+  covered,
+  buildOf,
+}: {
+  kind: Exclude<PurchaseKind, "main">;
+  post: InnovationPost;
+  covered: { x: PostProduct; i: number }[];
+  buildOf: (i: number) => ProductBuild;
+}) {
+  const [at, setAt] = React.useState(0);
+  const cur = covered[Math.min(at, covered.length - 1)];
+  return (
+    <section aria-labelledby="your-products" className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h3 id="your-products" className={H3}>
+          {covered.length === 1 ? "Your product" : `Your products · ${covered.length}`}
+        </h3>
+        {covered.length > 1 && (
+          <div role="group" aria-label="Products" className="inline-flex max-w-full overflow-x-auto rounded-lg border border-solid border-border">
+            {covered.map(({ x }, j) => {
+              const on = j === at;
+              return (
+                <button
+                  key={x.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setAt(j)}
+                  className={cn(
+                    "inline-flex min-h-[36px] items-center whitespace-nowrap px-7 text-md font-semibold leading-md outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)]",
+                    j > 0 && "border-x-0 border-y-0 border-l border-solid border-border",
+                    on ? "bg-bg-brand-subtle text-text-brand" : "bg-bg-surface text-text-secondary hover:bg-bg-subtle hover:text-text-primary",
+                  )}
+                >
+                  {x.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <ProductDetail key={`${kind}:${cur.x.id}`} kind={kind} product={cur.x} build={buildOf(cur.i)} postTitle={post.title} />
+    </section>
+  );
+}
+
+type DetailTab = "overview" | BuildItemKind;
+
+function ProductDetail({ kind, product, build, postTitle }: { kind: Exclude<PurchaseKind, "main">; product: PostProduct; build: ProductBuild; postTitle: string }) {
+  const pieces = build ? PIECES_OF[kind].filter((t) => build.bp.items.some((it) => it.kind === t.id)) : [];
+  const tabs: TabDef<DetailTab>[] = [{ id: "overview", label: "Overview" }, ...pieces.map((t) => ({ id: t.id as DetailTab, label: t.label }))];
+  const [tab, setTab] = React.useState<DetailTab>("overview");
+  return (
+    <article className={cn(CARD, "flex flex-col gap-8")} aria-label={product.name}>
+      <TabStrip groups={[tabs]} active={tab} onSelect={(t) => setTab(t as DetailTab)} label={`${product.name}: what your ${KIND_NAME[kind]} unlocks`} />
+      {tab === "overview" ? (
+        <div className="grid grid-cols-1 gap-8 [@container(min-width:720px)]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-bg-surface-raised">
+            {product.image ? (
+              <PostImg src={product.image} alt={`${product.name}, from ${postTitle}`} className="absolute inset-0 h-full w-full object-cover" fallback={<Gone />} />
+            ) : (
+              <Gone />
+            )}
+          </div>
+          <div className="flex min-w-0 flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <h4 className={H3}>{product.name}</h4>
+              {product.summary && <p className="m-0 text-md leading-md text-text-secondary">{product.summary}</p>}
+            </div>
+            {product.specs.length > 0 && (
+              <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-4">
+                {product.specs.map((s) => (
+                  <div key={s.label} className="flex min-w-0 flex-col gap-1">
+                    <dt className="text-sm text-text-tertiary">{s.label}</dt>
+                    <dd className="m-0 break-words text-md text-text-primary">{s.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <p className="m-0 text-sm leading-sm text-text-secondary">
+              {kind === "physical"
+                ? `Your copy opens ${pieces.filter((t) => t.id !== "parts" && t.id !== "3d").map((t) => t.label).join(", ") || "the build"} for this product, with its 3D model and parts.`
+                : "Your copy licenses this product's 3D model; its parts are open to everyone."}
+            </p>
+          </div>
+        </div>
+      ) : build ? (
+        // A holder takes the files this kind unlocks, as the maker does (the panel's own downloads).
+        <DeliverablesAccess.Provider value>
+          <ProductPiecePanel job={build.job} product={build.bp} kind={tab} chatHref={null} />
+        </DeliverablesAccess.Provider>
+      ) : null}
+    </article>
+  );
+}
+
+function RuleColumns({ licence }: { licence: Licence }) {
+  return (
+    <div className="grid grid-cols-1 gap-6 [@container(min-width:560px)]:grid-cols-2">
+      <RuleList tone="can" items={licence.can} />
+      {licence.cant.length > 0 && <RuleList tone="cant" items={licence.cant} />}
+    </div>
   );
 }
 
@@ -405,169 +637,11 @@ function RuleList({ tone, items }: { tone: "can" | "cant"; items: string[] }) {
   );
 }
 
-// ─────────────────────────────── 3 · your files, what you'll build ───────────────────────────────
-
-const WITH: Record<PurchaseKind, string> = {
-  main: "With the whole project",
-  physical: "With your Physical NFT",
-  virtual: "With your Virtual NFT",
-};
-
-function YourFiles({ held }: { held: PurchaseKind[] }) {
-  const id = React.useId();
-  const noteId = React.useId();
-  // The whole project holds every file, so it stands alone.
-  const groups: PurchaseKind[] = held.includes("main") ? ["main"] : held;
-  return (
-    <section aria-labelledby={id} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h2 id={id} className={H2}>
-          Your files
-        </h2>
-        <p id={noteId} className="m-0 text-md leading-md text-text-secondary">
-          On the real marketplace these come with the NFT. This testnet demo has no files to download.
-        </p>
-      </div>
-      {groups.map((k) => (
-        <div key={k} className="flex flex-col gap-4">
-          <h3 className={H3}>{WITH[k]}</h3>
-          <ul role="list" className="m-0 flex list-none flex-col rounded-xl border border-solid border-border bg-bg-surface p-0">
-            {FILES_OF[k].map((f) => (
-              <li
-                key={f.id}
-                className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-x-0 border-b-0 border-t border-solid border-border px-8 py-6 first:border-t-0 max-md:px-6"
-              >
-                <div className="flex min-w-0 flex-1 items-start gap-5">
-                  <span aria-hidden className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-lg bg-bg-subtle text-text-secondary">
-                    <Icon icon={File01Icon} size={20} />
-                  </span>
-                  <div className="flex min-w-0 flex-col gap-2">
-                    <span className="flex flex-wrap items-center gap-3">
-                      <span className="text-md font-semibold leading-md text-text-primary">{f.name}</span>
-                      <Badge tone="neutral">{f.format}</Badge>
-                    </span>
-                    <ul role="list" className="m-0 flex list-none flex-col gap-1 p-0 text-sm leading-sm text-text-secondary">
-                      {f.includes.map((line) => (
-                        <li key={line}>{line}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  hierarchy="tonal"
-                  size="md"
-                  disabled
-                  aria-describedby={noteId}
-                  iconLeading={<Icon icon={Download04Icon} size={16} />}
-                  className="max-md:min-h-[var(--touch-min)]"
-                >
-                  Download
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function WhatYoullBuild({ p, post, held }: { p: PurchasedProject; post: InnovationPost; held: PurchaseKind[] }) {
-  const id = React.useId();
-  const builds = held.includes("main") || held.includes("physical");
-  const twin = held.includes("main") || held.includes("virtual");
-  // A product's own copies cover that product; the whole project's copies cover every product.
-  const scoped = p.lines.every((l) => l.kind !== "main" && l.product !== null);
-  const names = new Set(p.lines.map((l) => l.product));
-  const covered = scoped ? post.products.filter((x) => names.has(x.name)) : post.products;
-  const products = covered.length ? covered : post.products;
-  if (!products.length) return null;
-  return (
-    <section aria-labelledby={id} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h2 id={id} className={H2}>
-          {builds ? "What you'll build" : "The digital twin"}
-        </h2>
-        <p className="m-0 text-md leading-md text-text-secondary">
-          {builds
-            ? `${products.length === 1 ? "The product" : `The ${products.length} products`} your NFTs cover: its specs, its parts${twin ? " and its 3D model" : ""}.`
-            : "The 3D model your Virtual NFT licenses, and the product it shows."}
-        </p>
-      </div>
-      <ul role="list" className="m-0 flex list-none flex-col gap-8 p-0">
-        {products.map((prod) => (
-          <li key={prod.id}>
-            <ProductCard product={prod} showModel={twin} showParts={builds} />
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function ProductCard({ product, showModel, showParts }: { product: PostProduct; showModel: boolean; showParts: boolean }) {
-  const { builds } = useCreateHistory();
-  const glb = product.build ? (builds.find((b) => b.id === product.build?.buildId)?.modelGlbUrl ?? null) : null;
-  const [modelOk, setModelOk] = React.useState(true);
-  const [allParts, setAllParts] = React.useState(false);
-  const model = showModel && glb !== null && modelOk;
-  const parts = allParts ? product.parts : product.parts.slice(0, FIRST_PARTS);
-  return (
-    <article className={cn(CARD, "flex flex-col gap-8")}>
-      <div className="grid grid-cols-1 gap-8 [@container(min-width:720px)]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <figure className="m-0 flex flex-col gap-3">
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-bg-surface-raised">
-            {model ? (
-              <ModelViewer url={glb} onError={() => setModelOk(false)} />
-            ) : product.image ? (
-              <PostImg src={product.image} alt={`${product.name}, a render`} className="absolute inset-0 h-full w-full object-cover" fallback={<Gone />} />
-            ) : (
-              <Gone />
-            )}
-          </div>
-          <figcaption className="text-sm text-text-tertiary">{model ? "3D model · drag to turn it" : "Render"}</figcaption>
-        </figure>
-        <div className="flex min-w-0 flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h3 className={H3}>{product.name}</h3>
-            {product.summary && <p className="m-0 text-md leading-md text-text-secondary">{product.summary}</p>}
-          </div>
-          {product.specs.length > 0 && (
-            <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-4">
-              {product.specs.map((s) => (
-                <div key={s.label} className="flex min-w-0 flex-col gap-1">
-                  <dt className="text-sm text-text-tertiary">{s.label}</dt>
-                  <dd className="m-0 break-words text-md text-text-primary">{s.value}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </div>
-      </div>
-      {showParts && product.parts.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <span className="text-md font-semibold leading-md text-text-primary">Parts · {product.parts.length}</span>
-          <ul role="list" className="m-0 flex list-none flex-col p-0">
-            {parts.map((x) => (
-              <li key={x.name} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-x-0 border-b-0 border-t border-solid border-border py-3">
-                <span className="text-md leading-md text-text-primary">
-                  {x.name}
-                  {x.qty > 1 && <span className="tabular-nums text-text-secondary"> × {x.qty}</span>}
-                </span>
-                <span className="text-sm leading-sm text-text-secondary">{x.use}</span>
-              </li>
-            ))}
-          </ul>
-          {product.parts.length > FIRST_PARTS && (
-            <button type="button" onClick={() => setAllParts((a) => !a)} aria-expanded={allParts} className={QUIET_BUTTON}>
-              {allParts ? "Show fewer" : `Show all ${product.parts.length} parts`}
-            </button>
-          )}
-        </div>
-      )}
-    </article>
-  );
+/** What was paid over these lines, per token: "0.08 ETH", "0.1 ETH + 5 USDC". */
+function paidOf(lines: PurchaseLine[]): string {
+  const byToken = new Map<Token, Amount>();
+  for (const l of lines) for (const x of l.paid) byToken.set(x.token, byToken.has(x.token) ? addAmounts(byToken.get(x.token) as Amount, x.amount) : x.amount);
+  return [...byToken].map(([token, amount]) => formatAmount(amount, token)).join(" + ");
 }
 
 function Gone() {
@@ -578,7 +652,7 @@ function Gone() {
   );
 }
 
-// ─────────────────────────────── 4 · receipts ───────────────────────────────
+// ─────────────────────────────── receipts ───────────────────────────────
 
 function Receipts({ p }: { p: PurchasedProject }) {
   const id = React.useId();

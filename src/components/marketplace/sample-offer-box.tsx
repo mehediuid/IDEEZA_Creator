@@ -19,6 +19,7 @@ import * as React from "react";
 import { Button } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
+import { listingUnitsLine } from "@/lib/market/units";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { formatDate } from "@/lib/manual/project-summary";
 import {
@@ -239,6 +240,7 @@ function CopyPanel({
   return (
     <>
       <p className="m-0 text-sm text-text-secondary">{helperLineOf(kind, post.title)}</p>
+      {kind === "physical" && <p className="m-0 text-sm text-text-secondary">{listingUnitsLine()}</p>}
       <ChoiceRows
         legend="Use"
         value={offer.use}

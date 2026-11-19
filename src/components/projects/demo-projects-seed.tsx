@@ -22,7 +22,9 @@ import { commerceKey } from "@/lib/commerce/record";
 import { BUILDS_KEY } from "@/lib/create/history";
 import { notifyStores } from "@/lib/key-store";
 import { DEMO_PROJECT_IDS, DEMO_SEED_KEY, DEMO_SEED_VERSION, demoSeedOf, withDemoSales } from "@/lib/demo/demo-projects";
-import { withDemoSampleSales } from "@/lib/demo/demo-purchases";
+import { withDemoSampleSales, withDemoUnits } from "@/lib/demo/demo-purchases";
+import { normalizeUnits, UNITS_KEY } from "@/lib/market/units";
+import { ACQUIRED_KEY, acquiredToPlant } from "@/lib/demo/acquired-projects";
 import { PROJECTS_KEY } from "@/lib/manual/projects";
 import { normalizeSampleSales, PHONE_SAMPLE_SALES_KEY } from "@/lib/market/phone-sample-sales";
 import { EDITIONS_KEY, LISTINGS_KEY, SALES_KEY, type EditionTrack, type Sale } from "@/lib/market/types";
@@ -69,6 +71,19 @@ function plantSamplePurchases(storage: Storage, now: number): boolean {
   return true;
 }
 
+/** The demo units already made (units.ts) the log lacks, on the copies their sales hold. */
+function plantUnits(storage: Storage, now: number): boolean {
+  const log = readList(storage, UNITS_KEY);
+  const sample = readList(storage, PHONE_SAMPLE_SALES_KEY);
+  const own = readList(storage, SALES_KEY);
+  if (!log || !sample || !own) return false;
+  const held = normalizeUnits(log);
+  const next = withDemoUnits(held, normalizeSampleSales(sample), own as Sale[], now);
+  if (next.length === held.length) return false;
+  storage.setItem(UNITS_KEY, JSON.stringify(next));
+  return true;
+}
+
 /** An older planting gets what a later seed added: copy tracks it lacks, on projects still there whose copies
  *  read; the sales it lacks, while what they sold is still there; the sample purchases. Nothing the maker changed
  *  is replaced. True when it wrote. */
@@ -99,6 +114,7 @@ function topUp(storage: Storage, now: number): boolean {
       }
     }
     if (plantSamplePurchases(storage, now)) wrote = true;
+    if (plantUnits(storage, now)) wrote = true;
     storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
   } catch {
     return false;
@@ -129,9 +145,41 @@ export function plantDemoProjects(storage: Storage, now: number): boolean {
       }
     }
     plantSamplePurchases(storage, now);
+    plantUnits(storage, now);
     storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
   } catch {
     // Storage full or blocked: the account simply has no demo projects this time.
+    return false;
+  }
+  return true;
+}
+
+/** A project for every sample Main NFT bought and not made before (acquired-projects.ts): the buyer's own,
+ *  browsed like any project. Runs on every start, after the demo planting, ahead of the stores. */
+export function plantAcquired(storage: Storage): boolean {
+  const projects = readList(storage, PROJECTS_KEY);
+  const builds = readList(storage, BUILDS_KEY);
+  const sales = readList(storage, PHONE_SAMPLE_SALES_KEY);
+  if (!projects || !builds || !sales) return false;
+  let made: string[] = [];
+  try {
+    const raw: unknown = JSON.parse(storage.getItem(ACQUIRED_KEY) ?? "[]");
+    made = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    made = [];
+  }
+  const add = acquiredToPlant(normalizeSampleSales(sales), new Set(made));
+  if (!add.length) return false;
+  try {
+    storage.setItem(PROJECTS_KEY, JSON.stringify(withMissing(projects, add.map((a) => a.project))));
+    storage.setItem(BUILDS_KEY, JSON.stringify(withMissing(builds, add.flatMap((a) => a.builds))));
+    for (const { project } of add) {
+      if (project.mint && storage.getItem(commerceKey(project.id)) === null) {
+        storage.setItem(commerceKey(project.id), JSON.stringify({ v: 1, mint: project.mint, ownerConfirmedAt: project.ownerConfirmedAt }));
+      }
+    }
+    storage.setItem(ACQUIRED_KEY, JSON.stringify([...made, ...add.map((a) => a.project.id)]));
+  } catch {
     return false;
   }
   return true;
@@ -145,7 +193,9 @@ export function DemoProjectsSeed() {
     } catch {
       return;
     }
-    if (plantDemoProjects(storage, Date.now())) notifyStores();
+    const planted = plantDemoProjects(storage, Date.now());
+    const acquired = plantAcquired(storage);
+    if (planted || acquired) notifyStores();
   }, []);
   return null;
 }

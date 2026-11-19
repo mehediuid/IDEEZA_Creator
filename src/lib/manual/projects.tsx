@@ -169,6 +169,9 @@ export type ManualProject = {
   descriptionHint?: DescriptionHint;
   /** The Innovations post a share carries: the maker's story (owner, 2026-10-12); its status is the project's current activity. */
   post?: SharePost;
+  /** A project bought whole (its Main NFT, from another creator's listing): who made it and what was paid
+   *  (owner, 2026-11-19: the buyer gets full control, browsed like any own project; lib/demo/acquired-projects.ts). */
+  acquired?: { from: string; feedId: string; saleId: string; at: number; price: string; token: string };
 };
 
 /** What updateProject takes. Its product rows may come without ids (the Brief's Step 1 writes

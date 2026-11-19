@@ -14,6 +14,7 @@
 
 import { discountFor, type BillingCycle } from "./credit-pricing";
 import { PLANS, planOf, priceOf, type Plan, type PlanTier, type Subscription } from "./plans";
+import { ACQUIRED_PREFIX } from "../demo/acquired-projects";
 import { DEMO_PROJECT_PREFIX } from "../demo/demo-projects";
 
 /** The plan a nudge names; null on the top plan. */
@@ -100,9 +101,10 @@ export function fitsYou(usage: { credits: number; projects: number }): PlanTier 
 
 /** C5 — whether one more project fits the plan. */
 /** Whether a project uses one of the plan's slots. The demo projects every account starts
- *  with (lib/demo, prototype only) don't: a new Free account has four of them and three slots. */
+ *  with (lib/demo, prototype only) don't: a new Free account has four of them and three slots.
+ *  Nor does a project bought whole (its Main NFT; decision open: plan 6rPKBgwzQ6r6woYmjfE6Td). */
 export function takesPlanSlot(projectId: string): boolean {
-  return !projectId.startsWith(DEMO_PROJECT_PREFIX);
+  return !projectId.startsWith(DEMO_PROJECT_PREFIX) && !projectId.startsWith(ACQUIRED_PREFIX);
 }
 
 export function projectRoom(tier: PlanTier, held: number): { allowed: number; held: number; full: boolean } {

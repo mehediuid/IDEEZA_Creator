@@ -62,9 +62,11 @@ test("every use held says what it allows and what it doesn't; one copy is one li
       assert.ok(l.can.length > 0 && l.cant.length > 0, `${k} ${u}`);
     }
   }
-  assert.match(P.LICENCE.physical["Personal use"].can[0], /one for yourself per copy/);
-  assert.match(P.LICENCE.physical["Business use"].can[0], /sell one unit per copy/);
+  assert.match(P.LICENCE.physical["Personal use"].can[0], /units each copy allows, for yourself/);
+  assert.match(P.LICENCE.physical["Business use"].can[0], /Make and sell the units each copy allows/);
+  for (const k of ["physical", "virtual"]) for (const u of ["Personal use", "Business use"]) assert.ok(P.LICENCE[k][u].can.some((t) => /^Sell the copy/.test(t)), "every copy can be sold on");
   assert.deepEqual(P.mainLicenceOf(100).cant, []);
+  assert.match(P.mainLicenceOf(100).can[0], /like your own/);
   assert.match(P.mainLicenceOf(10).can[0], /^Earn 10% of the project's sales/);
 });
 
@@ -112,11 +114,14 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
   assert.match(list, /\{ id: PURCHASED, label: "Purchased", n: purchased\.count, active: purchased\.active \}/);
   assert.doesNotMatch(read("lib/manual/project-list.ts"), /purchased/i, "the list's own tabs (shared with the phone) are untouched");
   const page = read("components/projects/purchased/purchased-page.tsx");
-  for (const h of ["Your NFTs", "What you can do", "Your files", "Receipts"]) assert.match(page, new RegExp(`>\\s*${h}\\s*<`));
-  assert.match(page, /<OfferTabs tabs=\{held\} active=\{tab\} onSelect=\{onTab\} label="Your NFTs">/, "the marketplace box's tabs, one per kind held");
+  for (const h of ["Your NFTs", "Receipts", "You own", "Send to manufacturing", "Sell this copy", "Open the project"]) assert.match(page, new RegExp(`>\\s*${h}\\s*<`));
+  assert.match(page, /<OfferTabs tabs=\{held\} active=\{tab\} onSelect=\{setTab\} label="Your NFTs">/, "a tab per kind held, with everything about that kind in it");
+  assert.match(page, /<ProductPiecePanel job=\{build\.job\} product=\{build\.bp\} kind=\{tab\} chatHref=\{null\} \/>/, "each product's pieces in the project's own panels");
+  assert.match(page, /<DeliverablesAccess\.Provider value>/, "a holder takes the files the pieces offer, as the maker does");
+  assert.doesNotMatch(page, /Download04Icon|no files to download/, "no placeholder downloads: a Main NFT opens the project, copies take the pieces' own files");
   assert.match(page, /<PostMediaStage post=\{post\} mine=\{mine\} \/>/, "media first, as the marketplace and Innovations pages");
   assert.match(read("components/innovations/post-product-bits.tsx"), /Open your files/, "the locked pieces lead a holder to them");
   assert.match(read("components/marketplace/market-rail.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} \/>/);
   assert.match(read("components/marketplace/sample-offer-box.tsx"), /<SeeWhatYouOwn projectId=\{feedId\} \/>/);
-  assert.match(page, /This testnet demo has no files to download\./, "files are named honestly, never a fake download");
+
 });
