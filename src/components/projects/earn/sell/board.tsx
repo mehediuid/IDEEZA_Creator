@@ -44,6 +44,13 @@ import { cn } from "@/lib/utils";
 import { EARN_H2, EARN_LEAD } from "../surface";
 
 export const KIND_NAME: Record<DeskKind, string> = { main: "Main NFT", physical: "Physical NFT", virtual: "Virtual NFT" };
+const DOT: Record<DeskKind, string> = { main: "bg-bg-brand", physical: "bg-bg-warning", virtual: "bg-bg-info" };
+
+/** A kind's dot, beside a group heading that names the kind (the purchased project's Earn board). The Sell
+ *  board's tiles use `KindMark`. */
+export function KindDot({ kind }: { kind: DeskKind }) {
+  return <span aria-hidden className={cn("inline-block size-[10px] shrink-0 rounded-full", DOT[kind])} />;
+}
 const TONE: Record<DeskTone, BadgeTone> = { success: "success", brand: "brand", neutral: "neutral", warning: "warning", info: "info" };
 /** A kind's mark: its tinted square and icon colour, the DS's subtle fills and icon inks. */
 const MARK: Record<DeskKind, string> = {
