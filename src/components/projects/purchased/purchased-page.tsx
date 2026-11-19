@@ -2,18 +2,22 @@
 
 // One project's purchases, as the active demo creator holds them: the project unlocked (owner, 2026-11-19; plan
 // 6rPKBgwzQ6r6woYmjfE6Td). The marketplace page's frame — media first, then the header — and then everything about
-// one kind of NFT in one place (v2: "the information drifts apart"):
+// one kind of NFT in one place (v2: "the information drifts apart"), in the order a buyer needs it once the NFT is
+// theirs (v4, owner: "what should a user see first, what lower?"): what they bought, then what they can do with
+// each copy, then the rules and the token facts folded away, for when they look them up:
 // - Your NFTs, a tab per kind held (as the marketplace box has):
-//   · Physical / Virtual: the copies by use, each use with what it allows and doesn't; each copy with its number,
-//     price and date, a Physical copy's units (allowance, made, left; units.ts), Send to manufacturing and Sell
-//     this copy (their flows come next: the buttons wait, and say what a sale would hand over); then the products
-//     the copies cover, one at a time, each in full: its overview and specs, and the pieces this kind unlocks in
-//     the project's own panels (Physical: 3D model, PCB, firmware, wiring, assembly, parts; Virtual: the 3D model
-//     and parts); then NFT details;
+//   · Physical / Virtual: the products the copies cover, one at a time, each in full: its overview and specs, and
+//     the pieces this kind unlocks in the project's own panels (Physical: 3D model, PCB, firmware, wiring,
+//     assembly, parts; Virtual: the 3D model and parts — the tabs say what the kind gives); then the copies, one
+//     row each with its use, number, price and date, a Physical copy's units (allowance, made, left; units.ts),
+//     Send to manufacturing and Sell this copy (their flows come next: the buttons wait, and say what a sale would
+//     hand over); then, folded, what each use allows, and NFT details;
 //   · Main: the whole project is the buyer's, so it opens as their own project (owner: "full control, browse it
-//     like my private project, no downloads"): Open the project, its products, and the ownership facts;
+//     like my private project, no downloads"): Open the project, its products, then folded what the Main NFT
+//     allows and the ownership facts;
 // - Receipts;
-// - the rail: a Summary of what is held, the creator, On Innovations.
+// - the rail: a Summary of what is held and the creator (questions about what was bought). No Innovations stats:
+//   a buyer's page is about what they own (owner).
 // The media, the products and the creator come from the project's Innovations post (a sample's own post, or this
 // browser's project read as one); every product's pieces come from a build (this browser's, or the sample's).
 
@@ -30,7 +34,6 @@ import type { MinePostFacts } from "@/components/innovations/use-post";
 import { AskCreator } from "@/components/marketplace/buyer-rail";
 import { DemoBuyerBanner } from "@/components/marketplace/demo-buyer-banner";
 import { FactGrid, MoreFacts, OfferTabs, type Fact, type OfferTab } from "@/components/marketplace/offer-parts";
-import { OnInnovations } from "@/components/marketplace/sample-market-page";
 import { LiveRegion, usePageArrival } from "@/components/projects/details/arrival";
 import { Breadcrumb } from "@/components/projects/details/breadcrumb";
 import { ProjectSkeleton } from "@/components/projects/details/page-states";
@@ -44,7 +47,6 @@ import type { InnovationPost, PostProduct } from "@/lib/innovations/types";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { useMarket } from "@/lib/market/market-store";
 import {
-  GIVES,
   KIND_NAME,
   LICENCE,
   lineTitleOf,
@@ -168,10 +170,7 @@ function PurchasedBody({
           <div className="flex min-w-0 flex-col gap-12">
             <PostMediaStage post={post} mine={mine} />
             <Header p={p} post={post} buyer={buyer} titleRef={titleRef} />
-            <div className={cn(NARROW_ONLY, "flex flex-col gap-8")}>
-              {summary}
-              {creator}
-            </div>
+            <div className={NARROW_ONLY}>{summary}</div>
 
             <section aria-labelledby="your-nfts" className="flex flex-col gap-8">
               <h2 id="your-nfts" className={H2}>
@@ -187,14 +186,13 @@ function PurchasedBody({
             </section>
 
             <Receipts p={p} />
-            {post.shared && <OnInnovations post={post} className={NARROW_ONLY} />}
+            <div className={NARROW_ONLY}>{creator}</div>
           </div>
 
           <aside aria-label="Summary and the creator" className={cn(WIDE_ONLY, "min-w-0 flex-col self-stretch")}>
             <div className="sticky top-[24px] flex flex-col gap-8">
               {summary}
               {creator}
-              {post.shared && <OnInnovations post={post} />}
             </div>
           </aside>
         </div>
@@ -339,7 +337,7 @@ function MainPanel({ p, post, buildOf }: { p: PurchasedProject; post: Innovation
           <h3 className="text-2xl font-semibold leading-2xl text-text-primary">{whole ? "The whole project is yours" : `${share}% of the project is yours`}</h3>
           <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
             {whole
-              ? "You hold its Main NFT, so it is one of your projects now: open its products, its editors and its builds as you open your own, and list it again from Earn when you want to."
+              ? "It's one of your projects now: open it, edit it and sell it again, as you do your own."
               : "You hold a share of its Main NFT: its sales and royalties are split with you."}
           </p>
         </div>
@@ -350,7 +348,6 @@ function MainPanel({ p, post, buildOf }: { p: PurchasedProject; post: Innovation
             <Icon icon={ArrowRight01Icon} size={16} />
           </a>
         )}
-        <RuleColumns licence={licence} />
       </div>
 
       {whole && post.products.length > 0 && (
@@ -365,10 +362,15 @@ function MainPanel({ p, post, buildOf }: { p: PurchasedProject; post: Innovation
         />
       )}
 
-      <MoreFacts>
-        <FactGrid facts={facts} />
-        <p className="m-0 text-sm text-text-tertiary">Minted when you bought it.</p>
-      </MoreFacts>
+      <div className="flex flex-col">
+        <MoreFacts title="What the Main NFT allows">
+          <RuleColumns licence={licence} />
+        </MoreFacts>
+        <MoreFacts>
+          <FactGrid facts={facts} />
+          <p className="m-0 text-sm text-text-tertiary">Minted when you bought it.</p>
+        </MoreFacts>
+      </div>
     </div>
   );
 }
@@ -407,56 +409,77 @@ function KindPanel({
   ];
   return (
     <div className="flex flex-col gap-10">
-      <GivesBlock kind={kind} />
-      {lines.map((l) => (
-        <UseGroup
-          key={`${l.use}|${l.product}`}
-          line={l}
-          buyer={buyer}
-          log={log}
-          setOf={l.product === null && post.products.length > 1 ? post.products.map((x) => x.name) : null}
-        />
-      ))}
       {covered.length > 0 && <ProductsView kind={kind} post={post} covered={covered} buildOf={buildOf} />}
-      <MoreFacts>
-        <FactGrid facts={facts} />
-        <p className="m-0 text-sm text-text-tertiary">Each copy is one licence. Minted when you bought it.</p>
-      </MoreFacts>
+      <YourCopies
+        kind={kind}
+        lines={lines}
+        buyer={buyer}
+        log={log}
+        setOf={!scoped && post.products.length > 1 ? post.products.map((x) => x.name) : null}
+      />
+      <div className="flex flex-col">
+        <MoreFacts title="What you can and can't do">
+          {lines.map((l) => (
+            <div key={`${l.use}|${l.product}`} className="flex flex-col gap-4">
+              {lines.length > 1 && <h4 className="text-md font-semibold leading-md text-text-primary">{[l.use, l.product].filter(Boolean).join(" · ")}</h4>}
+              <RuleColumns licence={LICENCE[kind][l.use ?? "Personal use"]} />
+            </div>
+          ))}
+        </MoreFacts>
+        <MoreFacts>
+          <FactGrid facts={facts} />
+          <p className="m-0 text-sm text-text-tertiary">Each copy is one licence. Minted when you bought it.</p>
+        </MoreFacts>
+      </div>
     </div>
   );
 }
 
-/** One use's copies with what that use allows: the licence beside the copies it covers. */
-function UseGroup({ line, buyer, log, setOf }: { line: PurchaseLine; buyer: DemoBuyer; log: readonly UnitsEntry[]; setOf: string[] | null }) {
+/** Every copy of this kind, one row each with its use: what the buyer acts on (make units, sell a copy). What
+ *  each use allows sits folded below, for when they look it up. */
+function YourCopies({
+  kind,
+  lines,
+  buyer,
+  log,
+  setOf,
+}: {
+  kind: Exclude<PurchaseKind, "main">;
+  lines: PurchaseLine[];
+  buyer: DemoBuyer;
+  log: readonly UnitsEntry[];
+  /** The products one whole-project copy covers, when there are several. */
+  setOf: string[] | null;
+}) {
   const noteId = React.useId();
-  const kind = line.kind as Exclude<PurchaseKind, "main">;
-  const licence = LICENCE[kind][line.use ?? "Personal use"];
-  const title = [line.use, line.product].filter(Boolean).join(" · ");
-  const n = line.copies.length;
+  const headId = React.useId();
+  const n = lines.reduce((x, l) => x + l.copies.length, 0);
   return (
-    <section aria-label={`${KIND_NAME[kind]} · ${title}`} className={cn(CARD, "flex flex-col gap-8")}>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h3 className={H3}>{title}</h3>
-        <span className="text-md tabular-nums text-text-secondary">
-          {n} {n === 1 ? "copy" : "copies"}
-          {line.unitsPerCopy !== null && ` · ${line.unitsPerCopy} ${line.unitsPerCopy === 1 ? "unit" : "units"} per copy`}
-        </span>
+    <section aria-labelledby={headId} className={cn(CARD, "flex flex-col gap-6")}>
+      <div className="flex flex-col gap-2">
+        <h3 id={headId} className={H3}>
+          {n === 1 ? "Your copy" : `Your copies · ${n}`}
+        </h3>
+        {setOf && (
+          <p className="m-0 text-md leading-md text-text-secondary">
+            {kind === "physical"
+              ? `Each copy covers the whole project, so one unit is one set: ${andList(setOf)}.`
+              : `Each copy covers the whole project: ${andList(setOf)}.`}
+          </p>
+        )}
       </div>
-      {setOf && (
-        <p className="m-0 rounded-lg bg-bg-subtle px-6 py-4 text-md leading-md text-text-primary">
-          These copies cover the whole project, so {kind === "physical" ? `each unit is one set: ${andList(setOf)}` : `each covers every product: ${andList(setOf)}`}.
-        </p>
-      )}
-      <RuleColumns licence={licence} />
       <ul role="list" className="m-0 flex list-none flex-col p-0">
-        {line.copies.map((c) => (
-          <CopyRow
-            key={c.id}
-            copy={c}
-            units={line.unitsPerCopy !== null ? copyUnitsOf(c.key, line.unitsPerCopy, buyer.id, log) : null}
-            noteId={noteId}
-          />
-        ))}
+        {lines.flatMap((l) =>
+          l.copies.map((c) => (
+            <CopyRow
+              key={c.id}
+              copy={c}
+              use={[l.use, l.product].filter(Boolean).join(" · ")}
+              units={l.unitsPerCopy !== null ? copyUnitsOf(c.key, l.unitsPerCopy, buyer.id, log) : null}
+              noteId={noteId}
+            />
+          )),
+        )}
       </ul>
       <p id={noteId} className="m-0 text-sm leading-sm text-text-tertiary">
         {kind === "physical"
@@ -467,13 +490,16 @@ function UseGroup({ line, buyer, log, setOf }: { line: PurchaseLine; buyer: Demo
   );
 }
 
-function CopyRow({ copy: c, units, noteId }: { copy: PurchaseCopy; units: CopyUnits | null; noteId: string }) {
+function CopyRow({ copy: c, use, units, noteId }: { copy: PurchaseCopy; use: string; units: CopyUnits | null; noteId: string }) {
   const number = c.serial !== null ? `#${c.serial}${c.of !== null ? ` of ${c.of}` : ""}` : "—";
   const resale = units ? unitsOnResale(units) : null;
   return (
     <li className="flex flex-col gap-4 border-x-0 border-b-0 border-t border-solid border-border py-6 first:border-t-0 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <span className="font-mono text-lg tabular-nums text-text-primary">{number}</span>
+        <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="font-mono text-lg tabular-nums text-text-primary">{number}</span>
+          {use && <Badge tone="neutral">{use}</Badge>}
+        </span>
         <span className="flex items-baseline gap-4 text-md text-text-secondary">
           <span className="tabular-nums">{formatAmount(c.price, c.token)}</span>
           <time dateTime={new Date(c.at).toISOString()} className="text-sm text-text-tertiary">
@@ -626,13 +652,13 @@ function ProductDetail({
                 ))}
               </dl>
             )}
-            <p className="m-0 text-sm leading-sm text-text-secondary">
-              {kind === "main"
-                ? "It's yours: every piece is in the tabs above, and its editors open in your project."
-                : kind === "physical"
-                  ? `Your copy opens ${pieces.filter((t) => t.id !== "parts" && t.id !== "3d").map((t) => t.label).join(", ") || "the build"} for this product, with its 3D model and parts.`
-                  : "Your copy licenses this product's 3D model; its parts are open to everyone."}
-            </p>
+            {kind === "virtual" && (
+              // The tabs above say what a kind opens; only a Virtual copy leaves pieces out, so it says which.
+              <p className="m-0 text-sm leading-sm text-text-secondary">
+                Your copy licenses this product&apos;s 3D model and renders; its parts are open to everyone. Its PCB, firmware, wiring and assembly, and
+                making units, come with a Physical NFT.
+              </p>
+            )}
           </div>
         </div>
       ) : build ? (
@@ -648,21 +674,6 @@ function ProductDetail({
 /** "A and B", "A, B and C". */
 function andList(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
-
-/** What this kind gives its holder and what it doesn't, said first (owner: "how much a Physical NFT shows, how
- *  much a Virtual NFT shows"). */
-function GivesBlock({ kind }: { kind: Exclude<PurchaseKind, "main"> }) {
-  const g = GIVES[kind];
-  return (
-    <section aria-label={`What your ${KIND_NAME[kind]} gives you`} className={cn(CARD, "flex flex-col gap-6")}>
-      <h3 className={H3}>What your {KIND_NAME[kind]} gives you</h3>
-      <div className="grid grid-cols-1 gap-6 [@container(min-width:560px)]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <RuleList tone="can" items={g.gets} label="Included" />
-        {g.not.length > 0 && <RuleList tone="cant" items={g.not} label="Not included" />}
-      </div>
-    </section>
-  );
 }
 
 function RuleColumns({ licence }: { licence: Licence }) {

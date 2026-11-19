@@ -47,6 +47,9 @@ export const DEMO_SAMPLE_BUYS: readonly DemoSampleBuy[] = [
   // A project of two products (Watering Hub + Soil Probe): whole-project Physical copies, each unit a set of both.
   { id: "ssale_demo_mira_hub_phys_biz", feedId: "p12", kind: "physical", use: "Business use", buyerId: "buyer-mira", daysAgo: 5 },
   { id: "ssale_demo_mira_hub_phys_personal", feedId: "p12", kind: "physical", use: "Personal use", buyerId: "buyer-mira", daysAgo: 3 },
+  // …and its Virtual NFT too, so one project of several products shows both kinds; plus a Virtual-only one.
+  { id: "ssale_demo_mira_hub_virt_personal", feedId: "p12", kind: "virtual", use: "Personal use", buyerId: "buyer-mira", daysAgo: 2 },
+  { id: "ssale_demo_mira_lora_virt_biz", feedId: "p22", kind: "virtual", use: "Business use", buyerId: "buyer-mira", daysAgo: 4 },
   // Leo and Sam: a few each, so switching who shops still shows purchases.
   { id: "ssale_demo_sam_jump_phys_biz", feedId: "p34", kind: "physical", use: "Business use", buyerId: "buyer-sam", daysAgo: 5 },
   { id: "ssale_demo_leo_hub_virt_biz", feedId: "p12", kind: "virtual", use: "Business use", buyerId: "buyer-leo", daysAgo: 3 },

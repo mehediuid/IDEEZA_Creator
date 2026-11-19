@@ -228,7 +228,8 @@ export function LegalLine() {
 }
 
 /** "NFT details", folded under a hairline: the facts a buyer may want, never in the way of the button. */
-export function MoreFacts({ children }: { children: React.ReactNode }) {
+/** A folded section under a line: "NFT details" unless it is given another title. */
+export function MoreFacts({ children, title = "NFT details" }: { children: React.ReactNode; title?: string }) {
   const [open, setOpen] = React.useState(false);
   const id = React.useId();
   return (
@@ -240,7 +241,7 @@ export function MoreFacts({ children }: { children: React.ReactNode }) {
         onClick={() => setOpen((o) => !o)}
         className="inline-flex min-h-[24px] items-center justify-between gap-3 rounded-sm text-md font-semibold text-text-primary outline-none hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
       >
-        NFT details
+        {title}
         <span
           aria-hidden
           className={cn("inline-flex transition-transform duration-fast motion-reduce:transition-none", open && "rotate-180")}

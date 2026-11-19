@@ -32,7 +32,11 @@ test("Mira, who shops by default, holds every kind: a whole project, Physical an
   assert.deepEqual(byName["Smart plant watering hub"], [
     "Physical NFT · Personal use | 1 copy · #1 of 30",
     "Physical NFT · Business use | 1 copy · #3 of 30",
-  ], "a project of two products: whole-project copies");
+    "Virtual NFT · Personal use | 1 copy · #1",
+  ], "a project of two products, both kinds");
+  assert.deepEqual(byName["LoRa weather station"], ["Virtual NFT · Business use | 1 copy · #1"], "and a Virtual-only one of two products");
+  const hub = mira.find((p) => p.name === "Smart plant watering hub");
+  assert.deepEqual(hub.products, ["Watering Hub", "Soil Probe"], "its card names its products");
   assert.deepEqual(byName["Lo-fi guitar pedal"], [
     "Physical NFT · Personal use | 1 copy · #12 of 40",
     "Virtual NFT · Personal use | 1 copy · #1",
@@ -130,7 +134,7 @@ test("topping up an older planting: a gone track or a sold Main NFT is skipped, 
 });
 
 test("the planter plants the purchases with the projects and tops up an older planting", () => {
-  assert.equal(demo.DEMO_SEED_VERSION, 5);
+  assert.equal(demo.DEMO_SEED_VERSION, 6);
   const seed = read("components/projects/demo-projects-seed.tsx");
   assert.equal(seed.match(/plantSamplePurchases\(storage, now\)/g)?.length, 2, "on a first planting and on a top-up");
   assert.match(seed, /withDemoSales\(sales as Sale\[\], ours, tracksOf\)/);

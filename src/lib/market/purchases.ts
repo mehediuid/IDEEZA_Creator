@@ -133,6 +133,8 @@ export type PurchasedProject = {
   creator: string;
   /** Its marketplace page. */
   marketHref: string;
+  /** Its products' names, in order: a project of several shows them on its card. */
+  products: string[];
   lines: PurchaseLine[];
   /** How many NFTs: each copy, and the Main NFT once. */
   count: number;
@@ -192,7 +194,7 @@ function projectOf(base: Omit<PurchasedProject, "lines" | "count" | "lastAt">, l
 export function ownPurchasesOf(
   sales: readonly Sale[],
   buyerId: DemoBuyerId,
-  projects: readonly { id: string; name: string; cover: string | null }[],
+  projects: readonly { id: string; name: string; cover: string | null; products?: readonly string[] }[],
   tracks: readonly EditionTrack[],
   creator: string,
 ): PurchasedProject[] {
@@ -247,6 +249,7 @@ export function ownPurchasesOf(
           cover: p.cover,
           creator,
           marketHref: `/marketplace/${id}`,
+          products: [...(p.products ?? [])],
           buyable: mainTo ? [] : buyable,
           soldInFullTo: mainTo ? buyerNameOf(mainTo) : null,
         },
@@ -299,6 +302,7 @@ export function samplePurchasesOf(sales: readonly SampleSale[], buyerId: DemoBuy
           cover: sampleCoverOf(m.post),
           creator: m.post.creator.name,
           marketHref: `/marketplace/${m.feedId}`,
+          products: m.post.products.map((x) => x.name),
           buyable: mainTo ? [] : buyable,
           soldInFullTo: mainTo ? buyerNameOf(mainTo) : null,
         },
@@ -357,34 +361,3 @@ export function cardChipsOf(p: PurchasedProject): string[] {
 export function usesOf(p: PurchasedProject): PurchaseUse[] {
   return (["Personal use", "Business use"] as PurchaseUse[]).filter((u) => p.lines.some((l) => l.use === u));
 }
-
-/** How much each NFT shows its holder (owner, 2026-11-19: "how much information a Physical NFT should show, and
- *  how much a Virtual NFT — that matters most"): what it gives, and what it doesn't, said at the top of its tab. */
-export const GIVES: Record<PurchaseKind, { gets: string[]; not: string[] }> = {
-  physical: {
-    gets: [
-      "Every product it covers, in full: pictures, specs and parts",
-      "PCB: the board layout, its bill of materials and fab profile, the Gerber files",
-      "Firmware: the commented source, pinned libraries and the pin map",
-      "Wiring: the netlist, a pin-to-pin table and the harness",
-      "Assembly and the 3D model of each product",
-      "Units to make with each copy, and Send to manufacturing",
-      "Selling the copy on, with the units it has left",
-    ],
-    not: ["The project itself: its Main NFT, its listing and its royalties"],
-  },
-  virtual: {
-    gets: [
-      "Every product it covers: pictures, specs and parts",
-      "The 3D model of each product, to turn and to download",
-      "Preview renders of each product",
-      "Using them in your own work, or in paid work with Business use",
-      "Selling the copy on, with its licence",
-    ],
-    not: ["PCB, firmware and wiring", "Assembly", "Making units"],
-  },
-  main: {
-    gets: ["The project itself, as one of your projects: every product, every piece, the editors", "Listing it again, selling its copies, its royalties"],
-    not: [],
-  },
-};

@@ -37,7 +37,7 @@ export function usePurchased(): { ready: boolean; buyer: DemoBuyer; purchases: P
     const bought = projects.filter((p) => boughtIds.includes(p.id));
     const like = bought.map((p) => {
       const s = projectSummary(p, { builds, brief: null, videoJobs: [], now, projects, market: market.data });
-      return { id: p.id, name: s.name, cover: s.cover };
+      return { id: p.id, name: s.name, cover: s.cover, products: (p.products ?? []).map((x) => x.name) };
     });
     return purchasedProjectsOf(ownPurchasesOf(market.data.sales, buyer.id, like, editions.record, me.name), samplePurchasesOf(sampleSales, buyer.id));
   }, [projects, boughtIds, builds, now, market.data, buyer.id, editions.record, me.name, sampleSales]);

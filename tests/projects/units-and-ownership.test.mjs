@@ -89,17 +89,22 @@ test("the planter makes bought projects on every start, and they take no plan sl
   }
 });
 
-test("how much each NFT shows: Physical everything to build, Virtual the digital twin only, Main the project", () => {
-  const g = P.GIVES;
-  const has = (k, re) => g[k].gets.some((t) => re.test(t));
-  for (const re of [/^PCB/, /^Firmware/, /^Wiring/, /^Assembly/, /Units to make/]) assert.ok(has("physical", re), `physical ${re}`);
-  assert.deepEqual(g.virtual.not, ["PCB, firmware and wiring", "Assembly", "Making units"]);
-  assert.ok(has("virtual", /3D model/) && has("physical", /3D model/));
-  assert.match(g.physical.not[0], /^The project itself/);
-  assert.match(g.main.gets[0], /^The project itself, as one of your projects/);
+test("how much each NFT shows: what a buyer needs first comes first (products, then copies, rules folded)", () => {
   const page = read("components/projects/purchased/purchased-page.tsx");
-  assert.match(page, /<GivesBlock kind=\{kind\} \/>/, "said at the top of each kind's tab");
-  assert.match(page, /each unit is one set: \$\{andList\(setOf\)\}/, "a whole-project Physical copy of several products makes sets");
+  // The piece tabs say what each kind opens: Physical everything to build, Virtual the 3D model and parts.
+  const pieces = (k) => [...page.match(new RegExp(`  ${k}: \\[([\\s\\S]*?)\\],`))[1].matchAll(/id: "(\w+)"/g)].map((m) => m[1]);
+  assert.deepEqual(pieces("physical"), ["3d", "pcb", "code", "wiring", "assembly", "parts"]);
+  assert.deepEqual(pieces("virtual"), ["3d", "parts"]);
+  assert.match(page, /Its PCB, firmware, wiring and assembly, and\s+making units, come with a Physical NFT/, "a Virtual copy says what it leaves out");
+  // Order in a kind's tab (owner, v4): the products, the copies, then the rules and NFT details folded.
+  const panel = page.slice(page.indexOf("function KindPanel("), page.indexOf("function YourCopies("));
+  const at = (s) => panel.indexOf(s);
+  assert.ok(at("<ProductsView") > 0 && at("<ProductsView") < at("<YourCopies") && at("<YourCopies") < at('<MoreFacts title="What you can and can\'t do">'));
+  assert.ok(at('<MoreFacts title="What you can and can\'t do">') < at("<MoreFacts>"), "NFT details last");
+  assert.doesNotMatch(page, /GivesBlock|Included/, "no pre-purchase list on top of what is already bought");
+  assert.doesNotMatch(page, /OnInnovations/, "no Innovations stats on a buyer's page");
+  assert.match(page, /one unit is one set: \$\{andList\(setOf\)\}/, "a whole-project Physical copy of several products makes sets");
   assert.match(page, /kind="main"\n\s+post=\{post\}\n\s+covered=\{post\.products\.map/, "a Main NFT shows every product in full");
+  assert.match(page, /<MoreFacts title="What the Main NFT allows">/, "and its rules folded");
   assert.match(page, /Open in your project/);
 });
