@@ -8,8 +8,11 @@
 // page has something real to open:
 // - Smart Plant Pot: Listed. Main NFT on Buy now, whole-project Physical and
 //   Virtual copies each for Personal use and Business use (owner, 2026-11-16:
-//   a buyer chooses the use), a Personal-use Virtual copy of its product, one
-//   copy already sold, and shared on Innovations (Showcase);
+//   a buyer chooses the use), a Personal-use Virtual copy of its product,
+//   copies of every kind already sold (owner, 2026-11-19: purchases of every
+//   kind always there) — Physical for Business use (Sam) and Personal use
+//   (Leo), Virtual for Personal use (Leo) and Business use (Mira), and its
+//   product's Virtual copy (Mira) — and shared on Innovations (Showcase);
 // - Gesture LED Lamp: Sold. Its Main NFT bought in full by Leo;
 // - Heart Rate Band: Minted (private), nothing listed;
 // - BLE Data Logger: Draft. Built, not minted.
@@ -39,8 +42,9 @@ import type { ManualProject } from "../manual/projects";
 /** Set once this account's demo projects are planted; parked and restored with its work. */
 export const DEMO_SEED_KEY = "ideeza:demo:projects";
 export const DEMO_PROJECT_PREFIX = "proj_demo_";
-/** The seed's version: 2 added the second use of each whole-project copy (an older planting is topped up). */
-export const DEMO_SEED_VERSION = 2;
+/** The seed's version: 2 added the second use of each whole-project copy; 3 the sales of every kind and the
+ *  demo creators' purchases of sample listings (demo-purchases.ts). An older planting is topped up. */
+export const DEMO_SEED_VERSION = 3;
 
 const DAY = 86_400_000;
 const NETWORK: Network = "baseSepolia";
@@ -328,18 +332,38 @@ export function demoSeedOf(now: number): DemoSeed {
         trackOf(d, "virt_commercial", PROJECT_SCOPE, "virtual", "commercial", 50, "0.02", listedAt),
         trackOf(d, "prod_virt", productIdOf(d), "virtual", "private", 50, "0.005", listedAt),
       ];
-      seed.sales.push(
-        saleOf({
-          id: `sale_demo_${d.key}_1`,
-          listingId: physical.id,
-          projectId: project.id,
-          at: listedAt + 2 * DAY,
-          buyerId: "buyer-sam",
-          item: { nft: "physical", trackId: physical.id, productId: PROJECT_SCOPE, productName: d.name, use: "commercial", tier: "extended", serial: 1 },
-          price: "0.04",
-          mint,
-        }),
-      );
+      const tracks = seed.editions[project.id];
+      // Copies of every kind already sold, one each, oldest first (Sam's is the first planting's).
+      const copySales: { id: string; key: string; buyerId: DemoBuyerId; days: number }[] = [
+        { id: `sale_demo_${d.key}_1`, key: "phys", buyerId: "buyer-sam", days: 2 },
+        { id: `sale_demo_${d.key}_phys_private`, key: "phys_private", buyerId: "buyer-leo", days: 3 },
+        { id: `sale_demo_${d.key}_virt`, key: "virt", buyerId: "buyer-leo", days: 4 },
+        { id: `sale_demo_${d.key}_virt_commercial`, key: "virt_commercial", buyerId: "buyer-mira", days: 5 },
+        { id: `sale_demo_${d.key}_prod_virt`, key: "prod_virt", buyerId: "buyer-mira", days: 6 },
+      ];
+      for (const c of copySales) {
+        const t = tracks.find((x) => x.id === `trk_demo_${d.key}_${c.key}`) as EditionTrack;
+        seed.sales.push(
+          saleOf({
+            id: c.id,
+            listingId: t.id,
+            projectId: project.id,
+            at: listedAt + c.days * DAY,
+            buyerId: c.buyerId,
+            item: {
+              nft: t.kind,
+              trackId: t.id,
+              productId: t.productId,
+              productName: t.productId === PROJECT_SCOPE ? d.name : d.product,
+              use: t.use,
+              tier: "extended",
+              serial: 1,
+            },
+            price: t.listing?.regular ?? "0",
+            mint,
+          }),
+        );
+      }
     }
     if (d.outcome === "sold") {
       const listing = listingOf(d, "0.12", listedAt);
@@ -359,6 +383,30 @@ export function demoSeedOf(now: number): DemoSeed {
     }
   }
   return seed;
+}
+
+/**
+ * The sales a list lacks from a later seed, for an older planting: each only while what it sold is still there
+ * (the project's Main NFT not sold to anyone else, the copy's track still held), and a copy takes the next free
+ * number of its track. Nothing already in the list changes.
+ */
+export function withDemoSales(existing: readonly Sale[], add: readonly Sale[], tracksOf: (projectId: string) => readonly EditionTrack[] | null): Sale[] {
+  let sales = [...existing];
+  for (const s of add) {
+    if (sales.some((x) => x.id === s.id)) continue;
+    const item = s.item;
+    if (item.nft === "main") {
+      if (sales.some((x) => x.projectId === s.projectId && x.item.nft === "main")) continue;
+      sales = [...sales, s];
+      continue;
+    }
+    const tracks = tracksOf(s.projectId);
+    if (!tracks?.some((t) => t.id === item.trackId)) continue;
+    const taken = sales.flatMap((x) => (x.item.nft !== "main" && x.item.trackId === item.trackId ? [x.item.serial] : []));
+    const serial = taken.includes(item.serial) ? Math.max(...taken) + 1 : item.serial;
+    sales = [...sales, { ...s, item: { ...item, serial } }];
+  }
+  return sales;
 }
 
 /** The demo projects' ids, for a check that they are there. */

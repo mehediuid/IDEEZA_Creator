@@ -9,18 +9,23 @@
 //
 // Once per account: DEMO_SEED_KEY is part of the account's work, parked and
 // restored with it (work-vault.ts), so a new account gets its own four and a
-// returning one keeps whatever it did with them. A later seed version only
-// tops up what it added (copy tracks a planted project lacks). Nothing is written over a
-// store that doesn't read (an unreadable list stays as it is), and a project
-// already there is never replaced.
+// returning one keeps whatever it did with them. With them come the demo
+// creators' purchases of sample listings (demo-purchases.ts; owner, 2026-11-19:
+// My projects › Purchased always has every kind). A later seed version only
+// tops up what it added (copy tracks a planted project lacks, the sales and
+// purchases it lacks while their listings can still take them). Nothing is
+// written over a store that doesn't read (an unreadable list stays as it is),
+// and a project already there is never replaced.
 
 import * as React from "react";
 import { commerceKey } from "@/lib/commerce/record";
 import { BUILDS_KEY } from "@/lib/create/history";
 import { notifyStores } from "@/lib/key-store";
-import { DEMO_PROJECT_IDS, DEMO_SEED_KEY, DEMO_SEED_VERSION, demoSeedOf } from "@/lib/demo/demo-projects";
+import { DEMO_PROJECT_IDS, DEMO_SEED_KEY, DEMO_SEED_VERSION, demoSeedOf, withDemoSales } from "@/lib/demo/demo-projects";
+import { withDemoSampleSales } from "@/lib/demo/demo-purchases";
 import { PROJECTS_KEY } from "@/lib/manual/projects";
-import { EDITIONS_KEY, LISTINGS_KEY, SALES_KEY } from "@/lib/market/types";
+import { normalizeSampleSales, PHONE_SAMPLE_SALES_KEY } from "@/lib/market/phone-sample-sales";
+import { EDITIONS_KEY, LISTINGS_KEY, SALES_KEY, type EditionTrack, type Sale } from "@/lib/market/types";
 
 type WithId = { id: string };
 
@@ -53,8 +58,20 @@ function plantedVersion(storage: Storage): number {
   }
 }
 
+/** The demo creators' purchases of sample listings the account lacks; false when the list doesn't read. */
+function plantSamplePurchases(storage: Storage, now: number): boolean {
+  const held = readList(storage, PHONE_SAMPLE_SALES_KEY);
+  if (!held) return false;
+  const sales = normalizeSampleSales(held);
+  const next = withDemoSampleSales(sales, now);
+  if (next.length === sales.length) return false;
+  storage.setItem(PHONE_SAMPLE_SALES_KEY, JSON.stringify(next));
+  return true;
+}
+
 /** An older planting gets what a later seed added: copy tracks it lacks, on projects still there whose copies
- *  read. Nothing the maker changed is replaced. True when it wrote. */
+ *  read; the sales it lacks, while what they sold is still there; the sample purchases. Nothing the maker changed
+ *  is replaced. True when it wrote. */
 function topUp(storage: Storage, now: number): boolean {
   const projects = readList(storage, PROJECTS_KEY);
   if (!projects) return false;
@@ -71,6 +88,17 @@ function topUp(storage: Storage, now: number): boolean {
         wrote = true;
       }
     }
+    const sales = readList(storage, SALES_KEY);
+    if (sales) {
+      const ours = seed.sales.filter((x) => hasId(projects, x.projectId));
+      const tracksOf = (projectId: string) => readList(storage, EDITIONS_KEY(projectId)) as EditionTrack[] | null;
+      const next = withDemoSales(sales as Sale[], ours, tracksOf);
+      if (next.length !== sales.length) {
+        storage.setItem(SALES_KEY, JSON.stringify(next));
+        wrote = true;
+      }
+    }
+    if (plantSamplePurchases(storage, now)) wrote = true;
     storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
   } catch {
     return false;
@@ -100,6 +128,7 @@ export function plantDemoProjects(storage: Storage, now: number): boolean {
         storage.setItem(commerceKey(p.id), JSON.stringify({ v: 1, mint: p.mint, ownerConfirmedAt: p.ownerConfirmedAt }));
       }
     }
+    plantSamplePurchases(storage, now);
     storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
   } catch {
     // Storage full or blocked: the account simply has no demo projects this time.
