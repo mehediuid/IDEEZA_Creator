@@ -48,14 +48,23 @@ export function useOwnTimeline(made: readonly MadeItem[], publicView: boolean): 
       });
     });
     const byId = (id: string): FeedClip | null => clips.find((c) => c.id === id) ?? FEED_CLIPS.find((c) => c.id === id) ?? null;
+    // A shared clip reads as the post it shares: a project with its products, a product with its project.
     const shares = prefs.shares.flatMap((s) => {
       const clip = byId(s.clipId);
       if (!clip) return [];
-      const projectTitle =
-        clip.source === "mine"
-          ? (projects.find((p) => p.id === clip.projectId)?.name.trim() || null)
-          : (SAMPLE_POSTS.find((p) => p.id === clip.postId)?.title ?? null);
-      return [sharePostOf(s, clip, projectTitle, ME.id)];
+      if (clip.source === "mine") {
+        const p = projects.find((x) => x.id === clip.projectId);
+        const products = p ? productsOfProject(p, buildsOf(p, builds)).filter((x) => x.dropped === null) : [];
+        return [
+          sharePostOf(s, clip, {
+            projectTitle: p?.name.trim() || null,
+            products: products.map((x) => ({ id: x.id, name: x.name, image: x.built?.product.conceptImageUrl || null })),
+            ownerId: ME.id,
+          }),
+        ];
+      }
+      const post = SAMPLE_POSTS.find((p) => p.id === clip.postId);
+      return [sharePostOf(s, clip, { projectTitle: post?.title ?? null, products: post?.products ?? [], ownerId: ME.id })];
     });
     return timelineOf([...own, ...shares], publicView);
   }, [ready, made, projects, builds, clips, prefs.shares, publicView]);

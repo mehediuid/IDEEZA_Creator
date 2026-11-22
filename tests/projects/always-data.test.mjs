@@ -133,7 +133,7 @@ test("four demo projects, one per outcome, each a finished build", () => {
 test("planted once per account, before the stores read, never over an unreadable list", () => {
   const seed = read("components/projects/demo-projects-seed.tsx");
   assert.match(seed, /if \(planted >= DEMO_SEED_VERSION\) return false;/);
-  assert.match(seed, /if \(planted > 0\) return topUp\(storage, now\);/, "an older planting only gets what a later seed added");
+  assert.match(seed, /if \(planted > 0\) return topUp\(storage, now, planted\);/, "an older planting only gets what a later seed added");
   assert.match(seed, /if \(!projects \|\| !builds \|\| !listings \|\| !sales\) return false;/);
   assert.match(seed, /React\.useLayoutEffect/);
   const layout = read("app/layout.tsx");

@@ -95,9 +95,14 @@ export function projectPostOf(input: {
   };
 }
 
-/** A clip shared to the Feed with words. `projectTitle` names a product's project; `ownerId` is the
- *  profile's person, so their own work carries no "by". */
-export function sharePostOf(share: FeedShare, clip: FeedClip, projectTitle: string | null, ownerId: string): TimelinePost {
+/** A clip shared to the Feed with words, drawn as the post it shares: a project with its products, a
+ *  product with its project's name. `ownerId` is the profile's person, so their own work carries no "by". */
+export function sharePostOf(
+  share: FeedShare,
+  clip: FeedClip,
+  ctx: { projectTitle: string | null; products?: readonly { id: string; name: string; image: string | null }[]; ownerId: string },
+): TimelinePost {
+  const { projectTitle, ownerId } = ctx;
   return {
     key: `share:${share.id}`,
     at: share.at,
@@ -112,7 +117,10 @@ export function sharePostOf(share: FeedShare, clip: FeedClip, projectTitle: stri
     playHref: phoneClipHref(clip.id),
     detailsHref: phoneDetailsHref(clip.projectId, clip.productId),
     stage: clip.stage,
-    products: [],
+    products:
+      clip.kind === "project"
+        ? (ctx.products ?? []).map((p) => ({ id: p.id, name: p.name.trim() || "Untitled product", image: p.image, href: phoneDetailsHref(clip.projectId, p.id) }))
+        : [],
     offers: [...clip.offers],
     postId: clip.postId,
     base: clip.base,
