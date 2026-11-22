@@ -17,7 +17,9 @@
 //   (the review's free retry) with Open chat, or Add pieces (D2);
 // then "What this covers" (`coversFor`, the web's words) as a grouped list,
 // and the ready piece's file as the bar's primary — or, for a buyer, "Buy a
-// copy to download" (off in a preview, with the reason). A piece the build
+// copy to download" (off in a preview, with the reason). The 3D Module's file
+// is the build's own 3D model, Download 3D model (.glb) (CL-015), for whoever
+// may take the files, when the build made one for this product. A piece the build
 // doesn't have is a state card with Back to Build; a buyer without a copy who
 // opens the firmware is told it comes with a copy. Back is the top bar's
 // (back, or replace to the product's Build section): it never pushes, so Back
@@ -49,7 +51,7 @@ import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { AddPiecesSheet } from "./build-tab";
+import { AddPiecesSheet, MODEL_FAILED, MODEL_LABEL, useModelDownload } from "./build-tab";
 import { BuyCopy, PREVIEW_BUY_OFF } from "./buy";
 import { ModelPiece } from "./model-view";
 import { useListedCopies } from "./overview";
@@ -382,6 +384,7 @@ function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduc
   const { retryBuildItem } = useCreateHistory();
   const toast = useToast();
   const [adding, setAdding] = React.useState(false);
+  const model = useModelDownload();
   if (state === "failed") {
     const rebuild = canEdit && job?.failure !== "system" && job;
     if (!rebuild && !chat) return null;
@@ -419,6 +422,18 @@ function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduc
     );
   }
   if (state !== "ready") return null;
+  if (kind === "3d" && downloads && model.file) {
+    return (
+      <BottomBar>
+        <Button size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} loading={model.state === "busy"} onClick={model.run}>
+          {MODEL_LABEL}
+        </Button>
+        <p aria-live="polite" className={cn(T.meta, "text-text-error empty:hidden")}>
+          {model.state === "failed" ? MODEL_FAILED : ""}
+        </p>
+      </BottomBar>
+    );
+  }
   const file = fileFor(kind, bp);
   if (!file) return null;
   if (downloads) {

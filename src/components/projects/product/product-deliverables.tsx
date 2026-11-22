@@ -236,7 +236,7 @@ export function saveBlob(blob: Blob, filename: string) {
 
 /** The build's generated model, when this product wears it: only the primary does (ModelTab),
  *  and the bundled sample mesh isn't a model of this product. */
-function modelFileOf(job: BuildJob, product: BuildProduct): { url: string; filename: string } | null {
+export function modelFileOf(job: BuildJob, product: BuildProduct): { url: string; filename: string } | null {
   const url = job.modelGlbUrl;
   if (product.id !== "primary" || !url || isSampleModel(url)) return null;
   return { url, filename: `${fileSlug(product.title)}-3d-model.glb` };

@@ -10,13 +10,18 @@
 //   One buy path: the sticky bar;
 // · Specs: the booked facts (`productFacts`) as a grouped list, with "Worked
 //   out from the parts." for a build that predates the spec and the owner's
-//   part changes (29a) as its footer lines;
+//   part changes (29a) as its footer lines; when the project has a network
+//   (CL-015) a Network row names it ("Unnamed Network" without a name) — the
+//   owner's opens the project's Network screen, as the project page's About
+//   row does; a preview reads it; the marketplace view has no network screen
+//   on a phone, so no row. A product no build stands behind still shows Specs
+//   for that row;
 // · Build check: one row — the web's line, its chip at the end — that opens
 //   See why (the grouped checks in a sheet, 10q, 29b, with the web's credit
 //   note) while the build is a Draft.
 
 import * as React from "react";
-import { CubeIcon, InformationCircleIcon, PackageIcon, Shield01Icon } from "@hugeicons/core-free-icons";
+import { CubeIcon, InformationCircleIcon, PackageIcon, ShareKnowledgeIcon, Shield01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
 import { buttonVariants } from "@/components/ideeza/button";
@@ -33,13 +38,16 @@ import {
   type ProductConfidence,
 } from "@/lib/create/confidence";
 import { productFacts } from "@/lib/manual/products-tab-view";
+import { phoneProjectPath } from "@/lib/manual/phone-project";
+import { projectTabsFor } from "@/lib/manual/project-route";
+import { useProjectNetwork } from "@/lib/network/store";
 import { editionChainOf, KIND_WORD, trackCardOf, tracksOf, USE_WORD } from "@/lib/market/editions";
 import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Chevron, LIST_ROW, ListCard } from "../kit/list";
+import { Chevron, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { T } from "../type";
 import { CARD, FactCard, InfoButton, ListFooter, SectionHead } from "./parts";
@@ -47,11 +55,11 @@ import { useProduct } from "./use-product";
 
 /** The buyer's Overview (the owner's page lays these out itself). */
 export function OverviewTab() {
-  const { buyer, bp, confidence } = useProduct();
+  const { buyer, confidence } = useProduct();
   return (
     <div className="flex flex-col gap-12">
       {buyer && <MarketplaceBlock />}
-      {bp && <SpecsSection />}
+      <SpecsSection />
       {confidence && (
         <section aria-labelledby="pd-check" className="flex flex-col gap-4">
           <SectionHead id="pd-check" title="Build check" />
@@ -66,17 +74,43 @@ export function OverviewTab() {
 
 // ─────────────────────────── Specs (10, 29a) ───────────────────────────
 
+/** The project's network as the product's Specs names it (the web's `useNetworkFact`): its name,
+ *  and the phone's Network screen for the owner; null with no network, on the marketplace view,
+ *  or for a viewer whose project page has no Network. */
+function useNetworkRow(): { name: string; href: string | null } | null {
+  const { project, viewer, mode } = useProduct();
+  const { network } = useProjectNetwork(mode === "market" ? null : project.id);
+  if (!network || mode === "market") return null;
+  if (!projectTabsFor(viewer, { networkReadable: true, contributors: project.contributors?.length ?? 0 }).includes("network")) return null;
+  return { name: network.name.trim() || "Unnamed Network", href: mode === "owner" ? phoneProjectPath(project.id, "network") : null };
+}
+
 export function SpecsSection() {
   const { bp, partChanges } = useProduct();
-  if (!bp) return null;
-  const facts = productFacts(specOfSource(bp), bp.parts);
-  if (!facts.length && !partChanges) return null;
+  const network = useNetworkRow();
+  const facts = bp ? productFacts(specOfSource(bp), bp.parts) : [];
+  if (!facts.length && !partChanges && !network) return null;
+  const title = (
+    <>
+      Network
+      {network?.href && <span className="sr-only"> · View network</span>}
+    </>
+  );
   return (
     <section aria-labelledby="pd-specs" className="flex flex-col gap-4">
       <SectionHead id="pd-specs" title="Specs" />
       {facts.length > 0 && <FactCard label="Specs" inset="row" rows={facts.map((f) => [f.label, f.value])} />}
-      {!bookedSpec(bp) && facts.length > 0 && <ListFooter>Worked out from the parts.</ListFooter>}
+      {bp && !bookedSpec(bp) && facts.length > 0 && <ListFooter>Worked out from the parts.</ListFooter>}
       {partChanges && <ListFooter>Built with your part changes: {partChanges}</ListFooter>}
+      {network && (
+        <ListCard label="Network">
+          {network.href ? (
+            <ListRow href={network.href} icon={ShareKnowledgeIcon} title={title} value={network.name} />
+          ) : (
+            <ListRow icon={ShareKnowledgeIcon} title={title} value={network.name} />
+          )}
+        </ListCard>
+      )}
     </section>
   );
 }

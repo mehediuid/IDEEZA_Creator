@@ -9,27 +9,39 @@
 //   + Add on a Not built row and Add the rest; then Build check (See why while
 //   a Draft), Version (only with more than one; a pick sheet) and Downloads (a
 //   sheet of the files, or why there are none);
-// · Media — one row: the video's state, how many images, opening the Media
-//   screen (`…/media`) with the player, the takes and Generate / Regenerate;
+// · Media and Sales — the hub's rows: Media (the video's state, how many
+//   images) opens the Media screen (`…/media`) with the player, the takes and
+//   Generate / Regenerate; a video ready and in use, with nothing rendering or
+//   waiting for review beside it, carries the web's quiet Replace (CL-015: the
+//   Generate form from the take in use, which stays in use until Use this
+//   video). Sales (the owner's, CL-015) opens this product's copy sales
+//   (`…/sales`), with how many under it;
 // · Activity — the newest entry, History (n) and NFT activity (activity.tsx);
 // · Specs — the grouped list with its footer lines (overview.tsx).
 // A product no build stands behind (made by hand) has Media and Activity.
 // A contributor preview reads the same page with nothing to change.
 
 import * as React from "react";
-import { Add01Icon, Download04Icon, GitBranchIcon, Video01Icon } from "@hugeicons/core-free-icons";
+import Link from "next/link";
+import { Add01Icon, Download04Icon, GitBranchIcon, UserMultipleIcon, Video01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import { buttonVariants } from "@/components/ideeza/button";
 import { isLeftOut } from "@/lib/create/pieces";
 import type { BuildItemKind } from "@/lib/create/history";
+import { customersOf, customersSummaryText } from "@/lib/manual/customers";
+import { can } from "@/lib/manual/permissions";
 import { formatDate } from "@/lib/manual/project-summary";
 import { piecesLine, versionRowsOf } from "@/lib/manual/phone-product";
-import { ListCard, ListRow } from "../kit/list";
+import { cn } from "@/lib/utils";
+import { LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { PickSheet } from "../kit/pick-list";
 import { ActivitySection } from "./activity";
-import { AddPiecesSheet, DownloadsSheet, filesOf, PieceRows, useSeedCaption } from "./build-tab";
+import { AddPiecesSheet, DownloadsSheet, filesOf, PieceRows, useModelDownload, useSeedCaption } from "./build-tab";
 import { useProductImages, useVideoStatus } from "./hero";
 import { videoLine } from "./media-tab";
 import { BuildCheckRow, SpecsSection } from "./overview";
 import { InfoButton, replaceQuery, SectionHead } from "./parts";
+import { T } from "../type";
 import { useProduct } from "./use-product";
 
 export function OwnerSections({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement | null> }) {
@@ -56,7 +68,7 @@ export function OwnerSections({ scrollRef }: { scrollRef: React.RefObject<HTMLDi
         </div>
       )}
       <div ref={mediaRef}>
-        <MediaRow />
+        <MediaAndSales />
       </div>
       <ActivitySection />
       <SpecsSection />
@@ -70,9 +82,10 @@ function BuildSection() {
   const [adding, setAdding] = React.useState<BuildItemKind[] | null>(null);
   const [files, setFiles] = React.useState(false);
   const [picking, setPicking] = React.useState(false);
+  const model = useModelDownload();
   if (!bp || !pieces) return null;
   const leftOut = bp.items.filter(isLeftOut).map((i) => i.kind);
-  const fileList = filesOf(bp);
+  const fileCount = filesOf(bp).length + (model.file ? 1 : 0);
   const owner = mode === "owner";
   const versions = owner && version && version.options.length > 1 ? version : null;
   const home = version?.home ?? 1;
@@ -101,14 +114,14 @@ function BuildSection() {
         )}
         {!downloads ? (
           <ListRow icon={Download04Icon} title="Downloads" meta="Firmware and downloads come with a purchase." />
-        ) : fileList.length ? (
-          <ListRow icon={Download04Icon} title="Downloads" value={`${fileList.length} ${fileList.length === 1 ? "file" : "files"}`} onClick={() => setFiles(true)} />
+        ) : fileCount ? (
+          <ListRow icon={Download04Icon} title="Downloads" value={`${fileCount} ${fileCount === 1 ? "file" : "files"}`} onClick={() => setFiles(true)} />
         ) : (
           <ListRow icon={Download04Icon} title="Downloads" meta="Nothing to download yet — the files come once their pieces are ready." />
         )}
       </ListCard>
       {adding && <AddPiecesSheet bp={bp} preselect={adding} onClose={() => setAdding(null)} />}
-      <DownloadsSheet open={files} onClose={() => setFiles(false)} bp={bp} />
+      <DownloadsSheet open={files} onClose={() => setFiles(false)} bp={bp} model={model} />
       {versions && (
         <PickSheet
           open={picking}
@@ -127,20 +140,53 @@ function BuildSection() {
   );
 }
 
-/** One row for the product's media: the video's state, how many images; the Media screen. */
-function MediaRow() {
-  const { path } = useProduct();
+/** The hub's rows after Build: Media (with Replace on a settled video), then the owner's Sales. */
+function MediaAndSales() {
+  const { project, view, viewer, product, name, path } = useProduct();
   const status = useVideoStatus();
   const images = useProductImages().length;
+  const imagesValue = images ? `${images} ${images === 1 ? "image" : "images"}` : undefined;
+  // The web's ReadinessRow: ready and in use, no take rendering beside it and none waiting for review.
+  const replace = can(viewer, "video.generate", view.canCtx) && status?.state === "ready" && !status.next && !status.review ? status.take : null;
+  const sales = can(viewer, "customers.see");
+  const customers = React.useMemo(
+    () => (sales ? customersOf(project, view.sales, { scope: { kind: "product", productId: product.id } }) : null),
+    [sales, project, view.sales, product.id],
+  );
   return (
-    <ListCard label="Media">
-      <ListRow
-        href={path("media")}
-        icon={Video01Icon}
-        title="Media"
-        meta={videoLine(status)}
-        value={images ? `${images} ${images === 1 ? "image" : "images"}` : undefined}
-      />
+    <ListCard label="Media and sales">
+      {replace ? (
+        <li className="flex items-center">
+          <Link href={path("media")} className={cn(LIST_ROW, "min-w-0 flex-1")}>
+            <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+              <Icon icon={Video01Icon} size={24} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={cn(T.body, "text-text-primary")}>Media</span>
+              <span className={T.meta}>{[videoLine(status), imagesValue].filter(Boolean).join(" · ")}</span>
+            </span>
+          </Link>
+          <div className="shrink-0 pr-8">
+            <Link
+              href={path("video", { from: replace.id })}
+              aria-label={`Replace ${name} video`}
+              className={buttonVariants({ hierarchy: "ghost", size: "xl" })}
+            >
+              Replace
+            </Link>
+          </div>
+        </li>
+      ) : (
+        <ListRow href={path("media")} icon={Video01Icon} title="Media" meta={videoLine(status)} value={imagesValue} />
+      )}
+      {customers && (
+        <ListRow
+          href={path("sales")}
+          icon={UserMultipleIcon}
+          title="Sales"
+          meta={view.marketUnreadable ? "Sales can't be shown" : customers.rows.length ? customersSummaryText(customers) : "No sales of this product yet"}
+        />
+      )}
     </ListCard>
   );
 }

@@ -4,19 +4,24 @@
 // 10h, 10n, 10t–10wb, 10x–10z, 23d, 28, 31a–32b). The same product as the
 // web's /projects/[id]/products/[productId], read through the web's one
 // derivation, laid out as a native object page (owner 2026-11-15):
-// · the top bar: Back and the owner's ⋯ (an M12 action sheet, 10c); the name
-//   comes into the bar once the title scrolls away;
+// · the top bar: Back and the owner's ⋯ (menu.tsx, 10c, CL-015: Edit name and
+//   description, Open chat, the previews, Delete product… with the web's
+//   rules); the name comes into the bar once the title scrolls away;
 // · the media on top (hero.tsx): the take in use, else the concept image of
 //   the version on screen;
 // · one header: the name (with "You own copy #n" as its one chip for a buyer
 //   who does, 23d), one meta line ("{project} · AI build · {date}", or the
 //   line of a product no build stands behind), the lock line once sold in
-//   full (10u), the description (3 lines, Show more), and the version notice
-//   while an older version is on screen (10e, 28a–28c); a buyer reads the
-//   product's activity here (10h);
+//   full (10u), the description (3 lines, Show more) — the maker's words on
+//   the current version, the build's on an older one — or, for the owner
+//   with none, Add a description (CL-015), and the version notice while an
+//   older version is on screen (10e, 28a–28c); a buyer reads the product's
+//   activity here (10h);
 // · the owner (and a contributor preview) then reads one scroll of sections —
-//   Build, Media, Activity, Specs (owner-page.tsx); the pieces line, Add the
-//   rest, the version pick and the computer note live there now;
+//   Build, Media and Sales, Activity, Specs (owner-page.tsx); the pieces line,
+//   Add the rest, the version pick and the computer note live there now; the
+//   owner's Bottom action bar holds Earn with its copies line (CL-031,
+//   earn-bar.tsx);
 // · a buyer keeps the tabs pinned under the top bar (`?tab=`, the kit's
 //   MobileTabs: a tap makes no request, so it works offline): Media ·
 //   Overview · Build · Contributors, and the sticky bar (D1): Copies from ·
@@ -29,7 +34,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { LockIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, LockIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
@@ -52,7 +57,9 @@ import { HeaderActivity } from "./activity";
 import { BuildTab } from "./build-tab";
 import { BuyBar, BuyCopy, DemoBuyerBanner } from "./buy";
 import { MediaTab } from "./media-tab";
-import { ProductMenu, RenameSheet } from "./menu";
+import { DeleteProductSheet } from "./delete-sheet";
+import { ProductEarnBar } from "./earn-bar";
+import { EditDetailsSheet, ProductMenu, useCanEditDetails } from "./menu";
 import { OverviewTab, useListedCopies } from "./overview";
 import { SampleProduct } from "./sample-product";
 import { OffMarket, ProductLoading, ProductMissing, ProjectMissing } from "./states";
@@ -93,7 +100,7 @@ function ProductReady() {
   const { project, viewer, bp, mode, buyer, name } = ctx;
   const params = useSearchParams();
   const gate = usePhoneWriteGate(project.id);
-  const [sheet, setSheet] = React.useState<"menu" | "rename" | "buy" | null>(() => (params.get("buy") === "1" && buyer ? "buy" : null));
+  const [sheet, setSheet] = React.useState<"menu" | "edit" | "delete" | "buy" | null>(() => (params.get("buy") === "1" && buyer ? "buy" : null));
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const tabsRef = React.useRef<HTMLDivElement>(null);
   const titleRef = React.useRef<HTMLHeadingElement>(null);
@@ -144,12 +151,12 @@ function ProductReady() {
             )}
           </>
         }
-        footer={buyer ? <BuyBar onBuy={() => setSheet("buy")} onFiles={toFiles} /> : undefined}
+        footer={buyer ? <BuyBar onBuy={() => setSheet("buy")} onFiles={toFiles} /> : owner ? <ProductEarnBar /> : undefined}
       >
         <ScrollHost scrollRef={scrollRef}>
           <OfflineBanner />
           <ProductHero />
-          <ProductHeader titleRef={titleRef} />
+          <ProductHeader titleRef={titleRef} onEdit={() => setSheet("edit")} />
           {mode === "market" && (
             <div className="px-8 pb-8">
               <DemoBuyerBanner />
@@ -181,8 +188,11 @@ function ProductReady() {
           )}
         </ScrollHost>
       </Screen>
-      {owner && <ProductMenu open={sheet === "menu"} onClose={() => setSheet(null)} onRename={() => setSheet("rename")} />}
-      {owner && sheet === "rename" && <RenameSheet open onClose={() => setSheet(null)} gate={gate} />}
+      {owner && (
+        <ProductMenu open={sheet === "menu"} onClose={() => setSheet(null)} onEdit={() => setSheet("edit")} onDelete={() => setSheet("delete")} />
+      )}
+      {owner && sheet === "edit" && <EditDetailsSheet onClose={() => setSheet(null)} gate={gate} />}
+      {owner && sheet === "delete" && <DeleteProductSheet onClose={() => setSheet(null)} />}
       {buyer && <BuyCopy open={sheet === "buy"} onClose={() => setSheet(null)} onFiles={toFiles} />}
       {gate.sheet}
     </>
@@ -239,13 +249,17 @@ function PreviewBanner() {
 
 // ─────────────────────────── the header ───────────────────────────
 
-function ProductHeader({ titleRef }: { titleRef: React.RefObject<HTMLHeadingElement | null> }) {
+function ProductHeader({ titleRef, onEdit }: { titleRef: React.RefObject<HTMLHeadingElement | null>; onEdit: () => void }) {
   const { project, view, product, name, mode, buyer, job, bp, version, copies } = useProduct();
   const owner = mode === "owner";
-  const description = bp?.description?.trim() || product.description.trim();
+  const canEditDetails = useCanEditDetails();
+  const home = version?.home ?? 1;
+  // The maker's words on the version the product is at (an edit writes them there); an older
+  // version keeps its build's (the web's H-7).
+  const kept = product.description.trim();
+  const description = (version?.shown ?? home) === home ? kept : bp?.description?.trim() || kept;
   const lockLine = owner ? (view.lock?.line ?? null) : null;
   const latestCopy = copies.length ? copies.reduce((a, s) => (s.at > a.at ? s : a), copies[0]) : null;
-  const home = version?.home ?? 1;
   // A version is picked in place, like a tab: no request, so it works offline.
   const showVersion = (n: number) => replaceQuery({ v: n === home ? null : String(n) });
   const unbuilt =
@@ -278,7 +292,16 @@ function ProductHeader({ titleRef }: { titleRef: React.RefObject<HTMLHeadingElem
         </p>
       )}
 
-      {description && <Description text={description} />}
+      {description ? (
+        <Description text={description} />
+      ) : canEditDetails ? (
+        <div>
+          <LinkButton onClick={onEdit} className="gap-2">
+            <Icon icon={Add01Icon} size={16} />
+            Add a description
+          </LinkButton>
+        </div>
+      ) : null}
 
       {owner && version?.notice && <VersionNotice onShow={showVersion} />}
 

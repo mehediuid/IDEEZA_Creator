@@ -69,7 +69,7 @@ const ofProduct = (a: Activity, rowId: string) =>
 
 /** The block over what is stored now, not what the page last rendered: the market, the copies
  *  and the record, in memory and in storage — either one blocking blocks. */
-function blockNow(project: ManualProject, view: ProjectView, rowId: string): ProductDeleteBlock | null {
+export function blockNow(project: ManualProject, view: ProjectView, rowId: string): ProductDeleteBlock | null {
   const market = readMarketNow();
   const editions = readEditions(project.id);
   const builds = view.refs.flatMap((r) => (r.job ? [r.job] : []));
@@ -96,7 +96,7 @@ function blockNow(project: ManualProject, view: ProjectView, rowId: string): Pro
 
 /** Everything of the product's outside the project record. Each store is read again and written
  *  once; a file store (activity files, video clips) is cleared only after its record let go of it. */
-function sweepProductRecords(projectId: string, rowId: string): void {
+export function sweepProductRecords(projectId: string, rowId: string): void {
   const tracks = readEditions(projectId);
   const keptTracks = tracks.filter((t) => t.productId !== rowId);
   if (keptTracks.length !== tracks.length) writeEditions(projectId, keptTracks);
