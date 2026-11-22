@@ -28,7 +28,7 @@ import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import type { Network, Token } from "@/lib/brief/types";
-import { historyOf, labelOf } from "@/lib/manual/journey";
+import { ageOf, historyOf, labelOf } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { RIGHT_LABEL, rightsOf } from "@/lib/manual/legal";
 import type { ProjectLegal } from "@/lib/manual/p2-types";
@@ -469,26 +469,30 @@ export function Disclosure({
 
 // ─────────────────────────── the project's own sections ───────────────────────────
 
-/** The project's journey as a visitor reads it: the newest entry (Now), Earlier (n) opening the rest.
- *  With nothing shared beyond the default Planning: "No journey shared yet." */
+/** The project's journey as a visitor reads it, as the web's header (ActivityNow) shows it: the
+ *  newest entry (Now) — the default Planning ("Project created.") while nothing else is shared —
+ *  with its age ("today"), Earlier (n) opening the rest. "No journey shared yet." only when there
+ *  is no entry at all. */
 export function ProjectActivity({ projectId, createdAt }: { projectId: string; createdAt: number }) {
   const { hydrated, record } = useJourney(projectId);
   const [open, setOpen] = React.useState(false);
   const listId = React.useId();
+  const now = useMinuteClock();
   const history = hydrated ? historyOf(record, projectId, { kind: "project" }, createdAt) : [];
-  const shared = history.some((e) => !e.isDefault);
   const [current, ...earlier] = history;
   return (
     <section aria-labelledby="bv-activity" className="flex flex-col gap-4">
       <SectionHeading id="bv-activity" title="Project activity" />
-      {!hydrated ? null : !shared || !current ? (
+      {!hydrated ? null : !current ? (
         <p className={NOTE}>No journey shared yet.</p>
       ) : (
         <div className={cn(LIST_CARD, "gap-3 px-8 py-6")}>
           <span className="flex flex-wrap items-center gap-4">
             <span className={T.meta}>Now</span>
             <Badge tone="brand-outline">{labelOf(current)}</Badge>
-            <span className={T.body}>{formatDate(current.createdAt)}</span>
+            <span className={T.body} title={formatDate(current.createdAt)}>
+              {ageOf(current.createdAt, now)}
+            </span>
           </span>
           {current.description && <p className={cn(T.body, "line-clamp-3 text-text-primary")}>{current.description}</p>}
           {earlier.length > 0 && (
@@ -507,7 +511,9 @@ export function ProjectActivity({ projectId, createdAt }: { projectId: string; c
                   <li key={e.id} className="flex flex-col gap-1 border-t-[length:var(--border-width-1)] border-solid border-border py-4 last:pb-0">
                     <span className="flex flex-wrap items-center gap-4">
                       <span className={T.rowTitle}>{labelOf(e)}</span>
-                      <span className={T.meta}>{formatDate(e.createdAt)}</span>
+                      <span className={T.meta} title={formatDate(e.createdAt)}>
+                        {ageOf(e.createdAt, now)}
+                      </span>
                     </span>
                     {e.description && <span className={T.body}>{e.description}</span>}
                   </li>

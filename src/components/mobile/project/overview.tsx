@@ -189,12 +189,14 @@ function PurchaseSheet({
   );
 }
 
+/** The web's rail log ("Recent", RailLog): the owner's once the project has gone out; a buyer's
+ *  (Explore marketplace, Preview as buyer) with the public lines only — no network, as the web. */
 export function ProjectRecent() {
   const { view, viewer } = useProject();
   const owner = can(viewer, "facts.seeOwnerOnly");
-  const lines = React.useMemo(() => logLinesOf(view.log, { network: true, products: view.products }), [view.log, view.products]);
+  const lines = React.useMemo(() => logLinesOf(view.log, { network: owner, products: view.products }), [view.log, owner, view.products]);
   const [all, setAll] = React.useState(false);
-  if (!owner || view.summary.status === "draft" || lines.length === 0) return null;
+  if ((owner && view.summary.status === "draft") || lines.length === 0) return null;
   const shown = all ? lines : lines.slice(0, LOG_SHOWN);
   return (
     <section aria-labelledby="ov-recent" className="flex flex-col gap-4">

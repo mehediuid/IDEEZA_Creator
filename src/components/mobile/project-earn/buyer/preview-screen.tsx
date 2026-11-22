@@ -40,6 +40,7 @@ import { auctionStateOf } from "@/lib/market/auction";
 import { PROTOCOLS } from "@/lib/network/catalog";
 import { useProjectNetwork } from "@/lib/network/store";
 import { ProjectProvider, type Ready } from "../../project/context";
+import { ProjectRecent } from "../../project/overview";
 import { ActivityTab } from "../../project/activity-tab";
 import { MediaTab } from "../../project/media-tab";
 import { ProductsTab } from "../../project/products-tab";
@@ -159,6 +160,7 @@ function PreviewReady({ data }: { data: Ready }) {
                   rows={detailsRows({ source: view.summary.source, when: view.summary.when, createdAt: project.createdAt, ownerFacts: false }).map(plainRow)}
                 />
               )}
+              <ProjectRecent />
             </div>
           )}
           {tab === "products" && <ProductsTab />}

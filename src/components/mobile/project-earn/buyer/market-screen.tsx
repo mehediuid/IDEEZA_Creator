@@ -22,7 +22,7 @@
 //   Then the description.
 // · Tabs Overview · Products · Media (`?tab=`, the kit's client-state tabs);
 //   the Overview holds Project activity, the products, Legal information,
-//   Holder benefits and About.
+//   Holder benefits, About and Recent (the web's rail log, public lines).
 // · The bottom bar: the one primary for where the buyer stands — Buy now (Buy
 //   another share), Place bid (Bid again), View your share, Browse other
 //   projects — beside Ask the creator, or Get creator support for a holder.
@@ -76,6 +76,7 @@ import { useToast } from "../../kit/toast";
 import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
 import { ProjectProvider, type Ready } from "../../project/context";
+import { ProjectRecent } from "../../project/overview";
 import { MediaTab } from "../../project/media-tab";
 import { BuildCheckLine, useProductRows } from "../../project/product-rows";
 import { ListCard } from "../../kit/list";
@@ -334,6 +335,7 @@ function MarketReady({ data }: { data: Ready }) {
                   value: r.value.map((m) => (m.kind === "time" ? m.time.text : m.text)).join(""),
                 }))}
               />
+              <ProjectRecent />
             </div>
           )}
           {tab === "products" && <ProductsTab />}
