@@ -1,10 +1,9 @@
 // A profile's Timeline on the phone (owner 2026-11-22): the projects and products the creator shared,
-// newest first, with what is on sale in the marketplace's words.
+// newest first; one share per post (no product list, no prices).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   kindChipOf,
-  offerLineOf,
   phoneDetailsHref,
   projectPostOf,
   sharePostOf,
@@ -35,7 +34,7 @@ const clip = (over = {}) => ({
   ...over,
 });
 
-test("a project post is the share: its words, its clip and what is on sale, no product list", () => {
+test("a project post is the share: its words and its clip, no product list", () => {
   const post = projectPostOf({
     projectId: "p_1",
     postId: "mine:p_1",
@@ -44,7 +43,7 @@ test("a project post is the share: its words, its clip and what is on sale, no p
     at: 100,
     cover: "/c.jpg",
     stage: "Prototype",
-    clip: { id: "mine:p_1", offers: [{ kind: "main", price: "0.3 ETH", use: null, sold: null }] },
+    clip: { id: "mine:p_1" },
   });
   assert.equal(post.title, "Smart Home Kit");
   assert.equal(post.caption, "Built for my flat.");
@@ -55,11 +54,10 @@ test("a project post is the share: its words, its clip and what is on sale, no p
   assert.equal(sharedLineOf(post), "Shared a project");
 });
 
-test("a project post off the marketplace has no clip and nothing on sale; the picture opens the project", () => {
+test("a project post off the marketplace has no clip; the picture opens the project", () => {
   const post = projectPostOf({ projectId: "p_2", postId: "mine:p_2", title: "", caption: "", at: 1, cover: null, stage: null, clip: null });
   assert.equal(post.title, "Untitled project");
   assert.equal(post.playHref, null);
-  assert.deepEqual(post.offers, []);
 });
 
 test("a share of someone else's product names them and its project; your own work has no 'by'", () => {
@@ -85,20 +83,9 @@ test("newest first; a public view leaves out Only me shares", () => {
   assert.deepEqual(timelineOf([c, b, a], true).map((p) => p.key), ["post:mine:p", "share:c"]);
 });
 
-test("what is on sale reads one part per kind, cheapest first, an auction by its bid", () => {
-  assert.equal(offerLineOf([]), null);
-  assert.equal(
-    offerLineOf([
-      { kind: "virtual", price: "0.01 ETH", use: "Personal use", sold: null },
-      { kind: "physical", price: "0.05 ETH", use: "Business use", sold: null },
-      { kind: "physical", price: "0.02 ETH", use: "Personal use", sold: null },
-      { kind: "main", price: "0.3 ETH", use: null, sold: null },
-    ]),
-    "Main NFT 0.3 ETH · Physical NFT from 0.02 ETH · Virtual NFT 0.01 ETH",
-  );
-  assert.equal(
-    offerLineOf([{ kind: "main", price: "0.4 ETH", use: null, sold: null, auction: { bidLabel: "Current bid", bid: "0.4 ETH", next: "0.42 ETH", endsAt: null } }]),
-    "Main NFT (Current bid 0.4 ETH)",
-  );
-  assert.equal(phoneDetailsHref("p 1"), "/m/projects/p%201");
+test("a post carries no prices: what is on sale is the details' and the marketplace's", () => {
+  const post = projectPostOf({ projectId: "p 1", postId: "mine:p 1", title: "P", caption: "", at: 1, cover: null, stage: null, clip: { id: "mine:p 1" } });
+  assert.equal("offers" in post, false);
+  assert.equal(post.detailsHref, "/m/projects/p%201");
+  assert.equal(phoneDetailsHref("p 1", "a b"), "/m/projects/p%201/products/a%20b");
 });

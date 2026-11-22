@@ -1,17 +1,17 @@
 // A profile's Timeline on the phone (owner 2026-11-22: "a timeline on my profile — which projects I
 // share, which products, what kind"): every post the creator put on the Feed, newest first.
 // · A project they shared ("Share to Feed" on its page, `showcasedAt`; a sample creator's post): the
-//   project with its story, its picture, its current Activity and what of it is on sale (Main NFT ·
-//   Physical NFT · Virtual NFT, the marketplace's words).
+//   project with its story, its picture and its current Activity.
 // · A clip shared to their Feed with their words ("Share to your Feed"): a project or one product,
 //   theirs or someone else's, with the caption and who sees it (Public / Only me — only they see an
 //   Only me post, so a public view leaves it out).
 // A post is one share, not the project's details (owner 2026-11-22: "a share is single — how many
-// products a project has, which ones, belongs on its details"): no product list, no product count;
-// the title opens the details. The Projects tab (Featured + More projects) and the Activity tab stay
-// as they were: other ways to read the same work. Pure, relative imports only.
+// products a project has, which ones, belongs on its details"): no product list, no product count,
+// no prices (what is on sale is the details' and the marketplace's); the title opens the details.
+// The Projects tab (Featured + More projects) and the Activity tab stay as they were: other ways to
+// read the same work. Pure, relative imports only.
 
-import type { ClipKind, ClipOffer, ClipOfferKind, FeedClip } from "../innovations/clips";
+import type { ClipKind, FeedClip } from "../innovations/clips";
 import type { FeedShare, ShareAudience } from "../innovations/feed-prefs";
 
 export type TimelinePost = {
@@ -35,7 +35,6 @@ export type TimelinePost = {
   detailsHref: string;
   /** The current Activity's name ("Prototype"); null for none. */
   stage: string | null;
-  offers: ClipOffer[];
   /** The post its hearts, comments and views are keyed by. */
   postId: string;
   base: { appreciations: number; views: number };
@@ -65,7 +64,7 @@ export function projectPostOf(input: {
   cover: string | null;
   stage: string | null;
   /** The project's clip on the Feed, when it plays there. */
-  clip: Pick<FeedClip, "id" | "offers"> | null;
+  clip: Pick<FeedClip, "id"> | null;
   base?: { appreciations: number; views: number };
 }): TimelinePost {
   return {
@@ -82,7 +81,6 @@ export function projectPostOf(input: {
     playHref: input.clip ? phoneClipHref(input.clip.id) : null,
     detailsHref: phoneDetailsHref(input.projectId),
     stage: input.stage,
-    offers: input.clip ? [...input.clip.offers] : [],
     postId: input.postId,
     base: input.base ?? { appreciations: 0, views: 0 },
     shareId: null,
@@ -108,7 +106,6 @@ export function sharePostOf(share: FeedShare, clip: FeedClip, ctx: { projectTitl
     playHref: phoneClipHref(clip.id),
     detailsHref: phoneDetailsHref(clip.projectId, clip.productId),
     stage: clip.stage,
-    offers: [...clip.offers],
     postId: clip.postId,
     base: clip.base,
     shareId: share.id,
@@ -129,32 +126,4 @@ export function sharedLineOf(post: Pick<TimelinePost, "kind" | "by">): string {
 /** The picture's chip: what was shared, "Project" or "Product". */
 export function kindChipOf(post: Pick<TimelinePost, "kind">): string {
   return post.kind === "product" ? "Product" : "Project";
-}
-
-const ORDER: readonly ClipOfferKind[] = ["main", "physical", "virtual"];
-const NAME: Readonly<Record<ClipOfferKind, string>> = { main: "Main NFT", physical: "Physical NFT", virtual: "Virtual NFT" };
-
-const amountOf = (price: string) => {
-  const n = Number.parseFloat(price);
-  return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
-};
-
-/** What is on sale, one part per kind, cheapest first when a kind has several prices:
- *  "Main NFT 0.3 ETH · Physical NFT from 0.02 ETH · Virtual NFT 0.01 ETH". An auction's part is its
- *  bid in the marketplace's words ("Main NFT (Current bid 0.4 ETH)"). Null with nothing on sale. */
-export function offerLineOf(offers: readonly ClipOffer[]): string | null {
-  const parts: string[] = [];
-  for (const kind of ORDER) {
-    const of = offers.filter((o) => o.kind === kind);
-    if (!of.length) continue;
-    const auction = of.find((o) => o.auction);
-    if (auction?.auction) {
-      parts.push(`${NAME[kind]} (${auction.auction.bidLabel} ${auction.auction.bid})`);
-      continue;
-    }
-    const cheapest = of.reduce((a, b) => (amountOf(b.price) < amountOf(a.price) ? b : a));
-    const several = new Set(of.map((o) => o.price)).size > 1;
-    parts.push(`${NAME[kind]} ${several ? "from " : ""}${cheapest.price}`);
-  }
-  return parts.length ? parts.join(" · ") : null;
 }

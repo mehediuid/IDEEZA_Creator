@@ -9,18 +9,17 @@
 //   was shared ("Project", "Product") and carries ▶ when it plays.
 // · The title (its details), "from <project>" for a product, "by <maker>" for someone else's work,
 //   and its current Activity.
-// · No product list or count: a post is one share, the project's details hold the rest (owner
-//   2026-11-22).
-// · What is on sale, in the marketplace's words ("Main NFT 0.3 ETH · Physical NFT from 0.02 ETH").
+// · No product list, no product count, no prices: a post is one share, the project's details and
+//   the marketplace hold the rest (owner 2026-11-22).
 // · The post's reactions (the Feed's stores); a share of yours has ⋯ › Remove from your Feed.
 // Ten first, then Show all.
 
 import * as React from "react";
 import Link from "next/link";
-import { CpuIcon, Folder01Icon, LockIcon, PackageIcon, Store01Icon } from "@hugeicons/core-free-icons";
+import { CpuIcon, Folder01Icon, LockIcon, PackageIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
-import { kindChipOf, offerLineOf, sharedLineOf, type TimelinePost } from "@/lib/people/timeline";
+import { kindChipOf, sharedLineOf, type TimelinePost } from "@/lib/people/timeline";
 import { ageOf, shortDateOf } from "@/lib/people/phone-profile";
 import { cn } from "@/lib/utils";
 import { MEDIA_CHIP } from "../kit/media";
@@ -66,7 +65,6 @@ function Caption({ text }: { text: string }) {
 
 function TimelineCard({ post, now, onMore }: { post: TimelinePost; now: number; onMore?: () => void }) {
   const open = post.playHref ?? post.detailsHref;
-  const offers = offerLineOf(post.offers);
   const sub = [post.from ? `from ${post.from}` : null, post.by ? `by ${post.by}` : null].filter(Boolean).join(" · ");
   return (
     <article aria-label={`${sharedLineOf(post)}: ${post.title}`} className="flex flex-col gap-5">
@@ -115,16 +113,6 @@ function TimelineCard({ post, now, onMore }: { post: TimelinePost; now: number; 
           </span>
         )}
       </div>
-      {offers && (
-        <p className={cn(T.meta, "flex items-start gap-2")}>
-          <span className="mt-[2px] shrink-0 text-[color:var(--color-icon-default)]">
-            <Icon icon={Store01Icon} size={16} />
-          </span>
-          <span className="min-w-0 tabular-nums">
-            <span className="text-text-primary">On sale</span> · {offers}
-          </span>
-        </p>
-      )}
       <ReactionRow
         postId={post.postId}
         base={post.base}
