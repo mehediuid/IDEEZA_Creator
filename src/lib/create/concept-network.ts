@@ -227,11 +227,14 @@ export function normalizeSeed(seed: LinkSeed, byId: Map<string, NetEnd>): LinkSe
  *  changed it: the model's links between products the project holds, the
  *  rule's for each companion the model said nothing about, and — with no
  *  link between products at all — the main product's link to the phone app
- *  or the cloud, when it has a radio. */
+ *  or the cloud, when it has a radio. A project of one product has none: the
+ *  concept stage offers a network only between products (owner, 2026-11-22);
+ *  one product's app or cloud link is made on the project's Network tab. */
 export function conceptLinks(
   peers: NetEnd[],
   input: { reply?: NetworkReply | null; edits?: NetworkEdits | null; prompt?: string },
 ): ConceptLink[] {
+  if (peers.length < 2) return [];
   const byId = new Map(peers.map((p) => [p.id, p]));
   const reply = input.reply ?? null;
   const seeds: { seed: LinkSeed; source: "ai" | "rules" }[] = [];
@@ -450,7 +453,7 @@ export type ConceptNetwork = {
 
 /** The section's whole model, off the project the rail reads. It shows once
  *  the question is answered and a product has its parts, and hides when no
- *  product has a radio. */
+ *  product has a radio or the project has one product (no link to offer). */
 export function conceptNetworkOf(state: ProjectState): ConceptNetwork {
   const peers = netPeersOf(state);
   const setup = state.setup;
@@ -464,8 +467,9 @@ export function conceptNetworkOf(state: ProjectState): ConceptNetwork {
         prompt: setup?.prompt,
       })
     : [];
-  // With no radio anywhere there is no link to show, and the section hides —
-  // as it does once a build holds the products, if it was never added.
+  // With no radio anywhere, or one product, there is no link to show, and the
+  // section hides — as it does once a build holds the products, if it was
+  // never added.
   const show = answered && peers.length > 0 && (links.length > 0 || working) && (added || state.locked.size === 0);
   return {
     show,

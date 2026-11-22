@@ -14,7 +14,7 @@
    - A protocol change moves **both** linked products' radio parts.
    - Full canvas editing stays on the project page's Connection Map.
 4. **On Save**, the concept network becomes the project's network (`ideeza:network:<projectId>`), so the Network tab arrives filled in.
-5. **One product:** if it has a radio, show its link to a phone app or the cloud (for example "Lamp ↔ Phone app · BLE"). If no product has a radio, hide the section.
+5. **One product:** no Network section — the concept stage offers a network only between products (owner, 2026-11-22; it used to show the product's link to a phone app or the cloud). One product's app or cloud link is made on the project's Network tab. If no product has a radio, hide the section too.
 6. **One control, one home.** Once a product is on a network link, its radio is chosen only in the Network section.
    - The spec sheet's Wireless section then shows the radio read-only, with a "Change it in Network" jump.
    - A product that is on no link, such as a charging dock with a radio, keeps the Wireless select as it is today.
@@ -74,7 +74,7 @@ This is a pure lib, for example `src/lib/create/concept-network.ts`, with node t
 - A companion named like remote, controller, transmitter or handheld: `companion → primary`, carrying commands (with telemetry back when two-way).
 - A companion named like base station, hub, gateway or receiver: `primary → companion`, carrying sensor readings.
 - A companion with no radio, or a charger, dock, case or spare pack: no link.
-- One product with a radio: a link to the phone app over its radio. It goes to the cloud (Wi-Fi) when the prompt mentions cloud, internet, anywhere or remote access.
+- One product: no link (owner, 2026-11-22). Two or more products with no link between them: the main product's link to the phone app over its radio, or to the cloud (Wi-Fi) when the prompt mentions cloud, internet, anywhere or remote access.
 
 **Protocol.**
 - The protocol always comes from the products' effective radio: `radioKeyOf` over the parts after edits.
@@ -110,7 +110,7 @@ The result must pass `sanitizeNetwork`. When a network already exists, it is kep
 
 ## Tests and docs
 - **Node tests (`npm run test:projects`):**
-  - the rule fallback: car + remote, drone + controller, sensor node + base station, a lamp alone, and no radio at all;
+  - the rule fallback: car + remote, drone + controller, sensor node + base station, a lamp alone (no link), a lamp with a charger (phone app), and no radio at all;
   - AI link parsing: invalid names dropped;
   - the radio → protocol mapping;
   - the concept → `Network` conversion, which must pass `sanitizeNetwork`;

@@ -109,18 +109,29 @@ test("rule: a sensor node reports its readings to the base station", () => {
   assert.equal(rolesLine(l, rolesOf(links), [node, base]), "Soil sensor node: Independent · Base station: Slave");
 });
 
-test("rule: a lamp alone talks to the phone app over its radio — the cloud when the prompt asks", () => {
+test("rule: one product has no link — a lamp alone, whatever the prompt or the model says (owner, 2026-11-22)", () => {
   const lamp = end("primary", "Lamp", [ESP32, LED]);
-  const [l] = conceptLinks([lamp], { prompt: "a desk lamp" });
+  assert.deepEqual(conceptLinks([lamp], { prompt: "a desk lamp" }), []);
+  assert.deepEqual(conceptLinks([lamp], { prompt: "a lamp I can switch from anywhere" }), []);
+  assert.deepEqual(conceptLinks([lamp], { reply: { links: [], app: "cloud" }, prompt: "a lamp" }), []);
+});
+
+const charger = end("battery-charger", "Battery charger", [ESP32, TP]);
+
+test("rule: products with no link between them — the lamp talks to the phone app, the cloud when the prompt asks", () => {
+  const lamp = end("primary", "Lamp", [ESP32, LED]);
+  const [l, more] = conceptLinks([lamp, charger], { prompt: "a desk lamp" });
+  assert.equal(more, undefined);
+  assert.equal(l.from, "primary");
   assert.equal(l.to, APP);
   assert.equal(l.twoWay, true);
   assert.equal(l.carries, "data+commands");
-  assert.equal(endsLine(l, [lamp]), "Lamp ↔ Phone app");
+  assert.equal(endsLine(l, [lamp, charger]), "Lamp ↔ Phone app");
   assert.match(connectsLine(l), / · 2\.4 GHz · Direct$/);
-  assert.equal(travelsLine(l, [lamp]), "Status and light commands");
-  const [c] = conceptLinks([lamp], { prompt: "a lamp I can switch from anywhere" });
+  assert.equal(travelsLine(l, [lamp, charger]), "Status and light commands");
+  const [c] = conceptLinks([lamp, charger], { prompt: "a lamp I can switch from anywhere" });
   assert.equal(c.to, CLOUD);
-  assert.equal(endsLine(c, [lamp]), "Lamp ↔ Cloud");
+  assert.equal(endsLine(c, [lamp, charger]), "Lamp ↔ Cloud");
   assert.match(connectsLine(c), /Through cloud$/);
 });
 
@@ -188,9 +199,9 @@ test("AI: the model's link wins for the products it named; the rule answers the 
   );
 });
 
-test("AI: a lone product's app answer is used", () => {
+test("AI: the model's app answer is used when no product links to another", () => {
   const lamp = end("primary", "Lamp", [ESP32, LED]);
-  const [l] = conceptLinks([lamp], { reply: { links: [], app: "cloud" }, prompt: "a lamp" });
+  const [l] = conceptLinks([lamp, charger], { reply: { links: [], app: "cloud" }, prompt: "a lamp" });
   assert.equal(l.to, CLOUD);
   assert.equal(l.source, "ai");
 });
@@ -383,6 +394,22 @@ test("the section: shown with the link once answered, working while a product is
   assert.equal(none.show, false);
 });
 
+test("the section: hidden for one product, even with a radio and an old chat that added it", () => {
+  const lamp = conceptNetworkOf(
+    projectState(chatWith([drawn("a1", undefined, [ESP32, LED])], { projectId: "", projectName: "Lamp", picked: [] })),
+  );
+  assert.equal(lamp.show, false);
+  assert.deepEqual(lamp.links, []);
+  const old = conceptNetworkOf(
+    projectState(
+      chatWith([drawn("a1", undefined, [ESP32, LED])], { projectId: "", projectName: "Lamp", picked: [], network: { added: true, links: {} } }),
+    ),
+  );
+  assert.equal(old.show, false);
+  // The spec sheet's Wireless stays the product's own: no radio is the network's.
+  assert.equal(old.onLink.size, 0);
+});
+
 // ───────────────────────── Save ─────────────────────────
 
 function savedCar() {
@@ -441,7 +468,7 @@ test("Save writes the network only when the maker added it, and the project has 
   assert.equal(networkForSave({ ...input, chat: null, existing: null }), null);
 });
 
-test("Save: a lone lamp's phone app link is a ctrl network with an app box and no broker", () => {
+test("Save: a one-product project writes no network, even from an old chat that added one", () => {
   const job = build({ id: "b2", chatId: "c2", title: "Lamp", createdAt: T, status: "ready", parts: [ESP32, LED] });
   const proj = project({
     id: "p2",
@@ -452,6 +479,31 @@ test("Save: a lone lamp's phone app link is a ctrl network with an app box and n
   });
   const products = networkProducts(proj, buildsOf(proj, [job]));
   const chat = { ...chatWith([], { projectId: "", projectName: "Lamp", picked: [], network: { added: true, links: {} } }), id: "c2" };
+  assert.equal(networkForSave({ existing: null, projectId: "p2", name: "Lamp", products, job, chat, now: T }), null);
+});
+
+test("Save: a lamp's phone app link (its charger on no link) is a ctrl network with an app box and no broker", () => {
+  const job = build({
+    id: "b2",
+    chatId: "c2",
+    title: "Lamp",
+    createdAt: T,
+    status: "ready",
+    parts: [ESP32, LED],
+    companions: [companion({ id: "battery-charger", name: "Battery charger", parts: [ESP32, TP] })],
+  });
+  const proj = project({
+    id: "p2",
+    name: "Lamp",
+    createdAt: T,
+    builds: [{ buildId: "b2", chatId: "c2", version: 1, savedAt: T }],
+    products: [row("r1", "Lamp", "", "b2", "primary", T), row("r2", "Battery charger", "", "b2", "battery-charger", T)],
+  });
+  const products = networkProducts(proj, buildsOf(proj, [job]));
+  const chat = {
+    ...chatWith([], { projectId: "", projectName: "Lamp", picked: ["battery-charger"], network: { added: true, links: {} } }),
+    id: "c2",
+  };
   const net = networkForSave({ existing: null, projectId: "p2", name: "Lamp", products, job, chat, now: T });
   assert.equal(net.intent, "ctrl");
   assert.deepEqual(net.nodes.map((n) => n.kind).sort(), ["app", "product"]);
