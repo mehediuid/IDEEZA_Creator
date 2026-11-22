@@ -21,24 +21,24 @@
 //   CL-032); ✦ stores the picture, then starts the chat that adds it
 //   (`createChat(prompt, { quality, addTo, ...image })`), which opens on the AI
 //   tab — the web opens the chat too; Back;
-// · Build manually (02d, 02g, 02h): the name ("Give the product a name."),
-//   then `addProduct` behind the edit gate. The editors need a computer
-//   (D3), so the phone adds it here and says so with a toast.
+// · Build manually: nothing is built by hand on the phone (owner 2026-11-22:
+//   "Build manually works nowhere on the mobile app"), so the option stays in
+//   the list but says so, and pressing it shows where it works: a state card
+//   ("Build manually on a computer" — the editors open in IDEEZA on the web),
+//   this project's web address to open there, and Copy link as the footer's
+//   one primary, with Back.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Add01Icon, AiMagicIcon, ArrowRight01Icon, PackageIcon, PencilEdit01Icon, SortingDownIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, AiMagicIcon, Copy01Icon, LaptopIcon, PackageIcon, PencilEdit01Icon, SortingDownIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Button } from "@/components/ideeza/button";
 import { SearchInput } from "@/components/ideeza/search-input";
-import { TextInput } from "@/components/ideeza/text-input";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { productsOf, statusOf, useCreateHistory } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { piecesOf } from "@/lib/manual/project-read";
-import { PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
 import { PRODUCT_SORTS, PRODUCT_TOOLS_FROM, filterProductRows, parseProductSort, phoneProjectHref, type ProductSort } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
 import type { PromptImage } from "@/components/dashboard/prompt-card";
@@ -282,7 +282,8 @@ export function AddProductSheet({ open, onClose }: { open: boolean; onClose: () 
     onClose();
   };
   const title = step === "ai" ? "Build with AI" : step === "manual" ? "Build manually" : `Add a product to ${project.name}`;
-  const description = step === "choose" ? "Pick how you want to make it." : `It's added to ${project.name}.`;
+  // Build manually adds nothing on the phone: its card says where it works, so no "It's added" line.
+  const description = step === "choose" ? "Pick how you want to make it." : step === "ai" ? `It's added to ${project.name}.` : undefined;
   return (
     <Sheet
       open={open}
@@ -308,26 +309,28 @@ export function AddProductSheet({ open, onClose }: { open: boolean; onClose: () 
             </span>
             <span className="flex min-w-0 flex-col gap-1">
               <span className={T.name}>Build manually</span>
-              <span className={T.body}>Start an empty product here; design it in the editors on a computer.</span>
+              <span className={T.body}>On a computer: design it yourself in the editors, on the web.</span>
             </span>
           </button>
         </div>
       )}
       {step === "ai" && <BuildWithAi onStarted={close} />}
-      {step === "manual" && <BuildManually onAdded={close} />}
+      {step === "manual" && <ManualOnComputer />}
     </Sheet>
   );
 }
 
 /** The sheet's footer per step: Back alone for Build with AI (✦ in the prompt box starts it, 02c);
- *  Create product + Back for Build manually (02d). */
+ *  Copy link + Back for Build manually (it works on a computer). */
 function StepActions({ step, onBack, onDone }: { step: Step; onBack: () => void; onDone: () => void }) {
+  const { project } = useProject();
+  const toast = useToast();
   void onDone;
   return (
     <>
       {step === "manual" && (
-        <Button size="xl" className="w-full" type="submit" form="m-add-manual">
-          Create product
+        <Button size="xl" className="w-full" iconLeading={<Icon icon={Copy01Icon} size={20} />} onClick={() => void copyWebLink(project.id, toast)}>
+          Copy link
         </Button>
       )}
       <Button hierarchy="secondary" size="xl" className="w-full" onClick={onBack}>
@@ -383,60 +386,39 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
   );
 }
 
-function BuildManually({ onAdded }: { onAdded: () => void }) {
-  const { project, gate } = useProject();
-  const { addProduct } = useManualProjects();
-  const toast = useToast();
-  const ids = useFieldIds(["name"] as const);
-  const [name, setName] = React.useState("");
-  const [tried, setTried] = React.useState(false);
-  const [refused, setRefused] = React.useState<string | null>(null);
-  const clean = name.trim();
-  const fieldError =
-    clean === "" ? "Give the product a name." : Array.from(clean).length > PROJECT_NAME_MAX ? `Keep it to ${PROJECT_NAME_MAX} characters.` : null;
-  const shown = tried ? fieldError : null;
-  const blocked = gate.reasonOf("addProduct") ?? refused;
+/** This project on the web, where Build manually works: the same site without the phone's /m. */
+function webProjectHref(projectId: string): string {
+  return `${window.location.origin}/projects/${encodeURIComponent(projectId)}`;
+}
 
-  const create = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (fieldError) return setTried(true);
-    const out = gate.guard("addProduct", () => {
-      const rowId = addProduct(project.id, clean);
-      if (!rowId) return setRefused("This browser's storage is full — the product wasn't added.");
-      onAdded();
-      toast({ title: `${clean} added to ${project.name}` });
-    });
-    setRefused(out.kind === "refused" ? out.reason : null);
-  };
+/** Copy the web address; where the browser refuses, the address stays on screen to select. */
+async function copyWebLink(projectId: string, toast: ReturnType<typeof useToast>) {
+  try {
+    await navigator.clipboard.writeText(webProjectHref(projectId));
+    toast({ title: "Link copied. Open it on your computer." });
+  } catch {
+    toast({ title: "Couldn't copy. Select the address above and copy it." });
+  }
+}
 
+/** Build manually on the phone: where it works instead — the editors on a computer — and the address to open there. */
+function ManualOnComputer() {
+  const { project } = useProject();
+  // Shown only after a press in the open sheet, so it is always in the browser, where the origin is known.
+  const href = typeof window === "undefined" ? null : webProjectHref(project.id);
   return (
-    <form id="m-add-manual" onSubmit={create} noValidate className="flex flex-col gap-6 pb-4">
-      <Field label="Product name" htmlFor={ids.name.id} error={shown} errorId={ids.name.errorId}>
-        <TextInput
-          id={ids.name.id}
-          size="xl"
-          value={name}
-          onValueChange={(v) => {
-            setName(v);
-            setTried(false);
-          }}
-          autoComplete="off"
-          enterKeyHint="done"
-          {...errorProps(shown, ids.name.errorId)}
-        />
-      </Field>
-      <p className={T.meta}>You can describe it later on its own page.</p>
-      <p className={cn(T.body, "flex items-start gap-2")}>
-        <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-          <Icon icon={ArrowRight01Icon} size={14} />
-        </span>
-        The editors open on a computer. On your phone the product is added to this project.
-      </p>
-      {blocked && (
-        <p role="alert" className={cn(T.body, "text-text-error")}>
-          {blocked}
-        </p>
+    <div className="flex flex-col gap-6 pb-4">
+      <EmptyState
+        icon={LaptopIcon}
+        title="Build manually on a computer"
+        body={`The editors for PCB, code, 3D and wiring open in IDEEZA on the web. On a computer, open ${project.name} and choose Add a product › Build manually.`}
+      />
+      {href && (
+        <div className="flex flex-col gap-2">
+          <span className={T.label}>This project on the web</span>
+          <p className={cn(T.body, "select-all break-all rounded-md border-[length:var(--border-width-1)] border-solid border-border px-6 py-4 text-text-primary")}>{href}</p>
+        </div>
       )}
-    </form>
+    </div>
   );
 }
