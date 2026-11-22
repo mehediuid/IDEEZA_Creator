@@ -3,22 +3,24 @@
 // /m/creators/[handle] — a creator's profile on the phone ("People · 2026
 // update", MFR-20): one layout for every viewer. Your own (PR-02/03: Share
 // and ⋯ in the top bar, Change cover, the prompts, Only you see this, pins,
-// Edit profile in the bar; brand-new PR-04; ⋯ PR-05; View as public PR-21/22),
+// Edit profile under the facts; brand-new PR-04; ⋯ PR-05; View as public PR-21/22),
 // someone else's (PR-10/11: the tie only you see, Follow + Message in the bar,
 // ⋯ Share · Report · Block; Following PR-13; Message's reason PR-14; blocked
 // PR-15), a locked profile (PR-17), not found (PR-18), loading (PR-19) and
 // couldn't load / offline (PR-20). The facts are the web profile's
-// (use-profile.ts); `me` is always you, as on the web. The Projects · Activity
-// tab lives in the address (`?tab=activity`), beside `?view=public`.
+// (use-profile.ts); `me` is always you, as on the web. The Timeline · Projects
+// · Activity tab lives in the address (`?tab=projects`), beside `?view=public`.
 // Mobile UX pass (2026-11-15): the top bar takes the name once the large name
 // scrolls away; one meta line (where · local time), since when moving to the
-// More about sheet; Open to as a chip; Only you see this as a grouped list;
-// Edit profile is your profile's one primary.
+// More about sheet; Open to as a chip; Only you see this as a grouped list.
+// Timeline (owner 2026-11-22): the work opens on a Timeline — every project and product shared,
+// newest first (timeline.tsx) — beside Projects and Activity; Edit profile is no longer a sticky
+// bar: it sits under your profile's facts, before what only you see.
 
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Edit02Icon, ImageAdd01Icon, InboxIcon, LockIcon, PinIcon, PinOffIcon, Share08Icon, SquareLock02Icon, UserGroupIcon, UserIcon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
+import { Delete02Icon, Edit02Icon, Folder01Icon, ImageAdd01Icon, InboxIcon, LockIcon, PackageIcon, PinIcon, PinOffIcon, Share08Icon, SquareLock02Icon, UserGroupIcon, UserIcon, ViewIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { useFollowing } from "@/components/profile/following-dialog";
 import { useBlocked } from "@/components/profile/person-actions";
@@ -48,6 +50,8 @@ import {
 import { deleteCover, putCover, useMyCover, useMyPhoto } from "@/lib/people/photo-store";
 import { featuredOf, localTimeOf } from "@/lib/people/portfolio";
 import { useMyProfile } from "@/lib/people/profile-store";
+import { withoutShares } from "@/lib/innovations/feed-prefs";
+import type { TimelinePost } from "@/lib/people/timeline";
 import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { BottomBar } from "../kit/bottom-bar";
@@ -60,13 +64,16 @@ import { useToast } from "../kit/toast";
 import { SCROLL_ATTR, Screen } from "../screen";
 import { MORE_ICON, TopBar, type TopBarAction } from "../top-bar";
 import { T } from "../type";
+import { useFeedPrefs } from "../feed/use-feed";
 import { useFollow } from "./follow";
 import { FollowingSheet } from "./following-sheet";
 import { MoreAboutSheet } from "./more-about-sheet";
 import { About, CoverAndAvatar, Identity, InfoRow, ProfileBones, Prompt, Stats, Work, type Maker } from "./parts";
 import { PersonMenu, messageHrefOf, useShareProfile } from "./person-sheets";
 import { PICTURE_FILE_ERROR, usePicturePicker } from "./picture-picker";
+import { Timeline } from "./timeline";
 import { useOtherData, useOwnData } from "./use-profile";
+import { useOwnTimeline, useSampleTimeline } from "./use-timeline";
 
 const CONTENT = "flex flex-col gap-6 px-8 pb-12 pt-4";
 const PRIVACY_HREF = "/m/settings/privacy";
@@ -253,6 +260,9 @@ function OwnProfile({
   const settings = useSettings();
   const { locale } = useDates();
   const data = useOwnData(fields);
+  const timeline = useOwnTimeline(data.made, publicView);
+  const feedPrefs = useFeedPrefs();
+  const [postFor, setPostFor] = React.useState<TimelinePost | null>(null);
   const following = useFollowing();
   const share = useShareProfile();
   const [menu, setMenu] = React.useState(false);
@@ -275,7 +285,7 @@ function OwnProfile({
     onBadFile: () => toast({ title: PICTURE_FILE_ERROR, lead: "error" }),
   });
 
-  if (!data.ready) return <Loading />;
+  if (!data.ready || !timeline.ready) return <Loading />;
 
   const owner = !publicView;
   const { audience } = settings;
@@ -383,6 +393,18 @@ function OwnProfile({
     else toast({ title: item.pinned ? "Unpinned" : "Pinned to top" });
   };
 
+  // ⋯ › Remove from your Feed on a share of yours, as the Feed's own ⋯ does it (with Undo).
+  const removeShare = (post: TimelinePost) => {
+    if (!post.clipId) return;
+    const clipId = post.clipId;
+    const before = feedPrefs.prefs.shares;
+    if (!feedPrefs.update((p) => withoutShares(p, clipId))) {
+      toast({ title: WRITE_FAILED, lead: "error" });
+      return;
+    }
+    toast({ title: "Removed from your Feed", action: { label: "Undo", onClick: () => feedPrefs.update((p) => ({ ...p, shares: before })) } });
+  };
+
   const followingCount = following.hydrated ? following.people.length : null;
   // Anything public beyond the name: the brand-new line (PR-04) is only true without it.
   const filled = !!(fields.headline || fields.bio || fields.location || fields.openTo || fields.links.length || Object.values(fields.social).some(Boolean));
@@ -416,17 +438,7 @@ function OwnProfile({
   return (
     <Screen
       top={top}
-      footer={
-        owner ? (
-          <BottomBar>
-            <Button size="xl" className="w-full" onClick={edit}>
-              Edit profile
-            </Button>
-          </BottomBar>
-        ) : (
-          <ViewerBar person={person} messageHref={null} reason={PUBLIC_VIEW_REASON} off />
-        )
-      }
+      footer={owner ? undefined : <ViewerBar person={person} messageHref={null} reason={PUBLIC_VIEW_REASON} off />}
     >
       {banner}
       <CoverAndAvatar
@@ -458,9 +470,19 @@ function OwnProfile({
             <InfoRow label={`More about ${first ?? "you"}`} value={summary ?? (owner ? "Add skills and links" : undefined)} onClick={() => setMoreOpen(true)} />
           </div>
         )}
+        {owner && (
+          <Button hierarchy="secondary" size="xl" className="w-full" iconLeading={<Icon icon={Edit02Icon} size={20} />} onClick={edit}>
+            Edit profile
+          </Button>
+        )}
         {ownerRows}
-        {made.length > 0 ? (
+        {made.length > 0 || timeline.posts.length > 0 ? (
           <Work
+            timeline={
+              timeline.posts.length
+                ? { count: timeline.posts.length, content: <Timeline posts={timeline.posts} now={data.now} onMore={owner ? setPostFor : undefined} /> }
+                : null
+            }
             items={made}
             activity={data.activity}
             maker={maker}
@@ -503,6 +525,19 @@ function OwnProfile({
             : []
         }
       />
+      <ActionSheet
+        open={postFor !== null}
+        onClose={() => setPostFor(null)}
+        title={postFor?.title}
+        items={
+          postFor
+            ? [
+                { label: postFor.kind === "product" ? "Open product" : "Open project", icon: postFor.kind === "product" ? PackageIcon : Folder01Icon, onSelect: () => router.push(postFor.detailsHref) },
+                { label: "Remove from your Feed", icon: Delete02Icon, destructive: true, onSelect: () => removeShare(postFor) },
+              ]
+            : []
+        }
+      />
     </Screen>
   );
 }
@@ -512,6 +547,7 @@ function OwnProfile({
 function OtherProfile({ person }: { person: Person }) {
   const { locale } = useDates();
   const data = useOtherData(person);
+  const posts = useSampleTimeline(person.kind === "feed" ? person.id.slice("feed:".length) : null);
   const blocks = useBlocked(person.id);
   const online = useOnline();
   const [menu, setMenu] = React.useState(false);
@@ -598,8 +634,10 @@ function OtherProfile({ person }: { person: Person }) {
             <InfoRow label={`More about ${first}`} value={summary ?? undefined} onClick={() => setMoreOpen(true)} />
           </div>
         )}
-        {data.made.length > 0 ? (
-          <Work items={data.made} activity={data.activity} maker={{ name: person.name, initials: person.initials, color: person.color, src: null, pro }} pinnedBy={first} now={data.now} />
+        {data.made.length > 0 || posts.length > 0 ? (
+          <Work
+            timeline={posts.length ? { count: posts.length, content: <Timeline posts={posts} now={data.now} /> } : null}
+            items={data.made} activity={data.activity} maker={{ name: person.name, initials: person.initials, color: person.color, src: null, pro }} pinnedBy={first} now={data.now} />
         ) : (
           <EmptyState icon={InboxIcon} title="Nothing shared yet" body={`${first} hasn’t shared a project yet.`} action={{ label: "Go to Feed", href: "/m" }} />
         )}
