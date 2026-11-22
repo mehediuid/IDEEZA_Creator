@@ -109,9 +109,9 @@ function factNotesOf(listing: Listing, view: ProjectView): string {
   return `Royalties are a share of resales, if marketplaces honor them.${isLazy(listing, view) ? " Lazy: the token is minted when you buy." : ""}`;
 }
 
-/** "Whole project · Main NFT", or the share on sale. */
+/** "Main NFT", or the share on sale (owner 2026-11-22: the box says Main NFT, never "Whole project"). */
 function soldWhat(listing: Listing): string {
-  return listing.percentSelling >= 100 ? "Whole project · Main NFT" : `Main NFT · ${listing.percentSelling}% of the project`;
+  return listing.percentSelling >= 100 ? "Main NFT" : `Main NFT · ${listing.percentSelling}% of the project`;
 }
 
 /** 18b: a live Buy now listing's box — the bottom bar's Buy now buys it. `foot`: the activity line and

@@ -22,7 +22,7 @@
 // · one buy box (buy-pick.tsx): Main NFT · Physical NFT · Virtual NFT, only what
 //   the post sells, opening on the web's tab (an address's ?nft=, else what
 //   the buyer holds, else the first with something to buy). Main NFT =
-//   its box ("Whole project · Main NFT", the price large, Listing,
+//   its box ("Main NFT", the price large, Listing,
 //   Share, Chain, the wallet line, the Testnet demo line), the share-sale
 //   note under it. A copy kind = what it gets you (units behind ⓘ), then
 //   Use: Personal use and Business use as radio rows (sample-market.ts
@@ -322,8 +322,8 @@ function MainPanel({ shop }: { shop: Shop }) {
   return (
     <div className="flex flex-col gap-3">
       <BuyBox
-        label="Main NFT, the whole project"
-        overline="Whole project · Main NFT"
+        label="Main NFT"
+        overline="Main NFT"
         price={formatAmount(main.price, main.token)}
         facts={[
           { label: "Listing", value: "Buy now" },
