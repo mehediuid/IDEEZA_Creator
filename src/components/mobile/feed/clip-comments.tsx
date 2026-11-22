@@ -21,6 +21,9 @@
 // hide, blocked people's words hidden, links and @mentions drawn as the web
 // draws them. A copied comment link opens its thread, brings it into view and
 // marks it a moment. A write the phone refuses keeps the words and says so.
+// A share on the profile's Timeline has its own thread too (owner 2026-11-22, Facebook's re-share:
+// the share has its own comments): the same sheet over the share's post (`share:<id>`), the sharer
+// its owner, its comment links opening the share on the Timeline (`link`).
 
 import * as React from "react";
 import {
@@ -109,14 +112,23 @@ const writeTime = () => Date.now();
 /** "12 comments" — the sheet's title. */
 export const commentsTitle = (n: number) => `${n} ${n === 1 ? "comment" : "comments"}`;
 
+/** What the comments are on: a clip, or a share on the Timeline (its post, its owner). */
+export type CommentTarget = Pick<FeedClip, "id" | "postId" | "source" | "creator">;
+
 export function ClipComments({
   clip,
   open,
   onClose,
   guard,
   focusId = null,
+  link,
+  maker = true,
 }: {
-  clip: FeedClip;
+  clip: CommentTarget;
+  /** The post's owner is its maker (their comments say "Maker"); a share's owner only shared it. */
+  maker?: boolean;
+  /** Where a comment's copied link opens (`?comment=` is added); the clip's own page by default. */
+  link?: string;
   open: boolean;
   onClose: () => void;
   guard: Guard;
@@ -254,7 +266,8 @@ export function ClipComments({
     });
 
   const copyLink = (c: PostComment) => {
-    const url = new URL(`${clipHref(clip.id)}?comment=${encodeURIComponent(c.id)}`, window.location.origin).toString();
+    const base = link ?? clipHref(clip.id);
+    const url = new URL(`${base}${base.includes("?") ? "&" : "?"}comment=${encodeURIComponent(c.id)}`, window.location.origin).toString();
     const ok = () => toast({ title: "Link to comment copied to clipboard" });
     const no = () => toast({ title: "Couldn’t copy the link", lead: "error" });
     if (!navigator.clipboard) return no();
@@ -487,7 +500,7 @@ export function ClipComments({
                     root={c}
                     comments={comments}
                     viewer={viewer}
-                    makerId={clip.creator.id}
+                    makerId={maker ? clip.creator.id : ""}
                     shown={shownOf(c.id)}
                     onShown={(n) => setReplies((r) => ({ ...r, [c.id]: n }))}
                     nameOf={nameOf}

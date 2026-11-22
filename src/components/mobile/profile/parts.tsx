@@ -296,13 +296,18 @@ export function ReactionRow({
   postId,
   base,
   commentsHref,
+  onComments,
+  views = true,
   onMore,
   moreLabel,
 }: {
   postId: string;
   base: { appreciations: number; views: number };
-  /** Where Comments opens; null for a post with no thread of its own (a share: Appreciate and Save). */
+  /** Where Comments opens: a page (a post's clip), or `onComments` opens its sheet here (a share). */
   commentsHref: string | null;
+  onComments?: () => void;
+  /** Views are a post's (the Feed counts them); a share shows none. */
+  views?: boolean;
   onMore?: () => void;
   moreLabel?: string;
 }) {
@@ -328,8 +333,17 @@ export function ReactionRow({
         }}
       />
       <span className={cn(T.meta, "tabular-nums")}>{compactCount(counts.appreciations)}</span>
-      {commentsHref !== null && (
-        <>
+      {onComments ? (
+        <button
+          type="button"
+          onClick={onComments}
+          aria-label={`Comments${comments !== null ? `, ${comments}` : ""}`}
+          className={cn("ml-2 inline-flex size-[44px] items-center justify-center rounded-xl text-[color:var(--color-icon-default)] hover:bg-bg-subtle", FOCUS)}
+        >
+          <Icon icon={Comment01Icon} size={22} />
+        </button>
+      ) : (
+        commentsHref !== null && (
           <Link
             href={commentsHref}
             aria-label={`Comments${comments !== null ? `, ${comments}` : ""}`}
@@ -337,15 +351,17 @@ export function ReactionRow({
           >
             <Icon icon={Comment01Icon} size={22} />
           </Link>
-          <span className={cn(T.meta, "tabular-nums")}>{comments === null ? "" : compactCount(comments)}</span>
-          <span className={cn(T.meta, "flex items-center gap-2 px-6 tabular-nums")}>
-            <span className="text-[color:var(--color-icon-default)]">
-              <Icon icon={ViewIcon} size={16} />
-            </span>
-            <span className="sr-only">Views</span>
-            {compactCount(counts.views)}
+        )
+      )}
+      {(onComments || commentsHref !== null) && <span className={cn(T.meta, "tabular-nums")}>{comments === null ? "" : compactCount(comments)}</span>}
+      {views && (
+        <span className={cn(T.meta, "flex items-center gap-2 px-6 tabular-nums")}>
+          <span className="text-[color:var(--color-icon-default)]">
+            <Icon icon={ViewIcon} size={16} />
           </span>
-        </>
+          <span className="sr-only">Views</span>
+          {compactCount(counts.views)}
+        </span>
       )}
       <span className="flex-1" />
       {onMore && <IconButton hierarchy="ghost" size="xl" aria-label={moreLabel ?? "More actions"} icon={<Icon icon={MoreHorizontalIcon} size={22} />} onClick={onMore} />}
