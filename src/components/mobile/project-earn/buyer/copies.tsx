@@ -1,73 +1,116 @@
 "use client";
 
-// 18h · Copies on sale: the whole project's Physical and Virtual NFTs under the Main NFT (the web's
-// copy-panel.tsx on a phone, CL-018 / CL-036). Only the whole project's copies: a product's own copies
-// are sold on that product's screen. Owner 2026-11-12 (the page read as a spreadsheet, a Buy on every
-// card): one row per offer, as a product page lists its options. Per kind, Physical first:
-// · the kind and what it gets you, said once (helperLineOf); a Physical NFT's ⓘ says the units each
-//   copy lets you make (listingUnitsLine);
-// · its two Use rows, Personal use then Business use, always both (owner 2026-11-16): a Physical or
-//   Virtual mark, "Physical NFT · Personal use", the price, a thin sold bar with "n of N sold" and
-//   " · you own n" (the copies held now: a copy sold on is its new holder's), the activity line, and a
-//   small Buy straight to the wallet — no version sheet (owner 2026-11-15): one price per use, the
-//   listing's Price (`versionless`). A use the creator didn't list reads "Not on sale", a sold-out one
-//   "Sold out"; both stay, greyed. While every unit left is in another checkout, Buy waits, greyed,
-//   with "Someone is buying this now. Try again in a few minutes.";
-// · From holders (holder-offers.tsx), when someone sells one on.
-// Buying is the web's `useEditionPurchase` through the phone's wallet sheet, in the owner's licence
-// words. A preview reads the same rows and prices with no button. Only the lock (sold in full) hides them.
+// A copy tab of the phone's buy box on the maker's own listing (market-screen.tsx) and its Preview as
+// buyer (preview-screen.tsx): the whole project's Physical NFT or Virtual NFT (the web's copy-panel.tsx
+// on a phone, CL-018 / CL-036). Only the whole project's copies: a product's own copies are sold on that
+// product's screen. Since 2026-11-22 (owner, "Yes, build A" on study Uq1VPBrq9Jjez6jeWwEkjz: the bar's
+// Buy now bought the Main NFT even with a copy on screen, and every row had a Buy of its own) the buyer
+// chooses first, then the bar buys what is chosen (buy-pick.tsx). Per kind:
+// · the kind and what it gets you, said once (KindHead: helperLineOf; a Physical NFT's ⓘ says the units
+//   each copy lets you make), then "Each with its own NFT.";
+// · Use: Personal use and Business use as radio rows, always both (owner 2026-11-16), each with its
+//   price, a thin sold bar with "n of N sold" and " · you own n" (the copies held now: a copy sold on is
+//   its new holder's) and the activity line. One price per use, the listing's Price (no version sheet,
+//   owner 2026-11-15). A use the creator didn't list reads "Not on sale", a sold-out one "Sold out"; both
+//   stay, greyed, and can't be picked. While every unit left is in another checkout, the row says
+//   "Someone is buying this now. Try again in a few minutes." and the bar's Buy now waits (CL-016);
+// · From holders (holder-offers.tsx), choices of the same group, when someone sells one on;
+// · the screen's foot (the wallet line and the Testnet demo line).
+// No row has a Buy: the bar's one Buy now buys the picked choice. A preview reads the same rows and
+// prices, pickable, with no holders, no wallet and no bar. Only the lock (sold in full) hides the uses.
 
 import * as React from "react";
-import { CubeIcon, PackageIcon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Button } from "@/components/ideeza/button";
-import { listedKindsOf } from "@/components/marketplace/copy-panel";
-import { useEditionPurchase, type EditionTier } from "@/components/marketplace/purchase-dialog";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
 import { useResales } from "@/components/projects/purchased/resales-store";
 import { useWalletRequest, WalletRequestScope, type WalletRequestApi } from "@/components/wallet/wallet-provider";
 import { historyOf, labelOf } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
-import { can, type Viewer } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import type { ManualProject } from "@/lib/manual/projects";
 import { checkoutBlocks, IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
-import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
-import { editionChainOf, trackCardOf, tracksOf } from "@/lib/market/editions";
+import { trackCardOf, tracksOf } from "@/lib/market/editions";
 import { readMarketNow } from "@/lib/market/market-store";
 import { plainUseWords, withUseWords } from "@/lib/market/phone-sell";
+import type { Resale } from "@/lib/market/resales";
 import { KIND_LABEL, USE_LABEL } from "@/lib/market/sell-flow";
 import { listingUnitsLine } from "@/lib/market/units";
-import { PROJECT_SCOPE, type EditionKind, type EditionTrack, type EditionUse, type Listing, type Sale } from "@/lib/market/types";
+import { PROJECT_SCOPE, type EditionKind, type EditionTrack, type EditionUse, type Sale } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
 import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
-import { LIST_CARD, LIST_DIVIDERS } from "../../kit/list";
 import { InfoButton } from "../parts";
 import { T } from "../../type";
+import { Choice, ChoiceGroup, titled } from "./buy-pick";
 import { heldCopiesOf } from "./held";
-import { HIT44, HolderOffers } from "./holder-offers";
+import { HolderChoice } from "./holder-offers";
 import type { DoneFacts } from "./parts";
 
 const USES: EditionUse[] = ["private", "commercial"];
-type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
 
-/** True while the whole project sells copies of its own (a product's are its screen's). */
-export function projectCopiesLive(view: ProjectView): boolean {
-  return listedKindsOf(view, PROJECT_SCOPE).length > 0;
+/** A creator's listed copy track. */
+export type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
+
+/** One use of one kind as a choice of the box: the creator's listing of it, or why it can't be bought. */
+export type UseChoiceOf = {
+  type: "use";
+  key: string;
+  tab: EditionKind;
+  use: EditionUse;
+  /** The creator's listing of this use; null when it isn't on sale. */
+  track: Listed | null;
+  /** Can be picked (listed and not sold out). */
+  open: boolean;
+  /** Said in the price's place when it can't be picked. */
+  aside: "Not on sale" | "Sold out" | null;
+  /** Every unit left is in another checkout: its Buy now waits (CL-016). */
+  held: boolean;
+};
+
+/** Another holder's copy as a choice of the box. */
+export type HolderChoiceOf = { type: "holder"; key: string; tab: EditionKind; open: boolean; resale: Resale };
+
+/** A kind's two uses, Personal use first, as choices: listed, sold out or not on sale (none listed while
+ *  the project is sold in full). `othersIn` counts another checkout's holds on a track (none in a preview). */
+export function copyUseChoicesOf(view: ProjectView, kind: EditionKind, othersIn: (trackId: string) => number): UseChoiceOf[] {
+  const offers = view.lock !== null ? [] : tracksOf(PROJECT_SCOPE, view.editions).filter((t): t is Listed => t.kind === kind && t.listing !== null);
+  return USES.map((use): UseChoiceOf => {
+    const key = `use:${use}`;
+    const track = offers.find((t) => t.use === use) ?? null;
+    if (!track) return { type: "use", key, tab: kind, use, track: null, open: false, aside: "Not on sale", held: false };
+    const card = trackCardOf(track, view.sales);
+    const held = !card.soldOut && checkoutBlocks(othersIn(track.id), card.total - card.sold);
+    return { type: "use", key, tab: kind, use, track, open: !card.soldOut, aside: card.soldOut ? "Sold out" : null, held };
+  });
 }
 
-/** The wallet requests under it in the owner's licence words (Personal use / Business use). */
-function UseWordsScope({ children }: { children: React.ReactNode }) {
+const BuyTitle = React.createContext<(title: string | null) => void>(() => {});
+
+/** The wallet requests under it in the owner's licence words (Personal use / Business use), titled with
+ *  what the box buys (D4) while a title is set — a buy sets it (`useBuyTitle`) right before it asks the
+ *  wallet and clears it once the request is on its way. */
+export function BuyWordsScope({ children }: { children: React.ReactNode }) {
   const api = useWalletRequest();
-  const scoped = React.useMemo<WalletRequestApi>(() => ({ ...api, request: (req, opts) => api.request(withUseWords(req), opts) }), [api]);
-  return <WalletRequestScope api={scoped}>{children}</WalletRequestScope>;
+  const titleRef = React.useRef<string | null>(null);
+  const scoped = React.useMemo<WalletRequestApi>(() => ({ ...api, request: (req, opts) => api.request(titled(withUseWords(req), titleRef.current), opts) }), [api]);
+  const setTitle = React.useCallback((title: string | null) => {
+    titleRef.current = title;
+  }, []);
+  return (
+    <WalletRequestScope api={scoped}>
+      <BuyTitle.Provider value={setTitle}>{children}</BuyTitle.Provider>
+    </WalletRequestScope>
+  );
+}
+
+/** Sets (or clears) the title BuyWordsScope gives the next wallet request. */
+export function useBuyTitle(): (title: string | null) => void {
+  return React.useContext(BuyTitle);
 }
 
 /** What Purchase successful says about a copy just bought: the sentence, its transaction and what was paid. */
-function doneFactsOf(sentence: string, projectId: string, buyerId: DemoBuyerId, trackId: string): DoneFacts {
+export function doneFactsOf(sentence: string, projectId: string, buyerId: DemoBuyerId, trackId: string): DoneFacts {
   const sale =
     readMarketNow()
       .sales.filter((s) => s.projectId === projectId && s.buyerId === buyerId && s.listingId === trackId)
@@ -79,90 +122,94 @@ function doneFactsOf(sentence: string, projectId: string, buyerId: DemoBuyerId, 
   };
 }
 
-export function PhoneCopies(props: {
-  project: ManualProject;
-  view: ProjectView;
-  viewer: Viewer;
-  /** The active demo buyer; null in a preview. */
-  buyerId: DemoBuyerId | null;
-  /** A purchase went through (a creator's copy, or one from a holder): what Purchase successful says. */
-  onBought: (done: DoneFacts) => void;
-  anchorRef?: React.Ref<HTMLElement>;
-}) {
-  return (
-    <UseWordsScope>
-      <Copies {...props} />
-    </UseWordsScope>
-  );
-}
-
-function Copies({
+/** A copy tab's panel: what the kind gets you, its Use choices, other holders' copies, then the foot. */
+export function CopyPanel({
   project,
   view,
-  viewer,
-  buyerId,
-  onBought,
-  anchorRef,
-}: {
-  project: ManualProject;
-  view: ProjectView;
-  viewer: Viewer;
-  buyerId: DemoBuyerId | null;
-  onBought: (done: DoneFacts) => void;
-  anchorRef?: React.Ref<HTMLElement>;
-}) {
-  const kinds = listedKindsOf(view, PROJECT_SCOPE);
-  const main: Listing | null = view.listing.kind === "none" ? null : view.listing.listing;
-  const chain = editionChainOf(view.mint.record, main, null);
-  if (!kinds.length || !chain) return null;
-  return (
-    <section ref={anchorRef} aria-labelledby="bv-copies" className="flex scroll-mt-[48px] flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h3 id="bv-copies" className={T.section}>
-          Copies
-        </h3>
-        <p className={T.meta}>Each with its own NFT.</p>
-      </div>
-      {kinds.map((kind) => (
-        <KindBlock key={kind} project={project} view={view} viewer={viewer} buyerId={buyerId} kind={kind} onBought={onBought} />
-      ))}
-    </section>
-  );
-}
-
-/** One kind: what it gets you, its two Use rows, then From holders. */
-function KindBlock({
-  project,
-  view,
-  viewer,
-  buyerId,
   kind,
-  onBought,
+  uses,
+  holders,
+  buyerId,
+  pickedKey,
+  onPick,
+  foot,
 }: {
   project: ManualProject;
   view: ProjectView;
-  viewer: Viewer;
-  buyerId: DemoBuyerId | null;
   kind: EditionKind;
-  onBought: (done: DoneFacts) => void;
+  uses: readonly UseChoiceOf[];
+  holders: readonly HolderChoiceOf[];
+  /** The active demo buyer; null in a preview, which lists no holders. */
+  buyerId: DemoBuyerId | null;
+  pickedKey: string | null;
+  onPick: (c: UseChoiceOf | HolderChoiceOf) => void;
+  foot?: React.ReactNode;
 }) {
-  const offers = tracksOf(PROJECT_SCOPE, view.editions).filter((t): t is Listed => t.kind === kind && t.listing !== null);
-  const headingId = `bv-copies-${kind}`;
+  const name = `bv-pick-${kind}`;
   return (
-    <div className="flex flex-col gap-4">
-      <KindHead id={headingId} kind={kind} name={project.name} />
-      <ul aria-labelledby={headingId} className={cn(LIST_CARD, LIST_DIVIDERS)}>
-        {USES.map((use) => {
-          const track = offers.find((t) => t.use === use);
-          return track ? (
-            <CopyRow key={use} project={project} view={view} viewer={viewer} buyerId={buyerId} track={track} onBought={onBought} />
-          ) : (
-            <NotOnSaleRow key={use} kind={kind} use={use} />
-          );
-        })}
-      </ul>
-      {buyerId && <HolderOffers projectId={project.id} kind={kind} product={null} onBought={onBought} />}
-    </div>
+    <>
+      <KindHead id={`bv-copies-${kind}`} kind={kind} name={project.name} />
+      <p className={T.meta}>Each with its own NFT.</p>
+      <ChoiceGroup label="Use">
+        {uses.map((c) => (
+          <CopyUseChoice key={c.key} project={project} view={view} choice={c} buyerId={buyerId} name={name} checked={pickedKey === c.key} onSelect={() => onPick(c)} />
+        ))}
+      </ChoiceGroup>
+      {buyerId && holders.length > 0 && (
+        <ChoiceGroup
+          label={`From holders · ${holders.length}`}
+          note={`Copies others bought and sell on. You get the copy, its licence${kind === "physical" ? " and its units left" : ""}; the creator still gets a royalty.`}
+        >
+          {holders.map((c) => (
+            <HolderChoice key={c.key} resale={c.resale} buyerId={buyerId} name={name} checked={pickedKey === c.key} onSelect={() => onPick(c)} />
+          ))}
+        </ChoiceGroup>
+      )}
+      {foot}
+    </>
+  );
+}
+
+/** One use as a radio row: its price, how many are sold (and held by this buyer now), its activity. */
+function CopyUseChoice({
+  project,
+  view,
+  choice,
+  buyerId,
+  name,
+  checked,
+  onSelect,
+}: {
+  project: ManualProject;
+  view: ProjectView;
+  choice: UseChoiceOf;
+  buyerId: DemoBuyerId | null;
+  name: string;
+  checked: boolean;
+  onSelect: () => void;
+}) {
+  const resales = useResales();
+  const track = choice.track;
+  const label = USE_LABEL[choice.use];
+  if (!track) return <Choice name={name} checked={false} disabled onSelect={onSelect} title={label} price="" aside="Not on sale" />;
+  const card = trackCardOf(track, view.sales);
+  // Held now: a copy sold on is its new holder's.
+  const owned = buyerId ? heldCopiesOf(view.sales, buyerId, resales, (s) => s.item.trackId === track.id).length : 0;
+  const soldLine = `${card.soldOut ? `All ${card.total} sold` : `${card.sold} of ${card.total} sold`}${owned > 0 ? ` · you own ${owned}` : ""}`;
+  return (
+    <Choice
+      name={name}
+      checked={checked && choice.open}
+      disabled={!choice.open}
+      onSelect={onSelect}
+      title={label}
+      price={formatAmount(track.listing.regular, track.listing.token)}
+      aside={choice.aside ?? undefined}
+    >
+      <SoldBar share={card.total ? Math.round((card.sold / card.total) * 100) : 0} line={soldLine} />
+      <CopyActivity project={project} track={track} sales={view.sales} />
+      {choice.held && <span className={T.caption}>{IN_CHECKOUT_BUYER_LINE}</span>}
+    </Choice>
   );
 }
 
@@ -185,15 +232,6 @@ export function KindHead({ id, kind, name }: { id: string; kind: EditionKind; na
   );
 }
 
-/** A kind's mark at the start of a row. */
-export function KindMark({ kind }: { kind: EditionKind }) {
-  return (
-    <span aria-hidden className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-lg bg-bg-subtle text-[color:var(--color-icon-default)]">
-      <Icon icon={kind === "physical" ? PackageIcon : CubeIcon} size={20} />
-    </span>
-  );
-}
-
 /** A thin sold bar and its line ("3 of 50 sold · you own 1"). */
 export function SoldBar({ share, line }: { share: number; line: string }) {
   return (
@@ -203,121 +241,6 @@ export function SoldBar({ share, line }: { share: number; line: string }) {
       </span>
       <span className={cn(T.caption, "tabular-nums")}>{line}</span>
     </span>
-  );
-}
-
-/** A use the creator didn't list: it stays in the list, greyed, and can't be bought. */
-export function NotOnSaleRow({ kind, use, aside = "Not on sale" }: { kind: EditionKind; use: string; aside?: string }) {
-  const label = use === "private" || use === "commercial" ? USE_LABEL[use] : use;
-  return (
-    <li className="flex items-center gap-6 px-8 py-6 opacity-60">
-      <KindMark kind={kind} />
-      <span className={cn(T.rowTitle, "min-w-0 flex-1 break-words")}>{`${KIND_LABEL[kind]} · ${label}`}</span>
-      <span className={cn(T.meta, "shrink-0")}>{aside}</span>
-    </li>
-  );
-}
-
-function CopyRow({
-  project,
-  view,
-  viewer,
-  buyerId,
-  track,
-  onBought,
-}: {
-  project: ManualProject;
-  view: ProjectView;
-  viewer: Viewer;
-  buyerId: DemoBuyerId | null;
-  track: Listed;
-  onBought: (done: DoneFacts) => void;
-}) {
-  const resales = useResales();
-  const holds = useCheckoutHolds();
-  const heldId = React.useId();
-  const card = trackCardOf(track, view.sales);
-  const name = `${KIND_LABEL[track.kind]} · ${USE_LABEL[track.use]}`;
-  const price = formatAmount(track.listing.regular, track.listing.token);
-  const share = card.total ? Math.round((card.sold / card.total) * 100) : 0;
-  // Held now: a copy sold on is its new holder's.
-  const owned = buyerId ? heldCopiesOf(view.sales, buyerId, resales, (s) => s.item.trackId === track.id).length : 0;
-  const held = buyerId !== null && !card.soldOut && checkoutBlocks(holds.others(track.id), card.total - card.sold);
-  const soldLine = `${card.soldOut ? `All ${card.total} sold` : `${card.sold} of ${card.total} sold`}${owned > 0 ? ` · you own ${owned}` : ""}`;
-  return (
-    <li className="flex items-center gap-6 px-8 py-6">
-      <KindMark kind={track.kind} />
-      <div className={cn("flex min-w-0 flex-1 flex-col gap-1", card.soldOut && "opacity-60")}>
-        <span className={cn(T.rowTitle, "break-words")}>{name}</span>
-        <span className={cn(T.meta, "tabular-nums text-text-primary")}>{price}</span>
-        <SoldBar share={share} line={soldLine} />
-        <CopyActivity project={project} track={track} sales={view.sales} />
-        {held && (
-          <span id={heldId} className={T.meta}>
-            {IN_CHECKOUT_BUYER_LINE}
-          </span>
-        )}
-      </div>
-      {card.soldOut ? (
-        <span className={cn(T.meta, "shrink-0 opacity-60")}>Sold out</span>
-      ) : (
-        buyerId && (
-          <BuyCopy project={project} view={view} viewer={viewer} buyerId={buyerId} track={track} name={name} price={price} held={held} heldId={heldId} onBought={onBought} />
-        )
-      )}
-    </li>
-  );
-}
-
-/** The row's small Buy: the use at its one price, straight to the wallet. */
-function BuyCopy({
-  project,
-  view,
-  viewer,
-  buyerId,
-  track,
-  name,
-  price,
-  held,
-  heldId,
-  onBought,
-}: {
-  project: ManualProject;
-  view: ProjectView;
-  viewer: Viewer;
-  buyerId: DemoBuyerId;
-  track: Listed;
-  name: string;
-  price: string;
-  held: boolean;
-  heldId: string;
-  onBought: (done: DoneFacts) => void;
-}) {
-  const { busyId, buy } = useEditionPurchase({ project, view, buyerId, versionless: true });
-  if (!can(viewer, "listing.buy", { ...view.canCtx, listingLive: true })) return null;
-  const busy = busyId === track.id;
-  // The listing's Price. Where the Sell flow's "Price with future updates" was left empty (the same price),
-  // the updates come with it, as on the web.
-  const tier: EditionTier = track.listing.regular === track.listing.extended ? "extended" : "regular";
-  return (
-    <Button
-      hierarchy="secondary"
-      size="md"
-      className={cn(HIT44, "shrink-0", held && "cursor-not-allowed opacity-60")}
-      data-copy-buy=""
-      aria-label={`Buy ${name} for ${price}`}
-      // Not `disabled`: that drops its focus before the wallet sheet reads its opener.
-      aria-disabled={busy || held || undefined}
-      aria-describedby={held ? heldId : undefined}
-      loading={busy}
-      onClick={async () => {
-        if (busy || held) return;
-        const done = await buy(track, tier);
-        if (done) onBought(doneFactsOf(done, project.id, buyerId, track.id));
-      }}
-    >
-      Buy
-    </Button>
   );
 }
 

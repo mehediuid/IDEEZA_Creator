@@ -9,9 +9,8 @@
 //   rules); the name comes into the bar once the title scrolls away;
 // · the media on top (hero.tsx): the take in use, else the concept image of
 //   the version on screen;
-// · one header: the name (with "You own copy #n" as its one chip for a buyer
-//   who does, 23d), one meta line ("{project} · AI build · {date}", or the
-//   line of a product no build stands behind), the lock line once sold in
+// · one header: the name, one meta line ("{project} · AI build · {date}", or
+//   the line of a product no build stands behind), the lock line once sold in
 //   full (10u), the description (3 lines, Show more) — the maker's words on
 //   the current version, the build's on an older one — or, for the owner
 //   with none, Add a description (CL-015), and the version notice while an
@@ -22,10 +21,13 @@
 //   Add the rest, the version pick and the computer note live there now; the
 //   owner's Bottom action bar holds Earn with its copies line (CL-031,
 //   earn-bar.tsx);
-// · a buyer keeps the tabs pinned under the top bar (`?tab=`, the kit's
-//   MobileTabs: a tap makes no request, so it works offline): Media ·
-//   Overview · Build · Contributors, and the sticky bar (D1): Copies from ·
-//   Buy a copy, or You own copy · See your files.
+// · a buyer who holds copies reads "You own copy #n" with its kind and use
+//   and See your files › right under the header (buy.tsx OwnedCopiesRow, D6
+//   of 2026-11-22: the bar keeps selling to a holder too); a buyer keeps the
+//   tabs pinned under the top bar (`?tab=`, the kit's MobileTabs: a tap makes
+//   no request, so it works offline): Media · Overview · Build · Contributors,
+//   and the sticky bar (D1): Copies from · Buy a copy while any copy is on
+//   sale, else, for a holder, You own copy · See your files.
 // The marketplace's "Testnet demo · shopping as Mira" (10h) sits under the
 // header, not over the name; the previews' "Previewing as …" with Exit preview
 // stays pinned under the top bar (31a, 31b). A Feed sample's product is
@@ -34,10 +36,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Add01Icon, LockIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, LockIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
-import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { can } from "@/lib/manual/permissions";
 import { formatDate } from "@/lib/manual/project-summary";
@@ -55,7 +56,7 @@ import { T } from "../type";
 import { usePhoneWriteGate } from "../project/write-gate";
 import { HeaderActivity } from "./activity";
 import { BuildTab } from "./build-tab";
-import { BuyBar, BuyCopy, DemoBuyerBanner } from "./buy";
+import { BuyBar, BuyCopy, DemoBuyerBanner, OwnedCopiesRow } from "./buy";
 import { MediaTab } from "./media-tab";
 import { DeleteProductSheet } from "./delete-sheet";
 import { ProductEarnBar } from "./earn-bar";
@@ -157,6 +158,7 @@ function ProductReady() {
           <OfflineBanner />
           <ProductHero />
           <ProductHeader titleRef={titleRef} onEdit={() => setSheet("edit")} />
+          {buyer && <OwnedCopiesRow onFiles={toFiles} />}
           {mode === "market" && (
             <div className="px-8 pb-8">
               <DemoBuyerBanner />
@@ -250,7 +252,7 @@ function PreviewBanner() {
 // ─────────────────────────── the header ───────────────────────────
 
 function ProductHeader({ titleRef, onEdit }: { titleRef: React.RefObject<HTMLHeadingElement | null>; onEdit: () => void }) {
-  const { project, view, product, name, mode, buyer, job, bp, version, copies } = useProduct();
+  const { project, view, product, name, mode, buyer, job, bp, version } = useProduct();
   const owner = mode === "owner";
   const canEditDetails = useCanEditDetails();
   const home = version?.home ?? 1;
@@ -259,7 +261,6 @@ function ProductHeader({ titleRef, onEdit }: { titleRef: React.RefObject<HTMLHea
   const kept = product.description.trim();
   const description = (version?.shown ?? home) === home ? kept : bp?.description?.trim() || kept;
   const lockLine = owner ? (view.lock?.line ?? null) : null;
-  const latestCopy = copies.length ? copies.reduce((a, s) => (s.at > a.at ? s : a), copies[0]) : null;
   // A version is picked in place, like a tab: no request, so it works offline.
   const showVersion = (n: number) => replaceQuery({ v: n === home ? null : String(n) });
   const unbuilt =
@@ -270,16 +271,9 @@ function ProductHeader({ titleRef, onEdit }: { titleRef: React.RefObject<HTMLHea
   return (
     <header className="flex flex-col gap-4 px-8 pb-8">
       <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 ref={titleRef} className={cn(T.title, "min-w-0 break-words")}>
-            {name}
-          </h1>
-          {latestCopy && latestCopy.item.nft !== "main" && (
-            <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
-              You own copy #{latestCopy.item.serial}
-            </Badge>
-          )}
-        </div>
+        <h1 ref={titleRef} className={cn(T.title, "min-w-0 break-words")}>
+          {name}
+        </h1>
         <p className={T.meta}>{meta}</p>
       </div>
 

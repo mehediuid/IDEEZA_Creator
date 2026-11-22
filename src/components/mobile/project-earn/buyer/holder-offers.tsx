@@ -1,17 +1,16 @@
 "use client";
 
 // From holders on the phone's shop screens (CL-036, the web's marketplace/holder-offers.tsx): the copies
-// of one kind other creators bought and sell on, cheapest first, under the creator's own copy rows — the
-// only way to get one once the creator's copies are sold out. Each row says what a buyer gets (its number,
-// its use, a Physical copy's units left) and who sells it, then its price and a small Buy, the same row
-// as a creator's copy. Buy is the buyer's wallet transaction (the web's resale request and commit, through
-// whichever wallet sheet the screen gives — PhoneWalletScope's, or `request`); the copy moves to them with
-// its licence and units left, and the seller is paid (`payOut`). The active demo creator's own listing
-// reads "Your listing" with Manage, to its Earn. Nobody selling: no section.
+// of one kind other creators bought and sell on, cheapest first — the only way to get one once the
+// creator's copies are sold out. Since the buy box (owner 2026-11-22, buy-pick.tsx) they are choices in
+// their kind's tab, not rows with a Buy each: `useHolderListings` lists them, `HolderChoice` draws one (its
+// number and use, its price, who sells it, a Physical copy's units left), `holderFactsOf` says it on the
+// bar, and `useHolderBuy` buys it — the buyer's wallet transaction (the web's resale request and commit,
+// through whichever wallet sheet the screen gives); the copy moves to them with its licence and units
+// left, and the seller is paid (`payOut`). The active demo creator's own listing reads "Your listing",
+// with Manage to its Earn.
 
 import * as React from "react";
-import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ideeza/button";
 import { useWalletRequest, type WalletRequestApi } from "@/components/wallet/wallet-provider";
 import { payOut, readResales, useResales, writeResales } from "@/components/projects/purchased/resales-store";
 import { readUnitsLog, useUnitsLog } from "@/components/projects/purchased/units-store";
@@ -27,15 +26,12 @@ import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
-import { LIST_CARD, LIST_DIVIDERS } from "../../kit/list";
 import { T } from "../../type";
+import { Choice } from "./buy-pick";
 import type { DoneFacts } from "./parts";
 import { readSampleSales, useSampleSales } from "./sample-sales-store";
 
 const STORAGE_FULL = "Your browser didn't save this purchase — storage is full.";
-
-/** A row's small button (A01 MD, 36 px) on the phone's 44 px tap area. */
-export const HIT44 = "relative after:absolute after:inset-x-0 after:-inset-y-[4px] after:content-['']";
 
 /** Where "Manage" leads: the Earn of the project the holder bought copies of. */
 export const purchasedEarnPath = (projectId: string) => `/m/projects/purchased/${encodeURIComponent(projectId)}/earn`;
@@ -57,35 +53,36 @@ export function useHolderListings(projectId: string, kind: EditionKind, product:
   );
 }
 
-export function HolderOffers({
-  projectId,
-  kind,
-  product,
-  request: askWallet,
-  onBought,
-}: {
-  projectId: string;
-  kind: EditionKind;
-  /** A product's screen: that product's own copies (its name); null for the whole project's. */
-  product: string | null;
-  /** The screen's own wallet sheet, when it isn't the scope's (the product page's). */
-  request?: WalletRequestApi["request"];
-  /** The purchase went through: what to say on Purchase successful. */
-  onBought: (done: DoneFacts) => void;
-}) {
-  const rows = useHolderListings(projectId, kind, product);
-  const log = useUnitsLog();
+/** What a holder's listing says on a choice and on the bar: its number and use, its price, who sells it
+ *  and a Physical copy's units left; `mine` for the active demo creator's own listing. */
+export function holderFactsOf(r: Resale, buyerId: DemoBuyerId, log: readonly UnitsEntry[]) {
+  const mine = r.sellerId === buyerId;
+  const units = r.kind === "physical" ? copyUnitsOf(r.copyKey, unitsAllowanceOf(r.use), r.sellerId, log) : null;
+  const unitsLine = units ? (units.left === 0 ? "no units left" : unitsLineOf(units)) : null;
+  return {
+    mine,
+    number: copyNumberOf(r),
+    use: r.use,
+    price: formatAmount(r.price, r.token),
+    seller: buyerNameOf(r.sellerId),
+    line: [mine ? "Your listing" : `Sold by ${buyerNameOf(r.sellerId)}`, unitsLine].filter(Boolean).join(" · "),
+    unitsLeft: units ? units.left : null,
+    manageHref: resaleItemPath(r.projectId, tileKeyOfCopy(r.copyKey)),
+  };
+}
+
+/** Buying another holder's copy: the web's resale request and commit, through the screen's wallet sheet
+ *  (the scope's, or `request`), titled with what is bought when `title` is given. */
+export function useHolderBuy({ request: askWallet, onBought }: { request?: WalletRequestApi["request"]; onBought: (done: DoneFacts) => void }) {
   const { buyer } = useActiveBuyer();
   const scope = useWalletRequest();
   const request = askWallet ?? scope.request;
-  const [busy, setBusy] = React.useState<string | null>(null);
-  const headingId = React.useId();
-  if (!rows.length) return null;
-
-  const buy = async (r: Resale) => {
-    if (busy) return;
+  const [busyId, setBusy] = React.useState<string | null>(null);
+  const buy = async (r: Resale, title?: string) => {
+    if (busyId) return;
     const holderFresh = () => holderNowOf(r.copyKey, readSampleSales(), readMarketNow().sales, readResales());
-    const req = resaleBuyRequestOf(r, buyer.id, unitsLeftOf(r, readUnitsLog()));
+    const base = resaleBuyRequestOf(r, buyer.id, unitsLeftOf(r, readUnitsLog()));
+    const req = title ? { ...base, title } : base;
     setBusy(r.id);
     try {
       const result = await request(req, {
@@ -110,61 +107,16 @@ export function HolderOffers({
       setBusy(null);
     }
   };
-
-  return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h5 id={headingId} className={cn(T.rowTitle, "tabular-nums")}>
-          {`From holders · ${rows.length}`}
-        </h5>
-        <p className={T.meta}>
-          Copies others bought and sell on. You get the copy, its licence{kind === "physical" ? " and its units left" : ""}; the creator still gets a royalty.
-        </p>
-      </div>
-      <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
-        {rows.map((r) => (
-          <HolderRow key={r.id} r={r} buyerId={buyer.id} log={log} busy={busy === r.id} onBuy={() => void buy(r)} />
-        ))}
-      </ul>
-    </section>
-  );
+  return { busyId, buy };
 }
 
-function HolderRow({ r, buyerId, log, busy, onBuy }: { r: Resale; buyerId: DemoBuyerId; log: readonly UnitsEntry[]; busy: boolean; onBuy: () => void }) {
-  const mine = r.sellerId === buyerId;
-  const price = formatAmount(r.price, r.token);
-  const units = r.kind === "physical" ? copyUnitsOf(r.copyKey, unitsAllowanceOf(r.use), r.sellerId, log) : null;
-  const who = mine ? "Your listing" : `Sold by ${buyerNameOf(r.sellerId)}`;
+/** Another holder's copy as a choice: its number and use, its price, who sells it and its units left. */
+export function HolderChoice({ resale, buyerId, name, checked, onSelect }: { resale: Resale; buyerId: DemoBuyerId; name: string; checked: boolean; onSelect: () => void }) {
+  const log = useUnitsLog();
+  const f = holderFactsOf(resale, buyerId, log);
   return (
-    <li className="flex items-center gap-6 px-8 py-6">
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={cn(T.rowTitle, "break-words tabular-nums")}>{`${copyNumberOf(r)} · ${r.use}`}</span>
-        <span className={cn(T.meta, "tabular-nums text-text-primary")}>{price}</span>
-        <span className={cn(T.caption, "tabular-nums")}>
-          {who}
-          {units ? ` · ${units.left === 0 ? "no units left" : unitsLineOf(units)}` : ""}
-        </span>
-      </div>
-      {mine ? (
-        <Link href={resaleItemPath(r.projectId, tileKeyOfCopy(r.copyKey))} className={cn(buttonVariants({ hierarchy: "secondary", size: "md" }), HIT44, "shrink-0")}>
-          Manage
-        </Link>
-      ) : (
-        <Button
-          hierarchy="secondary"
-          size="md"
-          className={cn(HIT44, "shrink-0")}
-          data-copy-buy=""
-          aria-label={`Buy ${copyNumberOf(r)} · ${r.use} from ${buyerNameOf(r.sellerId)}, ${price}`}
-          aria-disabled={busy || undefined}
-          loading={busy}
-          onClick={() => {
-            if (!busy) onBuy();
-          }}
-        >
-          Buy
-        </Button>
-      )}
-    </li>
+    <Choice name={name} checked={checked} onSelect={onSelect} title={`${f.number} · ${f.use}`} price={f.price}>
+      <span className={cn(T.caption, "tabular-nums")}>{f.line}</span>
+    </Choice>
   );
 }

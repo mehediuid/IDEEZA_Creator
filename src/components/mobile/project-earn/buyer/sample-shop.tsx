@@ -12,33 +12,38 @@
 // with the same request, re-check and commit. Samples sell by Buy now only.
 //
 // sample-project.tsx mounts the pieces: SampleShop around its screen,
-// SampleMarketSection right under the title (owner 2026-11-12: the page the
-// Feed's pill opens was a spreadsheet — a loud demo banner on top, a table of
-// rows that said the price twice, empty "activity" headings and a Buy button
-// on every card). As a product page:
+// SampleMarketSection right under the title, SampleShopBar as its footer.
+// Laid out as a product page (owner 2026-11-12), and since 2026-11-22 (owner,
+// "Yes, build A" on study Uq1VPBrq9Jjez6jeWwEkjz: the bar's Buy now silently
+// bought the whole project, even with a copy on screen) the buyer chooses
+// first, as on the web's Marketplace box:
 // · "You own n NFTs › See what you own" (you-own.tsx, CL-035) for anyone who
-//   holds any of it now — one row in place of a receipt card per purchase;
-//   it follows the holder, so a copy sold on is no longer "yours";
-// · one buy box — "Whole project · Main NFT", the price large, three facts
-//   (Listing, Share, Chain), the wallet line, the last sale and the Testnet
-//   demo line with Change — the share-sale note under it;
-// · the copies, each kind with its two Use rows, Personal use and Business
-//   use (sample-market.ts `copyUsesOf`: the post's row and the other use,
-//   Business at twice Personal), each with its own price, sold count and
-//   small Buy; a sold-out use reads "Sold out" (CL-018); then From holders
-//   (holder-offers.tsx, CL-036).
-// The bottom bar's Buy now buys the Main NFT, so the box has no button of its
-// own; with the Main NFT gone it brings the copies into view. The copies are
-// the whole project's: a product's screen doesn't sell them (CL-018) — its bar
-// (SampleCopiesBar) says what they start at and opens them here.
+//   holds any of it now; it follows the holder;
+// · one buy box (buy-pick.tsx): Main NFT · Physical NFT · Virtual NFT, only what
+//   the post sells, opening on the web's tab (an address's ?nft=, else what
+//   the buyer holds, else the first with something to buy). Main NFT =
+//   its box ("Whole project · Main NFT", the price large, Listing,
+//   Share, Chain, the wallet line, the Testnet demo line), the share-sale
+//   note under it. A copy kind = what it gets you (units behind ⓘ), then
+//   Use: Personal use and Business use as radio rows (sample-market.ts
+//   `copyUsesOf`: Business at twice Personal), each with its price, sold
+//   count and last sale (a sold-out use stays, greyed); then From holders as
+//   rows of the same choice (holder-offers.tsx, CL-036);
+// · the bar says what is picked and its price, with Change, beside Ask the
+//   creator (a chat icon) and the one Buy now — Manage for the buyer's own
+//   holder listing; the wallet sheet's title names it too (D4). Nothing left
+//   to buy: Ask the creator alone.
+// The copies are the whole project's: a product's screen doesn't sell them
+// (CL-018) — its bar (SampleCopiesBar) says what they start at and opens
+// this box on them (Buy a copy → ?nft=).
 
 import * as React from "react";
 import Link from "next/link";
-import { Activity01Icon, BubbleChatIcon, Coins01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
-import { scrollWithin } from "@/components/create/anchors";
-import { Icon } from "@/components/dashboard/icon";
-import { Button, buttonVariants } from "@/components/ideeza/button";
+import { useSearchParams } from "next/navigation";
+import { Activity01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { buttonVariants } from "@/components/ideeza/button";
 import { useResales } from "@/components/projects/purchased/resales-store";
+import { useUnitsLog } from "@/components/projects/purchased/units-store";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { estimateGas } from "@/lib/commerce/gas";
 import { SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
@@ -60,7 +65,9 @@ import {
   type SampleSale,
 } from "@/lib/market/phone-sample-sales";
 import { sampleSaleKeyOf } from "@/lib/market/purchases";
-import { holderOf } from "@/lib/market/resales";
+import { askedTabOf, buyTitleOf, holderPickTitle, MAIN_PICK_TITLE, mainBarLine, openingTabOf, pickedChoiceOf, copyBarLine, copyPickTitle, type PickTab } from "@/lib/market/buy-pick";
+import { holderOf, type Resale } from "@/lib/market/resales";
+import { unitsAllowanceOf, type UnitsUse } from "@/lib/market/units";
 import { lowestOf } from "@/lib/market/market-list";
 import { randomId } from "@/lib/market/sales";
 import { copyUseBlockOf, copyUsesOf, copyUseStateOf, type SampleMarket, type UseOffer } from "@/lib/market/sample-market";
@@ -72,10 +79,11 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../../kit/bottom-bar";
-import { LIST_CARD, LIST_DIVIDERS } from "../../kit/list";
 import { PhoneWalletScope } from "../phone-wallet";
-import { KindHead, KindMark, SoldBar } from "./copies";
-import { HIT44, HolderOffers, useHolderListings } from "./holder-offers";
+import { tabPanelProps } from "../../kit/tabs";
+import { BUY_BOX_ID, Choice, ChoiceGroup, PickBar, PickTabs, revealBuyBox, titled, type BarAction, type BarPick } from "./buy-pick";
+import { KindHead, SoldBar } from "./copies";
+import { HolderChoice, holderFactsOf, useHolderBuy, useHolderListings } from "./holder-offers";
 import { readSampleSales, useSampleSales, writeSampleSales } from "./sample-sales-store";
 import { BuyBox, ClosedCard, DemoShopBanner, IconLine, PurchaseDoneSheet, WalletLine, type DoneFacts } from "./parts";
 import { YouOwnRow } from "./you-own";
@@ -85,6 +93,13 @@ import { T } from "../../type";
 const LOCKED = "This project was sold in full, so its NFTs aren't for sale any more.";
 const SAMPLE_BANNER_BODY = "A demo creator does the buying — test tokens in a test wallet. Nothing is sent to a blockchain.";
 const KINDS: EditionKind[] = ["physical", "virtual"];
+const BOX_TABS = "sv-buy";
+
+/** One thing the box can pick: the Main NFT, a copy of one use, or another holder's copy. */
+type ShopChoice =
+  | { type: "main"; key: "main"; tab: "main"; open: boolean; offer: SampleOffer }
+  | { type: "use"; key: string; tab: EditionKind; open: boolean; offer: UseOffer; aside: string | null }
+  | { type: "holder"; key: string; tab: EditionKind; open: boolean; resale: Resale };
 
 type Shop = {
   post: InnovationPost;
@@ -96,17 +111,20 @@ type Shop = {
   sales: SampleSale[];
   buyerId: DemoBuyerId;
   holding: SampleSale[];
-  /** The offer being bought, by its name. */
+  /** The tabs the box shows, the open one, and its setter. */
+  tabs: PickTab[];
+  tab: PickTab | null;
+  setTab: (t: PickTab) => void;
+  choicesOf: (t: PickTab) => ShopChoice[];
+  /** What the open tab has picked. */
+  picked: ShopChoice | null;
+  pick: (c: ShopChoice) => void;
+  /** Something on the page can still be bought (the buyer's own holder listing aside). */
+  anyBuyable: boolean;
+  /** The key of the choice being bought. */
   busy: string | null;
-  buy: (offer: SampleOffer | UseOffer) => void;
-  /** Copies other holders sell on that the active buyer could buy. */
-  fromHolders: number;
-  /** A purchase from a holder went through: Purchase successful. */
-  bought: (done: DoneFacts) => void;
+  run: (c: ShopChoice) => void;
 };
-
-/** The marketplace block's id: with the Main NFT gone, the bar's Buy now brings the copies into view by it. */
-const SECTION_ID = "sample-market";
 
 const Ctx = React.createContext<Shop | null>(null);
 
@@ -130,25 +148,36 @@ export function SampleShop({ post, id, children }: { post: InnovationPost; id: s
 function ShopProvider({ post, id, children }: { post: InnovationPost; id: string; children: React.ReactNode }) {
   const { request } = useWalletRequest();
   const { buyer } = useActiveBuyer();
+  const params = useSearchParams();
   const all = useSampleSales();
   const sales = React.useMemo(() => sampleSalesOf(id, all), [id, all]);
   const offers = React.useMemo(() => sampleOffersOf(post), [post]);
   const market = React.useMemo<SampleMarket>(() => ({ feedId: id, post, offers }), [id, post, offers]);
   const physical = useHolderListings(id, "physical", null);
   const virtual = useHolderListings(id, "virtual", null);
-  const fromHolders = [...physical, ...virtual].filter((r) => r.sellerId !== buyer.id).length;
-  const [busy, setBusy] = React.useState<string | null>(null);
+  const [buying, setBuying] = React.useState<string | null>(null);
   const [done, setDone] = React.useState<DoneFacts | null>(null);
+  const holderBuy = useHolderBuy({ onBought: setDone });
+  const [pickedTab, setPickedTab] = React.useState<PickTab | null>(null);
+  const [picks, setPicks] = React.useState<Partial<Record<PickTab, string>>>({});
+  const asked = askedTabOf(params.get("nft"));
+
+  // A link that asks for a tab (a product's See copies) opens with the box in view.
+  React.useEffect(() => {
+    if (!asked) return;
+    const t = window.setTimeout(() => revealBuyBox("auto"), 60);
+    return () => window.clearTimeout(t);
+  }, [asked]);
 
   // The web's sample purchase (sample-offer-box.tsx): the Main NFT, or a copy for one use (its own count,
-  // its own sold-out).
+  // its own sold-out), titled with what it buys.
   const buy = React.useCallback(
-    async (o: SampleOffer | UseOffer) => {
-      if (busy) return;
+    async (o: SampleOffer | UseOffer, key: string, title: string) => {
+      if (buying) return;
       const blockOf = (list: SampleSale[]) => (isUse(o) ? copyUseBlockOf(o, id, list) : sampleBuyBlock(o, id, list));
       const serialOf = (list: SampleSale[]) => (isUse(o) ? copyUseStateOf(o, id, list).count + 1 : nextSampleSerial(o, id, list));
-      const req = sampleRequestOf({ title: post.title, offer: o, buyerId: buyer.id, serial: serialOf(readSampleSales()) });
-      setBusy(o.name);
+      const req = titled(sampleRequestOf({ title: post.title, offer: o, buyerId: buyer.id, serial: serialOf(readSampleSales()) }), title);
+      setBuying(key);
       try {
         const result = await request(req, {
           recheck: () => blockOf(readSampleSales()),
@@ -182,28 +211,63 @@ function ShopProvider({ post, id, children }: { post: InnovationPost; id: string
           });
         }
       } finally {
-        setBusy(null);
+        setBuying(null);
       }
     },
-    [busy, post.title, buyer.id, id, request],
+    [buying, post.title, buyer.id, id, request],
   );
 
-  const shop = React.useMemo<Shop>(
-    () => ({
+  const shop = React.useMemo<Shop>(() => {
+    const main = offers.find((o) => o.kind === "main") ?? null;
+    const holdersOf = (k: EditionKind) => (k === "physical" ? physical : virtual);
+    const choicesOf = (t: PickTab): ShopChoice[] => {
+      if (t === "main") return main ? [{ type: "main", key: "main", tab: "main", open: sampleBuyBlock(main, id, sales) === null, offer: main }] : [];
+      const uses: ShopChoice[] = copyUsesOf(market, t).map((o) => {
+        const why = copyUseBlockOf(o, id, sales);
+        return { type: "use", key: `use:${o.use}`, tab: t, open: why === null, offer: o, aside: why ? (copyUseStateOf(o, id, sales).locked ? "Not on sale" : "Sold out") : null };
+      });
+      const holders: ShopChoice[] = holdersOf(t).map((r) => ({ type: "holder", key: `holder:${r.id}`, tab: t, open: true, resale: r }));
+      return [...uses, ...holders];
+    };
+    const buyableChoice = (c: ShopChoice) => c.open && !(c.type === "holder" && c.resale.sellerId === buyer.id);
+    const tabs: PickTab[] = [...(main ? (["main"] as const) : []), ...KINDS.filter((k) => copyUsesOf(market, k).length > 0 || holdersOf(k).length > 0)];
+    const holding = sampleHoldingOf(id, buyer.id, sales);
+    const opening = openingTabOf({
+      tabs,
+      asked,
+      heldKinds: [...holding].reverse().map((s) => s.kind),
+      buyable: (t) => choicesOf(t).some(buyableChoice),
+    });
+    const tab = pickedTab && tabs.includes(pickedTab) ? pickedTab : opening;
+    const picked = tab ? pickedChoiceOf(choicesOf(tab), picks[tab] ?? null) : null;
+    const run = (c: ShopChoice) => {
+      if (c.type === "main") void buy(c.offer, c.key, buyTitleOf({ kind: "main", sharePct: null }));
+      else if (c.type === "use") void buy(c.offer, c.key, buyTitleOf({ kind: "use", copy: c.tab, use: c.offer.use }));
+      else if (c.resale.sellerId !== buyer.id) {
+        const f = holderFactsOf(c.resale, buyer.id, []);
+        void holderBuy.buy(c.resale, buyTitleOf({ kind: "holder", copy: c.tab, number: f.number, use: f.use, seller: f.seller }));
+      }
+    };
+    return {
       post,
       id,
       market,
       offers,
       sales,
       buyerId: buyer.id,
-      holding: sampleHoldingOf(id, buyer.id, sales),
-      busy,
-      buy: (o) => void buy(o),
-      fromHolders,
-      bought: setDone,
-    }),
-    [post, id, market, offers, sales, buyer.id, busy, buy, fromHolders],
-  );
+      holding,
+      tabs,
+      tab,
+      setTab: setPickedTab,
+      choicesOf,
+      picked,
+      pick: (c) => setPicks((m) => ({ ...m, [c.tab]: c.key })),
+      anyBuyable: tabs.some((t) => choicesOf(t).some(buyableChoice)),
+      busy: buying ?? (holderBuy.busyId ? `holder:${holderBuy.busyId}` : null),
+      run,
+    };
+  }, [post, id, market, offers, sales, buyer.id, physical, virtual, asked, pickedTab, picks, buy, buying, holderBuy]);
+
   return (
     <Ctx.Provider value={shop}>
       {children}
@@ -212,200 +276,185 @@ function ShopProvider({ post, id, children }: { post: InnovationPost; id: string
   );
 }
 
-/** Right under the title: what the active buyer holds, the Main NFT's buy box, then the copies. */
+/** Right under the title: what the active buyer holds, then the buy box. */
 export function SampleMarketSection() {
   const shop = useShop();
   if (!shop) return null;
-  const { id, offers, sales, buyerId } = shop;
-  const main = offers.find((o) => o.kind === "main") ?? null;
-  const mainState = main ? offerStateOf(main, id, sales) : null;
-  const mainSale = mainState?.soldTo ?? null;
-  const lastMain = mainSale
-    ? `Bought by ${buyerLabel(mainSale.buyerId)} · ${formatAmount(mainSale.price, mainSale.token)} · ${formatDate(mainSale.at)}`
-    : "No sales yet";
+  const { id, tabs, tab, setTab } = shop;
   return (
-    <section id={SECTION_ID} aria-labelledby="sv-market" className="flex flex-col gap-6 px-8 pb-8">
+    <section aria-labelledby="sv-market" className="flex flex-col gap-6 px-8 pb-8">
       <h2 id="sv-market" className="sr-only">
         Marketplace
       </h2>
       <YouOwnRow projectId={id} />
-      {main &&
-        (mainSale ? (
-          // The buyer's own whole project is in the row above (it opens as their project).
-          mainSale.buyerId === buyerId ? null : (
-            <ClosedCard title={`Sold on ${formatDate(mainSale.at)}.`} detail={`Sold for ${formatAmount(mainSale.price, mainSale.token)} · the whole project`} />
-          )
-        ) : (
-          <div className="flex flex-col gap-3">
-            <BuyBox
-              label="Main NFT, the whole project"
-              overline="Whole project · Main NFT"
-              price={formatAmount(main.price, main.token)}
-              facts={[
-                { label: "Listing", value: "Buy now" },
-                { label: "Share", value: "100%" },
-                { label: "Chain", value: networkLabelOf(SAMPLE_NETWORK) },
-              ]}
-              foot={
-                <>
-                  <IconLine icon={Wallet01Icon}>
-                    <WalletLine buyerId={buyerId} token={main.token} network={SAMPLE_NETWORK} verb="buy" />
-                  </IconLine>
-                  <IconLine icon={Activity01Icon}>
-                    <p className={T.meta}>
-                      <span className="sr-only">Main NFT activity: </span>
-                      {lastMain}
-                    </p>
-                  </IconLine>
-                  <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
-                </>
-              }
-            />
-            <p className={cn(T.caption, "text-text-tertiary")}>{SHARE_SALE_NOTE}</p>
+      {tab ? (
+        <div id={BUY_BOX_ID} className="flex scroll-mt-[56px] flex-col gap-6">
+          <PickTabs tabs={tabs} value={tab} onChange={setTab} idBase={BOX_TABS} />
+          <div {...(tabs.length > 1 ? tabPanelProps(BOX_TABS, tab) : {})} className="flex flex-col gap-6 outline-none">
+            {tab === "main" ? <MainPanel shop={shop} /> : <CopyPanel shop={shop} kind={tab} />}
           </div>
-        ))}
-      {/* With no buy box (no Main NFT, or it is sold), who is shopping is said on its own. */}
-      {(!main || mainSale) && <DemoShopBanner body={SAMPLE_BANNER_BODY} line />}
-      <SampleCopies />
+        </div>
+      ) : (
+        <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
+      )}
     </section>
   );
 }
 
-/** The whole project's copies: each kind with its Use rows, then From holders. */
-function SampleCopies() {
-  const shop = useShop();
-  if (!shop) return null;
-  const { market, sales } = shop;
-  const kinds = KINDS.filter((k) => copyUsesOf(market, k).length > 0);
-  if (!kinds.length) return null;
-  const locked = sales.some((s) => s.kind === "main");
+/** Main NFT: its box, or how it was sold. */
+function MainPanel({ shop }: { shop: Shop }) {
+  const { id, offers, sales, buyerId } = shop;
+  const main = offers.find((o) => o.kind === "main");
+  if (!main) return null;
+  const mainSale = offerStateOf(main, id, sales).soldTo ?? null;
+  if (mainSale) {
+    return (
+      <>
+        {mainSale.buyerId === buyerId ? (
+          <ClosedCard title="You own the Main NFT." detail="It opens from See what you own, above." />
+        ) : (
+          <ClosedCard title={`Sold on ${formatDate(mainSale.at)}.`} detail={`Sold for ${formatAmount(mainSale.price, mainSale.token)} · the whole project`} />
+        )}
+        <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
+      </>
+    );
+  }
   return (
-    <section aria-labelledby="sv-copies" className="flex flex-col gap-8">
-      <div className="flex flex-col gap-1">
-        <h3 id="sv-copies" className={T.section}>
-          Copies
-        </h3>
-        <p className={T.meta}>{locked ? LOCKED : "Of the whole project, each with its own NFT."}</p>
-      </div>
-      {kinds.map((kind) => (
-        <SampleKind key={kind} shop={shop} kind={kind} />
-      ))}
-    </section>
-  );
-}
-
-function SampleKind({ shop, kind }: { shop: Shop; kind: EditionKind }) {
-  const { market, post, id } = shop;
-  const headingId = `sv-copies-${kind}`;
-  return (
-    <div className="flex flex-col gap-4">
-      <KindHead id={headingId} kind={kind} name={post.title} />
-      <ul aria-labelledby={headingId} className={cn(LIST_CARD, LIST_DIVIDERS)}>
-        {copyUsesOf(market, kind).map((o) => (
-          <SampleUseRow key={o.use} shop={shop} offer={o} kind={kind} />
-        ))}
-      </ul>
-      <HolderOffers projectId={id} kind={kind} product={null} onBought={shop.bought} />
+    <div className="flex flex-col gap-3">
+      <BuyBox
+        label="Main NFT, the whole project"
+        overline="Whole project · Main NFT"
+        price={formatAmount(main.price, main.token)}
+        facts={[
+          { label: "Listing", value: "Buy now" },
+          { label: "Share", value: "100%" },
+          { label: "Chain", value: networkLabelOf(SAMPLE_NETWORK) },
+        ]}
+        foot={
+          <>
+            <IconLine icon={Wallet01Icon}>
+              <WalletLine buyerId={buyerId} token={main.token} network={SAMPLE_NETWORK} verb="buy" />
+            </IconLine>
+            <IconLine icon={Activity01Icon}>
+              <p className={T.meta}>
+                <span className="sr-only">Main NFT activity: </span>
+                No sales yet
+              </p>
+            </IconLine>
+            <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
+          </>
+        }
+      />
+      <p className={cn(T.caption, "text-text-tertiary")}>{SHARE_SALE_NOTE}</p>
     </div>
   );
 }
 
-/** One use of one kind: its price, how many are sold (and held by this buyer now), its last sale, and Buy. */
-function SampleUseRow({ shop, offer, kind }: { shop: Shop; offer: UseOffer; kind: EditionKind }) {
-  const { id, sales, buyerId, busy, buy, post } = shop;
+/** A copy kind: what it gets you, its Use choices, other holders' copies, then who is paying. */
+function CopyPanel({ shop, kind }: { shop: Shop; kind: EditionKind }) {
+  const { post, sales, buyerId, picked, pick, choicesOf } = shop;
+  const choices = choicesOf(kind);
+  const uses = choices.filter((c): c is Extract<ShopChoice, { type: "use" }> => c.type === "use");
+  const holders = choices.filter((c): c is Extract<ShopChoice, { type: "holder" }> => c.type === "holder");
+  const locked = sales.some((s) => s.kind === "main");
+  const token = picked?.type === "use" ? picked.offer.token : picked?.type === "holder" ? picked.resale.token : (uses[0]?.offer.token ?? "ETH");
+  const name = `sv-pick-${kind}`;
+  return (
+    <>
+      <KindHead id={`sv-copies-${kind}`} kind={kind} name={post.title} />
+      <p className={T.meta}>{locked ? LOCKED : "Of the whole project, each with its own NFT."}</p>
+      {uses.length > 0 && (
+        <ChoiceGroup label="Use">
+          {uses.map((c) => (
+            <UseChoice key={c.key} shop={shop} choice={c} name={name} checked={picked?.key === c.key} onSelect={() => pick(c)} />
+          ))}
+        </ChoiceGroup>
+      )}
+      {holders.length > 0 && (
+        <ChoiceGroup
+          label={`From holders · ${holders.length}`}
+          note={`Copies others bought and sell on. You get the copy, its licence${kind === "physical" ? " and its units left" : ""}; the creator still gets a royalty.`}
+        >
+          {holders.map((c) => (
+            <HolderChoice key={c.key} resale={c.resale} buyerId={buyerId} name={name} checked={picked?.key === c.key} onSelect={() => pick(c)} />
+          ))}
+        </ChoiceGroup>
+      )}
+      <IconLine icon={Wallet01Icon}>
+        <WalletLine buyerId={buyerId} token={token} network={SAMPLE_NETWORK} verb="buy" />
+      </IconLine>
+      <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
+    </>
+  );
+}
+
+/** One use of one kind: its price, how many are sold (and held by this buyer now), its last sale. */
+function UseChoice({ shop, choice, name, checked, onSelect }: { shop: Shop; choice: Extract<ShopChoice, { type: "use" }>; name: string; checked: boolean; onSelect: () => void }) {
+  const { id, sales, buyerId, post } = shop;
   const resales = useResales();
+  const offer = choice.offer;
   const state = copyUseStateOf(offer, id, sales);
-  const why = copyUseBlockOf(offer, id, sales);
-  const price = formatAmount(offer.price, offer.token);
   // Held now: a copy sold on is its new holder's (resales.ts).
   const owned = state.sales.filter((s) => holderOf(sampleSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length;
-  const sold = state.of !== null ? `${state.count} of ${state.of} sold` : state.count ? `${state.count} sold` : null;
+  const sold = state.of !== null ? (state.count >= state.of ? `All ${state.of} sold` : `${state.count} of ${state.of} sold`) : state.count ? `${state.count} sold` : null;
   const line = [sold, owned > 0 ? `you own ${owned}` : null].filter(Boolean).join(" · ");
   const last = state.sales.at(-1) ?? null;
   return (
-    <li className="flex items-center gap-6 px-8 py-6">
-      <KindMark kind={kind} />
-      <div className={cn("flex min-w-0 flex-1 flex-col gap-1", why && "opacity-60")}>
-        <span className={cn(T.rowTitle, "break-words")}>{offer.name}</span>
-        <span className={cn(T.meta, "tabular-nums text-text-primary")}>{price}</span>
-        {state.of !== null ? <SoldBar share={state.of ? Math.round((state.count / state.of) * 100) : 0} line={line} /> : line && <span className={cn(T.caption, "tabular-nums")}>{line}</span>}
-        <span className={T.caption}>
-          {last ? `Bought by ${buyerLabel(last.buyerId)} · ${formatAmount(last.price, last.token)} · ${formatDate(last.at)}` : `No activity yet · listed ${formatDate(post.sharedAt)}`}
-        </span>
-      </div>
-      {why ? (
-        <span className={cn(T.meta, "shrink-0 opacity-60")}>{state.locked ? "Not for sale" : "Sold out"}</span>
-      ) : (
-        <Button
-          hierarchy="secondary"
-          size="md"
-          className={cn(HIT44, "shrink-0")}
-          data-copy-buy=""
-          aria-label={`Buy ${offer.name} for ${price}`}
-          aria-disabled={busy !== null || undefined}
-          loading={busy === offer.name}
-          onClick={() => {
-            if (busy === null) buy(offer);
-          }}
-        >
-          Buy
-        </Button>
-      )}
-    </li>
+    <Choice
+      name={name}
+      checked={checked && choice.open}
+      disabled={!choice.open}
+      onSelect={onSelect}
+      title={offer.use}
+      price={formatAmount(offer.price, offer.token)}
+      aside={choice.aside ?? undefined}
+    >
+      {state.of !== null ? <SoldBar share={state.of ? Math.round((state.count / state.of) * 100) : 0} line={line} /> : line && <span className={cn(T.caption, "tabular-nums")}>{line}</span>}
+      <span className={T.caption}>
+        {last ? `Bought by ${buyerLabel(last.buyerId)} · ${formatAmount(last.price, last.token)} · ${formatDate(last.at)}` : `No activity yet · listed ${formatDate(post.sharedAt)}`}
+      </span>
+    </Choice>
   );
 }
 
-/** The bottom bar: Buy now (the Main NFT, else the copies — the creator's or a holder's) beside Ask the
- *  creator — Get creator support once the active buyer bought any of it. With nothing left to buy, the
- *  way to the creator is the bar's one button. */
+/** What the bar says the pick is, and its one primary (buy-pick.tsx). */
+function barOf(shop: Shop, log: Parameters<typeof holderFactsOf>[2]): { pick: BarPick; action: BarAction; reason: string | null } | null {
+  const c = shop.picked;
+  if (!c) return null;
+  const busy = shop.busy === c.key;
+  const off = (why: string) => ({ kind: "button" as const, label: "Buy now", run: () => {}, disabled: true, why });
+  if (c.type === "main") {
+    const price = formatAmount(c.offer.price, c.offer.token);
+    const action = c.open ? { kind: "button" as const, label: "Buy now", busy, run: () => shop.run(c) } : off("The Main NFT is sold.");
+    return { pick: { title: MAIN_PICK_TITLE, line: mainBarLine(price, null) }, action, reason: "why" in action ? action.why : null };
+  }
+  if (c.type === "use") {
+    const price = formatAmount(c.offer.price, c.offer.token);
+    const units = c.tab === "physical" ? unitsAllowanceOf(c.offer.use as UnitsUse) : null;
+    const action = c.open ? { kind: "button" as const, label: "Buy now", busy, run: () => shop.run(c) } : off(c.aside === "Not on sale" ? LOCKED : "This use is sold out. Pick another, or a holder's copy.");
+    return { pick: { title: copyPickTitle(c.tab, c.offer.use), line: copyBarLine(price, c.tab, units) }, action, reason: "why" in action ? action.why : null };
+  }
+  const f = holderFactsOf(c.resale, shop.buyerId, log);
+  const pick = { title: holderPickTitle(c.tab, f.number, f.use), line: `${f.price} · ${f.line}` };
+  if (f.mine) return { pick, action: { kind: "link", label: "Manage", href: f.manageHref }, reason: null };
+  return { pick, action: { kind: "button", label: "Buy now", busy, run: () => shop.run(c) }, reason: null };
+}
+
+/** The bottom bar: what is picked and its price, Ask the creator (Get creator support once the active buyer
+ *  bought any of it) and the one Buy now. With nothing left to buy, Ask the creator alone. */
 export function SampleShopBar({ ask }: { ask: string }) {
   const shop = useShop();
-  if (!shop) {
-    return (
-      <BottomBar className="pt-8">
-        <Link href={ask} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full")}>
-          <Icon icon={BubbleChatIcon} size={20} />
-          Ask the creator
-        </Link>
-      </BottomBar>
-    );
-  }
-  const { market, offers, id, sales, holding, busy, buy, fromHolders } = shop;
-  const main = offers.find((o) => o.kind === "main" && sampleBuyBlock(o, id, sales) === null) ?? null;
-  const copy = KINDS.some((k) => copyUsesOf(market, k).some((o) => copyUseBlockOf(o, id, sales) === null)) || fromHolders > 0;
-  const primary = main || copy;
-  return (
-    <BottomBar className={cn("pt-8", holding.length && primary ? "gap-4" : "flex-row gap-6")}>
-      {primary && (
-        <Button
-          size="xl"
-          className="min-w-0 flex-1"
-          iconLeading={<Icon icon={Coins01Icon} size={20} />}
-          aria-disabled={busy !== null || undefined}
-          onClick={() => {
-            if (busy !== null) return;
-            if (main) return buy(main);
-            const el = document.getElementById(SECTION_ID)?.querySelector<HTMLButtonElement>("[data-copy-buy]");
-            if (!el) return;
-            scrollWithin(el, "nearest", "smooth");
-            el.focus({ preventScroll: true });
-          }}
-        >
-          Buy now
-        </Button>
-      )}
-      <Link href={ask} className={cn(buttonVariants({ hierarchy: primary ? "secondary" : "primary", size: "xl" }), "min-w-0 flex-1")}>
-        <Icon icon={BubbleChatIcon} size={20} />
-        {holding.length ? "Get creator support" : "Ask the creator"}
-      </Link>
-    </BottomBar>
-  );
+  const log = useUnitsLog();
+  const askLink = { href: ask, label: shop?.holding.length ? "Get creator support" : "Ask the creator" };
+  const bar = shop && shop.anyBuyable ? barOf(shop, log) : null;
+  if (!bar) return <PickBar ask={askLink} pick={null} action={null} />;
+  return <PickBar ask={askLink} pick={bar.pick} action={bar.action} reason={bar.reason} onChange={() => revealBuyBox()} />;
 }
 
 /** A sample product's bottom bar: its copies are the whole project's, sold on the project's screen
- *  (CL-018: a product with no copies of its own sells none; "Part of {project}" leads to the project's
- *  offers). What they start at — the creator's open uses and other holders' listings — and Buy a copy,
- *  which opens them there; "All copies are sold." once none is left. No copies: no bar. */
+ *  (CL-018: a product with no copies of its own sells none). What they start at — the creator's open uses
+ *  and other holders' listings — and Buy a copy, which opens the project's buy box on them (?nft=); "All
+ *  copies are sold." once none is left. No copies: no bar. */
 export function SampleCopiesBar({ post, id }: { post: InnovationPost; id: string }) {
   const all = useSampleSales();
   const { buyer } = useActiveBuyer();
@@ -414,9 +463,13 @@ export function SampleCopiesBar({ post, id }: { post: InnovationPost; id: string
   const market = React.useMemo<SampleMarket>(() => ({ feedId: id, post, offers: sampleOffersOf(post) }), [id, post]);
   const uses = KINDS.flatMap((k) => copyUsesOf(market, k));
   if (!post.listing || !uses.length) return null;
-  const open = uses.filter((o) => copyUseBlockOf(o, id, all) === null).map((o) => ({ amount: o.price, token: o.token }));
-  const holders = [...physical, ...virtual].filter((r) => r.sellerId !== buyer.id).map((r) => ({ amount: r.price, token: r.token }));
+  const openUses = uses.filter((o) => copyUseBlockOf(o, id, all) === null);
+  const others = [...physical, ...virtual].filter((r) => r.sellerId !== buyer.id);
+  const open = openUses.map((o) => ({ amount: o.price, token: o.token }));
+  const holders = others.map((r) => ({ amount: r.price, token: r.token }));
   const from = lowestOf([...open, ...holders]) ?? lowestOf(uses.map((o) => ({ amount: o.price, token: o.token })));
+  // The kind it opens on: the first with something to buy, Physical first.
+  const kind = KINDS.find((k) => openUses.some((o) => o.kind === k) || others.some((r) => r.kind === k)) ?? "physical";
   return (
     <BottomBar className="pt-6">
       <div className="flex items-center gap-6">
@@ -425,7 +478,7 @@ export function SampleCopiesBar({ post, id }: { post: InnovationPost; id: string
           {from && <span className={cn(T.section, "tabular-nums")}>{formatAmount(from.amount, from.token)}</span>}
         </span>
         {open.length || holders.length ? (
-          <Link href={`/m/projects/${encodeURIComponent(id)}?tab=marketplace`} className={cn(buttonVariants({ size: "xl" }), "min-w-0 flex-1")}>
+          <Link href={`/m/projects/${encodeURIComponent(id)}?nft=${kind}`} className={cn(buttonVariants({ size: "xl" }), "min-w-0 flex-1")}>
             Buy a copy
           </Link>
         ) : (

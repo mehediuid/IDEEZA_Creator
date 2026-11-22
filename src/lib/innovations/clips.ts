@@ -340,11 +340,15 @@ export function clipDetailsHref(c: Pick<FeedClip, "projectId" | "productId">): s
 /** Where an offer's button goes: the marketplace of the project or product (buying has one home).
  *  A project you shared has its own marketplace page (the buyer's view of your listing); a product's
  *  own copies sell only on that product's market view (CL-018 scope). A sample's copies are the
- *  whole project's, so a sample product's clip buys on its project's marketplace. */
-export function clipBuyHref(c: Pick<FeedClip, "projectId" | "productId"> & { source?: FeedClip["source"] }): string {
+ *  whole project's, so a sample product's clip buys on its project's marketplace. The page's buy box
+ *  opens on the kind the clip's pill shows first (`?nft=`, owner 2026-11-22: what the buyer saw is
+ *  what is picked). */
+export function clipBuyHref(c: Pick<FeedClip, "projectId" | "productId"> & { source?: FeedClip["source"]; offers?: readonly Pick<ClipOffer, "kind">[] }): string {
   const project = `/m/projects/${encodeURIComponent(c.projectId)}`;
-  if (c.source === "mine") return c.productId ? `${clipDetailsHref(c)}?view=market` : `${project}/market`;
-  return `${project}?tab=marketplace`;
+  const kind = c.offers?.[0]?.kind ?? null;
+  const nft = kind ? `nft=${kind}` : null;
+  if (c.source === "mine") return c.productId ? `${clipDetailsHref(c)}?view=market` : `${project}/market${nft ? `?${nft}` : ""}`;
+  return `${project}?tab=marketplace${nft ? `&${nft}` : ""}`;
 }
 
 /** The address of one clip on its own (Copy link, Saved › View original post). */

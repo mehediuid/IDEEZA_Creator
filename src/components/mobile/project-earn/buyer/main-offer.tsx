@@ -6,17 +6,20 @@
 // `usePlaceBid` sign through the phone's wallet sheet (PhoneWalletScope), the
 // `can()` answers come from `view.canCtx`, the auction asks again at its own
 // clock (`useAuctionClock`).
+// It is the Main NFT tab of the screen's buy box (buy-pick.tsx, owner
+// 2026-11-22 "Yes, build A"): the bar says "Main NFT" and its price before its
+// one primary.
 // · A holder reads their receipt first (18e: what they own, Token · Paid ·
-//   Purchased, All details closed), then "Buy another share" when the creator
-//   has another share on sale.
+//   Purchased, All details closed), above the box, then "Buy another share"
+//   when the creator has another share on sale.
 // · Buy now (18b): a buy box (owner 2026-11-12: the page read as a
 //   spreadsheet) — what is sold, the price large, the facts three to a row,
 //   the wallet line, the activity line and the Testnet demo line; the
 //   share-sale note under it. The button is the bottom bar's.
 // · An auction (18f): the same box with the top (or starting) bid, its time
 //   left, Bid history (n), who leads, Your bid (the bar's Place bid submits
-//   it), Buy now with X (greyed, with "Someone is buying this now…", while
-//   another checkout holds it — CL-016). Outbid (18j), won (18k) and lost
+//   it; the bar's line is `auctionBarLineOf`), Buy now with X (greyed, with
+//   "Someone is buying this now…", while another checkout holds it — CL-016). Outbid (18j), won (18k) and lost
 //   (18l) each lead with a banner; once ended, the web's sentence replaces the
 //   field.
 // · Paused, removed, closed with no bids and sold each say so.
@@ -169,6 +172,14 @@ export function StandingBanner({ standing, listing, state, bids, buyerId }: { st
     );
   }
   return null;
+}
+
+/** The buy box bar's second line for an auction, in the box's own words: the top (or starting) bid and
+ *  the time left; once it ends, how it ended for this buyer (StandingBanner's titles). */
+export function auctionBarLineOf(listing: Listing, state: AuctionState, standing: BidStanding): string {
+  const price = formatAmount(state.top?.amount ?? listing.minBid ?? "0", listing.token);
+  if (state.phase !== "ended") return `${price} · ${state.top ? "Top bid" : "Starting bid"} · ${timeLeftLabel(state.msLeft)}`;
+  return `${price} · ${standing === "won" ? "You won the auction" : "The auction ended"}`;
 }
 
 /** 18f: the auction box. `buyerId` null in a preview, which reads it and never bids. `foot`: the
