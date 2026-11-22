@@ -3,7 +3,8 @@
 // The AI tab's first screen (Full AI flow 01–04, Voice prompt 01–04 and 07):
 // the hero over the AI wash (one line, the pieces as chips), "Start from an
 // idea" with Shuffle as two-line chips right above the composer, and the
-// Prompt Box pinned at the foot with the credits line under it; out of
+// Prompt Box pinned at the foot, with no credits line under it (owner 2026-11-22:
+// the web's Home box says no price; a concept's cost shows where it is drawn); out of
 // credits, one slim state row sits above the box: "You're out of credits.
 // They refill on 8 Dec.", Buy credits (the sheet, Starter picked) and the next
 // plan's line (CL-032). Typing hides the ideas so the box can grow (02–04).
@@ -25,7 +26,6 @@ import { Button } from "@/components/ideeza/button";
 import { Tag } from "@/components/ideeza/tag";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { ITEM_KINDS, ITEM_LABELS, useCreateHistory } from "@/lib/create/history";
-import { creditsLabel } from "@/lib/create/pieces";
 import type { PromptImage } from "@/components/dashboard/prompt-card";
 import { IDEAS, IDEAS_SHOWN, ideasAt } from "@/lib/mobile-ai/flow";
 import { Screen } from "../screen";
@@ -35,7 +35,6 @@ import { OutOfCreditsRow } from "../plans/upsell";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { BuyCreditsSheet } from "./buy-credits-sheet";
-import { CreditsFoot } from "./parts";
 import { PromptBox } from "./prompt-box";
 import { QualityPicker, useLastQuality } from "./quality";
 
@@ -92,7 +91,7 @@ export function AiStart() {
       <Screen
         top={<TopBar actions={[{ icon: MORE_ICON, label: "More", onClick: () => setMenu(true) }]} />}
         footer={
-          <div className="pt-4">
+          <div className="pb-5 pt-4">
             {/* Out of credits: one slim state row above the composer with its one action and the next
                 plan up (CL-032; owner rule: never a warning hung under the form). The box still takes a
                 draft; Generate stays held. */}
@@ -108,7 +107,6 @@ export function AiStart() {
               takesImage
               extra={<QualityPicker value={quality} onChange={setQuality} />}
             />
-            <CreditsFoot right={`${creditsLabel(CONCEPT_COST)} per concept`} />
           </div>
         }
       >
