@@ -14,7 +14,10 @@
 //   (Edit post, Stop sharing; Share again once it isn't shared) and the rail
 //   offers Share alone. Share is one menu — Copy link, Facebook, LinkedIn, X
 //   and WhatsApp (owner, 2026-11-15) — in the rail's actions and the phone's
-//   bar; the ⋯ menu keeps Report post for a visitor.
+//   bar; the ⋯ menu keeps Report post for a visitor. On someone else's post
+//   whose project is live on the Marketplace, Share to Innovations leads that
+//   menu (owner, 2026-11-22): your words over the original project
+//   (shares/share-item-dialog.tsx).
 // - Below a 1024 px page container it is one column, each rail block placed
 //   where it reads in the flow (the maker under the title; Marketplace and
 //   About before the comments; More from at the end), so the Tab order is the
@@ -36,7 +39,7 @@ import { LiveRegion, usePageArrival } from "@/components/projects/details/arriva
 import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-store";
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
 import { shareIntentUrl } from "@/lib/innovations/share-links";
-import { postHref, postProductHref } from "@/lib/innovations/slug";
+import { postHref, postIdOfSample, postProductHref } from "@/lib/innovations/slug";
 import type { InnovationPost } from "@/lib/innovations/types";
 import { sampleJourneyOf, sampleStatusOf } from "@/lib/innovations/sample-activity";
 import { historyOf, labelOf, shortOf, type JourneyEntry } from "@/lib/manual/journey";
@@ -45,6 +48,8 @@ import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
+import { ShareItemDialog } from "@/components/shares/share-item-dialog";
+import { useShareItems } from "@/components/shares/use-share-items";
 import { PostComments } from "./comments/post-comments";
 import {
   ImageGone,
@@ -114,6 +119,12 @@ function PostBody({
   const copyLink = useCopyLink(postHref(post.slug));
   const { titleRef, live } = usePageArrival(post.id, post.title, `${post.title} · Innovations · IDEEZA`);
   const { ref: railRef, top: railTop } = useStickyTop(24);
+  // Share to Innovations: a sample creator's post (its item id is the feed id, "sample:p12" → "p12")
+  // while its project is on the Marketplace. The maker's own post never offers it.
+  const { liveOf } = useShareItems();
+  const [sharing, setSharing] = React.useState(false);
+  const feedId = post.source === "sample" && post.id.startsWith(postIdOfSample("")) ? post.id.slice(postIdOfSample("").length) : null;
+  const reshare = !owner && feedId !== null && liveOf(feedId) ? feedId : null;
 
   const actions: PostActions = {
     toggleAppreciate: () => {
@@ -128,6 +139,7 @@ function PostBody({
       const url = new URL(postHref(post.slug), window.location.origin).toString();
       window.open(shareIntentUrl(network, url, post.title), "_blank", "noopener,noreferrer");
     },
+    shareToInnovations: reshare ? () => setSharing(true) : undefined,
   };
 
   // A visitor's view, once per post, once this browser's reactions are read. The maker's own isn't one.
@@ -227,6 +239,7 @@ function PostBody({
       </div>
 
       <PostActionBar owner={owner} counts={counts} actions={actions} />
+      {reshare && <ShareItemDialog itemId={reshare} open={sharing} onClose={() => setSharing(false)} />}
       <LiveRegion text={live} />
     </div>
   );

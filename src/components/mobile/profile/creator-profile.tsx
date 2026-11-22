@@ -50,7 +50,7 @@ import {
 import { deleteCover, putCover, useMyCover, useMyPhoto } from "@/lib/people/photo-store";
 import { featuredOf, localTimeOf } from "@/lib/people/portfolio";
 import { useMyProfile } from "@/lib/people/profile-store";
-import { withoutShares } from "@/lib/innovations/feed-prefs";
+import { withoutShare } from "@/lib/innovations/feed-prefs";
 import type { TimelinePost } from "@/lib/people/timeline";
 import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
@@ -395,10 +395,10 @@ function OwnProfile({
 
   // ⋯ › Remove from your Feed on a share of yours, as the Feed's own ⋯ does it (with Undo).
   const removeShare = (post: TimelinePost) => {
-    if (!post.clipId) return;
-    const clipId = post.clipId;
+    if (!post.shareId) return;
+    const shareId = post.shareId;
     const before = feedPrefs.prefs.shares;
-    if (!feedPrefs.update((p) => withoutShares(p, clipId))) {
+    if (!feedPrefs.update((p) => withoutShare(p, shareId))) {
       toast({ title: WRITE_FAILED, lead: "error" });
       return;
     }
@@ -532,7 +532,9 @@ function OwnProfile({
         items={
           postFor
             ? [
-                { label: postFor.kind === "product" ? "Open product" : "Open project", icon: postFor.kind === "product" ? PackageIcon : Folder01Icon, onSelect: () => router.push(postFor.detailsHref) },
+                ...(postFor.gone
+                  ? []
+                  : [{ label: postFor.kind === "product" ? "Open product" : "Open project", icon: postFor.kind === "product" ? PackageIcon : Folder01Icon, onSelect: () => router.push(postFor.detailsHref) }]),
                 { label: "Remove from your Feed", icon: Delete02Icon, destructive: true, onSelect: () => removeShare(postFor) },
               ]
             : []

@@ -1,8 +1,10 @@
 "use client";
 
 // Every clip the phone can play: the Feed's samples (lib/innovations/clips.ts)
-// and the projects you shared ("Share to Feed", `showcasedAt`), as the web
-// lists them under "Shared by you". A project of yours is read from the stores
+// and your own projects on the marketplace: one is on the Feed once it is
+// listed (owner 2026-11-22: "an item comes to the Feed when it is listed;
+// sharing doesn't put it there"), shared ("Share to Feed", `showcasedAt`, its
+// story on the clip) or not. A project of yours is read from the stores
 // its own page reads — the video in use (the project video, else a product's),
 // the cover, the current Activity, the mint, the live Main listing (Buy now or
 // auction, with its bids) and the listed copies — so its clip never disagrees
@@ -72,6 +74,13 @@ function mainOfferOf(projectId: string, market: MarketData, now: number): ClipOf
   return { kind: "main", price: formatAmount(main.price ?? "0", main.token), use: null, sold: null, sharePct: main.percentSelling };
 }
 
+/** When a project went on sale: its live Main listing's date, else the newest live copy's. */
+function listedAtOf(projectId: string, market: MarketData, tracks: readonly EditionTrack[]): number | null {
+  const main = market.listings.filter((l) => l.projectId === projectId && l.slot === "main" && l.status === "live").reduce<number | null>((at, l) => Math.max(at ?? 0, l.listedAt), null);
+  if (main !== null) return main;
+  return tracks.reduce<number | null>((at, t) => (t.listing ? Math.max(at ?? 0, t.listing.listedAt) : at), null);
+}
+
 function copyOfferOf(t: EditionTrack, market: MarketData): ClipOffer | null {
   if (!t.listing) return null;
   return {
@@ -82,7 +91,7 @@ function copyOfferOf(t: EditionTrack, market: MarketData): ClipOffer | null {
   };
 }
 
-/** The projects you shared, as clips, newest first. */
+/** Your projects on the marketplace, as clips, newest first (shared or listed). */
 export function useMineClips(): { hydrated: boolean; clips: FeedClip[] } {
   const { hydrated: projectsReady, projects } = useManualProjects();
   const { hydrated: buildsReady, builds } = useCreateHistory();
@@ -90,10 +99,8 @@ export function useMineClips(): { hydrated: boolean; clips: FeedClip[] } {
   const me = useMe();
   const now = useMinuteClock();
 
-  const shared = React.useMemo(
-    () => projects.filter((p) => typeof p.showcasedAt === "number").sort((a, b) => (b.showcasedAt ?? 0) - (a.showcasedAt ?? 0)),
-    [projects],
-  );
+  // Every minted project: one with nothing on sale makes no clip (the filter below); a listing needs the mint.
+  const shared = React.useMemo(() => projects.filter((p) => !!p.mint), [projects]);
   const ids = React.useMemo(() => shared.map((p) => p.id), [shared]);
   const editions = useProjectsEditions(ids);
   const journeys = useRawPerProject(ids, JOURNEY_KEY);
@@ -146,7 +153,8 @@ export function useMineClips(): { hydrated: boolean; clips: FeedClip[] } {
         title,
         description: p.post?.story.trim() || p.description.trim(),
         creator,
-        sharedAt: p.showcasedAt as number,
+        // Shared: when; else when it went on sale (the newest live listing or copy).
+        sharedAt: typeof p.showcasedAt === "number" ? p.showcasedAt : (listedAtOf(p.id, market, tracks) ?? p.createdAt),
         cover: coverOf(p, refs),
         // Others has no place on the stage line (the web's post shows none).
         stage: current && current.type !== "others" ? labelOf(current) : null,
@@ -155,7 +163,7 @@ export function useMineClips(): { hydrated: boolean; clips: FeedClip[] } {
         offers: [...(main ? [main] : []), ...copies],
         productOffers,
       }).filter(onMarketplace);
-    });
+    }).sort((a, b) => b.sharedAt - a.sharedAt);
   }, [hydrated, journeys, videos, shared, builds, editions.record, market, me.name, me.initials, now]);
 
   return { hydrated, clips };

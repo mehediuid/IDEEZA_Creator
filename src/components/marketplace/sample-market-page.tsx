@@ -13,7 +13,9 @@
 // - the story and the conversation stay on the post: "On Innovations" says
 //   how many and links there, never a copy.
 // The prototype-only Testnet demo banner with Shopping as sits under the
-// breadcrumb, as on every marketplace page.
+// breadcrumb, as on every marketplace page. Share sits beside the title
+// (owner, 2026-11-22): Share to Innovations while the sample is on the
+// Marketplace, then Copy link and the networks (shares/share-button.tsx).
 
 import * as React from "react";
 import Link from "next/link";
@@ -24,6 +26,8 @@ import { PersonName } from "@/components/profile/person-name";
 import { LiveRegion, usePageArrival } from "@/components/projects/details/arrival";
 import { Breadcrumb } from "@/components/projects/details/breadcrumb";
 import { CARD, partsLabel, productsLabel } from "@/components/innovations/post-bits";
+import { PostToastProvider } from "@/components/innovations/toast";
+import { MarketShareButton } from "@/components/shares/share-button";
 import { PostMediaStage } from "@/components/innovations/post-media";
 import { WhatsInside } from "@/components/innovations/post-page";
 import { MakerBlock } from "@/components/innovations/post-rail";
@@ -41,6 +45,15 @@ import type { OfferTab } from "./offer-parts";
 import { SampleOfferBox } from "./sample-offer-box";
 
 export function SampleMarketPage({ market, initialTab = null }: { market: SampleMarket; initialTab?: OfferTab | null }) {
+  // The toast (Link copied, Shared to Innovations) sits outside the page container, so it is the window's.
+  return (
+    <PostToastProvider>
+      <SampleMarketBody market={market} initialTab={initialTab} />
+    </PostToastProvider>
+  );
+}
+
+function SampleMarketBody({ market, initialTab }: { market: SampleMarket; initialTab: OfferTab | null }) {
   const { post } = market;
   const { titleRef, live, announce } = usePageArrival(`market:${market.feedId}`, post.title, marketDocTitle(post.title));
   const meta = [post.category, productsLabel(post.products.length), post.partsCount > 0 ? partsLabel(post.partsCount) : null].filter(Boolean).join(" · ");
@@ -69,6 +82,7 @@ export function SampleMarketPage({ market, initialTab = null }: { market: Sample
                     Minted
                   </Badge>
                 )}
+                <MarketShareButton itemId={market.feedId} title={post.title} className="ml-auto" />
               </div>
               <p className="m-0 text-md leading-md text-text-secondary">
                 Created by{" "}

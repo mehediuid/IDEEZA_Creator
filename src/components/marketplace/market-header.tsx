@@ -15,13 +15,25 @@
 //   refuses the demo buyer every owner control, so the pair, the pencil and
 //   Preview as buyer are absent, not disabled (PPL-6).
 // The way back to the owner's own page is the Testnet demo banner's.
+// Share sits at the end of the title row (owner, 2026-11-22): this is your
+// own project, so it holds Copy link and the networks only — Share to
+// Innovations for it is the project page's ⋯ (shares/share-button.tsx).
 
 import * as React from "react";
 import { PostMediaStage } from "@/components/innovations/post-media";
 import { ProjectHeader } from "@/components/projects/details/header";
-import type { HeaderSlotProps } from "@/components/projects/details/slots";
+import type { HeaderSlotProps, SlotProps } from "@/components/projects/details/slots";
+import { MarketShareButton } from "@/components/shares/share-button";
 import { minePostOf } from "@/lib/innovations/mine-post";
+import { shareItemId } from "@/lib/innovations/share-items";
 import { useCreatorName } from "./use-creator-name";
+
+/** The title row's Share, pushed to the row's end. */
+function MarketShare({ project }: SlotProps) {
+  return <MarketShareButton itemId={shareItemId("mine", project.id)} title={project.name.trim() || "Untitled project"} className="ml-auto" />;
+}
+
+const PARTS = { titleRow: [MarketShare] };
 
 export function MarketHeader(props: HeaderSlotProps) {
   const { project, view, brief } = props;
@@ -31,7 +43,7 @@ export function MarketHeader(props: HeaderSlotProps) {
   return (
     <div className="flex flex-col gap-10">
       <PostMediaStage post={post} mine={mine} />
-      <ProjectHeader {...props} context="market" creatorName={creator} />
+      <ProjectHeader {...props} context="market" creatorName={creator} parts={PARTS} />
     </div>
   );
 }

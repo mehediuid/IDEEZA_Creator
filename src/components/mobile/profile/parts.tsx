@@ -301,7 +301,8 @@ export function ReactionRow({
 }: {
   postId: string;
   base: { appreciations: number; views: number };
-  commentsHref: string;
+  /** Where Comments opens; null for a post with no thread of its own (a share: Appreciate and Save). */
+  commentsHref: string | null;
   onMore?: () => void;
   moreLabel?: string;
 }) {
@@ -327,21 +328,25 @@ export function ReactionRow({
         }}
       />
       <span className={cn(T.meta, "tabular-nums")}>{compactCount(counts.appreciations)}</span>
-      <Link
-        href={commentsHref}
-        aria-label={`Comments${comments !== null ? `, ${comments}` : ""}`}
-        className={cn("ml-2 inline-flex size-[44px] items-center justify-center rounded-xl text-[color:var(--color-icon-default)] hover:bg-bg-subtle", FOCUS)}
-      >
-        <Icon icon={Comment01Icon} size={22} />
-      </Link>
-      <span className={cn(T.meta, "tabular-nums")}>{comments === null ? "" : compactCount(comments)}</span>
-      <span className={cn(T.meta, "flex items-center gap-2 px-6 tabular-nums")}>
-        <span className="text-[color:var(--color-icon-default)]">
-          <Icon icon={ViewIcon} size={16} />
-        </span>
-        <span className="sr-only">Views</span>
-        {compactCount(counts.views)}
-      </span>
+      {commentsHref !== null && (
+        <>
+          <Link
+            href={commentsHref}
+            aria-label={`Comments${comments !== null ? `, ${comments}` : ""}`}
+            className={cn("ml-2 inline-flex size-[44px] items-center justify-center rounded-xl text-[color:var(--color-icon-default)] hover:bg-bg-subtle", FOCUS)}
+          >
+            <Icon icon={Comment01Icon} size={22} />
+          </Link>
+          <span className={cn(T.meta, "tabular-nums")}>{comments === null ? "" : compactCount(comments)}</span>
+          <span className={cn(T.meta, "flex items-center gap-2 px-6 tabular-nums")}>
+            <span className="text-[color:var(--color-icon-default)]">
+              <Icon icon={ViewIcon} size={16} />
+            </span>
+            <span className="sr-only">Views</span>
+            {compactCount(counts.views)}
+          </span>
+        </>
+      )}
       <span className="flex-1" />
       {onMore && <IconButton hierarchy="ghost" size="xl" aria-label={moreLabel ?? "More actions"} icon={<Icon icon={MoreHorizontalIcon} size={22} />} onClick={onMore} />}
       <IconButton

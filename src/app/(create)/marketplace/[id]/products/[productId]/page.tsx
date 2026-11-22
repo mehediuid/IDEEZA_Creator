@@ -3,9 +3,11 @@
 // project page's product page in its "market" context — the Explore
 // marketplace breadcrumb, `/marketplace` links, and the firmware and
 // downloads only for a holder — unless the listing is paused (OffMarketGate).
+// The page's toast (its header Share's "Link copied") sits outside the page.
 
 import type { Metadata } from "next";
 import * as React from "react";
+import { PostToastProvider } from "@/components/innovations/toast";
 import { ProductPage } from "@/components/projects/product/product-page";
 import { OffMarketGate } from "../../off-market";
 
@@ -18,8 +20,10 @@ export default async function MarketProductRoute({
 }) {
   const { id, productId } = await params;
   return (
-    <OffMarketGate id={id}>
-      <ProductPage id={id} productId={productId} context="market" />
-    </OffMarketGate>
+    <PostToastProvider>
+      <OffMarketGate id={id}>
+        <ProductPage id={id} productId={productId} context="market" />
+      </OffMarketGate>
+    </PostToastProvider>
   );
 }

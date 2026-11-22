@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "../kit/toast";
 import { ClipComments } from "./clip-comments";
 import { ClipMenu } from "./clip-menu";
-import { ClipShare } from "./clip-share";
+import { ClipShare, shareTargetOfClip } from "./clip-share";
 import { ClipView } from "./clip-view";
 import { useFeedPrefs } from "./use-feed";
 import type { Guard } from "./use-guest";
@@ -155,7 +155,7 @@ export function ClipDeck({
             guard={guard}
             focusId={startWithComments && openClip.id === clips[0]?.id ? focusComment : null}
           />
-          <ClipShare clip={openClip} open={open?.kind === "share"} onClose={() => setOpen(null)} onFeed={restoreKey === "feed"} />
+          <ClipShare item={shareTargetOfClip(openClip)} open={open?.kind === "share"} onClose={() => setOpen(null)} onFeed={restoreKey === "feed"} />
           <ClipMenu clip={openClip} open={open?.kind === "menu"} onClose={() => setOpen(null)} height={heights[openClip.id] ?? null} guard={guard} />
         </>
       )}

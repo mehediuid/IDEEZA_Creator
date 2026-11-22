@@ -11,17 +11,22 @@
 //   and its current Activity.
 // · No product list, no product count, no prices: a post is one share, the project's details and
 //   the marketplace hold the rest (owner 2026-11-22).
-// · The post's reactions (the Feed's stores); a share of yours has ⋯ › Remove from your Feed.
+// · A share (owner 2026-11-22, Facebook's re-share): the head and your words, then the original framed
+//   as its own card — its creator, its picture, title, "from" and Activity — or "no longer available"
+//   once the item is gone. It has its own appreciations and Save, and ⋯ › Remove from your Feed.
+// · The post's reactions (the Feed's stores).
 // Ten first, then Show all.
 
 import * as React from "react";
 import Link from "next/link";
 import { CpuIcon, Folder01Icon, LockIcon, PackageIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
 import { kindChipOf, sharedLineOf, type TimelinePost } from "@/lib/people/timeline";
 import { ageOf, shortDateOf } from "@/lib/people/phone-profile";
 import { cn } from "@/lib/utils";
+import { LIST_CARD } from "../kit/list";
 import { MEDIA_CHIP } from "../kit/media";
 import { T } from "../type";
 import { ReactionRow } from "./parts";
@@ -63,11 +68,76 @@ function Caption({ text }: { text: string }) {
   );
 }
 
-function TimelineCard({ post, now, onMore }: { post: TimelinePost; now: number; onMore?: () => void }) {
+/** The item's picture: it plays the clip while it is on the Feed, else opens the details; it says
+ *  what was shared and carries ▶ when it plays. */
+function ItemPicture({ post }: { post: TimelinePost }) {
   const open = post.playHref ?? post.detailsHref;
-  const sub = [post.from ? `from ${post.from}` : null, post.by ? `by ${post.by}` : null].filter(Boolean).join(" · ");
   return (
-    <article aria-label={`${sharedLineOf(post)}: ${post.title}`} className="flex flex-col gap-5">
+    <Link href={open} className={cn("rounded-lg", FOCUS)} aria-label={post.playHref ? `Play ${post.title}` : `Open ${post.title}`}>
+      <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg bg-bg-subtle text-[color:var(--color-icon-default)]">
+        {post.cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={post.cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <Icon icon={CpuIcon} size={32} />
+        )}
+        <span className={cn(MEDIA_CHIP, "absolute left-4 top-4")}>{kindChipOf(post)}</span>
+        {post.playHref && (
+          <span className={cn(MEDIA_CHIP, "absolute bottom-4 right-4")}>
+            <span className="sr-only">Video, </span>▶ Play
+          </span>
+        )}
+      </span>
+    </Link>
+  );
+}
+
+/** The item's title (its details), "from" its project, and its current Activity. */
+function ItemFacts({ post, by }: { post: TimelinePost; by: boolean }) {
+  const sub = [post.from ? `from ${post.from}` : null, by && post.by ? `by ${post.by}` : null].filter(Boolean).join(" · ");
+  return (
+    <div className="flex flex-col gap-2">
+      <Link href={post.detailsHref} className={cn(T.section, "self-start break-words rounded-xs", FOCUS)}>
+        {post.title}
+      </Link>
+      {sub && <p className={T.meta}>{sub}</p>}
+      {post.stage && (
+        <span className="flex">
+          <Badge tone="neutral">{post.stage}</Badge>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A share's original, framed as its own card under the words (Facebook's re-share): its creator,
+ *  then the item as it is now; a gone item says so. */
+function Original({ post }: { post: TimelinePost }) {
+  if (post.gone || !post.original) {
+    return (
+      <div className={cn(LIST_CARD, "p-6")}>
+        <p className={T.meta}>This {post.kind} is no longer available.</p>
+      </div>
+    );
+  }
+  return (
+    <div className={cn(LIST_CARD, "gap-4 p-4")}>
+      <div className="flex items-center gap-3 px-2 pt-1">
+        <Avatar size="xs" initials={post.original.initials} color={post.original.color ?? undefined} />
+        <span className={cn(T.meta, "min-w-0 truncate text-text-primary")}>{post.original.name}</span>
+      </div>
+      <ItemPicture post={post} />
+      <div className="px-2 pb-1">
+        <ItemFacts post={post} by={false} />
+      </div>
+    </div>
+  );
+}
+
+function TimelineCard({ post, now, onMore }: { post: TimelinePost; now: number; onMore?: () => void }) {
+  const share = post.via === "share";
+  return (
+    <article aria-label={`${sharedLineOf(post)}${post.title ? `: ${post.title}` : ""}`} className="flex flex-col gap-5">
       <header className="flex items-center gap-3">
         <span className="text-[color:var(--color-icon-default)]">
           <Icon icon={post.kind === "product" ? PackageIcon : Folder01Icon} size={18} />
@@ -86,39 +156,21 @@ function TimelineCard({ post, now, onMore }: { post: TimelinePost; now: number; 
         )}
       </header>
       {post.caption && <Caption text={post.caption} />}
-      <Link href={open} className={cn("rounded-lg", FOCUS)} aria-label={post.playHref ? `Play ${post.title}` : `Open ${post.title}`}>
-        <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg bg-bg-subtle text-[color:var(--color-icon-default)]">
-          {post.cover ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={post.cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-          ) : (
-            <Icon icon={CpuIcon} size={32} />
-          )}
-          <span className={cn(MEDIA_CHIP, "absolute left-4 top-4")}>{kindChipOf(post)}</span>
-          {post.playHref && (
-            <span className={cn(MEDIA_CHIP, "absolute bottom-4 right-4")}>
-              <span className="sr-only">Video, </span>▶ Play
-            </span>
-          )}
-        </span>
-      </Link>
-      <div className="flex flex-col gap-2">
-        <Link href={post.detailsHref} className={cn(T.section, "self-start break-words rounded-xs", FOCUS)}>
-          {post.title}
-        </Link>
-        {sub && <p className={T.meta}>{sub}</p>}
-        {post.stage && (
-          <span className="flex">
-            <Badge tone="neutral">{post.stage}</Badge>
-          </span>
-        )}
-      </div>
+      {share ? (
+        <Original post={post} />
+      ) : (
+        <>
+          <ItemPicture post={post} />
+          <ItemFacts post={post} by />
+        </>
+      )}
       <ReactionRow
         postId={post.postId}
         base={post.base}
-        commentsHref={post.clipId ? `/m/clip/${encodeURIComponent(post.clipId)}?comment=1` : post.detailsHref}
+        // A share has its own appreciations and no thread of its own; a post's comments open on its clip.
+        commentsHref={share ? null : post.clipId ? `/m/clip/${encodeURIComponent(post.clipId)}?comment=1` : post.detailsHref}
         onMore={onMore}
-        moreLabel={`Actions for this post about ${post.title}`}
+        moreLabel={`Actions for this post${post.title ? ` about ${post.title}` : ""}`}
       />
     </article>
   );

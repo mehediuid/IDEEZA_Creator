@@ -52,6 +52,8 @@ import { OfflineBanner } from "../kit/states";
 import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
 import { Screen } from "../screen";
 import { MORE_ICON, TopBar } from "../top-bar";
+import { useShareAction } from "../feed/share-action";
+import { shareItemId } from "@/lib/innovations/share-items";
 import { T } from "../type";
 import { usePhoneWriteGate } from "../project/write-gate";
 import { HeaderActivity } from "./activity";
@@ -106,6 +108,9 @@ function ProductReady() {
   const tabsRef = React.useRef<HTMLDivElement>(null);
   const titleRef = React.useRef<HTMLHeadingElement>(null);
   const titleGone = useScrolledPast(titleRef, scrollRef);
+  // Share (owner 2026-11-22): the product can be shared to your Feed while it is on the Marketplace
+  // (not from a preview of it).
+  const share = useShareAction(mode === "preview" || mode === "contributor" ? null : shareItemId("mine", project.id, ctx.product.id));
 
   // An old link's `?buy=1` opens Buy a copy once: the address drops it, so a reload or Back doesn't reopen it.
   React.useEffect(() => {
@@ -143,7 +148,10 @@ function ProductReady() {
               back={phoneProjectHref(project.id, "products")}
               title={titleGone ? name : undefined}
               titleAs="p"
-              actions={owner ? [{ icon: MORE_ICON, label: "Product actions", onClick: () => setSheet("menu") }] : []}
+              actions={[
+                ...(share.action ? [share.action] : []),
+                ...(owner ? [{ icon: MORE_ICON, label: "Product actions", onClick: () => setSheet("menu") }] : []),
+              ]}
             />
             {preview && (
               <div className="shrink-0 px-8 pb-4">
@@ -196,6 +204,7 @@ function ProductReady() {
       {owner && sheet === "edit" && <EditDetailsSheet onClose={() => setSheet(null)} gate={gate} />}
       {owner && sheet === "delete" && <DeleteProductSheet onClose={() => setSheet(null)} />}
       {buyer && <BuyCopy open={sheet === "buy"} onClose={() => setSheet(null)} onFiles={toFiles} />}
+      {share.sheets}
       {gate.sheet}
     </>
   );

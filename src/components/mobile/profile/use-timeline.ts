@@ -3,19 +3,21 @@
 // The Timeline's posts (lib/people/timeline.ts), read from the stores the Feed and the project pages
 // read, so a post never disagrees with its project or its clip:
 // · yours — every project you shared ("Share to Feed", `showcasedAt`) with its story and its clip
-//   while it is on the marketplace, then every clip you shared to your Feed with words
-//   ("Share to your Feed", yours or someone else's);
+//   while it is on the marketplace, then everything you shared with your words ("Share to your
+//   Feed": any marketplace project or product, yours or someone else's, read by share-items.ts — it
+//   stays after the item leaves the Marketplace, and plays while its clip is on the Feed);
 // · a sample creator's — their Feed posts, each with its clip.
 
 import * as React from "react";
 import { useCreateHistory } from "@/lib/create/history";
-import { FEED_CLIPS, stageLabelOf, type FeedClip } from "@/lib/innovations/clips";
+import { FEED_CLIPS, stageLabelOf } from "@/lib/innovations/clips";
 import { ME } from "@/lib/innovations/people";
 import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
 import { buildsOf, coverOf } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
 import type { MadeItem } from "@/lib/people/made";
-import { projectPostOf, sharePostOf, timelineOf, type TimelinePost } from "@/lib/people/timeline";
+import { phoneClipHref, projectPostOf, sharePostOf, timelineOf, type TimelinePost } from "@/lib/people/timeline";
+import { useShareItems } from "@/components/shares/use-share-items";
 import { useMineClips } from "../feed/use-clips";
 import { useFeedPrefs } from "../feed/use-feed";
 
@@ -25,7 +27,8 @@ export function useOwnTimeline(made: readonly MadeItem[], publicView: boolean): 
   const { hydrated: buildsReady, builds } = useCreateHistory();
   const { hydrated: clipsReady, clips } = useMineClips();
   const { hydrated: prefsReady, prefs } = useFeedPrefs();
-  const ready = projectsReady && buildsReady && clipsReady && prefsReady;
+  const items = useShareItems();
+  const ready = projectsReady && buildsReady && clipsReady && prefsReady && items.hydrated;
 
   const posts = React.useMemo(() => {
     if (!ready) return [];
@@ -45,19 +48,13 @@ export function useOwnTimeline(made: readonly MadeItem[], publicView: boolean): 
         clip,
       });
     });
-    const byId = (id: string): FeedClip | null => clips.find((c) => c.id === id) ?? FEED_CLIPS.find((c) => c.id === id) ?? null;
-    // A shared clip reads as the post it shares; a product names its project.
-    const shares = prefs.shares.flatMap((s) => {
-      const clip = byId(s.clipId);
-      if (!clip) return [];
-      const projectTitle =
-        clip.source === "mine"
-          ? projects.find((x) => x.id === clip.projectId)?.name.trim() || null
-          : (SAMPLE_POSTS.find((p) => p.id === clip.postId)?.title ?? null);
-      return [sharePostOf(s, clip, { projectTitle, ownerId: ME.id })];
+    const playable = new Set([...clips.map((c) => c.id), ...FEED_CLIPS.map((c) => c.id)]);
+    const shares = prefs.shares.map((s) => {
+      const item = items.itemOf(s.clipId);
+      return sharePostOf(s, item, { playHref: item && playable.has(item.id) ? phoneClipHref(item.id) : null, ownerId: ME.id });
     });
     return timelineOf([...own, ...shares], publicView);
-  }, [ready, made, projects, builds, clips, prefs.shares, publicView]);
+  }, [ready, made, projects, builds, clips, prefs.shares, items, publicView]);
 
   return { ready, posts };
 }

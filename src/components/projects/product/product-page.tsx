@@ -31,7 +31,9 @@
 // on the marketplace", and the firmware and downloads wait for a holding
 // (`DeliverablesAccess`, from `can(viewer, "deliverables.download", …)` with
 // the product-scoped `canCtxOf(view, viewer, { productId })`: an edition NFT
-// of this product holds its files too, R5-20).
+// of this product holds its files too, R5-20). Share sits beside the h1
+// (owner, 2026-11-22): the product is this browser's own, so Copy link and the
+// networks only (shares/share-button.tsx).
 //
 // In the "post" context (`/innovations/[slug]/products/[productId]` for this
 // browser's own shared project, plan §6) the page reads as a visitor: the
@@ -74,6 +76,8 @@ import { useCreatorName } from "@/components/marketplace/use-creator-name";
 import { PersonName } from "@/components/profile/person-name";
 import { ME } from "@/lib/messages/types";
 import { NotOnMarketplace } from "@/components/marketplace/market-project-page";
+import { MarketShareButton } from "@/components/shares/share-button";
+import { shareItemId } from "@/lib/innovations/share-items";
 import { SLOTS as PROJECT_SLOTS } from "../details/project-page";
 import { useProjectPageData, type ProjectPageContext } from "../details/use-project-page-data";
 import { LockedPiecePanel, PostProductLinks, PostRailBlocks } from "@/components/innovations/post-product-bits";
@@ -339,13 +343,26 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                     />
                   )}
                   <div className="flex min-w-0 flex-1 flex-col gap-3">
-                    <h1
-                      ref={titleRef}
-                      tabIndex={-1}
-                      className="min-w-0 break-words text-3xl font-semibold leading-3xl tracking-slight text-text-primary outline-none"
-                    >
-                      {name}
-                    </h1>
+                    {market ? (
+                      <div className="flex min-w-0 items-start justify-between gap-6">
+                        <h1
+                          ref={titleRef}
+                          tabIndex={-1}
+                          className="min-w-0 break-words text-3xl font-semibold leading-3xl tracking-slight text-text-primary outline-none"
+                        >
+                          {name}
+                        </h1>
+                        <MarketShareButton itemId={shareItemId("mine", project.id, product.id)} title={name} />
+                      </div>
+                    ) : (
+                      <h1
+                        ref={titleRef}
+                        tabIndex={-1}
+                        className="min-w-0 break-words text-3xl font-semibold leading-3xl tracking-slight text-text-primary outline-none"
+                      >
+                        {name}
+                      </h1>
+                    )}
                     {(meta || (ownerFacts && version && version.options.length > 1)) && (
                       <div className="flex flex-col gap-3 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:flex-wrap [@container(min-width:560px)]:items-center [@container(min-width:560px)]:gap-x-6">
                         {ownerFacts && version && version.options.length > 1 && (

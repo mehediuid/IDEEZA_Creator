@@ -88,6 +88,8 @@ import { OfflineBanner } from "../../kit/states";
 import { useToast } from "../../kit/toast";
 import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
+import { useShareAction } from "../../feed/share-action";
+import { shareItemId } from "@/lib/innovations/share-items";
 import { ProjectProvider, type Ready } from "../../project/context";
 import { ProjectRecent } from "../../project/overview";
 import { MediaTab } from "../../project/media-tab";
@@ -224,6 +226,8 @@ function MarketReady({ data }: { data: Ready }) {
   const ctx = { ...data, gate, open: NO_SHEET };
   const headRef = React.useRef<HTMLHeadingElement>(null);
   const titleGone = useScrolledPast(headRef);
+  // Share (owner 2026-11-22): the listing can be shared to your Feed while it is on the Marketplace.
+  const share = useShareAction(shareItemId("mine", project.id));
   const [focusBid, setFocusBid] = React.useState(0);
   const [done, setDone] = React.useState<DoneFacts | null>(null);
   const [pickedTab, setPickedTab] = React.useState<PickTab | null>(null);
@@ -472,7 +476,7 @@ function MarketReady({ data }: { data: Ready }) {
 
   return (
     <ProjectProvider value={ctx}>
-      <Screen top={<TopBar back title={titleGone ? project.name : undefined} />} footer={footer}>
+      <Screen top={<TopBar back title={titleGone ? project.name : undefined} actions={share.action ? [share.action] : []} />} footer={footer}>
         <OfflineBanner />
         <ListingHero project={project} view={view} />
         <ProjectTop name={project.name} chips={<StatusChip status={view.summary.status} word={text.chip.word} />} meta={meta} description="" titleRef={headRef} />
@@ -536,6 +540,7 @@ function MarketReady({ data }: { data: Ready }) {
           {tab === "products" && <ProductsTab />}
           {tab === "media" && <MediaTab />}
         </div>
+        {share.sheets}
       </Screen>
       <PurchaseDoneSheet done={done} onClose={() => setDone(null)} />
     </ProjectProvider>

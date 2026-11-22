@@ -28,8 +28,10 @@ import { parseProductTab, phoneProductPath, productTabsOf, type ProductTab } fro
 import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import type { InnovationPost, PostPiece, PostProduct } from "@/lib/innovations/types";
 import { ITEM_LABELS, type BuildItemKind } from "@/lib/create/history";
+import { shareItemId } from "@/lib/innovations/share-items";
 import { cn } from "@/lib/utils";
 import { ListCard } from "../kit/list";
+import { useShareAction } from "../feed/share-action";
 import { SampleCopiesBar } from "../project-earn/buyer/sample-shop";
 import { MediaHero } from "../project/sample-project";
 import { MEDIA_GROUND } from "../kit/media";
@@ -56,9 +58,14 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
     [post, product.id],
   );
   const video = product.video?.kind === "video" ? product.video : null;
+  // Share (owner 2026-11-22): anyone may share a product while it is on the Marketplace.
+  const share = useShareAction(shareItemId("sample", id, product.id));
 
   return (
-    <Screen top={<TopBar back={`/m/projects/${encodeURIComponent(id)}`} />} footer={<SampleCopiesBar post={post} id={id} />}>
+    <Screen
+      top={<TopBar back={`/m/projects/${encodeURIComponent(id)}`} actions={share.action ? [share.action] : []} />}
+      footer={<SampleCopiesBar post={post} id={id} />}
+    >
       <MediaHero video={video} picture={video?.poster ?? product.image} name={product.name} />
       <header className="flex flex-col gap-6 px-8 pb-8">
         <div className="flex flex-col gap-2">
@@ -81,6 +88,7 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
         {tab === "overview" && <SampleOverview post={post} product={product} />}
         {tab === "build" && <SampleBuild product={product} base={base} />}
       </div>
+      {share.sheets}
     </Screen>
   );
 }

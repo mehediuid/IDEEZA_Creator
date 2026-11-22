@@ -11,7 +11,8 @@
 // Three states, as on the project page: the skeleton until every store is
 // read (COR-2); "This project isn't on the marketplace" for an address that
 // matches nothing or a project that has never had a listing, so a private
-// project never leaks through a typed URL; else the shell.
+// project never leaks through a typed URL; else the shell. The header's Share
+// says "Link copied" in the page's toast, outside the page container.
 
 import * as React from "react";
 import Link from "next/link";
@@ -19,6 +20,7 @@ import { useSearchParams } from "next/navigation";
 import { Store01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { StateCard, buttonVariants } from "@/components/ideeza";
+import { PostToastProvider } from "@/components/innovations/toast";
 import { marketDocTitle, parseProjectTab } from "@/lib/manual/project-route";
 import { PAGE_CONTAINER } from "@/components/projects/details/frame";
 import { ProjectSkeleton } from "@/components/projects/details/page-states";
@@ -30,9 +32,11 @@ import { MARKET_SLOTS } from "./market-slots";
 export function MarketProjectPage({ id }: { id: string }) {
   // useSearchParams needs a boundary so the route can still be pre-rendered.
   return (
-    <React.Suspense fallback={<ProjectSkeleton />}>
-      <MarketProjectInner id={id} />
-    </React.Suspense>
+    <PostToastProvider>
+      <React.Suspense fallback={<ProjectSkeleton />}>
+        <MarketProjectInner id={id} />
+      </React.Suspense>
+    </PostToastProvider>
   );
 }
 

@@ -2,9 +2,11 @@
 // share, which products, what kind"): every post the creator put on the Feed, newest first.
 // · A project they shared ("Share to Feed" on its page, `showcasedAt`; a sample creator's post): the
 //   project with its story, its picture and its current Activity.
-// · A clip shared to their Feed with their words ("Share to your Feed"): a project or one product,
-//   theirs or someone else's, with the caption and who sees it (Public / Only me — only they see an
-//   Only me post, so a public view leaves it out).
+// · A share ("Share to your Feed", owner 2026-11-22: Facebook's re-share): their words over the
+//   original item — any project or product of the Marketplace, theirs or someone else's — with its
+//   creator, and who sees it (Public / Only me — only they see an Only me post, so a public view
+//   leaves it out). It stays after the item leaves the Marketplace; an item that is gone reads as no
+//   longer available. A share has its own appreciations (keyed by the share), as on Facebook.
 // A post is one share, not the project's details (owner 2026-11-22: "a share is single — how many
 // products a project has, which ones, belongs on its details"): no product list, no product count,
 // no prices (what is on sale is the details' and the marketplace's); the title opens the details.
@@ -12,6 +14,7 @@
 // read the same work. Pure, relative imports only.
 
 import type { ClipKind, FeedClip } from "../innovations/clips";
+import { parseShareItemId, type ShareItem } from "../innovations/share-items";
 import type { FeedShare, ShareAudience } from "../innovations/feed-prefs";
 
 export type TimelinePost = {
@@ -42,6 +45,10 @@ export type TimelinePost = {
   shareId: string | null;
   /** The clip a share shows (its comments open there). */
   clipId: string | null;
+  /** A share's original, drawn as its own card under the words: its creator. Null for a project post. */
+  original: { name: string; initials: string; color: string | null } | null;
+  /** A share whose item is gone (deleted): its card says it is no longer available. */
+  gone: boolean;
 };
 
 const enc = encodeURIComponent;
@@ -85,31 +92,38 @@ export function projectPostOf(input: {
     base: input.base ?? { appreciations: 0, views: 0 },
     shareId: null,
     clipId: input.clip?.id ?? null,
+    original: null,
+    gone: false,
   };
 }
 
-/** A clip shared to the Feed with words, drawn as the post it shares (a product with its project's
- *  name). `ownerId` is the profile's person, so their own work carries no "by". */
-export function sharePostOf(share: FeedShare, clip: FeedClip, ctx: { projectTitle: string | null; ownerId: string }): TimelinePost {
-  const { projectTitle, ownerId } = ctx;
+/** A share: the words over the original item (`item`, null once it is gone), with its creator.
+ *  `playHref` is set while the item plays on the Feed. `ownerId` is the profile's person, so their
+ *  own work carries no "by". */
+export function sharePostOf(share: FeedShare, item: ShareItem | null, ctx: { playHref: string | null; ownerId: string }): TimelinePost {
+  const at = parseShareItemId(share.clipId);
+  const kind: ClipKind = item?.kind ?? (at?.productId ? "product" : "project");
   return {
     key: `share:${share.id}`,
     at: share.at,
-    kind: clip.kind,
+    kind,
     via: "share",
     caption: share.caption.trim(),
     audience: share.audience,
-    title: clip.title,
-    from: clip.kind === "product" ? projectTitle : null,
-    by: clip.source === "mine" || clip.creator.id === ownerId ? null : clip.creator.name,
-    cover: clip.poster,
-    playHref: phoneClipHref(clip.id),
-    detailsHref: phoneDetailsHref(clip.projectId, clip.productId),
-    stage: clip.stage,
-    postId: clip.postId,
-    base: clip.base,
+    title: item?.title ?? "",
+    from: item?.projectTitle ?? null,
+    by: !item || item.source === "mine" || item.creator.id === ctx.ownerId ? null : item.creator.name,
+    cover: item?.cover ?? null,
+    playHref: item ? ctx.playHref : null,
+    detailsHref: item ? phoneDetailsHref(item.projectId, item.productId) : "",
+    stage: item?.stage ?? null,
+    // Its own appreciations, as a Facebook share has.
+    postId: `share:${share.id}`,
+    base: { appreciations: 0, views: 0 },
     shareId: share.id,
-    clipId: clip.id,
+    clipId: item && ctx.playHref ? item.id : null,
+    original: item ? { name: item.creator.name, initials: item.creator.initials, color: item.creator.color ?? null } : null,
+    gone: !item,
   };
 }
 

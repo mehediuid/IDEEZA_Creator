@@ -9,6 +9,10 @@
 // show), then Share now and Cancel. A share is real: the clip leads your Feed with "You shared", your
 // audience and your caption (lib/innovations/clips.ts `feedClips`), and its ⋯
 // takes it off again. A write the phone refuses keeps the caption and says so.
+// Any item live on the Marketplace can be shared the same way (owner 2026-11-22, Facebook's re-share:
+// your words over the original, with its creator): a clip from the Feed, or a project or product from
+// its marketplace screen (`ShareTarget`). View then opens the Feed on it when it plays there, else
+// your profile's Timeline.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -31,13 +35,19 @@ import { newId, useFeedPrefs } from "./use-feed";
 
 const AUDIENCE_ICON = { public: Globe02Icon, "only-me": LockIcon } as const;
 
+/** What is being shared, as the sheet shows it: its id (share-items.ts), picture, title and maker,
+ *  and whether it plays on the Feed. */
+export type ShareTarget = { id: string; title: string; cover: string | null; by: string; plays: boolean };
+
+export const shareTargetOfClip = (clip: FeedClip): ShareTarget => ({ id: clip.id, title: clip.title, cover: clip.poster, by: clip.creator.name, plays: true });
+
 export function ClipShare({
-  clip,
+  item,
   open,
   onClose,
   onFeed = false,
 }: {
-  clip: FeedClip;
+  item: ShareTarget;
   open: boolean;
   onClose: () => void;
   /** Shared from the Feed itself: the clip moves to its front, where it is being watched. */
@@ -64,7 +74,7 @@ export function ClipShare({
 
   const share = () => {
     if (problem) return;
-    const ok = update((p) => withShare(p, { id: newId("share"), clipId: clip.id, caption, audience, at: Date.now() }));
+    const ok = update((p) => withShare(p, { id: newId("share"), clipId: item.id, caption, audience, at: Date.now() }));
     if (!ok) {
       setFailed(true);
       return;
@@ -78,8 +88,10 @@ export function ClipShare({
             action: {
               label: "View",
               onClick: () => {
-                rememberFeedClip(clip.id);
-                router.push("/m");
+                if (item.plays) {
+                  rememberFeedClip(item.id);
+                  router.push("/m");
+                } else router.push("/m/creators/me");
               },
             },
           },
@@ -142,17 +154,17 @@ export function ClipShare({
             </span>
           )}
         </div>
-        {/* What the share shows: the clip itself. */}
+        {/* What the share shows: the item itself, with its maker. */}
         <div className={cn(LIST_CARD, "flex-row items-center gap-6 p-4")}>
-          {clip.poster ? (
-            // eslint-disable-next-line @next/next/no-img-element -- the clip's picture
-            <img src={clip.poster} alt="" className="size-[56px] shrink-0 rounded-md object-cover" />
+          {item.cover ? (
+            // eslint-disable-next-line @next/next/no-img-element -- the item's picture
+            <img src={item.cover} alt="" className="size-[56px] shrink-0 rounded-md object-cover" />
           ) : (
             <span aria-hidden className="size-[56px] shrink-0 rounded-md bg-bg-subtle" />
           )}
           <span className="flex min-w-0 flex-col gap-1">
-            <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>{clip.title}</span>
-            <span className={cn(T.meta, "truncate")}>{clip.creator.name}</span>
+            <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>{item.title}</span>
+            <span className={cn(T.meta, "truncate")}>{item.by}</span>
           </span>
         </div>
       </Sheet>
