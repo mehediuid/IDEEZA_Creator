@@ -2,14 +2,13 @@
 
 // The Share icon of a marketplace screen on the phone (owner 2026-11-22: "I see a good product or
 // project on the marketplace — whether I can buy it or not, I want others to see it"): in the top bar
-// of a project's or a product's screen while it is live on the Marketplace, anyone's, bought or not.
-// It opens the M12 menu:
-// · Share to your Feed — someone else's item only: the Feed's own share sheet (clip-share.tsx), your
-//   words over the item, with its creator, on your Timeline and your Feed (a Facebook-style re-share).
-//   Your own item goes out as your own post (the project ⋯ › Share to Feed), as on the web, where your
-//   own marketplace page's Share offers the outside share only;
+// of a project's or a product's screen whenever it is on Innovations or on the Marketplace, anyone's
+// or your own, bought or not. It opens the M12 menu:
+// · Share to your Feed — the Feed's own share sheet (clip-share.tsx): your words over the item, with
+//   its creator, on your Timeline; on the Feed too while it is on the Marketplace (a Facebook-style
+//   re-share);
 // · Copy link — this screen's address.
-// Off the Marketplace (sold out, delisted, a draft), there is no icon: nothing is offered that can't go.
+// A private project (a draft, minted and never shared or listed) has no icon.
 
 import * as React from "react";
 import { Link01Icon, Share01Icon, Share08Icon } from "@hugeicons/core-free-icons";
@@ -30,8 +29,8 @@ export function useShareAction(itemId: string | null): { action: TopBarAction | 
   const toast = useToast();
   const [open, setOpen] = React.useState<"menu" | "share" | null>(null);
   const item: ShareItem | null = itemId && items.hydrated ? items.itemOf(itemId) : null;
-  const live = !!itemId && items.liveOf(itemId);
-  if (!item || !live) return { action: null, sheets: null };
+  const shareable = !!itemId && items.publicOf(itemId);
+  if (!item || !shareable) return { action: null, sheets: null };
 
   const target: ShareTarget = { id: item.id, title: item.title, cover: item.cover, by: item.creator.name, plays: byId(item.id) !== null };
   const copy = async () => {
@@ -51,7 +50,7 @@ export function useShareAction(itemId: string | null): { action: TopBarAction | 
           onClose={() => setOpen(null)}
           title={item.title}
           items={[
-            ...(item.source === "mine" ? [] : [{ label: "Share to your Feed", icon: Share01Icon, onSelect: () => setOpen("share") }]),
+            { label: "Share to your Feed", icon: Share01Icon, onSelect: () => setOpen("share") },
             { label: "Copy link", icon: Link01Icon, onSelect: () => void copy() },
           ]}
         />

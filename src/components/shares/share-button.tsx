@@ -2,10 +2,8 @@
 
 // Share on a web marketplace page (owner, 2026-11-22): a quiet secondary button in the page header,
 // beside the title, never in the buy box. It opens the post page's Share menu (post-rail.tsx):
-// - someone else's item that is live on the Marketplace: Share to Innovations first (the re-share,
-//   share-item-dialog.tsx), then Copy link and the four networks;
-// - your own item: Copy link and the networks only. Your own project's Share to Innovations is its
-//   ⋯ menu's (your post), so the outside share is all this button offers you.
+// Share to Innovations first (the re-share, share-item-dialog.tsx) for any item on Innovations or on
+// the Marketplace, anyone's or your own, then Copy link and the four networks.
 // The link is the page's own address. The page around it gives the toast (PostToastProvider).
 
 import * as React from "react";
@@ -15,7 +13,6 @@ import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza";
 import { useCopyLink } from "@/components/innovations/post-bits";
 import { ShareMenu } from "@/components/innovations/post-rail";
-import { ME } from "@/lib/innovations/people";
 import { shareIntentUrl } from "@/lib/innovations/share-links";
 import { parseShareItemId } from "@/lib/innovations/share-items";
 import { cn } from "@/lib/utils";
@@ -25,12 +22,10 @@ import { useShareItems } from "./use-share-items";
 export function MarketShareButton({ itemId, title, className }: { itemId: string; title: string; className?: string }) {
   const pathname = usePathname();
   const copyLink = useCopyLink(pathname);
-  const { hydrated, itemOf, liveOf } = useShareItems();
+  const { publicOf } = useShareItems();
   const [sharing, setSharing] = React.useState(false);
   const at = parseShareItemId(itemId);
-  const item = itemOf(itemId);
-  const yours = at?.source === "mine" || item?.creator.id === ME.id;
-  const offered = !yours && (at?.source === "sample" || hydrated) && liveOf(itemId);
+  const offered = publicOf(itemId);
   const what = at?.productId ? "product" : "project";
 
   return (

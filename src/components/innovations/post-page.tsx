@@ -49,6 +49,7 @@ import { useMinuteClock } from "@/components/projects/details/use-project-page-d
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
 import { ShareItemDialog } from "@/components/shares/share-item-dialog";
+import { shareItemId } from "@/lib/innovations/share-items";
 import { useShareItems } from "@/components/shares/use-share-items";
 import { PostComments } from "./comments/post-comments";
 import {
@@ -119,12 +120,13 @@ function PostBody({
   const copyLink = useCopyLink(postHref(post.slug));
   const { titleRef, live } = usePageArrival(post.id, post.title, `${post.title} · Innovations · IDEEZA`);
   const { ref: railRef, top: railTop } = useStickyTop(24);
-  // Share to Innovations: a sample creator's post (its item id is the feed id, "sample:p12" → "p12")
-  // while its project is on the Marketplace. The maker's own post never offers it.
-  const { liveOf } = useShareItems();
+  // Share to Innovations: any post can be re-shared, a sample creator's (its item id is the feed id,
+  // "sample:p12" → "p12") or your own ("mine:<projectId>"), on the Marketplace or not.
+  const { publicOf } = useShareItems();
   const [sharing, setSharing] = React.useState(false);
   const feedId = post.source === "sample" && post.id.startsWith(postIdOfSample("")) ? post.id.slice(postIdOfSample("").length) : null;
-  const reshare = !owner && feedId !== null && liveOf(feedId) ? feedId : null;
+  const itemId = feedId ?? (post.projectId ? shareItemId("mine", post.projectId) : null);
+  const reshare = itemId !== null && publicOf(itemId) ? itemId : null;
 
   const actions: PostActions = {
     toggleAppreciate: () => {

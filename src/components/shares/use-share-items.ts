@@ -4,7 +4,10 @@
 // the sample creators' marketplace items, read from their posts, and your own projects and products,
 // read from the stores their pages read (the name, the products, the cover, the current Activity, and
 // whether anything of it is live on the Marketplace). `itemOf` finds an item by its id, shared or
-// about to be; `liveOf` says whether it is on the Marketplace now (only then can it be shared).
+// about to be; `publicOf` says whether it can be shared: anything on Innovations or on the
+// Marketplace, anyone's, yours too (owner 2026-11-22: "what is on Innovations I can re-share without
+// any problem; who said my own project or product can't be shared?") — never a private project;
+// `liveOf` says whether it is on the Marketplace now (then a share plays on the phone Feed too).
 // The shares themselves are the phone's Feed prefs (`shares`, one store for web and phone): `useShares`
 // adds one and removes one.
 
@@ -23,7 +26,12 @@ import { listingFactsOf } from "@/lib/people/listing-facts";
 import { useMe } from "@/lib/people/profile-store";
 import { newId, useFeedPrefs } from "@/components/mobile/feed/use-feed";
 
-export function useShareItems(): { hydrated: boolean; itemOf: (id: string) => ShareItem | null; liveOf: (id: string) => boolean } {
+export function useShareItems(): {
+  hydrated: boolean;
+  itemOf: (id: string) => ShareItem | null;
+  liveOf: (id: string) => boolean;
+  publicOf: (id: string) => boolean;
+} {
   const { hydrated: projectsReady, projects } = useManualProjects();
   const { hydrated: buildsReady, builds } = useCreateHistory();
   const { hydrated: marketReady, data: market } = useMarket();
@@ -64,7 +72,16 @@ export function useShareItems(): { hydrated: boolean; itemOf: (id: string) => Sh
       const facts = listingFactsOf(at.projectId, market.listings, market.sales, editions.record);
       return facts.mainLive || facts.copiesLive;
     };
-    return { hydrated, itemOf, liveOf };
+    const publicOf = (id: string): boolean => {
+      const at = parseShareItemId(id);
+      if (!at) return false;
+      // Every sample post is on Innovations.
+      if (at.source === "sample") return sampleShareItem(id) !== null;
+      const p = mine(at.projectId);
+      if (!p || !itemOf(id)) return false;
+      return typeof p.showcasedAt === "number" || liveOf(id);
+    };
+    return { hydrated, itemOf, liveOf, publicOf };
   }, [hydrated, projects, builds, market, editions.record, me.name, me.initials]);
 }
 
