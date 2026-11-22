@@ -1,21 +1,28 @@
 "use client";
 
 // 03d · Project video (full screen) and 03e · review the take. The web's
-// Project video dialog on its own screen: a timeline strip (each part's share
-// is its length), "19 s in all · each product 5 s", the Intro (title + line),
-// each current product in play order (↑ ↓ move it, its label), the Outro,
-// quality (720p with the Disruptor plan), the optional sound prompt kept for
-// the model, then Generate project video — rendered in this browser by the
-// web's video jobs (it keeps going if you leave). A render in progress shows
-// its progress with Cancel render. A finished take nobody chose yet comes
-// first (`?review=` or the status's own): Use this video in the bar (the note
-// above it while another take is in use), then Make another take (the same
-// scenes) · Change scenes · Decide later as rows, as the product video's
-// review draws them (project-earn/video/review.tsx). While it can't be made
-// yet (11q, blocked), each product is listed with its video's state and the
-// web's action (Generate AI video…), so the screen is never a dead end.
+// Project video dialog on its own screen (CL-030: it never waits for the
+// product videos — its storyboard is drafted from the products themselves):
+// "{project} · drafted from your n products’ prompts and specs", a timeline
+// strip (each part's share is its length), "n s in all · each product 5 s",
+// the Intro (title + line, 2 s), each current product in play order (↑ ↓ move
+// it; its concept image, its label and its scene line, "5 s · from its prompt
+// and spec"), the Outro (2 s, Built with IDEEZA), quality (720p with the
+// Disruptor plan: Get Disruptor opens its checkout), the optional sound prompt
+// kept for the model, then Generate project video — rendered in this browser
+// by the web's video jobs (it keeps going if you leave). A render in progress
+// shows its progress, the one notify switch and Cancel render; the bar's one
+// primary is "Next video: {product}" while a product's video hasn't started
+// ("The project video keeps rendering while you set up the next one."), else
+// Close ("Every video of this project has started."). A finished take nobody
+// chose yet comes first (`?review=` or the status's own): Use this video in
+// the bar (the note above it while another take is in use), then Make another
+// take (the same scenes) · Change scenes · Decide later as rows, as the
+// product video's review draws them (project-earn/video/review.tsx). One
+// product: no project video, its video is the project's (CL-025).
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
@@ -25,19 +32,27 @@ import { Radio } from "@/components/ideeza/checkbox";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { TextInput } from "@/components/ideeza/text-input";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
+import { projectVideoDescription } from "@/components/video-jobs/project-video-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useCreatePlan } from "@/lib/create/plan";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { currentProductsOf } from "@/lib/manual/readiness";
+import { phoneProductVideoHref } from "@/lib/manual/phone-earn";
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { WRITE_ERROR_MESSAGE } from "@/lib/storage-status";
 import { progressOf } from "@/lib/video/jobs";
+import { nextVideoOf } from "@/lib/video/next-video";
+import { useNotifyAll, writeNotifyAll } from "@/lib/video/notify-pref";
+import { trayProgressLine } from "@/lib/video/phone-video";
 import { INTRO_MS, OUTRO_MS, cutMs, defaultJoinPlan, joinLengthMs, mergeJoinDraft, projectVideoStatusOf } from "@/lib/video/project-video";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY, VIDEO_QUALITY, qualityOpen, type JoinPlan, type OnScreenLines, type VideoQuality } from "@/lib/video/types";
-import { HIGH_LOCKED_NOTE, LINE_MAX, PROJECT_HONESTY, RENDER_KEEPS_RUNNING, SINGLE_PRODUCT_NOTE } from "@/lib/video/video-copy";
+import { LINE_MAX, PROJECT_HONESTY, SINGLE_PRODUCT_NOTE, projectRowCopy, stageLine } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
+import { ConfirmSheet } from "../kit/confirm-sheet";
+import { HighLockedNote } from "../project-earn/video/form";
+import { NotifySwitch } from "../project-earn/video/notify-switch";
 import { ChoiceList, UseBar } from "../project-earn/video/review";
 import { useToast } from "../kit/toast";
 import { useGoBack } from "../nav-trail";
@@ -47,22 +62,17 @@ import { T } from "../type";
 import type { Ready } from "./context";
 import { Thumb } from "./parts";
 import { ProjectLoading, ProjectMissing } from "./project-screen";
-import { ReadinessRows, useReadinessOf } from "./sheets";
 import { PhoneVideo } from "./video";
 
 const secs = (ms: number) => `${Math.round(ms / 100) / 10} s`;
+/** The web's RENDER_KEEPS_RUNNING, where the phone shows the render: the Videos bar, at the foot. */
+const KEEPS_RUNNING = "You can close this — the render keeps running, and its progress shows at the bottom of the screen.";
 
 export function ProjectVideoScreen({ projectId, reviewId }: { projectId: string; reviewId: string | null }) {
   const data = useProjectPageData(projectId, "project");
   if (data.state === "loading") return <ProjectLoading />;
   if (data.state === "missing") return <ProjectMissing />;
   return <ProjectVideo data={data} reviewId={reviewId} />;
-}
-
-/** 11q · nothing to make yet: each product's video, with the way to make the ones missing. */
-function Blocked({ data }: { data: Ready }) {
-  const readiness = useReadinessOf(data.project, data.view, data.brief, "videos");
-  return <ReadinessRows readiness={readiness} projectId={data.project.id} projectVideo={false} />;
 }
 
 function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null }) {
@@ -74,20 +84,27 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
   const { record, hydrated } = useProjectVideos(project.id);
   const { jobs, now, hydrated: jobsHydrated, startProjectVideo, saveDraft, cancelRender, pickTake, declineTake, acknowledge } = useVideoJobs();
   const { sub } = useCreatePlan();
+  const router = useRouter();
+  const notifyAll = useNotifyAll();
+  const [confirmCancel, setConfirmCancel] = React.useState(false);
   const current = React.useMemo(() => currentProductsOf(products), [products]);
   const ready = hydrated && jobsHydrated;
   const status = projectVideoStatusOf({ products, videos: record, jobs, now });
+  const next = nextVideoOf({ products, videos: record, jobs, now, after: PROJECT_VIDEO_KEY });
+  // Drawn from the products (CL-030): each one's concept image and a line from its prompt and spec.
   const fresh = React.useMemo(
     () =>
       defaultJoinPlan({
         projectName: project.name,
         description: project.description,
-        products: current.map((p) => ({ id: p.id, name: displayProductName(p.name) })),
-        videos: record,
-        jobs,
-        now,
+        products: current.map((p) => ({
+          id: p.id,
+          name: displayProductName(p.name),
+          imageUrl: p.built?.product.conceptImageUrl || null,
+          line: p.description,
+        })),
       }),
-    [project.name, project.description, current, record, jobs, now],
+    [project.name, project.description, current],
   );
   const [edit, setEdit] = React.useState<JoinPlan | undefined>(undefined);
   const [quality, setQuality] = React.useState<VideoQuality>("low");
@@ -134,7 +151,7 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
     saveDraft(project.id, PROJECT_VIDEO_KEY, draftOf(plan));
     const res = startProjectVideo({ projectId: project.id, projectName: project.name, plan, quality: qualityOpen(quality, sub.tier) ? quality : "low", audioPrompt: sound.trim() });
     if (!res.ok) return setError(WRITE_ERROR_MESSAGE);
-    toast({ title: `Making the project video · Take ${res.n}` });
+    // It stays on its render, with Next video (CL-030): the screen says it, no toast.
     setEditing(false);
   };
   const useIt = () => {
@@ -205,40 +222,52 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
     );
   } else if (renderingTake && !editing) {
     const p = renderingJob ? progressOf(renderingJob, now) : null;
-    const pct = p ? p.total : 0;
+    const notifyOn = notifyAll || renderingJob?.browserNotify === true;
     body = (
-      <div className="flex flex-col gap-6">
-        <h2 className={T.section}>Making take {renderingTake.n}</h2>
-        <ProgressBar value={pct} label={`${project.name} project video`} />
-        <p className={T.body}>{RENDER_KEEPS_RUNNING}</p>
+      <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
+          <h2 className={T.section}>{renderingJob ? stageLine(renderingTake.n, renderingJob.stage) : `Making take ${renderingTake.n}`}</h2>
+          <ProgressBar value={p ? p.total : 0} label={`${project.name} project video`} />
+          {p && <p className={T.meta}>{trayProgressLine(p.total, p.etaSec)}</p>}
+          <div className="-my-3">
+            <NotifySwitch on={notifyOn} onToggle={() => writeNotifyAll(!notifyOn)} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirmCancel(true)}
+            className={cn(T.rowTitle, "-my-3 inline-flex min-h-[44px] items-center self-start text-text-error outline-none hover:underline focus-visible:underline")}
+          >
+            Cancel render
+          </button>
+        </div>
+        <p className={T.meta}>{KEEPS_RUNNING}</p>
+        <p className={cn(T.meta, "text-text-tertiary")}>{PROJECT_HONESTY}</p>
       </div>
     );
-    footer = (
+    // Next video (CL-030): a product's video starts while this one renders; it takes this screen's place.
+    footer = next ? (
       <>
-        <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => cancelRender(renderingTake.id)}>
-          Cancel render
+        <Button size="xl" className="w-full" onClick={() => router.replace(phoneProductVideoHref(project.id, next.productId))}>
+          {`Next video: ${next.name}`}
         </Button>
-        <Button hierarchy="ghost" size="xl" className="w-full" onClick={goBack}>
+        <p className={T.meta}>The project video keeps rendering while you set up the next one.</p>
+      </>
+    ) : (
+      <>
+        <Button size="xl" className="w-full" onClick={goBack}>
           Close
         </Button>
+        <p className={T.meta}>Every video of this project has started.</p>
       </>
     );
   } else if (!plan) {
-    body = (
-      <div className="flex flex-col gap-6">
-        <Banner tone="info" title="Not yet">
-          {status.state === "waiting"
-            ? `The project video is made from every product's video. ${status.ready} of ${status.total} are ready.`
-            : "Every current product needs a video in use first."}
-        </Banner>
-        <Blocked data={data} />
-      </div>
-    );
+    // No current product to draw a scene from: why, and nothing to press.
+    body = <Banner tone="info">{projectRowCopy(status).text}</Banner>;
   } else {
     const total = joinLengthMs(plan);
     const each = cutMs(plan.cuts.length);
     const nameOf = (id: string) => displayProductName(current.find((p) => p.id === id)?.name ?? "");
-    const thumbOf = (id: string) => current.find((p) => p.id === id)?.built?.product.conceptImageUrl ?? null;
+    const thumbOf = (id: string) => current.find((p) => p.id === id)?.built?.product.conceptImageUrl || null;
     const setIntro = (i: 0 | 1, text: string) => {
       const intro: [string, string] = [...plan.intro];
       intro[i] = text.slice(0, LINE_MAX);
@@ -247,7 +276,7 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
     const locked = !qualityOpen("high", sub.tier);
     body = (
       <div className="flex flex-col gap-6">
-        <p className={T.meta}>{project.name} · made from your product videos</p>
+        <p className={T.meta}>{projectVideoDescription(project.name, current.length)}</p>
         <div aria-hidden className={cn(T.micro, "flex h-[28px] overflow-hidden rounded-md border-[length:var(--border-width-1)] border-solid border-border")}>
           <span className="flex items-center justify-center bg-bg-brand-subtle px-2 text-text-brand" style={{ flexGrow: INTRO_MS }}>
             Intro
@@ -274,12 +303,12 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
         </Part>
         {plan.cuts.map((c, i) => (
           <div key={c.productId} className="flex items-start gap-6">
-            <Thumb url={thumbOf(c.productId)} />
+            <Thumb url={c.imageUrl ?? thumbOf(c.productId)} />
             <div className="flex min-w-0 flex-1 flex-col gap-3">
               <div className="flex items-center gap-4">
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className={cn(T.rowTitle, "truncate")}>{nameOf(c.productId)}</span>
-                  <span className={T.meta}>{secs(c.ms)} from its video</span>
+                  <span className={T.meta}>{c.takeId ? `${secs(c.ms)} from its video` : `${secs(c.ms)} · from its prompt and spec`}</span>
                 </span>
                 <Button hierarchy="secondary" size="xl" iconOnly aria-label={`Move ${nameOf(c.productId)} earlier`} disabled={i === 0} onClick={() => move(i, -1)}>
                   <Icon icon={ArrowUp01Icon} size={20} />
@@ -295,6 +324,16 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
                 value={c.label}
                 onValueChange={(t) => change({ ...plan, cuts: plan.cuts.map((x, j) => (j === i ? { ...x, label: t.slice(0, LINE_MAX) } : x)) })}
               />
+              {!c.takeId && (
+                <TextInput
+                  size="xl"
+                  aria-label={`${nameOf(c.productId)} scene line`}
+                  maxLength={LINE_MAX}
+                  placeholder="What this scene says"
+                  value={c.line ?? ""}
+                  onValueChange={(t) => change({ ...plan, cuts: plan.cuts.map((x, j) => (j === i ? { ...x, line: t.slice(0, LINE_MAX) } : x)) })}
+                />
+              )}
             </div>
           </div>
         ))}
@@ -330,7 +369,7 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
               </label>
             );
           })}
-          {locked && <p className={T.meta}>{HIGH_LOCKED_NOTE}</p>}
+          {locked && <HighLockedNote />}
         </div>
         <label className="flex flex-col gap-2">
           <span className={T.rowTitle}>Sound</span>
@@ -359,6 +398,18 @@ function ProjectVideo({ data, reviewId }: { data: Ready; reviewId: string | null
           {error}
         </p>
       )}
+      <ConfirmSheet
+        open={confirmCancel}
+        onClose={() => setConfirmCancel(false)}
+        title="Cancel this render?"
+        body={`Take ${renderingTake?.n ?? ""} stops and isn’t saved. You can start it again later.`}
+        verb="Cancel render"
+        destructive
+        cancelLabel="Keep rendering"
+        onConfirm={() => {
+          if (renderingTake) cancelRender(renderingTake.id);
+        }}
+      />
     </Screen>
   );
 }

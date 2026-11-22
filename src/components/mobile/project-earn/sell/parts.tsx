@@ -16,7 +16,10 @@
 //   top bar; stacked layers answer Escape top first;
 // · useLiveReadiness / ReadinessSheet — the web's readiness gate as a sheet
 //   (Sell, Relist, a product's copies): every product's video, the project
-//   video, Continue off until they are ready.
+//   video; Continue stays off only while a video hasn't started (CL-030: "Start
+//   every video first: …"). Once every one has, it opens even while they render:
+//   "You don't have to wait. It stays off Explore marketplace until …" and,
+//   under the button, "Goes live when all 4 videos are ready · 2 of 4 now".
 
 import * as React from "react";
 import Link from "next/link";
@@ -29,17 +32,18 @@ import { Checkbox } from "@/components/ideeza/checkbox";
 import { IconButton } from "@/components/ideeza/icon-button";
 import type { LevelCheck as Check } from "@/lib/commerce/ladder";
 import type { License } from "@/lib/brief/types";
-import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
+import { dialogBlockerOf, videosWaitOf } from "@/components/projects/details/readiness-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import type { ReadinessPurpose } from "@/lib/manual/p2-types";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf } from "@/lib/manual/readiness";
 import { phoneProductVideoHref } from "@/lib/manual/phone-earn";
+import { phoneTakeHref } from "@/lib/video/phone-video";
 import { phoneProjectPath, readyOfLine } from "@/lib/manual/phone-project";
 import { useProjectVideos } from "@/lib/video/store";
-import { actionLabel, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
+import { REPLACE_LABEL, actionLabel, heldCountLine, heldNoteOf, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { MOBILE_APP_ID } from "../../mobile-root";
 import { BottomBar } from "../../kit/bottom-bar";
@@ -90,10 +94,13 @@ export function SellListRow({
   onClick,
   disabled = false,
   label,
+  chip,
 }: {
   icon: IconValue;
   title: string;
   state: readonly string[];
+  /** A status chip beside the title ("Waiting for videos"). */
+  chip?: React.ReactNode;
   live?: boolean;
   /** A line under the state (how many steps before you can list, why it waits). */
   extra?: string | null;
@@ -110,7 +117,14 @@ export function SellListRow({
         <Icon icon={icon} size={20} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={cn(T.rowTitle, disabled && "text-text-disabled")}>{title}</span>
+        {chip ? (
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className={cn(T.rowTitle, disabled && "text-text-disabled")}>{title}</span>
+            {chip}
+          </span>
+        ) : (
+          <span className={cn(T.rowTitle, disabled && "text-text-disabled")}>{title}</span>
+        )}
         <StateLines lines={state} live={live} />
         {extra && <span className={cn(T.meta, "break-words")}>{extra}</span>}
       </span>
@@ -459,6 +473,12 @@ export function ReadinessSheet({
   const readiness = useLiveReadiness(purpose, product);
   const copy = readinessCopy(purpose, product ? displayProductName(product.name) : undefined);
   const blocker = dialogBlockerOf(readiness);
+  // A video rendering or waiting for review no longer holds it (CL-030): what it leads to waits.
+  const waiting = videosWaitOf(readiness);
+  const count = videoCountOf(readiness);
+  const where = purpose === "showcase" || purpose === "give" ? "Feed" : "Explore marketplace";
+  const rendering =
+    readiness.products.some((p) => p.video.state === "rendering" || (p.video.state === "ready" && !!p.video.next)) || readiness.project?.state === "rendering";
   return (
     <Sheet
       open
@@ -470,11 +490,16 @@ export function ReadinessSheet({
           <Button size="xl" className="w-full" disabled={blocker !== null} onClick={onPass}>
             {copy.cta}
           </Button>
-          {blocker && <p className={SUB}>{blocker}</p>}
+          {blocker ? <p className={SUB}>{blocker}</p> : waiting ? <p className={SUB}>{heldCountLine(count.ready, count.total)}</p> : null}
         </>
       }
     >
       <ReadinessRows readiness={readiness} />
+      {waiting && !blocker ? (
+        <p className={cn(T.body, "rounded-xl border-[length:var(--border-width-1)] border-solid border-border-brand bg-bg-brand-subtle p-6 text-text-primary")}>{heldNoteOf(where, count.total)}</p>
+      ) : (
+        rendering && <p className={cn(T.meta, "rounded-xl bg-bg-surface-raised p-6")}>Renders keep going if you close this. Their progress shows in Videos, at the bottom of the screen.</p>
+      )}
       {extra}
     </Sheet>
   );
@@ -489,7 +514,7 @@ export function MakeVideosSheet({ onClose }: { onClose: () => void }) {
       open
       onClose={onClose}
       title="Make videos"
-      description="Each product needs its own video before the project can be sold."
+      description={readinessCopy("videos").info}
     >
       <ReadinessRows readiness={readiness} />
     </Sheet>
@@ -515,6 +540,8 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
           const label = actionLabel(c.action);
           const ready = p.video.state === "ready";
           const name = displayProductName(p.name);
+          // A settled ready video: a new take, while the one in use stays until the maker chooses (CL-015).
+          const replaceFrom = p.video.state === "ready" && !p.video.next && !p.video.review ? p.video.take.id : null;
           // One compact row per product (owner 2026-11-15: two products didn't fit the sheet): the
           // video's state, and its action as the row's last line — the whole row opens the video maker.
           const body = (
@@ -546,7 +573,20 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
                   {body}
                 </button>
               ) : (
-                <div className={cn(LIST_ROW, "items-center hover:bg-transparent active:bg-transparent")}>{body}</div>
+                <div className={cn(LIST_ROW, "items-center hover:bg-transparent active:bg-transparent")}>
+                  {body}
+                  {replaceFrom && (
+                    <Button
+                      hierarchy="ghost"
+                      size="lg"
+                      className="min-h-[44px] shrink-0"
+                      aria-label={`Replace ${name} video`}
+                      onClick={() => router.push(phoneTakeHref(project.id, p.productId, { from: replaceFrom }))}
+                    >
+                      {REPLACE_LABEL}
+                    </Button>
+                  )}
+                </div>
               )}
             </li>
           );

@@ -6,7 +6,8 @@
 // Video prompt (Need prompt help?, Auto generate video) and Audio prompt
 // (Auto generate audio, on by default) in DS Textareas with an A10 Toggle row
 // under each — a prompt left to AI is read-only and says so; then the
-// quality, Low 480p · High 720p (High with the Disruptor plan only). For AR,
+// quality, Low 480p · High 720p (High with the Disruptor plan only; its note's
+// Get Disruptor opens Disruptor's checkout, CL-032). For AR,
 // the "Record the real product" note. The values, blockers and words are the
 // web's (`VideoFormValue`, `videoFormBlocker`).
 
@@ -19,9 +20,11 @@ import { Textarea } from "@/components/ideeza/text-input";
 import { Toggle } from "@/components/ideeza/toggle";
 import type { VideoFormValue, VideoMethod, VideoTarget } from "@/components/video-jobs/generate-video-dialog";
 import { useCreatePlan } from "@/lib/create/plan";
+import { pitchCycle } from "@/lib/create/upsell";
 import { VIDEO_QUALITY, qualityOpen, type VideoQuality } from "@/lib/video/types";
 import { HIGH_LOCKED_NOTE } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import { checkoutPath } from "../../plans/parts";
 import { T } from "../../type";
 
 /** A03 Link MD Brand on the kit's 44 px tap area. */
@@ -164,15 +167,22 @@ export function QualityField({ value, onChange }: { value: VideoQuality; onChang
           text={`${VIDEO_QUALITY[q].seconds} sec · ${VIDEO_QUALITY[q].resolution}`}
         />
       ))}
-      {locked && (
-        <p className={T.meta}>
-          {HIGH_LOCKED_NOTE}{" "}
-          <Link href="/m/plans" className={cn(T.caption, "-my-6 inline-flex min-h-[44px] items-center text-text-brand outline-none hover:underline focus-visible:underline")}>
-            See plans
-          </Link>
-        </p>
-      )}
+      {locked && <HighLockedNote />}
     </div>
+  );
+}
+
+/** "720p comes with the Disruptor plan. Get Disruptor" — straight to Disruptor's checkout (CL-032:
+ *  monthly from Free, else the cycle the maker pays by). Shared with the Project video screen. */
+export function HighLockedNote() {
+  const { sub } = useCreatePlan();
+  return (
+    <p className={T.meta}>
+      {HIGH_LOCKED_NOTE}{" "}
+      <Link href={checkoutPath("disruptor", pitchCycle(sub))} className={cn(T.caption, "-my-6 inline-flex min-h-[44px] items-center text-text-brand outline-none hover:underline focus-visible:underline")}>
+        Get Disruptor
+      </Link>
+    </p>
   );
 }
 

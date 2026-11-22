@@ -14,6 +14,12 @@
 //   lazy-mint box and the no-income line; Sign and sell makes the lazy
 //   copies (when new) then signs the listing, each through the phone's
 //   wallet sheet. Closing with anything entered asks first.
+// CL-030: Sign and sell stays off only while a video it needs hasn't started
+// ("Start every video first: …"; copies of one product need only that
+// product's video). Once every one has, a video still rendering or waiting for
+// review doesn't stop it: "You don't have to wait. …", the copies are made now
+// and their listing waits off Explore marketplace (lib/market/held.ts) until
+// the videos are ready, then goes live by itself.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -35,7 +41,9 @@ import { ROYALTY_MAX, ROYALTY_MIN, TOKENS_BY_NETWORK, type Token } from "@/lib/b
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf, videosStartBlockerOf } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
+import { heldNoteOf } from "@/lib/video/video-copy";
 import { phoneProductVideoHref } from "@/lib/manual/phone-earn";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { canCreate, createTrack, editionChainOf, listTrack, wholeNumberOf, type TrackTerms } from "@/lib/market/editions";
@@ -69,7 +77,7 @@ import {
 } from "@/lib/market/sell-flow";
 import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
 import { withUseWords } from "@/lib/market/phone-sell";
-import { useProjectVideos } from "@/lib/video/store";
+import { readProjectVideos, useProjectVideos } from "@/lib/video/store";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import { cn } from "@/lib/utils";
@@ -130,6 +138,10 @@ export function SellCopiesSheet({
   const { jobs, now } = useVideoJobs();
   const { record: tracks } = useEditions(project.id);
   const terms = useSellTerms(project.id);
+  const latestJobs = React.useRef(jobs);
+  React.useEffect(() => {
+    latestJobs.current = jobs;
+  }, [jobs]);
 
   const main = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, view.mint.status === "legacy" && brief ? brief.state : null);
@@ -175,6 +187,8 @@ export function SellCopiesSheet({
     video: sellVideoOf(scopeReadiness),
     ownershipConfirmed: facts.ownershipConfirmed,
     draft,
+    holdVideos: true,
+    notStarted: videosStartBlockerOf(scopeReadiness),
   });
   const state = draft.use ? trackStateOf(tracks, productId, kind, draft.use) : { kind: "new" as const };
   const index = SELL_STEPS.indexOf(step);
@@ -257,28 +271,44 @@ export function SellCopiesSheet({
     const listing: TrackTerms = { token: draft.token as TrackTerms["token"], regular: t.regular, extended: t.extended, royaltyPct: t.royaltyPct };
     const confirmOwner = askOwner && draft.owner;
     const note = draft.note;
-    const result = await request(
-      withUseWords(listRequestOf({ track, projectName: project.name, productName, terms: listing, network: chain.network, collection: chain.collection, editing: false })),
-      {
-        recheck: () => lockGateNow(project),
-        commit: (proof) => {
-          const gate = lockGateNow(project);
-          if (gate) return { ok: false, message: gate };
-          if (sellKind === "physical") {
-            const s = writeShipPlan(project.id, productId, note, proof.at);
-            if (!s.ok) return s;
-          }
+    const built = withUseWords(listRequestOf({ track, projectName: project.name, productName, terms: listing, network: chain.network, collection: chain.collection, editing: false }));
+    // A video still being made: the copies' listing waits, and the wallet says so (CL-030).
+    const req = readiness.videosWait ? { ...built, doneLine: "Signed. These copies go on Explore marketplace when every video is ready." } : built;
+    let heldCopies = false;
+    const result = await request(req, {
+      recheck: () => lockGateNow(project),
+      commit: (proof) => {
+        const gate = lockGateNow(project);
+        if (gate) return { ok: false, message: gate };
+        if (sellKind === "physical") {
+          const s = writeShipPlan(project.id, productId, note, proof.at);
+          if (!s.ok) return s;
+        }
+        // A video still being made: the copies are made now and their listing waits off Explore
+        // marketplace until it's ready, then goes live by itself.
+        const fresh = readinessFactsOf(project, view, brief, readProjectVideos(project.id), latestJobs.current, proof.at);
+        const waitFor = videosBlockerOf(product ? readinessOf({ ...fresh, product }, "edition") : readinessOf(fresh, "sell"));
+        if (waitFor) {
+          const h = hold({ id: heldId(), projectId: project.id, kind: "copies", at: proof.at, trackId: track.id, scope: productId, kindOfCopy: sellKind, terms: listing });
+          if (!h.ok) return { ok: false, message: "This browser's storage is full — nothing was saved." };
+          heldCopies = true;
+        } else {
           const w = writeTracks(project.id, (all) => listTrack(all, track.id, listing, proof.at));
           if (!w.ok) return { ok: false, message: w.message };
-          if (confirmOwner) setOwnerConfirmed(project.id, proof.at);
-          return { ok: true };
-        },
+        }
+        if (confirmOwner) setOwnerConfirmed(project.id, proof.at);
+        return { ok: true };
       },
-    );
+    });
     setBusy(false);
     if (result.ok) {
       const n = track.supply.total;
-      onDone(`On sale: ${n} ${KIND_LABEL[sellKind]} ${n === 1 ? "copy" : "copies"} of ${what} at ${formatAmount(listing.regular, listing.token)}.`, track);
+      onDone(
+        heldCopies
+          ? `Signed: ${n} ${KIND_LABEL[sellKind]} ${n === 1 ? "copy" : "copies"} of ${what}. They go on Explore marketplace when every video is ready.`
+          : `On sale: ${n} ${KIND_LABEL[sellKind]} ${n === 1 ? "copy" : "copies"} of ${what} at ${formatAmount(listing.regular, listing.token)}.`,
+        track,
+      );
       return;
     }
     const failed = failureCopy(result);
@@ -519,6 +549,11 @@ export function SellCopiesSheet({
                   );
                 })}
               </ul>
+              {readiness.videosWait && (
+                <p className={cn(T.body, "rounded-xl border-[length:var(--border-width-1)] border-solid border-border-brand bg-bg-brand-subtle p-6 text-text-primary")}>
+                  {heldNoteOf("Explore marketplace", videoCountOf(scopeReadiness).total)}
+                </p>
+              )}
               {!ladder.ok && <LevelCheck check={ladder} what={LADDER_WHAT[kind]} projectId={project.id} license={brief?.state.license ?? null} />}
               <div className="flex flex-col gap-2">
                 {askOwner && (

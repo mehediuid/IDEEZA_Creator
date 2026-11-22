@@ -149,7 +149,10 @@ function EarnReady({ data, section: opened }: { data: Ready; section: EarnSectio
   React.useEffect(() => {
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (!id) return;
-    const raf = requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" })));
+    // Before the mint a product's own row (`#editions-<product>`) isn't there: its copies section is.
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => (document.getElementById(id) ?? (id.startsWith("editions-") ? document.getElementById("copies") : null))?.scrollIntoView({ block: "start" })),
+    );
     return () => cancelAnimationFrame(raf);
   }, [section]);
 

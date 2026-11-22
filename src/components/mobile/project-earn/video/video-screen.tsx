@@ -14,16 +14,23 @@
 // · storyboard (11f, `?step=storyboard`, so Back returns to the form):
 //   Generate video · Regenerate storyboard (asks first once a scene was
 //   edited, 11z).
-// · render (11g): "Take n · Stage i of 5 · …", the progress, Notify me when
-//   it's ready; Cancel render (asks first, 11y) · Close in one row. Close
-//   (and Back) go back to where the maker came from, which opens what it
-//   had open (nav-trail useBackState: the Sell gate, a sheet); the render
-//   keeps going and the tray follows.
+// · render (11g): "Take n · Stage i of 5 · …", the progress, the one switch
+//   "Notify me on this browser · for every video" and Cancel render (asks
+//   first, 11y) in the card. The bar's one primary (CL-030): "Next video:
+//   {name}" while another video of the project hasn't started — it replaces
+//   this screen with that video's form (the next product without a started
+//   video, after this one, then from the top; then the project video) — with
+//   "{product} keeps rendering while you set up the next one." under it; once
+//   every video has started, Close with "Every video of this project has
+//   started.". Close (and Back) go back to where the maker came from, which
+//   opens what it had open (nav-trail useBackState: the Sell gate, a sheet);
+//   the render keeps going and the Videos bar follows.
 // · review (11b, `?review=<takeId>`): Use this video at the foot, the web's
 //   other choices as rows; a clip this phone recorded or uploaded reviews as
 //   11d (Use this clip at the foot).
 // · failed (11h): the one failure line; Try again (the form, from that take,
-//   as `?from=<takeId>` does) · Close.
+//   as `?from=<takeId>` does) · Close. Shown here, it is seen (the Videos
+//   bar stops counting it).
 // The take is the web's: the same record (`ideeza:video:<projectId>`) the
 // Media tab and the Sell / Give readiness read.
 
@@ -31,7 +38,6 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
-import { Checkbox } from "@/components/ideeza/checkbox";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { Spinner } from "@/components/ideeza/spinner";
 import {
@@ -42,16 +48,21 @@ import {
   type VideoTarget,
 } from "@/components/video-jobs/generate-video-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { useCreateHistory } from "@/lib/create/history";
 import { useCreatePlan } from "@/lib/create/plan";
 import { phoneProductArHref, phoneProductVideoHref } from "@/lib/manual/phone-earn";
+import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
+import { useManualProjects } from "@/lib/manual/projects";
 import { WRITE_ERROR_MESSAGE } from "@/lib/storage-status";
 import { progressOf } from "@/lib/video/jobs";
-import { clipMetaOf, trayProgressLine } from "@/lib/video/phone-video";
+import { nextVideoOf } from "@/lib/video/next-video";
+import { useNotifyAll, writeNotifyAll } from "@/lib/video/notify-pref";
+import { clipMetaOf, phoneProjectVideoHref, trayProgressLine } from "@/lib/video/phone-video";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import { draftStoryboard, linesOfStoryboard, sanitizeStoryboard, type Storyboard } from "@/lib/video/storyboard";
-import { qualityOpen, type VideoTake } from "@/lib/video/types";
+import { PROJECT_VIDEO_KEY, qualityOpen, type VideoTake } from "@/lib/video/types";
 import { FAILURE_COPY, honestyLine, renderTitle, stageLine, storyboardHonesty } from "@/lib/video/video-copy";
 import { BottomBar } from "../../kit/bottom-bar";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
@@ -62,6 +73,7 @@ import { TopBar } from "../../top-bar";
 import { CameraAskSheet, cameraPermission } from "./camera-ask";
 import { VideoFormFields } from "./form";
 import { PromptHelpSheet } from "./prompt-help";
+import { NotifySwitch } from "./notify-switch";
 import { ChoiceList, TakeReview, UseBar, clipKeptLine, inUseNote } from "./review";
 import { StoryboardEditor } from "./storyboard";
 import { VideoLoading, VideoUnavailable, useLeave, useRecordedTakes, useVideoScope } from "./target";
@@ -105,6 +117,13 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
   const { record } = useProjectVideos(target.projectId);
   const { jobs, now, startProductVideo, cancelRender, setBrowserNotify, acknowledge, pickTake, declineTake, saveDraft } = useVideoJobs();
   const { sub } = useCreatePlan();
+  const notifyAll = useNotifyAll();
+  // The project's products, for "Next video" (CL-030).
+  const { projects } = useManualProjects();
+  const { builds } = useCreateHistory();
+  const project = projects.find((p) => p.id === target.projectId);
+  const products = React.useMemo(() => (project ? productsOfProject(project, buildsOf(project, builds)) : []), [project, builds]);
+  const next = nextVideoOf({ products, videos: record, jobs, now, after: target.productId });
   const recorded = useRecordedTakes();
   const video = record?.products[target.productId];
   const videoHref = phoneProductVideoHref(target.projectId, target.productId);
@@ -177,9 +196,10 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
                 ? "render"
                 : "failed";
 
-  // A finished take shown here is seen: its tray notice goes, as the web's review does.
+  // A finished or failed take shown here is seen: the Videos bar stops counting it, as the web's
+  // review does.
   React.useEffect(() => {
-    if ((view === "review" || view === "clip") && job && !job.acknowledged) acknowledge(job.id);
+    if ((view === "review" || view === "clip" || view === "failed") && job && !job.acknowledged) acknowledge(job.id);
   }, [view, job, acknowledge]);
 
   const blocker = videoFormBlocker(value);
@@ -379,32 +399,55 @@ function GenerateVideo({ target, reviewId, fromId }: { target: VideoTarget; revi
     );
   } else if (view === "render" && take && job) {
     const { total, etaSec } = progressOf(job, now);
+    const notifyOn = notifyAll || job.browserNotify;
     body = (
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-8">
           <h2 className={T.section}>{stageLine(take.n, job.stage)}</h2>
           <ProgressBar value={total} label={`${target.productName} video`} />
           <p className={T.meta}>{trayProgressLine(total, etaSec)}</p>
-          <label className="relative -my-3 flex min-h-[44px] cursor-pointer items-center gap-4">
-            <input type="checkbox" className="peer sr-only" checked={job.browserNotify} onChange={() => setBrowserNotify(job.id, !job.browserNotify)} />
-            <Checkbox checked={job.browserNotify} decorative className="peer-focus-visible:shadow-focus-brand" />
-            <span className={cn(T.body, "text-text-primary")}>Notify me when it&apos;s ready</span>
-          </label>
+          {/* One switch for every video (CL-030); an older take's own tick still counts. */}
+          <div className="-my-3">
+            <NotifySwitch
+              on={notifyOn}
+              onToggle={() => {
+                writeNotifyAll(!notifyOn);
+                if (notifyOn && job.browserNotify) setBrowserNotify(job.id, false);
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirmCancel(true)}
+            className={cn(T.rowTitle, "-my-3 inline-flex min-h-[44px] items-center self-start text-text-error outline-none hover:underline focus-visible:underline")}
+          >
+            Cancel render
+          </button>
         </div>
         <p className={T.meta}>{KEEPS_RUNNING}</p>
         <p className={cn(T.meta, "text-text-tertiary")}>{honestyLine(target.productName)}</p>
       </div>
     );
-    // One row (owner 2026-11-15): Close goes back to where the maker came from, the render goes on.
-    footer = (
-      <div className="flex gap-4">
-        <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" onClick={() => setConfirmCancel(true)}>
-          Cancel render
+    // Next video (CL-030): the next one's storyboard starts while this one renders. It takes this
+    // screen's place, so Back from it goes where the maker came from.
+    footer = next ? (
+      <>
+        <Button
+          size="xl"
+          className="w-full"
+          onClick={() => router.replace(next.productId === PROJECT_VIDEO_KEY ? phoneProjectVideoHref(target.projectId) : phoneProductVideoHref(target.projectId, next.productId))}
+        >
+          {`Next video: ${next.name}`}
         </Button>
-        <Button size="xl" className="min-w-0 flex-1" onClick={leave}>
+        <p className={T.meta}>{`${target.productName} keeps rendering while you set up the next one.`}</p>
+      </>
+    ) : (
+      <>
+        <Button size="xl" className="w-full" onClick={leave}>
           Close
         </Button>
-      </div>
+        <p className={T.meta}>Every video of this project has started.</p>
+      </>
     );
   } else if (view === "review" && take) {
     title = "Review the video";

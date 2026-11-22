@@ -15,6 +15,10 @@
 //   primary: Add to marketplace (a made, unlisted use) or Sell … copies too;
 // · Edit (15f) and Add copies (15e) sign through the phone's wallet sheet;
 //   Remove listing (15g) asks first. Each write says so in a toast.
+// · signed while a video still renders or waits for review (CL-030): the row
+//   says "Waiting for videos" with the price and "Goes live when its videos are
+//   ready"; on the screen the made copies' card is the waiting block, Review
+//   videos is the bar's primary and Cancel listing a row.
 
 import * as React from "react";
 import { Add01Icon, Delete02Icon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
@@ -59,8 +63,17 @@ import { SellCopiesSheet, type CopyScope } from "./sell-copies";
 import { cn } from "@/lib/utils";
 import { useBackState } from "../../nav-trail";
 import { T } from "../../type";
+import { HeldCancelRow, HeldCard, HeldChip, ReviewVideosButton, useHeldItems } from "../video/held";
+import type { HeldCopies } from "@/lib/market/held";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
+
+/** "Personal use · 0.03 ETH" — the waiting copies' use and price. */
+function heldTrackLine(item: HeldCopies, tracks: readonly EditionTrack[]): string {
+  const use = tracks.find((t) => t.id === item.trackId)?.use;
+  const price = formatAmount(item.terms.regular, item.terms.token);
+  return use ? `${USE_LABEL[use]} · ${price}` : price;
+}
 type Dialog = { kind: "edit"; track: Listed } | { kind: "add"; track: EditionTrack } | { kind: "remove"; track: EditionTrack } | null;
 
 export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }) {
@@ -84,6 +97,8 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
     sales: view.sales,
   });
   const hasCopies = view.editions.some((t) => t.productId === scope.id && t.kind === kind);
+  // Signed while a video was still being made (CL-030): waiting, not for sale yet.
+  const waiting = useHeldItems(project.id).find((i): i is HeldCopies => i.kind === "copies" && i.scope === scope.id && i.kindOfCopy === kind) ?? null;
   const said = (message: string) => {
     announce(message);
     toast({ title: message });
@@ -93,7 +108,17 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
 
   return (
     <>
-      {state.kind === "manage" ? (
+      {waiting ? (
+        <SellListRow
+          icon={KIND_ICON[kind]}
+          title={KIND_LABEL[kind]}
+          chip={<HeldChip />}
+          state={[heldTrackLine(waiting, view.editions)]}
+          extra="Goes live when its videos are ready"
+          onClick={() => setScreen(true)}
+          label={`${name}: waiting for videos`}
+        />
+      ) : state.kind === "manage" ? (
         <SellListRow icon={KIND_ICON[kind]} title={KIND_LABEL[kind]} state={state.lines} live onClick={() => setScreen(true)} label={`${name}: ${state.lines.join(", ")}`} />
       ) : state.kind === "sell" ? (
         <SellListRow
@@ -107,7 +132,16 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
         <SellListRow icon={KIND_ICON[kind]} title={KIND_LABEL[kind]} state={[state.line]} disabled />
       )}
       {screen && chain && (
-        <CopiesScreen kind={kind} scope={scope} chain={chain} more={state.kind === "manage" ? state.more : null} onSell={startSell} onNote={said} onClose={() => setScreen(false)} />
+        <CopiesScreen
+          kind={kind}
+          scope={scope}
+          chain={chain}
+          more={state.kind === "manage" ? state.more : null}
+          waiting={waiting}
+          onSell={startSell}
+          onNote={said}
+          onClose={() => setScreen(false)}
+        />
       )}
       {sell && (
         <SellCopiesSheet
@@ -132,6 +166,7 @@ function CopiesScreen({
   scope,
   chain,
   more,
+  waiting,
   onSell,
   onNote,
   onClose,
@@ -140,6 +175,8 @@ function CopiesScreen({
   scope: CopyScope;
   chain: { network: Network; collection: string };
   more: EditionUse | null;
+  /** Its copies' listing, signed and waiting for videos (CL-030). */
+  waiting: HeldCopies | null;
   onSell: (use: EditionUse) => void;
   onNote: (message: string) => void;
   onClose: () => void;
@@ -160,7 +197,9 @@ function CopiesScreen({
 
   let primary: React.ReactNode = null;
   let reason: string | null = null;
-  if (unlisted) {
+  if (waiting) {
+    primary = <ReviewVideosButton projectId={project.id} />;
+  } else if (unlisted) {
     reason = lockReason;
     primary = (
       <Button size="xl" className="w-full" aria-haspopup="dialog" aria-disabled={lockReason ? true : undefined} aria-describedby={lockReason ? reasonId : undefined} onClick={() => !lockReason && onSell(unlisted.use)}>
@@ -192,6 +231,7 @@ function CopiesScreen({
           <p className={cn(T.meta, "break-words")}>{scope.product ? `Product · ${scope.name}` : `Whole project · ${project.name}`}</p>
           {PHONE_USES.map((use) => {
             const t = ofKind.find((x) => x.use === use);
+            if (t && waiting?.trackId === t.id) return <HeldCard key={use} item={waiting} projectId={project.id} products={view.products} />;
             if (t) return <TrackCard key={use} track={t} onMenu={setMenu} />;
             if (open !== use) return null;
             return (
@@ -206,6 +246,7 @@ function CopiesScreen({
             );
           })}
           <ul aria-label={`${KIND_LABEL[kind]} activity`} className={ROWS_CARD}>
+            {waiting && <HeldCancelRow item={waiting} onCancelled={onNote} />}
             <NftActivityRow target={{ kind, scope: scope.id }} />
           </ul>
           <p className={SUB}>{EDITION_DEMO_LINE}</p>

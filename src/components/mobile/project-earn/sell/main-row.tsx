@@ -14,25 +14,34 @@
 //     card; `?list=1` opens it once, on arrival (Publish › Sell of a Private
 //     project);
 //   – Buy now (14b): Edit listing and Remove listing rows; View on marketplace;
-//   – Auction (14e, 14k, 14l): the time chip, "An auction can't be changed
-//     once it starts.", Bidding History (n) (14f), and Close auction (14g,
-//     14m) in the bottom bar, off with its hint until it ends;
+//   – Auction (14e, 14k, 14l): the time chip, Bidding History (n) (14f), and
+//     Close auction (14g, 14m) in the bottom bar, off with its hint until it
+//     ends; while nobody has bid and it hasn't ended, a Cancel auction row
+//     (CL-016: "Cancel the auction?", Keep it · Cancel auction, everything
+//     checked again at the press); once someone bids, "An auction can't be
+//     cancelled once someone bids.";
+//   – a live listing a buyer is paying for reads "In checkout · a buyer is
+//     paying now" on its row and its screen (CL-016);
 //   – Paused (14d): what changed, "To relist:" (ready / missing with Generate
-//     videos), Relist in the bottom bar (off until ready), Edit · Remove;
+//     videos), Relist in the bottom bar (with a video missing it opens the
+//     videos sheet first), Edit · Remove;
+//   – signed while a video still renders or waits for review (CL-030): the row
+//     says "Waiting for videos" and the screen leads with the waiting block,
+//     Review videos in the bar and Cancel listing as a row; a relist the same;
 //   – every minted state: Activity and Mint details (Minting, Token, Signature
 //     with Copy signature, Payout wallet and its change while lazy) as rows.
 // Remove (14c) asks first and pays the network fee only on chain.
 
 import * as React from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Certificate01Icon, Clock01Icon, Copy01Icon, Delete02Icon, PencilEdit01Icon, Store01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, Certificate01Icon, Clock01Icon, Copy01Icon, Delete02Icon, PencilEdit01Icon, Store01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { unlistTracksIfLocked } from "@/components/marketplace/purchase-dialog";
-import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
+import { dialogBlockerOf, videosWaitOf } from "@/components/projects/details/readiness-dialog";
 import { useCommitCheck, useCommitGate } from "@/components/projects/earn/ladder/level-check";
 import { earnSourceOf } from "@/components/projects/earn/ladder/use-earn-facts";
 import { makerShareNow, refusedCopy, sellRecheckOf } from "@/components/projects/listing/listing-dialog";
@@ -40,6 +49,11 @@ import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useMint } from "@/components/wallet/use-mint";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { auctionStateOf, type SettleResult } from "@/lib/market/auction";
+import { IN_CHECKOUT_OWNER_LINE } from "@/lib/market/checkout-hold";
+import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
+import { hold, heldId, type HeldMain, type HeldRelist } from "@/lib/market/held";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { readProjectVideos } from "@/lib/video/store";
 import { earnPairOf, mainRowStateOf } from "@/lib/manual/earn-view";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { can } from "@/lib/manual/permissions";
@@ -48,8 +62,9 @@ import type { MetaPart, NextAction } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
 import { outcomeView, type OutcomeRow } from "@/lib/manual/rail-copy";
 import { phoneMarketHref, phoneMintHref } from "@/lib/manual/phone-earn";
-import { closeListing, relistChecklist, relistListing, removeListing } from "@/lib/market/listing";
+import { cancelAuction, closeListing, relistChecklist, relistListing, removeListing } from "@/lib/market/listing";
 import {
+  AUCTION_CANCELLED_ANNOUNCEMENT,
   RELISTED_ANNOUNCEMENT,
   REMOVED_ANNOUNCEMENT,
   biddingHistoryLabel,
@@ -97,11 +112,19 @@ import {
 } from "./parts";
 import { useBackState } from "../../nav-trail";
 import { T } from "../../type";
+import { HeldCancelRow, HeldCard, HeldChip, ReviewVideosButton, useHeldItems } from "../video/held";
 
 const LIST_HANDLED = ["videos", "ownership"] as const;
+/** A relist signed while a video is still being made (CL-030). */
+const HELD_RELIST_LINE = "Signed. It goes back on Explore marketplace when every video is ready.";
 const RELIST_HANDLED = ["videos"] as const;
 
-type Open = "gate" | "form" | "edit" | "remove" | "bids" | "close" | "mint" | null;
+type Open = "gate" | "form" | "edit" | "remove" | "bids" | "close" | "cancel" | "mint" | null;
+
+/** "Buy now · 10% of the project" — a waiting listing's use. */
+const heldUseOf = (l: Listing) => `${l.type === "auction" ? "Auction" : "Buy now"} · ${l.percentSelling}% of the project`;
+/** A waiting listing's price: Buy now's, else the auction's opening bid. */
+const heldPriceOf = (l: Listing) => formatAmount((l.type === "auction" ? l.minBid : l.price) ?? "0", l.token);
 
 /** A fact's parts: text, or a time with its full date as the title. */
 export function Parts({ parts }: { parts: readonly MetaPart[] }) {
@@ -132,17 +155,25 @@ function useMainState() {
   const { project, view, viewer, brief } = useEarn();
   const pair = earnPairOf(project, view.summary, brief, viewer, view.canCtx);
   const add = [pair.first, pair.second].find((a): a is Extract<NextAction, { kind: "add-to-marketplace" }> => a?.kind === "add-to-marketplace") ?? null;
+  // A buyer's checkout holds the live listing (CL-016): its row and screen say so.
+  const holds = useCheckoutHolds();
+  const inCheckout = view.listing.kind === "live" && holds.any(view.listing.listing.id) > 0;
   const state = mainRowStateOf({
     status: view.summary.status,
     listing: view.listing,
     locked: view.lock !== null,
     canList: add !== null,
     manage: can(viewer, "facts.seeOwnerOnly") && (view.listing.kind === "live" || view.listing.kind === "paused"),
+    inCheckout,
   });
   const { check, ready } = useCommitGate("list", earnSourceOf(project, view, brief), { handled: LIST_HANDLED });
   const steps = state.action === "list" && ready && !check.ok;
   const minted = view.summary.status !== "draft" && view.mint.status !== "notMinted";
-  return { add, state, check, ready, steps, minted, blocked: add?.blocked ?? null };
+  // Signed while videos were still being made (CL-030): the listing, or a relist, waits for them.
+  const waiting = useHeldItems(project.id);
+  const heldMain = waiting.find((i): i is HeldMain => i.kind === "main") ?? null;
+  const heldRelist = waiting.find((i): i is HeldRelist => i.kind === "relist") ?? null;
+  return { add, state, check, ready, steps, minted, blocked: add?.blocked ?? null, inCheckout, heldMain, heldRelist };
 }
 
 export function MainRow() {
@@ -151,8 +182,13 @@ export function MainRow() {
   const pathname = usePathname();
   const toast = useToast();
   const main = useMainState();
-  const { state, add, ready, steps, minted, blocked } = main;
-  const firstStep = React.useCallback((): Open => (dialogBlockerOf(view.videos.readiness.sell) ? "gate" : "form"), [view.videos.readiness.sell]);
+  const { state, add, ready, steps, minted, blocked, heldMain } = main;
+  // The videos sheet opens first while a video is still being made: its rows and the note that the
+  // listing will wait for them (CL-030). It never holds the listing back once each one has started.
+  const firstStep = React.useCallback(
+    (): Open => (dialogBlockerOf(view.videos.readiness.sell) || videosWaitOf(view.videos.readiness.sell) ? "gate" : "form"),
+    [view.videos.readiness.sell],
+  );
   // What was open (the Main NFT screen, the videos gate) comes back after a trip to a product's
   // video and Back / Close (useBackState).
   const [open, setOpen] = useBackState<Open>("sell-main-open", state.action === "list" && !blocked && search.get("list") === "1" ? firstStep() : null);
@@ -177,13 +213,30 @@ export function MainRow() {
     announce(message);
     toast({ title: message });
   };
+  // A listing signed and waiting for its videos opens its screen too.
+  const [heldSeen, setHeldSeen] = React.useState(heldMain?.id ?? null);
+  if (heldSeen !== (heldMain?.id ?? null)) {
+    setHeldSeen(heldMain?.id ?? null);
+    if (heldMain) setScreen(true);
+  }
   const listing: Listing | null = "listing" in view.listing ? view.listing.listing : null;
   const left = main.check.ok ? 0 : main.check.missing.length;
   const extra = steps ? `${left} ${left === 1 ? "step" : "steps"} before you can list` : blocked;
+  const sellCount = videoCountOf(view.videos.readiness.sell);
 
   return (
     <>
-      {state.action === "mint" ? (
+      {heldMain ? (
+        <SellListRow
+          icon={KIND_ICON.main}
+          title="Main NFT"
+          chip={<HeldChip />}
+          state={[`${heldUseOf(heldMain.listing)} · ${heldPriceOf(heldMain.listing)}`]}
+          extra={`${sellCount.ready} of ${sellCount.total} videos ready`}
+          onClick={() => setScreen(true)}
+          label={`Main NFT: waiting for videos. ${sellCount.ready} of ${sellCount.total} videos ready`}
+        />
+      ) : state.action === "mint" ? (
         <SellListRow icon={KIND_ICON.main} title="Main NFT" state={[state.line]} href={phoneMintHref(project.id, "sell")} label={`Main NFT: ${state.line}. Sell`} />
       ) : minted ? (
         <SellListRow icon={KIND_ICON.main} title="Main NFT" state={[state.line]} live={state.live} extra={extra} onClick={() => setScreen(true)} />
@@ -197,6 +250,7 @@ export function MainRow() {
       {open === "remove" && listing && <RemoveSheet listing={listing} onClose={() => setOpen(null)} onDone={done} />}
       {open === "bids" && listing && <BidsSheet listing={listing} onClose={() => setOpen(null)} />}
       {open === "close" && listing && <CloseAuctionSheet listing={listing} now={now} onClose={() => setOpen(null)} onDone={done} />}
+      {open === "cancel" && listing && <CancelAuctionSheet listing={listing} onClose={() => setOpen(null)} onDone={done} />}
       {open === "mint" && <MintDetailsSheet onClose={() => setOpen(null)} />}
     </>
   );
@@ -217,8 +271,13 @@ function MainNftScreen({
 }) {
   const { project, view, viewer, brief, now, announce } = useEarn();
   const router = useRouter();
-  const { state, steps, check, blocked } = main;
+  const toast = useToast();
+  const { state, steps, check, blocked, inCheckout, heldMain, heldRelist } = main;
   const card = marketplaceCardOf(view.listing, { bids: view.bids, now });
+  const cancelled = (message: string) => {
+    announce(message);
+    toast({ title: message });
+  };
   const manage = can(viewer, "listing.manage", view.canCtx) && state.action === "manage";
   const reasonId = React.useId();
   const relist = useRelist(listing);
@@ -227,7 +286,10 @@ function MainNftScreen({
 
   let primary: React.ReactNode = null;
   let reason: string | null = null;
-  if (state.action === "list" && main.add && !steps && main.ready) {
+  const waitingItem = heldMain ?? (card.kind === "paused" ? heldRelist : null);
+  if (waitingItem) {
+    primary = <ReviewVideosButton projectId={project.id} />;
+  } else if (state.action === "list" && main.add && !steps && main.ready) {
     reason = blocked;
     primary = (
       <Button size="xl" className="w-full" aria-disabled={blocked ? true : undefined} aria-describedby={blocked ? reasonId : undefined} onClick={() => !blocked && onOpen(null)}>
@@ -243,8 +305,17 @@ function MainNftScreen({
     );
   } else if (manage && card.kind === "paused" && listing) {
     reason = relist.ready ? null : "Finish the items above to relist.";
+    // With a video missing or still being made, Relist opens the videos sheet first (the web's).
     primary = (
-      <Button size="xl" className="w-full" loading={relist.busy} disabled={!relist.ready || !relist.ladder.ok} aria-describedby={reason ? reasonId : undefined} onClick={() => void relist.run(relist.ready)}>
+      <Button
+        size="xl"
+        className={cn("w-full", !relist.ready && "cursor-not-allowed opacity-60")}
+        loading={relist.busy}
+        disabled={!relist.ladder.ok}
+        aria-disabled={!relist.ready || undefined}
+        aria-describedby={reason ? reasonId : undefined}
+        onClick={() => (relist.ready ? void relist.run(true) : relist.setGate(true))}
+      >
         {relist.busy ? "Relisting…" : "Relist"}
       </Button>
     );
@@ -264,19 +335,35 @@ function MainNftScreen({
     >
       <div className="flex flex-col gap-8 px-8 pb-12 pt-4">
         <p className={cn(T.meta, "break-words")}>{`Whole project · ${project.name}`}</p>
-        <MainSummary card={card} listing={listing} line={state.line} blocked={blocked} />
+        {heldMain ? (
+          <>
+            <SummaryCard
+              label="Main NFT"
+              overline="Main NFT"
+              chip={<HeldChip />}
+              headline={heldPriceOf(heldMain.listing)}
+              sub={heldUseOf(heldMain.listing)}
+              note="Signed · goes live when its videos are ready"
+            />
+            <HeldCard item={heldMain} projectId={project.id} products={view.products} />
+          </>
+        ) : (
+          <MainSummary card={card} listing={listing} line={state.line} blocked={blocked} inCheckout={inCheckout} />
+        )}
         {card.kind === "auction" && listing && auctionStateOf(listing, view.bids, now).phase === "endingSoon" && (
           <Banner tone="attention">Ends in under an hour. You can close it once it ends.</Banner>
         )}
         {steps && <StepsCard check={check} what="list" projectId={project.id} license={brief?.state.license ?? null} announce={announce} />}
-        {manage && card.kind === "paused" && listing && <RelistCard relist={relist} />}
+        {manage && card.kind === "paused" && listing && !heldMain && (heldRelist ? <HeldCard item={heldRelist} projectId={project.id} products={view.products} /> : <RelistCard relist={relist} />)}
         <ul aria-label="Main NFT" className={ROWS_CARD}>
+          {waitingItem && <HeldCancelRow item={waitingItem} onCancelled={cancelled} />}
           <NftActivityRow target={{ kind: "main" }} />
           {manage && card.kind === "auction" && <ActionRow icon={Clock01Icon} title={biddingHistoryLabel(card.bids)} onClick={() => onOpen("bids")} />}
+          {manage && card.kind === "auction" && card.cancellable && <ActionRow icon={Cancel01Icon} title="Cancel auction" danger onClick={() => onOpen("cancel")} />}
           {hasProof && <ActionRow icon={Certificate01Icon} title="Mint details" onClick={() => onOpen("mint")} />}
           {live && <ActionRow icon={Store01Icon} title="View on marketplace" onClick={() => router.push(phoneMarketHref(project.id))} />}
         </ul>
-        {manage && (card.kind === "buyNow" || card.kind === "paused") && (
+        {manage && !waitingItem && (card.kind === "buyNow" || card.kind === "paused") && (
           <ul aria-label="Your listing" className={ROWS_CARD}>
             <ActionRow icon={PencilEdit01Icon} title="Edit listing" onClick={() => onOpen("edit")} />
             <ActionRow icon={Delete02Icon} title="Remove listing" danger onClick={() => onOpen("remove")} />
@@ -288,8 +375,22 @@ function MainNftScreen({
 }
 
 /** The summary the Main NFT screen leads with, per listing state. */
-function MainSummary({ card, listing, line, blocked }: { card: ReturnType<typeof marketplaceCardOf>; listing: Listing | null; line: string; blocked: string | null }) {
+function MainSummary({
+  card,
+  listing,
+  line,
+  blocked,
+  inCheckout,
+}: {
+  card: ReturnType<typeof marketplaceCardOf>;
+  listing: Listing | null;
+  line: string;
+  blocked: string | null;
+  inCheckout: boolean;
+}) {
   const { view, now } = useEarn();
+  // A buyer is paying now (CL-016): the state line, in the live state's own colour.
+  const checkout = inCheckout ? <p className={cn(T.meta, "text-text-success")}>{IN_CHECKOUT_OWNER_LINE}</p> : null;
   if (card.kind === "buyNow" && listing) {
     return (
       <SummaryCard
@@ -305,7 +406,9 @@ function MainSummary({ card, listing, line, blocked }: { card: ReturnType<typeof
         ]}
         details={asFacts(card.facts)}
         note={MAIN_SALE_NOTE}
-      />
+      >
+        {checkout}
+      </SummaryCard>
     );
   }
   if (card.kind === "auction" && listing) {
@@ -321,7 +424,9 @@ function MainSummary({ card, listing, line, blocked }: { card: ReturnType<typeof
         facts={pick(card.facts, top ? ["Minimum bid", "Buy now price", "Ends"] : ["Buy now price", "Ends"])}
         details={asFacts(card.facts)}
         note={card.fixedNote}
-      />
+      >
+        {checkout}
+      </SummaryCard>
     );
   }
   if (card.kind === "paused" && listing) {
@@ -375,12 +480,17 @@ function useRelist(listing: Listing | null) {
   const ready = items.every((i) => i.ok);
   const ladder = useCommitCheck("list", earnSourceOf(project, view, brief), { handled: RELIST_HANDLED });
 
-  /** `videosReady`: the checklist's, or the gate sheet's own once it lets the relist through. */
+  /** `videosReady`: the checklist's, or the gate sheet's own once it lets the relist through. A video
+   *  still rendering or waiting for review (CL-030): the relist is signed now and waits off Explore
+   *  marketplace until every video is ready, then goes live by itself. */
   const run = async (videosReady: boolean) => {
     if (!listing || busy || !ladder.ok || !videosReady) return;
     setError(null);
     setBusy(true);
-    const result = await request(relistRequestOf(listing, project.name, changed), {
+    let heldRelist = false;
+    const built = relistRequestOf(listing, project.name, changed);
+    const waitingNow = videosBlockerOf(view.videos.readiness.relist) !== null;
+    const result = await request(waitingNow ? { ...built, doneLine: HELD_RELIST_LINE } : built, {
       recheck: () => {
         const m = readMarketNow();
         const cur = m.listings.find((l) => l.id === listing.id);
@@ -391,6 +501,11 @@ function useRelist(listing: Listing | null) {
       commit: (proof) => {
         const p = latest.current.projects.find((x) => x.id === project.id) ?? project;
         const m = readMarketNow();
+        const waitFor = videosBlockerOf(readinessOf(readinessFactsOf(p, view, brief, readProjectVideos(p.id), latest.current.jobs, proof.at), "relist"));
+        if (waitFor) {
+          heldRelist = true;
+          return hold({ id: heldId(), projectId: p.id, kind: "relist", at: proof.at, listingId: listing.id }).ok ? { ok: true } : { ok: false, message: refusedCopy("storage") };
+        }
         const next = relistListing(m.listings, listing.id, listingMetadataOf(p, view.products, proof.at), videosReady, proof.at, { creatorPct: makerShareNow(p, m) });
         if (!next.ok) return { ok: false, message: next.reason };
         const w = writeListings(next.listings);
@@ -399,8 +514,9 @@ function useRelist(listing: Listing | null) {
     });
     setBusy(false);
     if (result.ok) {
-      announce(RELISTED_ANNOUNCEMENT);
-      toast({ title: RELISTED_ANNOUNCEMENT });
+      const said = heldRelist ? HELD_RELIST_LINE : RELISTED_ANNOUNCEMENT;
+      announce(said);
+      toast({ title: said });
     } else if (result.reason !== "rejected") setError(result.message || refusedCopy("storage"));
   };
   return { items, ready, ladder, busy, error, gate, setGate, changed, run };
@@ -507,6 +623,68 @@ function RemoveSheet({ listing, onClose, onDone }: { listing: Listing; onClose: 
       }
     >
       <p className={T.body}>Nobody can see or buy it now. Its terms are kept, so you can list it again.</p>
+      {onChain && <p className={T.body}>Removing an on-chain listing costs a network fee (test tokens — no real cost).</p>}
+      {error && <Banner tone="error">{error}</Banner>}
+    </Sheet>
+  );
+}
+
+/** CL-016 · Cancel the auction? — an auction nobody has bid on comes down before it ends (the web's
+ *  cancel-auction-dialog.tsx): Keep it · Cancel auction in one row, an on-chain listing's network
+ *  fee asked of the wallet as Remove does. Everything is read again at the press; if it changed,
+ *  nothing is written and the sheet says why. While it works the sheet can't be closed. */
+function CancelAuctionSheet({ listing, onClose, onDone }: { listing: Listing; onClose: () => void; onDone: (message: string) => void }) {
+  const { project } = useEarn();
+  const { writeListings } = useMarket();
+  const { request } = useWalletRequest();
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const onChain = listing.mintingType === "instant";
+  /** The one write; null when it went through. */
+  const write = (at: number): string | null => {
+    const m = readMarketNow();
+    if (m.sales.some((s) => s.listingId === listing.id && s.item.nft === "main")) return "It has just sold, so it can't be cancelled.";
+    const next = cancelAuction(m.listings, listing.id, m.bids, at);
+    if (!next.ok) return next.reason;
+    const w = writeListings(next.listings);
+    return w.ok ? null : refusedCopy(w.reason);
+  };
+  const confirm = async () => {
+    if (busy) return;
+    setError(null);
+    const req = removeRequestOf(listing, project.name);
+    if (!req) {
+      const failed = write(Date.now());
+      return failed ? setError(failed) : onDone(AUCTION_CANCELLED_ANNOUNCEMENT);
+    }
+    setBusy(true);
+    const result = await request(req, {
+      commit: (proof) => {
+        const failed = write(proof.at);
+        return failed ? { ok: false, message: failed } : { ok: true };
+      },
+    });
+    setBusy(false);
+    if (result.ok) onDone(AUCTION_CANCELLED_ANNOUNCEMENT);
+    else if (result.reason !== "rejected") setError(result.message || refusedCopy("storage"));
+  };
+  return (
+    <Sheet
+      open
+      onClose={() => !busy && onClose()}
+      title="Cancel the auction?"
+      actions={
+        <div className="flex gap-4">
+          <Button hierarchy="secondary" size="xl" className="min-w-0 flex-1" disabled={busy} onClick={onClose}>
+            Keep it
+          </Button>
+          <Button hierarchy="danger" size="xl" className="min-w-0 flex-1" loading={busy} onClick={() => void confirm()}>
+            Cancel auction
+          </Button>
+        </div>
+      }
+    >
+      <p className={T.body}>Nobody has bid yet. The listing comes down and you can list it again.</p>
       {onChain && <p className={T.body}>Removing an on-chain listing costs a network fee (test tokens — no real cost).</p>}
       {error && <Banner tone="error">{error}</Banner>}
     </Sheet>

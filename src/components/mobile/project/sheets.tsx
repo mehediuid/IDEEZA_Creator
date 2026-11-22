@@ -17,7 +17,14 @@
 //   would be lost; blocked (web order: couldn't check → sold → auction →
 //   listed → co-owners), it says why and where to fix it;
 // · 07d / 07e Share to Feed: every product's video, the project video, the
-//   story (500) and the owner's box; Share stays off with its reason;
+//   story (500) and the owner's box; Share stays off with its reason — a video
+//   never started ("Start every video first: …", CL-030). With every video
+//   started but some still rendering or waiting for review, the post waits off
+//   the Feed (lib/market/held.ts) and goes live by itself once they're ready;
+//   meanwhile the ⋯ row reads "Waiting for videos · goes live when they're
+//   ready" and opens the Videos sheet;
+// · each product's ready video in the readiness rows has a quiet Replace
+//   (CL-015): its form, filled from the take in use;
 // · 08 Publish: Keep private · Give to the community · Sell, each with its
 //   fee line; 08b readiness: Give and Sell first need every product's AI
 //   video and the project video, then go on to the mint (Earn).
@@ -44,6 +51,10 @@ import { useDescriptionAiAssist } from "@/components/projects/description-ai-ass
 import { useStoreWrite } from "@/components/projects/details/use-store-write";
 import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { openVideosPanel } from "@/components/video-jobs/videos-panel-store";
+import { hold, heldId } from "@/lib/market/held";
+import { phoneTakeHref } from "@/lib/video/phone-video";
+import { useHeldItems } from "../project-earn/video/held";
 import { useCreateHistory } from "@/lib/create/history";
 import { postIdOfProject } from "@/lib/innovations/slug";
 import { deletePlanOf, matchesTypedName } from "@/lib/manual/delete-plan";
@@ -56,13 +67,13 @@ import { DESCRIPTION_SAVED, WRITE_FAILED, checkDescription, checkProjectName, re
 import { deleteFactsOf, productRowsOf } from "@/lib/manual/project-read";
 import { formatDate, projectSummary } from "@/lib/manual/project-summary";
 import { PROJECT_DESC_COUNTER_FROM, PROJECT_DESC_MAX, PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
+import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
 import { STORY_MAX, sharePostBlocker } from "@/lib/manual/share-post";
-import { deleteFixOf, phoneHrefOf, phoneProjectPath, publishLineOf, readyOfLine } from "@/lib/manual/phone-project";
+import { deleteFixOf, phoneHrefOf, phoneProjectPath, phoneWords, publishLineOf, readyOfLine } from "@/lib/manual/phone-project";
 import { readMarketNow } from "@/lib/market/market-store";
 import { readNetwork } from "@/lib/network/store";
 import { useProjectVideos } from "@/lib/video/store";
-import { actionLabel, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
+import { REPLACE_LABEL, actionLabel, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
@@ -104,6 +115,8 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
   const canEdit = can(viewer, "project.rename", view.canCtx) || can(viewer, "project.editDescription", view.canCtx);
   const canShare = can(viewer, "project.showcase", view.canCtx);
   const shared = view.summary.showcase;
+  // The post signed while videos are still being made (CL-030): it waits for them.
+  const waitingShare = useHeldItems(project.id).some((i) => i.kind === "share");
   const onFeed = forSaleNow(view);
   // Minted with nothing for sale: sharing waits for a listing — unless it can never be listed again.
   const needsListing = canShare && !onFeed;
@@ -128,15 +141,17 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
                     ]
                   : []),
               ]
-            : [
-                {
-                  // A Draft can't share yet, nor a project with nothing for sale: the row says why
-                  // before the tap (Figma 07 10371:2201).
-                  label: !canShare ? "Share to Feed · Mint it first" : needsListing ? "Share to Feed · List it first" : "Share to Feed",
-                  icon: News01Icon,
-                  onSelect: () => (!canShare ? setMintFirst(true) : needsListing ? setListFirst(true) : onSheet({ kind: "share" })),
-                },
-              ]),
+            : waitingShare
+              ? [{ label: "Waiting for videos · goes live when they're ready", icon: News01Icon, onSelect: () => openVideosPanel(project.id) }]
+              : [
+                  {
+                    // A Draft can't share yet, nor a project with nothing for sale: the row says why
+                    // before the tap (Figma 07 10371:2201).
+                    label: !canShare ? "Share to Feed · Mint it first" : needsListing ? "Share to Feed · List it first" : "Share to Feed",
+                    icon: News01Icon,
+                    onSelect: () => (!canShare ? setMintFirst(true) : needsListing ? setListFirst(true) : onSheet({ kind: "share" })),
+                  },
+                ]),
         ]
       : []),
     ...(can(viewer, "project.delete") ? [{ label: "Delete project…", icon: Delete02Icon, destructive: true, onSelect: () => onSheet({ kind: "delete" }) }] : []),
@@ -537,6 +552,8 @@ export function ReadinessRows({
           const copy = statusCopy(p.video);
           const label = actionLabel(copy.action);
           const ready = p.video.state === "ready";
+          // A settled ready video: a new take, while the one in use stays until the maker chooses (CL-015).
+          const replaceFrom = p.video.state === "ready" && !p.video.next && !p.video.review ? p.video.take.id : null;
           const body = (
             <>
               <Thumb url={p.thumb}>
@@ -562,7 +579,20 @@ export function ReadinessRows({
                   {body}
                 </button>
               ) : (
-                <div className={cn(READY_ROW, "hover:bg-transparent")}>{body}</div>
+                <div className={cn(READY_ROW, "hover:bg-transparent")}>
+                  {body}
+                  {replaceFrom && (
+                    <Button
+                      hierarchy="ghost"
+                      size="lg"
+                      className="min-h-[44px] shrink-0"
+                      aria-label={`Replace ${p.name} video`}
+                      onClick={() => router.push(phoneTakeHref(project.id, p.productId, { from: replaceFrom }))}
+                    >
+                      {REPLACE_LABEL}
+                    </Button>
+                  )}
+                </div>
               )}
             </li>
           );
@@ -604,8 +634,15 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
   const storyId = React.useId();
   const share = () => {
     if (blocker) return;
-    setShowcase(project.id, true, undefined, { story: story.trim() });
-    toast({ title: "Shared to Feed" });
+    // Every video started, some still rendering or waiting for review (CL-030): the post waits off
+    // the Feed, then goes live by itself.
+    if (videosBlockerOf(readiness)) {
+      hold({ id: heldId(), projectId: project.id, kind: "share", at: Date.now(), story: story.trim() });
+      toast({ title: "Your post goes on Feed when every video is ready." });
+    } else {
+      setShowcase(project.id, true, undefined, { story: story.trim() });
+      toast({ title: "Shared to Feed" });
+    }
     onClose();
   };
   const reason = !story.trim() && ownership?.ok === false ? "Write your story and tick the box to share." : blocker;
@@ -623,7 +660,7 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <Banner tone="info">Every product needs an AI video, and the post needs your story.</Banner>
+      <Banner tone="info">{phoneWords(readinessCopy("showcase").info)}</Banner>
       <ReadinessRows readiness={readiness} projectId={project.id} />
       <div className="flex flex-col gap-2">
         <h3 className={T.section}>Write your story</h3>

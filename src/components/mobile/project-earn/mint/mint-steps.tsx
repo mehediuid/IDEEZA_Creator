@@ -24,6 +24,11 @@
 //   closed), the listing or what others can do, the videos, then View on
 //   marketplace and Open Earn as rows;
 // · MintShare — Share to Feed from Done, after a Sell (the flow mounts it then).
+// CL-030: Review's videos line says what hasn't started ("Start every video
+// first: …"), or that the listing waits ("… You don't have to wait. …"); Done
+// reads "Minted · listing waits for videos" with the waiting block for each
+// thing it signed; a share from Done while a video is still being made waits
+// off the Feed too.
 
 import * as React from "react";
 import Link from "next/link";
@@ -55,7 +60,8 @@ import { displayProductName } from "@/lib/manual/products-tab-view";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { videosBlockerOf } from "@/lib/manual/readiness";
+import { videoCountOf, videosBlockerOf, videosStartBlockerOf } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
 import { STORY_MAX, sharePostBlocker } from "@/lib/manual/share-post";
 import { FEE_LABEL } from "@/lib/market/fee";
 import { listingViewOf } from "@/lib/market/listing";
@@ -66,7 +72,7 @@ import type { ListingMetadata } from "@/lib/market/types";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY } from "@/lib/video/types";
-import { actionLabel, projectActionLabel, projectRowCopy, statusCopy } from "@/lib/video/video-copy";
+import { actionLabel, heldNoteOf, projectActionLabel, projectRowCopy, statusCopy } from "@/lib/video/video-copy";
 import { mintCostRows, mintProofRows } from "@/lib/wallet/mint";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { walletFactLineOf } from "@/lib/wallet/request-view";
@@ -85,6 +91,7 @@ import { InfoButton, StepsCard, SummaryCard, useLiveReadiness } from "../sell/pa
 import { LIST_CARD, LIST_ROW, Chevron } from "../../kit/list";
 import { PRESSED } from "../../kit/press";
 import { T } from "../../type";
+import { HeldCard, useHeldItems } from "../video/held";
 
 export type MintGate = {
   /** Every current product's video state, and — when `gated` — whether the commit may go ahead. */
@@ -568,7 +575,7 @@ export function MintReview({
         {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
       </section>
 
-      <VideosBlock projectId={project.id} readiness={gate.readiness} gated={gate.gated} />
+      <VideosBlock projectId={project.id} readiness={gate.readiness} gated={gate.gated} selling={selling} />
 
       <section aria-label="Cost" className={cn(LIST_CARD, "gap-6 p-8")}>
         {intent !== "save" && <CostCard type={type} network={state.network} intent={intent} listing={selling ? listingCostRow(input) : undefined} />}
@@ -591,10 +598,15 @@ export function MintReview({
 }
 
 /** Product videos (and the project video) as the gate reads them; what's missing opens where it's made. */
-function VideosBlock({ projectId, readiness, gated }: { projectId: string; readiness: Readiness; gated: boolean }) {
+function VideosBlock({ projectId, readiness, gated, selling }: { projectId: string; readiness: Readiness; gated: boolean; selling: boolean }) {
   const router = useRouter();
   const blocker = videosBlockerOf(readiness);
-  const line = !gated ? VIDEOS_OPTIONAL : (blocker ?? VIDEOS_READY);
+  // Every video started first (CL-030); one still rendering or waiting for review doesn't stop the
+  // signature — a Sell's listing waits for it.
+  const startBlocker = gated ? videosStartBlockerOf(readiness) : null;
+  const line = !gated
+    ? VIDEOS_OPTIONAL
+    : (startBlocker ?? (blocker ? (selling ? `${blocker} ${heldNoteOf("Explore marketplace", videoCountOf(readiness).total)}` : blocker) : VIDEOS_READY));
   const ok = gated && !blocker;
   const pv = readiness.project;
   const pvCopy = pv ? projectRowCopy(pv) : null;
@@ -757,9 +769,20 @@ export function MintDone({
   const listing = intent === "sell" ? listingViewOf(project.id, { ...market, now: clock, current: NO_METADATA }) : null;
   const listed = listing && listing.kind !== "none" ? listing.listing : null;
   const onMarket = listing?.kind === "live" || listing?.kind === "paused";
-  const badge = live ? DONE_BADGE[intent] : null;
-  const title = intent === "give" ? "Given to the community" : "Mint complete";
-  const subline = live ? (intent === "sell" ? LISTED_LINE : liveSubline(intent, ready > 0 || own.state === "ready")) : pendingSubline();
+  // A Sell signed while its videos still render or wait for review (CL-030): minted, and the listing
+  // waits off the marketplace — never "Listed" until it is.
+  const waiting = useHeldItems(project.id);
+  const toast = useToast();
+  const waitingSale = intent === "sell" && waiting.some((i) => i.kind === "main");
+  const badge = live && !waitingSale ? DONE_BADGE[intent] : null;
+  const title = waitingSale ? "Minted · listing waits for videos" : intent === "give" ? "Given to the community" : "Mint complete";
+  const subline = waitingSale
+    ? "It goes on Explore marketplace by itself when every video is ready — we'll tell you."
+    : live
+      ? intent === "sell"
+        ? LISTED_LINE
+        : liveSubline(intent, ready > 0 || own.state === "ready")
+      : pendingSubline();
   const licenseLabel = LICENSES.find((l) => l.value === state.license)?.label;
 
   const proof = project.mint ? mintProofRows(project.mint, { owner: true }, intent) : [];
@@ -822,7 +845,15 @@ export function MintDone({
         </section>
       )}
 
-      {!live && <Banner tone="info">{pendingCardLine(rendering)}</Banner>}
+      {waiting.length > 0 && (
+        <section aria-label="Waiting for videos" className="flex flex-col gap-4">
+          {waiting.map((item) => (
+            <HeldCard key={item.id} item={item} projectId={project.id} products={products} actions="inline" onCancelled={(title) => toast({ title })} />
+          ))}
+        </section>
+      )}
+
+      {!live && waiting.length === 0 && <Banner tone="info">{pendingCardLine(rendering)}</Banner>}
 
       <ul aria-label="Next" className={cn(LIST_CARD, "[&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border")}>
         <li className={cn(LIST_ROW, "hover:bg-transparent")}>
@@ -866,6 +897,9 @@ export function MintShare() {
   const readiness = useLiveReadiness("showcase");
   const [story, setStory] = React.useState(() => project.post?.story ?? brief?.state.story ?? "");
   const storyId = React.useId();
+  const waitingShare = useHeldItems(project.id).some((i) => i.kind === "share");
+  // Already waiting for its videos: Done's waiting block shows it.
+  if (waitingShare) return null;
   if (project.showcasedAt) {
     return (
       <Link href="/m" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "min-w-0 flex-1")}>
@@ -876,8 +910,14 @@ export function MintShare() {
   const blocker = dialogBlockerOf(readiness) ?? sharePostBlocker({ story });
   const share = () => {
     if (blocker) return;
-    setShowcase(project.id, true, undefined, { story: story.trim() });
-    toast({ title: "Shared to Feed" });
+    // A video still being made (CL-030): the post waits off the Feed, then goes live by itself.
+    if (videosBlockerOf(readiness)) {
+      hold({ id: heldId(), projectId: project.id, kind: "share", at: Date.now(), story: story.trim() });
+      toast({ title: "Your post goes on Feed when every video is ready." });
+    } else {
+      setShowcase(project.id, true, undefined, { story: story.trim() });
+      toast({ title: "Shared to Feed" });
+    }
     setOpen(false);
   };
   return (
