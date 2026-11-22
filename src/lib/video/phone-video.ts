@@ -13,7 +13,7 @@ import { phoneProjectHref } from "../manual/phone-project";
 import { etaLabel, progressOf, type VideoJob } from "./jobs";
 import * as pv from "./product-video";
 import { FAILURE_COPY, clockOf, moreToastsLine } from "./video-copy";
-import { PROJECT_VIDEO_KEY, type OnScreenLines, type ProductVideo, type VideoFailureKind, type VideoQuality } from "./types";
+import { PROJECT_VIDEO_KEY, type OnScreenLines, type ProductVideo, type ProductVideoStatus, type VideoFailureKind, type VideoQuality } from "./types";
 
 const enc = encodeURIComponent;
 
@@ -24,6 +24,15 @@ const enc = encodeURIComponent;
 export function phoneTakeHref(projectId: string, productId: string, take: { review: string } | { from: string }): string {
   const q = "review" in take ? `review=${enc(take.review)}` : `from=${enc(take.from)}`;
   return `${phoneProductVideoHref(projectId, productId)}?${q}`;
+}
+
+/** Where a product's video action (Generate AI video · Review · Try again) opens on the phone, as
+ *  the web's readiness row opens Generate video over its dialog: a take waiting for review opens
+ *  on it; anything else opens the product's Generate video screen, which shows what it has (the
+ *  form, or the failed take). Never the product's page: the video isn't made there. */
+export function phoneVideoActionHref(projectId: string, productId: string, video: ProductVideoStatus): string {
+  const waiting = video.state === "review" ? video.take : video.state === "ready" ? video.review : undefined;
+  return waiting ? phoneTakeHref(projectId, productId, { review: waiting.id }) : phoneProductVideoHref(projectId, productId);
 }
 
 /** The phone's Project video screen (03d), on a take's review when given. */

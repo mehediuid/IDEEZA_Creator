@@ -53,7 +53,8 @@ import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog"
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { openVideosPanel } from "@/components/video-jobs/videos-panel-store";
 import { hold, heldId } from "@/lib/market/held";
-import { phoneTakeHref } from "@/lib/video/phone-video";
+import { phoneTakeHref, phoneVideoActionHref } from "@/lib/video/phone-video";
+import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useHeldItems } from "../project-earn/video/held";
 import { useCreateHistory } from "@/lib/create/history";
 import { postIdOfProject } from "@/lib/innovations/slug";
@@ -523,9 +524,11 @@ function useLiveReadiness(purpose: ReadinessPurpose) {
 
 const READY_ROW = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
 
-/** Each product with its video's state and the web's action (Generate AI video…) as one row tap,
- *  then the project video's row. `projectVideo={false}` leaves that row out (the Project video
- *  screen). */
+/** Each product with its video's state and the web's action (Generate AI video…) as one row tap
+ *  that opens that product's video maker, as the web's row opens Generate video over its dialog;
+ *  Back or Close there returns here with this sheet open again (useBackState), so the maker goes
+ *  on to the listing. Then the project video's row. `projectVideo={false}` leaves that row out
+ *  (the Project video screen). */
 export function ReadinessRows({
   readiness,
   projectId,
@@ -536,7 +539,6 @@ export function ReadinessRows({
   projectVideo?: boolean;
 }) {
   const project = { id: projectId };
-  const productHref = (pid: string) => phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(pid)}`) ?? "#";
   const router = useRouter();
   const pv = projectVideo ? readiness.project : null;
   const pvCopy = pv ? projectRowCopy(pv) : null;
@@ -571,11 +573,12 @@ export function ReadinessRows({
               {label && <Chevron />}
             </>
           );
-          // A product whose video is still to make is one whole-row tap to its page, where it is made.
+          // A product whose video is still to make (or to review, or to try again) is one whole-row
+          // tap to its video maker.
           return (
             <li key={p.productId} className={LIST_ROW}>
               {label ? (
-                <button type="button" onClick={() => router.push(productHref(p.productId))} className={READY_ROW}>
+                <button type="button" aria-label={`${displayProductName(p.name)}: ${label}`} onClick={() => router.push(phoneVideoActionHref(project.id, p.productId, p.video))} className={READY_ROW}>
                   {body}
                 </button>
               ) : (

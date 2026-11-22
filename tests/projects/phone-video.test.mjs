@@ -163,3 +163,13 @@ test("the phone's addresses for a take", () => {
   assert.equal(v.phoneTakeHref("earn 2", "prd_lamp0001", { review: "take_x" }), "/m/projects/earn%202/products/prd_lamp0001/video?review=take_x");
   assert.equal(v.phoneProjectVideoHref("earn2"), "/m/projects/earn2/video");
 });
+
+test("a readiness row opens the product's video maker, never its page (owner 2026-11-22: the sheet closed and nothing happened)", () => {
+  const take = { id: "take_r1" };
+  const maker = "/m/projects/earn2/products/prd_lamp0001/video";
+  assert.equal(v.phoneVideoActionHref("earn2", "prd_lamp0001", { state: "none" }), maker);
+  assert.equal(v.phoneVideoActionHref("earn2", "prd_lamp0001", { state: "failed", take, failure: "render" }), maker);
+  // A take waiting for review opens on it, as the web's openGenerate does.
+  assert.equal(v.phoneVideoActionHref("earn2", "prd_lamp0001", { state: "review", take }), `${maker}?review=take_r1`);
+  assert.equal(v.phoneVideoActionHref("earn2", "prd_lamp0001", { state: "ready", take: { id: "t0" }, review: take }), `${maker}?review=take_r1`);
+});
