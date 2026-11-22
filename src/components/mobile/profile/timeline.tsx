@@ -6,11 +6,11 @@
 //   and how long ago; "Only me" when only you see it.
 // · The words: the project's story or the share's caption, three lines, then Show more.
 // · The picture: it opens the clip on the Feed while it plays there, else the details; it says what
-//   kind it is ("Project · 3 products", "Product") and carries ▶ when it plays.
+//   was shared ("Project", "Product") and carries ▶ when it plays.
 // · The title (its details), "from <project>" for a product, "by <maker>" for someone else's work,
 //   and its current Activity.
-// · A project's products: a row of small pictures with their names, each opening its product (one
-//   product: one row, its picture is the post's).
+// · No product list or count: a post is one share, the project's details hold the rest (owner
+//   2026-11-22).
 // · What is on sale, in the marketplace's words ("Main NFT 0.3 ETH · Physical NFT from 0.02 ETH").
 // · The post's reactions (the Feed's stores); a share of yours has ⋯ › Remove from your Feed.
 // Ten first, then Show all.
@@ -23,7 +23,6 @@ import { Badge } from "@/components/ideeza/badge";
 import { kindChipOf, offerLineOf, sharedLineOf, type TimelinePost } from "@/lib/people/timeline";
 import { ageOf, shortDateOf } from "@/lib/people/phone-profile";
 import { cn } from "@/lib/utils";
-import { Chevron } from "../kit/list";
 import { MEDIA_CHIP } from "../kit/media";
 import { T } from "../type";
 import { ReactionRow } from "./parts";
@@ -61,47 +60,6 @@ function Caption({ text }: { text: string }) {
           {open ? "Show less" : "Show more"}
         </button>
       )}
-    </div>
-  );
-}
-
-/** A project's products: small pictures with their names, side by side, each opening its product.
- *  One product is the post's own picture already, so it is one row: "Product · PlantPal ›". */
-function Products({ post }: { post: TimelinePost }) {
-  if (post.products.length === 0) return null;
-  if (post.products.length === 1) {
-    const p = post.products[0];
-    return (
-      <Link href={p.href} className={cn("-mx-6 flex min-h-[44px] items-center gap-4 rounded-md px-6 hover:bg-bg-subtle", FOCUS)}>
-        <span className={cn(T.label, "shrink-0")}>Product</span>
-        <span className={cn(T.body, "min-w-0 flex-1 truncate text-text-primary")}>{p.name}</span>
-        <Chevron />
-      </Link>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-3">
-      <span className={T.label}>Products · {post.products.length}</span>
-      <ul
-        aria-label={`Products in ${post.title}`}
-        className="-mx-8 m-0 flex list-none gap-4 overflow-x-auto px-8 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {post.products.map((p) => (
-          <li key={p.id} className="w-[104px] shrink-0">
-            <Link href={p.href} className={cn("flex flex-col gap-2 rounded-md", FOCUS)}>
-              <span className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-md bg-bg-subtle text-[color:var(--color-icon-default)]">
-                {p.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-                ) : (
-                  <Icon icon={CpuIcon} size={24} />
-                )}
-              </span>
-              <span className={cn(T.meta, "line-clamp-2 break-words text-text-primary")}>{p.name}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
@@ -157,7 +115,6 @@ function TimelineCard({ post, now, onMore }: { post: TimelinePost; now: number; 
           </span>
         )}
       </div>
-      <Products post={post} />
       {offers && (
         <p className={cn(T.meta, "flex items-start gap-2")}>
           <span className="mt-[2px] shrink-0 text-[color:var(--color-icon-default)]">

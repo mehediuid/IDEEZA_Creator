@@ -35,7 +35,7 @@ const clip = (over = {}) => ({
   ...over,
 });
 
-test("a project post carries its products, its clip and what is on sale", () => {
+test("a project post is the share: its words, its clip and what is on sale, no product list", () => {
   const post = projectPostOf({
     projectId: "p_1",
     postId: "mine:p_1",
@@ -44,62 +44,42 @@ test("a project post carries its products, its clip and what is on sale", () => 
     at: 100,
     cover: "/c.jpg",
     stage: "Prototype",
-    products: [
-      { id: "lamp", name: "VoxLamp", image: "/l.jpg" },
-      { id: "plug", name: " ", image: null },
-    ],
     clip: { id: "mine:p_1", offers: [{ kind: "main", price: "0.3 ETH", use: null, sold: null }] },
   });
   assert.equal(post.title, "Smart Home Kit");
   assert.equal(post.caption, "Built for my flat.");
   assert.equal(post.playHref, "/m/clip/mine%3Ap_1");
   assert.equal(post.detailsHref, "/m/projects/p_1");
-  assert.deepEqual(
-    post.products.map((p) => [p.name, p.href]),
-    [
-      ["VoxLamp", "/m/projects/p_1/products/lamp"],
-      ["Untitled product", "/m/projects/p_1/products/plug"],
-    ],
-  );
-  assert.equal(kindChipOf(post), "Project · 2 products");
+  assert.equal("products" in post, false, "the project's products belong on its details");
+  assert.equal(kindChipOf(post), "Project");
   assert.equal(sharedLineOf(post), "Shared a project");
 });
 
 test("a project post off the marketplace has no clip and nothing on sale; the picture opens the project", () => {
-  const post = projectPostOf({ projectId: "p_2", postId: "mine:p_2", title: "", caption: "", at: 1, cover: null, stage: null, products: [{ id: "a", name: "A", image: null }], clip: null });
+  const post = projectPostOf({ projectId: "p_2", postId: "mine:p_2", title: "", caption: "", at: 1, cover: null, stage: null, clip: null });
   assert.equal(post.title, "Untitled project");
   assert.equal(post.playHref, null);
   assert.deepEqual(post.offers, []);
-  assert.equal(kindChipOf(post), "Project · 1 product");
 });
 
 test("a share of someone else's product names them and its project; your own work has no 'by'", () => {
   const share = { id: "s1", clipId: "p3~remote", caption: " Look at this ", audience: "public", at: 50 };
-  const theirs = sharePostOf(share, clip(), { projectTitle: "Smart Garden", products: [{ id: "x", name: "X", image: null }], ownerId: "me" });
+  const theirs = sharePostOf(share, clip(), { projectTitle: "Smart Garden", ownerId: "me" });
   assert.equal(sharedLineOf(theirs), "Shared Leo Park’s product");
   assert.equal(theirs.from, "Smart Garden");
   assert.equal(theirs.caption, "Look at this");
   assert.equal(theirs.detailsHref, "/m/projects/p3/products/remote");
   assert.equal(kindChipOf(theirs), "Product");
-  assert.deepEqual(theirs.products, [], "a product share shows the product, not a strip");
-  const mine = sharePostOf(share, clip({ source: "mine", kind: "project", productId: null, title: "Kit", projectId: "p_9" }), {
-    projectTitle: null,
-    products: [
-      { id: "a", name: "Lamp", image: null },
-      { id: "b", name: "Plug", image: null },
-    ],
-    ownerId: "me",
-  });
+  const mine = sharePostOf(share, clip({ source: "mine", kind: "project", productId: null, title: "Kit", projectId: "p_9" }), { projectTitle: null, ownerId: "me" });
   assert.equal(mine.by, null);
-  assert.equal(kindChipOf(mine), "Project · 2 products", "a shared project shows its products, as its own post does");
-  assert.equal(mine.products[1].href, "/m/projects/p_9/products/b");
   assert.equal(mine.from, null);
+  assert.equal(kindChipOf(mine), "Project");
   assert.equal(sharedLineOf(mine), "Shared a project");
 });
 
 test("newest first; a public view leaves out Only me shares", () => {
   const a = sharePostOf({ id: "a", clipId: "x", caption: "", audience: "only-me", at: 30 }, clip(), { projectTitle: null, ownerId: "me" });
-  const b = projectPostOf({ projectId: "p", postId: "mine:p", title: "P", caption: "", at: 20, cover: null, stage: null, products: [], clip: null });
+  const b = projectPostOf({ projectId: "p", postId: "mine:p", title: "P", caption: "", at: 20, cover: null, stage: null, clip: null });
   const c = sharePostOf({ id: "c", clipId: "x", caption: "", audience: "public", at: 10 }, clip(), { projectTitle: null, ownerId: "me" });
   assert.deepEqual(timelineOf([c, b, a], false).map((p) => p.key), ["share:a", "post:mine:p", "share:c"]);
   assert.deepEqual(timelineOf([c, b, a], true).map((p) => p.key), ["post:mine:p", "share:c"]);

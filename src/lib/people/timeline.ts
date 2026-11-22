@@ -1,19 +1,18 @@
 // A profile's Timeline on the phone (owner 2026-11-22: "a timeline on my profile — which projects I
 // share, which products, what kind"): every post the creator put on the Feed, newest first.
 // · A project they shared ("Share to Feed" on its page, `showcasedAt`; a sample creator's post): the
-//   project with its story, its picture, its current Activity, every product in it, and what of it
-//   is on sale (Main NFT · Physical NFT · Virtual NFT, the marketplace's words).
+//   project with its story, its picture, its current Activity and what of it is on sale (Main NFT ·
+//   Physical NFT · Virtual NFT, the marketplace's words).
 // · A clip shared to their Feed with their words ("Share to your Feed"): a project or one product,
 //   theirs or someone else's, with the caption and who sees it (Public / Only me — only they see an
 //   Only me post, so a public view leaves it out).
-// The Projects tab (Featured + More projects) and the Activity tab stay as they were: other ways to
-// read the same work. Pure, relative imports only.
+// A post is one share, not the project's details (owner 2026-11-22: "a share is single — how many
+// products a project has, which ones, belongs on its details"): no product list, no product count;
+// the title opens the details. The Projects tab (Featured + More projects) and the Activity tab stay
+// as they were: other ways to read the same work. Pure, relative imports only.
 
 import type { ClipKind, ClipOffer, ClipOfferKind, FeedClip } from "../innovations/clips";
 import type { FeedShare, ShareAudience } from "../innovations/feed-prefs";
-
-/** A product inside a project post: its picture and name, opening its details. */
-export type TimelineProduct = { id: string; name: string; image: string | null; href: string };
 
 export type TimelinePost = {
   key: string;
@@ -36,8 +35,6 @@ export type TimelinePost = {
   detailsHref: string;
   /** The current Activity's name ("Prototype"); null for none. */
   stage: string | null;
-  /** A project post's products, in the project's order. */
-  products: TimelineProduct[];
   offers: ClipOffer[];
   /** The post its hearts, comments and views are keyed by. */
   postId: string;
@@ -67,7 +64,6 @@ export function projectPostOf(input: {
   at: number;
   cover: string | null;
   stage: string | null;
-  products: readonly { id: string; name: string; image: string | null }[];
   /** The project's clip on the Feed, when it plays there. */
   clip: Pick<FeedClip, "id" | "offers"> | null;
   base?: { appreciations: number; views: number };
@@ -86,7 +82,6 @@ export function projectPostOf(input: {
     playHref: input.clip ? phoneClipHref(input.clip.id) : null,
     detailsHref: phoneDetailsHref(input.projectId),
     stage: input.stage,
-    products: input.products.map((p) => ({ id: p.id, name: p.name.trim() || "Untitled product", image: p.image, href: phoneDetailsHref(input.projectId, p.id) })),
     offers: input.clip ? [...input.clip.offers] : [],
     postId: input.postId,
     base: input.base ?? { appreciations: 0, views: 0 },
@@ -95,13 +90,9 @@ export function projectPostOf(input: {
   };
 }
 
-/** A clip shared to the Feed with words, drawn as the post it shares: a project with its products, a
- *  product with its project's name. `ownerId` is the profile's person, so their own work carries no "by". */
-export function sharePostOf(
-  share: FeedShare,
-  clip: FeedClip,
-  ctx: { projectTitle: string | null; products?: readonly { id: string; name: string; image: string | null }[]; ownerId: string },
-): TimelinePost {
+/** A clip shared to the Feed with words, drawn as the post it shares (a product with its project's
+ *  name). `ownerId` is the profile's person, so their own work carries no "by". */
+export function sharePostOf(share: FeedShare, clip: FeedClip, ctx: { projectTitle: string | null; ownerId: string }): TimelinePost {
   const { projectTitle, ownerId } = ctx;
   return {
     key: `share:${share.id}`,
@@ -117,10 +108,6 @@ export function sharePostOf(
     playHref: phoneClipHref(clip.id),
     detailsHref: phoneDetailsHref(clip.projectId, clip.productId),
     stage: clip.stage,
-    products:
-      clip.kind === "project"
-        ? (ctx.products ?? []).map((p) => ({ id: p.id, name: p.name.trim() || "Untitled product", image: p.image, href: phoneDetailsHref(clip.projectId, p.id) }))
-        : [],
     offers: [...clip.offers],
     postId: clip.postId,
     base: clip.base,
@@ -139,11 +126,9 @@ export function sharedLineOf(post: Pick<TimelinePost, "kind" | "by">): string {
   return post.by ? `Shared ${post.by}’s ${post.kind}` : `Shared a ${post.kind}`;
 }
 
-/** The picture's chip: "Project · 3 products", "Project", "Product". */
-export function kindChipOf(post: Pick<TimelinePost, "kind" | "products">): string {
-  if (post.kind === "product") return "Product";
-  const n = post.products.length;
-  return n > 0 ? `Project · ${n} ${n === 1 ? "product" : "products"}` : "Project";
+/** The picture's chip: what was shared, "Project" or "Product". */
+export function kindChipOf(post: Pick<TimelinePost, "kind">): string {
+  return post.kind === "product" ? "Product" : "Project";
 }
 
 const ORDER: readonly ClipOfferKind[] = ["main", "physical", "virtual"];
