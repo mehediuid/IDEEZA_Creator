@@ -4,13 +4,14 @@
 // the web's Marketplace box (Main NFT / Physical NFT / Virtual NFT tabs, a Use choice, one Buy now) in a
 // phone's form. Every buyer screen that sells more than one thing uses these parts:
 // · PickTabs — Main NFT · Physical NFT · Virtual NFT (the web's tab names, only what the screen sells),
-//   the kit's M14 tabs inside
-//   the box, one panel at a time;
+//   the kit's M14 tabs inside the box, one panel at a time;
 // · Choice — a radio row: a use (Personal use / Business use) or another holder's copy, its price on the
 //   right, what it gets and how many are sold under it; a use that can't be bought stays, greyed, with
 //   why ("Sold out", "Not on sale"). No row has a Buy of its own;
 // · PickBar — the sticky bar: what is picked and its price ("Physical NFT · Personal use", "0.02 ETH · makes
-//   1 unit") with Change, which brings the box back into view, then Ask the creator as a chat icon beside
+//   1 unit") with Change while the box is scrolled away — it brings the box back into view; with the box on
+//   screen there is nothing to bring back, so Change isn't there (owner 2026-11-22: a Change that does
+//   nothing on a second press has no job) — then Ask the creator as a chat icon beside
 //   the one primary (Buy now, Place bid, Manage…). It always says what its button buys, so a press never
 //   buys something the buyer didn't see. Nothing to buy: Ask the creator alone, as the primary.
 // The wallet sheet says it too (D4): a request's title names what is bought (buyTitleOf).
@@ -43,6 +44,38 @@ export function revealBuyBox(behavior: ScrollBehavior = "smooth"): void {
   if (!box) return;
   scrollWithin(box, "start", behavior);
   box.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true });
+}
+
+/** True while most of the box is out of view (scrolled away under the top bar or below the bottom bar):
+ *  only then has the bar's Change something to do. It finds the box once it is on the page. */
+export function useBuyBoxAway(enabled: boolean): boolean {
+  const [away, setAway] = React.useState(false);
+  React.useEffect(() => {
+    if (!enabled || typeof IntersectionObserver === "undefined") return;
+    let io: IntersectionObserver | null = null;
+    let tries = 0;
+    let timer = 0;
+    const attach = () => {
+      const box = document.getElementById(BUY_BOX_ID);
+      if (!box) {
+        // The box mounts with the screen's data; look again for a little while.
+        if (tries++ < 40) timer = window.setTimeout(attach, 100);
+        return;
+      }
+      // Leave out the top bar (~56 px) and the bottom bar (~150 px): a box hidden under them is not in view.
+      io = new IntersectionObserver(([e]) => setAway(!e || e.intersectionRatio < 0.25), {
+        rootMargin: "-56px 0px -150px 0px",
+        threshold: [0, 0.25, 0.5, 1],
+      });
+      io.observe(box);
+    };
+    attach();
+    return () => {
+      window.clearTimeout(timer);
+      io?.disconnect();
+    };
+  }, [enabled]);
+  return enabled && away;
 }
 
 /** Main NFT · Physical NFT · Virtual NFT, only the tabs the screen sells; one tab draws nothing. */
@@ -139,10 +172,12 @@ export function PickBar({
   pick: BarPick | null;
   action: BarAction | null;
   reason?: string | null;
-  /** Bring the box back into view (Change); none where the box is the screen itself. */
+  /** Bring the box back into view (Change, shown only while the box is scrolled away); none where the box
+   *  is the screen itself. */
   onChange?: () => void;
 }) {
   const reasonId = React.useId();
+  const away = useBuyBoxAway(!!onChange && !!action && !!pick);
   if (!action || !pick) {
     return (
       <BottomBar className="pt-8">
@@ -161,7 +196,7 @@ export function PickBar({
           <span className={cn(T.rowTitle, "break-words")}>{pick.title}</span>
           <span className={cn(T.meta, "tabular-nums")}>{pick.line}</span>
         </span>
-        {onChange && (
+        {onChange && away && (
           <button type="button" onClick={onChange} className={cn(TEXT_LINK, "shrink-0")} aria-label={`Change what to buy (${pick.title})`}>
             Change
           </button>
