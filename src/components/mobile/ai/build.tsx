@@ -54,8 +54,10 @@ import {
 import { aboutTime, pickCost } from "@/lib/create/pieces";
 import { failedPieceNote, pieceWord, type PieceLite } from "@/lib/mobile-ai/flow";
 import { cn } from "@/lib/utils";
+import { PickList } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
+import { ProjectLimitCard } from "../plans/upsell";
 import { BuyCreditsSheet } from "./buy-credits-sheet";
 import { JobModel } from "./deliverables";
 import { T } from "../type";
@@ -80,6 +82,13 @@ type LeftOut = ConceptFlow["leftOutProducts"][number];
 
 // ─────────────────────────── the Build sheet ───────────────────────────
 
+// The plan's projects at Build (CL-034): when this build would start a new project and every one of the
+// plan's projects is in use, the sheet keeps its title, says so ("… would start a new project, and every
+// project on your plan is in use. Nothing has been charged."), and the plan's card takes the place of
+// everything that leads to paying — no spend lines, no Buy credits, no Build. "Use a project I have" turns
+// it into "Build it into" with the projects as pick rows; a pick points the build there and the usual
+// sheet comes back. ✕, swipe and the scrim still close it. No credit moves.
+
 export function BuildConfirmSheet({
   flow,
   gate,
@@ -93,6 +102,10 @@ export function BuildConfirmSheet({
 }) {
   const { hydrated, balance } = useCredits();
   const [buying, setBuying] = React.useState(false);
+  const [picking, setPicking] = React.useState(false);
+  const limit = flow.gateLimit;
+  // A closed sheet, or a project freed up, starts over at the card.
+  if (picking && (!gate || !limit)) setPicking(false);
   const cost = flow.state.cost;
   const n = flow.state.selected.length;
   const short = hydrated && balance < cost;
@@ -103,8 +116,9 @@ export function BuildConfirmSheet({
     const pieces = pick ? Object.values(pick).filter((c) => c.on).length : 6;
     return { id, name: row?.name ?? "Product", pieces, cost: pick ? pickCost(pick) : 0 };
   });
+  const listed = new Intl.ListFormat("en", { type: "conjunction" }).format(rows.map((r) => r.name));
   const build = async () => {
-    if (!gate || short) return;
+    if (!gate || short || limit) return;
     const result = await flow.confirmBuild(gate);
     if (result.booked) onBooked();
     else if (result.blocked) onBooked(result.blocked);
@@ -116,12 +130,14 @@ export function BuildConfirmSheet({
         onClose={() => !flow.submitting && onClose()}
         title={`Build ${n} ${n === 1 ? "product" : "products"}?`}
         description={
-          short
-            ? `You have ${balance} credits and this build needs ${cost}. Buy credits and the build starts — nothing is charged until it does.`
-            : "The build runs in the background. You can leave and we will tell you when it is ready."
+          limit
+            ? `${listed} would start a new project, and every project on your plan is in use. Nothing has been charged.`
+            : short
+              ? `You have ${balance} credits and this build needs ${cost}. Buy credits and the build starts — nothing is charged until it does.`
+              : "The build runs in the background. You can leave and we will tell you when it is ready."
         }
         actions={
-          short ? (
+          limit ? undefined : short ? (
             <>
               <Button size="xl" className="w-full" onClick={() => setBuying(true)}>
                 Buy credits
@@ -141,32 +157,53 @@ export function BuildConfirmSheet({
           )
         }
       >
-        <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
-          {rows.map((r, i) => (
-            <li key={r.id} className="flex flex-col gap-1 px-6 py-5">
-              <span className="flex items-baseline justify-between gap-4">
-                <span className={T.rowTitle}>{r.name}</span>
-                <span className={cn(T.meta, "shrink-0")}>
-                  {r.pieces} pieces · {r.cost} credits
-                </span>
-              </span>
-              {gate?.lines[i] && <span className={cn(T.meta, "text-text-tertiary")}>{gate.lines[i].replace(/^.*? — /, "")}</span>}
-            </li>
-          ))}
-        </ul>
-        <div className="flex flex-col gap-3 rounded-xl bg-bg-subtle p-7">
-          <p className={T.meta}>
-            Your concept images are a visual reference. The engineered output may differ from them.
-          </p>
-          <p className={T.meta}>
-            Automated design rule checks run on completion. If issues are found, you&apos;ll still receive the full output with a{" "}
-            <span className={cn(T.label, "text-text-primary")}>Draft</span> label and a list of what needs review.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Tag>{hydrated ? (short ? `You have ${balance} — ${cost - balance} short` : `${cost} credits · ${balance} → ${balance - cost} after`) : `${cost} credits`}</Tag>
-          <Tag>{aboutTime(flow.state.seconds).replace(/^about/, "About")}</Tag>
-        </div>
+        {limit ? (
+          picking ? (
+            <div className="flex flex-col gap-2 pb-4">
+              <p className={T.rowTitle}>Build it into</p>
+              <PickList
+                label="Choose a project"
+                value={null}
+                options={limit.projects.map((p) => ({ value: p.id, label: p.name, helper: p.detail }))}
+                onPick={(id) => {
+                  setPicking(false);
+                  limit.onUse(id);
+                }}
+              />
+            </div>
+          ) : (
+            <ProjectLimitCard className="mb-4" onUseExisting={limit.projects.length > 0 ? () => setPicking(true) : undefined} onLeave={onClose} />
+          )
+        ) : (
+          <>
+            <ul className={cn(LIST_CARD, LIST_DIVIDERS)}>
+              {rows.map((r, i) => (
+                <li key={r.id} className="flex flex-col gap-1 px-6 py-5">
+                  <span className="flex items-baseline justify-between gap-4">
+                    <span className={T.rowTitle}>{r.name}</span>
+                    <span className={cn(T.meta, "shrink-0")}>
+                      {r.pieces} pieces · {r.cost} credits
+                    </span>
+                  </span>
+                  {gate?.lines[i] && <span className={cn(T.meta, "text-text-tertiary")}>{gate.lines[i].replace(/^.*? — /, "")}</span>}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col gap-3 rounded-xl bg-bg-subtle p-7">
+              <p className={T.meta}>
+                Your concept images are a visual reference. The engineered output may differ from them.
+              </p>
+              <p className={T.meta}>
+                Automated design rule checks run on completion. If issues are found, you&apos;ll still receive the full output with a{" "}
+                <span className={cn(T.label, "text-text-primary")}>Draft</span> label and a list of what needs review.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Tag>{hydrated ? (short ? `You have ${balance} — ${cost - balance} short` : `${cost} credits · ${balance} → ${balance - cost} after`) : `${cost} credits`}</Tag>
+              <Tag>{aboutTime(flow.state.seconds).replace(/^about/, "About")}</Tag>
+            </div>
+          </>
+        )}
       </Sheet>
       <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={cost} />
     </>

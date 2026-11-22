@@ -4,10 +4,13 @@
 // the hero over the AI wash (one line, the pieces as chips), "Start from an
 // idea" with Shuffle as two-line chips right above the composer, and the
 // Prompt Box pinned at the foot with the credits line under it; out of
-// credits, one slim state row with Buy credits sits above the box. Typing
-// hides the ideas so the box can grow (02–04). Generate starts the web's chat
-// (createChat, with the Quality picked here, as Home does) and opens it; the
-// first render waits for the setup question, so nothing is charged yet.
+// credits, one slim state row sits above the box: "You're out of credits.
+// They refill on 8 Dec.", Buy credits (the sheet, Starter picked) and the next
+// plan's line (CL-032). Typing hides the ideas so the box can grow (02–04).
+// The box takes an inspiration image beside the mic (CL-027): Generate stores
+// it, then starts the web's chat (createChat, with the Quality picked here and
+// the picture, as Home does) and opens it; the first render waits for the
+// setup question, so nothing is charged yet.
 // ⋯ holds History and Buy credits. A tab root: no Back (the tab bar is the
 // way between tabs). `?chat=<id>` opens that chat in place of the start;
 // `?focus=1` puts the cursor in the Prompt Box.
@@ -15,49 +18,28 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { AiMagicIcon, ArrowDown01Icon, Clock01Icon, Coins01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, Clock01Icon, Coins01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Button } from "@/components/ideeza/button";
 import { Tag } from "@/components/ideeza/tag";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { ITEM_KINDS, ITEM_LABELS, useCreateHistory } from "@/lib/create/history";
-import { creditsLabel, defaultPick, pickCost } from "@/lib/create/pieces";
-import { DEFAULT_QUALITY, LAST_QUALITY_KEY, QUALITIES, QUALITY_INFO, readLastQuality, saveLastQuality, type RenderQuality } from "@/lib/create/quality";
+import { creditsLabel } from "@/lib/create/pieces";
+import type { PromptImage } from "@/components/dashboard/prompt-card";
 import { IDEAS, IDEAS_SHOWN, ideasAt } from "@/lib/mobile-ai/flow";
 import { Screen } from "../screen";
 import { MORE_ICON, TopBar } from "../top-bar";
 import { ActionSheet } from "../kit/sheet";
-import { PickSheet } from "../kit/pick-list";
+import { OutOfCreditsRow } from "../plans/upsell";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { BuyCreditsSheet } from "./buy-credits-sheet";
 import { CreditsFoot } from "./parts";
 import { PromptBox } from "./prompt-box";
+import { QualityPicker, useLastQuality } from "./quality";
 
 const PIECES_SHOWN = ITEM_KINDS.filter((k) => k !== "parts");
-
-// The Quality picked last, as Home keeps it (workspace-prompt.tsx): the next idea starts there.
-const listeners = new Set<() => void>();
-function subscribe(onChange: () => void) {
-  listeners.add(onChange);
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === LAST_QUALITY_KEY) onChange();
-  };
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners.delete(onChange);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-function useLastQuality(): [RenderQuality, (q: RenderQuality) => void] {
-  const value = React.useSyncExternalStore(subscribe, readLastQuality, () => DEFAULT_QUALITY);
-  const set = React.useCallback((q: RenderQuality) => {
-    saveLastQuality(q);
-    listeners.forEach((l) => l());
-  }, []);
-  return [value, set];
-}
 
 export function AiStart() {
   const router = useRouter();
@@ -81,15 +63,15 @@ export function AiStart() {
   const [offset, setOffset] = React.useState(0);
   const [menu, setMenu] = React.useState(false);
   const [buying, setBuying] = React.useState(false);
-  const [qualityOpen, setQualityOpen] = React.useState(false);
   const canRender = !hydrated || balance >= CONCEPT_COST;
   const inputId = "ai-start-prompt";
 
-  const generate = (text: string) => {
+  // `image`: the inspiration image, already stored by the box (prompt-box.tsx).
+  const generate = (text: string, image?: PromptImage) => {
     if (!canRender || submitting) return false;
     setSubmitting(true);
     try {
-      const session = createChat(text, { quality });
+      const session = createChat(text, { quality, ...image });
       router.push(`/m/ai/chat/${session.id}`);
     } catch {
       setSubmitting(false);
@@ -111,20 +93,10 @@ export function AiStart() {
         top={<TopBar actions={[{ icon: MORE_ICON, label: "More", onClick: () => setMenu(true) }]} />}
         footer={
           <div className="pt-4">
-            {/* Out of credits: one slim state row above the composer with its one action
-                (lens 5, owner rule: never a warning hung under the form). The box still
-                takes a draft; Generate stays held with its reason. */}
-            {hydrated && !canRender && (
-              <div role="status" className="mx-8 mb-4 flex items-center gap-4 rounded-xl bg-bg-error-subtle py-3 pl-6 pr-3">
-                <span className="shrink-0 text-[color:var(--color-icon-error)]">
-                  <Icon icon={Coins01Icon} size={18} />
-                </span>
-                <p className={cn(T.rowTitle, "min-w-0 flex-1")}>Not enough credits for a concept.</p>
-                <Button size="lg" onClick={() => setBuying(true)}>
-                  Buy credits
-                </Button>
-              </div>
-            )}
+            {/* Out of credits: one slim state row above the composer with its one action and the next
+                plan up (CL-032; owner rule: never a warning hung under the form). The box still takes a
+                draft; Generate stays held. */}
+            {hydrated && !canRender && <OutOfCreditsRow className="mx-8 mb-4" onBuy={() => setBuying(true)} />}
             <PromptBox
               inputId={inputId}
               value={prompt}
@@ -132,22 +104,9 @@ export function AiStart() {
               onSubmit={generate}
               placeholder="Describe your device"
               canSend={canRender}
-              sendReason="You are out of credits — top them up to draw a concept."
               busy={submitting}
-              extra={
-                <button
-                  type="button"
-                  aria-haspopup="dialog"
-                  onClick={() => setQualityOpen(true)}
-                  className={cn(T.label, "-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-3 text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
-                >
-                  <span className="sr-only">Quality: </span>
-                  {QUALITY_INFO[quality].label}
-                  <span className="inline-flex shrink-0">
-                    <Icon icon={ArrowDown01Icon} size={14} />
-                  </span>
-                </button>
-              }
+              takesImage
+              extra={<QualityPicker value={quality} onChange={setQuality} />}
             />
             <CreditsFoot right={`${creditsLabel(CONCEPT_COST)} per concept`} />
           </div>
@@ -223,15 +182,6 @@ export function AiStart() {
         ]}
       />
       <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={CONCEPT_COST} />
-      <PickSheet
-        open={qualityOpen}
-        onClose={() => setQualityOpen(false)}
-        title="Quality"
-        description="Every concept of this idea is drawn at it, and each product is built at it."
-        value={quality}
-        options={QUALITIES.map((q) => ({ value: q, label: QUALITY_INFO[q].label, helper: `${QUALITY_INFO[q].hint} · Build ${creditsLabel(pickCost(defaultPick(q)))} a product` }))}
-        onPick={setQuality}
-      />
     </div>
   );
 }

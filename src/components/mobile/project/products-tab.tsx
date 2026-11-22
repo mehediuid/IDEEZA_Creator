@@ -12,10 +12,14 @@
 //
 // Add a product is the web's dialog as one sheet with three steps:
 // · Choose (02b): Build with AI · Build manually;
-// · Build with AI (02c, 02e): the AI tab's Prompt Box (mic, Enhance, ✦), the
-//   web's cost line ("1 concept [credit] · you have n") and, out of credits,
-//   Top up credits; ✦ starts the chat that adds it (`createChat(prompt,
-//   { addTo })`), which opens on the AI tab — the web opens the chat too; Back;
+// · Build with AI (02c, 02e): the AI tab's Prompt Box — the mic, the
+//   inspiration image (CL-027), Quality (CL-021, the level picked last, here
+//   or on the AI tab), Enhance and ✦ — the web's cost line ("1 concept
+//   [credit] · you have n") and, out of credits, "You need 1 credit to start.
+//   You have 0." with Buy credits (Plan & pricing › Credits) and the next plan
+//   up (CL-032); ✦ stores the picture, then starts the chat that adds it
+//   (`createChat(prompt, { quality, addTo, ...image })`), which opens on the AI
+//   tab — the web opens the chat too; Back;
 // · Build manually (02d, 02g, 02h): the name ("Give the product a name."),
 //   then `addProduct` behind the edit gate. The editors need a computer
 //   (D3), so the phone adds it here and says so with a toast.
@@ -37,7 +41,10 @@ import { piecesOf } from "@/lib/manual/project-read";
 import { PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
 import { PRODUCT_SORTS, PRODUCT_TOOLS_FROM, filterProductRows, parseProductSort, phoneProjectHref, type ProductSort } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
+import type { PromptImage } from "@/components/dashboard/prompt-card";
 import { PromptBox } from "../ai/prompt-box";
+import { QualityPicker, useLastQuality } from "../ai/quality";
+import { PLAN_LINK, PlanLink } from "../plans/upsell";
 import { BottomBar } from "../kit/bottom-bar";
 import { PickSheet } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
@@ -47,7 +54,7 @@ import { PRESSED } from "../kit/press";
 import { T } from "../type";
 import { useProject } from "./context";
 import { BuildCheckLine, useProductRows } from "./product-rows";
-import { Chevron, LIST_ROW, ListCard, ProductRow, SubLine, TapLink } from "./parts";
+import { Chevron, LIST_ROW, ListCard, ProductRow, SubLine } from "./parts";
 
 /** 02f · A product a chat is building for this project (started from Build with AI): its newest
  *  build that isn't saved anywhere yet. The row opens that chat, where it is saved to the project. */
@@ -338,14 +345,17 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
   const { createChat } = useCreateHistory();
   const { hydrated, balance } = useCredits();
   const [prompt, setPrompt] = React.useState("");
+  // The AI tab's Quality, remembered across both boxes: the next idea starts at the one picked last.
+  const [quality, setQuality] = useLastQuality();
   const [starting, setStarting] = React.useState(false);
   const canRender = !hydrated || balance >= CONCEPT_COST;
   const short = `You need ${CONCEPT_COST} credit to start. You have ${balance}.`;
 
-  const start = (text: string) => {
+  // `image`: the inspiration image, already stored by the box; the new product's concept is drawn from it.
+  const start = (text: string, image?: PromptImage) => {
     if (starting || !canRender) return false;
     setStarting(true);
-    const chat = createChat(text, { addTo: project.id });
+    const chat = createChat(text, { quality, addTo: project.id, ...image });
     onStarted();
     router.push(`/m/ai/chat/${encodeURIComponent(chat.id)}`);
     return true;
@@ -363,6 +373,8 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
           canSend={canRender}
           sendReason={short}
           busy={starting}
+          takesImage
+          extra={<QualityPicker value={quality} onChange={setQuality} />}
         />
       </div>
       {canRender ? (
@@ -373,8 +385,12 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
       ) : (
         <div className="flex flex-col gap-2">
           <p className={cn(T.body, "text-text-error")}>{short}</p>
-          <div>
-            <TapLink href="/m/plans?tab=credits">Top up credits</TapLink>
+          {/* CL-032: the quick fix and the next plan up, one link style. */}
+          <div className="flex flex-col items-start">
+            <Link href="/m/plans?tab=credits" className={PLAN_LINK}>
+              Buy credits
+            </Link>
+            <PlanLink />
           </div>
         </div>
       )}

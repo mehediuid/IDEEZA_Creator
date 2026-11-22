@@ -10,12 +10,17 @@
 //   product — one grouped list: the described product always included, each
 //   other product a whole-row tick with why it is needed and the trash; the
 //   web's note behind ⓘ; Continue in a foot that sticks to the screen's foot;
-// · Which project is this for? (505–864): a sheet, for one product — the
-//   projects as pick rows in the sheet ("+ Start a new project" first, its
-//   name field under it), the decided products as a row back to the
-//   question; What should the project be
-//   called? (5110) for several, which make one new project. Start drawing
-//   shows the credits and stays off until there is a project. A chat started
+// · Which project is this for? (505–864): a sheet — the projects as pick rows
+//   in the sheet ("+ Start a new project" first, its name field under it),
+//   the decided products as a row back to the question. Several products may
+//   go into a project the maker has too (CL-034, D3: "Which project are these
+//   for?"); only a maker with no project to pick names a new one (5110, What
+//   should the project be called?). With every one of the plan's projects in
+//   use, "+ Start a new project" says so before it is picked ("3 of 3 used on
+//   Free · Builder gives you 20"), and picking it shows the plan's card in
+//   place of the name field; Start drawing waits with the web's reason, and
+//   nothing is drawn or charged. Start drawing shows the credits and stays
+//   off until there is a project. A chat started
 //   from a project's Add a product keeps that project (owner rule: it never
 //   makes a new one): nothing starts ticked, and the product question's
 //   button is Start drawing into it;
@@ -35,12 +40,14 @@ import { CreditBadge } from "@/components/credits/credit-badge";
 import { CONCEPT_COST } from "@/lib/create/credits";
 import type { SetupAnswer } from "@/lib/create/history";
 import { relativeLabel } from "@/components/create/use-clock";
+import { useNewProjectHint, useProjectRoom } from "@/components/projects/project-limit";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 import { Eyebrow } from "../kit/eyebrow";
 import { LIST_DIVIDERS, ListCard, ListRow } from "../kit/list";
 import { PickList } from "../kit/pick-list";
+import { ProjectLimitCard } from "../plans/upsell";
 import { DASHED } from "./parts";
 import type { SetupTurn } from "./use-concept-flow";
 
@@ -284,17 +291,42 @@ export function ProjectSheet({
 }) {
   const multi = products > 1;
   const addTo = projects.find((p) => p.preselect) ?? null;
-  // Several products with no project to add to name one new project; otherwise the question is which project.
-  const choosing = !multi || addTo !== null;
+  // With no project to pick from, several products only need a name for their new project; otherwise the
+  // question is which project — one the maker has, or a new one (CL-034, D3).
+  const choosing = !multi || addTo !== null || projects.length > 0;
   const [touched, setTouched] = React.useState<string | null>(null);
   const choice = touched ?? addTo?.id ?? null;
   const [name, setName] = React.useState("");
   const nameId = React.useId();
+  const existingRef = React.useRef<HTMLDivElement>(null);
+  // The plan's projects (CL-034): when they're all in use a new project can't start — the card takes the
+  // name field's place, before any credit is spent. When one frees up the name field comes back.
+  const room = useProjectRoom();
+  const newHint = useNewProjectHint();
   const isNew = !choosing || choice === NEW;
+  const newBlocked = room.full && isNew;
   const cost = products * CONCEPT_COST;
-  const ready = isNew ? name.trim().length > 0 : !!choice;
+  const ready = !newBlocked && (isNew ? name.trim().length > 0 : !!choice);
   const afford = canAfford(cost);
-  const reason = !ready ? (isNew ? "Name the project first" : "Pick a project first") : !afford ? "Not enough credits to draw these concepts" : (held ?? null);
+  const reason = newBlocked
+    ? choosing && projects.length > 0
+      ? "Pick a project you have, or upgrade"
+      : "Upgrade to start a new project"
+    : !ready
+      ? isNew
+        ? "Name the project first"
+        : "Pick a project first"
+      : !afford
+        ? "Not enough credits to draw these concepts"
+        : (held ?? null);
+  // "Use a project I have": the choice cleared and the maker's projects brought into view.
+  const useExisting = () => {
+    setTouched(null);
+    requestAnimationFrame(() => {
+      existingRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      existingRef.current?.querySelector<HTMLElement>("[role=option]")?.focus({ preventScroll: true });
+    });
+  };
 
   const start = () => {
     if (reason) return;
@@ -326,7 +358,9 @@ export function ProjectSheet({
         multi
           ? addTo
             ? `You're adding ${products} products to ${addTo.name}. You can pick another project, or start a new one.`
-            : `${products} products belong together, so they go in one new project.`
+            : choosing
+              ? `${products} products belong together, so they go in one project: one you have, or a new one.`
+              : `${products} products belong together, so they go in one new project.`
           : addTo
             ? `You're adding a product to ${addTo.name}. You can pick another project, or start a new one.`
             : "A single product can join a project you already have, or start a new one."
@@ -362,21 +396,21 @@ export function ProjectSheet({
           <PickList
             label="New project"
             value={choice}
-            options={[{ value: NEW, label: "+ Start a new project", helper: multi ? "These products become its first." : "This product becomes its first." }]}
+            options={[{ value: NEW, label: "+ Start a new project", helper: newHint ?? (multi ? "These products become its first." : "This product becomes its first.") }]}
             onPick={setTouched}
           />
-          {isNew && nameField}
+          {isNew && (newBlocked ? <ProjectLimitCard onUseExisting={projects.length > 0 ? useExisting : undefined} /> : nameField)}
           {projects.length > 0 && (
-            <>
+            <div ref={existingRef} className="flex scroll-mt-4 flex-col gap-2">
               <Eyebrow tone="tertiary" as="h3" className="pt-4">
                 Existing projects
               </Eyebrow>
               <PickList label="Existing projects" value={choice} options={projects.map((p) => ({ value: p.id, label: p.name, helper: p.detail }))} onPick={setTouched} />
-            </>
+            </div>
           )}
         </div>
       )}
-      {!choosing && nameField}
+      {!choosing && (newBlocked ? <ProjectLimitCard /> : nameField)}
     </Sheet>
   );
 }

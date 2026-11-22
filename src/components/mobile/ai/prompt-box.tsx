@@ -15,12 +15,22 @@
 // the box (07); one with no recogniser keeps the mic off with its reason.
 // Every control is a 44 px tap target (the send and ✓ draw 32 inside it),
 // 8 px apart.
+//
+// The inspiration image (CL-027), where the box `takesImage` (the AI tab's
+// start and a project's Add a product › Build with AI, as the web's one AI
+// box): the image button beside the mic opens the picker (JPG, PNG or WebP;
+// a pasted picture counts too), the picture is cropped and shrunk in the page
+// (lib/create/inspiration-client.ts) and shows as a chip above the text — a
+// 32 × 24 thumbnail, its own file name and ✕. One per idea: another replaces
+// it. Send stores it first and hands it over with the text, so the chat opens
+// already holding it; if it can't be kept the idea stays here with the reason.
 
 import * as React from "react";
 import {
   AiMagicIcon,
   ArrowUp02Icon,
   Cancel01Icon,
+  ImageAdd01Icon,
   MagicWand01Icon,
   Mic01Icon,
   Refresh01Icon,
@@ -28,6 +38,9 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
+import type { PromptImage } from "@/components/dashboard/prompt-card";
+import { INSPIRATION_TYPES, pickProblem } from "@/lib/create/inspiration";
+import { shrinkInspiration, uploadInspiration } from "@/lib/create/inspiration-client";
 import { useVoiceInput } from "@/lib/voice/use-voice-input";
 import { cn } from "@/lib/utils";
 import { usePrePrompt } from "../kit/permission-sheet";
@@ -52,11 +65,13 @@ export function PromptBox({
   enhanceMode = "brief",
   extra,
   inputId,
+  takesImage = false,
 }: {
   value: string;
   onChange: (v: string) => void;
-  /** Called with the trimmed text; return false to keep the draft (nothing was started). */
-  onSubmit: (text: string) => boolean | void;
+  /** Called with the trimmed text (and the stored inspiration image, where the box takes one);
+   *  return false to keep the draft (nothing was started). */
+  onSubmit: (text: string, image?: PromptImage) => boolean | void;
   placeholder: string;
   /** The start screen generates (the AI sparkle); the chat sends (the arrow). */
   sendKind?: "generate" | "send";
@@ -70,12 +85,19 @@ export function PromptBox({
   /** Controls beside the mic (the start screen's Quality). */
   extra?: React.ReactNode;
   inputId?: string;
+  /** The inspiration image button, chip and upload (CL-027): the AI tab's start and Add a product. */
+  takesImage?: boolean;
 }) {
   const ta = React.useRef<HTMLTextAreaElement>(null);
   const [refining, setRefining] = React.useState(false);
   const [held, setHeld] = React.useState<string | null>(null);
   const [micOff, setMicOff] = React.useState(false);
   const [enhanceFailed, setEnhanceFailed] = React.useState(false);
+  // The inspiration image, shrunk in the page and kept here until send stores it with the idea.
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [inspiration, setInspiration] = React.useState<{ dataUrl: string; name: string } | null>(null);
+  const [imageError, setImageError] = React.useState<string | null>(null);
+  const [uploading, setUploading] = React.useState(false);
   // Offline, nothing here reaches the model: send and Enhance are held with the reason.
   const online = useOnline();
   const mic = usePrePrompt("microphone", { body: "To describe your device by voice. You can always type it instead." });
@@ -113,10 +135,11 @@ export function PromptBox({
   }, [value, listening]);
 
   const trimmed = value.trim();
-  const ready = !!trimmed && canSend && online && !disabled && !busy && !refining;
+  const ready = !!trimmed && canSend && online && !disabled && !busy && !refining && !uploading;
+  const working = busy || uploading;
 
-  const send = () => {
-    if (busy || disabled) return;
+  const send = async () => {
+    if (busy || disabled || uploading) return;
     if (!trimmed) {
       ta.current?.focus();
       return;
@@ -127,6 +150,24 @@ export function PromptBox({
     }
     if (!canSend) {
       setHeld(sendReason ?? null);
+      return;
+    }
+    // The picture goes up first, so the chat opens already holding it; if it can't be kept,
+    // the idea waits here with the reason rather than opening without it.
+    if (takesImage && inspiration) {
+      setUploading(true);
+      setImageError(null);
+      const up = await uploadInspiration(inspiration.dataUrl);
+      setUploading(false);
+      if ("error" in up) {
+        setImageError(up.error);
+        return;
+      }
+      const kept = onSubmit(trimmed, { inspiration: up.url, inspirationName: inspiration.name });
+      if (kept !== false) {
+        onChange("");
+        setInspiration(null);
+      }
       return;
     }
     const kept = onSubmit(trimmed);
@@ -153,6 +194,26 @@ export function PromptBox({
     } finally {
       setRefining(false);
     }
+  };
+
+  const takeImage = async (file: File) => {
+    const problem = pickProblem(file);
+    if (problem) {
+      setImageError(problem);
+      return;
+    }
+    try {
+      const dataUrl = await shrinkInspiration(file);
+      setInspiration({ dataUrl, name: file.name || "Pasted image" });
+      setImageError(null);
+    } catch {
+      setImageError("We couldn't open that picture — try a JPG or PNG.");
+    }
+  };
+  const dropImage = () => {
+    setInspiration(null);
+    setImageError(null);
+    requestAnimationFrame(() => ta.current?.focus());
   };
 
   // KIT-PM-03: the first time, a pre-prompt says why before the browser asks.
@@ -184,6 +245,25 @@ export function PromptBox({
           disabled ? "border-border-subtle" : "border-[var(--color-input-border-focus)]",
         )}
       >
+        {/* The picture going with the idea, small: a thumbnail, its own file name and ✕ (no title
+            or explanation beside it, owner 2026-11-01). */}
+        {takesImage && inspiration && !listening && (
+          <div className="-mb-4 flex">
+            <div className="inline-flex min-w-0 max-w-full items-center gap-4 rounded-lg border-[length:var(--border-width-1)] border-solid border-border py-2 pl-2">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a data URL made in this page */}
+              <img src={inspiration.dataUrl} alt="Your inspiration image" width={32} height={24} className="h-[24px] w-[32px] shrink-0 rounded-sm object-cover" />
+              <span className={cn(T.caption, "min-w-0 truncate")}>{inspiration.name}</span>
+              <button
+                type="button"
+                onClick={dropImage}
+                aria-label={`Remove ${inspiration.name}`}
+                className="-my-5 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:text-text-primary active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                <Icon icon={Cancel01Icon} size={14} />
+              </button>
+            </div>
+          </div>
+        )}
         {listening ? (
           <div className="flex min-h-[24px] flex-col gap-3" role="status" aria-live="polite">
             <p className={cn(T.body, "inline-flex items-center gap-3")}>
@@ -207,9 +287,20 @@ export function PromptBox({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                send();
+                void send();
               }
             }}
+            onPaste={
+              takesImage
+                ? (e) => {
+                    // A pasted picture is an inspiration image; pasted text stays text.
+                    const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+                    if (!file) return;
+                    e.preventDefault();
+                    void takeImage(file);
+                  }
+                : undefined
+            }
             placeholder={placeholder}
             aria-label={placeholder}
             className={cn(T.bodyLg, "block min-h-[24px] w-full resize-none bg-transparent outline-none placeholder:text-[color:var(--color-input-placeholder)] disabled:cursor-not-allowed")}
@@ -255,7 +346,7 @@ export function PromptBox({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-4">
+          <div className={cn("flex flex-wrap items-center", takesImage ? "gap-x-2 gap-y-4" : "gap-4")}>
             <button
               type="button"
               onClick={startVoice}
@@ -266,45 +357,72 @@ export function PromptBox({
             >
               <Icon icon={Mic01Icon} size={20} />
             </button>
+            {takesImage && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={disabled}
+                  aria-label={inspiration ? "Change the inspiration image" : "Add an inspiration image"}
+                  className="-my-3 inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none transition-colors duration-fast hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:text-[color:var(--color-icon-disabled)] disabled:hover:bg-transparent"
+                >
+                  <Icon icon={ImageAdd01Icon} size={20} />
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept={INSPIRATION_TYPES.join(",")}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void takeImage(file);
+                  }}
+                />
+              </>
+            )}
             {extra}
-            <span className="flex-1" />
-            <button
-              type="button"
-              onClick={enhance}
-              disabled={disabled || !trimmed || refining || !online}
-              aria-busy={refining || undefined}
-              title={!online ? OFFLINE_REASON : undefined}
-              className={cn(
-                T.body, "-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:active:bg-transparent",
-                refining ? "text-text-brand" : "text-text-primary disabled:text-text-disabled",
-              )}
-            >
-              <span className={cn("inline-flex shrink-0", refining && "motion-safe:animate-spin")}>
-                <Icon icon={refining ? Refresh01Icon : MagicWand01Icon} size={16} />
-              </span>
-              Enhance
-            </button>
-            <button
-              type="button"
-              onClick={send}
-              aria-disabled={!ready || undefined}
-              aria-busy={busy || undefined}
-              aria-label={sendKind === "generate" ? "Generate" : "Send"}
-              className={cn("group -my-3 -mr-3 inline-flex size-[44px] shrink-0 items-center justify-center outline-none", !(ready || busy) && "cursor-not-allowed")}
-            >
-              <span
+            <span className="ml-auto flex shrink-0 items-center gap-4">
+              <button
+                type="button"
+                onClick={enhance}
+                disabled={disabled || !trimmed || refining || !online}
+                aria-busy={refining || undefined}
+                title={!online ? OFFLINE_REASON : undefined}
                 className={cn(
-                  "inline-flex size-[32px] items-center justify-center rounded-md transition-colors duration-fast group-focus-visible:ring-2 group-focus-visible:ring-border-focus",
-                  ready || busy
-                    ? "bg-bg-brand text-[color:var(--color-icon-on-brand)] group-hover:bg-bg-brand-hover group-active:bg-bg-brand-hover"
-                    : "bg-bg-subtle text-[color:var(--color-icon-disabled)]",
+                  T.body, "-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:active:bg-transparent",
+                  refining ? "text-text-brand" : "text-text-primary disabled:text-text-disabled",
                 )}
               >
-                <span className={cn("inline-flex", busy && "motion-safe:animate-spin")}>
-                  <Icon icon={busy ? Refresh01Icon : sendKind === "generate" ? AiMagicIcon : ArrowUp02Icon} size={18} />
+                <span className={cn("inline-flex shrink-0", refining && "motion-safe:animate-spin")}>
+                  <Icon icon={refining ? Refresh01Icon : MagicWand01Icon} size={16} />
                 </span>
-              </span>
-            </button>
+                Enhance
+              </button>
+              <button
+                type="button"
+                onClick={() => void send()}
+                aria-disabled={!ready || undefined}
+                aria-busy={working || undefined}
+                aria-label={sendKind === "generate" ? "Generate" : "Send"}
+                className={cn("group -my-3 -mr-3 inline-flex size-[44px] shrink-0 items-center justify-center outline-none", !(ready || working) && "cursor-not-allowed")}
+              >
+                <span
+                  className={cn(
+                    "inline-flex size-[32px] items-center justify-center rounded-md transition-colors duration-fast group-focus-visible:ring-2 group-focus-visible:ring-border-focus",
+                    ready || working
+                      ? "bg-bg-brand text-[color:var(--color-icon-on-brand)] group-hover:bg-bg-brand-hover group-active:bg-bg-brand-hover"
+                      : "bg-bg-subtle text-[color:var(--color-icon-disabled)]",
+                  )}
+                >
+                  <span className={cn("inline-flex", working && "motion-safe:animate-spin")}>
+                    <Icon icon={working ? Refresh01Icon : sendKind === "generate" ? AiMagicIcon : ArrowUp02Icon} size={18} />
+                  </span>
+                </span>
+              </button>
+            </span>
           </div>
         )}
       </div>
@@ -316,6 +434,11 @@ export function PromptBox({
       {held && (
         <p role="status" className={cn(T.meta, "text-text-error")}>
           {held}
+        </p>
+      )}
+      {imageError && (
+        <p role="status" className={cn(T.meta, "text-text-error")}>
+          {imageError}
         </p>
       )}
       {mic.sheet}

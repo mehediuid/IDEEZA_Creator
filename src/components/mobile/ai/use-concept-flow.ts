@@ -62,6 +62,8 @@ import { summarizeConcept } from "@/components/create/confirm-build-dialog";
 import type { LinkChange } from "@/components/create/network-rail";
 import { useSaveMode } from "@/components/create/save-step";
 import { useBuildModel } from "@/components/create/use-build-model";
+import { useProjectRoom } from "@/components/projects/project-limit";
+import { buildMakesNewProject } from "@/lib/create/upsell";
 import { useOnline } from "../kit/states";
 
 const POLL_MS = 2_500;
@@ -165,6 +167,7 @@ export function useConceptFlow(chatId: string) {
     setPieces,
     setNetworkEdit,
     setNetworkAdded,
+    setSetupProject,
   } = history;
   const { canAfford, charge, overCap, refund, balance, hydrated: creditsHydrated } = useCredits();
   const canRender = canAfford(CONCEPT_COST);
@@ -249,9 +252,38 @@ export function useConceptFlow(chatId: string) {
     return t?.id ?? null;
   }, [chat]);
 
+  // The plan's projects at the Build sheet (CL-034, the web's gate): the question checked them when it
+  // was answered, but the build is where the credits move, and projects can fill up in between (another
+  // chat saved, a project made by hand). So the sheet checks again when this build would make a new
+  // project — the question chose none (or one since deleted) and no build of this chat is in a project
+  // yet; a rebuild of a saved chat is that project's next version. Save never checks.
+  const room = useProjectRoom();
+  const gateNeedsRoom = React.useMemo(() => {
+    const t = chat?.turns.find((x) => x.id === answeredSetupId);
+    if (!chat || t?.role !== "setup" || !t.answer) return false;
+    return buildMakesNewProject(
+      t.answer.projectId,
+      projects.map((p) => p.id),
+      builds.filter((b) => b.chatId === chat.id).map((b) => b.projectId),
+    );
+  }, [chat, answeredSetupId, projects, builds]);
+  const gateLimit = React.useMemo(
+    () =>
+      room.full && gateNeedsRoom && chat && answeredSetupId
+        ? { projects: setupProjects, onUse: (projectId: string) => setSetupProject(chat.id, answeredSetupId, projectId) }
+        : null,
+    [room.full, gateNeedsRoom, chat, answeredSetupId, setupProjects, setSetupProject],
+  );
+
   // ── renders ──────────────────────────────────────────────────────
   const runGeneration = React.useCallback(
-    async (cid: string, turnId: string, input: { prompt: string; kind: "fresh" | "refine"; parentImageUrl?: string; quality?: RenderQuality }) => {
+    async (
+      cid: string,
+      turnId: string,
+      // `inspiration`: the idea's picture (CL-027) — the main product's fresh concepts only: a companion is
+      // another product, and a refine evolves its parent (the web's runGeneration).
+      input: { prompt: string; kind: "fresh" | "refine"; parentImageUrl?: string; quality?: RenderQuality; inspiration?: string },
+    ) => {
       try {
         if (overCap(CONCEPT_COST)) throw new FailedRender("cap");
         if (!charge(turnId, CONCEPT_COST, "concept")) throw new FailedRender("credits");
@@ -315,7 +347,13 @@ export function useConceptFlow(chatId: string) {
         void resumeGeneration(chat.id, turn.id, turn.renderJob);
         continue;
       }
-      void runGeneration(chat.id, turn.id, { prompt: turn.prompt, kind: turn.kind, parentImageUrl, quality: chat.quality });
+      void runGeneration(chat.id, turn.id, {
+        prompt: turn.prompt,
+        kind: turn.kind,
+        parentImageUrl,
+        quality: chat.quality,
+        ...(chat.inspiration && turn.kind === "fresh" && !turn.companionOf ? { inspiration: chat.inspiration } : null),
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs per turn list, guarded per turn id
   }, [hydrated, chat?.id, chat?.turns, online]);
@@ -672,7 +710,8 @@ export function useConceptFlow(chatId: string) {
   /** Build, confirmed: one job for every chosen product. False when nothing was booked. */
   const confirmBuild = React.useCallback(
     async (gate: Gate): Promise<{ booked: boolean; blocked?: string }> => {
-      if (!chat || !online) return { booked: false };
+      // A build that would start a project past the plan's books nothing (CL-034): no credit moves.
+      if (!chat || !online || gateLimit) return { booked: false };
       setSubmitting(true);
       try {
         const primaryRead = gate.read.get(gate.turnId) ?? (await summarizeConcept(gate.turnId, gate.prompt));
@@ -740,7 +779,7 @@ export function useConceptFlow(chatId: string) {
         setSubmitting(false);
       }
     },
-    [chat, online, labels, startBuild, editsAt, readForBuild],
+    [chat, online, gateLimit, labels, startBuild, editsAt, readForBuild],
   );
 
   /** The products the maker drew and then left out of this build (Build
@@ -839,6 +878,7 @@ export function useConceptFlow(chatId: string) {
     savedName,
     saveInfo,
     setupProjects,
+    gateLimit,
     answerSetup,
     focusedProduct,
     setFocusedProduct,

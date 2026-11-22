@@ -39,7 +39,7 @@ import { CreditBadge } from "@/components/credits/credit-badge";
 import { elapsedLabel } from "@/components/create/use-clock";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
 import { companionId } from "@/lib/create/companions";
-import { CONCEPT_COST } from "@/lib/create/credits";
+import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { aboutTime, cleanPick, pickCost, qualityOf, withQuality, type PiecePick, type PieceQuality } from "@/lib/create/pieces";
 import { QUALITIES, QUALITY_INFO } from "@/lib/create/quality";
 import type { RailRow } from "@/lib/create/project-state";
@@ -55,6 +55,8 @@ import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
 import { DASHED, FAIL_COPY, FAIL_FALLBACK, OFFLINE_REASON } from "./parts";
 import { PickList } from "../kit/pick-list";
 import { PromptBox } from "./prompt-box";
+import { BuyCreditsSheet } from "./buy-credits-sheet";
+import { PlanLink, ShortOfCreditsLine } from "../plans/upsell";
 import type { AssistantTurn, ConceptFlow } from "./use-concept-flow";
 
 /** One line of facts for a product's drawing: up to three of the spec's card facts. */
@@ -391,8 +393,14 @@ function DrawingRing({ since, now, label }: { since: number; now: number; label:
 
 // ─────────────────────────── the Build line ───────────────────────────
 
+/** The Build line. Short of credits with every concept drawn (CL-032, no warning hung under it): Buy
+ *  credits is the line's one button (the sheet in place, the smallest pack that covers the shortfall picked),
+ *  with one line on what's missing and the next plan up under it. Once the credits cover the build, Build
+ *  is back; while a concept still draws, the usual reason shows and no Buy credits. */
 export function BuildBar({ flow, onBuild, onOptions }: { flow: ConceptFlow; onBuild: () => void; onOptions?: () => void }) {
   const { state } = flow;
+  const { hydrated, balance } = useCredits();
+  const [buying, setBuying] = React.useState(false);
   const n = state.selected.length;
   const waiting = !state.allReady;
   const failedRow = state.failedChoice ? flow.rail.rows.find((r) => r.turnId === state.failedChoice!.id) : undefined;
@@ -406,37 +414,53 @@ export function BuildBar({ flow, onBuild, onOptions }: { flow: ConceptFlow; onBu
         : !flow.online
           ? OFFLINE_REASON
           : null;
+  const short = hydrated && balance < state.cost && !reason && !flow.preparing;
   const qualities = new Set(state.selected.map((t) => qualityOf(pickOf(flow, t.companionOf ?? "primary"))));
   const quality = qualities.size === 1 ? QUALITY_INFO[[...qualities][0]].label : "Mixed quality";
   const off = !!reason || flow.preparing;
   return (
     <section
       aria-label="Build"
-      className={cn(DASHED, "flex items-center gap-6 p-6", off && !flow.preparing ? "border-border bg-bg-subtle" : "border-border-brand bg-bg-brand-subtle")}
+      className={cn(DASHED, "flex flex-col gap-4 p-6", off && !flow.preparing ? "border-border bg-bg-subtle" : "border-border-brand bg-bg-brand-subtle")}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className={cn(T.rowTitle, reason ? "text-text-tertiary" : "text-text-brand")}>
-          {n} {n === 1 ? "product" : "products"} · {state.cost} credits
-        </p>
-        <p className={T.meta}>
-          {reason ?? `${quality} · ${aboutTime(state.seconds).replace(/^about/, "About")}`}
-          {onOptions && (
-            <>
-              {" · "}
-              <button
-                type="button"
-                onClick={onOptions}
-                className={cn(T.label, "-my-3 inline-flex min-h-[40px] items-center text-text-brand underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
-              >
-                Options
-              </button>
-            </>
-          )}
-        </p>
+      <div className="flex items-center gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p className={cn(T.rowTitle, reason ? "text-text-tertiary" : "text-text-brand")}>
+            {n} {n === 1 ? "product" : "products"} · {state.cost} credits
+          </p>
+          <p className={T.meta}>
+            {reason ?? `${quality} · ${aboutTime(state.seconds).replace(/^about/, "About")}`}
+            {onOptions && (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={onOptions}
+                  className={cn(T.label, "-my-3 inline-flex min-h-[40px] items-center text-text-brand underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+                >
+                  Options
+                </button>
+              </>
+            )}
+          </p>
+        </div>
+        {short ? (
+          <Button size="md" className="shrink-0" onClick={() => setBuying(true)}>
+            Buy credits
+          </Button>
+        ) : (
+          <Button size="md" className="shrink-0" onClick={onBuild} disabled={!!reason} loading={flow.preparing} aria-label={flow.preparing ? "Preparing the build" : undefined}>
+            {n === 1 ? "Build" : `Build ${n} products`}
+          </Button>
+        )}
       </div>
-      <Button size="md" className="shrink-0" onClick={onBuild} disabled={!!reason} loading={flow.preparing} aria-label={flow.preparing ? "Preparing the build" : undefined}>
-        {n === 1 ? "Build" : `Build ${n} products`}
-      </Button>
+      {short && (
+        <div role="status" className="flex flex-col gap-1 border-t-[length:var(--border-width-1)] border-solid border-border-brand pt-4">
+          <ShortOfCreditsLine cost={state.cost} balance={balance} />
+          <PlanLink className="-mb-3 self-start" />
+        </div>
+      )}
+      <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={state.cost} />
     </section>
   );
 }

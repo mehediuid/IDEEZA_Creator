@@ -52,8 +52,9 @@ export function Stepper({ stage }: { stage: FlowStage }) {
 // ─────────────────────────── the prompt bubble ───────────────────────────
 
 /** The maker's idea, right-aligned in the brand's quiet fill; a long one
- *  shows its start and "Show full prompt" (05 → 06). */
-export function PromptBubble({ text }: { text: string }) {
+ *  shows its start and "Show full prompt" (05 → 06). The inspiration image sent
+ *  with it (CL-027) sits under the words as the composer's chip, without ✕. */
+export function PromptBubble({ text, image, imageName }: { text: string; image?: string; imageName?: string }) {
   const [open, setOpen] = React.useState(false);
   const short = promptPreview(text);
   return (
@@ -70,8 +71,20 @@ export function PromptBubble({ text }: { text: string }) {
             {open ? "Show less" : "Show full prompt"}
           </button>
         )}
+        {image && <InspirationChip src={image} name={imageName} />}
       </div>
     </div>
+  );
+}
+
+/** The picture sent with the idea, small, by its own file name (the web's chip under You). */
+export function InspirationChip({ src, name }: { src: string; name?: string }) {
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-center gap-4 self-start rounded-lg border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface py-2 pl-2 pr-4">
+      {/* eslint-disable-next-line @next/next/no-img-element -- our own image route, already 512 × 384 */}
+      <img src={src} alt="Your inspiration image" width={32} height={24} className="h-[24px] w-[32px] shrink-0 rounded-sm object-cover" />
+      <span className={cn(T.caption, "min-w-0 truncate")}>{name ?? "Image"}</span>
+    </span>
   );
 }
 

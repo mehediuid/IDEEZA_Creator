@@ -6,18 +6,20 @@
 // unlock), the web's three packs at that discount and a custom amount at
 // the flat rate as one pick-one list, and Purchase in the Bottom action bar
 // (→ the checkout; a custom amount offers the cheaper pack first when one
-// gives more for no more: Better deal available). Compare credit discounts
-// and Credit alerts and limits are rows under the list.
+// gives more for no more: Better deal available). On a plan without a credit
+// discount each pack says its price with Builder ("With Builder: $4.25",
+// CL-032). Redeem a code (CL-011), Compare credit discounts and Credit alerts
+// and limits are rows under the list.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { AlarmClockIcon, ArrowRight01Icon, DiscountTag01Icon, PercentSquareIcon } from "@hugeicons/core-free-icons";
+import { AlarmClockIcon, ArrowRight01Icon, DiscountTag01Icon, PercentSquareIcon, Ticket01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { TextInput } from "@/components/ideeza/text-input";
-import { CREDIT_PACKS, CUSTOM_MIN, CUSTOM_RATE, MAX_DISCOUNT, VALIDITY_MONTHS, betterDeal, customAmountError, customPrice, packPrice, usd } from "@/lib/create/credit-pricing";
+import { CREDIT_PACKS, CUSTOM_MIN, CUSTOM_RATE, MAX_DISCOUNT, VALIDITY_MONTHS, betterDeal, customAmountError, customPrice, discountFor, packPrice, usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,7 @@ import { ListCard, ListRow } from "../kit/list";
 import { T } from "../type";
 import { BetterDealSheet, DiscountsSheet, UpgradeUnlockSheet } from "./credit-sheets";
 import { PlanFoot, RadioCard, n, pct } from "./parts";
+import { RedeemCodeSheet } from "./redeem-sheet";
 
 const CUSTOM = "custom";
 
@@ -42,6 +45,7 @@ export function CreditsTab() {
   const [text, setText] = React.useState("");
   const [touched, setTouched] = React.useState(false);
   const [offer, setOffer] = React.useState(false);
+  const [redeeming, setRedeeming] = React.useState(false);
   const inputId = React.useId();
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -123,6 +127,8 @@ export function CreditsTab() {
                   <span className={cn(T.rowTitle, "tabular-nums")}>Total credit {n(p.base + p.bonus)}</span>
                   {i === 0 && <TestnetDemoBadge />}
                 </span>
+                {/* Upgrade plan E2: on a plan without a discount, the pack's price with Builder, not a vague "up to". */}
+                {discount === 0 && <span className={cn(T.meta, "tabular-nums")}>With Builder: {usd(packPrice(p, discountFor("builder", "monthly")).final)}</span>}
               </RadioCard>
             );
           })}
@@ -173,10 +179,11 @@ export function CreditsTab() {
       </section>
 
       <ListCard label="More about credits">
+        <ListRow icon={Ticket01Icon} title="Redeem a code" meta="Got a credit code from IDEEZA or an event?" onClick={() => setRedeeming(true)} />
         <ListRow
           icon={PercentSquareIcon}
           title="Compare credit discounts"
-          meta={discount > 0 ? `You’re saving ${pct(discount)} with your ${plan.name} plan` : `Save up to ${pct(MAX_DISCOUNT)} with an IDEEZA plan`}
+          meta={discount > 0 ? `You’re saving ${pct(discount)} with your ${plan.name} plan` : undefined}
           onClick={() => setCompare(true)}
         />
       </ListCard>
@@ -202,6 +209,7 @@ export function CreditsTab() {
 
       <DiscountsSheet open={compare} onClose={() => setCompare(false)} />
       <UpgradeUnlockSheet open={unlock} onClose={() => setUnlock(false)} />
+      <RedeemCodeSheet open={redeeming} onClose={() => setRedeeming(false)} />
       {deal && <BetterDealSheet open={offer} onClose={() => setOffer(false)} deal={deal} credits={credits} customPrice={customCost.final} discount={discount} onCustom={goCustom} />}
     </div>
   );

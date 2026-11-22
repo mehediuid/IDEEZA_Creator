@@ -7,6 +7,10 @@
 // wallet's own request (components/credits/buy-credits.tsx `pay`, in the
 // kit's wallet sheet KIT-WS), and the credits land in the same commit as its debit. A paused build starts by
 // itself once they cover it (the build simulator watches the balance).
+// The sheet's last block is the next plan up (CL-032: the plan, its perks, the
+// month's credit spend when the plan is really the better buy, MAKER20 once
+// the welcome offer ended unused); not on Disruptor, never on the wallet's own
+// pay step.
 
 import * as React from "react";
 import { Button } from "@/components/ideeza/button";
@@ -20,6 +24,7 @@ import { useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { useWalletSheet } from "../earn-coin/wallet-sheet";
+import { PlanPitchRow } from "../plans/upsell";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 
@@ -175,6 +180,7 @@ function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
           {note.text}
         </p>
       )}
+      <PlanPitchRow onLeave={onClose} />
       {/* The wallet's own request rises over this sheet (it portals to the body). */}
       {sheet}
     </Sheet>

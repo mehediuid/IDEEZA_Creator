@@ -6,7 +6,8 @@
 // pattern, mobile UX pass 2026-11-15): the top bar with settings and search
 // (a tab root, so no Back), your card (photo, name, headline, "@handle · View
 // profile", your level) that opens your profile, then Wallet with your IDZ,
-// Refer and Earn and Plan & pricing with your plan and credits; Projects with
+// Refer and Earn and Plan & pricing with your credits and the web account
+// menu's plan line ("Free plan · Upgrade to Builder", CL-032); Projects with
 // how many you have and Saved Items; Settings, which opens in place on General
 // · Payments · $IDZ Pay · Security · Help and Support · Others; and Sign out as
 // a row. Every row that opens something carries the chevron. No Friends (D-1).
@@ -53,6 +54,7 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { SignOutSheet } from "../settings/sign-out";
+import { usePhonePitch, usePlanLine } from "../plans/upsell";
 
 /** A row's value at its end ("Free · 28 credits", "5"); the warning ink once credits run low. */
 export function HubValue({ children, warning }: { children: React.ReactNode; warning?: boolean }) {
@@ -121,18 +123,27 @@ function WalletValue() {
   );
 }
 
-/** PR-01 "Plan & pricing · Free · 28 credits", in the warning ink once credits run low (the web's rule). */
+/** PR-01 "Plan & pricing · 28 credits", in the warning ink once credits run low (the web's rule). The plan
+ *  itself is the row's meta line (usePlanLine). */
 function PlanValue() {
-  const { hydrated: planRead, plan } = useCreatePlan();
+  const { hydrated: planRead } = useCreatePlan();
   const { hydrated: creditsRead, ledger } = useCredits();
   const { lowAt } = useSettings().credits;
-  if (!planRead || !creditsRead) return <Skeleton shape="text" size="md" className="inline-block w-[96px]" />;
+  if (!planRead || !creditsRead) return <Skeleton shape="text" size="md" className="inline-block w-[72px]" />;
   const credits = creditTotals(ledger).remaining;
   return (
     <HubValue warning={runningLow(credits, lowAt)}>
-      {plan.name} · {credits.toLocaleString("en-US")} {credits === 1 ? "credit" : "credits"}
+      {credits.toLocaleString("en-US")} {credits === 1 ? "credit" : "credits"}
     </HubValue>
   );
+}
+
+/** The Plan & pricing row: the web account menu's plan line as its meta ("Free plan · Upgrade to Builder",
+ *  CL-032); with a next plan, the row opens Plans on that plan, its Upgrade in the bar. */
+function PlanRow() {
+  const line = usePlanLine();
+  const pitch = usePhonePitch();
+  return <ListRow href={pitch ? `/m/plans?pick=${pitch.plan.tier}` : "/m/plans"} icon={Tag01Icon} title="Plan & pricing" meta={line ?? undefined} value={<PlanValue />} />;
 }
 
 function ProjectsValue() {
@@ -208,7 +219,7 @@ export function ProfileHub() {
           <ListCard label="Money">
             <ListRow href="/m/earn/wallet" icon={Wallet03Icon} title="Wallet" value={<WalletValue />} />
             <ListRow href="/m/earn/refer" icon={Share01Icon} title="Refer and Earn" />
-            <ListRow href="/m/plans" icon={Tag01Icon} title="Plan & pricing" value={<PlanValue />} />
+            <PlanRow />
           </ListCard>
           <ListCard label="Your work">
             <ListRow href="/m/projects" icon={Note03Icon} title="Projects" value={<ProjectsValue />} />

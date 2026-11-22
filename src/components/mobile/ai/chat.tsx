@@ -7,7 +7,10 @@
 // composer at the foot (held once a build holds the concepts). The top bar
 // has the Build log one tap away (the Figma's chat frames) and ⋯ with
 // History, a new idea and Delete. All of it runs on the web's stores through
-// `useConceptFlow`.
+// `useConceptFlow`. Out of credits, the composer gets the state row with Buy
+// credits and the next plan up (CL-032); the maker's first ready build gets the
+// first-build card (Free, once); the idea's inspiration image shows as a chip
+// in the maker's bubble (CL-027).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -27,12 +30,14 @@ import { OfflineBanner } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { BuildCard, BuildConfirmSheet, FinishedCard, FinishedFoot, isFinished } from "./build";
 import { BuildLogSheet } from "./build-log-sheet";
+import { BuyCreditsSheet } from "./buy-credits-sheet";
 import { BuildBar, BuildOptionsSheet, ConceptImageViewer, ConceptSheet, ConceptStage, ConceptsMini, RefineSheet } from "./concepts";
 import { DeleteChatSheet } from "./delete-chat-sheet";
 import { NetworkCard } from "./network";
 import { CreditsFoot, OFFLINE_REASON, PromptBubble, Stepper } from "./parts";
 import { PromptBox } from "./prompt-box";
 import { SaveSheet } from "./save-sheet";
+import { FirstBuildCard, OutOfCreditsRow } from "../plans/upsell";
 import { ProductQuestion, ProjectSheet, ReadingCard, RequiredStep } from "./setup";
 import { SpecSheet } from "./spec-sheet";
 import { useConceptFlow, type Gate, type SetupTurn } from "./use-concept-flow";
@@ -76,6 +81,7 @@ export function AiChat({ chatId }: { chatId: string }) {
   const [conceptProduct, setConceptProduct] = React.useState("primary");
   const [optionsOpen, setOptionsOpen] = React.useState(false);
   const [imageFor, setImageFor] = React.useState<string | null>(null);
+  const [buying, setBuying] = React.useState(false);
 
   const job = flow.activeBuild;
   const notify = useNotifyPrePrompt();
@@ -169,6 +175,7 @@ export function AiChat({ chatId }: { chatId: string }) {
     </div>
   ) : (
     <div className="pt-4">
+      {flow.creditsHydrated && !flow.canRender && <OutOfCreditsRow className="mx-8 mb-4" onBuy={() => setBuying(true)} />}
       <PromptBox
         value={draft}
         onChange={setDraft}
@@ -177,7 +184,6 @@ export function AiChat({ chatId }: { chatId: string }) {
         enhanceMode={flow.target.kind === "refine" ? "change" : "brief"}
         disabled={flow.setupPending}
         canSend={flow.canRender}
-        sendReason={!flow.canRender ? "You are out of credits — top them up to draw another concept." : undefined}
         onSubmit={(text) => {
           if (flow.submit(text)) return;
           toast({
@@ -211,7 +217,7 @@ export function AiChat({ chatId }: { chatId: string }) {
       >
         <div className="flex flex-col gap-6 px-8 pb-8 pt-2">
           <OfflineBanner />
-          {firstAsk?.role === "user" && <PromptBubble text={firstAsk.text} />}
+          {firstAsk?.role === "user" && <PromptBubble text={firstAsk.text} image={firstAsk.image} imageName={firstAsk.imageName} />}
           {setup && <ReadingCard setup={setup} now={now} projectName={flow.projectName} />}
           {needsProductQ && setup && (
             <ProductQuestion
@@ -235,6 +241,7 @@ export function AiChat({ chatId }: { chatId: string }) {
           {asking && !needsProductQ && projectDismissed && <RequiredStep onOpen={() => setProjectDismissed(false)} />}
 
           {finished && job && <FinishedCard job={job} flow={flow} product={buildProduct} onProduct={setBuildProduct} onSpec={setSpecFor} />}
+          {finished && job && <FirstBuildCard jobId={job.id} />}
           {job && !finished && <BuildCard job={job} product={buildProduct} onProduct={setBuildProduct} />}
 
           {conceptStage && !job && (
@@ -291,6 +298,7 @@ export function AiChat({ chatId }: { chatId: string }) {
       />
       {job && flow.saveInfo && <SaveSheet open={saveOpen} job={job} info={flow.saveInfo} onClose={() => setSaveOpen(false)} />}
       {notify.sheet}
+      <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={CONCEPT_COST} />
       <BuildLogSheet open={logOpen} onClose={() => setLogOpen(false)} flow={flow} />
       <ActionSheet
         open={menu}
