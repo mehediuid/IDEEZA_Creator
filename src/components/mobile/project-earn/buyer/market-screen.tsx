@@ -13,16 +13,21 @@
 // · The header: name and status chip, "Created by {the creator's name} ·
 //   Listed {date}" — the page speaks to the buyer, never "you" for the
 //   creator — (and "You own n%" for a holder).
-// · Right under it, the marketplace: an auction's standing banner, Purchase
-//   summary for a holder, the Main NFT's buy box (main-offer.tsx) with the
-//   wallet, activity and Testnet demo lines in its foot, then the copies as
-//   rows (copies.tsx). Then the description.
+// · Right under it, the marketplace: an auction's standing banner, "You own n
+//   NFTs › See what you own" for anyone who holds any of it now (you-own.tsx,
+//   CL-035: a copy sold on is no longer theirs), Purchase summary for a holder
+//   of the Main NFT, its buy box (main-offer.tsx) with the wallet, activity and
+//   Testnet demo lines in its foot, then the whole project's copies as Use rows
+//   with From holders (copies.tsx; a product's own copies are its screen's).
+//   Then the description.
 // · Tabs Overview · Products · Media (`?tab=`, the kit's client-state tabs);
 //   the Overview holds Project activity, the products, Legal information,
 //   Holder benefits and About.
 // · The bottom bar: the one primary for where the buyer stands — Buy now (Buy
 //   another share), Place bid (Bid again), View your share, Browse other
 //   projects — beside Ask the creator, or Get creator support for a holder.
+//   While another checkout holds the Main NFT, Buy now waits, greyed, with
+//   "Someone is buying this now. Try again in a few minutes." (CL-016).
 // · 18d: a confirmed purchase ends on Purchase successful, a bid on its toast.
 // Not on the marketplace (never listed, or listed in another browser): the
 // web's "This project isn't on the marketplace". A Feed sample's market
@@ -50,9 +55,11 @@ import { coverOf } from "@/lib/manual/project-read";
 import { headerText } from "@/lib/manual/project-summary";
 import type { ManualProject } from "@/lib/manual/projects";
 import { auctionStateOf } from "@/lib/market/auction";
+import { IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
+import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import { readMarketNow } from "@/lib/market/market-store";
 import { holdingOf } from "@/lib/market/sales";
-import type { EditionTrack, Listing, Sale } from "@/lib/market/types";
+import type { Listing, Sale } from "@/lib/market/types";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
@@ -78,7 +85,8 @@ import { MediaHero } from "../../project/sample-project";
 import { ProductsTab } from "../../project/products-tab";
 import { usePhoneWriteGate } from "../../project/write-gate";
 import { PhoneWalletScope } from "../phone-wallet";
-import { PhoneCopies } from "./copies";
+import { PhoneCopies, projectCopiesLive } from "./copies";
+import { YouOwnRow } from "./you-own";
 import {
   AuctionCard,
   BID_FORM_ID,
@@ -193,18 +201,18 @@ function MarketReady({ data }: { data: Ready }) {
   const canBuy = live && can(viewer, "listing.buy", view.canCtx);
   const canBid = live && auction !== null && can(viewer, "listing.bid", { ...view.canCtx, auction: auction.phase });
   const standing: BidStanding = listing && auction ? bidStandingOf(listing, auction, view.bids, buyerId) : "none";
-  const copiesLive = view.lock === null && view.editions.some((t) => t.listing !== null);
+  // The whole project's copies only: a product's own are sold on its screen (CL-018).
+  const copiesLive = projectCopiesLive(view);
   const { busy, buy } = usePurchase({ project, view, buyerId });
+  const holds = useCheckoutHolds();
+  // Another tab's checkout holds the Main NFT: its Buy waits until that settles or lapses (CL-016).
+  const mainHeld = listing !== null && holds.others(listing.id) > 0;
 
   const purchase = async (via: "buyNow" | "auctionBuyNow") => {
-    if (!listing || busy) return;
+    if (!listing || busy || mainHeld) return;
     const sentence = await buy(listing, via);
     if (!sentence) return;
     const sale = newestSale(project.id, buyerId, listing.id);
-    setDone({ sentence: sentence.replace(/^Purchase successful\. /, ""), transaction: sale?.txHash ?? null, paid: sale ? paidOf(sale) : null });
-  };
-  const boughtCopy = (sentence: string, track: EditionTrack) => {
-    const sale = newestSale(project.id, buyerId, track.id);
     setDone({ sentence: sentence.replace(/^Purchase successful\. /, ""), transaction: sale?.txHash ?? null, paid: sale ? paidOf(sale) : null });
   };
 
@@ -226,7 +234,7 @@ function MarketReady({ data }: { data: Ready }) {
       buyerId={buyerId}
       primary={
         live && listing?.type === "buyNow" && canBuy
-          ? { kind: "buy", label: holding ? "Buy another share" : "Buy now", busy, run: () => void purchase("buyNow") }
+          ? { kind: "buy", label: holding ? "Buy another share" : "Buy now", busy, held: mainHeld, run: () => void purchase("buyNow") }
           : auction && canBid && (standing === "none" || standing === "outbid" || standing === "leads")
             ? {
                 kind: "bid",
@@ -277,6 +285,7 @@ function MarketReady({ data }: { data: Ready }) {
             Marketplace
           </h2>
           {listing && auction && <StandingBanner standing={standing} listing={listing} state={auction} bids={view.bids} buyerId={buyerId} />}
+          <YouOwnRow projectId={project.id} />
           {holding && can(viewer, "purchase.seeSummary", view.canCtx) && <PurchaseSummary holding={holding} toggleRef={summaryRef} />}
           {listing && live && listing.type === "buyNow" ? (
             <div className="flex flex-col gap-4">
@@ -294,6 +303,7 @@ function MarketReady({ data }: { data: Ready }) {
               canBid={canBid}
               canBuy={canBuy}
               buyBusy={busy}
+              buyHeld={mainHeld}
               onBuyNow={() => void purchase("auctionBuyNow")}
               onPlaced={(sentence) => toast({ title: sentence })}
               focusBid={focusBid}
@@ -303,7 +313,7 @@ function MarketReady({ data }: { data: Ready }) {
             <ClosedOrNothing view={view} holdsSale={holding !== null && view.listing.kind === "sold" && view.listing.sale.buyerId === buyerId} />
           )}
           {!boxShown && <DemoShopBanner body={MARKET_BANNER_BODY} line />}
-          <PhoneCopies project={project} view={view} viewer={viewer} buyerId={buyerId} onBought={boughtCopy} anchorRef={copiesRef} />
+          <PhoneCopies project={project} view={view} viewer={viewer} buyerId={buyerId} onBought={setDone} anchorRef={copiesRef} />
         </section>
         {project.description.trim() && (
           <div className="px-8 pb-8">
@@ -386,7 +396,7 @@ export function ProductsSection({ seeAll }: { seeAll: string }) {
 }
 
 type Primary =
-  | { kind: "buy" | "bid" | "copies"; label: string; busy?: boolean; run: () => void }
+  | { kind: "buy" | "bid" | "copies"; label: string; busy?: boolean; held?: boolean; run: () => void }
   | { kind: "share"; label: string; reason: string | null; run: () => void }
   | { kind: "browse"; label: string }
   | null;
@@ -403,32 +413,51 @@ function MarketBar({ projectId, sales, buyerId, primary }: { projectId: string; 
       {askLabel}
     </Link>
   );
-  const reason = primary?.kind === "share" ? primary.reason : null;
+  const held = primary !== null && "held" in primary && primary.held === true;
+  const reason = primary?.kind === "share" ? primary.reason : held ? IN_CHECKOUT_BUYER_LINE : null;
+  const reasonId = React.useId();
+  // A label longer than half the bar holds ("Get creator support", "Browse other projects", "Buy another
+  // share") stacks the two; stacked, the held line sits right under the button it is about.
+  const stacked = primary !== null && (latest !== null || primary.label.length > 15);
+  const reasonLine = reason && (
+    <p id={reasonId} className={T.meta}>
+      {reason}
+    </p>
+  );
+  const button =
+    primary &&
+    (primary.kind === "browse" ? (
+      <Link href="/m" className={cn(buttonVariants({ size: "xl" }), "min-w-0 flex-1")}>
+        {primary.label}
+      </Link>
+    ) : (
+      <Button
+        size="xl"
+        className={cn("min-w-0 flex-1", held && "cursor-not-allowed opacity-60")}
+        iconLeading={<Icon icon={Coins01Icon} size={20} />}
+        disabled={reason !== null && primary.kind === "share"}
+        // Held: not `disabled`, so it keeps its focus; pressing it does nothing (CL-016).
+        aria-disabled={("busy" in primary && primary.busy) || held || undefined}
+        aria-describedby={held ? reasonId : undefined}
+        onClick={held ? undefined : primary.run}
+      >
+        {primary.label}
+      </Button>
+    ));
   return (
     <BottomBar className="gap-2 pt-8">
-      {/* A label longer than half the bar holds ("Get creator support", "Browse other projects",
-          "Buy another share") stacks the two. */}
-      <div className={cn("flex gap-6", primary && (latest || primary.label.length > 15) && "flex-col gap-4")}>
-        {primary &&
-          (primary.kind === "browse" ? (
-            <Link href="/m" className={cn(buttonVariants({ size: "xl" }), "min-w-0 flex-1")}>
-              {primary.label}
-            </Link>
-          ) : (
-            <Button
-              size="xl"
-              className="min-w-0 flex-1"
-              iconLeading={<Icon icon={Coins01Icon} size={20} />}
-              disabled={reason !== null && primary.kind === "share"}
-              aria-disabled={("busy" in primary && primary.busy) || undefined}
-              onClick={primary.run}
-            >
-              {primary.label}
-            </Button>
-          ))}
+      <div className={cn("flex gap-6", stacked && "flex-col gap-4")}>
+        {stacked && held ? (
+          <div className="flex flex-col gap-2">
+            {button}
+            {reasonLine}
+          </div>
+        ) : (
+          button
+        )}
         {ask}
       </div>
-      {reason && <p className={T.meta}>{reason}</p>}
+      {!(stacked && held) && reasonLine}
     </BottomBar>
   );
 }

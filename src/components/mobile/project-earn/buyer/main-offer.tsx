@@ -15,8 +15,10 @@
 //   share-sale note under it. The button is the bottom bar's.
 // · An auction (18f): the same box with the top (or starting) bid, its time
 //   left, Bid history (n), who leads, Your bid (the bar's Place bid submits
-//   it), Buy now with X. Outbid (18j), won (18k) and lost (18l) each lead with
-//   a banner; once ended, the web's sentence replaces the field.
+//   it), Buy now with X (greyed, with "Someone is buying this now…", while
+//   another checkout holds it — CL-016). Outbid (18j), won (18k) and lost
+//   (18l) each lead with a banner; once ended, the web's sentence replaces the
+//   field.
 // · Paused, removed, closed with no bids and sold each say so.
 // · Main NFT activity: the newest sale, else the newest NFT entry, else "No
 //   activity yet · listed {date}".
@@ -36,6 +38,7 @@ import type { ProjectView } from "@/lib/manual/project-read";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import type { ManualProject } from "@/lib/manual/projects";
 import { bidsOf, timeLeftLabel, validateBid } from "@/lib/market/auction";
+import { IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
 import { useMarket } from "@/lib/market/market-store";
 import type { AuctionState, Bid, Listing, Sale } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
@@ -180,6 +183,7 @@ export function AuctionCard({
   canBid,
   canBuy,
   buyBusy,
+  buyHeld = false,
   onBuyNow,
   onPlaced,
   focusBid,
@@ -194,6 +198,8 @@ export function AuctionCard({
   canBid: boolean;
   canBuy: boolean;
   buyBusy: boolean;
+  /** Another checkout holds the listing (CL-016): Buy now with X waits, greyed, with the line under it. */
+  buyHeld?: boolean;
   onBuyNow: () => void;
   onPlaced: (sentence: string) => void;
   /** Bumped by the bar's Place bid when the field wasn't on screen: focus it. */
@@ -205,6 +211,7 @@ export function AuctionCard({
   const rows = bidsOf(listing.id, view.bids);
   const leads = buyerId !== null && top?.bidderId === buyerId;
   const leaderRef = React.useRef<HTMLParagraphElement>(null);
+  const heldId = React.useId();
   const count = `${rows.length} ${rows.length === 1 ? "bid" : "bids"}`;
   const price = formatAmount(top?.amount ?? listing.minBid ?? "0", listing.token);
   const sub = ended ? (top ? `Auction ended · top bid · ${count}` : "Auction ended · no bids") : top ? `Top bid · ${count}` : "Starting bid";
@@ -282,17 +289,25 @@ export function AuctionCard({
           />
         )}
         {!ended && canBuy && listing.auctionBuyNow && (
-          <Button
-            hierarchy="secondary"
-            size="xl"
-            className="w-full"
-            aria-disabled={buyBusy || undefined}
-            onClick={() => {
-              if (!buyBusy) onBuyNow();
-            }}
-          >
-            {`Buy now with ${formatAmount(listing.auctionBuyNow, listing.token)}`}
-          </Button>
+          <div className="flex flex-col gap-3">
+            <Button
+              hierarchy="secondary"
+              size="xl"
+              className={cn("w-full", buyHeld && "cursor-not-allowed opacity-60")}
+              aria-disabled={buyBusy || buyHeld || undefined}
+              aria-describedby={buyHeld ? heldId : undefined}
+              onClick={() => {
+                if (!buyBusy && !buyHeld) onBuyNow();
+              }}
+            >
+              {`Buy now with ${formatAmount(listing.auctionBuyNow, listing.token)}`}
+            </Button>
+            {buyHeld && (
+              <p id={heldId} className={T.body}>
+                {IN_CHECKOUT_BUYER_LINE}
+              </p>
+            )}
+          </div>
         )}
       </BuyBox>
       {!ended && <p className={cn(T.caption, "text-text-tertiary")}>{SHARE_SALE_NOTE}</p>}

@@ -7,14 +7,15 @@
 // Laid out as a product page (owner 2026-11-12: the Feed's pill opened a page
 // with no picture, a table and a Buy a copy that was off — "can't be
 // bought" — after the Feed had shown its price): the product's video on top
-// (the Feed's clip, muted and looping), the project link, the name and its
-// line, the summary, then its copies as rows with a Buy each and the Testnet
-// demo line (project-earn/buyer/sample-shop.tsx — the same demo buying as
-// the project's page), then the product's activity. Tabs: Media, Overview
-// (the collection's chain and license, Specs) and Build (the pieces it was
-// built with; the PCB, firmware and wiring come with a copy, D2 — the parts
-// list is open). The bar says what copies start at; Buy a copy buys the one
-// copy, or brings the copies into view to pick from.
+// (the Feed's clip, muted and looping), "Part of {project}", the name and its
+// line, the summary, then the product's activity. Tabs: Media, Overview (the
+// collection's chain and license, Specs) and Build (the pieces it was built
+// with; the PCB, firmware and wiring come with a copy, D2 — the parts list is
+// open). A sample's copies are the whole project's, so they are sold on the
+// project's screen, never on a product's (CL-018: "A product with no copies of
+// its own has no box. 'Part of {project}' leads to the project's offers."):
+// the bar says what they start at, and Buy a copy opens them there
+// (project-earn/buyer/sample-shop.tsx `SampleCopiesBar`).
 
 import * as React from "react";
 import Link from "next/link";
@@ -24,14 +25,12 @@ import { Badge } from "@/components/ideeza/badge";
 import { historyOf } from "@/lib/manual/journey";
 import { formatDate } from "@/lib/manual/project-summary";
 import { parseProductTab, phoneProductPath, productTabsOf, type ProductTab } from "@/lib/manual/phone-product";
-import { offerOf, type ClipOffer } from "@/lib/innovations/clips";
 import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import type { InnovationPost, PostPiece, PostProduct } from "@/lib/innovations/types";
 import { ITEM_LABELS, type BuildItemKind } from "@/lib/create/history";
 import { cn } from "@/lib/utils";
 import { ListCard } from "../kit/list";
-import { DemoShopBanner } from "../project-earn/buyer/parts";
-import { SampleCopies, SampleCopyBar, SampleShop } from "../project-earn/buyer/sample-shop";
+import { SampleCopiesBar } from "../project-earn/buyer/sample-shop";
 import { MediaHero } from "../project/sample-project";
 import { MEDIA_GROUND } from "../kit/media";
 import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
@@ -41,11 +40,6 @@ import { T } from "../type";
 import { SectionHeading } from "../project/parts";
 import { ActivityCardBlock } from "./activity";
 import { FactCard, TABS_FIT, TABS_SCROLL } from "./parts";
-
-/** Copies only: a product has no Main NFT (owner, 2026-10-12). */
-function copiesOf(post: InnovationPost): ClipOffer[] {
-  return (post.listing?.rows ?? []).map((r) => offerOf(r, post.license)).filter((o): o is ClipOffer => o !== null && o.kind !== "main");
-}
 
 /** The pieces a visitor may open (D2): the 3D model and the parts list. */
 const OPEN: ReadonlySet<PostPiece> = new Set<PostPiece>(["3d", "parts"]);
@@ -61,17 +55,15 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
     () => historyOf(sampleJourneyOf(post), post.id, { kind: "product", productId: product.id }, post.createdAt),
     [post, product.id],
   );
-  const copies = copiesOf(post);
   const video = product.video?.kind === "video" ? product.video : null;
 
   return (
-    <SampleShop post={post} id={id}>
-    <Screen top={<TopBar back={`/m/projects/${encodeURIComponent(id)}`} />} footer={<SampleCopyBar />}>
+    <Screen top={<TopBar back={`/m/projects/${encodeURIComponent(id)}`} />} footer={<SampleCopiesBar post={post} id={id} />}>
       <MediaHero video={video} picture={video?.poster ?? product.image} name={product.name} />
       <header className="flex flex-col gap-6 px-8 pb-8">
         <div className="flex flex-col gap-2">
           <Link href={`/m/projects/${encodeURIComponent(id)}`} className={cn(T.meta, "self-start outline-none hover:underline focus-visible:underline")}>
-            {post.title} · product
+            Part of {post.title}
           </Link>
           <h1 className={cn(T.title, "break-words")}>{product.name}</h1>
           <p className={T.meta}>
@@ -79,12 +71,6 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
           </p>
         </div>
         <p className={cn(T.body, "text-text-primary")}>{product.summary}</p>
-        {copies.length > 0 && (
-          <div className="flex flex-col gap-4">
-            <SampleCopies sub="Each with its own NFT." />
-            <DemoShopBanner body="A demo creator does the buying — test tokens in a test wallet. Nothing is sent to a blockchain." line />
-          </div>
-        )}
         <ActivityCardBlock name={product.name} entries={entries} />
       </header>
       <div className={cn("sticky top-0 z-10 bg-bg-page", TABS_SCROLL)}>
@@ -96,7 +82,6 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
         {tab === "build" && <SampleBuild product={product} base={base} />}
       </div>
     </Screen>
-    </SampleShop>
   );
 }
 

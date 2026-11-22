@@ -6,7 +6,8 @@
 // · 18 · Preview as others see it (Earn's top bar opens it): the banner and
 //   Exit preview, the page with no ⋯, no Publish or Earn, no Versions and no
 //   Activity tab — the Marketplace block read-only when the project is on
-//   sale (Open in Explore marketplace), Project activity (Now + Earlier),
+//   sale (the Main NFT, the whole project's copies as Use rows with their
+//   prices and no Buy; Open in Explore marketplace), Project activity (Now + Earlier),
 //   Products, Legal information, Holder benefits, About (Source).
 // · 19 · Preview as a contributor (Earn › Money's contributor rows): "Previewing
 //   as Ana Silva" and the role chip; the engineering page, read-only, with the
@@ -51,7 +52,7 @@ import { LINK_MD } from "../sell/parts";
 import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
 import { PhoneWalletScope } from "../phone-wallet";
-import { PhoneCopies } from "./copies";
+import { PhoneCopies, projectCopiesLive } from "./copies";
 import { AuctionCard, BuyNowCard, closedLineOf, MainActivity } from "./main-offer";
 import { ProductsSection } from "./market-screen";
 import { AboutRows, ClosedCard, HolderBenefits, LegalSection, PreviewBanner, ProjectActivity, ProjectTop, useScrolledPast, ViewerTabs, VIEWER_TABS_ID, type OfferRow } from "./parts";
@@ -188,7 +189,8 @@ function PreviewMarket({ data }: { data: Ready }) {
   const listing = view.listing.kind === "none" ? null : view.listing.listing;
   const clock = useAuctionClock(listing?.type === "auction" ? listing.endsAt : undefined, now);
   if (!can(viewer, "listing.seePublic", view.canCtx)) return null;
-  const copies = view.lock === null && view.editions.some((t) => t.listing !== null);
+  // The whole project's copies only: a product's own are read on its screen (CL-018).
+  const copies = projectCopiesLive(view);
   if (!listing && !copies) return null;
   const live = view.listing.kind === "live";
   const auction = live && listing?.type === "auction" ? auctionStateOf(listing, view.bids, clock) : null;
