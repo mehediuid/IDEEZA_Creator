@@ -14,10 +14,11 @@
 // · Choose (02b): Build with AI · Build manually;
 // · Build with AI (02c, 02e): the AI tab's Prompt Box — the mic, the
 //   inspiration image (CL-027), Quality (CL-021, the level picked last, here
-//   or on the AI tab), Enhance and ✦ — the web's cost line ("1 concept
-//   [credit] · you have n") and, out of credits, "You need 1 credit to start.
-//   You have 0." with Buy credits (Plan & pricing › Credits) and the next plan
-//   up (CL-032); ✦ stores the picture, then starts the chat that adds it
+//   or on the AI tab), Enhance and ✦, with no cost line under it — the AI
+//   tab's box says none either (owner 2026-11-22: one rule for the box on the
+//   phone); out of credits, the AI tab's own row above the box ("You're out of
+//   credits.", Buy credits → Plan & pricing › Credits, the next plan up,
+//   CL-032); ✦ stores the picture, then starts the chat that adds it
 //   (`createChat(prompt, { quality, addTo, ...image })`), which opens on the AI
 //   tab — the web opens the chat too; Back;
 // · Build manually (02d, 02g, 02h): the name ("Give the product a name."),
@@ -30,7 +31,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Add01Icon, AiMagicIcon, ArrowRight01Icon, PackageIcon, PencilEdit01Icon, SortingDownIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
-import { CreditBadge } from "@/components/credits/credit-badge";
 import { Button } from "@/components/ideeza/button";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { TextInput } from "@/components/ideeza/text-input";
@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
 import type { PromptImage } from "@/components/dashboard/prompt-card";
 import { PromptBox } from "../ai/prompt-box";
 import { QualityPicker, useLastQuality } from "../ai/quality";
-import { PLAN_LINK, PlanLink } from "../plans/upsell";
+import { OutOfCreditsRow } from "../plans/upsell";
 import { BottomBar } from "../kit/bottom-bar";
 import { PickSheet } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
@@ -363,6 +363,8 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
 
   return (
     <div className="flex flex-col gap-4 pb-4">
+      {/* Out of credits: the AI tab's row, above the box (never a warning under the form). */}
+      {hydrated && !canRender && <OutOfCreditsRow onBuy={() => router.push("/m/plans?tab=credits")} />}
       {/* The AI tab's Prompt Box (it brings its own 16 px sides): the mic, Enhance and ✦. */}
       <div className="-mx-8">
         <PromptBox
@@ -377,23 +379,6 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
           extra={<QualityPicker value={quality} onChange={setQuality} />}
         />
       </div>
-      {canRender ? (
-        <p className={cn(T.meta, "flex flex-wrap items-center gap-2")}>
-          1 concept <CreditBadge credits={CONCEPT_COST} />
-          {hydrated ? ` · you have ${balance}` : ""}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <p className={cn(T.body, "text-text-error")}>{short}</p>
-          {/* CL-032: the quick fix and the next plan up, one link style. */}
-          <div className="flex flex-col items-start">
-            <Link href="/m/plans?tab=credits" className={PLAN_LINK}>
-              Buy credits
-            </Link>
-            <PlanLink />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
