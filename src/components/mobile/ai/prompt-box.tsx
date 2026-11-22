@@ -346,7 +346,10 @@ export function PromptBox({
             </button>
           </div>
         ) : (
-          <div className={cn("flex flex-wrap items-center", takesImage ? "gap-x-2 gap-y-4" : "gap-4")}>
+          // One row on every phone (owner 2026-11-22: in the Add a product sheet Enhance and send fell to a line
+          // of their own): the row is a size container, and below 320 px — the image button and Quality take the
+          // room — Enhance keeps its wand and drops its word, still named "Enhance" to touch and assistive tech.
+          <div className={cn("flex items-center [container-type:inline-size]", takesImage ? "gap-x-2" : "gap-4")}>
             <button
               type="button"
               onClick={startVoice}
@@ -390,16 +393,20 @@ export function PromptBox({
                 onClick={enhance}
                 disabled={disabled || !trimmed || refining || !online}
                 aria-busy={refining || undefined}
-                title={!online ? OFFLINE_REASON : undefined}
+                aria-label="Enhance"
+                title={!online ? OFFLINE_REASON : "Enhance"}
                 className={cn(
-                  T.body, "-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:active:bg-transparent",
+                  T.body, "-my-3 inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md px-2 outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:active:bg-transparent",
                   refining ? "text-text-brand" : "text-text-primary disabled:text-text-disabled",
                 )}
               >
                 <span className={cn("inline-flex shrink-0", refining && "motion-safe:animate-spin")}>
                   <Icon icon={refining ? Refresh01Icon : MagicWand01Icon} size={16} />
                 </span>
-                Enhance
+                {/* Only a box with the image button or Quality runs short of room; the chat's keeps the word. */}
+                <span aria-hidden className={takesImage || extra ? "hidden [@container(min-width:320px)]:inline" : undefined}>
+                  Enhance
+                </span>
               </button>
               <button
                 type="button"
