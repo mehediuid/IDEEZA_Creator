@@ -67,6 +67,9 @@ test("addresses: details, the marketplace, the clip itself", () => {
   assert.equal(clips.clipDetailsHref({ projectId: "p1", productId: null }), "/m/projects/p1");
   assert.equal(clips.clipDetailsHref({ projectId: "p1", productId: "remote" }), "/m/projects/p1/products/remote");
   assert.equal(clips.clipBuyHref({ projectId: "p1", productId: null }), "/m/projects/p1?tab=marketplace");
+  // A sample's copies are the whole project's; your own product's copies sell on its market view.
+  assert.equal(clips.clipBuyHref({ projectId: "p1", productId: "remote" }), "/m/projects/p1?tab=marketplace");
+  assert.equal(clips.clipBuyHref({ projectId: "m7", productId: "base", source: "mine" }), "/m/projects/m7/products/base?view=market");
   assert.equal(clips.clipHref("p1~remote"), "/m/clip/p1~remote");
 });
 

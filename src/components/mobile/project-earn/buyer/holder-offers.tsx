@@ -18,6 +18,8 @@ import { readUnitsLog, useUnitsLog } from "@/components/projects/purchased/units
 import { estimateGas } from "@/lib/commerce/gas";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import { holderNowOf } from "@/lib/market/purchases";
+import { tileKeyOfCopy } from "@/lib/market/resale-desk";
+import { resaleItemPath } from "../../purchased/paths";
 import { buyerNameOf, buyResale, copyNumberOf, onSaleOf, resaleBuyBlock, resaleBuyRequestOf, type Resale } from "@/lib/market/resales";
 import { copyUnitsOf, unitsAllowanceOf, unitsLineOf, type UnitsEntry } from "@/lib/market/units";
 import type { EditionKind } from "@/lib/market/types";
@@ -144,7 +146,7 @@ function HolderRow({ r, buyerId, log, busy, onBuy }: { r: Resale; buyerId: DemoB
         </span>
       </div>
       {mine ? (
-        <Link href={purchasedEarnPath(r.projectId)} className={cn(buttonVariants({ hierarchy: "secondary", size: "md" }), HIT44, "shrink-0")}>
+        <Link href={resaleItemPath(r.projectId, tileKeyOfCopy(r.copyKey))} className={cn(buttonVariants({ hierarchy: "secondary", size: "md" }), HIT44, "shrink-0")}>
           Manage
         </Link>
       ) : (

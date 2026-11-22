@@ -3,9 +3,9 @@
 // The buyer's Overview tab (Product Details 10, 10e, 10u, 10x, 29a, 31b) and
 // the blocks the owner's object page shares with it:
 // · Marketplace (the buyer's side, 10x): its copies on sale as one list —
-//   a Physical or Virtual mark, "Physical NFT · Private use", Regular price ·
-//   Extended price · Royalties and the sold line (the web's EditionBlock in its
-//   buyer's words); the collection and chain as one line; what each kind of
+//   a Physical or Virtual mark, "Physical NFT · Personal use", its one Price ·
+//   Royalties and the sold line, and "Not on sale" for a use not listed (CL-018:
+//   one price per use, no version); the collection and chain as one line; what each kind of
 //   NFT is in the ⓘ (owner 2026-11-15: no tab strip inside the page's tabs).
 //   One buy path: the sticky bar;
 // · Specs: the booked facts (`productFacts`) as a grouped list, with "Worked
@@ -41,7 +41,8 @@ import { productFacts } from "@/lib/manual/products-tab-view";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { projectTabsFor } from "@/lib/manual/project-route";
 import { useProjectNetwork } from "@/lib/network/store";
-import { editionChainOf, KIND_WORD, trackCardOf, tracksOf, USE_WORD } from "@/lib/market/editions";
+import { editionChainOf, KIND_WORD, trackCardOf, tracksOf } from "@/lib/market/editions";
+import { USE_LABEL } from "@/lib/market/sell-flow";
 import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
@@ -278,18 +279,30 @@ function MarketplaceBlock() {
               </li>,
             ];
           }
-          return ofKind.map((t) => {
+          // Both uses, always (CL-018): a use the creator didn't list reads "Not on sale".
+          return USES.map((use) => {
+            const t = ofKind.find((x) => x.use === use);
+            if (!t) {
+              return (
+                <li key={`${kind}-${use}`} aria-label={`${KIND_WORD[kind]} NFT · ${USE_LABEL[use]}: not on sale`} className={cn(LIST_ROW, "items-start opacity-60 hover:bg-transparent")}>
+                  <KindMark kind={kind} />
+                  <span className={cn(T.rowTitle, "min-w-0 flex-1")}>
+                    {KIND_WORD[kind]} NFT · {USE_LABEL[use]}
+                  </span>
+                  <span className={cn(T.meta, "shrink-0 text-right")}>Not on sale</span>
+                </li>
+              );
+            }
             const card = trackCardOf(t, view.sales);
             return (
-              <li key={t.id} aria-label={`${KIND_WORD[t.kind]} NFT · ${USE_WORD[t.use]}`} className={cn(LIST_ROW, "items-start hover:bg-transparent")}>
+              <li key={t.id} aria-label={`${KIND_WORD[t.kind]} NFT · ${USE_LABEL[t.use]}`} className={cn(LIST_ROW, "items-start hover:bg-transparent")}>
                 <KindMark kind={t.kind} />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className={T.rowTitle}>
-                    {KIND_WORD[t.kind]} NFT · {USE_WORD[t.use]}
+                    {KIND_WORD[t.kind]} NFT · {USE_LABEL[t.use]}
                   </span>
                   <span className={T.meta}>
-                    Regular price {formatAmount(t.listing.regular, t.listing.token)} · Extended price{" "}
-                    {formatAmount(t.listing.extended, t.listing.token)} · Royalties {t.listing.royaltyPct}% on resales
+                    {formatAmount(t.listing.regular, t.listing.token)} · Royalties {t.listing.royaltyPct}% on resales
                   </span>
                 </span>
                 <span className={cn(T.meta, "shrink-0 text-right", card.soldOut && "text-text-success")}>{card.soldLine}</span>

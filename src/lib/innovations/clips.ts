@@ -338,10 +338,13 @@ export function clipDetailsHref(c: Pick<FeedClip, "projectId" | "productId">): s
 }
 
 /** Where an offer's button goes: the marketplace of the project or product (buying has one home).
- *  A project you shared has its own marketplace page (the buyer's view of your listing). */
+ *  A project you shared has its own marketplace page (the buyer's view of your listing); a product's
+ *  own copies sell only on that product's market view (CL-018 scope). A sample's copies are the
+ *  whole project's, so a sample product's clip buys on its project's marketplace. */
 export function clipBuyHref(c: Pick<FeedClip, "projectId" | "productId"> & { source?: FeedClip["source"] }): string {
-  if (c.source === "mine") return `/m/projects/${encodeURIComponent(c.projectId)}/market`;
-  return `${clipDetailsHref(c)}?tab=marketplace`;
+  const project = `/m/projects/${encodeURIComponent(c.projectId)}`;
+  if (c.source === "mine") return c.productId ? `${clipDetailsHref(c)}?view=market` : `${project}/market`;
+  return `${project}?tab=marketplace`;
 }
 
 /** The address of one clip on its own (Copy link, Saved › View original post). */

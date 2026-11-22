@@ -54,7 +54,7 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { SignOutSheet } from "../settings/sign-out";
-import { usePhonePitch, usePlanLine } from "../plans/upsell";
+import { usePlanLine } from "../plans/upsell";
 
 /** A row's value at its end ("Free · 28 credits", "5"); the warning ink once credits run low. */
 export function HubValue({ children, warning }: { children: React.ReactNode; warning?: boolean }) {
@@ -139,11 +139,10 @@ function PlanValue() {
 }
 
 /** The Plan & pricing row: the web account menu's plan line as its meta ("Free plan · Upgrade to Builder",
- *  CL-032); with a next plan, the row opens Plans on that plan, its Upgrade in the bar. */
+ *  CL-032); it opens Plans, whose bar already offers the next plan's Upgrade. */
 function PlanRow() {
   const line = usePlanLine();
-  const pitch = usePhonePitch();
-  return <ListRow href={pitch ? `/m/plans?pick=${pitch.plan.tier}` : "/m/plans"} icon={Tag01Icon} title="Plan & pricing" meta={line ?? undefined} value={<PlanValue />} />;
+  return <ListRow href="/m/plans" icon={Tag01Icon} title="Plan & pricing" meta={line ?? undefined} value={<PlanValue />} />;
 }
 
 function ProjectsValue() {
