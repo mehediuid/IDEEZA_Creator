@@ -3,8 +3,9 @@
 // A profile's work column (owner picked the Portfolio direction, 2026-10-14):
 // two tabs. Projects: the one project that leads (a pin, else the one that has
 // come furthest) as a large card with its picture and story, the rest as a
-// grid. Activity: the recent Activity across them, as a timeline. Only what is already public: shared to Innovations,
-// or on sale. On your own profile a card's ⋯ pins it (three at most); empty,
+// grid. Activity: the recent Activity across them, as a timeline — on your own profile only (owner
+// 2026-11-24): someone else's, and yours as others see it, get no Activity, so no tabs. Only what is
+// already public: shared to Innovations, or on sale. On your own profile a card's ⋯ pins it (three at most); empty,
 // your own says what shows here and offers Share a project, someone else's
 // says they haven't shared one yet.
 
@@ -212,13 +213,15 @@ function ProjectsPanel({ items, own, ownerName, appreciationsOf, onTogglePin }: 
 
 const ACTIVITY_FIRST = 10;
 
-/** The newest Activity across the shared projects, newest first, as a timeline. */
-function ActivityPanel({ items }: { items: readonly ActivityItem[] }) {
+/** The newest Activity across the shared projects, newest first, as a timeline. `onlyYou`: your
+ *  own profile says up top that no one else sees it. */
+function ActivityPanel({ items, onlyYou }: { items: readonly ActivityItem[]; onlyYou: boolean }) {
   const listId = React.useId();
   const [all, setAll] = React.useState(false);
   const shown = all ? items : items.slice(0, ACTIVITY_FIRST);
   return (
     <div className="flex flex-col gap-[8px]">
+      {onlyYou && <p className="text-sm leading-sm text-text-tertiary">Only you see your Activity.</p>}
       <ol id={listId} className="m-0 list-none p-0">
         {shown.map((a) => (
           <li key={a.key} className="grid grid-cols-[18px_minmax(0,1fr)] gap-x-[12px] border-b border-solid border-border-subtle py-[16px] first:pt-[4px] last:border-b-0 min-[480px]:grid-cols-[18px_minmax(0,1fr)_auto]">
@@ -263,13 +266,17 @@ const TAB_PARAM = "tab";
 /** The work, under two tabs (owner picked tabs, 2026-10-14): Projects (Featured and the rest)
  *  and Activity (the full timeline). `?tab=activity` opens the second; switching rewrites the
  *  address in place, so Back leaves the profile rather than undoing a tab. With no Activity
- *  there is nothing to switch to, and the projects show without a strip. */
+ *  there is nothing to switch to, and the projects show without a strip (someone else's profile,
+ *  and yours as others see it, always pass none: Activity is only for you). */
 export function WorkTabs({
   activity,
+  activityOnlyYou = false,
   pinNotice,
   ...work
 }: WorkProps & {
   activity: readonly ActivityItem[];
+  /** Your own profile: the Activity tab says only you see it (others never get the tab). */
+  activityOnlyYou?: boolean;
   /** A refused pin or write, said once above the work. */
   pinNotice?: string | null;
 }) {
@@ -322,7 +329,7 @@ export function WorkTabs({
       />
       {notice}
       <div role="tabpanel" id={`panel-${active}`} aria-labelledby={`tab-${active}`}>
-        {active === "projects" ? <ProjectsPanel {...work} /> : <ActivityPanel items={activity} />}
+        {active === "projects" ? <ProjectsPanel {...work} /> : <ActivityPanel items={activity} onlyYou={activityOnlyYou} />}
       </div>
     </div>
   );

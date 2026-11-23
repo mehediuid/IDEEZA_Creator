@@ -145,7 +145,7 @@ export function PrivacySettings() {
         <SettingsRow
           id="lock"
           label="Lock your profile"
-          helper="Only your project teams see your projects and activity"
+          helper="Only your project teams see your projects"
           toggle={{ checked: a.locked, onChange: toggleLock }}
           disabled={off}
         />
