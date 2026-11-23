@@ -138,3 +138,13 @@ test("Follow and Message sit with the profile's facts, never in a sticky bar (ow
   assert.ok(full > other.indexOf("More about ${first}"));
   assert.ok(full < other.indexOf("<Work"));
 });
+
+test("a share on the Feed: one small You shared chip, your words in the description's one line (owner 2026-11-24)", () => {
+  const src = read("components/mobile/feed/clip-view.tsx");
+  assert.doesNotMatch(src, /You shared · \{audience\}/);
+  assert.match(src, /RepostIcon/);
+  // Public is said by nothing; Only me is named.
+  assert.match(src, /audience !== "Public" \? ` · \$\{audience\}` : ""/);
+  // The caption stands in for the description, never both.
+  assert.match(src, /\{!caption && clip\.description && \(/);
+});

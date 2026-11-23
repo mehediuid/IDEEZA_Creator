@@ -20,7 +20,10 @@
 //
 // A project you shared plays its video in use from this browser's clip store
 // (`takeId`); it carries no Follow, and says so when the video isn't here. A
-// clip you shared to your Feed leads with "You shared" and your caption.
+// clip you shared to your Feed (owner 2026-11-24: the old two-line note took too much of the
+// video) leads with one small "You shared" chip (its audience only when it isn't Public), and
+// your caption takes the description's one line: "more" opens it in place, the title still
+// opens the item's details, where its own description is.
 //
 // Owner 2026-11-12: no chip row over the video. Whether it is a project or a
 // product is an icon in front of the title (layers: a project, a chip: a
@@ -40,6 +43,7 @@ import {
   MoreHorizontalIcon,
   PauseIcon,
   PlayIcon,
+  RepostIcon,
   Share01Icon,
   VirtualRealityVr01Icon,
 } from "@hugeicons/core-free-icons";
@@ -78,12 +82,15 @@ export function ClipText({
 }) {
   const audience = clip.share ? (AUDIENCES.find((a) => a.id === clip.share?.audience)?.label ?? "Public") : null;
   const kind = clip.kind === "project" ? "Project" : "Product";
+  // Your words on a share stand in for the item's description line (that is on its details page).
+  const caption = clip.share?.caption.trim() || null;
+  const [open, setOpen] = React.useState(false);
   return (
     <div className="flex min-w-0 flex-col items-start gap-4">
       {clip.share && (
-        <p className={cn(T.meta, MEDIA_INK, "flex max-w-full flex-col")}>
-          <span>You shared · {audience}</span>
-          {clip.share.caption && <span className="line-clamp-2 [overflow-wrap:anywhere]">{clip.share.caption}</span>}
+        <p className={cn(T.caption, MEDIA_INK, "inline-flex max-w-full items-center gap-2 rounded-full bg-[var(--color-modal-scrim)] px-3 py-1")}>
+          <Icon icon={RepostIcon} size={14} />
+          <span className="truncate">You shared{audience && audience !== "Public" ? ` · ${audience}` : ""}</span>
         </p>
       )}
       <div className="flex max-w-full items-center gap-4">
@@ -125,13 +132,25 @@ export function ClipText({
             {clip.title}
           </span>
         </span>
-        {clip.description && (
+        {!caption && clip.description && (
           <span className={cn(T.body, MEDIA_INK, "flex w-full min-w-0 gap-2")}>
             <span className="min-w-0 truncate">{clip.description.trim()}</span>
             <span className="shrink-0 text-text-tertiary">more</span>
           </span>
         )}
       </button>
+      {caption && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className={cn(T.body, MEDIA_INK, "-mt-2 flex w-full min-w-0 gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+        >
+          <span className="sr-only">Your words: </span>
+          <span className={cn("min-w-0 [overflow-wrap:anywhere]", open ? "line-clamp-5" : "truncate")}>{caption}</span>
+          <span className="shrink-0 self-end text-text-tertiary">{open ? "less" : "more"}</span>
+        </button>
+      )}
     </div>
   );
 }
