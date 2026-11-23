@@ -19,7 +19,7 @@
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCredits } from "@/lib/create/credits";
-import { useCreateHistory, type ChatTurn } from "@/lib/create/history";
+import { useCreateHistory } from "@/lib/create/history";
 import { PROJECTS as FEED_POSTS } from "@/lib/feed";
 import { editorHref, parseEditorPath } from "@/lib/manual/editor-scope";
 import { earnHref } from "@/lib/manual/earn-route";
@@ -27,7 +27,7 @@ import type { EditorStep } from "@/lib/manual/p2-types";
 import { productRowsOf } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { TOUR_CHAPTERS, chapterById } from "@/lib/tour/chapters";
-import { guideNow, type GuideFacts, type GuideStep } from "@/lib/tour/guide";
+import { guideFactsOf, guideNow, type GuideFacts, type GuideStep } from "@/lib/tour/guide";
 import { TOUR_EVENT, type TourRequest } from "@/lib/tour/open";
 import {
   editorStepOf,
@@ -131,8 +131,6 @@ function focusIn(el: HTMLElement) {
   t?.focus({ preventScroll: true });
 }
 
-type SetupTurn = Extract<ChatTurn, { role: "setup" }>;
-type ImageTurn = Extract<ChatTurn, { role: "assistant" }>;
 
 /** The page's own heading takes the focus when a tour ends with nothing to give it back to. */
 function focusPage() {
@@ -391,27 +389,17 @@ export function TourHost() {
   const guideOn = rec?.guide === "open" || rec?.guide === "small";
   const chatNow = newest(chats);
 
-  /** Where the user's first product stands, read from the app itself. */
-  const guideFacts = (): GuideFacts => {
-    const turns = chatNow?.turns ?? [];
-    const setup = turns.find((t): t is SetupTurn => t.role === "setup");
-    const images = turns.filter((t): t is ImageTurn => t.role === "assistant");
-    const jobs = chatNow ? builds.filter((b) => b.chatId === chatNow.id) : [];
-    return {
-      hasChat: !!chatNow,
-      reading: setup?.status === "loading",
-      answered: setup ? setup.status === "answered" : images.length > 0,
-      drawing: images.some((t) => t.status === "pending"),
-      conceptReady: images.some((t) => t.status === "ready"),
-      buildStarted: jobs.length > 0,
-      building: jobs.some((b) => b.status === "queued" || b.status === "running"),
-      hasProject: projects.length > 0,
-      editorSeen: here === "editor" || here === "pcb" || projects.some((p) => Object.keys(p.editorOpened ?? {}).length > 0),
-      minted: projects.some((p) => !!p.mint),
-      shared: projects.some((p) => typeof p.showcasedAt === "number"),
+  /** Where the user's first product stands, read from the app itself. Only the user's own
+   *  projects count (`guideFactsOf`): the demo projects every account starts with are already
+   *  built, minted and shared, and would finish the guide before anything was made. */
+  const guideFacts = (): GuideFacts =>
+    guideFactsOf({
+      chat: chatNow ?? null,
+      builds,
+      projects,
+      inEditor: here === "editor" || here === "pcb",
       phone: isPhone(),
-    };
-  };
+    });
   const guideHref = (step: GuideStep): string | null =>
     step.place === "chat" ? (chatNow ? `/chat/${chatNow.id}` : null) : hrefOf(step.place);
   const onGuidePlace = (step: GuideStep): boolean =>

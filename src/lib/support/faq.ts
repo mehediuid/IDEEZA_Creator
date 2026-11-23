@@ -10,7 +10,7 @@
 // (lib/create/pieces.ts), as the AI tab names them (SET-17), so the answer
 // never drifts from what a build makes.
 
-import { PICKABLE_KINDS, PIECES } from "../create/pieces";
+import { PICKABLE_KINDS, PIECES, WHOLE_PRODUCT_COSTS } from "../create/pieces";
 
 /** "PCB, Code, 3D Module, Assembly and Wiring": the pieces a build makes for each product. */
 const names = PICKABLE_KINDS.map((k) => PIECES[k].name);
@@ -33,7 +33,7 @@ export const FAQS: readonly FaqItem[] = [
   {
     id: "credits",
     q: "What does a credit pay for?",
-    a: "AI work. A concept drawing (a first draft, a refine or a regenerate) uses 1 credit, and a build uses 4 for each product in it. Your plan adds credits every month, and you can buy more any time.",
+    a: `AI work. A concept drawing (a first draft, a refine or a regenerate) uses 1 credit, and a build uses ${WHOLE_PRODUCT_COSTS} for each product in it, by its Quality (Low, Medium or High), less when you pick fewer pieces. Your plan adds credits every month, and you can buy more any time.`,
     link: { label: "See your credits", href: "/m/plans/credits" },
   },
   {

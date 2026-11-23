@@ -21,7 +21,8 @@ import { allowanceOf, lotStateOf, type LotState } from "@/lib/account/money-phon
 import { runningLow } from "@/lib/create/credit-limits";
 import { lotsOf, type Lot } from "@/lib/create/credit-lots";
 import { usd } from "@/lib/create/credit-pricing";
-import { BUILD_COST, describeEntry, useCredits, type CreditEntry } from "@/lib/create/credits";
+import { describeEntry, useCredits, type CreditEntry } from "@/lib/create/credits";
+import { wholeProductCost } from "@/lib/create/pieces";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
@@ -98,7 +99,7 @@ export function CurrentCreditScreen() {
             label="Current balance"
             meta={
               <span>
-                ≈ {n(balance)} concept drawings or {n(Math.floor(balance / BUILD_COST))} one-product builds
+                ≈ {n(balance)} concept drawings or {n(Math.floor(balance / wholeProductCost()))} one-product builds
                 {expiring ? ` · ${n(expiring.credits)} expire ${dateOf(expiring.expiresAt)}` : ""}
               </span>
             }

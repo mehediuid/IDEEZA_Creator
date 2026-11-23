@@ -73,6 +73,11 @@ test("copied links are the web's public pages, never the phone's /m addresses (S
   assert.equal(clips.webHrefOfItem("mine:proj_1~base", shared), `/innovations/${slug}/products/base`);
   assert.equal(clips.webHrefOfItem("mine:proj_1", listed), "/marketplace/proj_1");
   assert.equal(clips.webHrefOfItem("mine:proj_1~base", listed), "/marketplace/proj_1/products/base");
+  // A comment: its post's page on the comment (a product's comments live on its post); none on
+  // the marketplace only, where the phone keeps its own address.
+  assert.equal(clips.webCommentHrefOf(`/innovations/${post.slug}`, "c1"), `/innovations/${post.slug}#comment-c1`);
+  assert.equal(clips.webCommentHrefOf(`/innovations/${slug}/products/base`, "c2"), `/innovations/${slug}#comment-c2`);
+  assert.equal(clips.webCommentHrefOf("/marketplace/proj_1", "c3"), null);
   assert.equal(clips.webHrefOfItem("mine:proj_1", shared, true), "/marketplace/proj_1");
   for (const c of ALL) assert.doesNotMatch(clips.webHrefOfItem(c.id, none), /^\/m\//, c.id);
 });

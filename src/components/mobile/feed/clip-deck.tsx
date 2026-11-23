@@ -202,23 +202,23 @@ function WiredClip({
   // Your own clip opens your own profile.
   const creatorHref = clip.source === "mine" ? "/profile" : profileHrefOf(clip.creator.id, "innovations");
   const handlers = {
-    onDetails: () => go(clip.kind === "project" ? "Sign in to see this project" : "Sign in to see this product", clipDetailsHref(clip)),
+    onDetails: () => go(clip.kind === "project" ? "Log In to see this project" : "Log In to see this product", clipDetailsHref(clip)),
     onCreator: () => {
-      if (creatorHref) go(`Sign in to see ${clip.creator.name}’s profile`, `/m${creatorHref}`);
+      if (creatorHref) go(`Log In to see ${clip.creator.name}’s profile`, `/m${creatorHref}`);
     },
     onFollow: () =>
-      guard(`Sign in to follow ${clip.creator.name}`, () => {
+      guard(`Log In to follow ${clip.creator.name}`, () => {
         if (!setFollow(clip.creator.id, !following)) failed();
       }),
     onAppreciate: () =>
-      guard("Sign in to appreciate this", () => {
+      guard("Log In to appreciate this", () => {
         if (!toggle("appreciated", clip.postId)) failed();
       }),
     onComments: () => onOpen("comments"),
-    onShare: () => guard("Sign in to share this video", () => onOpen("share")),
+    onShare: () => guard("Log In to share this video", () => onOpen("share")),
     onMore: () => onOpen("menu"),
-    onArVr: () => go("Sign in to view it in AR/VR", `/m/clip/${encodeURIComponent(clip.id)}/ar`),
-    onBuy: () => go("Sign in to buy", clipBuyHref(clip)),
+    onArVr: () => go("Log In to view it in AR/VR", `/m/clip/${encodeURIComponent(clip.id)}/ar`),
+    onBuy: () => go("Log In to buy", clipBuyHref(clip)),
     onSeen: () => markViewed(clip.postId),
     onHeight,
   };

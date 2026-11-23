@@ -54,7 +54,7 @@ import { Skeleton } from "@/components/ideeza/skeleton";
 import { downscalePhoto } from "@/components/innovations/comments/comment-dom";
 import { CommentText } from "@/components/innovations/comments/comment-text";
 import { formatCount } from "@/lib/feed";
-import { clipHref, type FeedClip } from "@/lib/innovations/clips";
+import { clipHref, webCommentHrefOf, type FeedClip } from "@/lib/innovations/clips";
 import {
   actionsFor,
   addComment,
@@ -100,7 +100,7 @@ import { ReportSheet } from "../kit/report-sheet";
 import { ActionSheet, Sheet, type ActionSheetItem } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import { T } from "../type";
-import { VIDEO_REPORT_REASONS } from "./clip-menu";
+import { VIDEO_REPORT_REASONS, useWebLinkOf } from "./clip-menu";
 import { newId, useMinuteNow } from "./use-feed";
 import type { Guard } from "./use-guest";
 
@@ -258,7 +258,7 @@ export function ClipComments({
       toast({ title: problem, lead: "error" });
       return;
     }
-    guard("Sign in to comment", () => {
+    guard("Log In to comment", () => {
       const now = Date.now();
       let next: PostComment[];
       let id: string | null = null;
@@ -285,21 +285,26 @@ export function ClipComments({
   };
 
   const like = (c: PostComment) =>
-    guard("Sign in to like this comment", () => {
+    guard("Log In to like this comment", () => {
       if (!save(toggleLike(comments, c.id))) toast({ title: FAILED, lead: "error" });
     });
 
   const reply = (c: PostComment) =>
-    guard("Sign in to reply", () => {
+    guard("Log In to reply", () => {
       setMode({ kind: "reply", target: c });
       setText("");
       setPhoto(null);
       setFocusAsk((n) => n + 1);
     });
 
+  const webLinkOf = useWebLinkOf();
+  /** The web's post page on the comment when the web shows this thread (SOC-19); a share's own
+   *  thread (`link`) and an item only on the marketplace keep the phone address. */
   const copyLink = (c: PostComment) => {
     const base = link ?? clipHref(clip.id);
-    const url = new URL(`${base}${base.includes("?") ? "&" : "?"}comment=${encodeURIComponent(c.id)}`, window.location.origin).toString();
+    const web = link ? null : webCommentHrefOf(webLinkOf(clip.id), c.id);
+    const path = web ?? `${base}${base.includes("?") ? "&" : "?"}comment=${encodeURIComponent(c.id)}`;
+    const url = new URL(path, window.location.origin).toString();
     const ok = () => toast({ title: "Link to comment copied to clipboard" });
     const no = () => toast({ title: "Couldn’t copy the link", lead: "error" });
     if (!navigator.clipboard) return no();
@@ -337,7 +342,7 @@ export function ClipComments({
         case "unhide":
           return [{ label: "Unhide comment", icon: ViewIcon, onSelect: () => setHiddenTo(c, false) }];
         case "report":
-          return [{ label: "Report", icon: Flag02Icon, onSelect: () => guard("Sign in to report this comment", () => setReporting(c)) }];
+          return [{ label: "Report", icon: Flag02Icon, onSelect: () => guard("Log In to report this comment", () => setReporting(c)) }];
         case "reported":
           return [{ label: "Reported", icon: Flag02Icon, onSelect: () => toast({ title: "You reported this comment. We’re looking into it." }) }];
         case "delete":

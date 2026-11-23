@@ -164,7 +164,7 @@ export function DeleteAccount() {
     const day = dates.date(scheduled.until, { style: "day" });
     const rows: [string, string][] = [
       ["Now", lose.listings.length ? "Hidden · listings taken down" : "Hidden"],
-      [`Until ${day}`, "Sign in to restore it"],
+      [`Until ${day}`, "Log In to restore it"],
       [`After ${day}`, "Deleted for good"],
     ];
     return (
@@ -362,7 +362,7 @@ export function DeleteAccount() {
           <>
             <AccountHeading title="Confirm it’s you">
               {provider
-                ? `Sign in with ${PROVIDER_WORDS[provider]} once more to delete your account.`
+                ? `Log In with ${PROVIDER_WORDS[provider]} once more to delete your account.`
                 : "Enter your password to delete your account."}
             </AccountHeading>
             <AccountAlert
@@ -402,7 +402,7 @@ export function DeleteAccount() {
               </Field>
             )}
             <AccountAlert
-              alert={{ tone: "info", title: `Deleted on ${until}`, body: "Until then your account is hidden in the app. Sign in to the app before then to restore it. The website still signs you in as usual for now." }}
+              alert={{ tone: "info", title: `Deleted on ${until}`, body: "Until then your account is hidden in the app. Log In to the app before then to restore it. The website still signs you in as usual for now." }}
             />
           </>
         )}

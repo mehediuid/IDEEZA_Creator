@@ -15,9 +15,12 @@ import {
   presetOf,
   qualityOf,
   togglePiece,
+  WHOLE_PRODUCT_COSTS,
+  wholeProductCost,
   withPreset,
   withQuality,
 } from "../../.tmp-test/lib/create/pieces.js";
+import { readFileSync } from "node:fs";
 
 test("the whole product: the editor's five pieces and the Parts list, at Medium", () => {
   const p = defaultPick();
@@ -146,3 +149,15 @@ test("the card's Quality sets every piece that has one", () => {
   // The pieces picked stay picked.
   assert.deepEqual(pickedKinds(withQuality(withPreset(defaultPick(), "enclosure"), "high")), ["3d", "parts"]);
 });
+
+test("a whole product's build is 5, 8 or 11 credits by Quality, and the words say so", () => {
+  assert.deepEqual([wholeProductCost("low"), wholeProductCost("medium"), wholeProductCost("high")], [5, 8, 11]);
+  assert.equal(wholeProductCost(), 8);
+  assert.equal(WHOLE_PRODUCT_COSTS, "5, 8 or 11");
+  // The FAQs and tutorials (web and phone) no longer price a build at 4 a product.
+  for (const path of ["lib/support/faq.ts", "lib/tutorials/content.ts", "components/credits/plans-panel.tsx"]) {
+    const text = readFileSync(new URL(`../../src/${path}`, import.meta.url), "utf8");
+    assert.doesNotMatch(text, /\b4 (credits )?(for|per) each product|4 credits per product/, path);
+  }
+});
+

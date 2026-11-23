@@ -41,6 +41,7 @@ import { discountFor, usd, type BillingCycle } from "@/lib/create/credit-pricing
 import { useCreatePlan } from "@/lib/create/plan";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useCredits } from "@/lib/create/credits";
+import { WHOLE_PRODUCT_COSTS } from "@/lib/create/pieces";
 import { fitsYou, takesPlanSlot, usageOf } from "@/lib/create/upsell";
 import {
   HIGH_VIDEO_TIER,
@@ -497,7 +498,7 @@ export const FAQ: Record<FaqTab, { q: string; a: string }[]> = {
       q: "Is IDEEZA priced on usage or a subscription?",
       a: "Both, kept simple. A plan adds AI credits every month and sets how many projects, exports and contributors you have. AI work spends credits, and you can buy more credits any time.",
     },
-    { q: "What does a credit pay for?", a: "AI work. A concept render (a first draft, a refine or a regenerate) uses 1 credit, and a build uses 4 for each product in it." },
+    { q: "What does a credit pay for?", a: `AI work. A concept render (a first draft, a refine or a regenerate) uses 1 credit, and a build uses ${WHOLE_PRODUCT_COSTS} for each product in it, by its Quality.` },
     {
       q: "What happens to my credits each month?",
       a: "Your plan adds its credits at the start of each monthly period, and they last until the period ends. Credits you buy last 12 months. The credits that expire first are spent first.",

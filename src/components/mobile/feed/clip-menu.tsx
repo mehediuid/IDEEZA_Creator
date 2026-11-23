@@ -209,7 +209,7 @@ export function ClipMenu({
   };
 
   const save = () =>
-    guard("Sign in to save this video", () => {
+    guard("Log In to save this video", () => {
       const r = toggleSave(clip);
       if (!r.ok) return failed();
       toast(r.saved ? { title: "Saved", action: { label: "View Saved", onClick: () => router.push("/m/saved") } } : { title: "Removed from Saved" });
@@ -273,7 +273,7 @@ export function ClipMenu({
           icon: Flag02Icon,
           onSelect: () => {
             if (reported) return toast({ title: "You reported this post." });
-            guard("Sign in to report this post", () => setSheet("report"));
+            guard("Log In to report this post", () => setSheet("report"));
           },
         },
         ...shared,

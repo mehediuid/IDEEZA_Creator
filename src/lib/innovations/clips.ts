@@ -30,7 +30,7 @@ import { savedRows, type FeedShare } from "./feed-prefs";
 import { follows, type Reactions } from "./reactions";
 import { SAMPLE_POSTS } from "./sample-posts";
 import { parseShareItemId, webItemHref } from "./share-items";
-import { mineSlugOf, postHref, postProductHref } from "./slug";
+import { commentAnchor, mineSlugOf, postHref, postProductHref } from "./slug";
 import type { InnovationPost, PostPerson } from "./types";
 
 export type ClipKind = "project" | "product";
@@ -393,6 +393,16 @@ export function webHrefOfItem(id: string, mine: (projectId: string) => MineWebFa
   }
   const facts = mine(at.projectId);
   return facts?.shared ? onPost(mineSlugOf({ id: at.projectId, name: facts.name })) : webItemHref(at);
+}
+
+/** A comment's public web address (SOC-19): its post's page on Innovations, where the web shows
+ *  the same thread, opened on the comment (`#comment-<id>`). `itemHref` is the item's web page
+ *  (`webHrefOfItem`); a product's comments live on its post, so its product page gives the post.
+ *  null when the item has no post on the web (on the marketplace only): only the phone shows its
+ *  comments, so its phone address stays. */
+export function webCommentHrefOf(itemHref: string, commentId: string): string | null {
+  const post = /^\/innovations\/[^/?#]+/.exec(itemHref);
+  return post ? `${post[0]}#${commentAnchor(commentId)}` : null;
 }
 
 /** "Buy Main NFT (0.25 ETH)", "Place bid (0.01 ETH)" on an auction (the marketplace's words for

@@ -284,7 +284,7 @@ function PostMenu({ post, owner }: { post: InnovationPost; owner: boolean }) {
         onClose={() => setReporting(false)}
         onSend={() => {
           setReporting(false);
-          toast(markReported() ? "Report sent. We'll review it." : "Couldn't send the report from this browser. Try again.");
+          toast(markReported() ? "Report sent. In this demo nobody reviews reports yet." : "Couldn't send the report from this browser. Try again.");
         }}
       />
     </>
