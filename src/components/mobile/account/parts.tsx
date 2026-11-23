@@ -11,7 +11,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Banner, type BannerTone } from "@/components/ideeza/banner";
 import { currentAccount, needsAccountDetails, needsSourceQuestion, readAccounts, readSession } from "@/lib/account/auth";
-import { phonePasswordChecks } from "@/lib/account/phone";
+import { clockOf, phonePasswordChecks } from "@/lib/account/phone";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 
@@ -39,8 +39,10 @@ const STRENGTH = [
 
 /** "Password checklist (live)": the web's five rules, each ticking (icon and
  *  text success) as it is met, under the web's strength bar (one segment a
- *  rule, Weak · Fair · Almost there · Strong). */
-export function PasswordChecklist({ password, id }: { password: string; id?: string }) {
+ *  rule, Weak · Fair · Almost there · Strong). `invalid` (Create account was
+ *  pressed with rules unmet): the unmet ones read in the error ink, as the
+ *  web's do (AUTH-14). */
+export function PasswordChecklist({ password, id, invalid }: { password: string; id?: string; invalid?: boolean }) {
   const checks = phonePasswordChecks(password);
   const met = checks.filter((c) => c.met).length;
   const level = STRENGTH[password ? met : 0];
@@ -56,7 +58,7 @@ export function PasswordChecklist({ password, id }: { password: string; id?: str
       </div>
       <ul aria-label="Password rules" className="flex flex-col gap-2">
         {checks.map((c) => (
-          <li key={c.id} className={cn(T.meta, "flex items-center gap-4", c.met && "text-text-success")}>
+          <li key={c.id} className={cn(T.meta, "flex items-center gap-4", c.met ? "text-text-success" : invalid && "text-text-error")}>
             <span className={c.met ? "text-[color:var(--color-icon-success)]" : "text-[color:var(--color-icon-secondary)]"}>
               <Icon icon={c.met ? CheckmarkCircle02Icon : CircleIcon} size={16} />
             </span>
@@ -87,6 +89,12 @@ export const REFUSED_ALERT: AlertSpec = {
   title: "Couldn’t save",
   body: "This browser wouldn’t save that. Check that it allows this site to store data, then try again.",
 };
+
+/** Too many wrong passwords (Log In, Link accounts): this phone's own pause, which the web
+ *  doesn't have, so it says plainly that it is this phone's (AUTH-9). */
+export function signInPausedBody(ms: number): string {
+  return `Log In is paused on this phone. Try again in ${clockOf(ms)}, or reset your password.`;
+}
 
 /** Where a new account goes once it is in, as on the web: the one question
  *  ("Where did you hear about IDEEZA?") when the link that brought it didn't

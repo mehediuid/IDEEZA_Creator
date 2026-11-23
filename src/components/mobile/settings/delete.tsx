@@ -179,7 +179,8 @@ export function DeleteAccount() {
       >
         <div className={`${ACCOUNT_CONTENT} pt-12`}>
           <AccountHeading title={`Your account will be deleted on ${until}`}>
-            Signing in to the app before then restores it. We’ve sent the details to {email}.
+            {/* No email is sent (the prototype sends none), so it promises none. */}
+            Signing in to the app before then restores it.
           </AccountHeading>
           <SettingsGroup footer={DELETE_APP_ONLY}>
             {rows.map(([term, value]) => (

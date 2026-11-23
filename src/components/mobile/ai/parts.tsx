@@ -9,7 +9,6 @@
 import * as React from "react";
 import { Coins01Icon, InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button } from "@/components/ideeza/button";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { ConceptFailReason } from "@/lib/create/history";
 import { PIECES, PICKABLE_KINDS, defaultPick, pickCost } from "@/lib/create/pieces";
@@ -179,11 +178,6 @@ export function CreditsInfoSheet({ open, onClose }: { open: boolean; onClose: ()
       onClose={onClose}
       title="How credits are spent"
       description={hydrated ? `You have ${balance.toLocaleString("en-US")} credits. Nothing is charged until a concept starts drawing.` : undefined}
-      actions={
-        <Button size="xl" className="w-full" onClick={onClose}>
-          Done
-        </Button>
-      }
     >
       <dl className="flex flex-col">
         {rows.map(([k, v]) => (

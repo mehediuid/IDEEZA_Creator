@@ -3,7 +3,10 @@
 // AU-02 · Welcome, the owner's design (2026-11-09): after the onboarding (and
 // after a sign-out), the logo on the night and the two ways on — Sign up and
 // Log In. Social sign-in lives on Log In ("Or login with"). Offline, and a
-// provider's error sent back here (AU-04c), show above the logo.
+// provider's error sent back here (AU-04c), show above the logo. So does a
+// sign-in without Remember me that ended with its tab (`?expired=1`, AUTH-8):
+// "Your session expired", and Log In carries it on with the page that was
+// opened (`next`), so it says so there too and goes back to that page.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -20,7 +23,9 @@ export default function WelcomePage() {
   const next = mobileNext(params.get("next"));
   const failed = PROVIDERS.find((p) => p === params.get("error")) as Provider | undefined;
   const online = useOnline();
+  const expired = params.get("expired") === "1";
   const carry = next === "/m" ? "" : `?next=${encodeURIComponent(next)}`;
+  const logInCarry = expired ? `?${new URLSearchParams({ expired: "1", ...(next === "/m" ? {} : { next }) })}` : carry;
 
   return (
     <Screen
@@ -29,7 +34,7 @@ export default function WelcomePage() {
           <Button size="xl" className="w-full" onClick={() => router.push(`/m/sign-up${carry}`)}>
             Sign up
           </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => router.push(`/m/sign-in${carry}`)}>
+          <Button hierarchy="secondary" size="xl" className="w-full" onClick={() => router.push(`/m/sign-in${logInCarry}`)}>
             Log In
           </Button>
         </div>
@@ -40,6 +45,11 @@ export default function WelcomePage() {
         {failed && online && (
           <Banner tone="error" title={`Couldn’t log in with ${PROVIDER_WORDS[failed]}`}>
             Try again, or use another way.
+          </Banner>
+        )}
+        {expired && !failed && online && (
+          <Banner tone="info" title="Your session expired">
+            Log in again to go back where you were.
           </Banner>
         )}
         <div className="flex flex-1 items-center justify-center text-text-primary">

@@ -210,7 +210,7 @@ export function CreditsTab() {
       <DiscountsSheet open={compare} onClose={() => setCompare(false)} />
       <UpgradeUnlockSheet open={unlock} onClose={() => setUnlock(false)} />
       <RedeemCodeSheet open={redeeming} onClose={() => setRedeeming(false)} />
-      {deal && <BetterDealSheet open={offer} onClose={() => setOffer(false)} deal={deal} credits={credits} customPrice={customCost.final} discount={discount} onCustom={goCustom} />}
+      {deal && <BetterDealSheet open={offer} onClose={() => setOffer(false)} deal={deal} discount={discount} onCustom={goCustom} />}
     </div>
   );
 }

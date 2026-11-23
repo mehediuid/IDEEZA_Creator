@@ -21,11 +21,15 @@
 // hide, blocked people's words hidden, links and @mentions drawn as the web
 // draws them. A copied comment link opens its thread, brings it into view and
 // marks it a moment. A write the phone refuses keeps the words and says so.
+// On your own post a line over the composer says who can comment now, or that
+// your break holds comments, with Change opening that setting (SOC-14, the
+// web's line over its composer): the same rules already decide what shows.
 // A share on the profile's Timeline has its own thread too (owner 2026-11-22, Facebook's re-share:
 // the share has its own comments): the same sheet over the share's post (`share:<id>`), the sharer
 // its owner, its comment links opening the share on the Timeline (`link`).
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ArrowDown01Icon,
   AtIcon,
@@ -86,6 +90,9 @@ import { sampleSeedOf } from "@/lib/innovations/sample-posts";
 import { ME_ID } from "@/lib/innovations/types";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMe } from "@/lib/people/profile-store";
+import { commentRuleOf, quietEndLabel } from "@/lib/settings/audience";
+import { quietModeOn, type Reach } from "@/lib/settings/prefs";
+import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { PickSheet } from "../kit/pick-list";
@@ -108,6 +115,31 @@ const FIELD_MAX = 120;
 const rowId = (id: string) => `m-comment-${id}`;
 /** The time of a write, read when the write happens (never during render). */
 const writeTime = () => Date.now();
+
+/** The web's words for who can comment (post-comments.tsx). */
+const RULE_WORD: Record<Reach, string> = { everyone: "Anyone", work: "People you work with", nobody: "Only you" };
+
+/** On your own post: who can comment now, from Settings › Privacy & safety, as the web says it over its
+ *  composer — or that your break holds comments from people you don't work with. Change opens it. */
+function CommentRuleLine() {
+  const settings = useSettings();
+  const now = useMinuteNow();
+  const rule = commentRuleOf(settings, now);
+  const quiet = quietModeOn(settings, now) && rule !== settings.audience.comment;
+  return (
+    <p className={cn(T.body, "px-2")}>
+      {quiet && settings.audience.quietUntil !== null
+        ? `You’re taking a break until ${quietEndLabel(settings.audience.quietUntil)}, so only people you work with can comment.`
+        : `Who can comment: ${RULE_WORD[rule]}.`}{" "}
+      <Link
+        href="/m/settings/privacy?open=comment"
+        className={cn(T.rowTitle, "relative text-text-brand outline-none after:absolute after:-inset-x-2 after:-inset-y-[12px] after:content-[''] hover:underline focus-visible:underline")}
+      >
+        Change
+      </Link>
+    </p>
+  );
+}
 
 /** "12 comments" — the sheet's title. */
 export const commentsTitle = (n: number) => `${n} ${n === 1 ? "comment" : "comments"}`;
@@ -363,6 +395,8 @@ export function ClipComments({
     <p className={cn(T.body, "px-2 py-4")}>{refusal}</p>
   ) : (
     <div className="flex flex-col gap-2">
+      {/* Your own post (its maker's rules apply): who can comment now. */}
+      {owner && rules && <CommentRuleLine />}
       {mode.kind !== "comment" && (
         <div className="flex min-h-[44px] items-center justify-between gap-4 pl-[44px]">
           {mode.kind === "reply" ? (

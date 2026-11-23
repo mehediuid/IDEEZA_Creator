@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ideeza/text-input";
 import { rememberSentReport } from "@/lib/data/reports";
 import { IMAGES_MAX, admitImages, titleOf } from "@/lib/support/problem-report";
 import { imageFilesOf, shrinkFile, type ReportImage } from "@/lib/support/report-images";
+import { useDates, type Dates } from "@/lib/settings/use-dates";
 import { MESSAGE_MAX, putMessage, readChat, writeChat, type ChatMessage } from "@/lib/support/support-chat";
 import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
@@ -32,11 +33,10 @@ import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { newReportId, phoneContext, postReport } from "./report-screen";
 
-const time = (ts: number) => new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-const day = (ts: number) => {
-  const d = new Date(ts);
-  const today = new Date();
-  return d.toDateString() === today.toDateString() ? "Today" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+/** A message's day in the thread, in Settings › Language & region's format and zone (SET-18): "Today", else its date. */
+const dayOf = (dates: Dates, ts: number) => {
+  const d = dates.date(ts);
+  return d === dates.date(Date.now()) ? "Today" : d;
 };
 
 type Shot = ReportImage & { url: string };
@@ -50,6 +50,8 @@ const ICON_BTN =
 
 export function ContactScreen() {
   const online = useOnline();
+  const dates = useDates();
+  const day = (ts: number) => dayOf(dates, ts);
   const toast = useToast();
   const [thread, setThread] = React.useState<ChatMessage[] | null>(null);
   const [text, setText] = React.useState("");
@@ -261,7 +263,7 @@ export function ContactScreen() {
                 {m.text && <p className="whitespace-pre-wrap">{m.text}</p>}
                 {m.images ? <p className={T.meta}>{m.images} {m.images === 1 ? "screenshot" : "screenshots"}</p> : null}
                 <p className={cn(T.micro, "flex items-center justify-end gap-2 pt-1 text-text-tertiary")}>
-                  {time(m.at)}
+                  {dates.time(m.at)}
                   {m.state === "sent" ? <Icon icon={TickDouble02Icon} size={14} aria-label="Sent" /> : m.state === "sending" ? <Icon icon={Tick02Icon} size={14} aria-label="Sending" /> : null}
                 </p>
               </div>
@@ -306,6 +308,7 @@ export function ContactScreen() {
 }
 
 function TeamBubble({ children, at }: { children: React.ReactNode; at?: number }) {
+  const dates = useDates();
   return (
     <li className="flex items-end gap-3">
       <span aria-hidden className="inline-flex size-[28px] shrink-0 items-center justify-center rounded-full bg-bg-surface ring-[length:var(--border-width-1)] ring-border">
@@ -313,7 +316,7 @@ function TeamBubble({ children, at }: { children: React.ReactNode; at?: number }
       </span>
       <div className={cn(T.body, "max-w-[85%] rounded-xl rounded-bl-sm bg-bg-surface px-6 py-4 text-text-primary ring-[length:var(--border-width-1)] ring-border")}>
         <p>{children}</p>
-        {at !== undefined && <p className={cn(T.micro, "pt-1 text-right text-text-tertiary")}>{time(at)}</p>}
+        {at !== undefined && <p className={cn(T.micro, "pt-1 text-right text-text-tertiary")}>{dates.time(at)}</p>}
       </div>
     </li>
   );

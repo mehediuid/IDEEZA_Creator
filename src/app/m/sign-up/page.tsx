@@ -5,9 +5,12 @@
 // email, a password with its live checklist, the re-typed password, date of
 // birth (day, month and year, each from a bottom sheet), and the consent line.
 // As on the web, Create account checks everything: each field says what is
-// wrong under it (the password through its checklist) and the first one gets
-// the focus; a field also says so once it is left. An email that is already used says so with Sign in instead
-// (10f); creating (10g); offline keeps the input (10h). The Terms open in a
+// wrong under it (the password through its checklist, its unmet rules then in
+// red; each date picker its own "Choose a day." — AUTH-14) and the first one
+// gets the focus; a field also says so once it is left. An email that is
+// already used says so with Log In instead (10f); creating (10g); offline
+// keeps the input (10h). "Have an Account? Log In" carries the email typed, as
+// the web's Sign in link does (AUTH-12). The Terms open in a
 // full-height sheet (AU-11). Next: the 6-digit code (AU-12), then the web's
 // one question and the Welcome map. A link's utm_source is kept with the
 // account, as on the web, so the question can be skipped. `?email=` fills the
@@ -33,6 +36,7 @@ import {
   NAME_PART_MAX,
   PASSWORD_MAX,
   createAccount,
+  isEmail,
   signUpProblems,
   type SignUpField,
   type SignUpInput,
@@ -86,13 +90,12 @@ export default function SignUpPage() {
       <>
         There’s already an account with this email.{" "}
         <Link href={signInHref(true)} className="font-medium text-text-brand hover:underline">
-          Sign in instead
+          Log In instead
         </Link>
       </>
     ) : (
       show("email")
     );
-  const birthdayError = show("birthday");
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +125,7 @@ export default function SignUpPage() {
     <Screen
       footer={
         <div className="px-8 pb-4 pt-4">
-          <SwitchLine text="Have an Account?" link="Log In" href={signInHref(false)} />
+          <SwitchLine text="Have an Account?" link="Log In" href={signInHref(isEmail(input.email))} />
         </div>
       }
     >
@@ -197,7 +200,7 @@ export default function SignUpPage() {
                 {...(tried && problems.password ? { invalid: true, "aria-invalid": true as const } : {})}
               />
             </Field>
-            <PasswordChecklist password={input.password} id={ids.rules.id} />
+            <PasswordChecklist password={input.password} id={ids.rules.id} invalid={tried && !!problems.password} />
           </div>
           <Field label="Re-type password" htmlFor={ids.confirm.id} error={show("confirm")} errorId={ids.confirm.errorId}>
             <PasswordInput
@@ -214,7 +217,7 @@ export default function SignUpPage() {
           <BirthDateField
             value={{ day: input.day, month: input.month, year: input.year }}
             onChange={(part, v) => set(part)(v)}
-            error={birthdayError}
+            shown={tried || dateChosen}
             now={now}
             ids={ids}
           />

@@ -85,8 +85,9 @@ export function DowngradeScreen() {
       className="px-8 pb-8 pt-4"
       footer={
         <BottomBar>
-          <Button hierarchy="danger" size="xl" className="w-full" onClick={confirm}>
-            {same ? "Switch to monthly" : "Confirm downgrade"}
+          {/* The web's DowngradeDialog words and weight (MON-14): nothing is charged or removed, so primary. */}
+          <Button size="xl" className="w-full" onClick={confirm}>
+            {same ? "Switch to monthly" : `Downgrade to ${target.name}`}
           </Button>
           <Button hierarchy="secondary" size="xl" className="w-full" onClick={keepPlan}>
             Keep {current.name}

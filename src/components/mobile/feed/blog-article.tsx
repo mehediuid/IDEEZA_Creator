@@ -12,42 +12,42 @@
 // type ladder and the same images). The words and rules are the web's
 // (blog/article/article-reader.tsx, lib/blog/article-view.ts; SET-7). Only a
 // blog readers can open is shown: one not on the IDEEZA Blog says so in the
-// web's words; one that isn't there is the kit's not-found page.
+// web's words; one that isn't there is the kit's not-found page. A blog the
+// IDEEZA team removed still reads for its writer, under the web's banner
+// (blog/article/article-read.tsx; SET-8), never as "not approved yet".
 
 import * as React from "react";
 import Link from "next/link";
-import { LeftToRightListBulletIcon, News01Icon } from "@hugeicons/core-free-icons";
+import { News01Icon } from "@hugeicons/core-free-icons";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
+import { Banner } from "@/components/ideeza/banner";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { Tag } from "@/components/ideeza/tag";
 import { ArticleBody, ArticleBodySkeleton } from "@/components/blog/article/article-body";
 import { CoverImage } from "@/components/blog/cover-image";
-import { currentHeading, minRead, showContents } from "@/lib/blog/article-view";
+import { minRead, showContents } from "@/lib/blog/article-view";
 import { categoryLabel } from "@/lib/blog/categories";
 import { dayDate } from "@/lib/blog/dates";
-import { headingsOf, isEmptyDoc, readingMinutes, type Heading } from "@/lib/blog/doc";
+import { headingsOf, isEmptyDoc, readingMinutes } from "@/lib/blog/doc";
 import { findBySlug } from "@/lib/blog/slug";
 import { useBlog, useBody } from "@/lib/blog/store";
 import type { ArticleMeta } from "@/lib/blog/types";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMe } from "@/lib/people/profile-store";
-import { motionReduced } from "@/lib/settings/appearance";
 import { cn } from "@/lib/utils";
-import { ListCard, ListRow } from "../kit/list";
-import { PickSheet } from "../kit/pick-list";
 import { EmptyState, ErrorState, NotFoundState } from "../kit/state";
-import { SCROLL_ATTR, Screen } from "../screen";
+import { PageContents } from "../help/page-contents";
+import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-
-/** The reading line, as a share of the screen's scrolling box from its top (the web's). */
-const LINE = 0.3;
 
 export function BlogArticleScreen({ slug }: { slug: string }) {
   const { hydrated, data } = useBlog();
   const article = hydrated ? findBySlug(data, slug) : null;
-  const live = article?.live && !article.takenDown ? article.live : null;
+  // A removed blog keeps its live copy: the writer still reads it, under the web's banner.
+  const live = article?.live ?? null;
+  const removedAt = article?.takenDown?.at ?? null;
 
   return (
     <Screen top={<TopBar back="/m/search?kind=blog" title="Blog" />}>
@@ -71,13 +71,13 @@ export function BlogArticleScreen({ slug }: { slug: string }) {
           />
         </div>
       ) : (
-        <Reader id={article.id} meta={live} at={live.approvedAt} />
+        <Reader id={article.id} meta={live} at={live.approvedAt} removedAt={removedAt} />
       )}
     </Screen>
   );
 }
 
-function Reader({ id, meta, at }: { id: string; meta: ArticleMeta; at: number }) {
+function Reader({ id, meta, at, removedAt }: { id: string; meta: ArticleMeta; at: number; removedAt: number | null }) {
   const body = useBody(id, "live");
   const me = useMe();
   const photo = useMyPhoto();
@@ -122,8 +122,14 @@ function Reader({ id, meta, at }: { id: string; meta: ArticleMeta; at: number })
             ))}
           </ul>
         )}
+        {/* The web's notice for a removed blog, under the title and byline as there (SET-8). */}
+        {removedAt != null && (
+          <Banner tone="attention" title="Readers can’t see this blog">
+            The IDEEZA team removed it from the IDEEZA Blog on {dayDate(removedAt)}. Only you can read it here.
+          </Banner>
+        )}
       </header>
-      {showContents(headings.length) && <OnThisPage headings={headings} article={ref} />}
+      {showContents(headings.length) && <PageContents headings={headings} within={ref} label="On this page" />}
       {!body.hydrated ? (
         <ArticleBodySkeleton />
       ) : body.unreadable ? (
@@ -132,60 +138,5 @@ function Reader({ id, meta, at }: { id: string; meta: ArticleMeta; at: number })
         <ArticleBody doc={doc} />
       )}
     </article>
-  );
-}
-
-/** The heading being read when the sheet opens: the web's rule (lib/blog/article-view
- *  currentHeading), measured in the phone screen's own scrolling box. */
-function headingBeingRead(article: HTMLElement | null, headings: readonly Heading[]): string | null {
-  const box = article?.closest<HTMLElement>(`[${SCROLL_ATTR}]`);
-  const els = headings.map((h) => document.getElementById(h.anchor)).filter((e): e is HTMLElement => !!e);
-  if (!box || !els.length) return headings[0]?.anchor ?? null;
-  const rect = box.getBoundingClientRect();
-  const endInView = box.scrollTop + box.clientHeight >= box.scrollHeight - 2;
-  const at = currentHeading(
-    els.map((e) => e.getBoundingClientRect().top - rect.top),
-    rect.height * LINE,
-    rect.height,
-    endInView,
-  );
-  return at >= 0 ? els[at].id : null;
-}
-
-/** "On this page": one row that opens the headings in a pick-one sheet; a pick scrolls to that
- *  heading and hands it the focus, so reading (and a screen reader) carries on from there. */
-function OnThisPage({ headings, article }: { headings: readonly Heading[]; article: React.RefObject<HTMLElement | null> }) {
-  const [open, setOpen] = React.useState(false);
-  const [current, setCurrent] = React.useState<string | null>(null);
-  const go = (anchor: string) => {
-    // After the sheet has closed and handed the focus back (kit/sheet), so the heading keeps it.
-    requestAnimationFrame(() => {
-      const el = document.getElementById(anchor);
-      if (!el) return;
-      el.scrollIntoView({ block: "start", behavior: motionReduced() ? "auto" : "smooth" });
-      el.focus({ preventScroll: true });
-    });
-  };
-  return (
-    <>
-      <ListCard>
-        <ListRow
-          icon={LeftToRightListBulletIcon}
-          title="On this page"
-          onClick={() => {
-            setCurrent(headingBeingRead(article.current, headings));
-            setOpen(true);
-          }}
-        />
-      </ListCard>
-      <PickSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title="On this page"
-        value={current}
-        options={headings.map((h) => ({ value: h.anchor, label: h.text }))}
-        onPick={go}
-      />
-    </>
   );
 }

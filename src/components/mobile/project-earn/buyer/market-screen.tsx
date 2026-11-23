@@ -28,10 +28,12 @@
 //   screen's): what it gets you, Use (Personal use / Business use) and From
 //   holders as choices of one radio group. Then the description.
 // · Tabs Overview · Products · Media (`?tab=`, the kit's client-state tabs);
-//   the Overview holds Project activity, the products, Legal information,
-//   Holder benefits, About (with Team and Network rows that push read-only
-//   screens when the web shows those tabs, BUY-9) and Recent (the web's rail
-//   log, public lines).
+//   the Overview holds Project activity, the products, Creator (the web's
+//   Creator block: the creator's name opens their profile, "Made {project}" —
+//   CL-018, BUY-14; the way to ask them is the bar's chat icon), Legal
+//   information, Holder benefits, About (with Team and Network rows that push
+//   read-only screens when the web shows those tabs, BUY-9) and Recent (the
+//   web's rail log, public lines).
 // · The bottom bar (PickBar): what is picked and its price, with Change, then
 //   Ask the creator (Get creator support for a holder) as a chat icon beside
 //   the one primary for the pick — Buy now (Buy another share), Place bid
@@ -55,7 +57,8 @@ import { scrollWithin } from "@/components/create/anchors";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { useAuctionClock } from "@/components/marketplace/bid-card";
 import { listedKindsOf } from "@/components/marketplace/copy-panel";
-import { useCreatorName } from "@/components/marketplace/use-creator-name";
+import { useCreator, useCreatorName } from "@/components/marketplace/use-creator-name";
+import { Avatar } from "@/components/ideeza/avatar";
 import { useEditionPurchase, usePurchase, type EditionTier } from "@/components/marketplace/purchase-dialog";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { useResales } from "@/components/projects/purchased/resales-store";
@@ -83,6 +86,8 @@ import { PROJECT_SCOPE, type EditionKind, type Listing, type Sale } from "@/lib/
 import { unitsAllowanceOf, type UnitsUse } from "@/lib/market/units";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
+import { profileHrefOf } from "@/lib/people/ids";
+import { useMyProfile } from "@/lib/people/profile-store";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY } from "@/lib/video/types";
@@ -100,7 +105,7 @@ import { ProjectProvider, type Ready } from "../../project/context";
 import { ProjectRecent } from "../../project/overview";
 import { MediaTab } from "../../project/media-tab";
 import { BuildCheckLine, ProductLinkQueryProvider, useProductRows } from "../../project/product-rows";
-import { ListCard } from "../../kit/list";
+import { ListCard, ListRow } from "../../kit/list";
 import { ProductRow, SectionHeading, SubLine } from "../../project/parts";
 import { Description } from "../../project/project-screen";
 import { MediaHero } from "../../project/sample-project";
@@ -543,6 +548,7 @@ function MarketReady({ data }: { data: Ready }) {
             <div className="flex flex-col gap-12">
               <ProjectActivity projectId={project.id} createdAt={project.createdAt} />
               <ProductsSection seeAll={`${phoneMarketHref(project.id)}?tab=products`} />
+              <CreatorSection projectName={project.name} />
               <LegalSection legal={project.legal} />
               <HolderBenefits listing={view.listing} />
               <AboutRows
@@ -595,6 +601,29 @@ function ClosedOrNothing({ view }: { view: Ready["view"] }) {
   const closed = closedLineOf(view);
   if (!closed) return null;
   return <ClosedCard title={closed.title} detail={closed.detail} />;
+}
+
+/** BUY-14 · the web's Creator block (market-rail.tsx, CL-018 "The creator's name links to their profile"): who made
+ *  the project as a buyer knows them, "Made {project}", opening their profile. Every listing here is the signed-in
+ *  person's own, so the profile is theirs (by their handle, as the web's PersonName links it). */
+function CreatorSection({ projectName }: { projectName: string }) {
+  const creator = useCreator();
+  const { fields } = useMyProfile();
+  // Yours always has an address: your handle, else /creators/me (which opens you).
+  const profile = `/m${profileHrefOf(ME, "messages", fields.handle) ?? "/creators/me"}`;
+  return (
+    <section aria-labelledby="bv-creator" className="flex flex-col gap-4">
+      <SectionHeading id="bv-creator" title="Creator" />
+      <ListCard label="Creator">
+        <ListRow
+          leading={<Avatar initials={creator.initials} color="var(--color-gray-700)" size="sm" />}
+          title={creator.name}
+          meta={`Made ${projectName}`}
+          href={profile}
+        />
+      </ListCard>
+    </section>
+  );
 }
 
 /** The Overview's products: the count and pieces line, the Build check, the first three rows. */

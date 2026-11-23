@@ -7,9 +7,12 @@
 // M01 error alert, the note kept, Try again), offline (an M01 warning; the
 // report is kept — closing the sheet keeps it for this target, reopening
 // brings it back — and Send report turns on when the phone is back online),
-// then one "Report sent" done state for every target. While the note has
-// focus (keyboard up, KIT-RB-12) the reasons fold to the picked one. The
-// person reported never learns who reported.
+// then one "Report sent" done state for every target, with one receipt for
+// all of them (SOC-20): where to find it, and the web's honest line that
+// nobody reviews reports in this demo (the web's profile and message reports
+// say the same). ✕, a swipe or the scrim close it. While the note has focus
+// (keyboard up, KIT-RB-12) the reasons fold to the picked one. The person
+// reported never learns who reported.
 
 import * as React from "react";
 import { Banner } from "@/components/ideeza/banner";
@@ -63,14 +66,14 @@ export function ReportSheet({
 }: {
   open: boolean;
   onClose: () => void;
-  /** "Report Philip’s profile", "Report post"… */
+  /** "Report Philip’s profile", "Report this post"… */
   title: string;
   /** "Philip won’t know who reported." / "The maker won’t know who reported." */
   description: string;
   reasons: readonly ReportReason[];
   /** Offers "Also block {name}" (profile and conversation reports). */
   blockName?: string;
-  /** The reasons' heading (the Feed asks "Why are you reporting this video?"). */
+  /** The reasons' heading (the Feed asks "Why are you reporting this post?"). */
   question?: string;
   /** The note's words, and the reason that opens it (the Feed's "Tell us more" shows under Others only). */
   note?: { label: string; placeholder: string; onlyFor?: string };
@@ -128,16 +131,7 @@ export function ReportSheet({
 
   if (phase === "sent") {
     return (
-      <Sheet
-        open={open}
-        onClose={close}
-        title="Report sent"
-        actions={
-          <Button size="xl" className="w-full" onClick={close}>
-            Done
-          </Button>
-        }
-      >
+      <Sheet open={open} onClose={close} title="Report sent">
         <p className={T.body}>Thanks for telling us. You can find it in Settings › Privacy &amp; safety › Your reports.</p>
         {/* The web's honest line (report dialog, done state). */}
         <p className={T.body}>In this demo nobody reviews reports yet.</p>

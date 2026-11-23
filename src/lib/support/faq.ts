@@ -6,7 +6,15 @@
 // that does it. Search folds case and matches every typed word anywhere in
 // the question or the answer, questions first.
 //
-// Pure, no imports.
+// Pure. A build's pieces are named from the build's own table
+// (lib/create/pieces.ts), as the AI tab names them (SET-17), so the answer
+// never drifts from what a build makes.
+
+import { PICKABLE_KINDS, PIECES } from "../create/pieces";
+
+/** "PCB, Code, 3D Module, Assembly and Wiring": the pieces a build makes for each product. */
+const names = PICKABLE_KINDS.map((k) => PIECES[k].name);
+export const BUILD_PIECES = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names.join("");
 
 export type FaqItem = { id: string; q: string; a: string; link?: { label: string; href: string } };
 
@@ -14,7 +22,7 @@ export const FAQS: readonly FaqItem[] = [
   {
     id: "no-knowledge",
     q: "Can I use IDEEZA without knowing hardware design?",
-    a: "Yes. Describe your idea in plain words on the AI tab. AI draws concepts for each product, and a build gives every product five pieces: a 3D model, a PCB, firmware code, wiring and a parts list.",
+    a: `Yes. Describe your idea in plain words on the AI tab. AI draws concepts for each product, and a build makes ${BUILD_PIECES} for each one, plus its parts list.`,
     link: { label: "Start with an idea", href: "/m/ai" },
   },
   {

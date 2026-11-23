@@ -6,7 +6,8 @@
 // screen: the available balance first (in dollars at the demo rates, whose
 // table sits behind the ⓘ), Withdraw money in the Bottom action bar, then —
 // once something of yours is listed or sold — one identity row (Verify your
-// identity, a higher level that's due, or the level you're at), the balance
+// identity, a higher level that's due, or the level you're at — which says
+// the next one ahead from 75 % of its threshold, as the web does), the balance
 // by project, the withdrawal methods (a row opens ⋮ Make default — signed in
 // the wallet sheet — or Remove, asked first; Add withdrawal method takes a
 // crypto wallet, bank, Payoneer and PayPal aren't in the app), Get paid in
@@ -42,7 +43,7 @@ import { methodRequest } from "@/components/settings/get-paid/method-dialog";
 import { networkName, useGetPaidData } from "@/components/settings/get-paid/parts";
 import { DEMO_USD_RATES, IDZ_RATE_LINE, balanceOf, centsFloor, formatUsd, makeDefault, removeMethod, type PayoutStore, type PayoutToken, type WithdrawalMethod } from "@/lib/account/payout";
 import { scrubPayout, updatePayout, usePayout } from "@/lib/account/use-payout";
-import { levelDueOf, levelStatusOf, LEVEL_AT, type KycLevels } from "@/lib/commerce/kyc-levels";
+import { levelDueOf, levelNearOf, levelStatusOf, LEVEL_AT, type KycLevels } from "@/lib/commerce/kyc-levels";
 import { useKyc } from "@/lib/commerce/use-commerce";
 import { useKycLevels } from "@/lib/commerce/use-kyc-levels";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
@@ -113,6 +114,7 @@ export function GetPaidScreen() {
   const available = balance ? centsFloor(balance.available) : "0";
   const hasMoney = compareAmounts(available, "0") > 0;
   const due = levels ? levelDueOf(levels, data.salesUsd) : null;
+  const near = levels ? levelNearOf(levels, data.salesUsd) : null;
   const setup = store ? data.stageOf(store) === "setup" : false;
   const verifyHref = "/m/settings/kyc/1?next=/m/settings/idz-pay";
   const ready = loaded && !!store && !!balance;
@@ -192,7 +194,7 @@ export function GetPaidScreen() {
           ) : (
             <>
               <ListCard label="Identity">
-                <IdentityRow verified={verified} levels={levels} due={due} verifyHref={verifyHref} onDue={() => setHigher(true)} />
+                <IdentityRow verified={verified} levels={levels} due={due} near={near} salesUsd={data.salesUsd} verifyHref={verifyHref} onDue={() => setHigher(true)} />
               </ListCard>
 
               <ByProject byProject={data.byProject} withdrawn={balance.withdrawn} />
@@ -329,12 +331,17 @@ function IdentityRow({
   verified,
   levels,
   due,
+  near,
+  salesUsd,
   verifyHref,
   onDue,
 }: {
   verified: boolean;
   levels: KycLevels | undefined;
   due: "intermediate" | "advanced" | null;
+  /** The next level, said ahead from 75 % of its threshold (MON-21). */
+  near: { at: number } | null;
+  salesUsd: number;
   verifyHref: string;
   onDue: () => void;
 }) {
@@ -360,7 +367,18 @@ function IdentityRow({
     <ListRow
       leading={<StateMark icon={Shield01Icon} tone="success" />}
       title="KYC verification"
-      meta={kycLine(verified, levels)}
+      meta={
+        near ? (
+          <>
+            {kycLine(verified, levels)}
+            <span className="block">
+              Your sales are {formatUsd(salesUsd.toFixed(2))}. From ${n(near.at)}, a fuller check with ID documents will be asked.
+            </span>
+          </>
+        ) : (
+          kycLine(verified, levels)
+        )
+      }
       trailing={<Badge tone="success">Verified</Badge>}
       href="/m/settings/kyc"
     />

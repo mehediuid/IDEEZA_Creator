@@ -129,21 +129,9 @@ export function SpecSheet({ flow, productId, onClose }: { flow: ConceptFlow; pro
           ? `Concept ${flow.labels.get(turn.id) ?? "1"} · Built — this is what was built`
           : `Concept ${turn ? flow.labels.get(turn.id) ?? "1" : "1"} · tap a group to change it`
       }
-      actions={
-        <>
-          <Button
-            size="xl"
-            className="w-full"
-            onClick={() => {
-              setOpenGroup(null);
-              onClose();
-            }}
-          >
-            Done
-          </Button>
-          <p className={cn(T.meta, "text-center text-text-tertiary")}>Changes save as you go · the build uses these parts · the image stays as the look</p>
-        </>
-      }
+      // Changes save as they're made, so the foot only says so: ✕, swipe and the scrim close the sheet —
+      // no Done that only closes (kit rule).
+      actions={<p className={cn(T.meta, "text-center text-text-tertiary")}>Changes save as you go · the build uses these parts · the image stays as the look</p>}
     >
       {open && turn && spec && productId && <Groups flow={flow} productId={productId} turnId={turn.id} openGroup={openGroup} setOpenGroup={setOpenGroup} />}
     </Sheet>

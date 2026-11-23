@@ -1,13 +1,12 @@
 "use client";
 
 // The AI Credits popups (mobile Figma "03 · AI Credits": Better deal
-// available, Upgrade to unlock, Compare credit discounts, Compare plans), each
-// a bottom sheet in the kit's one style, on the web's prices and rules
-// (lib/create/credit-pricing.ts, plans.ts). The plan they offer is the web's
-// pitch (`pitchPlan`, CL-032): Builder from Free or Tinkerer, Disruptor from
-// Builder, at the cycle the maker pays by. "You've reached your limit" is gone:
-// Buy more credits opens Buy credits, the main way out, as on the web — that
-// sheet's last block names the plan.
+// available, You've reached your limit, Upgrade to unlock, Compare credit
+// discounts, Compare plans), each a bottom sheet in the kit's one style, on
+// the web's prices and rules (lib/create/credit-pricing.ts, plans.ts). The
+// plan they offer is the web's pitch (`pitchPlan`, CL-032): Builder from Free
+// or Tinkerer, Disruptor from Builder, at the cycle the maker pays by
+// (`pitchCycle`).
 
 import * as React from "react";
 import Link from "next/link";
@@ -22,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
 import { T } from "../type";
 import { BulletList, CARD, LINK, SheetMark, checkoutPath, dollars, n, pct } from "./parts";
+import { usePhonePitch } from "./upsell";
 
 /** The plan the "upgrade" offers name — the web's pitch: Builder from Free or Tinkerer, Disruptor from Builder; null on Disruptor. */
 export function useNextPlan(): Plan | null {
@@ -29,41 +29,34 @@ export function useNextPlan(): Plan | null {
   return pitchPlan(sub.tier);
 }
 
-/** Better deal available: a pack gives at least the typed credits for no more than the custom price. */
+/** Better deal available (CL-033): a pack gives at least the typed credits for no more than the custom
+ *  price — the web's title, line and Switch to … pack (credits-panel.tsx CustomAmount, MON-10); the
+ *  phone's bullets stay. */
 export function BetterDealSheet({
   open,
   onClose,
   deal,
-  credits,
-  customPrice,
   discount,
   onCustom,
 }: {
   open: boolean;
   onClose: () => void;
   deal: CreditPack;
-  credits: number;
-  customPrice: number;
   discount: number;
   onCustom: () => void;
 }) {
   const router = useRouter();
   const price = packPrice(deal, discount).final;
-  const gap = Math.round((price - customPrice) * 100) / 100;
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      title="Better deal available"
-      description={
-        gap > 0
-          ? `For just ${usd(gap)} more, get the ${deal.name} pack: ${n(deal.base + deal.bonus)} credits instead of ${n(credits)}.`
-          : `The ${deal.name} pack gives ${n(deal.base + deal.bonus)} credits for ${usd(price)}, no more than ${n(credits)} custom credits cost.`
-      }
+      title="Better deal available!"
+      description={`Get ${n(deal.base)} credits${deal.bonus > 0 ? ` (+${n(deal.bonus)} bonus)` : " (0 bonus)"} for just ${usd(price)} instead.`}
       actions={
         <>
           <Button size="xl" className="w-full" onClick={() => router.push(`/m/plans/checkout?pack=${deal.id}`)}>
-            Get {deal.name} pack — {usd(price)}
+            Switch to {deal.name} pack — {usd(price)}
           </Button>
           <Button
             hierarchy="secondary"
@@ -90,10 +83,52 @@ export function BetterDealSheet({
   );
 }
 
+/** You've reached your limit: this month's plan credits are all spent. Current credit's Buy more credits
+ *  opens it when there is a plan to offer (the phone's own step, kept by the owner's rule 2026-11-23);
+ *  the plan it names and opens is the web's pitch, so Free reads Builder (CL-032). */
+export function ReachedLimitSheet({ open, onClose, allowance, onBuy }: { open: boolean; onClose: () => void; allowance: number; onBuy: () => void }) {
+  const router = useRouter();
+  const { sub, plan } = useCreatePlan();
+  const next = useNextPlan();
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="You’ve reached your limit"
+      description={`You’ve used all ${n(allowance)} monthly AI credits on the ${plan.name} plan.`}
+      actions={
+        <>
+          {next && (
+            <Button size="xl" className="w-full" onClick={() => router.push(checkoutPath(next.tier, pitchCycle(sub)))}>
+              Upgrade plan
+            </Button>
+          )}
+          <Button
+            hierarchy={next ? "secondary" : "primary"}
+            size="xl"
+            className="w-full"
+            onClick={() => {
+              onClose();
+              onBuy();
+            }}
+          >
+            Buy credits instead
+          </Button>
+        </>
+      }
+    >
+      <SheetMark icon={InformationCircleIcon} tone="warning" />
+      <BulletList items={[...(next ? [`Upgrade to ${next.name} for ${n(next.credits)} a month`] : []), "Or buy a one-time credit pack"]} />
+    </Sheet>
+  );
+}
+
 /** Upgrade to unlock: the credit discount comes with Builder and higher plans. */
 export function UpgradeUnlockSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const builder = planOf("builder");
+  // The web's pitch cycle (CL-032, MON-23): monthly from Free, else the cycle the maker pays by.
+  const pitch = usePhonePitch();
   return (
     <Sheet
       open={open}
@@ -102,7 +137,7 @@ export function UpgradeUnlockSheet({ open, onClose }: { open: boolean; onClose: 
       description="AI credit discounts come with Builder and higher plans."
       actions={
         <>
-          <Button size="xl" className="w-full" onClick={() => router.push(checkoutPath("builder", "monthly"))}>
+          <Button size="xl" className="w-full" onClick={() => router.push(pitch?.href ?? checkoutPath("builder", "monthly"))}>
             Upgrade to Builder
           </Button>
           <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>

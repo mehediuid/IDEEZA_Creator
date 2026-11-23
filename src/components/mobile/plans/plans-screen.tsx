@@ -395,13 +395,18 @@ function ComparePlans({ cycle, offer }: { cycle: BillingCycle; offer: boolean })
         {PLANS.map((p) => {
           const per = priceOf(p.tier, p.monthly > 0 ? cycle : "monthly").perMonth;
           const offered = offer && p.monthly > 0;
+          // The web's Compare heads (plans-panel.tsx CompareHead, MON-18): an annual price says it's
+          // billed yearly, and with the welcome offer the usual price shows struck through.
+          const yearly = p.monthly > 0 && cycle === "yearly";
           return (
             <span key={p.tier} className="flex min-w-0 flex-col py-2">
               <span className={cn(T.rowTitle, "truncate")}>{p.tier === "free" ? "Free" : p.name}</span>
               <span className={cn(T.micro, "tabular-nums", offered && "text-text-success")}>
                 {dollars(offered ? offerPrice(per).final : per)}/mo
-                {offered && <span className="sr-only"> with the welcome offer, then {dollars(per)}</span>}
+                {offered && <span className="sr-only"> with the welcome offer, then</span>}
               </span>
+              {offered && <s className={cn(T.micro, "tabular-nums text-text-tertiary")}>{dollars(per)}/mo</s>}
+              {yearly && <span className={cn(T.micro, "text-text-tertiary")}>billed yearly</span>}
             </span>
           );
         })}

@@ -1,11 +1,13 @@
 "use client";
 
 // AU-50 · Sign out: a neutral sheet (the brand button, not red) from the foot
-// of the Settings root, or from a device's sheet for this phone. AU-50b, the
-// "changes not synced" variant: this app keeps everything on the phone, so
-// nothing is lost by signing out — except that Sign in needs a connection,
-// so offline the sheet says so and asks again ("Sign out anyway"). AU-50c:
-// after it, Welcome with "Signed out" (this phone forgets Explore first).
+// of the Settings root, or from a device's sheet for this phone. It says what
+// the web's note after signing out says (AUTH-15): "Your account and your
+// work are saved in this browser." — and that builds keep running. AU-50b,
+// the "changes not synced" variant: nothing is lost by signing out — except
+// that Log In needs a connection, so offline the sheet says so and asks again
+// ("Sign out anyway"). AU-50c: after it, Welcome with "Signed out" (this
+// phone forgets Explore first).
 
 import * as React from "react";
 import { Button } from "@/components/ideeza/button";
@@ -46,8 +48,8 @@ export function SignOutSheet({ open, onClose }: { open: boolean; onClose: () => 
     >
       <p className={T.body}>
         {online
-          ? "Your projects stay in your account. Builds keep running."
-          : "You’re offline. Signing in again needs a connection, so you can’t get back in until you’re online."}
+          ? "Your account and your work are saved in this browser. Builds keep running."
+          : "You’re offline. Log In needs a connection, so you can’t get back in until you’re online."}
       </p>
     </Sheet>
   );

@@ -31,6 +31,7 @@ import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { refusedCopy } from "@/components/projects/listing/listing-dialog";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
+import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useMintShortfall } from "@/components/wallet/mint-cost";
 import { useMint } from "@/components/wallet/use-mint";
@@ -307,6 +308,8 @@ export function MintFlow({ projectId }: { projectId: string }) {
       };
 
       let result: RequestResult | null = null;
+      // "Use lazy mint instead" from the wallet sheet: not a reject, so no "Not minted" line.
+      let switchedToLazy = false;
       if (!req) {
         const wrote = writeAll(Date.now(), null);
         if (!wrote.ok) setMintError(notMintedLine(wrote.message));
@@ -330,8 +333,17 @@ export function MintFlow({ projectId }: { projectId: string }) {
             return null;
           },
           commit: (proof) => writeAll(proof.at, proof),
+          // "Use lazy mint instead" when an instant mint can't be paid (EARN-13, the web's mint):
+          // the wallet sheet closes, still on Review with Lazy chosen.
+          onUseLazy:
+            type === "instant"
+              ? () => {
+                  switchedToLazy = true;
+                  patch({ mintType: "lazy" });
+                }
+              : undefined,
         });
-        if (!result.ok) {
+        if (!result.ok && !switchedToLazy) {
           setMintError(
             result.reason === "rejected" ? NOT_MINTED_REJECTED : notMintedLine(result.message || requestCopy("failed", req, readWallet(), result.reason).body[0]),
           );
@@ -385,6 +397,8 @@ export function MintFlow({ projectId }: { projectId: string }) {
       }
     >
       <OfflineBanner />
+      {/* A write the browser refused says so (EARN-18), as on the project screen. */}
+      <StorageErrorBanner className="mx-8 mb-6" />
       <div ref={topRef} className="flex flex-col gap-8 px-8 pb-12 pt-2">
         {step !== "success" && <MintIntro step={step} intent={state.intent} skipChoose={asked !== null} />}
         {step === "choose" && <MintChoose intent={state.intent} onPick={(i) => patch({ intent: i })} />}

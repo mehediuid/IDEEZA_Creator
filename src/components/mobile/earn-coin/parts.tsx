@@ -40,12 +40,13 @@ import { NETWORKS, type Network } from "@/lib/brief/types";
 import { useMarket } from "@/lib/market/market-store";
 import { cn } from "@/lib/utils";
 import { demoAddress, makerId, readWallet, shortAddress, walletConnect, walletDisconnect, walletSwitchAccount, walletSwitchNetwork } from "@/lib/wallet/demo-wallet";
-import { DEMO_ACCOUNTS } from "@/lib/wallet/identities";
+import { DEMO_ACCOUNTS, DEMO_BUYERS } from "@/lib/wallet/identities";
 import { IDZ_TOKEN, idzContractOf, idzHoldingsOf, idzUsdOf, type IdzHoldings } from "@/lib/wallet/idz";
 import { compareAmounts, formatAmount } from "@/lib/wallet/money";
 import { TIMING } from "@/lib/wallet/request";
-import { balanceLineOf, networkLabelOf } from "@/lib/wallet/request-view";
-import type { AccountIndex } from "@/lib/wallet/types";
+import type { BalanceCtx } from "@/lib/wallet/balances";
+import { balanceLineOf, buyerRowOf, networkLabelOf } from "@/lib/wallet/request-view";
+import type { AccountIndex, DemoBuyerId, DemoWallet } from "@/lib/wallet/types";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
 import { PickSheet } from "../kit/pick-list";
@@ -693,7 +694,8 @@ export function ConnectSheet({
   );
 }
 
-/** The Demo wallet (the web's Demo wallet dialog, as a sheet): connect, the demo account, the network. */
+/** The Demo wallet (the web's Demo wallet dialog, as a sheet): connect, the demo account, the network, and
+ *  the demo creators a shopper buys as on the marketplace (Mira, Leo, Sam), each connected on its own. */
 export function DemoWalletSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { wallet, market, now } = useEarnState();
   const toast = useToast();
@@ -776,7 +778,76 @@ export function DemoWalletSheet({ open, onClose }: { open: boolean; onClose: () 
           </button>
         ))}
       </fieldset>
+      <DemoCreatorRows wallet={wallet} ctx={ctx} />
     </Sheet>
+  );
+}
+
+/** "Demo creators (for Explore marketplace)": the web manage dialog's last section (wallet-dialog.tsx,
+ *  BUY-11) — each demo creator a shopper can buy as, with its address, what it holds on its network, whether
+ *  it is connected, and Connect (after the wallet's usual pause) or Disconnect, one at a time. */
+function DemoCreatorRows({ wallet, ctx }: { wallet: DemoWallet; ctx: BalanceCtx }) {
+  const toast = useToast();
+  const [busy, setBusy] = React.useState<DemoBuyerId | null>(null);
+  const timer = React.useRef<number | null>(null);
+  React.useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+  const failed = () => toast({ title: "This browser couldn’t save it — storage is full or blocked.", lead: "error" });
+  const connect = (b: (typeof DEMO_BUYERS)[number]) => {
+    if (busy) return;
+    setBusy(b.id);
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      setBusy(null);
+      // Read again at the end, so another tab's change is never overwritten.
+      if (persistWallet(walletConnect(readWallet(), b.id))) toast({ title: `${b.name}’s demo wallet connected` });
+      else failed();
+    }, TIMING.connect);
+  };
+  const disconnect = (b: (typeof DEMO_BUYERS)[number]) => {
+    if (persistWallet(walletDisconnect(readWallet(), b.id))) toast({ title: `${b.name}’s demo wallet disconnected` });
+    else failed();
+  };
+  return (
+    <section aria-labelledby="demo-creators" className="flex flex-col gap-2">
+      <h3 id="demo-creators" className={cn(T.rowTitle, "pb-2")}>
+        Demo creators (for Explore marketplace)
+      </h3>
+      <ul className="flex flex-col">
+        {DEMO_BUYERS.map((b) => {
+          const on = wallet.identities[b.id]?.connected === true;
+          const rowBusy = busy === b.id;
+          const [, address, holds] = buyerRowOf(b.id, b.name, wallet, ctx).split(" · ");
+          return (
+            <li key={b.id} className="flex min-h-[56px] items-center justify-between gap-6 px-6 py-3">
+              <span className="flex min-w-0 flex-col">
+                <span className={T.bodyLg}>
+                  {b.name} <span className={cn(T.meta, on && "text-text-success")}>{on ? "· Connected" : "· Not connected"}</span>
+                </span>
+                <span className={cn(T.meta, "truncate tabular-nums")}>
+                  {address} · {holds}
+                </span>
+              </span>
+              <Button
+                hierarchy="secondary"
+                size="xl"
+                className="shrink-0"
+                loading={rowBusy}
+                disabled={!!busy && !rowBusy}
+                aria-label={rowBusy ? `Connecting ${b.name}’s demo wallet` : `${on ? "Disconnect" : "Connect"} ${b.name}’s demo wallet`}
+                onClick={() => (rowBusy ? undefined : on ? disconnect(b) : connect(b))}
+              >
+                {rowBusy ? "Connecting…" : on ? "Disconnect" : "Connect"}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

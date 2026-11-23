@@ -13,7 +13,8 @@
 // · 07b Edit name and description (07g–07n): the web's editor — the name
 //   (1–80, a name another project has is a note), the description (counter
 //   from 800, "What it is, and who it is for."), Update with AI with Undo,
-//   Save through the edit gate (a live listing pauses first, 21), Discard
+//   Save through the edit gate (a live listing pauses first, 21; an auction
+//   or the lock turns Save off with the reason under it, PRJ-9), Discard
 //   changes? on the way out, the storage error kept in the sheet;
 // · 07c / 22a–22i Delete: What goes and What stays, the typed name when work
 //   would be lost; blocked (web order: couldn't check → sold → auction →
@@ -40,13 +41,13 @@ import {
   Bug01Icon,
   Delete02Icon,
   Edit02Icon,
-  LockIcon,
   News01Icon,
   PencilEdit01Icon,
   PlayIcon,
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { REPORT_PROBLEM, reportProblemHref } from "../help/report-link";
+import { ProjectVideoSection } from "../project-earn/sell/parts";
 import { forSaleNowOf, shareOffFeedLineOf } from "@/lib/manual/phone-earn";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
@@ -78,11 +79,11 @@ import { formatDate, projectSummary } from "@/lib/manual/project-summary";
 import { PROJECT_DESC_COUNTER_FROM, PROJECT_DESC_MAX, PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
 import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
 import { STOPPED_SHARING, STORY_MAX, sharePostBlocker, stopSharingBodyOf } from "@/lib/manual/share-post";
-import { deleteFixOf, phoneHrefOf, phoneProjectPath, phoneWords, publishLineOf, readyOfLine } from "@/lib/manual/phone-project";
+import { deleteFixOf, phoneHrefOf, phoneWords, publishLineOf, readyOfLine } from "@/lib/manual/phone-project";
 import { readMarketNow } from "@/lib/market/market-store";
 import { readNetwork } from "@/lib/network/store";
 import { useProjectVideos } from "@/lib/video/store";
-import { REPLACE_LABEL, actionLabel, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
+import { REPLACE_LABEL, actionLabel, readinessCopy, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
@@ -209,6 +210,10 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
   const descChanged = descCheck.value !== initial.description.trim();
   const dirty = name !== initial.name || description !== initial.description;
   const change = nameChanged ? "rename" : "description";
+  // Why a save can't go ahead right now (an auction, the lock), before the press — the web's
+  // edit-details and the phone's product sheet (PRJ-9): Save off, the reason under it.
+  const blocked = gate.reasonOf(change);
+  const reason = denied ?? blocked;
   const rows = React.useMemo(() => productRowsOf(project).map((r) => ({ name: r.name, description: r.description })), [project]);
   const ai = useDescriptionAiAssist({ products: rows, value: description, onReplace: setDescription, pillClassName: "min-h-[44px] rounded-xl leading-md tracking-wide" });
   const started = React.useRef(false);
@@ -234,7 +239,7 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
   const save = () => {
     if (write.saving) return;
     setTried(true);
-    if (nameCheck.error || descCheck.tooLong) return;
+    if (nameCheck.error || descCheck.tooLong || blocked) return;
     if (!nameChanged && !descChanged && !write.failed) {
       if (ai.wrote) setDescriptionHint(project.id, { dismissedAt: stamp(), productCount: rows.length });
       ai.reset();
@@ -270,9 +275,10 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
         description="People who buy it and the community see these."
         actions={
           <>
-            <Button size="xl" className="w-full" loading={write.saving || ai.running} onClick={save}>
+            <Button size="xl" className="w-full" disabled={blocked !== null} loading={write.saving || ai.running} onClick={save}>
               {write.failed ? "Try again" : "Save"}
             </Button>
+            {reason && <p className={T.meta}>{reason}</p>}
           </>
         }
       >
@@ -313,7 +319,7 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
             {ai.status}
           </div>
         )}
-        {(denied || write.failed) && <Banner tone="error">{denied ?? WRITE_FAILED}</Banner>}
+        {write.failed && <Banner tone="error">{WRITE_FAILED}</Banner>}
       </Sheet>
       <ConfirmSheet
         open={discarding}
@@ -519,17 +525,17 @@ const READY_ROW = cn("flex w-full items-center gap-6 p-6 text-left outline-none 
 export function ReadinessRows({
   readiness,
   projectId,
+  projectName,
   projectVideo = true,
 }: {
   readiness: ReturnType<typeof useReadinessOf>;
   projectId: string;
+  /** The name the project video's row shows. */
+  projectName?: string;
   projectVideo?: boolean;
 }) {
   const project = { id: projectId };
   const router = useRouter();
-  const pv = projectVideo ? readiness.project : null;
-  const pvCopy = pv ? projectRowCopy(pv) : null;
-  const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
   return (
     <>
       <div className="flex items-baseline justify-between">
@@ -588,24 +594,8 @@ export function ReadinessRows({
           );
         })}
       </ListCard>
-      {pv && pvCopy && (
-        <>
-          <h3 className={T.section}>Project video</h3>
-          <div className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-dashed border-border p-6">
-            <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-              <Icon icon={LockIcon} size={16} />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className={T.meta}>{pvCopy.text}</span>
-              {pvAction && (
-                <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(phoneProjectPath(project.id, "video"))}>
-                  {pvAction}
-                </Button>
-              )}
-            </span>
-          </div>
-        </>
-      )}
+      {/* The project video as a row like a product's, never drawn locked (EARN-19; the Sell sheet's own). */}
+      {projectVideo && <ProjectVideoSection projectId={projectId} projectName={projectName ?? "Project video"} readiness={readiness} />}
     </>
   );
 }
@@ -655,7 +645,7 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
     >
       <Banner tone="info">{phoneWords(readinessCopy("showcase").info)}</Banner>
       {!onFeed && <p className={T.meta}>{shareOffFeedLineOf(view.commerce.outcome === "given")}</p>}
-      <ReadinessRows readiness={readiness} projectId={project.id} />
+      <ReadinessRows readiness={readiness} projectId={project.id} projectName={project.name} />
       <div className="flex flex-col gap-2">
         <h3 className={T.section}>Write your story</h3>
         <label htmlFor={storyId} className={T.label}>

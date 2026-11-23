@@ -226,6 +226,13 @@ test("where the phone goes next: its own pages only, never back to a way-in scre
   assert.equal(phone.mobileNext("/mobile"), "/m");
 });
 
+test("a sign-in without Remember me that ended lands on Welcome, saying so, with the page that was opened (AUTH-8)", () => {
+  assert.equal(phone.sessionExpiredHref("/m/profile", "?tab=projects"), "/m/welcome?expired=1&next=%2Fm%2Fprofile%3Ftab%3Dprojects");
+  assert.equal(phone.sessionExpiredHref("/m", ""), "/m/welcome?expired=1");
+  assert.equal(phone.sessionExpiredHref("/m/welcome", "?next=%2Fm%2Fearn"), "/m/welcome?expired=1&next=%2Fm%2Fearn", "a way-in screen hands on its own next");
+  assert.equal(phone.sessionExpiredHref("/m/sign-in", ""), "/m/welcome?expired=1", "never back to a way-in screen");
+});
+
 test("the phone's way-in keys stay with the browser when accounts swap their work", async () => {
   const vault = await import("../../.tmp-test/lib/account/work-vault.js");
   for (const k of [phone.PHONE_KEY, phone.PHONE_ACCOUNTS_KEY, phone.CODE_KEY, phone.TRIES_KEY, phone.PROVIDER_KEY]) {

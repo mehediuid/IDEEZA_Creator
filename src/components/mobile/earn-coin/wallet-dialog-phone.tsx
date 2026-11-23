@@ -93,13 +93,13 @@ function PhoneWalletBody({ mode, wallet, market, onClose, request: view, actions
   const close = phase === "pending" ? () => setNudge((n) => n + 1) : actions.cancel;
   return (
     <RequestSheet
-      view={{ phase, req, identity, reason: view.reason, message: view.message, hash: view.hash }}
+      view={{ phase, req, identity, reason: view.reason, message: view.message, hash: view.hash, canUseLazy: view.canUseLazy }}
       wallet={wallet}
       ctx={ctx}
       short={short}
       nudge={nudge}
       onClose={close}
-      actions={{ connect: actions.connect, switchNetwork: actions.switchNetwork, approve: actions.approve, retry: actions.retry, close: actions.cancel }}
+      actions={{ connect: actions.connect, switchNetwork: actions.switchNetwork, approve: actions.approve, retry: actions.retry, close: actions.cancel, useLazy: actions.useLazy }}
     />
   );
 }

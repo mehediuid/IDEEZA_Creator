@@ -2,7 +2,8 @@
 // IDEEZA has no live agents, so nothing here pretends one is typing: each
 // message you send goes to the IDEEZA team as a problem report (the web's
 // /api/reports, kind "other"), and the thread answers with the report's
-// reference and that the team replies by email. The thread itself — your
+// reference, in the web's words: the team can't reply in the app yet, and
+// Settings › Your reports keeps it (no email is promised). The thread itself — your
 // messages, their state and the references — is kept in this browser under
 // `ideeza:support:chat`, newest last, the last CHAT_MAX kept.
 //

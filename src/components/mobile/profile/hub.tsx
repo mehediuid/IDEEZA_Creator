@@ -5,8 +5,9 @@
 // (10674:659) folded in, laid out as grouped inset lists (the iOS Settings
 // pattern, mobile UX pass 2026-11-15): the top bar with settings and search
 // (a tab root, so no Back), your card (photo, name, headline, "@handle · View
-// profile", your level) that opens your profile, then Wallet with your IDZ,
-// Refer and Earn and Plan & pricing with your credits and the web account
+// profile", your level and its XP against the next level) that opens your
+// profile, then Wallet with your IDZ, Refer and Earn and Plan & pricing with
+// your credits and the day they refill (the web sidebar's card) and the web account
 // menu's plan line ("Free plan · Upgrade to Builder", CL-032), which opens
 // Plans on that plan (MON-4); while the welcome offer runs and its sheet is
 // closed, the row is the offer instead, as the web sidebar's Upgrade card
@@ -61,7 +62,7 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { SignOutSheet } from "../settings/sign-out";
-import { usePhonePitch, usePlanLine } from "../plans/upsell";
+import { usePhonePitch, usePlanLine, useRefillDay } from "../plans/upsell";
 
 /** A row's value at its end ("Free · 28 credits", "5"); the warning ink once credits run low. */
 export function HubValue({ children, warning }: { children: React.ReactNode; warning?: boolean }) {
@@ -132,18 +133,23 @@ function WalletValue() {
   );
 }
 
-/** PR-01 "Plan & pricing · 28 credits", in the warning ink once credits run low (the web's rule). The plan
- *  itself is the row's meta line (usePlanLine). */
+/** PR-01 "Plan & pricing · 28 credits", in the warning ink once credits run low (the web's rule), and
+ *  under it the day the plan's credits come back, as the web sidebar's card says it ("· refills 8 Dec",
+ *  CL-032, MON-16). The plan itself is the row's meta line (usePlanLine). */
 function PlanValue() {
   const { hydrated: planRead } = useCreatePlan();
   const { hydrated: creditsRead, ledger } = useCredits();
   const { lowAt } = useSettings().credits;
+  const refill = useRefillDay();
   if (!planRead || !creditsRead) return <Skeleton shape="text" size="md" className="inline-block w-[72px]" />;
   const credits = creditTotals(ledger).remaining;
   return (
-    <HubValue warning={runningLow(credits, lowAt)}>
-      {credits.toLocaleString("en-US")} {credits === 1 ? "credit" : "credits"}
-    </HubValue>
+    <span className="inline-flex flex-col items-end">
+      <HubValue warning={runningLow(credits, lowAt)}>
+        {credits.toLocaleString("en-US")} {credits === 1 ? "credit" : "credits"}
+      </HubValue>
+      {refill && <span className={cn(T.micro, "tabular-nums")}>refills {refill}</span>}
+    </span>
   );
 }
 
@@ -190,15 +196,17 @@ function ProjectsValue() {
   return <HubValue>{projects.length}</HubValue>;
 }
 
-/** Your level, as the web's account menu shows it ("Maker", 620 XP); only you see it. */
+/** Your level, as the web's account menu shows it ("Maker", "620 / 1,000 XP" — how far to the next
+ *  level, SET-19; just the XP at the top level); only you see it. */
 function LevelBadge() {
   const { hydrated, ledger } = useCredits();
   if (!hydrated) return null;
   const level = levelOf(xpOf(ledger));
+  const xp = level.cap === null ? `${level.xp.toLocaleString("en-US")} XP` : `${level.xp.toLocaleString("en-US")} / ${level.cap.toLocaleString("en-US")} XP`;
   return (
     <span className="flex shrink-0 flex-col items-end gap-1">
       <Badge tone="brand">{level.name}</Badge>
-      <span className={cn(T.micro, "tabular-nums")}>{level.xp.toLocaleString("en-US")} XP</span>
+      <span className={cn(T.micro, "tabular-nums")}>{xp}</span>
     </span>
   );
 }

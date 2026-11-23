@@ -39,7 +39,7 @@ import { CreditsFoot, OFFLINE_REASON, PromptBubble, Stepper } from "./parts";
 import { PromptBox } from "./prompt-box";
 import { SaveSheet } from "./save-sheet";
 import { FirstBuildCard, OutOfCreditsRow } from "../plans/upsell";
-import { ProductQuestion, ProjectSheet, ReadingCard, RequiredStep } from "./setup";
+import { ProductQuestion, ProjectSheet, ReadingCard, RequiredStep, productNameOf } from "./setup";
 import { SpecSheet } from "./spec-sheet";
 import { useConceptFlow, type Gate, type SetupTurn } from "./use-concept-flow";
 
@@ -262,7 +262,7 @@ export function AiChat({ chatId }: { chatId: string }) {
           open={projectOpen}
           onClose={() => setProjectDismissed(true)}
           products={1 + picked.size}
-          productNames={[setup.productName?.trim() || "Your product", ...setup.companions.filter((c) => picked.has(c.id)).map((c) => c.name)]}
+          productNames={[productNameOf(setup), ...setup.companions.filter((c) => picked.has(c.id)).map((c) => c.name)]}
           onChangeProducts={() => setProductsConfirmed(false)}
           held={flow.online ? null : OFFLINE_REASON}
           projects={flow.setupProjects}

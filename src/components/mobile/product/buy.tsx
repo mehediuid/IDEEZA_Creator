@@ -23,9 +23,13 @@
 //   copy lets you make), then Use: Personal use and Business use, always both,
 //   each with its price and "n of N sold · you own n" (a use the creator
 //   didn't list reads "Not on sale", a sold-out one "Sold out"; both greyed,
-//   never picked), the copies' activity line, then From holders as choices of
-//   the same group (CL-036), then NFT details — one row opening the picked
-//   use's facts (BUY-7). No row has a Buy of its own. No version choice
+//   never picked) and, once one sold, its newest sale ("Bought by Leo · 0.02
+//   ETH · Nov 20, 2026", the web's copy tab, BUY-10), the copies' activity
+//   line, then From holders as choices of the same group (CL-036), then NFT
+//   details — one row opening the picked use's facts (BUY-7), then who pays:
+//   "Paying from Mira's demo wallet · 0x… · 0.5 test ETH · Manage" (the web's
+//   wallet line under its Buy now, placed as the project screen's copy tab
+//   places it, BUY-10/11). No row has a Buy of its own. No version choice
 //   (owner 2026-11-15): one price per use, the listing's Price (`versionless`);
 // - the sheet's foot says what is picked and its price ("Physical NFT ·
 //   Personal use", "0.02 ETH · makes 1 unit") over its one Buy now (every unit
@@ -47,7 +51,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button, buttonVariants } from "@/components/ideeza/button";
@@ -85,10 +89,10 @@ import { PickSheet } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
 import { tabPanelProps } from "../kit/tabs";
 import { Choice, ChoiceGroup, PickTabs, titled, type BarPick } from "../project-earn/buyer/buy-pick";
-import { copyFactsOf, NftDetailsRow, SoldBar } from "../project-earn/buyer/copies";
+import { copyFactsOf, CopySaleLine, NftDetailsRow, SoldBar } from "../project-earn/buyer/copies";
 import { heldCopiesOf } from "../project-earn/buyer/held";
 import { HolderChoice, holderFactsOf, useHolderBuy, useHolderListings } from "../project-earn/buyer/holder-offers";
-import type { DoneFacts } from "../project-earn/buyer/parts";
+import { IconLine, WalletLine, type DoneFacts } from "../project-earn/buyer/parts";
 import { T } from "../type";
 import { useListedCopies } from "./overview";
 import { BANNER_LINK, FactCard } from "./parts";
@@ -406,8 +410,8 @@ export function BuyCopy({ open, onClose, onFiles }: { open: boolean; onClose: ()
   );
 }
 
-/** One kind's tab: what it gets you, its two Use choices, the copies' activity, then other holders' copies.
- *  `named`: the only kind on offer, so no tab names it. */
+/** One kind's tab: what it gets you, its two Use choices (each with its newest sale), the copies' activity, other
+ *  holders' copies, NFT details, then who pays. `named`: the only kind on offer, so no tab names it. */
 function KindPanel({
   kind,
   named,
@@ -425,11 +429,15 @@ function KindPanel({
   const uses = choices.filter((c): c is UseChoiceT => c.type === "use");
   const holders = choices.filter((c): c is HolderChoiceT => c.type === "holder");
   const group = `use-${product.id}-${kind}`;
+  const listed = uses.find((c) => c.track)?.track ?? null;
   // The activity of the picked use's copies, else of the first use the creator lists.
-  const shown = (picked?.type === "use" ? picked.track : null) ?? uses.find((c) => c.track)?.track ?? null;
+  const shown = (picked?.type === "use" ? picked.track : null) ?? listed;
   // NFT details (BUY-7): the picked use's, else the first that can be bought — the web's copy tab.
   const detailed = (picked?.type === "use" ? picked.track : null) ?? uses.find((c) => c.open)?.track ?? shown;
   const chain = editionChainOf(view.mint.record, view.listing.kind === "none" ? null : view.listing.listing, null);
+  // Who pays (BUY-10): the picked choice's coin on its chain, as the project screen's copy tab says it.
+  const coin = picked?.type === "use" && picked.track ? picked.track.listing.token : picked?.type === "holder" ? picked.resale.token : (listed?.listing.token ?? "ETH");
+  const network = picked?.type === "holder" ? picked.resale.network : chain?.network;
   return (
     <>
       <div className="flex flex-col gap-1">
@@ -456,6 +464,11 @@ function KindPanel({
         </ChoiceGroup>
       )}
       {detailed && chain && <NftDetailsRow offer={`${KIND_LABEL[kind]} · ${USE_LABEL[detailed.use]}`} facts={copyFactsOf(detailed, view.sales, chain)} />}
+      {buyerId && network && (
+        <IconLine icon={Wallet01Icon}>
+          <WalletLine buyerId={buyerId} token={coin} network={network} verb="buy" />
+        </IconLine>
+      )}
     </>
   );
 }
@@ -485,6 +498,7 @@ function UseChoice({ choice, name, checked, onSelect }: { choice: UseChoiceT; na
           line={`${card.soldOut ? `All ${card.total} sold` : `${card.sold} of ${card.total} sold`}${owned > 0 ? ` · you own ${owned}` : ""}`}
         />
       )}
+      {t && <CopySaleLine track={t} sales={view.sales} />}
     </Choice>
   );
 }

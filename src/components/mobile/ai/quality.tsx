@@ -49,8 +49,12 @@ export function QualityPicker({ value, onChange }: { value: RenderQuality; onCha
         onClick={() => setOpen(true)}
         className={cn(T.label, "-my-3 inline-flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-3 text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus")}
       >
-        <span className="sr-only">Quality: </span>
-        {QUALITY_INFO[value].label}
+        {/* The web's trigger, "Medium quality" (CRE-18). The Prompt Box's row is a size container: below
+            320 px the word goes, as Enhance's does, and is still read out. */}
+        <span>
+          {QUALITY_INFO[value].label}
+          <span className="sr-only [@container(min-width:320px)]:not-sr-only">&nbsp;quality</span>
+        </span>
         <span className="inline-flex shrink-0">
           <Icon icon={ArrowDown01Icon} size={14} />
         </span>

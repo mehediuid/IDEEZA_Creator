@@ -4,7 +4,8 @@
 // (AU-31…31e). No Verify button: the 6th digit sends it. Checking the code…,
 // then the next step — or one line under the cells: the code didn't work, or
 // it expired (Resend code). Five wrong codes lock the step for 10 minutes
-// (an M01 alert counts down). Offline keeps the code and checks it on Try
+// (an M01 alert counts down; the lock is this phone's own — the web's code
+// step has none — so it says so, AUTH-9). Offline keeps the code and checks it on Try
 // again. A browser that won't save what the code unlocks says so, with Try
 // again. Resend waits 30 s after each code. The code itself comes from the
 // prototype's Demo email, shown on the page as the web's is (owner
@@ -168,7 +169,7 @@ export function CodeStep({
   }, [fills]);
 
   const alert: AlertSpec | null = locked
-    ? { tone: "error", title: "Too many tries", body: `Try again in ${clockOf(record!.lockedUntil - now)}.` }
+    ? { tone: "error", title: "Too many tries", body: `This step is paused on this phone. Try again in ${clockOf(record!.lockedUntil - now)}.` }
     : phase === "refused"
       ? {
           ...REFUSED_ALERT,

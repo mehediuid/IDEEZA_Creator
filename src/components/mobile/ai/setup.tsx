@@ -43,6 +43,7 @@ import { CreditBadge } from "@/components/credits/credit-badge";
 import { CONCEPT_COST } from "@/lib/create/credits";
 import type { SetupAnswer } from "@/lib/create/history";
 import { relativeLabel } from "@/components/create/use-clock";
+import { titleFromPrompt } from "@/components/create/setup-turn";
 import { useNewProjectHint, useProjectRoom } from "@/components/projects/project-limit";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
@@ -60,6 +61,12 @@ const NEW = "__new__";
 
 type Row = { key: string; text: string; tone: "done" | "info" | "next" | "working"; when: string };
 
+/** The described product's name: the model's reading of it, else the maker's own first words — never
+ *  a generic "Your product" (the web's titleFromPrompt, CRE-20). */
+export function productNameOf(setup: SetupTurn): string {
+  return setup.productName?.trim() || titleFromPrompt(setup.prompt);
+}
+
 export function ReadingCard({ setup, now, projectName }: { setup: SetupTurn; now: number; projectName: string }) {
   const done = setup.status === "answered";
   // Open while the idea is read; folded once the question is asked (the question under it
@@ -73,7 +80,7 @@ export function ReadingCard({ setup, now, projectName }: { setup: SetupTurn; now
   const rel = relativeLabel(setup.ts, now);
   const when = rel.charAt(0).toUpperCase() + rel.slice(1);
   const n = 1 + (setup.answer ? setup.answer.picked.length : setup.companions.length);
-  const names = [setup.productName?.trim() || "Your product", ...setup.companions.filter((c) => !setup.answer || setup.answer.picked.includes(c.id)).map((c) => c.name)];
+  const names = [productNameOf(setup), ...setup.companions.filter((c) => !setup.answer || setup.answer.picked.includes(c.id)).map((c) => c.name)];
   const rows: Row[] =
     setup.status === "loading"
       ? [
@@ -159,7 +166,7 @@ export function ProductQuestion({
   /** Why Start drawing can't run now (offline). Credits never hold it (the web's rule). */
   held?: string | null;
 }) {
-  const name = setup.productName?.trim() || "Your product";
+  const name = productNameOf(setup);
   const chosen = 1 + setup.companions.filter((c) => picked.has(c.id)).length;
   const [info, setInfo] = React.useState(false);
   // The web's whole note (setup-turn.tsx): one short line inline, all of it behind ⓘ (lens 1).
@@ -250,17 +257,8 @@ export function ProductQuestion({
           </p>
         )}
       </div>
-      <Sheet
-        open={info}
-        onClose={() => setInfo(false)}
-        title="What should we build?"
-        description={note}
-        actions={
-          <Button size="xl" className="w-full" onClick={() => setInfo(false)}>
-            Done
-          </Button>
-        }
-      />
+      {/* An ⓘ sheet: ✕, swipe and the scrim close it — no Done that only closes (kit rule). */}
+      <Sheet open={info} onClose={() => setInfo(false)} title="What should we build?" description={note} />
     </section>
   );
 }

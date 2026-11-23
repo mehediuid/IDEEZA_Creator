@@ -29,6 +29,8 @@ import { formatAmount } from "../wallet/money";
 import { savedRows, type FeedShare } from "./feed-prefs";
 import { follows, type Reactions } from "./reactions";
 import { SAMPLE_POSTS } from "./sample-posts";
+import { parseShareItemId, webItemHref } from "./share-items";
+import { mineSlugOf, postHref, postProductHref } from "./slug";
 import type { InnovationPost, PostPerson } from "./types";
 
 export type ClipKind = "project" | "product";
@@ -59,6 +61,9 @@ export type FeedClip = {
   projectId: string;
   productId: string | null;
   title: string;
+  /** A Product clip's project ("Smart plant watering hub"), as a share's card says it ("from …"); null
+   *  for a Project clip. */
+  projectTitle: string | null;
   description: string;
   category: ProjectCategory | null;
   creator: PostPerson;
@@ -147,6 +152,7 @@ export function clipsOfPost(post: InnovationPost): FeedClip[] {
       kind: "project",
       productId: null,
       title: post.title,
+      projectTitle: null,
       description: post.description,
       video: { src: first.video.src, label: first.video.label },
       poster: first.video.poster ?? first.image,
@@ -161,6 +167,7 @@ export function clipsOfPost(post: InnovationPost): FeedClip[] {
       kind: "product",
       productId: p.id,
       title: p.name,
+      projectTitle: post.title,
       description: p.summary,
       video: { src: p.video.src, label: p.video.label },
       poster: p.video.poster ?? p.image,
@@ -182,6 +189,12 @@ export const FEED_CLIPS: readonly FeedClip[] = SAMPLE_POSTS.flatMap(clipsOfPost)
 /** A sample clip by its id; a project you shared (`mine:…`) is found in `useFeedClips`. */
 export function clipById(id: string): FeedClip | null {
   return FEED_CLIPS.find((c) => c.id === id) ?? null;
+}
+
+/** How many of a sample creator's projects play on the Feed now (SOC-16: only what is listed is on
+ *  the Feed, so the Following sheet's "{n} projects in the Feed" counts these, not every post). */
+export function feedProjectCountOf(creatorId: string): number {
+  return FEED_CLIPS.filter((c) => c.kind === "project" && c.creator.id === creatorId).length;
 }
 
 // ─────────────────────────── a project you shared ───────────────────────────
@@ -240,6 +253,7 @@ export function mineClipsOf(input: MineClipInput): FeedClip[] {
       kind: "project",
       productId: null,
       title: input.title,
+      projectTitle: null,
       description: input.description,
       video: { src: "", label: `${input.title} video` },
       takeId: lead?.takeId ?? null,
@@ -255,6 +269,7 @@ export function mineClipsOf(input: MineClipInput): FeedClip[] {
       kind: "product",
       productId: v.productId,
       title: v.name,
+      projectTitle: input.title,
       description: v.summary,
       video: { src: "", label: `${v.name} video` },
       takeId: v.takeId,
@@ -351,8 +366,34 @@ export function clipBuyHref(c: Pick<FeedClip, "projectId" | "productId"> & { sou
   return `${project}?tab=marketplace${nft ? `&${nft}` : ""}`;
 }
 
-/** The address of one clip on its own (Copy link, Saved › View original post). */
+/** The address of one clip on its own, inside the app (Saved › View original post, a notice). */
 export const clipHref = (id: string) => `/m/clip/${encodeURIComponent(id)}`;
+
+/** What the web address of your own project needs: its name (the post's slug) and whether you shared
+ *  it (then it has an Innovations post). */
+export type MineWebFacts = { name: string; shared: boolean };
+
+/** The public web page of a clip or a shareable item, by its id (SOC-19): what Copy link and Share via…
+ *  hand outside the app, so a friend on a computer opens the web's page, as Share profile hands the
+ *  web's /creators/<handle> — never a phone-only /m address. The web's Copy link gives the post (post
+ *  page) or the marketplace page (marketplace Share):
+ *  - a sample's clip or item: its Innovations post, a product its post's product page;
+ *  - your own: its post once you shared the project (`mine(projectId).shared`), else its marketplace
+ *    page (it is on the Feed because it is listed);
+ *  - `market` (a marketplace screen's Share while the item is on the Marketplace): its marketplace page,
+ *    as the web's marketplace Share copies its own page. */
+export function webHrefOfItem(id: string, mine: (projectId: string) => MineWebFacts | null, market = false): string {
+  const at = parseShareItemId(id);
+  if (!at) return "/marketplace";
+  if (market) return webItemHref(at);
+  const onPost = (slug: string) => (at.productId ? postProductHref(slug, at.productId) : postHref(slug));
+  if (at.source === "sample") {
+    const post = SAMPLE_POSTS.find((p) => p.id === `sample:${at.projectId}`);
+    return post ? onPost(post.slug) : webItemHref(at);
+  }
+  const facts = mine(at.projectId);
+  return facts?.shared ? onPost(mineSlugOf({ id: at.projectId, name: facts.name })) : webItemHref(at);
+}
 
 /** "Buy Main NFT (0.25 ETH)", "Place bid (0.01 ETH)" on an auction (the marketplace's words for
  *  the Figma's "Make an offer"), "Buy Physical NFT (0.04 ETH)" for a copy. */

@@ -600,8 +600,9 @@ function NameField({
 }
 
 /** The product the maker described, named from their own words — the model
- *  has not run yet, so this is their phrasing, not an invention. */
-function titleFromPrompt(prompt: string): string {
+ *  has not run yet, so this is their phrasing, not an invention. (Exported for
+ *  the phone's question, the same fallback.) */
+export function titleFromPrompt(prompt: string): string {
   const first = prompt.trim().split(/[.,\n]/)[0].trim();
   const short = first.length > 52 ? `${first.slice(0, 52).trimEnd()}…` : first;
   return short.charAt(0).toUpperCase() + short.slice(1);

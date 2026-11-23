@@ -11,6 +11,10 @@
 // The search reads the web's registry (lib/settings/search.ts) and sends each
 // hit to its phone screen with the phone's words; the settings only the phone
 // has (2-step, devices, delete account, sign out…) are PHONE_ROWS.
+// Two of the web home's status facts (settings-home.tsx; SET-14) sit where a
+// phone reads them: under the account card, that the work lives on this
+// phone only, with a way to keep a download; and a break that is on, on the
+// Privacy row.
 
 import * as React from "react";
 import {
@@ -43,6 +47,8 @@ import { useKyc } from "@/lib/commerce/use-commerce";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { popupModeOf } from "@/lib/notifications/filter";
+import { quietModeOn } from "@/lib/settings/prefs";
+import { useDates } from "@/lib/settings/use-dates";
 import { displayNameOf, initialsOf, ownHandleOf } from "@/lib/people/ids";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMyProfile } from "@/lib/people/profile-store";
@@ -50,7 +56,7 @@ import { searchSettings, type SettingsHit } from "@/lib/settings/search";
 import { useSettings } from "@/lib/settings/use-settings";
 import { Chevron, LIST_CARD } from "../kit/list";
 import { useDataRowValue } from "./data";
-import { BILLING_DETAILS_HREF, CREDIT_ALERTS_HREF, SettingsGroup, SettingsRow, SettingsScreen } from "./kit";
+import { BILLING_DETAILS_HREF, CREDIT_ALERTS_HREF, HELPER_LINK, SettingsGroup, SettingsRow, SettingsScreen } from "./kit";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { SignOutSheet } from "./sign-out";
@@ -113,6 +119,10 @@ const PHONE_LABELS: Record<string, string> = {
 };
 const phoneLabelOf = (h: SettingsHit) => PHONE_LABELS[`${h.page}:${h.rowId}`] ?? h.label;
 
+/** Web rows the phone leaves out on purpose, so a search never lands on a page without them
+ *  (Single-key shortcuts: a phone has no keyboard for them; appearance.tsx; SET-11). */
+const WEB_ONLY = new Set(["appearance:single-key"]);
+
 type PhoneRow = { label: string; page: string; words: string; href?: string; signOut?: true };
 
 /** Settings only the phone has, or that sit somewhere else on it. */
@@ -142,7 +152,7 @@ function phoneRowsFor(query: string): PhoneRow[] {
 export function SettingsRoot() {
   const [query, setQuery] = React.useState("");
   const [signOut, setSignOut] = React.useState(false);
-  const hits = React.useMemo(() => searchSettings(query), [query]);
+  const hits = React.useMemo(() => searchSettings(query).filter((h) => !WEB_ONLY.has(`${h.page}:${h.rowId}`)), [query]);
   const phoneHits = React.useMemo(() => phoneRowsFor(query), [query]);
   const searching = query.trim().length > 0;
   const profileRead = useMyProfile().hydrated;
@@ -172,7 +182,17 @@ export function SettingsRoot() {
         />
       ) : (
         <>
-          <AccountCard />
+          <div className="flex flex-col gap-2">
+            <AccountCard />
+            {/* The web's "This browser" card in one line (SET-14). */}
+            <p className={T.meta}>
+              Your work is kept on this phone only.{" "}
+              <Link href="/m/settings/data/download" className={HELPER_LINK}>
+                Keep a download
+              </Link>
+              .
+            </p>
+          </div>
           <Preferences />
           <Money />
           <SettingsGroup label="Support">
@@ -258,6 +278,10 @@ function Preferences() {
   const settings = useSettings();
   const { theme } = useTheme();
   const data = useDataRowValue();
+  const dates = useDates();
+  // Read once per visit, as the web's Privacy at a glance: a break ends on its own and the next visit shows it.
+  const [now] = React.useState(() => Date.now());
+  const breakUntil = quietModeOn(settings, now) ? settings.audience.quietUntil : null;
   return (
     <SettingsGroup label="Preferences">
       <SettingsRow icon={Notification01Icon} label="Notifications" value={POPUP_WORDS[popupModeOf(settings)]} href="/m/settings/notifications" />
@@ -265,6 +289,7 @@ function Preferences() {
         icon={Shield01Icon}
         label="Privacy & safety"
         value={settings.audience.locked ? "Profile locked" : "Profile open"}
+        helper={breakUntil !== null ? `On a break until ${dates.dateTime(breakUntil, { style: "weekday" })}` : undefined}
         href="/m/settings/privacy"
       />
       <SettingsRow icon={LanguageSkillIcon} label="Language & region" value="English" href="/m/settings/language" />

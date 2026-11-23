@@ -8,22 +8,30 @@
 //   says so with Undo;
 // - Save video saves this clip (a product clip is saved as itself, not as its
 //   project); its post goes on the web's Saved list with its first saved clip;
-// - Copy link copies the clip's own address ("Link to post copied to clipboard");
+// - Copy link copies the clip's public web page ("Link to post copied to
+//   clipboard"; SOC-19: the post, or your listed project's marketplace page —
+//   never the phone's /m address, as Share profile gives the web's profile);
 //   Share via… hands it to the phone's own share sheet (WhatsApp, Messages…: the
 //   web's Share on Facebook / LinkedIn / X / WhatsApp in one row, SOC-5);
 // - Playback speed (kept) and Video quality are pick-one sheets (quality offers
 //   what the clip really has, and Data saver — Settings › Appearance's switch,
 //   one for the app — which waits for a tap before playing); their rows say
 //   the current choice ("Playback speed · Normal", "Video quality · Auto");
-// - Report is the kit's Report sheet with "Also block {creator}" (Figma 07):
-//   "Tell us more" opens under Something else; a reported clip reads Reported.
-// A clip you shared to your Feed adds "Remove from your Feed". On your own
+// - Report is the kit's Report sheet with "Also block {creator}" (Figma 07), in
+//   the web's noun, "Report this post" (SOC-20): "Tell us more" opens under
+//   Something else; a reported clip reads Reported.
+// A clip you shared to your Feed adds "Remove from your Feed": that one share,
+// with Undo putting back that one (SOC-11, the Timeline's and the web's rule:
+// an older share of the same item stays). On your own
 // project the menu is the owner's (the web's post owner bar), picked by the
 // share: shared (`showcasedAt`) → Edit post, Stop sharing, Open project; on the
 // Feed only because it is listed, never shared → Share to Feed (the project's
 // own share sheet) and Open project. Stopping a share takes the post off your
 // Timeline; the clip stays on the Feed while the project is for sale. No
-// Report or Hide on your own, as on the web.
+// Report or Hide on your own, as on the web. The side Share on your own clip
+// is `OwnClipShare`: the project's own Share to Feed while it isn't shared,
+// then Copy link and Share via… — never "Share to your Feed", the re-share of
+// others' items (SOC-13).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -47,7 +55,8 @@ import { Button } from "@/components/ideeza/button";
 import { Textarea } from "@/components/ideeza/text-input";
 import { Toggle } from "@/components/ideeza/toggle";
 import { useReportedPost } from "@/components/innovations/post-bits";
-import { clipHref, type FeedClip } from "@/lib/innovations/clips";
+import { useShares } from "@/components/shares/use-share-items";
+import { webHrefOfItem, type FeedClip } from "@/lib/innovations/clips";
 import {
   isClipSaved,
   qualityOptions,
@@ -55,7 +64,6 @@ import {
   SPEEDS,
   withChoice,
   withoutChoice,
-  withoutShares,
   withReported,
   type ClipChoice,
 } from "@/lib/innovations/feed-prefs";
@@ -95,18 +103,37 @@ const CHOICE_TOAST: Record<ClipChoice, string> = {
 
 const FAILED = "This phone couldn’t save that. Nothing changed.";
 
-/** Copies a clip's address and says so. */
+/** The public web page of a clip or an item, by its id (SOC-19, `webHrefOfItem`), read with your
+ *  own projects (their names, and whether you shared them); `market`: its marketplace page. */
+export function useWebLinkOf(): (id: string, market?: boolean) => string {
+  const { projects } = useManualProjects();
+  return React.useCallback(
+    (id: string, market = false) =>
+      webHrefOfItem(
+        id,
+        (projectId) => {
+          const p = projects.find((x) => x.id === projectId);
+          return p ? { name: p.name, shared: typeof p.showcasedAt === "number" } : null;
+        },
+        market,
+      ),
+    [projects],
+  );
+}
+
+/** Copies a clip's (or an item's) public web page and says so. */
 export function useCopyClipLink(): (clipId: string) => void {
   const toast = useToast();
+  const webLinkOf = useWebLinkOf();
   return React.useCallback(
     (clipId: string) => {
-      const url = new URL(clipHref(clipId), window.location.origin).toString();
+      const url = new URL(webLinkOf(clipId), window.location.origin).toString();
       const done = () => toast({ title: "Link to post copied to clipboard" });
       const failed = () => toast({ title: "Couldn’t copy the link", lead: "error" });
       if (!navigator.clipboard) return failed();
       navigator.clipboard.writeText(url).then(done, failed);
     },
-    [toast],
+    [toast, webLinkOf],
   );
 }
 
@@ -149,10 +176,12 @@ export function ClipMenu({
   const toast = useToast();
   const router = useRouter();
   const { prefs, update } = useFeedPrefs();
+  const shares = useShares();
   const dataSaver = useSettings().appearance.dataSaver;
   const { isSaved, toggleSave } = useSaveClip();
   const post = useReportedPost(clip.postId);
   const copy = useCopyClipLink();
+  const webLinkOf = useWebLinkOf();
   const shareVia = useShareVia();
   const [sheet, setSheet] = React.useState<"speed" | "quality" | "report" | "edit" | "stop" | null>(null);
 
@@ -186,10 +215,13 @@ export function ClipMenu({
       toast(r.saved ? { title: "Saved", action: { label: "View Saved", onClick: () => router.push("/m/saved") } } : { title: "Removed from Saved" });
     });
 
+  // Only the share this clip carries (the newest of it): an older share of the same item stays, and
+  // Undo puts back just this one, so a share made in between is never wiped (SOC-11).
   const removeShare = () => {
-    const before = prefs.shares;
-    if (!update((p) => withoutShares(p, clip.id))) return failed();
-    toast({ title: "Removed from your Feed", action: { label: "Undo", onClick: () => update((p) => ({ ...p, shares: before })) } });
+    const share = clip.share;
+    if (!share) return;
+    if (!shares.remove(share.id)) return failed();
+    toast({ title: "Removed from your Feed", action: { label: "Undo", onClick: () => shares.restore(share) } });
   };
 
   const shared: ActionSheetItem[] = clip.share ? [{ label: "Remove from your Feed", icon: Delete02Icon, destructive: true, onSelect: removeShare }] : [];
@@ -204,7 +236,7 @@ export function ClipMenu({
   const shareViaRow: ActionSheetItem = {
     label: "Share via…",
     icon: SentIcon,
-    onSelect: () => shareVia({ url: clipHref(clip.id), title: clip.title, copied: "Link to post copied to clipboard" }),
+    onSelect: () => shareVia({ url: webLinkOf(clip.id), title: clip.title, copied: "Link to post copied to clipboard" }),
   };
 
   const items: ActionSheetItem[] = mine
@@ -240,8 +272,8 @@ export function ClipMenu({
           label: reported ? "Reported" : "Report",
           icon: Flag02Icon,
           onSelect: () => {
-            if (reported) return toast({ title: "You reported this video. We’re looking into it." });
-            guard("Sign in to report this video", () => setSheet("report"));
+            if (reported) return toast({ title: "You reported this post." });
+            guard("Sign in to report this post", () => setSheet("report"));
           },
         },
         ...shared,
@@ -291,13 +323,13 @@ export function ClipMenu({
         <ReportSheet
           open={sheet === "report"}
           onClose={() => setSheet(null)}
-          title="Report this video"
+          title="Report this post"
           description={`${firstName} won’t know who reported.`}
-          question="Why are you reporting this video?"
+          question="Why are you reporting this post?"
           reasons={VIDEO_REPORT_REASONS}
           blockName={firstName}
           draftKey={`clip:${clip.id}`}
-          note={{ label: "Tell us more", placeholder: "What happened in this video?", onlyFor: "other" }}
+          note={{ label: "Tell us more", placeholder: "What happened in this post?", onlyFor: "other" }}
           onSend={async ({ alsoBlock }) => {
             const ok = clip.kind === "project" ? post.markReported() : update((p) => withReported(p, clip.id));
             if (!ok) throw new Error("not saved");
@@ -376,4 +408,29 @@ function OwnerSheets({ clip, sheet, onClose }: { clip: FeedClip; sheet: string |
       />
     </>
   );
+}
+
+/** The side Share on your own clip (SOC-13). Your own project's share is the project's own Share to
+ *  Feed (its page's sheet, as ⋯ › Share to Feed opens it), offered while the project isn't shared;
+ *  then Copy link and Share via… with its public web page. Never "Share to your Feed": that is the
+ *  re-share of someone else's item, so each act keeps one name. */
+export function OwnClipShare({ clip, open, onClose }: { clip: FeedClip; open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const copy = useCopyClipLink();
+  const webLinkOf = useWebLinkOf();
+  const shareVia = useShareVia();
+  const { projects } = useManualProjects();
+  const posted = typeof projects.find((p) => p.id === clip.projectId)?.showcasedAt === "number";
+  const items: ActionSheetItem[] = [
+    ...(posted
+      ? []
+      : [{ label: "Share to Feed", icon: News01Icon, onSelect: () => router.push(`/m/projects/${encodeURIComponent(clip.projectId)}?sheet=share`) }]),
+    { label: "Copy link", icon: Link01Icon, onSelect: () => copy(clip.id) },
+    {
+      label: "Share via…",
+      icon: SentIcon,
+      onSelect: () => shareVia({ url: webLinkOf(clip.id), title: clip.title, copied: "Link to post copied to clipboard" }),
+    },
+  ];
+  return <ActionSheet open={open} onClose={onClose} title={clip.title} items={items} />;
 }

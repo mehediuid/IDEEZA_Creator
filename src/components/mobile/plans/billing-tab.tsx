@@ -10,7 +10,8 @@
 // on Free, Upgrade now. Then every payment as an invoice row
 // (lib/account/invoices.ts: plan payments, renewals marked Not charged,
 // credit purchases; the web's search by order ID and year), each opening
-// its invoice.
+// its invoice. A row says the web's "Successful" for a payment and, under its
+// amount, the coupon it used (CL-006, MON-12).
 
 import * as React from "react";
 import Link from "next/link";
@@ -31,7 +32,7 @@ import { filterInvoices, invoiceYears, invoicesOf } from "@/lib/account/invoices
 import { usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
-import { PLANS, planOf, priceOf } from "@/lib/create/plans";
+import { PLANS, creditPeriod, planOf, priceOf } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { Sheet } from "../kit/sheet";
@@ -114,7 +115,7 @@ export function BillingTab() {
                   <li key={inv.id}>
                     <Link
                       href={invoicePath(inv.id)}
-                      aria-label={`${inv.item}, ${dateOf(inv.ts)}, ${usd(inv.total)}, ${inv.status}, ${inv.paidWith}. Open the invoice`}
+                      aria-label={`${inv.item}, ${dateOf(inv.ts)}, ${usd(inv.total)}${inv.coupon ? `, coupon ${inv.coupon.code} −${usd(inv.coupon.amount)}` : ""}, ${inv.status === "Paid" ? "Successful" : inv.status}, ${inv.paidWith}. Open the invoice`}
                       className={cn(LIST_ROW, "justify-between active:bg-bg-subtle")}
                     >
                       <span className="flex min-w-0 flex-col gap-1">
@@ -126,7 +127,12 @@ export function BillingTab() {
                       </span>
                       <span className="flex shrink-0 flex-col items-end gap-1">
                         <span className={cn(T.rowTitle, "tabular-nums")}>{usd(inv.total)}</span>
-                        <Badge tone={inv.status === "Paid" ? "success" : "neutral"}>{inv.status}</Badge>
+                        {inv.coupon && (
+                          <span className={cn(T.meta, "whitespace-nowrap tabular-nums")}>
+                            Coupon {inv.coupon.code} −{usd(inv.coupon.amount)}
+                          </span>
+                        )}
+                        <Badge tone={inv.status === "Paid" ? "success" : "neutral"}>{inv.status === "Paid" ? "Successful" : inv.status}</Badge>
                       </span>
                       <Chevron />
                     </Link>
@@ -149,7 +155,9 @@ export function BillingTab() {
 function CurrentPlan() {
   const router = useRouter();
   const { sub, plan, keep, cancel } = useCreatePlan();
+  const { ledger } = useCredits();
   const usage = usePlanUsage();
+  const [now] = React.useState(() => Date.now());
   const wallet = useWalletStatus();
   const token = useDefaultToken();
   const details = useBillingDetails();
@@ -164,8 +172,10 @@ function CurrentPlan() {
   const status = !paid || !pending ? { tone: "success" as const, label: "Active" } : pending.tier === "free" ? { tone: "warning" as const, label: `Ends ${when}` } : { tone: "warning" as const, label: `Changes ${when}` };
   const smaller = PLANS.filter((p) => p.monthly > 0 && p.monthly < plan.monthly);
   const down = smaller[smaller.length - 1] ?? null;
+  // This month's plan credits, as the web's Plan details says when they came (plan-banner.tsx, MON-15).
+  const granted = ledger.find((e) => e.reason === "grant" && e.orderId === `grant_${sub.id}_${creditPeriod(sub, now).index}`);
   const benefits: { label: string; meter?: { used: number; amount: number; verb: string } }[] = [
-    { label: `${n(plan.credits)} AI credits every month` },
+    { label: `${n(plan.credits)} AI credits every month${granted ? `, ${n(granted.delta)} added on ${dateOf(granted.ts)}` : ""}` },
     { label: `Create ${n(plan.projects)} projects`, meter: { used: usage.projects, amount: plan.projects, verb: "created" } },
     { label: `${n(plan.exports)} exports a month` },
     { label: plan.queue },

@@ -242,7 +242,8 @@ export function MyProjectsScreen() {
           <EmptyState
             icon={File01Icon}
             title="No projects yet"
-            body="Describe a device and IDEEZA builds its PCB, code, 3D model and more."
+            // The web's words (NoProjectsState), the phone's place: the AI tab is its Home box (PRJ-12).
+            body="Describe an idea on the AI tab and save the build. It shows up here."
             action={{ label: "Create a project", href: "/m/ai" }}
           />
         </div>

@@ -2,12 +2,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { FAQS, searchFaqs } = await import("../../.tmp-test/lib/support/faq.js");
+const { FAQS, searchFaqs, BUILD_PIECES } = await import("../../.tmp-test/lib/support/faq.js");
+const { PICKABLE_KINDS, PIECES } = await import("../../.tmp-test/lib/create/pieces.js");
 const { normalizeChat, putMessage, CHAT_MAX } = await import("../../.tmp-test/lib/support/support-chat.js");
 
 test("every question is unique and every link is a phone screen", () => {
   assert.equal(new Set(FAQS.map((f) => f.id)).size, FAQS.length);
   for (const f of FAQS) if (f.link) assert.match(f.link.href, /^\/m(\/|$)/);
+});
+
+test("the first answer names every piece a build makes, from the build's own table (SET-17)", () => {
+  const first = FAQS.find((f) => f.id === "no-knowledge");
+  for (const k of PICKABLE_KINDS) assert.ok(first.a.includes(PIECES[k].name), PIECES[k].name);
+  assert.equal(BUILD_PIECES, "PCB, Code, 3D Module, Assembly and Wiring");
+  assert.match(first.a, /plus its parts list\.$/);
 });
 
 test("an empty search lists everything; every word must match; questions come first", () => {

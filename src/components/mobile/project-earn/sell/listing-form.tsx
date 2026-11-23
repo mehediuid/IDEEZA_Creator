@@ -192,6 +192,9 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
         held = waitFor !== null;
         return { ok: true };
       },
+      // "Use lazy mint instead" when an instant mint can't be paid (EARN-13, the web's listing
+      // dialog): the wallet sheet closes, back on the form with Lazy chosen.
+      onUseLazy: mints && chosen === "instant" ? () => change({ mintingType: "lazy" }) : undefined,
     });
     return { result, written, held };
   };

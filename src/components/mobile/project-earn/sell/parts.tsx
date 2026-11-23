@@ -20,6 +20,8 @@
 //   every video first: …"). Once every one has, it opens even while they render:
 //   "You don't have to wait. It stays off Explore marketplace until …" and,
 //   under the button, "Goes live when all 4 videos are ready · 2 of 4 now".
+//   The project video is never drawn locked (EARN-19, CL-030: it can start
+//   now): its products' pictures in place of the lock, its state and its button.
 // · SalesFacts / RecentSales — an item screen's sales (EARN-4, the web item
 //   panel's): Earned · Bought by · Last sale, then the last three sales and
 //   "All sales in Money", which opens Money's Sales.
@@ -37,7 +39,7 @@ import type { LevelCheck as Check } from "@/lib/commerce/ladder";
 import type { License } from "@/lib/brief/types";
 import { dialogBlockerOf, videosWaitOf } from "@/components/projects/details/readiness-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
-import type { ReadinessPurpose } from "@/lib/manual/p2-types";
+import type { Readiness, ReadinessPurpose } from "@/lib/manual/p2-types";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -48,8 +50,8 @@ import { allSalesLineOf, boughtByOf, earnedTextOf, NO_SALES_LINE, RECENT_SALES_S
 import type { Sale } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
 import { formatAmount } from "@/lib/wallet/money";
-import { phoneTakeHref } from "@/lib/video/phone-video";
-import { phoneProjectPath, readyOfLine } from "@/lib/manual/phone-project";
+import { phoneProjectVideoHref, phoneTakeHref } from "@/lib/video/phone-video";
+import { readyOfLine } from "@/lib/manual/phone-project";
 import { useProjectVideos } from "@/lib/video/store";
 import { REPLACE_LABEL, actionLabel, heldCountLine, heldNoteOf, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
@@ -533,9 +535,6 @@ export function MakeVideosSheet({ onClose }: { onClose: () => void }) {
 function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveReadiness> }) {
   const { project } = useEarn();
   const router = useRouter();
-  const pv = readiness.project;
-  const pvCopy = pv ? projectRowCopy(pv) : null;
-  const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
   return (
     <>
       <div className="flex items-baseline justify-between">
@@ -600,24 +599,55 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
           );
         })}
       </ListCard>
-      {pv && pvCopy && (
-        <>
-          <h3 className={T.section}>Project video</h3>
-          <div className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-dashed border-border p-6">
-            <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-              <Icon icon={LockIcon} size={16} />
+      <ProjectVideoSection projectId={project.id} projectName={project.name} readiness={readiness} />
+    </>
+  );
+}
+
+/** "Project video" and its state (EARN-19; CL-030: it can start now, so it is never drawn locked):
+ *  the phone's block keeps its words and its button, drawn like a product's row — its products'
+ *  pictures as the Media tab draws them (no lock), the project's name, its state, then the button
+ *  that opens the Project video screen (on the take waiting for review, as the Media tab's action
+ *  does). Nothing with one product (its video is the project's). */
+export function ProjectVideoSection({ projectId, projectName, readiness }: { projectId: string; projectName: string; readiness: Readiness }) {
+  const router = useRouter();
+  const pv = readiness.project;
+  if (!pv) return null;
+  const copy = projectRowCopy(pv);
+  const action = projectActionLabel(copy.action);
+  const ready = pv.state === "ready";
+  return (
+    <>
+      <h3 className={T.section}>Project video</h3>
+      <section aria-label={`${projectName} project video`} className={cn(LIST_CARD, "flex-row items-start gap-6 p-6")}>
+        <span className="relative flex size-[56px] shrink-0 items-center justify-center">
+          <span aria-hidden className="grid size-full grid-cols-2 grid-rows-2 gap-[1px] overflow-hidden rounded-md bg-bg-surface-raised">
+            {readiness.products.slice(0, 4).map((p) => (
+              <Thumb key={p.productId} url={p.thumb} className="size-full rounded-none" />
+            ))}
+          </span>
+          {ready && (
+            <span aria-hidden className={cn(MEDIA_CHIP, "absolute size-[28px] justify-center p-0")}>
+              <Icon icon={PlayIcon} size={16} />
             </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className={SUB}>{pvCopy.text}</span>
-              {pvAction && (
-                <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(phoneProjectPath(project.id, "video"))}>
-                  {pvAction}
-                </Button>
-              )}
-            </span>
-          </div>
-        </>
-      )}
+          )}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-2">
+          <span className={cn(T.rowTitle, "truncate")}>{projectName}</span>
+          <span className={cn(T.meta, ready ? "text-text-success" : "text-text-secondary")}>{copy.text}</span>
+          {copy.sub && <span className={T.meta}>{copy.sub}</span>}
+          {action && (
+            <Button
+              hierarchy="secondary"
+              size="xl"
+              className="self-start"
+              onClick={() => router.push(phoneProjectVideoHref(projectId, copy.action === "review" ? pv.review?.id : undefined))}
+            >
+              {action}
+            </Button>
+          )}
+        </span>
+      </section>
     </>
   );
 }

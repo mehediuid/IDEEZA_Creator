@@ -55,25 +55,25 @@ export const TABS: readonly Tab[] = [
     href: "/m/earn",
     label: "Earn Coin",
     icon: CoinsDollarIcon,
-    gate: { title: "Sign in to earn coins", description: "You’ll land on Earn Coin after signing in." },
+    gate: { title: "Log In to earn coins", description: "You’ll land on Earn Coin after you Log In." },
   },
   {
     href: "/m/ai",
     label: "AI",
     icon: null,
-    gate: { title: "Sign in to start a project", description: "You’ll start your project right after signing in." },
+    gate: { title: "Log In to start a project", description: "You’ll start your project right after you Log In." },
   },
   {
     href: "/m/messages",
     label: "Message",
     icon: Message01Icon,
-    gate: { title: "Sign in to see your messages", description: "You’ll land on Messages after signing in." },
+    gate: { title: "Log In to see your messages", description: "You’ll land on Messages after you Log In." },
   },
   {
     href: "/m/profile",
     label: "Profile",
     icon: UserCircleIcon,
-    gate: { title: "Sign in to see your profile", description: "You’ll land on your profile after signing in." },
+    gate: { title: "Log In to see your profile", description: "You’ll land on your profile after you Log In." },
   },
 ];
 

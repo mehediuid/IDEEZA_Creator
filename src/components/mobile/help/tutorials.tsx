@@ -10,7 +10,11 @@
 // (only real playback counts) → Claim 2.0 IDZ (paid into the demo wallet as
 // a wallet line, once per video; no wallet → Connect first) → ✓ Claimed.
 // The editor categories say up front that their steps are done on a
-// computer: a phone has no editors, keyboard or sidebar.
+// computer: a phone has no editors, keyboard or sidebar. As on the web
+// (SET-15): a page with headings has a "Page Content" row (a sheet of them);
+// the % watched moves while the video plays (what has played since the last
+// save is merged in, and saved every few seconds); a video that can't play
+// says so in the web's words.
 
 import * as React from "react";
 import Link from "next/link";
@@ -23,7 +27,7 @@ import { ProgressBar } from "@/components/ideeza/progress-bar";
 import { SearchInput } from "@/components/ideeza/search-input";
 import { persistWallet } from "@/components/wallet/wallet-provider";
 import { TUTORIAL_CATEGORIES } from "@/lib/tutorials/content";
-import { anchorsOf, countLabel, findPage, formatIdz, isAvailable, isGroup, isZero, pagesOf, statsOf, type PageMatch } from "@/lib/tutorials/catalog";
+import { anchorsOf, countLabel, findPage, formatIdz, headingsOf, isAvailable, isGroup, isZero, pagesOf, statsOf, type PageMatch } from "@/lib/tutorials/catalog";
 import { addSpan, earnedIn, isPageDone, pageKey, resumeSlugOf, rewardStateOf, tickSpan, watchedShare, type Span, type TutorialProgress } from "@/lib/tutorials/progress";
 import { claimReward, payeeOf } from "@/lib/tutorials/reward";
 import type { TutorialBlock, TutorialCategory, TutorialVideo } from "@/lib/tutorials/types";
@@ -42,6 +46,7 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { InfoLine } from "../plans/parts";
+import { PageContents } from "./page-contents";
 
 const POSTER = "/tutorials/video-poster.jpg";
 export const tutorialHref = (category: string, page: string) => `/m/tutorials/${category}/${page}`;
@@ -178,6 +183,7 @@ function TopicPage({ match }: { match: PageMatch }) {
   const progress = useTutorialProgress();
   const [menu, setMenu] = React.useState(false);
   const endRef = React.useRef<HTMLDivElement>(null);
+  const articleRef = React.useRef<HTMLElement>(null);
   const key = pageKey(category.slug, page.slug);
 
   // Opening a page remembers it as the category's last.
@@ -201,9 +207,10 @@ function TopicPage({ match }: { match: PageMatch }) {
 
   const blocks = page.blocks ?? [];
   const anchors = anchorsOf(blocks);
+  const headings = headingsOf(blocks);
   return (
     <Screen top={<TopBar back="/m/tutorials" title="Tutorial details" actions={[{ icon: Menu01Icon, label: "Tutorial topics", onClick: () => setMenu(true) }]} />} className="px-8 pb-12 pt-4">
-      <article className="flex flex-col gap-6">
+      <article ref={articleRef} className="flex flex-col gap-6">
         <p className={T.meta}>
           {category.title}
           {match.group ? ` › ${match.group.title}` : ""}
@@ -218,6 +225,7 @@ function TopicPage({ match }: { match: PageMatch }) {
             These steps are done on a computer.
           </InfoLine>
         )}
+        {headings.length > 0 && <PageContents headings={headings} within={articleRef} label="Page Content" />}
         {blocks.map((b, i) => (
           <Block key={i} block={b} anchor={anchors.get(i)} progress={progress} />
         ))}
@@ -264,11 +272,11 @@ function Block({ block: b, anchor, progress }: { block: TutorialBlock; anchor?: 
       return <p className={T.bodyLg}>{b.text}</p>;
     case "heading":
       return b.level === 2 ? (
-        <h3 id={anchor} className={cn(T.title, "pt-4")}>
+        <h3 id={anchor} tabIndex={-1} className={cn(T.title, "scroll-mt-4 pt-4 outline-none")}>
           {b.text}
         </h3>
       ) : (
-        <h4 id={anchor} className={T.section}>
+        <h4 id={anchor} tabIndex={-1} className={cn(T.section, "scroll-mt-4 outline-none")}>
           {b.text}
         </h4>
       );
@@ -288,12 +296,19 @@ function Block({ block: b, anchor, progress }: { block: TutorialBlock; anchor?: 
   }
 }
 
+/** How often what has played is saved while it plays (the web's). */
+const SAVE_EVERY_MS = 5000;
+
+/** The saved spans plus what has played since (the web's merge). */
+const merge = (stored: readonly Span[] | undefined, live: readonly Span[]): Span[] =>
+  live.reduce<Span[]>((acc, [a, z]) => addSpan(acc, a, z), [...(stored ?? [])]);
+
 /** Saves what has played so far, and the video's length. */
 function save(videoId: string, live: readonly Span[], duration: number | null) {
   if (!live.length && !duration) return;
   updateProgress((p) => ({
     ...p,
-    watched: live.length ? { ...p.watched, [videoId]: live.reduce<Span[]>((acc, [a, z]) => addSpan(acc, a, z), [...(p.watched[videoId] ?? [])]) } : p.watched,
+    watched: live.length ? { ...p.watched, [videoId]: merge(p.watched[videoId], live) } : p.watched,
     duration: duration ? { ...p.duration, [videoId]: duration } : p.duration,
   }));
 }
@@ -302,27 +317,46 @@ function VideoCard({ video, progress }: { video: TutorialVideo; progress: Tutori
   const toast = useToast();
   const [claiming, setClaiming] = React.useState(false);
   const [connect, setConnect] = React.useState(false);
+  const [broken, setBroken] = React.useState(false);
   const live = React.useRef<Span[]>([]);
+  // What has played since the last save, drawn into the bar as it plays.
+  const [playing, setPlaying] = React.useState<Span[]>([]);
   const last = React.useRef<number | null>(null);
   const duration = React.useRef<number | null>(null);
-  const state = progress ? rewardStateOf(progress, video) : "soon";
-  const share = progress ? watchedShare(progress, video.id) : 0;
+  // The record as saved, plus what has played since the last save (the web's view).
+  const view = React.useMemo<TutorialProgress | undefined>(
+    () => (progress && playing.length ? { ...progress, watched: { ...progress.watched, [video.id]: merge(progress.watched[video.id], playing) } } : progress),
+    [progress, playing, video.id],
+  );
+  const state = view ? rewardStateOf(view, video) : "soon";
+  const share = view ? watchedShare(view, video.id) : 0;
   const reward = `${formatIdz(video.reward)} IDZ Token`;
 
-  const flush = () => {
+  const flush = React.useCallback(() => {
     save(video.id, live.current, duration.current);
     live.current = [];
-  };
-  React.useEffect(() => () => save(video.id, live.current, duration.current), [video.id]);
+    setPlaying([]);
+  }, [video.id]);
+  React.useEffect(() => {
+    const t = window.setInterval(() => {
+      if (live.current.length) flush();
+    }, SAVE_EVERY_MS);
+    return () => {
+      window.clearInterval(t);
+      flush();
+    };
+  }, [flush]);
 
   const claim = () => {
     const w = readWallet();
-    if (!progress) return;
+    if (!view) return;
     if (!payeeOf(w)) return setConnect(true);
+    // What has played is saved first, so the claim reads the same record the button showed.
+    flush();
     setClaiming(true);
     window.setTimeout(() => {
       const at = Date.now();
-      const r = claimReward(readWallet(), progress, video, at);
+      const r = claimReward(readWallet(), view, video, at);
       setClaiming(false);
       if (!r.ok) {
         if (r.reason === "already") updateProgress((p) => ({ ...p, claimed: { ...p.claimed, [video.id]: { at: r.entry.at, amount: video.reward, activityId: r.entry.id } } }));
@@ -337,7 +371,11 @@ function VideoCard({ video, progress }: { video: TutorialVideo; progress: Tutori
 
   return (
     <figure className="flex flex-col gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-border bg-bg-surface p-4">
-      {isAvailable(video) ? (
+      {isAvailable(video) && broken ? (
+        <div role="alert" className="flex aspect-video w-full flex-col items-center justify-center rounded-lg bg-bg-subtle px-8 text-center">
+          <p className={cn(T.body, "text-text-primary")}>This video can’t play in this browser. Try again later.</p>
+        </div>
+      ) : isAvailable(video) ? (
         <video
           src={video.src}
           poster={video.poster ?? POSTER}
@@ -356,7 +394,10 @@ function VideoCard({ video, progress }: { video: TutorialVideo; progress: Tutori
             const v = e.currentTarget;
             if (last.current !== null && !v.paused) {
               const span = tickSpan(last.current, v.currentTime, v.seeking);
-              if (span) live.current = addSpan(live.current, span[0], span[1]);
+              if (span) {
+                live.current = addSpan(live.current, span[0], span[1]);
+                setPlaying(live.current);
+              }
             }
             last.current = v.currentTime;
           }}
@@ -365,6 +406,7 @@ function VideoCard({ video, progress }: { video: TutorialVideo; progress: Tutori
           }}
           onPause={flush}
           onEnded={flush}
+          onError={() => setBroken(true)}
         />
       ) : (
         <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-bg-overlay">
@@ -394,8 +436,8 @@ function VideoCard({ video, progress }: { video: TutorialVideo; progress: Tutori
       </figcaption>
       {state === "watching" && (
         <div className="flex flex-col gap-2 px-2 pb-2">
-          <ProgressBar value={share * 100} label={`${Math.round(share * 100)}% watched`} />
-          <span className={T.meta}>{Math.round(share * 100)}% watched · watch to the end to earn</span>
+          <ProgressBar value={share * 100} label={`${Math.floor(share * 100)}% watched`} />
+          <span className={T.meta}>{Math.floor(share * 100)}% watched · watch to the end to earn</span>
         </div>
       )}
       <ConnectSheet

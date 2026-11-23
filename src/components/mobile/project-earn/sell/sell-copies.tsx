@@ -14,6 +14,8 @@
 //   lazy-mint box and the no-income line; Sign and sell makes the lazy
 //   copies (when new) then signs the listing, each through the phone's
 //   wallet sheet. Closing with anything entered asks first.
+// The foot: Next on Step 1 (✕, a swipe and the scrim close the sheet — no
+// Cancel that only closes, the kit's rule); Sign and sell with Back on Review.
 // EARN-5: a video fix on Review leaves for the video screen; Back brings the
 // sheet back on the same step with everything entered (useBackState), as the
 // web's Generate video dialog opens over the Sell copies dialog.
@@ -375,9 +377,11 @@ export function SellCopiesSheet({
             <Button size="xl" className="w-full" loading={busy} aria-disabled={blocked || undefined} aria-describedby={reason || blocked ? reasonId : undefined} onClick={() => (atReview ? void sign() : next())}>
               {busy ? "Signing…" : atReview ? "Sign and sell" : "Next"}
             </Button>
-            <Button hierarchy="secondary" size="xl" className="w-full" disabled={busy} onClick={index === 0 ? requestClose : () => go(SELL_STEPS[index - 1])}>
-              {index === 0 ? "Cancel" : "Back"}
-            </Button>
+            {index > 0 && (
+              <Button hierarchy="secondary" size="xl" className="w-full" disabled={busy} onClick={() => go(SELL_STEPS[index - 1])}>
+                Back
+              </Button>
+            )}
             {reason ? (
               <p id={reasonId} role="alert" className={cn(T.meta, "text-text-error")}>
                 {reason}

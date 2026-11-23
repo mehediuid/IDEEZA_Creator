@@ -50,7 +50,8 @@ const SOURCE_ICON: Record<Source, IconValue> = {
   other: MoreHorizontalCircle01Icon,
 };
 
-const SOURCE_HINT: Record<Source, string> = {
+/** Each choice's hint; the phone's one question shows them too (components/mobile/account/source-step.tsx). */
+export const SOURCE_HINT: Record<Source, string> = {
   youtube: "A video or a channel",
   friend: "Someone told you",
   google: "You searched",

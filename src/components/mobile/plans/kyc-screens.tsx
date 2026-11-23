@@ -4,14 +4,19 @@
 // mobile Figma "Level 1", "Level 2", "Level 3").
 // · Level 1 is the web's demo identity check (lib/commerce/kyc.ts): the full
 //   legal name (saved as your one private legal name) and the country of
-//   residence, both required, no seller terms (web V10), and nothing else —
-//   the Figma's mobile number, its code and the read-only email are gone, as
-//   a flow the web has follows the web's steps (MON-6). One screen, Verify in
-//   the Bottom action bar (identity-fields.tsx, shared with the first
-//   withdrawal's first step). The country isn't kept; the check keeps only
-//   that you verified, and when. `?next=` may name Get paid, KYC or a
-//   project's Earn, where Verify sends you back. Verified shows the date and
-//   Reset. Offline, Verify waits with its reason.
+//   residence, both required, no seller terms (web V10). The phone adds the
+//   Figma's mobile number with its six-digit code — a Demo text message
+//   shows the code, as the way-in's Demo email does, on the account's code
+//   rules (lib/account/phone.ts) — and the account's email, read only. The
+//   number and the country aren't kept; the check keeps only that you
+//   verified, and when. The number takes its calling code from a picker
+//   (the Figma's flag and code), which follows the country picked above.
+//   The fields and the code step are identity-fields.tsx, shared with the
+//   first withdrawal's first step, so both ask the same. While the code step
+//   is open its record lives in this tab's session, so a reload keeps the
+//   number. `?next=` may name Get paid, KYC or a project's Earn, where
+//   completing sends you back. Verified shows the date and Reset. Offline,
+//   sending and completing wait with their reason.
 // · Levels 2 and 3 (Intermediate from $1,000 of sales, Advanced from $5,000)
 //   need documents and a reviewer the app doesn't have, so a Demo ID check
 //   stands in for the provider (lib/commerce/kyc-levels.ts): Start KYC
@@ -52,7 +57,7 @@ import { MORE_ICON, TopBar } from "../top-bar";
 import { Screen } from "../screen";
 import { T } from "../type";
 import { LEVEL_NEEDS, SAVE_FAILED } from "./get-paid-screen";
-import { IDENTITY_WHY, IdentityFields, useIdentityForm } from "./identity-fields";
+import { IDENTITY_WHY, IdentityCode, IdentityFields, readIdentityDraft, useIdentityForm } from "./identity-fields";
 import { BulletList, OFFLINE_REASON, dateOf, n } from "./parts";
 
 const STATUS_BADGE: Record<LevelStatus, { tone: "neutral" | "warning" | "error" | "success"; label: string }> = {
@@ -202,18 +207,72 @@ function LevelOneForm() {
   const params = useSearchParams();
   const toast = useToast();
   const online = useOnline();
-  const { fields, verify } = useIdentityForm();
+  const form = useIdentityForm({ keep: true });
+  const [busy, setBusy] = React.useState(false);
   const next = params.get("next");
-  const back = next && NEXT_OK.test(next) ? next : "/m/settings/kyc";
+  const nextOk = next && NEXT_OK.test(next) ? next : null;
+  const back = nextOk ?? "/m/settings/kyc";
+  const formHref = `/m/settings/kyc/1${nextOk ? `?next=${encodeURIComponent(nextOk)}` : ""}`;
+  const wantsCode = params.get("step") === "code";
+  const { record, restore } = form;
+
+  // A reload on the code step: the number and the code sent come back from this tab's session.
+  React.useEffect(() => {
+    if (!wantsCode || record) return;
+    const saved = readIdentityDraft();
+    if (saved) restore(saved);
+  }, [wantsCode, record, restore]);
+
+  // The code step has its own address, so Back returns to the form with what was typed.
+  const step = wantsCode && record ? "code" : "form";
 
   const submit = () => {
-    if (!online) return;
-    const result = verify();
-    if (result === "invalid") return;
-    if (result === "failed") return toast({ title: SAVE_FAILED, lead: "error" });
+    if (!form.valid() || !online) return;
+    form.send();
+    router.push(`/m/settings/kyc/1?step=code${nextOk ? `&next=${encodeURIComponent(nextOk)}` : ""}`);
+  };
+
+  const complete = () => {
+    if (busy || !online) return;
+    setBusy(true);
+    if (!form.complete()) {
+      setBusy(false);
+      toast({ title: SAVE_FAILED, lead: "error" });
+      return;
+    }
     toast({ title: "Identity verified (demo)", lead: "success" });
     router.replace(back);
   };
+
+  if (step === "code") {
+    const { code, result, check } = form.code;
+    return (
+      <Screen
+        top={<TopBar back={formHref} title="Verify your number" />}
+        className="px-8 pb-8 pt-8"
+        footer={
+          <BottomBar>
+            {!online && (
+              <p id="code-why" role="status" className={T.caption}>
+                {OFFLINE_REASON}
+              </p>
+            )}
+            {result === "ok" ? (
+              <Button size="xl" className="w-full" loading={busy} disabled={!online} aria-describedby={!online ? "code-why" : undefined} onClick={complete}>
+                Complete verification
+              </Button>
+            ) : (
+              <Button size="xl" className="w-full" disabled={code.length < 6} onClick={() => check(code)}>
+                Verify code
+              </Button>
+            )}
+          </BottomBar>
+        }
+      >
+        <IdentityCode form={form} onChangeNumber={() => router.replace(formHref)} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen
@@ -222,12 +281,12 @@ function LevelOneForm() {
       footer={
         <BottomBar>
           {!online && (
-            <p id="verify-why" role="status" className={T.caption}>
+            <p id="send-why" role="status" className={T.caption}>
               {OFFLINE_REASON}
             </p>
           )}
-          <Button size="xl" className="w-full" disabled={!online} aria-describedby={!online ? "verify-why" : undefined} onClick={submit}>
-            Verify
+          <Button size="xl" className="w-full" disabled={!online} aria-describedby={!online ? "send-why" : undefined} onClick={submit}>
+            Continue
           </Button>
         </BottomBar>
       }
@@ -241,7 +300,7 @@ function LevelOneForm() {
           </span>
           <p className={T.body}>{IDENTITY_WHY}</p>
         </header>
-        <IdentityFields {...fields} />
+        <IdentityFields {...form.fields} />
       </div>
     </Screen>
   );

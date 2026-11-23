@@ -14,7 +14,9 @@
 // · failed (10o), waiting (33b), still being built (33c, with its bar) and
 //   not built (33a: what it adds, its price and time) as the kit's clean
 //   states, their one action in the Bottom action bar — Rebuild this piece
-//   (the review's free retry) with Open chat, or Add pieces (D2);
+//   for a failed one (the review's free retry, in place; the phone's own,
+//   kept by the owner's rule 2026-11-23) with Open chat under it, the web's
+//   way (COR-36 / PRJ-11: retry it in the chat), or Add pieces (D2);
 // then "What this covers" (`coversFor`, the web's words) as a grouped list,
 // and the ready piece's file as the bar's primary — or, for a buyer, "Buy a
 // copy to download" (off in a preview, with the reason). The 3D Module's file
@@ -84,7 +86,7 @@ export function PieceScreen({ id, productId, piece }: { id: string; productId: s
 }
 
 function PieceView({ kind }: { kind: BuildItemKind | null }) {
-  const { job, bp, name, version, downloads, mode, path, canEdit } = useProduct();
+  const { job, bp, name, version, downloads, mode, path, canEdit, chat } = useProduct();
   const back = path("", { tab: "build" });
   const item = kind && bp ? (bp.items.find((i) => i.kind === kind) ?? null) : null;
   // A left-out piece is the maker's to add: anyone who can't build finds it isn't in the build.
@@ -122,14 +124,9 @@ function PieceView({ kind }: { kind: BuildItemKind | null }) {
             <p className={cn(T.meta, "text-center")}>{notBuiltCostLine(kind)}</p>
           </div>
         ) : state === "failed" ? (
-          <ErrorState
-            title="This piece failed in this build"
-            body={
-              job.failure === "system"
-                ? "The whole build stopped on our side — try it again from the chat."
-                : "Rebuild it, or ask in the chat what went wrong. The other pieces are unaffected, and retrying costs no extra credits."
-            }
-          />
+          // Both ways back, as the bar offers them: Rebuild this piece here (the maker's, not after a
+          // failure on our side) and the web's "Retry it in the chat" (product-deliverables PieceNotReady).
+          <ErrorState title="This piece failed in this build" body={failedLine(canRebuild(canEdit, job), !!chat, job?.failure === "system")} />
         ) : state === "building" ? (
           <div className="flex flex-col items-center gap-4">
             {/* 33c: the Build row's own sentence, then that the screen may be left. */}
@@ -382,8 +379,23 @@ function PartsTable({ bp }: { bp: BuildProduct }) {
 
 // ─────────────────────────── the footer ───────────────────────────
 
+/** A failed piece can be rebuilt in place by its maker, unless the whole build stopped on our side. */
+function canRebuild(canEdit: boolean, job: { failure?: string } | null | undefined): boolean {
+  return canEdit && !!job && job.failure !== "system";
+}
+
+/** The failed card's line, fitting the ways the bar offers: Rebuild this piece, Open chat, or both. */
+function failedLine(rebuild: boolean, chat: boolean, system: boolean): string | undefined {
+  const free = "The other pieces are unaffected, and retrying costs no extra credits.";
+  if (rebuild && chat) return `Rebuild it here, or retry it in the chat. ${free}`;
+  if (rebuild) return `Rebuild it here. ${free}`;
+  if (chat) return system ? "The whole build stopped on our side — try it again from the chat." : "Retry it in the chat.";
+  return undefined;
+}
+
 /** The screen's one action, in the thumb zone: the ready piece's file (or Buy a copy to download),
- *  Rebuild this piece with Open chat for a failed one, Add pieces for one that isn't built. */
+ *  Rebuild this piece for a failed one with Open chat as the second way (the web's: retry it in the
+ *  chat, PRJ-11; the primary when there's nothing to rebuild), Add pieces for one that isn't built. */
 function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduct; state: BuildItem["status"] | "notBuilt" }) {
   const { downloads, job, chat, canEdit } = useProduct();
   const { retryBuildItem } = useCreateHistory();
@@ -391,7 +403,7 @@ function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduc
   const [adding, setAdding] = React.useState(false);
   const model = useModelDownload();
   if (state === "failed") {
-    const rebuild = canEdit && job?.failure !== "system" && job;
+    const rebuild = canRebuild(canEdit, job) && job;
     if (!rebuild && !chat) return null;
     return (
       <BottomBar>
@@ -400,7 +412,7 @@ function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduc
             size="xl"
             className="w-full"
             onClick={() => {
-              retryBuildItem(job.id, kind, bp.id);
+              retryBuildItem(rebuild.id, kind, bp.id);
               toast({ title: `Rebuilding ${ITEM_LABELS[kind]}` });
             }}
           >
@@ -408,7 +420,10 @@ function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduc
           </Button>
         )}
         {chat && (
-          <Link href={`/m/ai/chat/${encodeURIComponent(chat.id)}`} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
+          <Link
+            href={`/m/ai/chat/${encodeURIComponent(chat.id)}`}
+            className={cn(buttonVariants({ hierarchy: rebuild ? "secondary" : "primary", size: "xl" }), "w-full", rebuild && "border-solid")}
+          >
             Open chat
           </Link>
         )}

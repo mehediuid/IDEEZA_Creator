@@ -6,7 +6,9 @@
 // covers the shortfall picked, paid in test USDT or IDZ through the Demo
 // wallet's own request (components/credits/buy-credits.tsx `pay`, in the
 // kit's wallet sheet KIT-WS), and the credits land in the same commit as its debit. A paused build starts by
-// itself once they cover it (the build simulator watches the balance).
+// itself once they cover it (the build simulator watches the balance); the
+// toast says so in the web's words — "200 credits added · Desk Lamp starts
+// now.", or what it still needs, or "You now have 204 credits." (MON-22).
 // The sheet's last block is the next plan up (CL-032: the plan, its perks, the
 // month's credit spend when the plan is really the better buy, MAKER20 once
 // the welcome offer ended unused); not on Disruptor, never on the wallet's own
@@ -22,6 +24,7 @@ import { creditsLine, orderOf } from "@/components/credits/buy-credits";
 import { useDefaultToken } from "@/lib/account/payment";
 import { CREDIT_PACKS, VALIDITY_MONTHS, coinAmount, packCovering, usd, type PackId } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
+import { jobCost, useCreateHistory } from "@/lib/create/history";
 import { needsConfirm } from "@/lib/create/credit-limits";
 import { useCreditDiscount } from "@/lib/create/plan";
 import { useSettings } from "@/lib/settings/use-settings";
@@ -35,6 +38,9 @@ import { useToast } from "../kit/toast";
 
 type Coin = "USDT" | "IDZ";
 
+/** "1 credit", "200 credits". */
+const count = (v: number) => `${v.toLocaleString("en-US")} ${v === 1 ? "credit" : "credits"}`;
+
 function newOrderId(): string {
   return `order_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -45,6 +51,7 @@ export function BuyCreditsSheet({ open, onClose, need }: { open: boolean; onClos
 
 function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
   const { hydrated, balance, purchase } = useCredits();
+  const { attentionBuilds } = useCreateHistory();
   const discount = useCreditDiscount();
   const { request, sheet } = useWalletSheet();
   const toast = useToast();
@@ -66,6 +73,10 @@ function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
       setAsking(true);
       return;
     }
+    // The paused build this is for, read before the credits land (the web's rule, buy-credits.tsx): once
+    // they cover it the simulator starts it and it leaves the attention list. A build held by the
+    // monthly limit isn't one credits can start.
+    const paused = attentionBuilds.find((a) => a.job.blocked === "credits")?.job ?? null;
     setPaying(true);
     setNote(null);
     try {
@@ -102,7 +113,14 @@ function BuyPanel({ onClose, need }: { onClose: () => void; need?: number }) {
         },
       );
       if (result.ok) {
-        toast({ title: `Payment successful · ${credits.toLocaleString("en-US")} credits added`, lead: "success" });
+        const after = balance + credits;
+        let line = `You now have ${count(after)}.`;
+        if (paused) {
+          const name = paused.projectChoiceName?.trim() || paused.title;
+          const cost = jobCost(paused);
+          line = after >= cost ? `${name} starts now.` : `${name} needs ${cost} credits, ${cost - after} more.`;
+        }
+        toast({ title: `${count(credits)} added · ${line}`, lead: "success" });
         onClose();
       } else if (result.reason === "rejected") {
         setNote({ tone: "plain", text: "Payment cancelled in the wallet. Nothing was charged." });

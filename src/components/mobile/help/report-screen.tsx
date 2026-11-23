@@ -13,10 +13,15 @@
 // picks are the web's draft (`ideeza:report-draft`), so leaving the screen
 // or reloading loses nothing but the screenshots (kept in memory only, and
 // it says so); a link may fill an empty draft (`?details=`, `?kind=`).
+// As on the web (SET-10): while there is a draft, Clear (the top bar's
+// eraser) starts a fresh one; "It's confusing" points at the Tutorials; and
+// "Report sent" says nobody can reply in the app yet, with Your reports as a
+// link.
 
 import * as React from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckmarkCircle02Icon, Delete02Icon, Upload04Icon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, Delete02Icon, Eraser01Icon, Upload04Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox, Radio } from "@/components/ideeza/checkbox";
@@ -168,6 +173,8 @@ export function ReportScreen() {
   const [sent, setSent] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const shotsRef = React.useRef<Shot[]>([]);
+  // The web's isBlank: nothing picked, nothing typed, no screenshot.
+  const blank = !kind && !impact && !details.trim() && shots.length === 0;
 
   React.useEffect(() => {
     shotsRef.current = shots;
@@ -245,10 +252,31 @@ export function ReportScreen() {
     }
   };
 
+  /** The web's Clear: a fresh draft (a new id), the screenshots let go, back to the first field. */
+  const clear = () => {
+    shots.forEach((s) => URL.revokeObjectURL(s.url));
+    setShots([]);
+    setId(newReportId());
+    setKind(null);
+    setImpact(null);
+    setDetails("");
+    setIncludeContext(false);
+    setTried(false);
+    setSendError(null);
+    setImageNote(null);
+    requestAnimationFrame(() => document.getElementById(ids.kind.id)?.focus());
+  };
+
   const count = details.trim().length;
   return (
     <Screen
-      top={<TopBar back={from} title="Report a problem" />}
+      top={
+        <TopBar
+          back={from}
+          title="Report a problem"
+          actions={!blank && !sending && sent === null ? [{ icon: Eraser01Icon, label: "Clear", onClick: clear }] : []}
+        />
+      }
       className="px-8 pb-8 pt-4"
       footer={
         <BottomBar>
@@ -307,7 +335,18 @@ export function ReportScreen() {
           />
         </Field>
         <p id={`${ids.details.id}-hint`} className={cn(T.caption, "-mt-6 flex justify-between gap-4 text-text-tertiary")}>
-          {copy.hint}
+          <span>
+            {copy.hint}
+            {kind === "confusing" && (
+              <>
+                {" "}A tutorial may already show how:{" "}
+                <Link href="/m/tutorials" className="font-medium text-text-brand underline underline-offset-2">
+                  Tutorials
+                </Link>
+                .
+              </>
+            )}
+          </span>
           {count >= DETAILS_COUNTER_FROM && (
             <span className={cn("tabular-nums", count > DETAILS_MAX && "text-text-error")}>
               {count}/{DETAILS_MAX}
@@ -395,8 +434,13 @@ export function ReportScreen() {
         <span aria-hidden className="self-center text-text-success">
           <Icon icon={CheckmarkCircle02Icon} size={40} />
         </span>
-        <p className={cn(T.body, "text-center text-text-primary")}>
-          Your reference is <span className="font-mono font-medium">{sent}</span>. Settings › Your reports keeps it.
+        {/* The web's no-reply line (support/report-problem.tsx), and Your reports as a link. */}
+        <p role="status" className={cn(T.body, "text-center text-text-primary")}>
+          Your reference is <span className="font-mono font-medium">{sent}</span>. We can’t reply in the app yet. Settings ›{" "}
+          <Link href="/m/settings/privacy/reports" className="font-medium text-text-brand underline underline-offset-2">
+            Your reports
+          </Link>{" "}
+          keeps it.
         </p>
       </Sheet>
     </Screen>

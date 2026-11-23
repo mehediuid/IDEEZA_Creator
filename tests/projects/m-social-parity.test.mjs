@@ -1,15 +1,14 @@
 // The phone's social screens against the web (web-vs-phone audit 2026-11-23, Medium): Saved and
 // Appreciated list every post on the web's lists, clip or not (SOC-4); a clip's address leads on to
 // the post's comments or its details once the clip is off the Feed (SOC-9, SOC-3); Profile search
-// and the Search history rows follow "Keep my search history" (SOC-8, SET-6); no sample creator's
-// profile is locked on the phone only (SOC-7); Share via… on the clip ⋯ and the marketplace Share
-// menu (SOC-5).
+// and the Search history rows follow "Keep my search history" (SOC-8, SET-6); Share via… on the
+// clip ⋯ and the marketplace Share menu (SOC-5). The sample locked profile stays (owner 2026-11-23:
+// SOC-7 reversed, the phone keeps its PR-17 lock; mobile-profile-hub.test.mjs tests it).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const clips = await import("../../.tmp-test/lib/innovations/clips.js");
-const profile = await import("../../.tmp-test/lib/people/phone-profile.js");
 const { SAMPLE_POSTS } = await import("../../.tmp-test/lib/innovations/sample-posts.js");
 
 const read = (path) => readFileSync(new URL(`../../src/${path}`, import.meta.url), "utf8");
@@ -86,11 +85,6 @@ test("every sample post can be listed and opened, on sale or not", () => {
     assert.ok(row, `${post.id} is listed`);
     if (!row.clip) assert.ok(ALL.every((c) => c.postId !== post.id || !clips.onMarketplace(c)), `${post.id} has no clip on the Feed`);
   }
-});
-
-test("no sample creator's profile is locked on the phone only (SOC-7)", () => {
-  assert.equal("sampleProfileLocked" in profile, false);
-  assert.doesNotMatch(read("components/mobile/profile/creator-profile.tsx"), /sampleProfileLocked|LOCKED_SAMPLES/);
 });
 
 test("Profile search keeps Recent only while Keep my search history is on (SOC-8)", () => {

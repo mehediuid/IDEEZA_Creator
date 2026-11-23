@@ -9,7 +9,8 @@
 // · Withdraw money (/m/settings/idz-pay/withdraw): the web's Withdraw dialog
 //   (components/settings/get-paid/withdraw-dialog.tsx) as one screen in
 //   steps, asking only what is missing (`withdrawStepsOf`, fixed when the
-//   screen opens): Verify your identity (Level 1, the first time only), Where
+//   screen opens): Verify your identity (Level 1, the first time only: the
+//   same fields and code step as KYC › Level 1, identity-fields.tsx), Where
 //   the money goes (a first withdrawal with no method: the same fields as
 //   Information setup), then How much — the available balance, Full balance
 //   or Other amount, the method, the fee ($0.00) and the total. Each step's
@@ -43,6 +44,7 @@ import {
   subtractWithdrawn,
   withdrawAmountProblem,
   withdrawStepsOf,
+  withdrawalReference,
   type PayoutStore,
   type Withdrawal,
   type WithdrawStep,
@@ -64,7 +66,7 @@ import { SCROLL_ATTR, Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { IDZ_RATE_LINE, SAVE_FAILED, useGetPaid } from "./get-paid-screen";
-import { IdentityFields, useIdentityForm } from "./identity-fields";
+import { IdentityCode, IdentityFields, useIdentityForm } from "./identity-fields";
 import { Hero, OFFLINE_REASON, Row, RowsCard, payoutLine } from "./parts";
 
 const PAYOUT_NETWORK = "baseSepolia" as const;
@@ -73,14 +75,6 @@ const PROBLEM: Record<"address" | "duplicate" | "full", string> = {
   duplicate: "This address is already one of your withdrawal methods.",
   full: "You can keep up to 10 withdrawal methods. Remove one to add another.",
 };
-
-/** A withdrawal's reference: ten letters and digits nobody misreads. */
-function referenceId(): string {
-  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let id = "";
-  for (const b of crypto.getRandomValues(new Uint8Array(10))) id += A[b % A.length];
-  return id;
-}
 
 /** `?next=` when it is one of the phone's own Get paid screens. */
 function nextOf(params: URLSearchParams, fallback: string): string {
@@ -321,6 +315,8 @@ function WithdrawFlow({ store, earned, verified }: { store: PayoutStore; earned:
   const [at, setAt] = React.useState(0);
   const step = steps[at];
   const identity = useIdentityForm();
+  // Level 1's own two parts, as KYC › Level 1 asks them: the form, then the code sent to the number.
+  const [identityCode, setIdentityCode] = React.useState(false);
   const form = useMethodForm(store);
   const [methodProblem, setMethodProblem] = React.useState<string | null>(null);
   const [methodId, setMethodId] = React.useState<string | null>(store.defaultMethodId ?? store.methods[0]?.id ?? null);
@@ -360,11 +356,19 @@ function WithdrawFlow({ store, earned, verified }: { store: PayoutStore; earned:
     topRef.current?.closest<HTMLElement>(`[${SCROLL_ATTR}]`)?.scrollTo({ top: 0 });
   };
 
+  // Identity, as KYC › Level 1 asks it (identity-fields.tsx): Continue sends the code to the number (the
+  // Demo text message opens), Verify code checks it, Verify and continue saves it and goes on.
+  const sendIdentityCode = () => {
+    if (!online || !identity.valid()) return;
+    identity.send();
+    setFailure(null);
+    setIdentityCode(true);
+    topRef.current?.closest<HTMLElement>(`[${SCROLL_ATTR}]`)?.scrollTo({ top: 0 });
+  };
+
   const verifyIdentity = () => {
     if (!online) return;
-    const result = identity.verify();
-    if (result === "invalid") return;
-    if (result === "failed") return setFailure(SAVE_FAILED);
+    if (!identity.complete()) return setFailure(SAVE_FAILED);
     go(at + 1);
   };
 
@@ -383,7 +387,8 @@ function WithdrawFlow({ store, earned, verified }: { store: PayoutStore; earned:
       if (problem) otherRef.current?.focus();
       return;
     }
-    const reference = referenceId();
+    // "WD7K2M9QX4LP", as the web makes it (MON-20).
+    const reference = withdrawalReference();
     const newId = target.isNew ? randomId("wm_") : null;
     setBusy(true);
     const result = await request(
@@ -462,7 +467,15 @@ function WithdrawFlow({ store, earned, verified }: { store: PayoutStore; earned:
           {failure ?? why}
         </p>
       )}
-      {step === "identity" ? (
+      {step === "identity" && !identityCode ? (
+        <Button size="xl" className="w-full" disabled={!online} aria-describedby={why || failure ? "withdraw-why" : undefined} onClick={sendIdentityCode}>
+          Continue
+        </Button>
+      ) : step === "identity" && identity.result !== "ok" ? (
+        <Button size="xl" className="w-full" disabled={identity.code.code.length < 6} onClick={() => identity.code.check(identity.code.code)}>
+          Verify code
+        </Button>
+      ) : step === "identity" ? (
         <Button size="xl" className="w-full" disabled={!online} aria-describedby={why || failure ? "withdraw-why" : undefined} onClick={verifyIdentity}>
           Verify and continue
         </Button>
@@ -480,7 +493,7 @@ function WithdrawFlow({ store, earned, verified }: { store: PayoutStore; earned:
 
   return (
     <Screen
-      top={<TopBar back="/m/settings/idz-pay" onBack={(goBack) => (at > 0 ? go(at - 1) : goBack())} title="Withdraw money" />}
+      top={<TopBar back="/m/settings/idz-pay" onBack={(goBack) => (step === "identity" && identityCode ? setIdentityCode(false) : at > 0 ? go(at - 1) : goBack())} title="Withdraw money" />}
       className="px-8 pb-8"
       footer={footer}
     >
@@ -492,7 +505,7 @@ function WithdrawFlow({ store, earned, verified }: { store: PayoutStore; earned:
           </p>
         )}
 
-        {step === "identity" && (
+        {step === "identity" && !identityCode && (
           <section aria-labelledby="withdraw-identity" className="flex flex-col gap-8">
             <header className="flex flex-col gap-2">
               <h2 id="withdraw-identity" className={T.title}>
@@ -501,6 +514,15 @@ function WithdrawFlow({ store, earned, verified }: { store: PayoutStore; earned:
               <p className={T.body}>Your first withdrawal asks who is withdrawing. You do this once.</p>
             </header>
             <IdentityFields {...identity.fields} />
+          </section>
+        )}
+
+        {step === "identity" && identityCode && (
+          <section aria-labelledby="withdraw-number" className="flex flex-col gap-8">
+            <h2 id="withdraw-number" className={T.title}>
+              Verify your number
+            </h2>
+            <IdentityCode form={identity} onChangeNumber={() => setIdentityCode(false)} />
           </section>
         )}
 

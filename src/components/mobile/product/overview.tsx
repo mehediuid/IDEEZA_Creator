@@ -7,7 +7,9 @@
 //   Royalties and the sold line, and "Not on sale" for a use not listed (CL-018:
 //   one price per use, no version); the collection and chain as one line; what each kind of
 //   NFT is in the ⓘ (owner 2026-11-15: no tab strip inside the page's tabs).
-//   One buy path: the sticky bar;
+//   One buy path: the sticky bar. In Preview as others see it, a quiet "View
+//   on Explore marketplace" under it opens the live product shop (the web's
+//   edition block, CL-018; BUY-15);
 // · Specs: the booked facts (`productFacts`) as a grouped list, with "Worked
 //   out from the parts." for a build that predates the spec and the owner's
 //   part changes (29a) as its footer lines; when the project has a network
@@ -21,7 +23,7 @@
 //   note) while the build is a Draft.
 
 import * as React from "react";
-import { CubeIcon, InformationCircleIcon, PackageIcon, ShareKnowledgeIcon, Shield01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUpRight01Icon, CubeIcon, InformationCircleIcon, PackageIcon, ShareKnowledgeIcon, Shield01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
 import { buttonVariants } from "@/components/ideeza/button";
@@ -38,6 +40,7 @@ import {
   type ProductConfidence,
 } from "@/lib/create/confidence";
 import { productFacts } from "@/lib/manual/products-tab-view";
+import { MARKET_VIEW, phoneProductPath } from "@/lib/manual/phone-product";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { projectTabsFor } from "@/lib/manual/project-route";
 import { useProjectNetwork } from "@/lib/network/store";
@@ -51,7 +54,7 @@ import { cn } from "@/lib/utils";
 import { Chevron, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { T } from "../type";
-import { CARD, FactCard, InfoButton, ListFooter, SectionHead } from "./parts";
+import { CARD, FactCard, InfoButton, LINK, ListFooter, SectionHead } from "./parts";
 import { useProduct } from "./use-product";
 
 /** The buyer's Overview (the owner's page lays these out itself). */
@@ -238,7 +241,7 @@ export function useListedCopies(): Listed[] {
 }
 
 function MarketplaceBlock() {
-  const { view, name } = useProduct();
+  const { view, name, mode, project, product } = useProduct();
   const tracks = useListedCopies();
   if (!tracks.length) return null;
   const main = view.listing.kind === "none" ? null : view.listing.listing;
@@ -311,6 +314,12 @@ function MarketplaceBlock() {
           });
         })}
       </ul>
+      {mode === "preview" && (
+        <Link href={`${phoneProductPath(project.id, product.id)}?view=${MARKET_VIEW}`} className={cn(LINK, "gap-2 self-start")}>
+          View on Explore marketplace
+          <Icon icon={ArrowUpRight01Icon} size={14} />
+        </Link>
+      )}
     </section>
   );
 }

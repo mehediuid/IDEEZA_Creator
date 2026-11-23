@@ -1,13 +1,15 @@
 "use client";
 
 // AU-30…33 · Reset password, one flow, email only (P2-AU-16):
-// 1. the email (prefilled from Sign in), Send code — sending, offline, the
+// 1. the email (prefilled from Log In), Send code — sending, offline, the
 //    email's form (30–30d); an email with no account says so, as the web
 //    does, with Try another email and Create account;
 // 2. the code, sent on to the next step by its 6th digit (31–31e);
-// 3. a new password with the checklist, not the current one, Sign out of
-//    other devices on by default (32–32e) — ticked, the other devices are
-//    signed out as Change password does it;
+// 3. the web's "Set a new password": New password with the checklist (not
+//    the current one, as the phone has always asked) and Confirm password,
+//    Sign out of other devices on by default (32–32e) — ticked, the other
+//    devices are signed out as Change password does it — and Save and Log In
+//    (the web's words, AUTH-10, with the phone's "Log In", AUTH-16);
 // then signed in where they were, with "Password reset" (AU-33). An account
 // made through a provider has a password of its own from then on. Back goes
 // one step back: the password to the code, the code to the email.
@@ -75,7 +77,7 @@ export default function ResetPage() {
     }, SENDING_MS);
   };
 
-  const confirmError = confirmLeft && confirm && confirm !== password ? "Passwords don’t match." : "";
+  const confirmError = confirmLeft && confirm && confirm !== password ? "The passwords don’t match." : "";
   const valid = !phonePasswordProblem(password) && confirm === password;
 
   const save = async (e: React.FormEvent) => {
@@ -163,13 +165,13 @@ export default function ResetPage() {
         footer={
           <BottomBar>
             <Button type="submit" form="new-password" size="xl" className="w-full" loading={busy} disabled={!valid || !online}>
-              Reset password
+              Save and Log In
             </Button>
           </BottomBar>
         }
       >
         <form id="new-password" noValidate onSubmit={save} className={ACCOUNT_CONTENT}>
-          <AccountHeading title="Create a new password">For {normalizeEmail(email)}. You’ll be signed in as soon as it’s saved.</AccountHeading>
+          <AccountHeading title="Set a new password">For {normalizeEmail(email)}. You’ll be signed in as soon as it’s saved.</AccountHeading>
           <AccountAlert
             alert={
               !online
@@ -201,7 +203,7 @@ export default function ResetPage() {
               </Field>
               <PasswordChecklist password={password} id={ids.rules.id} />
             </div>
-            <Field label="Re-type password" htmlFor={ids.confirm.id} error={confirmError} errorId={ids.confirm.errorId}>
+            <Field label="Confirm password" htmlFor={ids.confirm.id} error={confirmError} errorId={ids.confirm.errorId}>
               <PasswordInput
                 id={ids.confirm.id}
                 autoComplete="new-password"

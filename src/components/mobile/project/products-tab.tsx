@@ -374,7 +374,7 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
           value={prompt}
           onChange={(v) => setPrompt(v.slice(0, PROMPT_MAX))}
           onSubmit={start}
-          placeholder="Describe your device"
+          placeholder="e.g. A solar battery pack that charges this desk charger at night"
           canSend={canRender}
           sendReason={short}
           busy={starting}

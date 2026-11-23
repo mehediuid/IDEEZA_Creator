@@ -35,6 +35,7 @@ export default function SourcePage() {
   if (details) return <DetailsStep account={account} />;
   return (
     <SourceStep
+      firstName={account.firstName}
       onDone={() => {
         setAnswered(true);
         router.replace(after);

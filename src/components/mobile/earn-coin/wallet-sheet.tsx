@@ -18,7 +18,11 @@
 // fee such as the instant mint's 4 IDZ included, the network fee with its
 // "test ETH — no real cost" note), "Total to pay now" ("Nothing" for a
 // signature) and "Balance after". The buttons are Sign / Confirm and pay, and
-// Reject (the web's word).
+// Reject (the web's word). When an instant mint can't be paid and the caller
+// passed `onUseLazy` (the listing form, the mint), the foot also offers "Use
+// lazy mint instead": the request ends as rejected, then `onUseLazy()` runs
+// at once — before the caller's `await` goes on — so the caller can tell a
+// switch from a plain reject (the web provider's rule, EARN-13).
 // The wallet is read fresh at every step; a change of account, network or
 // connection under the request ends it and says which ("Your wallet
 // disconnected before it confirmed."); funds are checked at review, at
@@ -102,6 +106,8 @@ export type WalletSheetView = {
   message: string | null;
   /** The submitted transaction's hash, shown while it confirms. */
   hash: string | null;
+  /** The caller passed `onUseLazy`: a mint the wallet can't pay can switch to a lazy mint (EARN-13). */
+  canUseLazy?: boolean;
 };
 type View = WalletSheetView;
 
@@ -234,7 +240,15 @@ export function useWalletSheet() {
   const show = React.useCallback((phase: Phase, extra: { reason?: FailReason; message?: string; hash?: string } = {}) => {
     const f = flight.current;
     if (!f) return;
-    setView({ phase, req: f.req, identity: f.identity, reason: extra.reason ?? null, message: extra.message ?? null, hash: extra.hash ?? null });
+    setView({
+      phase,
+      req: f.req,
+      identity: f.identity,
+      reason: extra.reason ?? null,
+      message: extra.message ?? null,
+      hash: extra.hash ?? null,
+      canUseLazy: typeof f.opts.onUseLazy === "function",
+    });
   }, []);
 
   const later = React.useCallback(
@@ -379,6 +393,13 @@ export function useWalletSheet() {
     show("rejected");
   };
 
+  /** "Use lazy mint instead": the request ends as rejected, then the caller's switch runs (EARN-13). */
+  const switchToLazy = () => {
+    const onUseLazy = flight.current?.opts.onUseLazy;
+    end({ ok: false, reason: "rejected" });
+    onUseLazy?.();
+  };
+
   /** ✕, the scrim, Escape and Close, by phase. */
   const dismiss = () => {
     const f = flight.current;
@@ -430,7 +451,7 @@ export function useWalletSheet() {
       short={short?.text ?? null}
       nudge={nudge}
       onClose={dismiss}
-      actions={{ connect, switchNetwork, approve, retry: gate, close: dismiss }}
+      actions={{ connect, switchNetwork, approve, retry: gate, close: dismiss, useLazy: switchToLazy }}
     />
   ) : null;
 
@@ -525,7 +546,7 @@ export function RequestSheet({
   /** Taps on the scrim while a submitted transaction confirms. */
   nudge: number;
   onClose: () => void;
-  actions: { connect: () => void; switchNetwork: () => void; approve: () => void; retry: () => void; close: () => void };
+  actions: { connect: () => void; switchNetwork: () => void; approve: () => void; retry: () => void; close: () => void; useLazy?: () => void };
 }) {
   const { req, phase, identity } = view;
   const target = networkLabelOf(req.network);
@@ -637,6 +658,11 @@ export function RequestSheet({
           <Button size="xl" className={xl} disabled={!!short && !signing} loading={signing} onClick={signing ? undefined : actions.approve}>
             {signing ? "Waiting for your signature…" : req.kind === "signature" ? "Sign" : "Confirm and pay"}
           </Button>
+          {short && !signing && view.canUseLazy && actions.useLazy && (
+            <Button hierarchy="secondary" size="xl" className={xl} onClick={actions.useLazy}>
+              Use lazy mint instead
+            </Button>
+          )}
           <Button hierarchy="secondary" size="xl" className={xl} onClick={onClose}>
             {signing ? "Cancel" : "Reject"}
           </Button>

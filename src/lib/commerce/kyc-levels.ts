@@ -10,7 +10,7 @@
 //
 // Pure apart from the guarded localStorage read and write; relative imports only.
 
-import { KYC_ADVANCED_AT, KYC_INTERMEDIATE_AT } from "./kyc";
+import { KYC_ADVANCED_AT, KYC_INTERMEDIATE_AT, higherCheckOf } from "./kyc";
 
 export const KYC_LEVELS_KEY = "ideeza:commerce:kyc-levels";
 
@@ -91,6 +91,16 @@ export function levelDueOf(levels: KycLevels, salesUsd: number): HigherLevel | n
   }
   if (salesUsd >= LEVEL_AT.intermediate && levelStatusOf(levels, "intermediate") !== "approved") return "intermediate";
   return null;
+}
+
+/** The higher level coming up, said ahead as the web's Get paid does (kyc.ts higherCheckOf, MON-21): sales
+ *  at 75 % of its threshold or more but not past it, and that level not approved yet; null otherwise
+ *  (past the threshold it is `levelDueOf`'s). */
+export function levelNearOf(levels: KycLevels, salesUsd: number): { level: HigherLevel; at: number } | null {
+  const near = higherCheckOf(salesUsd);
+  if (!near || near.passed) return null;
+  const level: HigherLevel = near.at === LEVEL_AT.advanced ? "advanced" : "intermediate";
+  return levelStatusOf(levels, level) === "approved" ? null : { level, at: near.at };
 }
 
 function storage(): Storage | null {

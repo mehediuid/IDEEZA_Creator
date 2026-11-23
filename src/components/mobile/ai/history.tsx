@@ -5,7 +5,8 @@
 // Prompts (each chat, its newest drawing, its project and how many builds)
 // and Builds (each build's state and progress, its project, the newest first,
 // filtered by In progress / Ready / Needs attention) — and a search. A row
-// opens the chat; a build row opens its pieces, and a failed one has Try
+// opens the chat; a build row opens its pieces, a waiting or paused one says
+// where it stands, and a failed one has Try
 // again (the whole build, or only the pieces that failed) and its steps,
 // each failed one with its own Retry. ⋯ on a prompt deletes it, with the
 // web's rule for the builds that go with it.
@@ -62,7 +63,7 @@ const STATUS: Record<BuildEntry["status"], { word: string; tone: "brand" | "succ
   waiting: { word: "Waiting", tone: "neutral" },
   building: { word: "Building", tone: "brand" },
   ready: { word: "Ready", tone: "success" },
-  failed: { word: "Needs a retry", tone: "error" },
+  failed: { word: "Failed", tone: "error" },
   paused: { word: "Paused", tone: "warning" },
 };
 
@@ -308,7 +309,16 @@ export function AiHistory() {
   );
 }
 
-/** A build: tap opens its pieces; a failed one has Try again and its steps, each failed step with Retry. */
+/** Where a waiting or paused build stands, in the web's words (history-builds useFacts, CRE-14); the
+ *  row's badge already says Paused, so its line says only where to look. */
+function waitFact(b: BuildEntry): string | null {
+  if (b.status === "waiting") return b.ahead ? `${b.ahead} build${b.ahead === 1 ? "" : "s"} ahead in line` : "Next in line";
+  if (b.status === "paused") return "open the build to see why";
+  return null;
+}
+
+/** A build: tap opens its pieces; a waiting or paused one says where it stands; a failed one has Try again
+ *  and its steps, each failed step with Retry. */
 function BuildRow({ row: b, now, onRetry, onRetryStep }: { row: BuildEntry; now: number; onRetry?: () => void; onRetryStep: (productId: string, kind: string) => void }) {
   const dates = useDates();
   const [open, setOpen] = React.useState(false);
@@ -332,6 +342,7 @@ function BuildRow({ row: b, now, onRetry, onRetryStep }: { row: BuildEntry; now:
           <span className={cn(T.meta, "text-text-tertiary")}>
             {dates.stamp(b.createdAt, now)}
             {b.older ? " · an older build of its chat" : ""}
+            {waitFact(b) ? ` · ${waitFact(b)}` : ""}
           </span>
         </span>
       </Link>

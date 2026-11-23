@@ -6,20 +6,35 @@
 // listed is the web's (lib/data/blog-reuse.ts): your blogs where you chose
 // "Give access to IDEEZA to future use" (what that means is the list's ⓘ;
 // Revoke access for all is the red row at the foot). A blog IDEEZA has already shared
-// is locked by the blog's own rule; only support can change it.
+// is locked by the blog's own rule; only support can change it: its row's
+// Contact support opens Report a problem with the blog named, the web's
+// askBlogSupport (lib/blog/support.ts) through the phone report's `?details=`
+// prefill. Every title opens its blog in the phone's reader, as the web's
+// titles link to theirs (SET-9).
 
 import * as React from "react";
+import Link from "next/link";
 import { News01Icon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ideeza/button";
-import { REUSE_SCOPE } from "@/lib/blog/consent";
+import { Button, buttonVariants } from "@/components/ideeza/button";
+import { REUSE_SCOPE, supportTopic } from "@/lib/blog/consent";
 import { updateBlog, useBlog } from "@/lib/blog/store";
 import { reuseGrants, revokeReuse, type ReuseGrant } from "@/lib/data/blog-reuse";
 import { useDates } from "@/lib/settings/use-dates";
+import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { EmptyState } from "../kit/state";
 import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { SaveFailed, SettingsGroup, SettingsNote, SettingsRow, SettingsScreen, useSaver } from "./kit";
+
+const HERE = "/m/settings/data/blog-reuse";
+
+/** The web's blog address (/blog/<slug>) in the phone's reader (/m/blog/<slug>). */
+const phoneBlogHref = (href: string) => `/m${href}`;
+
+/** The web's askBlogSupport, the phone's way: Report a problem, opened with the blog named. */
+const supportHref = (title: string) =>
+  `/m/help/report?from=${encodeURIComponent(HERE)}&details=${encodeURIComponent(supportTopic(title))}`;
 
 export function BlogReuseSettings() {
   const { hydrated, data, unreadable } = useBlog();
@@ -66,7 +81,15 @@ export function BlogReuseSettings() {
             {grants.map((g) => (
               <SettingsRow
                 key={g.id}
-                label={<span className="[overflow-wrap:anywhere]">{g.title}</span>}
+                label={
+                  <Link
+                    href={phoneBlogHref(g.href)}
+                    // A 44 px tap area that doesn't move the row: the padding grows it, the margin takes it back.
+                    className="-my-[12px] block rounded-sm py-[12px] text-text-primary outline-none [overflow-wrap:anywhere] hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                  >
+                    {g.title}
+                  </Link>
+                }
                 helper={
                   g.sharedOn
                     ? `Shared on ${g.sharedOn.where} · ${day(g.sharedOn.at)}. This can’t be taken back here. Contact support to change it.`
@@ -75,7 +98,15 @@ export function BlogReuseSettings() {
                       : "Access given"
                 }
                 trailing={
-                  g.sharedOn ? undefined : (
+                  g.sharedOn ? (
+                    <Link
+                      href={supportHref(g.title)}
+                      aria-label={`Contact support about “${g.title}”`}
+                      className={cn(buttonVariants({ hierarchy: "ghost", size: "sm" }), "-my-[6px] h-[44px] shrink-0")}
+                    >
+                      Contact support
+                    </Link>
+                  ) : (
                     <Button hierarchy="secondary" size="sm" className="shrink-0" disabled={off} aria-label={`Revoke access to “${g.title}”`} onClick={() => revoke([g])}>
                       Revoke
                     </Button>

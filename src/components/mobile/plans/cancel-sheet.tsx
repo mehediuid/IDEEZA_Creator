@@ -2,15 +2,19 @@
 
 // Back to Free? (mobile Figma "Billing History › Popup Container",
 // the web's CancelDialog): you keep the plan until the period ends, then
-// Free; what you lose; that nothing you made is removed. Keep my plan, or
-// Cancel subscription; from a bigger plan the web's smaller-plan way out too.
+// Free; what you lose; what you have against Free (projects, and contributors
+// in the web's words); that nothing you made is removed. Keep Builder (the
+// web's word), or Cancel subscription; from a bigger plan the web's
+// smaller-plan way out too, with its price under it (MON-14).
 
 import * as React from "react";
 import { Cancel01Icon, Alert02Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ideeza/button";
 import { usePlanUsage } from "@/components/credits/plans-panel";
+import { usd } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { lossesOf, planOf, type PlanTier } from "@/lib/create/plans";
+import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import { T } from "../type";
@@ -37,7 +41,7 @@ export function CancelSheet({ open, onClose }: { open: boolean; onClose: () => v
       actions={
         <>
           <Button size="xl" className="w-full" onClick={onClose}>
-            Keep my plan
+            Keep {current.name}
           </Button>
           <Button
             hierarchy="danger"
@@ -64,6 +68,9 @@ export function CancelSheet({ open, onClose }: { open: boolean; onClose: () => v
       <p className={T.body}>
         You have {n(usage.projects)} {usage.projects === 1 ? "project" : "projects"}; Free allows {n(free.projects)}. Nothing is removed: credits you bought stay until they expire, and every project and contributor stays as it is.
       </p>
+      <p className={T.body}>
+        Contributors: up to {n(usage.mostContributors)} on one project. Free allows {free.contributors === 0 ? "none" : n(free.contributors)}.
+      </p>
       {offerSmaller && (
         <Button
           hierarchy="tonal"
@@ -77,6 +84,11 @@ export function CancelSheet({ open, onClose }: { open: boolean; onClose: () => v
         >
           Downgrade to {smaller.name} instead
         </Button>
+      )}
+      {offerSmaller && (
+        <p className={cn(T.meta, "-mt-2 text-center")}>
+          {smaller.name} is {usd(smaller.monthly)} a month with {n(smaller.credits)} AI credits, from {when}.
+        </p>
       )}
     </Sheet>
   );

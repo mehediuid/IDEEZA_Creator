@@ -27,6 +27,7 @@ import {
   isAlive,
   keepUtm,
   mobileNext,
+  sessionExpiredHref,
   usePhone,
 } from "@/lib/account/phone";
 import { owedOf, readDeviceId, useSecurity } from "@/lib/account/security";
@@ -102,8 +103,11 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
     ready && signedIn ? (owedOf(security, sessionAt, readDeviceId(), Math.max(openedAt, sessionAt)) ?? (account && needsAccountDetails(account) ? "source" : null)) : null;
   const target = ready ? redirectFor(pathname, window.location.search, signedIn, phone.explored, owes, phone.onboarded) : null;
 
+  // Set while a sign-in that ended with its tab is being signed out (AUTH-8): the reload to Welcome
+  // that says so is on its way, so the signed-out redirect below stands aside.
+  const forgetting = React.useRef(false);
   React.useEffect(() => {
-    if (target) router.replace(target);
+    if (target && !forgetting.current) router.replace(target);
   }, [target, router]);
 
   // The campaign tag of the link that opened the app, for the account made from it.
@@ -125,12 +129,16 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(id);
   }, []);
 
-  // Logged in without Remember me: a cold start (a new tab) ends that sign-in.
+  // Logged in without Remember me: a cold start (a new tab) ends that sign-in, on Welcome as after
+  // any sign-out — never silently (AUTH-8): it says "Your session expired", and Log In goes back to
+  // the page that was opened.
   const forget = ready && signedIn && phone.forgetSession && !isAlive();
+  const expiredTo = forget ? sessionExpiredHref(pathname, window.location.search) : null;
   React.useEffect(() => {
-    if (!forget) return;
-    void signOut().then(() => window.location.replace("/m/welcome"));
-  }, [forget]);
+    if (!expiredTo || forgetting.current) return;
+    forgetting.current = true;
+    void signOut().then(() => window.location.replace(expiredTo));
+  }, [expiredTo]);
 
   if (!ready || target || holding || forget) return <SplashScreen />;
 

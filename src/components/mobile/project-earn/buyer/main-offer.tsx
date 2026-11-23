@@ -16,7 +16,7 @@
 //   spreadsheet) — what is sold, the price large, the facts three to a row,
 //   the wallet line, the activity line and the Testnet demo line; the
 //   share-sale note under it. The button is the bottom bar's.
-// · An auction (18f): the same box with the top (or starting) bid, its time
+// · An auction (18f): the same box with the current (or starting) bid, its time
 //   left, Bid history (n), who leads, Your bid (the bar's Place bid submits
 //   it; the bar's line is `auctionBarLineOf`), Buy now with X (greyed, with
 //   "Someone is buying this now…", while another checkout holds it — CL-016). Outbid (18j), won (18k) and lost
@@ -106,7 +106,7 @@ function tailFacts(listing: Listing, view: ProjectView): BoxFact[] {
 }
 
 function factNotesOf(listing: Listing, view: ProjectView): string {
-  return `Royalties are a share of resales, if marketplaces honor them.${isLazy(listing, view) ? " Lazy: the token is minted when you buy." : ""}`;
+  return `Royalties are a share of resales, if marketplaces honour them.${isLazy(listing, view) ? " Lazy: the token is minted when you buy." : ""}`;
 }
 
 /** "Main NFT", or the share on sale (owner 2026-11-22: the box says Main NFT, never "Whole project"). */
@@ -174,11 +174,12 @@ export function StandingBanner({ standing, listing, state, bids, buyerId }: { st
   return null;
 }
 
-/** The buy box bar's second line for an auction, in the box's own words: the top (or starting) bid and
- *  the time left; once it ends, how it ended for this buyer (StandingBanner's titles). */
+/** The buy box bar's second line for an auction, in the box's own words: the current (or starting) bid and
+ *  the time left — the web's "Current bid" / "Starting bid" (offer-parts.tsx AuctionTop, BUY-12); once it
+ *  ends, how it ended for this buyer (StandingBanner's titles). */
 export function auctionBarLineOf(listing: Listing, state: AuctionState, standing: BidStanding): string {
   const price = formatAmount(state.top?.amount ?? listing.minBid ?? "0", listing.token);
-  if (state.phase !== "ended") return `${price} · ${state.top ? "Top bid" : "Starting bid"} · ${timeLeftLabel(state.msLeft)}`;
+  if (state.phase !== "ended") return `${price} · ${state.top ? "Current bid" : "Starting bid"} · ${timeLeftLabel(state.msLeft)}`;
   return `${price} · ${standing === "won" ? "You won the auction" : "The auction ended"}`;
 }
 
@@ -225,7 +226,9 @@ export function AuctionCard({
   const heldId = React.useId();
   const count = `${rows.length} ${rows.length === 1 ? "bid" : "bids"}`;
   const price = formatAmount(top?.amount ?? listing.minBid ?? "0", listing.token);
-  const sub = ended ? (top ? `Auction ended · top bid · ${count}` : "Auction ended · no bids") : top ? `Top bid · ${count}` : "Starting bid";
+  // The web's words for the bid (offer-parts.tsx AuctionTop, BUY-12): Current bid / Starting bid, once ended
+  // winning bid / no bids — the Feed's pill says Current bid too.
+  const sub = ended ? (top ? `Auction ended · winning bid · ${count}` : "Auction ended · no bids") : top ? `Current bid · ${count}` : "Starting bid";
   const facts: BoxFact[] = [
     { label: "Minimum bid", value: formatAmount(listing.minBid ?? "0", listing.token) },
     ...(listing.auctionBuyNow ? [{ label: "Buy now", value: formatAmount(listing.auctionBuyNow, listing.token) }] : []),
@@ -244,7 +247,7 @@ export function AuctionCard({
     : leads
       ? null
       : top
-        ? `Top bid ${formatAmount(top.amount, listing.token)}, by ${buyerLabel(top.bidderId)}. Bid more than ${formatAmount(top.amount, listing.token)}.`
+        ? `Current bid ${formatAmount(top.amount, listing.token)}, by ${buyerLabel(top.bidderId)}. Bid more than ${formatAmount(top.amount, listing.token)}.`
         : `No bids yet. Bid at least ${formatAmount(listing.minBid ?? "0", listing.token)}.`;
   const wallet = !ended && buyerId !== null;
 

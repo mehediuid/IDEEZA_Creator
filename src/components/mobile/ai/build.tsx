@@ -51,7 +51,8 @@ import {
   type BuildItemKind,
   type BuildJob,
 } from "@/lib/create/history";
-import { aboutTime, pickCost } from "@/lib/create/pieces";
+import { aboutTime, cleanPick, pickCost, pickedKinds, pickSummary } from "@/lib/create/pieces";
+import { pieceLine } from "@/components/create/pieces-card";
 import { failedPieceNote, pieceWord, type PieceLite } from "@/lib/mobile-ai/flow";
 import { cn } from "@/lib/utils";
 import { PickList } from "../kit/pick-list";
@@ -111,10 +112,15 @@ export function BuildConfirmSheet({
   const short = hydrated && balance < cost;
   const rows = flow.state.selected.map((t) => {
     const id = t.companionOf ?? "primary";
-    const pick = flow.state.picks.get(id);
+    const pick = flow.state.picks.get(id) ?? cleanPick(undefined, flow.chat?.quality);
     const row = flow.rail.rows.find((r) => r.productId === id);
-    const pieces = pick ? Object.values(pick).filter((c) => c.on).length : 6;
-    return { id, name: row?.name ?? "Product", pieces, cost: pick ? pickCost(pick) : 0 };
+    // What this product gets, in the web gate's words (CRE-10): "Whole product — PCB · Firmware code · …".
+    const kinds = pickedKinds(pick).filter((k) => k !== "parts");
+    const gets = `${pickSummary(pick)} — ${
+      kinds.length ? kinds.map((k) => { const l = pieceLine(k, pick[k]); return l.name + l.note; }).join(" · ") : "nothing picked"
+    }`;
+    const pieces = Object.values(pick).filter((c) => c.on).length;
+    return { id, name: row?.name ?? "Product", pieces, gets, cost: pickCost(pick) };
   });
   const listed = new Intl.ListFormat("en", { type: "conjunction" }).format(rows.map((r) => r.name));
   const build = async () => {
@@ -128,12 +134,14 @@ export function BuildConfirmSheet({
       <Sheet
         open={!!gate && !buying}
         onClose={() => !flow.submitting && onClose()}
-        title={`Build ${n} ${n === 1 ? "product" : "products"}?`}
+        // The web gate's title (CL-034 keeps it): "Build this product?" / "Build 2 products?" (CRE-8).
+        title={n === 1 ? "Build this product?" : `Build ${n} products?`}
         description={
           limit
             ? `${listed} would start a new project, and every project on your plan is in use. Nothing has been charged.`
             : short
-              ? `You have ${balance} credits and this build needs ${cost}. Buy credits and the build starts — nothing is charged until it does.`
+              ? // Buying doesn't book the build: Build wakes up once the credits land, and the maker presses it (CRE-9).
+                `You have ${balance} credits and this build needs ${cost}. Buy credits, then Build.`
               : "The build runs in the background. You can leave and we will tell you when it is ready."
         }
         actions={
@@ -185,6 +193,7 @@ export function BuildConfirmSheet({
                       {r.pieces} pieces · {r.cost} credits
                     </span>
                   </span>
+                  <span className={T.meta}>{r.gets}</span>
                   {gate?.lines[i] && <span className={cn(T.meta, "text-text-tertiary")}>{gate.lines[i].replace(/^.*? — /, "")}</span>}
                 </li>
               ))}

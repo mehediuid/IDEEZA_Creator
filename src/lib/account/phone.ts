@@ -399,3 +399,12 @@ export function mobileNext(raw: string | null | undefined, fallback = "/m", entr
   if (!entryOk && ENTRY_PATH.test(raw.split(/[?#]/)[0])) return fallback;
   return raw;
 }
+
+/** A Log In without Remember me ended with its tab (AUTH-8): the next open lands on Welcome, as
+ *  after any sign-out, now saying "Your session expired" and carrying, as `next`, the page that was
+ *  opened — or, on a way-in screen, the page it was itself carrying on to — so Log In comes back
+ *  to it. */
+export function sessionExpiredHref(pathname: string, search: string): string {
+  const opened = ENTRY_PATH.test(pathname) ? mobileNext(new URLSearchParams(search).get("next")) : mobileNext(pathname + search);
+  return `/m/welcome?${new URLSearchParams({ expired: "1", ...(opened === "/m" ? {} : { next: opened }) })}`;
+}

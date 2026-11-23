@@ -20,7 +20,9 @@
 // comment on your post. Opening one marks it read where the bell keeps it;
 // turning a kind off and muting a project are the web's Notification settings;
 // Delete and Clear all take notices off this phone's list only (the web bell
-// keeps every record).
+// keeps every record), and mark them read first, so the web bell's count drops
+// with the phone's (SOC-17). A notice the Blog's demo review decided carries
+// the web's "Demo review" badge after its tag (SOC-18).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -44,9 +46,11 @@ import {
   VolumeOffIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { markRead, muteProject, unmuteProject } from "@/components/notifications/use-notices";
 import { updateSecurity, withoutDevice } from "@/lib/account/security";
+import { DEMO_REVIEW_LABEL } from "@/lib/blog/demo-review";
 import {
   actionLabelOf,
   deviceIdOf,
@@ -249,6 +253,9 @@ export function NotificationsScreen() {
         destructive
         onConfirm={() => {
           if (!confirm) return;
+          // What leaves the list is read too, so the web bell doesn't keep counting it.
+          const gone = confirm.kind === "all" ? unread : unread.filter((n) => n.id === confirm.notice.id);
+          if (gone.length && !markRead(gone)) return failed();
           const ok = updateCleared((c) => (confirm.kind === "all" ? withAllCleared(c, Date.now()) : withClearedId(c, confirm.notice.id)));
           if (!ok) failed();
           else toast({ title: confirm.kind === "all" ? "Notifications cleared" : "Notification deleted" });
@@ -290,8 +297,10 @@ function NoticeRow({
           className="flex flex-col gap-1 rounded-sm text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           {!read && <span className="sr-only">Unread: </span>}
-          <span className={cn(T.meta, "text-text-tertiary")}>
-            {n.tag} · {when}
+          <span className={cn(T.meta, "flex flex-wrap items-center gap-x-2 text-text-tertiary")}>
+            {n.tag}
+            {n.demo && <Badge tone="neutral">{DEMO_REVIEW_LABEL}</Badge>}
+            <span>· {when}</span>
           </span>
           <span className={cn(read ? T.body : T.rowTitle, error ? "text-text-error" : "text-text-primary")}>{n.title}</span>
           {n.body && <span className={cn(T.body, "line-clamp-2")}>{n.body}</span>}

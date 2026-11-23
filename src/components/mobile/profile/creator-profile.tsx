@@ -6,9 +6,7 @@
 // Edit profile under the facts; brand-new PR-04; ⋯ PR-05; View as public PR-21/22),
 // someone else's (PR-10/11: the tie only you see, Follow + Message in the bar,
 // ⋯ Share · Report · Block; Following PR-13; Message's reason PR-14; blocked
-// PR-15), your own locked as others see it (PR-17/22, Settings › Privacy &
-// safety; a sample creator is never locked, as on the web — SOC-7), not
-// found (PR-18), loading (PR-19) and
+// PR-15), a locked profile (PR-17), not found (PR-18), loading (PR-19) and
 // couldn't load / offline (PR-20). The facts are the web profile's
 // (use-profile.ts); `me` is always you, as on the web. The Timeline · Projects
 // · Activity tab lives in the address (`?tab=projects`), beside `?view=public`.
@@ -45,6 +43,7 @@ import {
   moreAboutSummaryOf,
   phoneProjectHref,
   profileStatsOf,
+  sampleProfileLocked,
   sinceLineOf,
   type MoreAbout,
 } from "@/lib/people/phone-profile";
@@ -394,16 +393,19 @@ function OwnProfile({
     else toast({ title: item.pinned ? "Unpinned" : "Pinned to top" });
   };
 
-  // ⋯ › Remove from your Feed on a share of yours, as the Feed's own ⋯ does it (with Undo).
+  // ⋯ › Remove from your Feed on a share of yours, as the Feed's own ⋯ does it: that one share, and
+  // Undo puts back that one (a share made in between is never wiped, SOC-11).
   const removeShare = (post: TimelinePost) => {
-    if (!post.shareId) return;
-    const shareId = post.shareId;
-    const before = feedPrefs.prefs.shares;
-    if (!feedPrefs.update((p) => withoutShare(p, shareId))) {
+    const share = feedPrefs.prefs.shares.find((s) => s.id === post.shareId);
+    if (!share) return;
+    if (!feedPrefs.update((p) => withoutShare(p, share.id))) {
       toast({ title: WRITE_FAILED, lead: "error" });
       return;
     }
-    toast({ title: "Removed from your Feed", action: { label: "Undo", onClick: () => feedPrefs.update((p) => ({ ...p, shares: before })) } });
+    toast({
+      title: "Removed from your Feed",
+      action: { label: "Undo", onClick: () => feedPrefs.update((p) => (p.shares.some((s) => s.id === share.id) ? p : { ...p, shares: [...p.shares, share] })) },
+    });
   };
 
   const followingCount = following.hydrated ? following.people.length : null;
@@ -565,6 +567,9 @@ function OtherProfile({ person }: { person: Person }) {
   const more: MoreAbout = { skills: [], specialities: [], languages: [], builtWith: data.builtWith, worksOn: data.worksOn, links: [] };
   const summary = moreAboutSummaryOf(more);
   const { meta, since } = metaOf(about?.location ?? null, about ? localTimeOf(about.timeZone, data.now, locale) : null, data.since);
+  // PR-17: a locked profile shows who they are and no more, unless you work with them (the tie).
+  // Follow, Message and ⋯ stay.
+  const locked = sampleProfileLocked(person.id) && !data.tie && !blocked;
   // The web's reason, in the phone's words: the first name, the typographic apostrophe.
   const refusal = data.refusal ? curly(data.refusal.replace(person.name, first)) : null;
   const top = (
@@ -585,6 +590,24 @@ function OtherProfile({ person }: { person: Person }) {
   );
   const photo = { initials: person.initials, color: person.color, src: null, label: `${person.name}’s photo` };
   const pro = person.kind === "feed" && (CREATORS.find((c) => `feed:${c.id}` === person.id)?.pro ?? false);
+
+  if (locked) {
+    return (
+      <Screen top={top} footer={bar}>
+        {!online && (
+          <div className="px-8 pb-4">
+            <OfflineBanner />
+          </div>
+        )}
+        <CoverAndAvatar cover={undefined} avatar={photo} />
+        <div className={CONTENT}>
+          <Identity titleRef={nameRef} name={person.name} latinName={person.latinName} demo headline={null} meta={null} relation={null} openTo={null} />
+          <LockedCard first={first} />
+        </div>
+        <PersonMenu person={person} open={menu} onClose={() => setMenu(false)} blocked={blocked} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen top={top} footer={bar}>

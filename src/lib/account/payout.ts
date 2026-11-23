@@ -515,6 +515,17 @@ export function recordWithdrawal(store: PayoutStore, w: Withdrawal): PayoutStore
   return { ...store, withdrawals: [...store.withdrawals, w] };
 }
 
+/** Letters and digits nobody misreads: no 0/O, no 1/I. */
+const REFERENCE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** "WD7K2M9QX4LP": a withdrawal's reference to quote — WD, then ten of the letters above, the same on the
+ *  web (withdraw-dialog.tsx) and the phone (MON-20). `random` is ten random bytes (a test passes its own). */
+export function withdrawalReference(random: Uint8Array = globalThis.crypto.getRandomValues(new Uint8Array(10))): string {
+  let id = "WD";
+  for (const b of random) id += REFERENCE_LETTERS[b % REFERENCE_LETTERS.length];
+  return id;
+}
+
 const pad = (n: number) => String(n).padStart(2, "0");
 /** The local calendar day, "2026-10-19". */
 const dayOf = (t: number) => {

@@ -19,8 +19,8 @@
 // One record is written (saveBuild), the store's write is waited for, then
 // the build names its project and the concept network becomes the project's
 // network; the sheet turns into what was saved, read off the project's real
-// status (the web's SavedDialog, CRE-3), with View project (the project page)
-// and Back to chat. A refused write keeps what was typed.
+// status (the web's SavedDialog, CRE-3), with View project (the project page);
+// ✕ goes back to the chat. A refused write keeps what was typed.
 
 import * as React from "react";
 import Image from "next/image";
@@ -455,15 +455,11 @@ function SavedPanel({
       onClose={onClose}
       title={notice.title}
       description={`${notice.body}${notice.publishLine ? " When it’s ready, publish it from the project page." : ""}`}
+      // One primary; ✕, swipe and the scrim go back to the chat (kit rule: no button that only closes).
       actions={
-        <>
-          <Button size="xl" className="w-full" onClick={() => router.push(`/m/projects/${project.id}`)}>
-            View project
-          </Button>
-          <Button hierarchy="secondary" size="xl" className="w-full" onClick={onClose}>
-            Back to chat
-          </Button>
-        </>
+        <Button size="xl" className="w-full" onClick={() => router.push(`/m/projects/${project.id}`)}>
+          View project
+        </Button>
       }
     >
       <div className="flex items-center gap-6 rounded-xl bg-bg-subtle p-6">

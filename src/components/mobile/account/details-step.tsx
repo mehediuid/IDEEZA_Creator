@@ -123,7 +123,7 @@ export function DetailsStep({ account }: { account: Account }) {
           <BirthDateField
             value={{ day: input.day, month: input.month, year: input.year }}
             onChange={(part, v) => set(part)(v)}
-            error={show("birthday")}
+            shown={tried || chosen}
             now={now}
             ids={ids}
           />

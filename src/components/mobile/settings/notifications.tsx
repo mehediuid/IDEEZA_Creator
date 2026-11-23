@@ -1,11 +1,13 @@
 "use client";
 
 // Settings › Notifications (mobile Figma "Settings · 2026 update" 10688:2):
-// ST-20 the page — On this phone (push, how often, quiet hours with Between
+// ST-20 the page — On this phone (push, Show pop-ups, quiet hours with Between
 // and Let sales through, keep notices), What you hear about (the seven kinds
 // and the bid amount), the note, Muted projects; ST-20b / 20c push blocked and
 // its pre-prompt (notifications-push.tsx); ST-21 the quiet hours sheet and
-// ST-24 the bids sheet (notifications-sheets.tsx); ST-23 How often.
+// ST-24 the bids sheet (notifications-sheets.tsx); ST-23 Show pop-ups (the
+// web's name, the one Find a setting already shows), and the kinds' footer
+// says the web's rule: a kind switched off still lists in the bell (SET-13).
 // The record and its rules are the web's (components/settings/
 // notifications-page.tsx): `ideeza:settings` notifications, and
 // appearance.keepNotices. Toggles save as they change (ST-92 when refused);
@@ -96,9 +98,9 @@ export function NotificationsSettings() {
 
   return (
     <SettingsScreen title="Notifications" loading={!running}>
-      <SettingsGroup label="On this phone">
+      <SettingsGroup label="On this phone" footer="Sound and vibration follow your phone’s settings.">
         <PushRow permission={permission} mode={mode} disabled={off} onAsk={() => setOpen("ask")} onBlocked={() => setOpen("blocked")} />
-        <SettingsRow id="popups" label="How often" value={MODES.find((m) => m.value === mode)?.label} onClick={() => setOpen("often")} disabled={off} />
+        <SettingsRow id="popups" label="Show pop-ups" value={MODES.find((m) => m.value === mode)?.label} onClick={() => setOpen("often")} disabled={off} />
         <SettingsRow
           id="quiet-hours"
           label="Quiet hours"
@@ -131,8 +133,8 @@ export function NotificationsSettings() {
       </SettingsGroup>
       <SaveFailed saver={saver} group="phone" />
 
-      {/* Each kind is a switch; what it covers is one tap away in the group's ⓘ, and the phone's
-          email / sound line is the group's footer. */}
+      {/* Each kind is a switch; what it covers is one tap away in the group's ⓘ, and the web's
+          switched-off rule with the phone's email line is the group's footer. */}
       <SettingsGroup
         id="email"
         label="What you hear about"
@@ -149,7 +151,7 @@ export function NotificationsSettings() {
             </dl>
           ),
         }}
-        footer="Email and text messages aren’t sent yet. Sound and vibration follow your phone’s settings."
+        footer="Switched off, a kind still lists in the bell but doesn’t pop up or add to its count. Email and text messages aren’t sent yet."
       >
         {SHOWN_KINDS.map((k) => (
           <React.Fragment key={k}>
@@ -177,7 +179,7 @@ export function NotificationsSettings() {
       <ChoiceSheet
         open={open === "often"}
         onClose={close}
-        title="How often"
+        title="Show pop-ups"
         description="For notices on this phone."
         options={MODES}
         value={mode}

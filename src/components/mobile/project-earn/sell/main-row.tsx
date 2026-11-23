@@ -32,12 +32,17 @@
 //     with Copy signature, Payout wallet and its change while lazy) as rows;
 //   – until it is sold in full (EARN-4, the web item panel's): Earned · Bought
 //     by · Last sale under the summary once something sold or is listed, and
-//     Recent sales (the last three, "All sales in Money") at the foot.
+//     Recent sales (the last three, "All sales in Money") at the foot;
+//   – sold in full (EARN-9, the web item panel's): under the summary, a
+//     Receipt — the price large, Bought by · You got · Date · Share, "It's
+//     theirs now, …" — then See this sale in Money (`?sale=`) and Get paid;
+//   – Mint details ends with Open the mint summary (the mint's read-only
+//     Done) when the project has one (EARN-15, the web's Sell).
 // Remove (14c) asks first and pays the network fee only on chain.
 
 import * as React from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Cancel01Icon, Certificate01Icon, Clock01Icon, Copy01Icon, Delete02Icon, PencilEdit01Icon, Store01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, Certificate01Icon, Clock01Icon, Copy01Icon, Delete02Icon, Invoice03Icon, PencilEdit01Icon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
@@ -61,10 +66,10 @@ import { earnPairOf, mainRowStateOf } from "@/lib/manual/earn-view";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { can } from "@/lib/manual/permissions";
 import { listingMetadataOf } from "@/lib/manual/project-read";
-import type { MetaPart, NextAction } from "@/lib/manual/project-summary";
+import { formatDate, type MetaPart, type NextAction } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
 import { outcomeView, type OutcomeRow } from "@/lib/manual/rail-copy";
-import { phoneMarketHref, phoneMintHref } from "@/lib/manual/phone-earn";
+import { phoneEarnHref, phoneMarketHref, phoneMintHref } from "@/lib/manual/phone-earn";
 import { cancelAuction, closeListing, relistChecklist, relistListing, removeListing } from "@/lib/market/listing";
 import {
   AUCTION_CANCELLED_ANNOUNCEMENT,
@@ -84,7 +89,9 @@ import { readMarketNow, settleWithWallets, useMarket } from "@/lib/market/market
 import { makeSale } from "@/lib/market/purchase";
 import { mainSalesOf } from "@/lib/market/sales";
 import { MAIN_SALE_NOTE } from "@/lib/market/sell-flow";
-import { mainTileOf } from "@/lib/market/sell-desk";
+import { mainTileOf, type DeskTile } from "@/lib/market/sell-desk";
+import { payoutLinesText } from "@/lib/commerce/payout";
+import type { CustomerRow } from "@/lib/manual/customers";
 import type { Listing, MarketData } from "@/lib/market/types";
 import { demoAddress, makerId, readWallet } from "@/lib/wallet/demo-wallet";
 import { buyerLabel, DEMO_ACCOUNTS } from "@/lib/wallet/identities";
@@ -97,6 +104,7 @@ import { LIST_CARD } from "../../kit/list";
 import { Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
 import { useEarn } from "../context";
+import { FactGrid } from "../parts";
 import { ListingFormLayer } from "./listing-form";
 import { NftActivityRow } from "./nft-activity";
 import {
@@ -227,7 +235,8 @@ export function MainRow() {
   }
   const listing: Listing | null = "listing" in view.listing ? view.listing.listing : null;
   const left = main.check.ok ? 0 : main.check.missing.length;
-  const extra = steps ? `${left} ${left === 1 ? "step" : "steps"} before you can list` : blocked;
+  // The web desk's words (sell.tsx): "1 step before listing" / "3 steps before listing".
+  const extra = steps ? (left === 1 ? "1 step before listing" : `${left} steps before listing`) : blocked;
   const sellCount = videoCountOf(view.videos.readiness.sell);
 
   return (
@@ -301,6 +310,8 @@ function MainNftScreen({
     inCheckout,
   });
   const selling = main.minted && view.lock === null;
+  // Sold in full (EARN-9): the sale's receipt leads, with the way to that sale and to the payout.
+  const receipt = view.lock !== null ? view.customers.mainSale : null;
 
   let primary: React.ReactNode = null;
   let reason: string | null = null;
@@ -368,6 +379,19 @@ function MainNftScreen({
         ) : (
           <MainSummary card={card} listing={listing} line={state.line} blocked={blocked} inCheckout={inCheckout} />
         )}
+        {receipt && !heldMain && (
+          <>
+            <MainReceipt sale={receipt} tile={tile} />
+            <ul aria-label="This sale" className={ROWS_CARD}>
+              <ActionRow
+                icon={Invoice03Icon}
+                title="See this sale in Money"
+                onClick={() => router.push(`${phoneEarnHref(project.id, "money", { sale: receipt.saleId })}#customers`)}
+              />
+              <ActionRow icon={Wallet01Icon} title="Get paid" onClick={() => router.push(GET_PAID_HREF)} />
+            </ul>
+          </>
+        )}
         {card.kind === "auction" && listing && auctionStateOf(listing, view.bids, now).phase === "endingSoon" && (
           <Banner tone="attention">Ends in under an hour. You can close it once it ends.</Banner>
         )}
@@ -391,6 +415,36 @@ function MainNftScreen({
         {selling && <RecentSales sales={tile.sales} />}
       </div>
     </FullLayer>
+  );
+}
+
+/** The phone's Get paid (the web's `getPaidHref("balance")`). */
+const GET_PAID_HREF = "/m/settings/idz-pay";
+/** The web item panel's line under a Main NFT sold in full. */
+const SOLD_IN_FULL_NOTE = "It's theirs now, so this project is read-only. The payment joined your balance in Get paid.";
+
+/** Sold in full (EARN-9; the web item panel's Receipt), under the screen's own summary (its state
+ *  and All details stay): the price large, Bought by · You got · Date · Share, and the line that
+ *  it's theirs now. */
+function MainReceipt({ sale, tile }: { sale: CustomerRow; tile: DeskTile }) {
+  return (
+    <SummaryCard
+      label="Receipt"
+      overline="Receipt"
+      chip={<Badge tone={tile.chip.tone}>{tile.chip.label}</Badge>}
+      headline={formatAmount(sale.price.amount, sale.price.token)}
+      note={SOLD_IN_FULL_NOTE}
+    >
+      <FactGrid
+        className="grid-cols-2"
+        facts={[
+          { label: "Bought by", value: sale.buyer },
+          { label: "You got", value: payoutLinesText(tile.earned) || formatAmount(sale.payout, sale.price.token) },
+          { label: "Date", value: formatDate(sale.at) },
+          { label: "Share", value: `${tile.meter?.sold ?? 0}% of the project` },
+        ]}
+      />
+    </SummaryCard>
   );
 }
 
@@ -951,8 +1005,14 @@ function PayoutChange({ projectId, account }: { projectId: string; account: numb
   );
 }
 
-/** Mint details as a sheet (the web's disclosure): the mint's proof rows, Copy, the payout wallet. */
+/** Mint details as a sheet (the web's disclosure): the mint's proof rows, Copy, the payout wallet,
+ *  and Open the mint summary (the mint's read-only Done) when the project has one (EARN-15). */
 function MintDetailsSheet({ onClose }: { onClose: () => void }) {
+  const { project, view, viewer, brief } = useEarn();
+  const router = useRouter();
+  // The web's rule (sell.tsx): the pair's View brief, offered only for a project minted from its Brief.
+  const pair = earnPairOf(project, view.summary, brief, viewer, view.canCtx);
+  const summary = [pair.first, pair.second].some((a) => a?.kind === "view-brief");
   return (
     <Sheet
       open
@@ -960,6 +1020,11 @@ function MintDetailsSheet({ onClose }: { onClose: () => void }) {
       title="Mint details"
     >
       <MintRows />
+      {summary && (
+        <ul aria-label="Mint summary" className={ROWS_CARD}>
+          <ActionRow icon={Certificate01Icon} title="Open the mint summary" onClick={() => router.push(phoneMintHref(project.id))} />
+        </ul>
+      )}
     </Sheet>
   );
 }

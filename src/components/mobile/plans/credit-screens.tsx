@@ -7,8 +7,9 @@
 // monthly period's plan credits, the latest movements, and every lot —
 // starting balance, plan credits, packs and custom credits — Active, Used
 // up or Expired. Buy more credits (the Bottom action bar) is the AI tab's
-// Buy credits sheet, straight away as on the web — its last block names the
-// next plan (CL-032). This month reads as three figures, then its rows.
+// Buy credits sheet — its last block names the next plan (CL-032); with this
+// month's plan credits spent it offers that plan first (You've reached your
+// limit). This month reads as three figures, then its rows.
 
 import * as React from "react";
 import { Alert02Icon, Calendar03Icon, DiscountTag01Icon, Invoice03Icon, Table02Icon } from "@hugeicons/core-free-icons";
@@ -32,7 +33,7 @@ import { ListBones, OfflineBanner } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { ComparePlansSheet, UpgradeUnlockSheet } from "./credit-sheets";
+import { ComparePlansSheet, ReachedLimitSheet, UpgradeUnlockSheet, useNextPlan } from "./credit-sheets";
 import { OutOfCreditsRow, useRefillDay } from "./upsell";
 import { Hero, dateOf, n, pct } from "./parts";
 
@@ -50,8 +51,10 @@ export function CurrentCreditScreen() {
   const { hydrated: planReady, sub, plan } = useCreatePlan();
   const discount = useCreditDiscount();
   const { lowAt } = useSettings().credits;
+  const next = useNextPlan();
   const [now] = React.useState(() => Date.now());
   const [buying, setBuying] = React.useState(false);
+  const [limit, setLimit] = React.useState(false);
   const [compare, setCompare] = React.useState(false);
   const [unlock, setUnlock] = React.useState(false);
 
@@ -63,8 +66,12 @@ export function CurrentCreditScreen() {
   const recent = ledger.slice(-3).reverse();
   const refill = useRefillDay();
 
-  // The web's Buy credits, straight away: the fix first, the plan quieter in the sheet's last block (CL-032).
-  const buy = () => setBuying(true);
+  // Buy credits (the web's sheet, its plan in the last block, CL-032); with this month's plan credits
+  // spent and a plan to offer, You've reached your limit comes first — Upgrade plan or Buy credits instead.
+  const buy = () => {
+    if (month && month.remaining === 0 && next) setLimit(true);
+    else setBuying(true);
+  };
 
   return (
     <Screen
@@ -149,6 +156,7 @@ export function CurrentCreditScreen() {
         </div>
       )}
       <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} />
+      <ReachedLimitSheet open={limit} onClose={() => setLimit(false)} allowance={month?.allowance ?? plan.credits} onBuy={() => setBuying(true)} />
       <ComparePlansSheet open={compare} onClose={() => setCompare(false)} />
       <UpgradeUnlockSheet open={unlock} onClose={() => setUnlock(false)} />
     </Screen>

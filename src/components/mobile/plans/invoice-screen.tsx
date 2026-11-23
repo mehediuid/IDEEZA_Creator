@@ -3,8 +3,9 @@
 // Invoice (mobile Figma "v2 · Invoice"; the web's invoice-view.tsx): one
 // payment's invoice, derived from the ledger and the plan's orders
 // (lib/account/invoices.ts) — number, date, billed to (Billing details, else
-// the legal name, else the profile name), the lines, what came off, tax and
-// the total, and how it was paid. Download PDF is the phone's print sheet,
+// the legal name, else the profile name), how long bought credits last, the
+// lines, the Subtotal, what came off, tax, the Total and the Amount paid (the
+// web's rows, MON-13), and how it was paid. Download PDF is the phone's print sheet,
 // which saves a PDF; on paper only the invoice prints.
 
 import * as React from "react";
@@ -18,7 +19,7 @@ import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { billedTo, useBillingDetails } from "@/lib/account/billing-details";
 import { invoiceNameOf, useIdentity } from "@/lib/account/identity";
 import { invoicesOf } from "@/lib/account/invoices";
-import { usd } from "@/lib/create/credit-pricing";
+import { VALIDITY_MONTHS, usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
@@ -103,10 +104,16 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
               <span className="font-mono">{invoice.number}</span>
             </Row>
             <Row label="Date">{dateOf(invoice.ts)}</Row>
-            {invoice.period && (
+            {invoice.period ? (
               <Row label="Period">
                 {dateOf(invoice.period.from)} – {dateOf(invoice.period.to)}
               </Row>
+            ) : (
+              invoice.kind === "credits" && (
+                <Row label="Credits last">
+                  {VALIDITY_MONTHS} months from {dateOf(invoice.ts)}
+                </Row>
+              )
             )}
             <Row label="Billed to">
               <span className="flex flex-col items-end">
@@ -125,17 +132,19 @@ export function InvoiceScreen({ orderId }: { orderId: string }) {
                 {usd(l.total)}
               </Row>
             ))}
+            <Row label="Subtotal">{usd(invoice.subtotal)}</Row>
             {invoice.adjustments.map((a) => (
               <Row key={a.label} label={a.label} tone="success">
                 −{usd(a.amount)}
               </Row>
             ))}
-            <Row label="Tax">{usd(invoice.tax)}</Row>
+            <Row label="Tax (0%)">{usd(invoice.tax)}</Row>
           </dl>
           <p className={cn(T.section, "flex items-center justify-between")}>
-            {invoice.status === "Paid" ? "Total paid" : "Total"} <span className="tabular-nums">{usd(invoice.status === "Paid" ? invoice.paid : invoice.total)}</span>
+            Total <span className="tabular-nums">{usd(invoice.total)}</span>
           </p>
           <dl className={cn(HAIRLINE, "flex flex-col border-t-[length:var(--border-width-1)] pt-4")}>
+            <Row label="Amount paid">{usd(invoice.paid)}</Row>
             <Row label="Paid with">{invoice.paidWith}</Row>
             {invoice.payer && <Row label="From">{shortAddress(invoice.payer)}</Row>}
             {invoice.txHash && (

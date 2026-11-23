@@ -190,7 +190,9 @@ export function MintChoose({ intent, onPick }: { intent: Intent | null; onPick: 
 // ─────────────────────────── details ───────────────────────────
 
 const NETWORK_OPTIONS = NETWORKS.map((n) => ({ value: n.value, label: n.label }));
-const LICENSE_OPTIONS = LICENSES.map((l) => ({ value: l.value, label: l.label }));
+// Each licence's ⓘ line under its name (EARN-17, the web's step-details.tsx): the names alone don't
+// tell a maker them apart. The pick-one sheet draws `helper` as the row's line.
+const LICENSE_OPTIONS = LICENSES.map((l) => ({ value: l.value, label: l.label, helper: l.info }));
 const NEW_COLLECTION = "__new__";
 const SAVE_SIGNATURE_LINE = "Saved with a free signature — nothing is charged. You can mint it on chain when you list it.";
 /** The web's note on a private mint's post while a video is missing (step-details.tsx). */
@@ -931,6 +933,11 @@ export function MintShare() {
   // Nothing of it for sale (a gift, a private mint, a listing still waiting for videos): the post is
   // on your Timeline, and joins the Feed once something of it is for sale (SOC-6).
   const onFeed = forSaleNowOf(view);
+  // One product has no project video (CL-025): the post shows that product's video.
+  const only = readiness.products.length === 1 ? readiness.products[0] : null;
+  const shows = only
+    ? `Your post shows ${displayProductName(only.name)}'s video, with your story.`
+    : "Your post shows the project video and each product's video, with your story.";
   // Already waiting for its videos: Done's waiting block shows it.
   if (waitingShare) return null;
   if (project.showcasedAt) {
@@ -962,7 +969,7 @@ export function MintShare() {
         open={open}
         onClose={() => setOpen(false)}
         title="Share to Feed"
-        description="Your post shows the project video and each product's video, with your story."
+        description={shows}
         actions={
           <>
             <Button size="xl" className="w-full" disabled={!!blocker} onClick={share}>

@@ -156,3 +156,9 @@ test("return-to: only a project page is a way back; it rides as ?from= before an
   assert.equal(withReturn("/settings/get-paid#withdraw", "/projects/p"), "/settings/get-paid?from=%2Fprojects%2Fp#withdraw");
   assert.equal(withReturn("/settings/get-paid#identity", "/elsewhere"), "/settings/get-paid#identity");
 });
+
+test("a withdrawal's reference is WD and ten letters nobody misreads, on the web and the phone (MON-20)", () => {
+  assert.equal(P.withdrawalReference(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 31, 32])), "WDABCDEFGH9A");
+  const made = P.withdrawalReference();
+  assert.match(made, /^WD[A-HJ-NP-Z2-9]{10}$/);
+});

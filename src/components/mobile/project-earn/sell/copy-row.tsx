@@ -23,9 +23,13 @@
 //   says "Waiting for videos" with the price and "Goes live when its videos are
 //   ready"; on the screen the made copies' card is the waiting block, Review
 //   videos is the bar's primary and Cancel listing a row.
+// · while a use is on sale (EARN-8, the web item panel's): View on
+//   marketplace opens what buyers see — the project's market screen on this
+//   kind's tab, or the product's market view.
 
 import * as React from "react";
-import { Add01Icon, Delete02Icon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { useRouter } from "next/navigation";
+import { Add01Icon, Delete02Icon, MoreHorizontalIcon, PencilEdit01Icon, Store01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field } from "@/components/auth/auth-parts";
 import { Badge } from "@/components/ideeza/badge";
@@ -39,6 +43,8 @@ import { listRequestOf, termsOf, termsProblem, type TermsField, type TermsInput 
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { ROYALTY_MAX, ROYALTY_MIN, TOKENS_BY_NETWORK, type Network, type Token } from "@/lib/brief/types";
 import { can } from "@/lib/manual/permissions";
+import { phoneMarketHref } from "@/lib/manual/phone-earn";
+import { MARKET_VIEW, phoneProductPath } from "@/lib/manual/phone-product";
 import {
   addToSupply,
   checkAddNfts,
@@ -54,7 +60,7 @@ import { FEE_LABEL, payoutOf } from "@/lib/market/fee";
 import { PHONE_USES, plainUseWords, withUseWords } from "@/lib/market/phone-sell";
 import { copiesSoldLineOf, copyRowStateOf, KIND_LABEL, PRICE_LABEL, trackNameOf, USE_LABEL } from "@/lib/market/sell-flow";
 import { copyTileOf, SOLD_OUT_NOTE, type DeskTile } from "@/lib/market/sell-desk";
-import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
+import { PROJECT_SCOPE, type EditionKind, type EditionTrack, type EditionUse } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { ActionSheet, Sheet } from "../../kit/sheet";
@@ -63,7 +69,7 @@ import { useToast } from "../../kit/toast";
 import { useEarn } from "../context";
 import { FactRows } from "../parts";
 import { NftActivityRow } from "./nft-activity";
-import { CheckRow, FullLayer, KIND_ICON, PrimaryBar, RecentSales, ROWS_CARD, SalesFacts, SellListRow, SUB, SummaryCard } from "./parts";
+import { ActionRow, CheckRow, FullLayer, KIND_ICON, PrimaryBar, RecentSales, ROWS_CARD, SalesFacts, SellListRow, SUB, SummaryCard } from "./parts";
 import { SellCopiesSheet, type CopyScope } from "./sell-copies";
 import { cn } from "@/lib/utils";
 import { useBackState } from "../../nav-trail";
@@ -72,6 +78,13 @@ import { HeldCancelRow, HeldCard, HeldChip, ReviewVideosButton, useHeldItems } f
 import type { HeldCopies } from "@/lib/market/held";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
+
+/** Where buyers see a scope's copies of a kind on the phone (the web's `marketHrefOf`): the
+ *  project's market screen on that kind's tab, or the product's market view. */
+function phoneCopiesMarketHref(projectId: string, scope: string, kind: EditionKind): string {
+  if (scope === PROJECT_SCOPE) return `${phoneMarketHref(projectId)}?nft=${kind}`;
+  return `${phoneProductPath(projectId, scope)}?view=${MARKET_VIEW}`;
+}
 
 /** "Personal use · 0.03 ETH" — the waiting copies' use and price. */
 function heldTrackLine(item: HeldCopies, tracks: readonly EditionTrack[]): string {
@@ -197,6 +210,7 @@ function CopiesScreen({
   onClose: () => void;
 }) {
   const { project, view } = useEarn();
+  const router = useRouter();
   const toast = useToast();
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const [menu, setMenu] = React.useState<Listed | null>(null);
@@ -264,6 +278,7 @@ function CopiesScreen({
           <ul aria-label={`${KIND_LABEL[kind]} activity`} className={ROWS_CARD}>
             {waiting && <HeldCancelRow item={waiting} onCancelled={onNote} />}
             <NftActivityRow target={{ kind, scope: scope.id }} />
+            {tile.live && <ActionRow icon={Store01Icon} title="View on marketplace" onClick={() => router.push(phoneCopiesMarketHref(project.id, scope.id, kind))} />}
           </ul>
           {ofKind.length > 0 && <RecentSales sales={tile.sales} />}
           <p className={SUB}>{EDITION_DEMO_LINE}</p>

@@ -13,14 +13,15 @@
 //   benefits, and the sentence that points to Activity. A row opens its
 //   detail sheet (17e): who bought it, then the web's detail lines (the
 //   wallet with Copy, Bought, Paid, the fee, You received, When, Minted,
-//   Network, Benefits), the demo line, Message {buyer} · Close. `?sale=<id>`
+//   Network, Benefits), the demo line, See {buyer}'s profile while they
+//   have one (EARN-14) and Message {buyer}. `?sale=<id>`
 //   opens that sale's sheet once, on arrival. With none: a "No sales yet."
 //   row and, while nothing is for sale, a Go to Sell row.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Copy01Icon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, Store01Icon, Tick02Icon, UserCircleIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { buttonVariants } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
@@ -33,6 +34,7 @@ import { saleFromQuery, saleItemLine, saleWhenLine } from "@/lib/manual/phone-pl
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
+import { profileHrefOf } from "@/lib/people/ids";
 import { addAmounts, formatAmount } from "@/lib/wallet/money";
 import { useResales } from "@/components/projects/purchased/resales-store";
 import { perTokenText } from "@/lib/market/resale-desk";
@@ -224,6 +226,8 @@ function SaleSheet({ row, onClose }: { row: CustomerRow; onClose: () => void }) 
       .catch(() => {});
   };
   const lines = [{ term: "Bought by", value: text.buyer }, ...text.detail];
+  // The buyer's profile on the phone, when they have one (EARN-14, the web's customers-tab.tsx).
+  const profile = profileHrefOf(row.buyerId);
   return (
     <Sheet
       open
@@ -265,6 +269,19 @@ function SaleSheet({ row, onClose }: { row: CustomerRow; onClose: () => void }) 
         ))}
       </dl>
       <p className={EARN_NOTE}>Testnet demo: bought with a demo wallet in this browser. No transaction was sent.</p>
+      {profile && (
+        <ListCard label={`About ${buyerName}`}>
+          <li>
+            <Link href={`/m${profile}`} className={LIST_ROW}>
+              <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+                <Icon icon={UserCircleIcon} size={24} />
+              </span>
+              <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>{`See ${buyerName}'s profile`}</span>
+              <Chevron />
+            </Link>
+          </li>
+        </ListCard>
+      )}
     </Sheet>
   );
 }

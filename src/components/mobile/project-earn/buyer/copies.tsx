@@ -296,15 +296,25 @@ export function SoldBar({ share, line }: { share: number; line: string }) {
   );
 }
 
+/** A copy's newest sale in the web's words ("Bought by Leo · 0.02 ETH · Nov 20, 2026"); null before its first. */
+export function copySaleLineOf(track: Listed, sales: readonly Sale[]): string | null {
+  const sale = sales.filter((s) => s.item.nft !== "main" && s.item.trackId === track.id).reduce<Sale | null>((a, s) => (!a || s.at > a.at ? s : a), null);
+  return sale ? `Bought by ${buyerLabel(sale.buyerId)} · ${formatAmount(sale.price, sale.token)} · ${formatDate(sale.at)}` : null;
+}
+
+/** The newest sale of a copy, alone, under its use (the product's Buy a copy, BUY-10: its own activity line stays
+ *  under the uses); nothing before its first sale. */
+export function CopySaleLine({ track, sales }: { track: Listed; sales: readonly Sale[] }) {
+  const line = copySaleLineOf(track, sales);
+  return line ? <span className={cn(T.caption, "tabular-nums")}>{line}</span> : null;
+}
+
 /** A copy's activity line: its newest sale, else its newest entry, else when it was listed. */
 function CopyActivity({ project, track, sales }: { project: ManualProject; track: Listed; sales: Sale[] }) {
   const { record } = useJourney(project.id);
-  const sale = sales.filter((s) => s.item.nft !== "main" && s.item.trackId === track.id).reduce<Sale | null>((a, s) => (!a || s.at > a.at ? s : a), null);
   const entry = historyOf(record, project.id, { kind: track.kind, scope: track.productId })[0] ?? null;
-  const line = sale
-    ? `Bought by ${buyerLabel(sale.buyerId)} · ${formatAmount(sale.price, sale.token)} · ${formatDate(sale.at)}`
-    : entry
-      ? `${labelOf(entry)} · ${formatDate(entry.createdAt)}`
-      : `No activity yet · listed ${formatDate(track.listing.listedAt)}`;
+  const line =
+    copySaleLineOf(track, sales) ??
+    (entry ? `${labelOf(entry)} · ${formatDate(entry.createdAt)}` : `No activity yet · listed ${formatDate(track.listing.listedAt)}`);
   return <span className={T.caption}>{line}</span>;
 }

@@ -16,6 +16,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Alert02Icon,
   Cancel01Icon,
@@ -56,7 +57,8 @@ import { DASHED, FAIL_COPY, FAIL_FALLBACK, OFFLINE_REASON } from "./parts";
 import { PickList } from "../kit/pick-list";
 import { PromptBox } from "./prompt-box";
 import { BuyCreditsSheet } from "./buy-credits-sheet";
-import { OutOfCreditsRow, PlanLink, ShortOfCreditsLine } from "../plans/upsell";
+import { OutOfCreditsRow, PLAN_LINK, PlanLink, ShortOfCreditsLine } from "../plans/upsell";
+import { CREDIT_ALERTS_HREF } from "../settings/kit";
 import type { AssistantTurn, ConceptFlow } from "./use-concept-flow";
 
 /** Why a concept can't be drawn while short of credits — the web's words (image-turn NO_RENDER, CL-032). */
@@ -296,6 +298,16 @@ function ConceptHero({
             <Eyebrow className="text-text-error">Couldn&apos;t draft that concept</Eyebrow>
             <span className={cn(T.rowTitle, "truncate")}>{row.name}</span>
             <span className={T.meta}>{turn?.failReason ? FAIL_COPY[turn.failReason] : FAIL_FALLBACK}</span>
+            {/* Stopped by the maker's own monthly limit: the way to change it, right under the reason (the web's
+                "Change your limit →", CRE-12). */}
+            {turn?.failReason === "cap" && CREDIT_ALERTS_HREF && (
+              <Link
+                href={CREDIT_ALERTS_HREF}
+                className={cn(PLAN_LINK, "-my-2 w-fit")}
+              >
+                Change your limit&nbsp;→
+              </Link>
+            )}
           </span>
         </div>
         <Button
@@ -424,6 +436,11 @@ export function BuildBar({ flow, onBuild, onOptions }: { flow: ConceptFlow; onBu
           ? OFFLINE_REASON
           : null;
   const short = hydrated && balance < state.cost && !reason && !flow.preparing;
+  // While a concept still draws (or one failed) the line keeps its reason, and a shortfall is said now
+  // too — the web puts it first (CL-032, CRE-11) — so the maker doesn't learn it only after the wait.
+  // Offline holds everything, buying too, so it says nothing more; with no credit at all the
+  // out-of-credits row above already says it.
+  const shortToo = hydrated && balance < state.cost && !!reason && flow.online && flow.canRender;
   const qualities = new Set(state.selected.map((t) => qualityOf(pickOf(flow, t.companionOf ?? "primary"))));
   const quality = qualities.size === 1 ? QUALITY_INFO[[...qualities][0]].label : "Mixed quality";
   const off = !!reason || flow.preparing;
@@ -440,6 +457,11 @@ export function BuildBar({ flow, onBuild, onOptions }: { flow: ConceptFlow; onBu
           <p className={cn(T.rowTitle, reason ? "text-text-tertiary" : "text-text-brand")}>
             {n} {n === 1 ? "product" : "products"} · {state.cost} credits
           </p>
+          {shortToo && (
+            <p role="status" className={cn(T.meta, "text-text-primary")}>
+              Not enough credits — this build costs {state.cost}, you have {balance}
+            </p>
+          )}
           <p className={T.meta}>
             {reason ?? `${quality} · ${aboutTime(state.seconds).replace(/^about/, "About")}`}
             {onOptions && (
@@ -462,7 +484,8 @@ export function BuildBar({ flow, onBuild, onOptions }: { flow: ConceptFlow; onBu
           </Button>
         ) : (
           <Button size="md" className="shrink-0" onClick={onBuild} disabled={!!reason} loading={flow.preparing} aria-label={flow.preparing ? "Preparing the build" : undefined}>
-            {n === 1 ? "Build" : `Build ${n} products`}
+            {/* The web's three labels (CRE-8): a build of this chat exists, so this books the next one. */}
+            {flow.activeBuild ? "Build again" : n === 1 ? "Build this product" : `Build ${n} products`}
           </Button>
         )}
       </div>

@@ -156,6 +156,11 @@ export const PHONE_SETTINGS_OTHERS_HREF = "/m/profile/settings/others";
 /** The app's version as the master page prints it at the foot of Profile Settings. */
 export const PHONE_APP_VERSION = "1.1.5.451";
 
+/** Demo creators whose profile is locked (PR-17): someone who doesn't work with them sees who
+ *  they are and no more. Sample data only, like every Demo creator's words. */
+const LOCKED_SAMPLES: ReadonlySet<string> = new Set(["feed:c7"]);
+export const sampleProfileLocked = (personId: string) => LOCKED_SAMPLES.has(personId);
+
 /** Phone copy uses the typographic apostrophe; a few shared strings still carry the straight one. */
 export const curly = (text: string) => text.replace(/'/g, "’");
 

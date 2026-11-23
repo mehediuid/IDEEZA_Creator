@@ -6,7 +6,8 @@
 // Virtual copy sales, newest first — Main NFT sales are the project's
 // (Earn › Money › Sales). The rows are the project Sales screen's (who, the
 // price, the item, the date and benefits), each opening its sale in a sheet
-// (the web's detail lines, Message {buyer}); `?sale=<id>` opens one on
+// (the web's detail lines, Message {buyer}, and See {buyer}'s profile while
+// they have one — EARN-14, as Earn › Money's sale sheet); `?sale=<id>` opens one on
 // arrival. Above them "{n} sales to {m} people." with the Testnet demo badge,
 // the demo note in the ⓘ; under them "To tell everyone who bought at once, add
 // to Activity." With none: the web's empty state ("No sales of this product
@@ -17,7 +18,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Copy01Icon, Tick02Icon, UserMultipleIcon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, Tick02Icon, UserCircleIcon, UserMultipleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { buttonVariants } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
@@ -28,6 +29,7 @@ import { saleFromQuery, saleItemLine, saleWhenLine } from "@/lib/manual/phone-pl
 import { phoneHrefOf, phoneProjectHref } from "@/lib/manual/phone-project";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
+import { profileHrefOf } from "@/lib/people/ids";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { cn } from "@/lib/utils";
 import { Chevron, LIST_ROW, ListCard } from "../kit/list";
@@ -158,6 +160,8 @@ function SaleSheet({ row, onClose }: { row: CustomerRow; onClose: () => void }) 
       .catch(() => {});
   };
   const lines = [{ term: "Bought by", value: text.buyer }, ...text.detail];
+  // The buyer's profile on the phone, when they have one (EARN-14, the web's customers-tab.tsx).
+  const profile = profileHrefOf(row.buyerId);
   return (
     <Sheet
       open
@@ -199,6 +203,19 @@ function SaleSheet({ row, onClose }: { row: CustomerRow; onClose: () => void }) 
         ))}
       </dl>
       <p className={T.meta}>Testnet demo: bought with a demo wallet in this browser. No transaction was sent.</p>
+      {profile && (
+        <ListCard label={`About ${buyerName}`}>
+          <li>
+            <Link href={`/m${profile}`} className={LIST_ROW}>
+              <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+                <Icon icon={UserCircleIcon} size={24} />
+              </span>
+              <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>{`See ${buyerName}'s profile`}</span>
+              <Chevron />
+            </Link>
+          </li>
+        </ListCard>
+      )}
     </Sheet>
   );
 }

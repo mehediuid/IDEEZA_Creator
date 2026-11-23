@@ -12,7 +12,8 @@
 // and "Listening…", the words as they arrive (03), the waveform of the real
 // microphone level, ✕ to throw the words away and ✓ to put them in the box
 // (04). A browser that blocks the microphone shows "Microphone is off" over
-// the box (07); one with no recogniser keeps the mic off with its reason.
+// the box (07); a session that stops on its own shows the same banner in the
+// web's words; one with no recogniser keeps the mic off with its reason.
 // Every control is a 44 px tap target (the send and ✓ draw 32 inside it),
 // 8 px apart.
 //
@@ -41,7 +42,7 @@ import { Banner } from "@/components/ideeza/banner";
 import type { PromptImage } from "@/components/dashboard/prompt-card";
 import { INSPIRATION_TYPES, pickProblem } from "@/lib/create/inspiration";
 import { shrinkInspiration, uploadInspiration } from "@/lib/create/inspiration-client";
-import { useVoiceInput } from "@/lib/voice/use-voice-input";
+import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { cn } from "@/lib/utils";
 import { usePrePrompt } from "../kit/permission-sheet";
 import { useOnline } from "../kit/states";
@@ -125,6 +126,9 @@ export function PromptBox({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- follows the recogniser's own status
     if (voice.status === "denied" || voice.status === "failed") setMicOff(true);
   }, [voice.status]);
+  // Only a blocked microphone is a settings problem: a session that just stopped keeps the banner and
+  // its Try again, in the web's words instead of "Microphone is off" (CRE-17).
+  const voiceFailed = voice.status === "failed";
 
   // The box grows with its text (04 "Bigger text box").
   React.useLayoutEffect(() => {
@@ -229,14 +233,14 @@ export function PromptBox({
       {micOff && (
         <Banner
           tone="attention"
-          title="Microphone is off"
+          title={voiceFailed ? voiceErrorMessage("failed") ?? "" : "Microphone is off"}
           action={
             <button type="button" onClick={startVoice} className="-my-3 inline-flex min-h-[44px] items-center hover:underline">
               Try again
             </button>
           }
         >
-          Turn it on in your browser&apos;s settings to speak your idea. You can still type it.
+          {voiceFailed ? "You can still type it." : <>Turn it on in your browser&apos;s settings to speak your idea. You can still type it.</>}
         </Banner>
       )}
       <div

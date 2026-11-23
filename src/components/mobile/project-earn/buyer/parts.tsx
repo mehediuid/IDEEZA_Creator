@@ -15,7 +15,9 @@
 //   IconLine puts a small mark before a foot line;
 // · OfferCard / OfferRows — a seller's card: its price line, Info rows and a
 //   foot;
-// · WalletLine — "Paying from Mira's demo wallet · 0x… · 0.5 test ETH";
+// · WalletLine — "Paying from Mira's demo wallet · 0x… · 0.5 test ETH ·
+//   Manage", Manage opening the Demo wallet (the web's "Manage demo wallets"
+//   under every wallet line, BUY-11);
 // · NftActivityLine, ProjectActivity (Now + Earlier, or "No journey shared
 //   yet."), LegalSection, HolderBenefits, AboutRows (its facts, then Team and
 //   Network as rows that push their screens, BUY-9);
@@ -45,6 +47,7 @@ import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { testCoin } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer, useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { Sheet } from "../../kit/sheet";
@@ -393,10 +396,14 @@ export function OfferCard({
   );
 }
 
-/** The wallet a purchase or a bid pays from, with what it has free of the listing's coin. */
+/** The wallet a purchase or a bid pays from, with what it has free of the listing's coin, then Manage: the Demo
+ *  wallet (connect, test tokens) without leaving the shop — the web's "Manage demo wallets" (offer-parts.tsx),
+ *  in the Change pattern of the Testnet demo line. Inside PhoneWalletScope it is that scope's sheet; elsewhere on
+ *  /m the root provider draws the same phone sheet (MON-9). */
 export function WalletLine({ buyerId, token, network, verb }: { buyerId: DemoBuyerId; token: Token; network: Network; verb: "buy" | "bid" }) {
   const wallet = useDemoWallet();
   const { data } = useMarket();
+  const { openManage } = useWalletRequest();
   const now = useMinuteClock();
   const name = DEMO_BUYERS.find((b) => b.id === buyerId)?.name ?? "Demo creator";
   const connected = wallet?.identities[buyerId]?.connected === true;
@@ -408,6 +415,11 @@ export function WalletLine({ buyerId, token, network, verb }: { buyerId: DemoBuy
         : connected
           ? `Paying from ${name}'s demo wallet · ${shortAddress(demoAddress(buyerId))} · ${testCoin(have, token)}`
           : `${name}'s demo wallet isn't connected — you'll connect it when you ${verb}.`}
+      <span aria-hidden> · </span>
+      {/* Inline, so it follows the sentence; the kit's 44 px tap area with its -my-6 keeps the line's height. */}
+      <button type="button" aria-haspopup="dialog" onClick={openManage} className={cn(TEXT_ACTION, T.meta, "font-medium text-text-brand")}>
+        Manage<span className="sr-only"> demo wallets</span>
+      </button>
     </p>
   );
 }

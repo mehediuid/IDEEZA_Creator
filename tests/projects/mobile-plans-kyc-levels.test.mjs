@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { EMPTY_LEVELS, normalizeLevels, parseLevels, levelStatusOf, startBlockOf, submitLevel, reviewLevel, levelDueOf, writeLevels, readLevelsRaw, KYC_LEVELS_KEY } =
+const { EMPTY_LEVELS, normalizeLevels, parseLevels, levelStatusOf, startBlockOf, submitLevel, reviewLevel, levelDueOf, levelNearOf, writeLevels, readLevelsRaw, KYC_LEVELS_KEY } =
   await import("../../.tmp-test/lib/commerce/kyc-levels.js");
 
 test("nothing stored reads as not submitted", () => {
@@ -59,4 +59,14 @@ test("an empty record removes the key; a refused write says so", () => {
   globalThis.window = { localStorage: { getItem: () => null, setItem: () => { throw new Error("full"); }, removeItem: () => {} } };
   assert.equal(writeLevels(submitLevel(EMPTY_LEVELS, "intermediate", true, 1)), false);
   delete globalThis.window;
+});
+
+test("the next level is said ahead from 75 % of its threshold, as the web's Get paid does (MON-21)", () => {
+  assert.equal(levelNearOf(EMPTY_LEVELS, 749), null);
+  assert.deepEqual(levelNearOf(EMPTY_LEVELS, 800), { level: "intermediate", at: 1000 });
+  assert.equal(levelNearOf(EMPTY_LEVELS, 1000), null, "past it, it is due, not near");
+  const l2 = { v: 1, intermediate: { status: "approved", at: 1 }, advanced: null };
+  assert.equal(levelNearOf(l2, 800), null, "already approved: nothing to say");
+  assert.deepEqual(levelNearOf(l2, 4000), { level: "advanced", at: 5000 });
+  assert.equal(levelNearOf(EMPTY_LEVELS, 5200), null);
 });

@@ -5,7 +5,8 @@
 // comments, sharing to your Feed and the ⋯ menu. The clip on screen plays;
 // the ones beside it load. Each clip reads its heart, count and comments from
 // the web's stores (reactions.ts, comments-store.ts), so they agree with the
-// web's post page.
+// web's post page. Your own clip's Share opens your project's share, never the
+// re-share of others' items (SOC-13).
 //
 // The deck remembers the clip on screen (`restoreKey`, for this tab's session),
 // so Back from a clip's details returns to that clip, not to the first one.
@@ -24,7 +25,7 @@ import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { useToast } from "../kit/toast";
 import { ClipComments } from "./clip-comments";
-import { ClipMenu } from "./clip-menu";
+import { ClipMenu, OwnClipShare } from "./clip-menu";
 import { ClipShare, shareTargetOfClip } from "./clip-share";
 import { ClipView } from "./clip-view";
 import { useFeedPrefs } from "./use-feed";
@@ -155,7 +156,11 @@ export function ClipDeck({
             guard={guard}
             focusId={startWithComments && openClip.id === clips[0]?.id ? focusComment : null}
           />
-          <ClipShare item={shareTargetOfClip(openClip)} open={open?.kind === "share"} onClose={() => setOpen(null)} onFeed={restoreKey === "feed"} />
+          {openClip.source === "mine" ? (
+            <OwnClipShare clip={openClip} open={open?.kind === "share"} onClose={() => setOpen(null)} />
+          ) : (
+            <ClipShare item={shareTargetOfClip(openClip)} open={open?.kind === "share"} onClose={() => setOpen(null)} onFeed={restoreKey === "feed"} />
+          )}
           <ClipMenu clip={openClip} open={open?.kind === "menu"} onClose={() => setOpen(null)} height={heights[openClip.id] ?? null} guard={guard} />
         </>
       )}

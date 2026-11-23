@@ -21,7 +21,8 @@
 //   asks first;
 // · From your builds: the concept images in a 3-column grid, the Cover chip
 //   on the cover; a tap opens the image viewer (03b), where "Use as cover"
-//   lives (03g "This image is the cover", 03h the toast). The page's cover
+//   lives (03g "This image is the cover", 03h the toast); on the maker's own
+//   pick it reads the web's "Stop using as cover" (PRJ-5). The page's cover
 //   opens the same viewer (`BuildImagesViewer`).
 // Every picture opens in the kit's one full-screen viewer (kit/image-viewer:
 // dark in both themes, white text, ✕, "n of N", the caption, ← action →).
@@ -31,6 +32,7 @@ import Link from "next/link";
 import {
   Alert02Icon,
   Bookmark02Icon,
+  BookmarkRemove02Icon,
   CheckmarkCircle02Icon,
   Delete02Icon,
   Film01Icon,
@@ -50,9 +52,9 @@ import { mediaTilesOf } from "@/components/projects/details/media-tab";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import { coverOf } from "@/lib/manual/project-read";
+import { coverOf, type BuildRef } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
-import { useManualProjects } from "@/lib/manual/projects";
+import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { currentProductsOf } from "@/lib/manual/readiness";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { describeJoin, projectVideoStatusOf } from "@/lib/video/project-video";
@@ -403,7 +405,8 @@ function BuildImagesSection() {
     return (
       <section aria-label="From your builds" className="flex flex-col gap-4">
         <SectionHeading title="From your builds" />
-        <p className={T.body}>No images yet. A build&apos;s concept images show here once it is saved to this project.</p>
+        {/* The web's words (EmptyMedia, PRJ-12). */}
+        <p className={T.body}>No images yet — concept images from AI builds appear here.</p>
       </section>
     );
   }
@@ -444,6 +447,7 @@ function BuildImagesSection() {
           tiles={tiles}
           index={at}
           coverUrl={coverUrl}
+          pinned={pinnedCoverOf(project, view.refs, coverUrl)}
           canCover={can(viewer, "product.edit", view.canCtx)}
           gate={gate}
           projectId={project.id}
@@ -457,17 +461,25 @@ function BuildImagesSection() {
 
 type Tile = ReturnType<typeof mediaTilesOf>[number];
 
+/** The web's rule (PRJ-5): the cover is the maker's own pick — not the image
+ *  coverOf() would show anyway — so "Stop using as cover" can change it. */
+function pinnedCoverOf(project: ManualProject, refs: BuildRef[], coverUrl: string | null): boolean {
+  return project.cover != null && coverUrl !== null && coverUrl !== coverOf({ ...project, cover: null }, refs);
+}
+
 /** The build images full size, opened at `startUrl` (the page's cover): Use as cover lives here. */
 export function BuildImagesViewer({ startUrl, onClose }: { startUrl: string | null; onClose: () => void }) {
   const { project, view, viewer, gate } = useProject();
   const tiles = React.useMemo(() => mediaTilesOf(view.refs), [view.refs]);
   const [at, setAt] = React.useState(() => Math.max(0, tiles.findIndex((t) => t.url === startUrl)));
   if (tiles.length === 0) return null;
+  const coverUrl = coverOf(project, view.refs);
   return (
     <BuildImageViewer
       tiles={tiles}
       index={Math.min(at, tiles.length - 1)}
-      coverUrl={coverOf(project, view.refs)}
+      coverUrl={coverUrl}
+      pinned={pinnedCoverOf(project, view.refs, coverUrl)}
       canCover={can(viewer, "product.edit", view.canCtx)}
       gate={gate}
       projectId={project.id}
@@ -569,11 +581,13 @@ function SnapshotsSection() {
 
 // ─────────────────────────── 03b · the image viewer ───────────────────────────
 
-/** 03b · a build's concept images full size, with Use as cover (03g, 03h). */
+/** 03b · a build's concept images full size, with Use as cover (03g, 03h) and,
+ *  on the maker's own pick, the web's Stop using as cover (PRJ-5). */
 function BuildImageViewer({
   tiles,
   index,
   coverUrl,
+  pinned,
   canCover,
   gate,
   projectId,
@@ -583,6 +597,8 @@ function BuildImageViewer({
   tiles: Tile[];
   index: number;
   coverUrl: string | null;
+  /** The cover is the maker's pick (not the default image): Stop using as cover. */
+  pinned: boolean;
   canCover: boolean;
   gate: ReturnType<typeof useProject>["gate"];
   projectId: string;
@@ -603,6 +619,15 @@ function BuildImageViewer({
     });
     if (out.kind === "refused") setRefused(out.reason);
   };
+  // Back to coverOf()'s default image — the web's words (media-tab.tsx).
+  const stopUsingAsCover = () => {
+    setRefused(null);
+    const out = gate.guard("cover", () => {
+      setCover(projectId, null);
+      toast({ title: "The cover is back to the default image" });
+    });
+    if (out.kind === "refused") setRefused(out.reason);
+  };
 
   return (
     <ImageViewer
@@ -620,7 +645,11 @@ function BuildImageViewer({
       caption={`${tile.name} · v${tile.version}`}
       note={refused}
       action={
-        !canCover ? undefined : isCover ? (
+        !canCover ? undefined : isCover && pinned ? (
+          <Button hierarchy="secondary" size="xl" className="flex-1" iconLeading={<Icon icon={BookmarkRemove02Icon} size={20} />} onClick={stopUsingAsCover}>
+            Stop using as cover
+          </Button>
+        ) : isCover ? (
           <p className={cn(T.bodyStrong, MEDIA_INK, "flex h-[44px] flex-1 items-center justify-center gap-2")}>
             <Icon icon={Tick02Icon} size={20} />
             This image is the cover

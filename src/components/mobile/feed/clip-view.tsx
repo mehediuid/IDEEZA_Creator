@@ -10,7 +10,8 @@
 // marketplace offers (clip-offers.tsx). The text block keeps to the lower
 // fifth of the screen, so the video is what you see (owner 2026-11-12). On
 // the right, the clip side nav: 3D, AR/VR, appreciate (with its count),
-// comments (with theirs), share and ⋯.
+// comments (with theirs), share and ⋯. On your own clip Share is named Share
+// (your project's own share, not "Share to your Feed", SOC-13).
 //
 // It plays only while it is the clip on screen (muted, looping, inline); with
 // Data saver on (Settings › Appearance) it waits for a tap. A clip that can't
@@ -360,7 +361,7 @@ export function ClipView({
               name={state.comments === null ? "Comments" : `Comments, ${state.comments}`}
               onClick={handlers.onComments}
             />
-            <SideButton icon={Share01Icon} name="Share to your Feed" onClick={handlers.onShare} />
+            <SideButton icon={Share01Icon} name={mine ? "Share" : "Share to your Feed"} onClick={handlers.onShare} />
             <SideButton icon={MoreHorizontalIcon} name="More" onClick={handlers.onMore} />
           </nav>
         </div>
