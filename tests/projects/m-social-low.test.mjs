@@ -128,3 +128,13 @@ test("only you see your Activity: someone else's profile and View as public leav
   assert.match(own, /activity=\{owner \? data\.activity : \[\]\}/);
   assert.doesNotMatch(src, /can see their projects and activity/);
 });
+
+test("Follow and Message sit with the profile's facts, never in a sticky bar (owner 2026-11-24)", () => {
+  const src = read("components/mobile/profile/creator-profile.tsx");
+  assert.doesNotMatch(src, /BottomBar|footer=\{/);
+  const other = src.slice(src.indexOf("function OtherProfile("), src.indexOf("function BlockedBanner("));
+  // A locked profile: under the name. The full profile: after the facts (More about), before the work.
+  const full = other.lastIndexOf("{actions}");
+  assert.ok(full > other.indexOf("More about ${first}"));
+  assert.ok(full < other.indexOf("<Work"));
+});

@@ -4,7 +4,7 @@
 // update", MFR-20): one layout for every viewer. Your own (PR-02/03: Share
 // and ⋯ in the top bar, Change cover, the prompts, Only you see this, pins,
 // Edit profile under the facts; brand-new PR-04; ⋯ PR-05; View as public PR-21/22),
-// someone else's (PR-10/11: the tie only you see, Follow + Message in the bar,
+// someone else's (PR-10/11: the tie only you see, Follow + Message under the facts,
 // ⋯ Share · Report · Block; Following PR-13; Message's reason PR-14; blocked
 // PR-15), a locked profile (PR-17), not found (PR-18), loading (PR-19) and
 // couldn't load / offline (PR-20). The facts are the web profile's
@@ -18,6 +18,8 @@
 // bar: it sits under your profile's facts, before what only you see.
 // Activity is yours alone (owner 2026-11-24, "hide it from others"): only your own profile shows
 // the Activity tab; someone else's profile, and yours as View as public, show Timeline · Projects.
+// Follow + Message are no longer a sticky bar (owner 2026-11-24: "no need to push the user to
+// message"): they sit with the profile's facts, where your own profile has Edit profile.
 
 import * as React from "react";
 import Link from "next/link";
@@ -56,7 +58,6 @@ import { withoutShare } from "@/lib/innovations/feed-prefs";
 import type { TimelinePost } from "@/lib/people/timeline";
 import { useDates } from "@/lib/settings/use-dates";
 import { useSettings } from "@/lib/settings/use-settings";
-import { BottomBar } from "../kit/bottom-bar";
 import { ListCard, ListRow } from "../kit/list";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { ActionSheet } from "../kit/sheet";
@@ -178,11 +179,12 @@ function LockedCard({ first }: { first: string | null }) {
 
 // ─────────────────────────── the bar ───────────────────────────
 
-/** Follow (primary) + Message (secondary) — PR-10's bar, text only. `off` turns both off (View as
- *  public, offline); `reason` is the line above them saying why (PR-14, PR-21). */
+/** Follow (primary) + Message (secondary), PR-10's pair, text only — with the profile's facts,
+ *  where your own profile has Edit profile, never a sticky bar (owner 2026-11-24). `off` turns
+ *  both off (View as public, offline); `reason` is the line above them saying why (PR-14, PR-21). */
 const PUBLIC_VIEW_REASON = "Others can follow and message you from here.";
 
-function ViewerBar({
+function ViewerActions({
   person,
   messageHref,
   reason,
@@ -197,7 +199,7 @@ function ViewerBar({
   const reasonId = React.useId();
   const on = follow.isOn(person);
   return (
-    <BottomBar>
+    <div className="flex flex-col gap-2">
       {reason && (
         <p id={reasonId} className={T.meta}>
           {reason}
@@ -235,7 +237,7 @@ function ViewerBar({
           </Button>
         )}
       </div>
-    </BottomBar>
+    </div>
   );
 }
 
@@ -356,11 +358,12 @@ function OwnProfile({
   // Locked (Settings › Privacy & safety): someone you don't work with sees who you are, no more.
   if (publicView && audience.locked) {
     return (
-      <Screen top={top} footer={<ViewerBar person={person} messageHref={null} reason={PUBLIC_VIEW_REASON} off />}>
+      <Screen top={top}>
         {banner}
         <CoverAndAvatar cover={undefined} avatar={avatar} />
         <div className={CONTENT}>
           <Identity titleRef={nameRef} name={shownName} latinName={person.latinName} demo={false} headline={null} meta={null} relation={null} openTo={null} />
+          <ViewerActions person={person} messageHref={null} reason={PUBLIC_VIEW_REASON} off />
           <LockedCard first={first} />
         </div>
         {ownMenu}
@@ -441,10 +444,7 @@ function OwnProfile({
   const maker: Maker = { name: shownName, initials, color: null, src: photoUrl, pro: planRead && plan.tier !== "free" };
 
   return (
-    <Screen
-      top={top}
-      footer={owner ? undefined : <ViewerBar person={person} messageHref={null} reason={PUBLIC_VIEW_REASON} off />}
-    >
+    <Screen top={top}>
       {banner}
       <CoverAndAvatar
         cover={cover ?? (made.length ? null : undefined)}
@@ -475,10 +475,12 @@ function OwnProfile({
             <InfoRow label={`More about ${first ?? "you"}`} value={summary ?? (owner ? "Add skills and links" : undefined)} onClick={() => setMoreOpen(true)} />
           </div>
         )}
-        {owner && (
+        {owner ? (
           <Button hierarchy="secondary" size="xl" className="w-full" iconLeading={<Icon icon={Edit02Icon} size={20} />} onClick={edit}>
             Edit profile
           </Button>
+        ) : (
+          <ViewerActions person={person} messageHref={null} reason={PUBLIC_VIEW_REASON} off />
         )}
         {ownerRows}
         {made.length > 0 || timeline.posts.length > 0 ? (
@@ -584,8 +586,8 @@ function OtherProfile({ person }: { person: Person }) {
       actions={[{ icon: MORE_ICON, label: `More actions for ${person.name}`, onClick: () => setMenu(true) }]}
     />
   );
-  const bar = blocked ? undefined : (
-    <ViewerBar
+  const actions = blocked ? null : (
+    <ViewerActions
       person={person}
       messageHref={data.start && !refusal ? messageHrefOf(data.start) : null}
       reason={!online ? "You’re offline. Follow and Message work again when you’re back online." : refusal}
@@ -597,7 +599,7 @@ function OtherProfile({ person }: { person: Person }) {
 
   if (locked) {
     return (
-      <Screen top={top} footer={bar}>
+      <Screen top={top}>
         {!online && (
           <div className="px-8 pb-4">
             <OfflineBanner />
@@ -606,6 +608,7 @@ function OtherProfile({ person }: { person: Person }) {
         <CoverAndAvatar cover={undefined} avatar={photo} />
         <div className={CONTENT}>
           <Identity titleRef={nameRef} name={person.name} latinName={person.latinName} demo headline={null} meta={null} relation={null} openTo={null} />
+          {actions}
           <LockedCard first={first} />
         </div>
         <PersonMenu person={person} open={menu} onClose={() => setMenu(false)} blocked={blocked} />
@@ -614,7 +617,7 @@ function OtherProfile({ person }: { person: Person }) {
   }
 
   return (
-    <Screen top={top} footer={bar}>
+    <Screen top={top}>
       {!online && (
         <div className="px-8 pb-4">
           <OfflineBanner />
@@ -643,6 +646,7 @@ function OtherProfile({ person }: { person: Person }) {
             <InfoRow label={`More about ${first}`} value={summary ?? undefined} onClick={() => setMoreOpen(true)} />
           </div>
         )}
+        {actions}
         {data.made.length > 0 || posts.length > 0 ? (
           <Work
             timeline={posts.length ? { count: posts.length, content: <Timeline posts={posts} now={data.now} /> } : null}
