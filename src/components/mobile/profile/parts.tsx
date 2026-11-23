@@ -430,6 +430,7 @@ export function Work({
   timeline,
   items,
   activity,
+  activityOnlyYou = false,
   maker,
   pinnedBy,
   now,
@@ -439,6 +440,8 @@ export function Work({
   timeline: { count: number; content: React.ReactNode } | null;
   items: readonly MadeItem[];
   activity: readonly ActivityItem[];
+  /** Your own profile: the Activity tab says only you see it (others never get the tab). */
+  activityOnlyYou?: boolean;
   maker: Maker;
   /** "you" or a first name: "Pinned by …". */
   pinnedBy: string;
@@ -497,7 +500,10 @@ export function Work({
             )}
           </>
         ) : (
-          <ActivityRows items={activity} now={now} />
+          <>
+            {activityOnlyYou && <p className={T.meta}>Only you see your Activity.</p>}
+            <ActivityRows items={activity} now={now} />
+          </>
         )}
       </div>
     </div>

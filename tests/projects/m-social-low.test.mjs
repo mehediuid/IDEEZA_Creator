@@ -118,3 +118,13 @@ test("comments, notices and reports read as the web's (SOC-14, SOC-17, SOC-18, S
   assert.match(menu, /title="Report this post"/);
   assert.doesNotMatch(menu, /Report this video|reporting this video/);
 });
+
+test("only you see your Activity: someone else's profile and View as public leave the tab out (owner 2026-11-24)", () => {
+  const src = read("components/mobile/profile/creator-profile.tsx");
+  const other = src.slice(src.indexOf("function OtherProfile("), src.indexOf("function BlockedBanner("));
+  const own = src.slice(src.indexOf("function OwnProfile("), src.indexOf("function OtherProfile("));
+  assert.match(other, /activity=\{\[\]\}/);
+  assert.doesNotMatch(other, /activity=\{data\.activity\}/);
+  assert.match(own, /activity=\{owner \? data\.activity : \[\]\}/);
+  assert.doesNotMatch(src, /can see their projects and activity/);
+});

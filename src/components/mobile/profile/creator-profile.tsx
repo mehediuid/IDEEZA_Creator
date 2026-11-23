@@ -16,6 +16,8 @@
 // Timeline (owner 2026-11-22): the work opens on a Timeline — every project and product shared,
 // newest first (timeline.tsx) — beside Projects and Activity; Edit profile is no longer a sticky
 // bar: it sits under your profile's facts, before what only you see.
+// Activity is yours alone (owner 2026-11-24, "hide it from others"): only your own profile shows
+// the Activity tab; someone else's profile, and yours as View as public, show Timeline · Projects.
 
 import * as React from "react";
 import Link from "next/link";
@@ -168,7 +170,7 @@ function LockedCard({ first }: { first: string | null }) {
     <div className="flex flex-col gap-2 rounded-lg bg-bg-subtle p-8">
       <p className={T.bodyStrong}>This profile is locked</p>
       <p className={T.body}>
-        Only people who work with {first ?? "this creator"} on a project can see their projects and activity.
+        Only people who work with {first ?? "this creator"} on a project can see their projects.
       </p>
     </div>
   );
@@ -487,7 +489,9 @@ function OwnProfile({
                 : null
             }
             items={made}
-            activity={data.activity}
+            // Only you see your Activity: View as public leaves it out, as others see it.
+            activity={owner ? data.activity : []}
+            activityOnlyYou={owner}
             maker={maker}
             pinnedBy={owner ? "you" : (first ?? "this creator")}
             now={data.now}
@@ -642,7 +646,8 @@ function OtherProfile({ person }: { person: Person }) {
         {data.made.length > 0 || posts.length > 0 ? (
           <Work
             timeline={posts.length ? { count: posts.length, content: <Timeline posts={posts} now={data.now} /> } : null}
-            items={data.made} activity={data.activity} maker={{ name: person.name, initials: person.initials, color: person.color, src: null, pro }} pinnedBy={first} now={data.now} />
+            // Someone else's Activity isn't shown (owner 2026-11-24): Timeline · Projects only.
+            items={data.made} activity={[]} maker={{ name: person.name, initials: person.initials, color: person.color, src: null, pro }} pinnedBy={first} now={data.now} />
         ) : (
           <EmptyState icon={InboxIcon} title="Nothing shared yet" body={`${first} hasn’t shared a project yet.`} action={{ label: "Go to Feed", href: "/m" }} />
         )}
