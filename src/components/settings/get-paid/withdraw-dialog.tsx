@@ -23,6 +23,8 @@ import {
   addMethod,
   centsFloor,
   formatUsd,
+  IDZ_RATE_LINE,
+  payoutLine,
   recordWithdrawal,
   subtractWithdrawn,
   withdrawAmountProblem,
@@ -35,7 +37,7 @@ import { readPayoutNow, updatePayout } from "@/lib/account/use-payout";
 import { randomId } from "@/lib/market/sales";
 import { cn } from "@/lib/utils";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
-import { compareAmounts, formatAmount, normalizeAmount } from "@/lib/wallet/money";
+import { compareAmounts, normalizeAmount } from "@/lib/wallet/money";
 import { SAVE_FAILED } from "../settings-card";
 import { IdentityForm } from "./identity";
 import { MethodFields, useMethodForm, type MethodDraft } from "./method-dialog";
@@ -152,7 +154,7 @@ function WithdrawBody({ store, earned, verified, onClose, onDone, onShowHistory 
         title: "Withdraw your earnings",
         summary: [
           { label: "Amount", value: `${formatUsd(amount)} (demo rate)` },
-          { label: "You receive", value: formatAmount(amount, token) },
+          { label: "You receive", value: payoutLine(amount, token) },
           { label: "To", value: target.label },
           { label: "Address", value: target.address },
           { label: "Network", value: networkName(target.network) },
@@ -223,7 +225,7 @@ function WithdrawBody({ store, earned, verified, onClose, onDone, onShowHistory 
             <Icon icon={CheckmarkCircle02Icon} size={32} />
           </span>
           <p className="m-0 text-md leading-md text-text-primary">
-            {formatUsd(sent.amount)} as {formatAmount(sent.amount, sent.token)} to {sent.to.label} on{" "}
+            {formatUsd(sent.amount)} as {payoutLine(sent.amount, sent.token)} to {sent.to.label} on{" "}
             {sent.to.network ? networkName(sent.to.network) : "its network"}, reference <span className="font-mono">{sent.id}</span>.
           </p>
           <p className="m-0 flex flex-wrap items-center gap-[8px] text-sm leading-sm text-text-secondary">
@@ -394,7 +396,7 @@ function WithdrawBody({ store, earned, verified, onClose, onDone, onShowHistory 
                 </div>
                 <div className={ROW}>
                   <dt className="text-text-secondary">You receive</dt>
-                  <dd className="m-0 tabular-nums text-text-primary">{amount ? formatAmount(amount, token) : "—"}</dd>
+                  <dd className="m-0 tabular-nums text-text-primary">{amount ? payoutLine(amount, token) : "—"}</dd>
                 </div>
                 <div className={ROW}>
                   <dt className="text-text-secondary">Withdrawal fee</dt>
@@ -408,7 +410,7 @@ function WithdrawBody({ store, earned, verified, onClose, onDone, onShowHistory 
             )}
             <p className="m-0 flex flex-wrap items-center gap-[8px] text-sm leading-sm text-text-secondary">
               <TestnetDemoBadge />
-              {`Paid in ${token}${token === "IDZ" ? " at the demo rate 1 IDZ = $1" : " (1 USDT = $1)"}. You sign it in the demo wallet.`}
+              {`Paid in ${token}${token === "IDZ" ? ` at the demo rate ${IDZ_RATE_LINE}` : " (1 USDT = $1)"}. You sign it in the demo wallet.`}
             </p>
           </>
         )}

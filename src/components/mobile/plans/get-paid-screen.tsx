@@ -40,9 +40,8 @@ import { Skeleton } from "@/components/ideeza/skeleton";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { methodRequest } from "@/components/settings/get-paid/method-dialog";
 import { networkName, useGetPaidData } from "@/components/settings/get-paid/parts";
-import { DEMO_USD_RATES, balanceOf, centsFloor, formatUsd, makeDefault, removeMethod, type PayoutStore, type PayoutToken, type WithdrawalMethod } from "@/lib/account/payout";
+import { DEMO_USD_RATES, IDZ_RATE_LINE, balanceOf, centsFloor, formatUsd, makeDefault, removeMethod, type PayoutStore, type PayoutToken, type WithdrawalMethod } from "@/lib/account/payout";
 import { scrubPayout, updatePayout, usePayout } from "@/lib/account/use-payout";
-import { IDZ_USD_PRICE } from "@/lib/wallet/idz-price";
 import { levelDueOf, levelStatusOf, LEVEL_AT, type KycLevels } from "@/lib/commerce/kyc-levels";
 import { useKyc } from "@/lib/commerce/use-commerce";
 import { useKycLevels } from "@/lib/commerce/use-kyc-levels";
@@ -75,8 +74,8 @@ export function useGetPaid() {
   return { store, kyc: kyc ?? null, levels, data, loaded, balance, verified: !!kyc };
 }
 
-/** "1 IDZ ≈ $0.025": the one IDZ price, as short as it reads. */
-export const IDZ_RATE_LINE = `1 IDZ ≈ $${Number(IDZ_USD_PRICE).toFixed(3)}`;
+/** "1 IDZ ≈ $0.025": the one IDZ price, as short as it reads — the web's Get paid says the same (lib/account/payout). */
+export { IDZ_RATE_LINE };
 
 const TOKENS: PickOption<PayoutToken>[] = [
   { value: "USDT", label: "USDT", helper: "1 USDT = $1" },

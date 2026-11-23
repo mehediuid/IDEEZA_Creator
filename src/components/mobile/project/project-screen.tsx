@@ -154,6 +154,16 @@ function ProjectReady({ data }: { data: Ready }) {
   const gate = usePhoneWriteGate(project.id);
   // A sheet that sent the maker away (Publish's video readiness → a product) is open again on Back.
   const [sheet, setSheet] = useBackState<ProjectSheet | null>("project-sheet", null);
+  // The Feed's own-clip ⋯ › Share to Feed lands here with `?sheet=share`: the share sheet, once.
+  const router = useRouter();
+  const askedShare = params.get("sheet") === "share";
+  React.useEffect(() => {
+    if (!askedShare) return;
+    setSheet({ kind: "share" });
+    const rest = new URLSearchParams(window.location.search);
+    rest.delete("sheet");
+    router.replace(`${window.location.pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
+  }, [askedShare, setSheet, router]);
   const ctx = { ...data, gate, open: setSheet };
   return (
     <ProjectProvider value={ctx}>

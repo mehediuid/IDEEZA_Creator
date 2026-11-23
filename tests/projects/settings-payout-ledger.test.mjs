@@ -17,6 +17,9 @@ const {
   statementCsv,
   statementFileName,
   statementYears,
+  IDZ_RATE_LINE,
+  payoutCoinAmount,
+  payoutLine,
 } = await import("../../.tmp-test/lib/account/payout.js");
 const { payoutOf, ideezaFeeOf } = await import("../../.tmp-test/lib/market/fee.js");
 
@@ -152,4 +155,16 @@ test("statementFileName and statementYears", () => {
   const e = earningsOf([sale("s1", "p", "1", "USDT", at(2024, 6, 1))], [project("p", "P")]);
   assert.deepEqual(statementYears(e, W, at(2026, 10, 19)), [2026, 2025, 2024]);
   assert.deepEqual(statementYears([], [], at(2026, 10, 19)), [2026]);
+});
+
+test("an IDZ payout is one rule on the web, the phone and the statement: the one IDZ price, never 1 IDZ = $1", () => {
+  assert.equal(IDZ_RATE_LINE, "1 IDZ ≈ $0.025");
+  assert.equal(payoutCoinAmount("10", "USDT"), "10");
+  assert.equal(payoutCoinAmount("10", "IDZ"), "398.96");
+  assert.equal(payoutLine("10", "USDT"), "10 USDT");
+  assert.equal(payoutLine("10", "IDZ"), "≈ 398.96 IDZ");
+  assert.equal(payoutLine("100", "IDZ"), "≈ 3,989.63 IDZ");
+  const idz = [{ id: "WD9", amount: "10", token: "IDZ", methodId: null, to: { label: "Cold wallet", address: null }, at: at(2026, 3, 2), status: "complete" }];
+  const rows = statementCsv({ year: 2026, month: 3 }, [], idz).split("\r\n");
+  assert.equal(rows[1], "2026-03-02 12:00,Withdrawal,,Cold wallet,-398.96,IDZ,-10,Complete,WD9");
 });

@@ -16,6 +16,10 @@
 // its own has no box. 'Part of {project}' leads to the project's offers."):
 // the bar says what they start at, and Buy a copy opens them there
 // (project-earn/buyer/sample-shop.tsx `SampleCopiesBar`).
+// Whoever holds a Physical NFT of it (or the whole project) has those files
+// (the web's LockedPiecePanel for a holder, CL-035 › Elsewhere): "You own …
+// › See what you own" under the header, and the PCB, Code and Wiring rows
+// read "Files are yours" and open the purchased piece screens — no lock.
 
 import * as React from "react";
 import Link from "next/link";
@@ -30,7 +34,11 @@ import type { InnovationPost, PostPiece, PostProduct } from "@/lib/innovations/t
 import { ITEM_LABELS, type BuildItemKind } from "@/lib/create/history";
 import { shareItemId } from "@/lib/innovations/share-items";
 import { cn } from "@/lib/utils";
+import { usePurchased } from "@/components/projects/purchased/use-purchased";
+import { heldFilesHrefOf, type PurchasedProject } from "@/lib/market/purchases";
 import { ListCard } from "../kit/list";
+import { piecePath, purchasedPhoneHrefOf } from "../purchased/paths";
+import { YouOwnRow } from "../project-earn/buyer/you-own";
 import { useShareAction } from "../feed/share-action";
 import { SampleCopiesBar } from "../project-earn/buyer/sample-shop";
 import { MediaHero } from "../project/sample-project";
@@ -47,6 +55,14 @@ import { FactCard, TABS_FIT, TABS_SCROLL } from "./parts";
 const OPEN: ReadonlySet<PostPiece> = new Set<PostPiece>(["3d", "parts"]);
 /** A sample's piece as the build names it, so its row and its screen read the same ("3D Module", "Code"). */
 const PIECE_KIND: Record<PostPiece, BuildItemKind> = { "3d": "3d", pcb: "pcb", code: "code", wiring: "wiring", parts: "parts" };
+
+/** What a holder of this sample opens: the purchase, and whether a Physical NFT is among it (else the whole project). */
+function useHeldFiles(id: string): { purchase: PurchasedProject; physical: boolean } | null {
+  const { ready, purchases } = usePurchased();
+  if (!ready || !heldFilesHrefOf(purchases, id)) return null;
+  const purchase = purchases.find((x) => x.id === id);
+  return purchase ? { purchase, physical: purchase.lines.some((l) => l.kind === "physical") } : null;
+}
 
 export function SampleProduct({ post, product, id }: { post: InnovationPost; product: PostProduct; id: string }) {
   const tabs = productTabsOf({ buyer: true, built: true, contributors: false });
@@ -78,6 +94,7 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
           </p>
         </div>
         <p className={cn(T.body, "text-text-primary")}>{product.summary}</p>
+        <YouOwnRow projectId={id} />
         <ActivityCardBlock name={product.name} entries={entries} />
       </header>
       <div className={cn("sticky top-0 z-10 bg-bg-page", TABS_SCROLL)}>
@@ -86,7 +103,7 @@ export function SampleProduct({ post, product, id }: { post: InnovationPost; pro
       <div {...tabPanelProps("pd", tab)} className="px-8 pb-12 pt-8 outline-none">
         {tab === "media" && <SampleMedia product={product} />}
         {tab === "overview" && <SampleOverview post={post} product={product} />}
-        {tab === "build" && <SampleBuild product={product} base={base} />}
+        {tab === "build" && <SampleBuild product={product} base={base} id={id} />}
       </div>
       {share.sheets}
     </Screen>
@@ -142,18 +159,29 @@ function SampleOverview({ post, product }: { post: InnovationPost; product: Post
   );
 }
 
-function SampleBuild({ product, base }: { product: PostProduct; base: string }) {
+function SampleBuild({ product, base, id }: { product: PostProduct; base: string; id: string }) {
+  const held = useHeldFiles(id);
+  /** A locked piece for a holder: its own purchased screen (Physical NFT), else the project they bought whole. */
+  const heldHref = (k: PostPiece): string | null =>
+    held ? (held.physical ? piecePath(id, product.id, PIECE_KIND[k], "physical") : purchasedPhoneHrefOf(held.purchase)) : null;
   return (
     <div className="flex flex-col gap-12">
       <ListCard label="Pieces">
         {product.pieces.map((k) => {
-          const open = OPEN.has(k);
+          const yours = OPEN.has(k) ? null : heldHref(k);
+          const open = OPEN.has(k) || yours !== null;
           const body = (
             <>
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className={T.name}>{ITEM_LABELS[PIECE_KIND[k]]}</span>
                 <span className={T.meta}>
-                  {k === "parts" ? `${product.parts.length} parts · bill of materials` : open ? "Enclosure and parts in 3D" : "Comes with a copy"}
+                  {k === "parts"
+                    ? `${product.parts.length} parts · bill of materials`
+                    : yours
+                      ? "Files are yours"
+                      : open
+                        ? "Enclosure and parts in 3D"
+                        : "Comes with a copy"}
                 </span>
               </span>
               {open ? (
@@ -173,7 +201,7 @@ function SampleBuild({ product, base }: { product: PostProduct; base: string }) 
           return (
             <li key={k}>
               {open ? (
-                <Link href={`${base}/build/${PIECE_KIND[k]}`} className="flex items-center gap-4 p-6 outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle">
+                <Link href={yours ?? `${base}/build/${PIECE_KIND[k]}`} className="flex items-center gap-4 p-6 outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle">
                   {body}
                 </Link>
               ) : (
@@ -185,7 +213,20 @@ function SampleBuild({ product, base }: { product: PostProduct; base: string }) 
       </ListCard>
       <section aria-labelledby="sp-downloads" className="flex flex-col gap-4">
         <SectionHeading id="sp-downloads" title="Downloads" />
-        <p className={T.body}>Firmware and downloads come with a purchase.</p>
+        {held ? (
+          <>
+            <p className={T.body}>Your firmware and downloads are with what you bought.</p>
+            <Link
+              href={held.physical ? `${purchasedPhoneHrefOf(held.purchase)}?nft=physical` : purchasedPhoneHrefOf(held.purchase)}
+              className={cn(T.rowTitle, "-my-3 inline-flex min-h-[44px] items-center gap-2 self-start text-text-brand outline-none hover:underline focus-visible:underline")}
+            >
+              Open your files
+              <Icon icon={ArrowRight01Icon} size={16} />
+            </Link>
+          </>
+        ) : (
+          <p className={T.body}>Firmware and downloads come with a purchase.</p>
+        )}
       </section>
     </div>
   );

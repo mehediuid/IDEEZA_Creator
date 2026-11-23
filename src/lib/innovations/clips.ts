@@ -321,8 +321,8 @@ export function orderClips(clips: readonly FeedClip[], choices: ClipChoices = NO
 }
 
 /** The Following tab: the clips of the creators the viewer follows (their own choice, else the
- *  dataset's — `withDataset` false: their own choice only, as a new account on the phone starts
- *  following no one), newest first; hidden ones left out. */
+ *  dataset's — the web's rule, which the phone's Feed, profile and Following sheet all use;
+ *  `withDataset` false: their own choice only), newest first; hidden ones left out. */
 export function followingClips(clips: readonly FeedClip[], reactions: Reactions, choices: ClipChoices = NO_CHOICES, withDataset = true): FeedClip[] {
   const gone = new Set(choices.hidden);
   return clips

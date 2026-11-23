@@ -14,7 +14,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Add01Icon, AnalyticsUpIcon, Clock01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, AnalyticsUpIcon, Clock01Icon, Coins01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { useSecondClock } from "@/components/create/use-clock";
 import { CONCEPT_COST } from "@/lib/create/credits";
@@ -306,6 +306,7 @@ export function AiChat({ chatId }: { chatId: string }) {
         items={[
           { label: "History", icon: Clock01Icon, onSelect: () => router.push("/m/ai/history") },
           { label: "New idea", icon: Add01Icon, onSelect: () => router.push("/m/ai") },
+          { label: "Buy credits", icon: Coins01Icon, onSelect: () => setBuying(true) },
           { label: "Delete this chat", icon: Delete02Icon, onSelect: () => setDeleting(true), destructive: true },
         ]}
       />

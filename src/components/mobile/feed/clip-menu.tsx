@@ -15,9 +15,13 @@
 //   the current choice ("Playback speed · Normal", "Video quality · Auto");
 // - Report is the kit's Report sheet with "Also block {creator}" (Figma 07):
 //   "Tell us more" opens under Something else; a reported clip reads Reported.
-// A clip you shared to your Feed adds "Remove from your Feed". On a project you
-// shared, the menu is the owner's (the web's post owner bar): Edit post, Stop
-// sharing, Open project — and no Report or Hide, as on the web.
+// A clip you shared to your Feed adds "Remove from your Feed". On your own
+// project the menu is the owner's (the web's post owner bar), picked by the
+// share: shared (`showcasedAt`) → Edit post, Stop sharing, Open project; on the
+// Feed only because it is listed, never shared → Share to Feed (the project's
+// own share sheet) and Open project. Stopping a share takes the post off your
+// Timeline; the clip stays on the Feed while the project is for sale. No
+// Report or Hide on your own, as on the web.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -29,6 +33,7 @@ import {
   Delete02Icon,
   Flag02Icon,
   Link01Icon,
+  News01Icon,
   PencilEdit02Icon,
   ThumbsDownIcon,
   ThumbsUpIcon,
@@ -53,7 +58,7 @@ import {
 } from "@/lib/innovations/feed-prefs";
 import { useReactions } from "@/lib/innovations/reactions";
 import { useManualProjects } from "@/lib/manual/projects";
-import { sharePostBlocker, STORY_MAX } from "@/lib/manual/share-post";
+import { sharePostBlocker, stopSharingBodyOf, STOPPED_SHARING, STORY_MAX } from "@/lib/manual/share-post";
 import { blockPerson } from "@/lib/messages/actions";
 import { canonicalId, ME } from "@/lib/people/ids";
 import { updateSettings } from "@/lib/settings/prefs";
@@ -147,6 +152,10 @@ export function ClipMenu({
   const [sheet, setSheet] = React.useState<"speed" | "quality" | "report" | "edit" | "stop" | null>(null);
 
   const mine = clip.source === "mine";
+  const { projects } = useManualProjects();
+  // Your own project is on the Feed because it is listed; it is a post only once you shared it.
+  const posted = mine && typeof projects.find((p) => p.id === clip.projectId)?.showcasedAt === "number";
+  const projectHref = `/m/projects/${encodeURIComponent(clip.projectId)}`;
   const saved = isSaved(clip);
   // A Project clip's report is the post's (the web's reported list); a Product clip's is its own.
   const reported = clip.kind === "project" ? post.reported : prefs.reported.includes(clip.id);
@@ -190,13 +199,15 @@ export function ClipMenu({
 
   const items: ActionSheetItem[] = mine
     ? [
-        { label: "Edit post", icon: PencilEdit02Icon, onSelect: () => setSheet("edit") },
-        { label: "Open project", icon: ArrowRight01Icon, onSelect: () => router.push(`/m/projects/${encodeURIComponent(clip.projectId)}`) },
+        ...(posted
+          ? [{ label: "Edit post", icon: PencilEdit02Icon, onSelect: () => setSheet("edit") }]
+          : [{ label: "Share to Feed", icon: News01Icon, onSelect: () => router.push(`${projectHref}?sheet=share`) }]),
+        { label: "Open project", icon: ArrowRight01Icon, onSelect: () => router.push(projectHref) },
         saveRow,
         copyRow,
         ...playback,
-        // One red row, last: removing a share when this copy is one, else stopping the post.
-        ...(clip.share ? shared : [{ label: "Stop sharing", icon: ViewOffSlashIcon, destructive: true, onSelect: () => setSheet("stop") }]),
+        // One red row, last: removing a share when this copy is one, else stopping the post (only a shared one).
+        ...(clip.share ? shared : posted ? [{ label: "Stop sharing", icon: ViewOffSlashIcon, destructive: true, onSelect: () => setSheet("stop") }] : []),
       ]
     : [
         {
@@ -315,7 +326,8 @@ function OwnerSheets({ clip, sheet, onClose }: { clip: FeedClip; sheet: string |
               size="xl"
               className="w-full"
               onClick={() => {
-                if (blocker || !project) return setTried(true);
+                // Only a shared post is edited here: saving never shares a project that wasn't.
+                if (blocker || !project || typeof project.showcasedAt !== "number") return setTried(true);
                 setShowcase(project.id, true, project.showcasedAt ?? undefined, { story: value.trim() });
                 toast({ title: "Post updated" });
                 close();
@@ -341,13 +353,13 @@ function OwnerSheets({ clip, sheet, onClose }: { clip: FeedClip; sheet: string |
       <ConfirmSheet
         open={sheet === "stop"}
         onClose={onClose}
-        title="Stop sharing to the Feed?"
-        body="The post leaves the Feed, and only you can open it. Its comments are kept and come back if you share again."
+        title="Stop sharing?"
+        body={stopSharingBodyOf(true)}
         verb="Stop sharing"
         destructive
         onConfirm={() => {
           setShowcase(clip.projectId, false);
-          toast({ title: "Stopped sharing. The post left the Feed." });
+          toast({ title: STOPPED_SHARING });
         }}
       />
     </>

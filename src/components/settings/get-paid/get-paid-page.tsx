@@ -26,6 +26,7 @@ import {
   balanceOf,
   centsFloor,
   DEMO_USD_RATES,
+  IDZ_RATE_LINE,
   formatUsd,
   removeMethod,
   withdrawStepsOf,
@@ -56,7 +57,7 @@ const ARRIVED =
 
 const TOKENS: { value: PayoutToken; label: string; hint: string }[] = [
   { value: "USDT", label: "USDT", hint: "A dollar stablecoin: 1 USDT = $1" },
-  { value: "IDZ", label: "IDZ", hint: "IDEEZA's token, at the demo rate 1 IDZ = $1" },
+  { value: "IDZ", label: "IDZ", hint: `IDEEZA's token, at the demo rate ${IDZ_RATE_LINE}` },
 ];
 
 /** Lands on a row of this page, outlining it again when the address already points there. */
@@ -281,7 +282,7 @@ function BalanceCard({
 
         <p className="m-0 max-w-[62ch] text-sm leading-sm text-text-tertiary">
           Sales in test coins count at fixed demo rates: 1 ETH or WETH = {formatUsd(DEMO_USD_RATES.ETH)}, 1 MATIC = {formatUsd(DEMO_USD_RATES.MATIC)};
-          USDT, USDC and IDZ = $1.00. Withdrawals are recorded here and no coins move.
+          USDT and USDC = $1.00; {IDZ_RATE_LINE}. Withdrawals are recorded here and no coins move.
         </p>
       </div>
     </SettingsCard>

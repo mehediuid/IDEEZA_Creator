@@ -7,6 +7,10 @@
 // its work is in the editor."), and the Power · Radio facts (Size and Board
 // are on the product page). The heading line and the project's Build check
 // are the web's (`productsHeadingOf`, `headlineConfidenceOf`).
+// A row opens the product page in the screen's own view (`ProductLinkQuery`):
+// the owner's page as it is, the shop screen's rows the buyer's product page
+// (`?view=market`, where its copies are sold — CL-018), and a preview's rows
+// the product in the same preview — the web's market-slots and project-page links.
 
 import * as React from "react";
 import { ConfidenceBadge } from "@/components/create/confidence-badge";
@@ -37,6 +41,10 @@ const UNBUILT_NOTE: Record<Exclude<ProjectProduct["state"], "built">, string> = 
   hand: "Made by hand — its work is in the editor.",
 };
 
+/** The query a product row carries to the product page: none on the owner's page. */
+const ProductLinkQuery = React.createContext("");
+export const ProductLinkQueryProvider = ProductLinkQuery.Provider;
+
 export type PhoneProductRow = {
   id: string;
   name: string;
@@ -65,6 +73,7 @@ export function useProductRows(): {
   const { record: journey } = useJourney(project.id);
   const owner = can(viewer, "facts.seeOwnerOnly");
   const canEdit = can(viewer, "product.edit", view.canCtx);
+  const query = React.useContext(ProductLinkQuery);
   return React.useMemo(() => {
     const cards = productsTabView(view, { owner, journey, project });
     const heading = productsHeadingOf(
@@ -101,7 +110,7 @@ export function useProductRows(): {
         stage: card?.stage ?? null,
         meta,
         facts: facts || null,
-        href: phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(pp.id)}`) ?? "/m/projects",
+        href: `${phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(pp.id)}`) ?? "/m/projects"}${query ? `?${query}` : ""}`,
       };
     });
     const pieces = heading.pieces
@@ -112,7 +121,7 @@ export function useProductRows(): {
       line: [countLabel(heading.count), pieces].filter(Boolean).join(" · "),
       headline: headlineConfidenceOf(current),
     };
-  }, [project, view, owner, canEdit, journey]);
+  }, [project, view, owner, canEdit, journey, query]);
 }
 
 /** "Build check: [Draft] 6 passed · 1 not run ⌄" — the web's badge and its disclosure. */

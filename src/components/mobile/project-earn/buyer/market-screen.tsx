@@ -60,6 +60,7 @@ import { StatusChip } from "@/components/projects/status-chip";
 import { can } from "@/lib/manual/permissions";
 import { phoneMarketHref } from "@/lib/manual/phone-earn";
 import { sampleProjectOf, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
+import { MARKET_VIEW } from "@/lib/manual/phone-product";
 import { detailsRows } from "@/lib/manual/rail-copy";
 import { coverOf } from "@/lib/manual/project-read";
 import { headerText } from "@/lib/manual/project-summary";
@@ -93,7 +94,7 @@ import { shareItemId } from "@/lib/innovations/share-items";
 import { ProjectProvider, type Ready } from "../../project/context";
 import { ProjectRecent } from "../../project/overview";
 import { MediaTab } from "../../project/media-tab";
-import { BuildCheckLine, useProductRows } from "../../project/product-rows";
+import { BuildCheckLine, ProductLinkQueryProvider, useProductRows } from "../../project/product-rows";
 import { ListCard } from "../../kit/list";
 import { ProductRow, SectionHeading, SubLine } from "../../project/parts";
 import { Description } from "../../project/project-screen";
@@ -476,6 +477,7 @@ function MarketReady({ data }: { data: Ready }) {
 
   return (
     <ProjectProvider value={ctx}>
+      <ProductLinkQueryProvider value={`view=${MARKET_VIEW}`}>
       <Screen top={<TopBar back title={titleGone ? project.name : undefined} actions={share.action ? [share.action] : []} />} footer={footer}>
         <OfflineBanner />
         <ListingHero project={project} view={view} />
@@ -543,6 +545,7 @@ function MarketReady({ data }: { data: Ready }) {
         {share.sheets}
       </Screen>
       <PurchaseDoneSheet done={done} onClose={() => setDone(null)} />
+      </ProductLinkQueryProvider>
     </ProjectProvider>
   );
 }

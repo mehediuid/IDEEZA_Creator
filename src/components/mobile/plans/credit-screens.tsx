@@ -7,8 +7,8 @@
 // monthly period's plan credits, the latest movements, and every lot —
 // starting balance, plan credits, packs and custom credits — Active, Used
 // up or Expired. Buy more credits (the Bottom action bar) is the AI tab's
-// Buy credits sheet; with this month's plan credits spent it offers a bigger
-// plan first. This month reads as three figures, then its rows.
+// Buy credits sheet, straight away as on the web — its last block names the
+// next plan (CL-032). This month reads as three figures, then its rows.
 
 import * as React from "react";
 import { Alert02Icon, Calendar03Icon, DiscountTag01Icon, Invoice03Icon, Table02Icon } from "@hugeicons/core-free-icons";
@@ -32,7 +32,7 @@ import { ListBones, OfflineBanner } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { ComparePlansSheet, ReachedLimitSheet, UpgradeUnlockSheet, useNextPlan } from "./credit-sheets";
+import { ComparePlansSheet, UpgradeUnlockSheet } from "./credit-sheets";
 import { Hero, dateOf, n, pct } from "./parts";
 
 /** The credits that end first: every lot ending on the earliest day counts, not only one of them. */
@@ -49,10 +49,8 @@ export function CurrentCreditScreen() {
   const { hydrated: planReady, sub, plan } = useCreatePlan();
   const discount = useCreditDiscount();
   const { lowAt } = useSettings().credits;
-  const next = useNextPlan();
   const [now] = React.useState(() => Date.now());
   const [buying, setBuying] = React.useState(false);
-  const [limit, setLimit] = React.useState(false);
   const [compare, setCompare] = React.useState(false);
   const [unlock, setUnlock] = React.useState(false);
 
@@ -63,10 +61,8 @@ export function CurrentCreditScreen() {
   const low = hydrated && runningLow(balance, lowAt);
   const recent = ledger.slice(-3).reverse();
 
-  const buy = () => {
-    if (month && month.remaining === 0 && next) setLimit(true);
-    else setBuying(true);
-  };
+  // The web's Buy credits, straight away: the fix first, the plan quieter in the sheet's last block (CL-032).
+  const buy = () => setBuying(true);
 
   return (
     <Screen
@@ -144,7 +140,6 @@ export function CurrentCreditScreen() {
         </div>
       )}
       <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} />
-      <ReachedLimitSheet open={limit} onClose={() => setLimit(false)} allowance={month?.allowance ?? plan.credits} onBuy={() => setBuying(true)} />
       <ComparePlansSheet open={compare} onClose={() => setCompare(false)} />
       <UpgradeUnlockSheet open={unlock} onClose={() => setUnlock(false)} />
     </Screen>

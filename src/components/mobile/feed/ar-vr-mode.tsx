@@ -79,7 +79,7 @@ export function ArVrMode({ id }: { id: string }) {
     );
   }
 
-  const following = follows(reactions, clip.creator.id, false);
+  const following = follows(reactions, clip.creator.id, clip.followedByDataset);
   const creatorHref = clip.source === "mine" ? "/profile" : profileHrefOf(clip.creator.id, "innovations");
   const can =
     xr === null

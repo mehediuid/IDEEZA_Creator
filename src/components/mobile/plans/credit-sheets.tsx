@@ -1,9 +1,13 @@
 "use client";
 
 // The AI Credits popups (mobile Figma "03 · AI Credits": Better deal
-// available, You've reached your limit, Upgrade to unlock, Compare credit
-// discounts, Compare plans), each a bottom sheet in the kit's one style, on
-// the web's prices and rules (lib/create/credit-pricing.ts, plans.ts).
+// available, Upgrade to unlock, Compare credit discounts, Compare plans), each
+// a bottom sheet in the kit's one style, on the web's prices and rules
+// (lib/create/credit-pricing.ts, plans.ts). The plan they offer is the web's
+// pitch (`pitchPlan`, CL-032): Builder from Free or Tinkerer, Disruptor from
+// Builder, at the cycle the maker pays by. "You've reached your limit" is gone:
+// Buy more credits opens Buy credits, the main way out, as on the web — that
+// sheet's last block names the plan.
 
 import * as React from "react";
 import Link from "next/link";
@@ -12,17 +16,17 @@ import { InformationCircleIcon, SparklesIcon } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ideeza/button";
 import { CREDIT_PACKS, MAX_DISCOUNT, discountRows, packPrice, usd, type CreditPack } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
+import { pitchCycle, pitchPlan } from "@/lib/create/upsell";
 import { PLANS, planOf, priceOf, relationOf, type Plan } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
 import { T } from "../type";
 import { BulletList, CARD, LINK, SheetMark, checkoutPath, dollars, n, pct } from "./parts";
 
-/** The next plan up from the current one, for the "upgrade" offers; null on Disruptor. */
+/** The plan the "upgrade" offers name — the web's pitch: Builder from Free or Tinkerer, Disruptor from Builder; null on Disruptor. */
 export function useNextPlan(): Plan | null {
   const { sub } = useCreatePlan();
-  const at = PLANS.findIndex((p) => p.tier === sub.tier);
-  return PLANS[at + 1] ?? null;
+  return pitchPlan(sub.tier);
 }
 
 /** Better deal available: a pack gives at least the typed credits for no more than the custom price. */
@@ -82,44 +86,6 @@ export function BetterDealSheet({
           `Save up to ${pct(MAX_DISCOUNT)} on credits with an IDEEZA plan`,
         ]}
       />
-    </Sheet>
-  );
-}
-
-/** You've reached your limit: this month's plan credits are all spent. */
-export function ReachedLimitSheet({ open, onClose, allowance, onBuy }: { open: boolean; onClose: () => void; allowance: number; onBuy: () => void }) {
-  const router = useRouter();
-  const { plan } = useCreatePlan();
-  const next = useNextPlan();
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="You’ve reached your limit"
-      description={`You’ve used all ${n(allowance)} monthly AI credits on the ${plan.name} plan.`}
-      actions={
-        <>
-          {next && (
-            <Button size="xl" className="w-full" onClick={() => router.push(checkoutPath(next.tier, "monthly"))}>
-              Upgrade plan
-            </Button>
-          )}
-          <Button
-            hierarchy={next ? "secondary" : "primary"}
-            size="xl"
-            className="w-full"
-            onClick={() => {
-              onClose();
-              onBuy();
-            }}
-          >
-            Buy credits instead
-          </Button>
-        </>
-      }
-    >
-      <SheetMark icon={InformationCircleIcon} tone="warning" />
-      <BulletList items={[...(next ? [`Upgrade to ${next.name} for ${n(next.credits)} a month`] : []), "Or buy a one-time credit pack"]} />
     </Sheet>
   );
 }
@@ -211,7 +177,8 @@ export function ComparePlansSheet({ open, onClose }: { open: boolean; onClose: (
   const { sub, plan } = useCreatePlan();
   const next = useNextPlan();
   const router = useRouter();
-  const upgrade = next && relationOf(sub, next.tier, "monthly") === "upgrade" ? next : null;
+  const cycle = pitchCycle(sub);
+  const upgrade = next && relationOf(sub, next.tier, cycle) === "upgrade" ? next : null;
   return (
     <Sheet
       open={open}
@@ -220,7 +187,7 @@ export function ComparePlansSheet({ open, onClose }: { open: boolean; onClose: (
       description="See how many AI credits each plan includes every month."
       actions={
         upgrade ? (
-          <Button size="xl" className="w-full" onClick={() => router.push(checkoutPath(upgrade.tier, "monthly"))}>
+          <Button size="xl" className="w-full" onClick={() => router.push(checkoutPath(upgrade.tier, cycle))}>
             Upgrade to {upgrade.name}
           </Button>
         ) : undefined

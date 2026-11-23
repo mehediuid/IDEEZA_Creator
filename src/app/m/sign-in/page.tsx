@@ -4,7 +4,8 @@
 // In", Email and Password (with its eye), Remember me and Forgot password,
 // Log In, "Or login with" Google and Facebook, and "Don't Have an Account?
 // Sign Up". Its states, as drawn: a field's own error under it — "Invalid
-// email address", "Your password is incorrect!" — and Account Suspended (the
+// email address", a wrong email or password (in the web's words, "That email
+// and password don't match.", so it never says which one) — and Account Suspended (the
 // title becomes "Welcome to IDEEZA", a red alert, the button "Account
 // Suspended"). Kept from before: empty fields on submit, too many tries with
 // a countdown, email not verified → Send code, offline with the input kept.
@@ -79,7 +80,7 @@ export default function SignInPage() {
 
   const emailError =
     touched.submit && !email.trim() ? "Enter your email." : (touched.email || touched.submit) && email.trim() && !isEmail(email) ? "Invalid email address" : "";
-  const passwordError = touched.submit && !password ? "Enter your password." : outcome === "wrong" ? "Your password is incorrect!" : "";
+  const passwordError = touched.submit && !password ? "Enter your password." : outcome === "wrong" ? "That email and password don't match." : "";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

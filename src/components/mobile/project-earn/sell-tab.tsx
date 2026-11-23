@@ -10,16 +10,19 @@
 //   Before the mint the copies fold into one line: they use the project's
 //   collection and blockchain;
 // · One product at a time (`#copies`): each product's Physical and Virtual
-//   rows, or the one folded line before the mint.
+//   rows, or the one folded line before the mint. The web desk's rule
+//   (`deskProductsOf`, CL-028): in a one-product project the whole project's
+//   copies are that product's, so it gets no second row unless it already has
+//   copy tracks of its own — and the section isn't there.
 // Each row is listed on its own, never asking the Main listing.
 
 import * as React from "react";
 import { PackageIcon } from "@hugeicons/core-free-icons";
 import { Badge } from "@/components/ideeza/badge";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
-import { editionProductsOf } from "@/lib/manual/earn-view";
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { displayProductName } from "@/lib/manual/products-tab-view";
+import { deskProductsOf } from "@/lib/market/sell-desk";
 import { PROJECT_SCOPE } from "@/lib/market/types";
 import { preMintCopiesLine } from "@/lib/market/phone-sell";
 import { MAIN_SALE_DETAIL, MAIN_SALE_NOTE, SELL_RULES, SELL_RULES_LEAD } from "@/lib/market/sell-flow";
@@ -115,7 +118,10 @@ function WholeProject() {
 function EachProduct() {
   const { project, view } = useEarn();
   const minted = useMinted();
-  const products = editionProductsOf(view.products, view.editions);
+  const products = deskProductsOf(view.products, view.editions);
+  const current = view.products.filter((p) => p.dropped === null).length;
+  // One product and no copies of its own: the Whole project rows above are its copies.
+  if (current > 0 && products.length === 0) return null;
   return (
     <section id="copies" aria-labelledby="sell-products" className="flex scroll-mt-8 flex-col gap-4">
       <h2 id="sell-products" className={T.section}>

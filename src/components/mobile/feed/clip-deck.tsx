@@ -189,8 +189,8 @@ function WiredClip({
   const { reactions, toggle, markViewed, setFollow } = useReactions();
   const comments = useCommentCount(clip.postId, sampleSeedOf(clip.postId));
   const counts = countsOf(reactions, clip.postId, clip.base);
-  // Your own choice only: a new account starts following no one (the dataset is the web's demo).
-  const following = follows(reactions, clip.creator.id, false);
+  // The web's rule (person-actions): your own choice, else the sample dataset's — as the profile says.
+  const following = follows(reactions, clip.creator.id, clip.followedByDataset);
   const failed = () => toast({ title: "This phone couldn’t save that. Nothing changed.", lead: "error" });
   const go = (title: string, href: string) => guard(title, () => router.push(href), href);
 

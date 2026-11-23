@@ -8,8 +8,10 @@
 // verified."; then the License row. A right's sheet: Type (A06 as a pick-one sheet; the
 // web's segmented control), the kind's own field, Attorney name (optional)
 // for a trademark, Link (optional), checked on Save; editing adds Remove,
-// which asks first. The License row opens the Choose a license sheet (the
-// web's dialog, `LicenseSheet`). Sold in full, the rights read only.
+// which asks first. The License row is chosen once, as on the web: while
+// the project has none it opens Choose a license (the ladder's fix, the
+// web's LicenseDialog, `LicenseSheet`); once set it reads only — a gift was
+// made under it and buyers bought under it. Sold in full, the rights read only.
 
 import * as React from "react";
 import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
@@ -123,10 +125,10 @@ export function Rights() {
         <div className="flex flex-col gap-2">
           <ListCard label="License">
             <li>
-              {editable ? (
+              {editable && !license ? (
                 <button type="button" aria-haspopup="dialog" className={ROW_BUTTON} onClick={() => setOpen({ kind: "license" })}>
                   <span className={cn(T.body, "shrink-0")}>License</span>
-                  <span className={cn(T.body, "min-w-0 flex-1 truncate text-right text-text-primary")}>{license?.label ?? "Choose a license"}</span>
+                  <span className={cn(T.body, "min-w-0 flex-1 truncate text-right text-text-primary")}>Choose a license</span>
                   <Chevron />
                 </button>
               ) : (
@@ -143,7 +145,7 @@ export function Rights() {
 
       {open?.kind === "new" && <RightSheet key="new" right={null} onClose={() => setOpen(null)} onDone={said} />}
       {open?.kind === "edit" && <RightSheet key={open.right.id} right={open.right} onClose={() => setOpen(null)} onDone={said} />}
-      <LicenseSheet open={open?.kind === "license"} projectId={project.id} current={licenseId} onClose={() => setOpen(null)} onSaved={said} />
+      <LicenseSheet open={open?.kind === "license" && !license} projectId={project.id} current={null} onClose={() => setOpen(null)} onSaved={said} />
     </MoneySection>
   );
 }

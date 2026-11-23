@@ -69,7 +69,7 @@ import { deleteFactsOf, productRowsOf } from "@/lib/manual/project-read";
 import { formatDate, projectSummary } from "@/lib/manual/project-summary";
 import { PROJECT_DESC_COUNTER_FROM, PROJECT_DESC_MAX, PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
 import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
-import { STORY_MAX, sharePostBlocker } from "@/lib/manual/share-post";
+import { STOPPED_SHARING, STORY_MAX, sharePostBlocker, stopSharingBodyOf } from "@/lib/manual/share-post";
 import { deleteFixOf, phoneHrefOf, phoneProjectPath, phoneWords, publishLineOf, readyOfLine } from "@/lib/manual/phone-project";
 import { readMarketNow } from "@/lib/market/market-store";
 import { readNetwork } from "@/lib/network/store";
@@ -765,15 +765,15 @@ function StopSharingSheet({ open, onClose }: { open: boolean; onClose: () => voi
     <ConfirmSheet
       open={open}
       onClose={onClose}
-      title="Stop sharing to Feed?"
-      body="The post leaves Feed, and only you can open it. Its comments are kept and come back if you share again."
+      title="Stop sharing?"
+      body={stopSharingBodyOf(forSaleNow(view))}
       verb="Stop sharing"
       onConfirm={() => {
         const at = view.summary.showcase?.at;
         const post = project.post;
         setShowcase(project.id, false);
         toast({
-          title: "Stopped sharing. The post left Feed.",
+          title: STOPPED_SHARING,
           action: { label: "Undo", onClick: () => setShowcase(project.id, true, at, post) },
         });
       }}

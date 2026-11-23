@@ -63,6 +63,7 @@ import { PickTabs } from "./buy-pick";
 import { CopyPanel, copyUseChoicesOf } from "./copies";
 import { AuctionCard, BuyNowCard, closedLineOf, MainActivity } from "./main-offer";
 import { ProductsSection } from "./market-screen";
+import { ProductLinkQueryProvider } from "../../project/product-rows";
 import { AboutRows, ClosedCard, HolderBenefits, LegalSection, PreviewBanner, ProjectActivity, ProjectTop, useScrolledPast, ViewerTabs, VIEWER_TABS_ID, type OfferRow } from "./parts";
 
 export function PreviewScreen({ id }: { id: string }) {
@@ -138,6 +139,7 @@ function PreviewReady({ data }: { data: Ready }) {
 
   return (
     <ProjectProvider value={ctx}>
+      <ProductLinkQueryProvider value={previewQuery(params)}>
       <Screen top={<TopBar back={fallback} title={titleGone ? project.name : undefined} />}>
         <OfflineBanner />
         {contributor ? (
@@ -176,6 +178,7 @@ function PreviewReady({ data }: { data: Ready }) {
           {tab === "activity" && contributor && <ActivityTab />}
         </div>
       </Screen>
+      </ProductLinkQueryProvider>
     </ProjectProvider>
   );
 }
