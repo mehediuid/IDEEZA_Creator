@@ -10,7 +10,9 @@
 // · the media on top (hero.tsx): the take in use, else the concept image of
 //   the version on screen;
 // · one header: the name, one meta line ("{project} · AI build · {date}", or
-//   the line of a product no build stands behind), the lock line once sold in
+//   the line of a product no build stands behind; a buyer's "Part of
+//   {project} · Created by {creator}", the project opening its shop, BUY-3),
+//   the lock line once sold in
 //   full (10u), the description (3 lines, Show more) — the maker's words on
 //   the current version, the build's on an older one — or, for the owner
 //   with none, Add a description (CL-015), and the version notice while an
@@ -44,7 +46,9 @@ import { can } from "@/lib/manual/permissions";
 import { formatDate } from "@/lib/manual/project-summary";
 import { ROLE_WORD, initialsOf, teamOf } from "@/lib/manual/contributors";
 import { madeByHand, parseProductTab, productTabsOf, type ProductTab } from "@/lib/manual/phone-product";
-import { phoneProjectHref, sampleProjectOf } from "@/lib/manual/phone-project";
+import { offMarketNow, phoneProjectHref, sampleProjectOf } from "@/lib/manual/phone-project";
+import { phoneMarketHref, phonePreviewHref } from "@/lib/manual/phone-earn";
+import { useCreatorName } from "@/components/marketplace/use-creator-name";
 import { productRowsOf } from "@/lib/manual/project-read";
 import { useMe } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
@@ -63,7 +67,7 @@ import { MediaTab } from "./media-tab";
 import { DeleteProductSheet } from "./delete-sheet";
 import { ProductEarnBar } from "./earn-bar";
 import { EditDetailsSheet, ProductMenu, useCanEditDetails } from "./menu";
-import { OverviewTab, useListedCopies } from "./overview";
+import { OverviewTab } from "./overview";
 import { SampleProduct } from "./sample-product";
 import { OffMarket, ProductLoading, ProductMissing, ProjectMissing } from "./states";
 import { ProductProvider, useProduct, useProductData, type ProductCtx } from "./use-product";
@@ -91,10 +95,12 @@ export function ProductScreen({ id, productId }: { id: string; productId: string
   );
 }
 
-/** 32b: on the marketplace, a project its creator paused, with none of this product's copies on sale. */
+/** 32b: on the marketplace, a project its creator paused is off it for now — the pause alone decides, as on the
+ *  web (OffMarketGate, BUY-4) — unless the buyer already holds part of it. */
 function MarketGate({ ctx }: { ctx: ProductCtx }) {
-  const listed = useListedCopies().length > 0;
-  if (ctx.mode === "market" && ctx.view.listing.kind === "paused" && !listed && ctx.copies.length === 0) return <OffMarket paused />;
+  if (ctx.mode === "market" && offMarketNow({ listing: ctx.view.listing.kind, projectId: ctx.project.id, sales: ctx.view.sales, buyerId: ctx.buyerId })) {
+    return <OffMarket paused />;
+  }
   return <ProductReady />;
 }
 
@@ -283,7 +289,7 @@ function ProductHeader({ titleRef, onEdit }: { titleRef: React.RefObject<HTMLHea
         <h1 ref={titleRef} className={cn(T.title, "min-w-0 break-words")}>
           {name}
         </h1>
-        <p className={T.meta}>{meta}</p>
+        {mode === "market" || mode === "preview" ? <PartOfLine /> : <p className={T.meta}>{meta}</p>}
       </div>
 
       {lockLine && (
@@ -310,6 +316,26 @@ function ProductHeader({ titleRef, onEdit }: { titleRef: React.RefObject<HTMLHea
 
       {buyer && <HeaderActivity />}
     </header>
+  );
+}
+
+/** BUY-3 · the buyer's line (the web's product page on Explore marketplace, CL-018): "Part of {project} · Created by
+ *  {creator}" — what the product belongs to and who made it; how it was built is the maker's. "Part of {project}"
+ *  opens the project's shop, where its offers are (a product with no copies of its own sells none); in Preview as
+ *  others see it, the preview's project page. The creator is named as a buyer knows them, never "you". */
+function PartOfLine() {
+  const { project, mode } = useProduct();
+  const creator = useCreatorName();
+  const href = mode === "preview" ? phonePreviewHref(project.id, "buyer") : phoneMarketHref(project.id);
+  return (
+    <p className={cn(T.meta, "break-words")}>
+      <Link href={href} className="-my-[13px] inline-flex min-h-[44px] items-center rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus">
+        <span>
+          Part of <span className="font-medium text-text-brand">{project.name}</span>
+        </span>
+      </Link>
+      {` · Created by ${creator}`}
+    </p>
   );
 }
 

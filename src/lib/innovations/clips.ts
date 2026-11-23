@@ -26,7 +26,7 @@
 import { CREATORS, PROJECTS, type ProjectCategory } from "../feed";
 import { CATALOGUES } from "../manual/journey";
 import { formatAmount } from "../wallet/money";
-import type { FeedShare } from "./feed-prefs";
+import { savedRows, type FeedShare } from "./feed-prefs";
 import { follows, type Reactions } from "./reactions";
 import { SAMPLE_POSTS } from "./sample-posts";
 import type { InnovationPost, PostPerson } from "./types";
@@ -367,3 +367,77 @@ export const OFFER_NAME: Readonly<Record<ClipOfferKind, string>> = {
   physical: "Physical NFT",
   virtual: "Virtual NFT",
 };
+
+// ─────────────────────────── a post off the Feed ───────────────────────────
+// The Feed plays only what is on the marketplace, but a post stays after its item leaves it, as the
+// web's post page does: Saved and Appreciated still list it, its address still leads somewhere, and
+// its comments are still read.
+
+/** The id of a post's item (share-items.ts), which is also its Project clip's id: "sample:p12" →
+ *  "p12"; "mine:<projectId>" stays as it is. */
+export const postItemIdOf = (postId: string) => postId.replace(/^sample:/, "");
+
+/** A post of the samples' or of yours ("sample:…", "mine:…"), not a share's own thread ("share:…"). */
+const isPostId = (id: string) => id.startsWith("sample:") || id.startsWith(MINE);
+
+/** A row of Saved or Appreciated: one clip of a post on the Feed, or a post with none (`clip` null). */
+export type PostRow<C> = { postId: string; clip: C | null; at: number | null };
+
+type PostClipRef = Pick<FeedClip, "id" | "postId" | "kind">;
+
+/** The newest date this phone noted for saving a post or any of its clips; null when it knows none. */
+function newestMarkOf(savedAt: Readonly<Record<string, number>>, postId: string): number | null {
+  const base = postItemIdOf(postId);
+  let at = 0;
+  for (const [k, v] of Object.entries(savedAt)) {
+    if (k === postId || k === base || k.startsWith(`${base}${PRODUCT_SEP}`)) at = Math.max(at, v || 0);
+  }
+  return at || null;
+}
+
+/** The marks this phone keeps for a post (`savedAt` keys: the post's, its clips'), so unsaving a
+ *  post with no clip leaves no date behind. */
+export function postMarksOf(savedAt: Readonly<Record<string, number>>, postId: string): string[] {
+  const base = postItemIdOf(postId);
+  return Object.keys(savedAt).filter((k) => k === postId || k === base || k.startsWith(`${base}${PRODUCT_SEP}`));
+}
+
+/** Saved (SOC-4): every post on the web's Saved list. A post with a clip on the Feed is listed by its
+ *  clips as `savedRows` lists them; a post with none (never on the marketplace, or off sale now) is
+ *  listed as itself, dated by the newest mark this phone keeps for it — so a post saved on the web,
+ *  or saved here while it was on sale, is never missing. Newest saved first, as `savedRows` orders. */
+export function savedPostRows<C extends PostClipRef>(savedPosts: readonly string[], savedAt: Readonly<Record<string, number>>, clips: readonly C[]): PostRow<C>[] {
+  const posts = savedPosts.filter(isPostId);
+  const index = new Map(posts.map((p, i) => [p, i] as const));
+  const listed = savedRows(posts, savedAt, clips).map((r) => ({ postId: r.clip.postId, clip: r.clip as C | null, at: r.at, i: index.get(r.clip.postId) ?? 0 }));
+  const shown = new Set(listed.map((r) => r.postId));
+  const bare = posts.flatMap((postId, i) => (shown.has(postId) ? [] : [{ postId, clip: null, at: newestMarkOf(savedAt, postId), i }]));
+  return [...listed, ...bare].sort((a, b) => (b.at ?? 0) - (a.at ?? 0) || b.i - a.i).map(({ postId, clip, at }) => ({ postId, clip, at }));
+}
+
+/** Appreciated (SOC-4): every post you appreciated, newest first — its Project clip while it plays on
+ *  the Feed, else the post itself. A share's own appreciations stay on the Timeline. */
+export function appreciatedPostRows<C extends PostClipRef>(appreciated: readonly string[], clips: readonly C[]): PostRow<C>[] {
+  return appreciated
+    .filter(isPostId)
+    .map((postId) => ({ postId, clip: clips.find((c) => c.postId === postId && c.kind === "project") ?? null, at: null }))
+    .reverse();
+}
+
+/** Where a clip's address leads when the clip isn't on the Feed but its item is still there — it left
+ *  the Marketplace, or was never on it (SOC-9, SOC-3); the web's post page stays, comments and all:
+ *  - an address that opens the comments (`?comment=`: a comment notice, a copied comment link) opens
+ *    the post on its maker's Timeline (`timeline`, that profile's address) with its comments, on that
+ *    comment;
+ *  - any other, or a post on no Timeline (`timeline` null: your own project, never shared), opens the
+ *    item's details, never "Clip not found". */
+export function offFeedHrefOf(
+  item: Pick<FeedClip, "projectId" | "productId" | "postId">,
+  comment: string | null,
+  timeline: string | null,
+): string {
+  if (comment === null || !timeline) return clipDetailsHref(item);
+  const q = new URLSearchParams({ post: item.postId });
+  if (comment) q.set("comment", comment);
+  return `${timeline}?${q}`;
+}

@@ -24,7 +24,8 @@ import { Spinner } from "@/components/ideeza/spinner";
 import { Textarea } from "@/components/ideeza/text-input";
 import { Field, useFieldIds } from "@/components/auth/auth-parts";
 import { rememberSentReport } from "@/lib/data/reports";
-import { deviceOf, pageRefFor } from "@/lib/support/page-context";
+import { deviceOf, namesFor, pageRefFor, placeLine } from "@/lib/support/page-context";
+import { useManualProjects } from "@/lib/manual/projects";
 import {
   DETAILS_COUNTER_FROM,
   DETAILS_MAX,
@@ -63,7 +64,8 @@ export function newReportId(): string {
 
 /** What the phone can say about where you were: the screen you came from, this browser, this window. */
 export function phoneContext(from: string): ReportContext {
-  const ref = pageRefFor(from);
+  const [path, query = ""] = from.split("?");
+  const ref = pageRefFor(path, query);
   const { browser, os } = deviceOf(navigator.userAgent, navigator.maxTouchPoints);
   const dark = document.documentElement.getAttribute("data-theme") === "dark" || window.matchMedia?.("(prefers-color-scheme: dark)").matches;
   return {
@@ -133,7 +135,13 @@ export function ReportScreen() {
   const raw = params.get("from") ?? "";
   const from = raw.startsWith("/m") ? raw : "/m/help";
   const done = useGoBack(from);
-  const [context] = React.useState(() => phoneContext(from));
+  const [taken] = React.useState(() => phoneContext(from));
+  // The project and product it is about, by name, as the web's report says them (once this browser's projects are read).
+  const { projects } = useManualProjects();
+  const context = React.useMemo(() => {
+    const [path, query = ""] = from.split("?");
+    return { ...taken, ...namesFor(pageRefFor(path, query), projects, null) };
+  }, [taken, from, projects]);
   const ids = useFieldIds(["kind", "impact", "details", "images"] as const);
   // The draft as kept; a link's `?details=` / `?kind=` fill only what it leaves empty (the web's prefill rule).
   const [start] = React.useState<Draft>(() => {
@@ -308,7 +316,7 @@ export function ReportScreen() {
         </p>
         <div className="flex flex-col gap-3">
           <span className={T.label}>Page</span>
-          <p className={cn(T.bodyLg, "flex h-[44px] items-center rounded-xl bg-bg-subtle px-6 text-text-secondary")}>{context.page}</p>
+          <p className={cn(T.bodyLg, "flex h-[44px] items-center rounded-xl bg-bg-subtle px-6 text-text-secondary")}>{placeLine(context)}</p>
         </div>
         <div className="flex flex-col gap-4">
           <input
@@ -368,7 +376,7 @@ export function ReportScreen() {
           <span className="flex flex-col gap-1">
             <span className={cn(T.body, "text-text-primary")}>Send page and device details</span>
             <span className={T.meta}>
-              {context.page} · {context.browser} on {context.os}
+              {placeLine(context)} · {context.browser} on {context.os}
             </span>
           </span>
         </label>

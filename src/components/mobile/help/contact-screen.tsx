@@ -3,9 +3,11 @@
 // Contact support (/m/help/contact; mobile Figma "Contact support · Live
 // chat"). IDEEZA has no live agents, so nobody pretends to type: each message
 // goes to the IDEEZA team as a report (/api/reports, kind "other", with up
-// to 3 screenshots), and the thread answers with its reference and that the
-// team replies by email (lib/support/support-chat.ts keeps the thread in
-// this browser). A message that didn't arrive says so and can be sent again;
+// to 3 screenshots), and the thread answers with its reference in the web's
+// words (support/report-problem.tsx): the team can't reply in the app yet and
+// Settings › Your reports keeps it — no email is promised, as on the web
+// (SET-3; lib/support/support-chat.ts keeps the thread in this browser).
+// A message that didn't arrive says so and can be sent again;
 // after a reload its screenshots are gone (they are never stored), and it
 // says so before sending the words alone. The Figma's composer is kept:
 // the emoji button opens a sheet that types at the cursor, and the mic sits
@@ -17,7 +19,6 @@ import { Cancel01Icon, Image01Icon, Mic01Icon, SentIcon, SmileIcon, Tick02Icon, 
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Textarea } from "@/components/ideeza/text-input";
-import { useAuth } from "@/lib/account/auth";
 import { rememberSentReport } from "@/lib/data/reports";
 import { IMAGES_MAX, admitImages, titleOf } from "@/lib/support/problem-report";
 import { imageFilesOf, shrinkFile, type ReportImage } from "@/lib/support/report-images";
@@ -48,7 +49,6 @@ const ICON_BTN =
   "inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:text-[color:var(--color-icon-disabled)] disabled:hover:bg-transparent";
 
 export function ContactScreen() {
-  const { account } = useAuth();
   const online = useOnline();
   const toast = useToast();
   const [thread, setThread] = React.useState<ChatMessage[] | null>(null);
@@ -153,7 +153,6 @@ export function ContactScreen() {
     void deliver({ id: m.id, text: m.text, at: m.at, state: m.state }, []);
   };
 
-  const email = account?.email ?? "your account’s email";
   return (
     <Screen
       top={<TopBar back="/m/help" title="Contact support" />}
@@ -240,13 +239,13 @@ export function ContactScreen() {
         </div>
       }
     >
-      <p className={cn(T.meta, "-mt-2 pb-6 text-center")}>IDEEZA team · replies by email</p>
+      <p className={cn(T.meta, "-mt-2 pb-6 text-center")}>IDEEZA team · can’t reply in the app yet</p>
       <div className="pb-6">
         <OfflineBanner />
       </div>
       <ol className="flex flex-col gap-6" aria-live="polite">
         <TeamBubble>
-          Hi, this is IDEEZA support. Tell us what you need: each message goes to the team, and we answer by email at {email}.
+          Hi, this is IDEEZA support. Tell us what you need: each message goes to the IDEEZA team. We can’t reply in the app yet.
         </TeamBubble>
         {(thread ?? []).map((m, i, all) => (
           <React.Fragment key={m.id}>
@@ -279,7 +278,7 @@ export function ContactScreen() {
             </li>
             {m.state === "sent" && m.ref && (
               <TeamBubble at={m.at}>
-                Got it: it’s with the IDEEZA team as <span className="font-mono">{m.ref}</span>. We’ll answer by email at {email}. Settings › Your reports keeps it.
+                It’s with the IDEEZA team as <span className="font-mono">{m.ref}</span>. We can’t reply in the app yet. Settings › Your reports keeps it.
               </TeamBubble>
             )}
           </React.Fragment>

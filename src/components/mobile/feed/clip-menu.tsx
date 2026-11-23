@@ -9,6 +9,8 @@
 // - Save video saves this clip (a product clip is saved as itself, not as its
 //   project); its post goes on the web's Saved list with its first saved clip;
 // - Copy link copies the clip's own address ("Link to post copied to clipboard");
+//   Share via… hands it to the phone's own share sheet (WhatsApp, Messages…: the
+//   web's Share on Facebook / LinkedIn / X / WhatsApp in one row, SOC-5);
 // - Playback speed (kept) and Video quality are pick-one sheets (quality offers
 //   what the clip really has, and Data saver — Settings › Appearance's switch,
 //   one for the app — which waits for a tap before playing); their rows say
@@ -35,6 +37,7 @@ import {
   Link01Icon,
   News01Icon,
   PencilEdit02Icon,
+  SentIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
   Video01Icon,
@@ -70,6 +73,7 @@ import { ReportSheet, type ReportReason } from "../kit/report-sheet";
 import { ActionSheet, Sheet, type ActionSheetItem } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import { T } from "../type";
+import { useShareVia } from "./share-via";
 import { useFeedClips } from "./use-clips";
 import { useFeedPrefs } from "./use-feed";
 import type { Guard } from "./use-guest";
@@ -149,6 +153,7 @@ export function ClipMenu({
   const { isSaved, toggleSave } = useSaveClip();
   const post = useReportedPost(clip.postId);
   const copy = useCopyClipLink();
+  const shareVia = useShareVia();
   const [sheet, setSheet] = React.useState<"speed" | "quality" | "report" | "edit" | "stop" | null>(null);
 
   const mine = clip.source === "mine";
@@ -196,6 +201,11 @@ export function ClipMenu({
   ];
   const saveRow: ActionSheetItem = { label: saved ? "Unsave video" : "Save video", icon: saved ? BookmarkRemove01Icon : Bookmark01Icon, onSelect: save };
   const copyRow: ActionSheetItem = { label: "Copy link", icon: Link01Icon, onSelect: () => copy(clip.id) };
+  const shareViaRow: ActionSheetItem = {
+    label: "Share via…",
+    icon: SentIcon,
+    onSelect: () => shareVia({ url: clipHref(clip.id), title: clip.title, copied: "Link to post copied to clipboard" }),
+  };
 
   const items: ActionSheetItem[] = mine
     ? [
@@ -205,6 +215,7 @@ export function ClipMenu({
         { label: "Open project", icon: ArrowRight01Icon, onSelect: () => router.push(projectHref) },
         saveRow,
         copyRow,
+        shareViaRow,
         ...playback,
         // One red row, last: removing a share when this copy is one, else stopping the post (only a shared one).
         ...(clip.share ? shared : posted ? [{ label: "Stop sharing", icon: ViewOffSlashIcon, destructive: true, onSelect: () => setSheet("stop") }] : []),
@@ -222,6 +233,7 @@ export function ClipMenu({
         },
         saveRow,
         copyRow,
+        shareViaRow,
         ...playback,
         { label: "Hide video", icon: ViewOffSlashIcon, onSelect: () => choose("hidden") },
         {

@@ -133,6 +133,55 @@ test("a provider signs in to its email's account, or makes a verified one", asyn
   assert.equal(await auth.providerSignIn("not-an-email", { first: "", last: "" }, NOW), "refused");
 });
 
+test("AUTH-2: a provider's new account fills the profile's name, then asks Sign up's date of birth and Terms", async () => {
+  assert.equal(await auth.providerSignIn("maya@gmail.com", { first: "Maya", last: "Karim" }, NOW), "new");
+  let a = auth.accountOf(auth.readAccounts(), "maya@gmail.com");
+  assert.equal(a.birthDate, "");
+  assert.equal(a.consentAt, 0, "nobody ticked the Terms box yet");
+  assert.equal(auth.needsAccountDetails(a), true);
+  const profile = JSON.parse(store.get("ideeza:profile"));
+  assert.equal(profile.name, "Maya Karim", "the name is saved to the profile, as verifying does");
+  if (a.country) assert.ok(profile.location.length > 0);
+
+  // Sign up's own rules and words.
+  const details = { firstName: "Maya", lastName: "Karim", day: "", month: "", year: "", consent: false };
+  assert.deepEqual(auth.accountDetailsProblems(details, NOW), {
+    birthday: "Choose your day, month and year of birth.",
+    consent: "Agree to the Privacy policy and Terms to continue.",
+  });
+  const full = signUp({ firstName: "", day: "31", month: "2", year: "2000", consent: false });
+  const fromSignUp = auth.signUpProblems(full, NOW);
+  assert.deepEqual(auth.accountDetailsProblems(full, NOW), { firstName: fromSignUp.firstName, birthday: fromSignUp.birthday, consent: fromSignUp.consent });
+  assert.equal(auth.completeAccountDetails(details, NOW + 5), "invalid");
+
+  assert.equal(auth.completeAccountDetails({ ...details, day: "9", month: "3", year: "1994", consent: true }, NOW + 5), "ok");
+  a = auth.accountOf(auth.readAccounts(), "maya@gmail.com");
+  assert.equal(a.birthDate, "1994-03-09");
+  assert.equal(a.consentAt, NOW + 5);
+  assert.equal(auth.needsAccountDetails(a), false);
+});
+
+test("AUTH-2: a provider that shared no name: the details give it, and the profile takes it", async () => {
+  assert.equal(await auth.providerSignIn("sora@gmail.com", { first: "", last: "" }, NOW), "new");
+  assert.equal(JSON.parse(store.get("ideeza:profile") ?? "{}").name ?? "", "");
+  const a = auth.accountOf(auth.readAccounts(), "sora@gmail.com");
+  assert.equal(auth.needsAccountDetails(a), true);
+  const input = { firstName: "Sora", lastName: "Ito", day: "1", month: "12", year: "2001", consent: true };
+  assert.equal(auth.completeAccountDetails(input, NOW + 1), "ok");
+  const done = auth.accountOf(auth.readAccounts(), "sora@gmail.com");
+  assert.equal(done.firstName, "Sora");
+  assert.equal(done.lastName, "Ito");
+  assert.equal(JSON.parse(store.get("ideeza:profile")).name, "Sora Ito");
+  // An account Sign up made never needs them.
+  assert.equal(await auth.createAccount(signUp(), "", NOW), "ok");
+  assert.equal(auth.needsAccountDetails(auth.accountOf(auth.readAccounts(), "rafi@mail.com")), false);
+});
+
+test("AUTH-2: an older account that never gave a date of birth isn't stopped for one", () => {
+  assert.equal(auth.needsAccountDetails({ firstName: "Ana", lastName: "Lee", birthDate: "", consentAt: 5 }), false);
+  assert.equal(auth.needsAccountDetails({ firstName: "Ana", lastName: "Lee", birthDate: "2000-01-01", consentAt: 0 }), true);
+});
+
 test("a link's utm_source is kept with the account made from it, so the question isn't asked", async () => {
   assert.equal(await auth.createAccount(signUp(), "YouTube Ads!", NOW), "ok");
   const byEmail = auth.accountOf(auth.readAccounts(), "rafi@mail.com");

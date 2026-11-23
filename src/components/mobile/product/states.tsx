@@ -9,7 +9,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { HelpCircleIcon, Store01Icon } from "@hugeicons/core-free-icons";
+import { HelpCircleIcon, PauseIcon, Store01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { buttonVariants } from "@/components/ideeza/button";
@@ -116,8 +116,9 @@ export function PieceMissing({ title, body, back }: { title: string; body: strin
   );
 }
 
-/** 32a · not on the marketplace; 32b · off it for now (its creator paused it). The phone's
- *  marketplace items live on the Feed, so that is where Back goes. */
+/** 32a · not on the marketplace; 32b · off it for now (its creator paused it: the shop and each of its
+ *  product pages, the web's OffMarketGate, its pause mark). The phone's marketplace items live on the Feed,
+ *  so that is where Back goes. */
 export function OffMarket({ paused }: { paused: boolean }) {
   return (
     <CardScreen>
@@ -126,7 +127,7 @@ export function OffMarket({ paused }: { paused: boolean }) {
         tone="empty"
         className="w-full"
         titleAs="h1"
-        icon={<Icon icon={paused ? HelpCircleIcon : Store01Icon} size={32} />}
+        icon={<Icon icon={paused ? PauseIcon : Store01Icon} size={32} />}
         title={paused ? "This project is off the marketplace for now" : "This project isn’t on the marketplace"}
         body={
           paused

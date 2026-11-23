@@ -116,3 +116,16 @@ test("the Products tab's sort from the address", () => {
   assert.equal(p.parseProductSort("zzz"), "project");
   assert.equal(p.parseProductSort(null), "project");
 });
+
+test("a paused listing is off the marketplace, unless the buyer already bought part of it (BUY-4)", () => {
+  const sales = [
+    { projectId: "p1", buyerId: "buyer-leo" },
+    { projectId: "p2", buyerId: "buyer-mira" },
+  ];
+  assert.equal(p.offMarketNow({ listing: "live", projectId: "p1", sales, buyerId: "buyer-mira" }), false);
+  assert.equal(p.offMarketNow({ listing: "paused", projectId: "p1", sales, buyerId: "buyer-mira" }), true);
+  assert.equal(p.offMarketNow({ listing: "paused", projectId: "p1", sales, buyerId: "buyer-leo" }), false);
+  // A sale of another project is no holding of this one.
+  assert.equal(p.offMarketNow({ listing: "paused", projectId: "p1", sales: [{ projectId: "p2", buyerId: "buyer-mira" }], buyerId: "buyer-mira" }), true);
+  assert.equal(p.offMarketNow({ listing: "paused", projectId: "p1", sales: [], buyerId: null }), true);
+});

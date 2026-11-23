@@ -8,7 +8,9 @@
 // sticky under the top bar), then the seven sections as cards; Print or save
 // as PDF (`window.print()`) is the screen's one primary at the foot. The top
 // bar's ⋯ (M12) holds Edit · Regenerate · Delete business plan… (16e's
-// decision); while a run writes, Edit and Regenerate wait (the menu's line
+// decision; Edit's list ends with Add section, and each section's editor has
+// Move up · Move down · Delete section — EARN-7); while a run writes, Edit
+// and Regenerate wait (the menu's line
 // says so), as on the web, and Print joins the menu while the foot holds the
 // run's own actions. Sold in full (16o): the info banner, no ⋯, Restore off —
 // the plan stays readable and printable.
@@ -33,6 +35,7 @@ import { MORE_ICON } from "../../top-bar";
 import { useEarn } from "../context";
 import { EarnBar, useEarnTopActions } from "../parts";
 import { VersionsSheet } from "./plan-sheets";
+import { AddSectionSheet } from "./section-add";
 import { SectionEditSheet, SectionPickSheet } from "./section-edit";
 import { SectionCard } from "./section-view";
 import { T } from "../../type";
@@ -40,7 +43,7 @@ import { T } from "../../type";
 const RESTORE_MID_RUN = "Restore is available once the plan has finished writing.";
 const PRINT = "Print or save as PDF";
 
-type Open = "menu" | "versions" | "pick" | "regenerate" | "delete" | { edit: string } | null;
+type Open = "menu" | "versions" | "pick" | "add" | "regenerate" | "delete" | { edit: string } | null;
 
 export function PlanDoc({
   plan,
@@ -166,7 +169,28 @@ export function PlanDoc({
           requestAnimationFrame(toTitle);
         }}
       />
-      <SectionPickSheet open={open === "pick"} sections={editableSections(current)} onClose={() => setOpen(null)} onPick={(id) => setOpen({ edit: id })} />
+      <SectionPickSheet
+        open={open === "pick"}
+        sections={editableSections(current)}
+        onClose={() => setOpen(null)}
+        onPick={(id) => setOpen({ edit: id })}
+        onAdd={() => setOpen("add")}
+      />
+      <AddSectionSheet
+        open={open === "add"}
+        projectId={project.id}
+        versionN={current.n}
+        sections={current.sections}
+        planPrompt={current.prompt}
+        saveBlocked={lockReason}
+        onClose={() => setOpen(null)}
+        onAdded={(s) => {
+          setOpen(null);
+          toast({ title: `${s.title} added.` });
+          announce(`${s.title} added.`);
+          requestAnimationFrame(() => document.getElementById(`${anchor(s.id)}-card`)?.scrollIntoView({ block: "start", behavior: "smooth" }));
+        }}
+      />
       {editing && (
         <SectionEditSheet
           key={editing}

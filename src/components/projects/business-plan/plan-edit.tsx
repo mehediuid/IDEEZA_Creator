@@ -28,7 +28,7 @@ function improveContextOf(section: PlanSection, precedingDone: readonly PlanSect
   return [own && `This section, to rewrite:\n${own}`, earlier && `Earlier sections:\n${earlier}`].filter(Boolean).join("\n\n");
 }
 
-function newSectionId(): string {
+export function newSectionId(): string {
   return `bps_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 

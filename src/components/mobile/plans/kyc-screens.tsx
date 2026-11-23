@@ -4,17 +4,14 @@
 // mobile Figma "Level 1", "Level 2", "Level 3").
 // · Level 1 is the web's demo identity check (lib/commerce/kyc.ts): the full
 //   legal name (saved as your one private legal name) and the country of
-//   residence, both required, no seller terms (web V10). The phone adds the
-//   Figma's mobile number with its six-digit code — a Demo text message
-//   shows the code, as the way-in's Demo email does, on the account's code
-//   rules (lib/account/phone.ts) — and the account's email, read only. The
-//   number and the country aren't kept; the check keeps only that you
-//   verified, and when. The number takes its calling code from a picker
-//   (the Figma's flag and code), which follows the country picked above.
-//   While the code step is open its record lives in this tab's session, so
-//   a reload keeps the number. `?next=` may name Get paid, KYC or a
+//   residence, both required, no seller terms (web V10), and nothing else —
+//   the Figma's mobile number, its code and the read-only email are gone, as
+//   a flow the web has follows the web's steps (MON-6). One screen, Verify in
+//   the Bottom action bar (identity-fields.tsx, shared with the first
+//   withdrawal's first step). The country isn't kept; the check keeps only
+//   that you verified, and when. `?next=` may name Get paid, KYC or a
 //   project's Earn, where Verify sends you back. Verified shows the date and
-//   Reset. Offline, sending and completing wait with their reason.
+//   Reset. Offline, Verify waits with its reason.
 // · Levels 2 and 3 (Intermediate from $1,000 of sales, Advanced from $5,000)
 //   need documents and a reviewer the app doesn't have, so a Demo ID check
 //   stands in for the provider (lib/commerce/kyc-levels.ts): Start KYC
@@ -40,18 +37,10 @@ import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
-import { TextInput } from "@/components/ideeza/text-input";
-import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
-import { countryOptions } from "@/components/settings/get-paid/parts";
-import { useAuth } from "@/lib/account/auth";
-import { saveLegalName, useIdentity } from "@/lib/account/identity";
-import { checkCode, newCode, normalizeCode, resendWait, type CodeRecord } from "@/lib/account/phone";
-import { kycFormProblems, KYC_NAME_MAX } from "@/lib/commerce/kyc";
 import { LEVEL_AT, levelStatusOf, reviewLevel, startBlockOf, submitLevel, type HigherLevel, type LevelStatus } from "@/lib/commerce/kyc-levels";
-import { resetKycDemo, useKyc, verifyKycDemo } from "@/lib/commerce/use-commerce";
+import { resetKycDemo, useKyc } from "@/lib/commerce/use-commerce";
 import { clearKycLevels, updateKycLevels, useKycLevels } from "@/lib/commerce/use-kyc-levels";
 import { cn } from "@/lib/utils";
-import { CodeCells } from "../kit/code-cells";
 import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard, ListRow } from "../kit/list";
@@ -62,9 +51,9 @@ import { useToast } from "../kit/toast";
 import { MORE_ICON, TopBar } from "../top-bar";
 import { Screen } from "../screen";
 import { T } from "../type";
-import { DIAL_CODES, flagOf } from "./dial-codes";
 import { LEVEL_NEEDS, SAVE_FAILED } from "./get-paid-screen";
-import { BulletList, OFFLINE_REASON, SearchSelectField, dateOf, n } from "./parts";
+import { IDENTITY_WHY, IdentityFields, useIdentityForm } from "./identity-fields";
+import { BulletList, OFFLINE_REASON, dateOf, n } from "./parts";
 
 const STATUS_BADGE: Record<LevelStatus, { tone: "neutral" | "warning" | "error" | "success"; label: string }> = {
   none: { tone: "neutral", label: "Not submitted" },
@@ -74,7 +63,7 @@ const STATUS_BADGE: Record<LevelStatus, { tone: "neutral" | "warning" | "error" 
 };
 
 const LEVELS: { n: 1 | 2 | 3; title: string; icon: IconValue; line: string }[] = [
-  { n: 1, title: "Verify your identity", icon: UserIdVerificationIcon, line: "Complete the required steps to withdraw and to sell physical copies." },
+  { n: 1, title: "Verify your identity", icon: UserIdVerificationIcon, line: IDENTITY_WHY },
   { n: 2, title: "Intermediate KYC", icon: Shield01Icon, line: `Asked from $${n(LEVEL_AT.intermediate)} of total sales.` },
   { n: 3, title: "Advanced KYC", icon: ShieldUserIcon, line: `Asked from $${n(LEVEL_AT.advanced)} of total sales.` },
 ];
@@ -162,36 +151,6 @@ export function KycLevelScreen() {
 
 /** Where Verify may send you back: Get paid's screens, KYC, or a project's Earn (any of its sections). */
 const NEXT_OK = /^\/m\/(settings\/(idz-pay(\/[a-z-]+)?|kyc)|projects\/[^/?#]+\/earn(\/[a-z-]+)?)$/;
-const LOCAL = /^\d{4,14}$/;
-const digitsOf = (s: string) => s.replace(/[\s()-]/g, "");
-/** The code step's record, for this tab only: a reload keeps the number and the code sent. */
-const STEP_KEY = "ideeza:m:kyc1-step";
-type StepSave = { record: CodeRecord; dial: string; local: string; country: string | null; name: string };
-
-function readStep(): StepSave | null {
-  try {
-    const raw = JSON.parse(sessionStorage.getItem(STEP_KEY) ?? "null") as Partial<StepSave> | null;
-    const record = raw ? normalizeCode(raw.record) : null;
-    if (!raw || !record || typeof raw.dial !== "string" || typeof raw.local !== "string") return null;
-    return { record, dial: raw.dial, local: raw.local, country: typeof raw.country === "string" ? raw.country : null, name: typeof raw.name === "string" ? raw.name : "" };
-  } catch {
-    return null;
-  }
-}
-
-function writeStep(v: StepSave | null): void {
-  try {
-    if (v) sessionStorage.setItem(STEP_KEY, JSON.stringify(v));
-    else sessionStorage.removeItem(STEP_KEY);
-  } catch {
-    // Storage refused: a reload goes back to the form.
-  }
-}
-
-/** Every calling code as a pick-one list: "Bangladesh (+880)". */
-function dialOptions(countries: readonly { value: string; label: string }[]) {
-  return countries.filter((c) => DIAL_CODES[c.value]).map((c) => ({ value: c.value, label: `${flagOf(c.value)} ${c.label} (+${DIAL_CODES[c.value]})` }));
-}
 
 function LevelOne() {
   const kyc = useKyc();
@@ -243,189 +202,18 @@ function LevelOneForm() {
   const params = useSearchParams();
   const toast = useToast();
   const online = useOnline();
-  const { account } = useAuth();
-  const { identity } = useIdentity();
-  const options = React.useMemo(() => countryOptions(), []);
-  const dials = React.useMemo(() => dialOptions(options), [options]);
-  const ids = useFieldIds(["name", "email", "country", "dial", "phone"] as const);
-  const [typed, setTyped] = React.useState<string | null>(null);
-  const name = typed ?? identity.legalName;
-  const [country, setCountry] = React.useState<string | null>(null);
-  const [dialPick, setDialPick] = React.useState<string | null>(null);
-  const [local, setLocal] = React.useState("");
-  const [shown, setShown] = React.useState(false);
-  const [record, setRecord] = React.useState<CodeRecord | null>(null);
-  const [code, setCode] = React.useState("");
-  const [result, setResult] = React.useState<"wrong" | "expired" | "locked" | "ok" | null>(null);
-  const [sms, setSms] = React.useState(false);
-  const [now, setNow] = React.useState(() => Date.now());
-  const [busy, setBusy] = React.useState(false);
+  const { fields, verify } = useIdentityForm();
   const next = params.get("next");
-  const nextOk = next && NEXT_OK.test(next) ? next : null;
-  const back = nextOk ?? "/m/settings/kyc";
-  const formHref = `/m/settings/kyc/1${nextOk ? `?next=${encodeURIComponent(nextOk)}` : ""}`;
-  // The calling code follows the country until you pick one yourself.
-  const dial = dialPick ?? (country && DIAL_CODES[country] ? country : null);
-  const phone = dial ? `+${DIAL_CODES[dial]}${digitsOf(local)}` : "";
-  const wantsCode = params.get("step") === "code";
-
-  // A reload on the code step: the number and the code sent come back from this tab's session.
-  React.useEffect(() => {
-    if (!wantsCode || record) return;
-    const saved = readStep();
-    if (!saved) return;
-    /* eslint-disable react-hooks/set-state-in-effect -- one read of sessionStorage after mount */
-    setRecord(saved.record);
-    setDialPick(saved.dial);
-    setLocal(saved.local);
-    setCountry(saved.country);
-    setTyped(saved.name);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [wantsCode, record]);
-
-  // The code step has its own address, so Back returns to the form with what was typed.
-  const step = wantsCode && record ? "code" : "form";
-
-  React.useEffect(() => {
-    if (step !== "code") return;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [step]);
-
-  const problems = {
-    ...kycFormProblems({ name, country: country ?? "" }),
-    ...(!dial ? { dial: "Choose your country code." } : {}),
-    ...(LOCAL.test(digitsOf(local)) ? {} : { phone: local.trim() ? "Enter the number without its country code: 4 to 14 digits." : "Enter your mobile number." }),
-  } as { name?: string; country?: string; dial?: string; phone?: string };
-  const show = (k: keyof typeof problems) => (shown ? problems[k] : undefined);
-
-  const send = () => {
-    if (!online) return toast({ title: OFFLINE_REASON, lead: "error" });
-    const at = Date.now();
-    const r: CodeRecord = { v: 1, purpose: "verify", email: account?.email ?? "phone", code: newCode(), sentAt: at, tries: 0, lockedUntil: 0 };
-    setRecord(r);
-    writeStep({ record: r, dial: dial ?? "", local, country, name });
-    setCode("");
-    setResult(null);
-    setNow(at);
-    setSms(true);
-  };
+  const back = next && NEXT_OK.test(next) ? next : "/m/settings/kyc";
 
   const submit = () => {
-    if (problems.name || problems.country || problems.dial || problems.phone) {
-      setShown(true);
-      document.getElementById(problems.name ? ids.name.id : problems.country ? ids.country.id : problems.dial ? ids.dial.id : ids.phone.id)?.focus();
-      return;
-    }
     if (!online) return;
-    send();
-    router.push(`/m/settings/kyc/1?step=code${nextOk ? `&next=${encodeURIComponent(nextOk)}` : ""}`);
-  };
-
-  const check = (value: string) => {
-    setCode(value);
-    if (!record || value.length < 6) {
-      if (result === "wrong") setResult(null);
-      return;
-    }
-    const r = checkCode(record, value, Date.now());
-    setRecord(r.record);
-    setResult(r.result);
-  };
-
-  const complete = () => {
-    if (busy || !online) return;
-    setBusy(true);
-    if (!saveLegalName(name).ok || !verifyKycDemo()) {
-      setBusy(false);
-      toast({ title: SAVE_FAILED, lead: "error" });
-      return;
-    }
-    writeStep(null);
+    const result = verify();
+    if (result === "invalid") return;
+    if (result === "failed") return toast({ title: SAVE_FAILED, lead: "error" });
     toast({ title: "Identity verified (demo)", lead: "success" });
     router.replace(back);
   };
-
-  if (step === "code" && record) {
-    const wait = resendWait(record, now);
-    const masked = phone.replace(/^(\+\d{1,3})(\d+)(\d{3})$/, (_, a: string, b: string, c: string) => `${a} ${"•".repeat(Math.min(6, b.length))}${c}`);
-    return (
-      <Screen
-        top={<TopBar back={formHref} title="Verify your number" />}
-        className="px-8 pb-8 pt-8"
-        footer={
-          <BottomBar>
-            {!online && (
-              <p id="code-why" role="status" className={T.caption}>
-                {OFFLINE_REASON}
-              </p>
-            )}
-            {result === "ok" ? (
-              <Button size="xl" className="w-full" loading={busy} disabled={!online} aria-describedby={!online ? "code-why" : undefined} onClick={complete}>
-                Complete verification
-              </Button>
-            ) : (
-              <Button size="xl" className="w-full" disabled={code.length < 6} onClick={() => check(code)}>
-                Verify code
-              </Button>
-            )}
-          </BottomBar>
-        }
-      >
-        <div className="flex flex-col items-center gap-8 text-center">
-          <p className={T.bodyLg}>
-            Enter the 6-digit code we sent to <span className="font-medium">{masked}</span>.{" "}
-            <button type="button" onClick={() => router.replace(formHref)} className="font-medium text-text-brand hover:underline">
-              Change number
-            </button>
-          </p>
-          <CodeCells value={code} onChange={check} invalid={result === "wrong" || result === "expired" || result === "locked"} disabled={result === "ok" || result === "locked"} autoFocus label="Verification code" />
-          <p role={result && result !== "ok" ? "alert" : "status"} className={cn(T.caption, "min-h-[16px]", result === "ok" ? "text-text-success" : "text-text-error")}>
-            {result === "ok"
-              ? "Mobile number verified successfully"
-              : result === "wrong"
-                ? "Invalid verification code. Please try again."
-                : result === "expired"
-                  ? "That code has expired. Send a new one."
-                  : result === "locked"
-                    ? "Too many wrong codes. Try again in a few minutes."
-                    : ""}
-          </p>
-          {result !== "ok" && (
-            <p className={T.body}>
-              Didn’t get a code?{" "}
-              <button type="button" disabled={wait > 0 || !online} onClick={send} className="font-medium text-text-brand disabled:text-text-disabled hover:underline">
-                Resend{wait > 0 ? ` (${Math.ceil(wait / 1000)}s)` : ""}
-              </button>
-            </p>
-          )}
-          <button type="button" onClick={() => setSms(true)} className={cn(T.caption, "min-h-[44px] font-medium text-text-brand hover:underline")}>
-            Show the Demo text message
-          </button>
-        </div>
-        <Sheet
-          open={sms}
-          onClose={() => setSms(false)}
-          title="Demo text message"
-          description="Stands in for the text your phone would get (prototype only). Nothing is sent."
-          actions={
-            <Button
-              size="xl"
-              className="w-full"
-              onClick={() => {
-                setSms(false);
-                check(record.code);
-              }}
-            >
-              Use this code
-            </Button>
-          }
-        >
-          <p className={cn(T.body, "rounded-xl bg-bg-subtle px-6 py-5 text-text-primary")}>IDEEZA: {record.code} is your verification code. It works for 10 minutes. Don’t share it.</p>
-        </Sheet>
-      </Screen>
-    );
-  }
 
   return (
     <Screen
@@ -434,12 +222,12 @@ function LevelOneForm() {
       footer={
         <BottomBar>
           {!online && (
-            <p id="send-why" role="status" className={T.caption}>
+            <p id="verify-why" role="status" className={T.caption}>
               {OFFLINE_REASON}
             </p>
           )}
-          <Button size="xl" className="w-full" disabled={!online} aria-describedby={!online ? "send-why" : undefined} onClick={submit}>
-            Continue
+          <Button size="xl" className="w-full" disabled={!online} aria-describedby={!online ? "verify-why" : undefined} onClick={submit}>
+            Verify
           </Button>
         </BottomBar>
       }
@@ -451,49 +239,9 @@ function LevelOneForm() {
             <h2 className={T.title}>Verify your identity</h2>
             <Badge tone="neutral">Not submitted</Badge>
           </span>
-          <p className={T.body}>Complete the required steps to withdraw and to sell physical copies.</p>
+          <p className={T.body}>{IDENTITY_WHY}</p>
         </header>
-        <Field label="Full legal name" htmlFor={ids.name.id} error={show("name")} errorId={ids.name.errorId}>
-          <TextInput id={ids.name.id} size="xl" value={name} maxLength={KYC_NAME_MAX} onValueChange={setTyped} autoComplete="name" spellCheck={false} placeholder="Enter your full legal name" {...errorProps(show("name"), ids.name.errorId)} />
-        </Field>
-        <Field label="Email address" htmlFor={ids.email.id}>
-          <TextInput id={ids.email.id} size="xl" value={account?.email ?? ""} readOnly aria-readonly />
-        </Field>
-        <Field label="Country of residence" htmlFor={ids.country.id} error={show("country")} errorId={ids.country.errorId}>
-          <SearchSelectField id={ids.country.id} label="Country" placeholder="Select country" value={country} options={options} onChange={setCountry} invalid={!!show("country")} describedBy={show("country") ? ids.country.errorId : undefined} />
-        </Field>
-        <Field label="Mobile number" htmlFor={ids.phone.id} error={show("dial") ?? show("phone")} errorId={ids.phone.errorId}>
-          <div className="flex items-start gap-4">
-            <SearchSelectField
-              id={ids.dial.id}
-              label="Country code"
-              placeholder="Code"
-              value={dial}
-              options={dials}
-              onChange={setDialPick}
-              shown={dial ? `${flagOf(dial)} ${dial} +${DIAL_CODES[dial]}` : undefined}
-              invalid={!!show("dial")}
-              describedBy={show("dial") ? ids.phone.errorId : undefined}
-              className="w-[136px] shrink-0"
-            />
-            <TextInput
-              id={ids.phone.id}
-              size="xl"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel-national"
-              value={local}
-              onValueChange={setLocal}
-              placeholder="555 343 3534"
-              containerClassName="min-w-0 flex-1"
-              {...errorProps(show("phone") ?? show("dial"), ids.phone.errorId)}
-            />
-          </div>
-        </Field>
-        <p className={cn(T.meta, "flex flex-wrap items-center gap-3")}>
-          <TestnetDemoBadge />
-          Demo: nothing is checked or sent anywhere. Your legal name is saved privately in this browser; your number and country aren’t kept.
-        </p>
+        <IdentityFields {...fields} />
       </div>
     </Screen>
   );

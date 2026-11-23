@@ -7,10 +7,14 @@
 // (a tab root, so no Back), your card (photo, name, headline, "@handle · View
 // profile", your level) that opens your profile, then Wallet with your IDZ,
 // Refer and Earn and Plan & pricing with your credits and the web account
-// menu's plan line ("Free plan · Upgrade to Builder", CL-032); Projects with
-// how many you have and Saved Items; Settings, which opens in place on General
-// · Payments · $IDZ Pay · Security · Help and Support · Others; and Sign out as
-// a row. Every row that opens something carries the chevron. No Friends (D-1).
+// menu's plan line ("Free plan · Upgrade to Builder", CL-032), which opens
+// Plans on that plan (MON-4); while the welcome offer runs and its sheet is
+// closed, the row is the offer instead, as the web sidebar's Upgrade card
+// becomes it (CL-004, AUTH-3); Projects with how many you have and Saved
+// Items; Settings, which opens in place on General · Payment method · Get paid
+// · Sign-in & security · Help · Others — each row named as the screen it
+// opens (SET-4); and Sign out as a row. Every row that opens something
+// carries the chevron. No Friends (D-1).
 
 import * as React from "react";
 import Link from "next/link";
@@ -18,7 +22,7 @@ import { useRouter } from "next/navigation";
 import {
   AllBookmarkIcon,
   ArrowDown01Icon,
-  CreditCardIcon,
+  CreditCardPosIcon,
   Globe02Icon,
   HelpCircleIcon,
   Logout01Icon,
@@ -29,6 +33,7 @@ import {
   Settings01Icon,
   Share01Icon,
   Tag01Icon,
+  Wallet01Icon,
   Wallet03Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
@@ -37,8 +42,10 @@ import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
+import { OfferSticker, useWelcomeOffer } from "@/components/credits/welcome-offer";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/account/auth";
+import { OFFER_OFF, countdown } from "@/lib/account/welcome-offer";
 import { creditTotals, levelOf, xpOf } from "@/lib/account/summary";
 import { runningLow } from "@/lib/create/credit-limits";
 import { useCredits } from "@/lib/create/credits";
@@ -54,19 +61,21 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { SignOutSheet } from "../settings/sign-out";
-import { usePlanLine } from "../plans/upsell";
+import { usePhonePitch, usePlanLine } from "../plans/upsell";
 
 /** A row's value at its end ("Free · 28 credits", "5"); the warning ink once credits run low. */
 export function HubValue({ children, warning }: { children: React.ReactNode; warning?: boolean }) {
   return <span className={cn("tabular-nums", warning && "text-text-warning")}>{children}</span>;
 }
 
+// The Figma's in-place list, each row named (and drawn) as the screen it opens and as Settings
+// itself names it — "Get paid", not "$IDZ Pay" (SET-4; lib/settings/registry.ts, settings/root.tsx).
 const SETTINGS: readonly { href: string; icon: IconValue; label: string }[] = [
   { href: PHONE_SETTINGS_GENERAL_HREF, icon: Globe02Icon, label: "General" },
-  { href: "/m/settings/payments", icon: CreditCardIcon, label: "Payments" },
-  { href: "/m/settings/idz-pay", icon: CreditCardIcon, label: "$IDZ Pay" },
-  { href: "/m/settings/security", icon: SecurityPasswordIcon, label: "Security" },
-  { href: "/m/help", icon: HelpCircleIcon, label: "Help and Support" },
+  { href: "/m/settings/payments", icon: CreditCardPosIcon, label: "Payment method" },
+  { href: "/m/settings/idz-pay", icon: Wallet01Icon, label: "Get paid" },
+  { href: "/m/settings/security", icon: SecurityPasswordIcon, label: "Sign-in & security" },
+  { href: "/m/help", icon: HelpCircleIcon, label: "Help" },
   { href: PHONE_SETTINGS_OTHERS_HREF, icon: MenuSquareIcon, label: "Others" },
 ];
 
@@ -138,11 +147,41 @@ function PlanValue() {
   );
 }
 
-/** The Plan & pricing row: the web account menu's plan line as its meta ("Free plan · Upgrade to Builder",
- *  CL-032); it opens Plans, whose bar already offers the next plan's Upgrade. */
+const OFF = `${Math.round(OFFER_OFF * 100)}%`;
+
+/** The Plan & pricing row: the web account menu's plan line as its meta ("Builder plan · Upgrade to
+ *  Disruptor", CL-032). It opens Plans on the plan that line names, so its bar reads "Upgrade to
+ *  Disruptor" — the web's link opens that plan's checkout (MON-4); on Disruptor, Plans as it is.
+ *  While the welcome offer runs and its sheet has been closed, the row is the offer, as the web
+ *  sidebar's Upgrade card becomes it (CL-004, AUTH-3): the gift and its clock as the meta, the OFF
+ *  sticker at the end, opening Plans, where every plan shows its offer price. */
 function PlanRow() {
   const line = usePlanLine();
-  return <ListRow href="/m/plans" icon={Tag01Icon} title="Plan & pricing" meta={line ?? undefined} value={<PlanValue />} />;
+  const pitch = usePhonePitch();
+  const offer = useWelcomeOffer();
+  if (offer.ready && offer.live && offer.entry?.closedAt != null)
+    return (
+      <ListRow
+        href="/m/plans"
+        icon={Tag01Icon}
+        title="Plan & pricing"
+        meta={
+          <>
+            Welcome gift: {OFF} off · ends in <span className="tabular-nums">{countdown(offer.left)}</span>
+          </>
+        }
+        trailing={<OfferSticker size="sm" />}
+      />
+    );
+  return (
+    <ListRow
+      href={pitch ? `/m/plans?pick=${pitch.plan.tier}` : "/m/plans"}
+      icon={Tag01Icon}
+      title="Plan & pricing"
+      meta={line ?? undefined}
+      value={<PlanValue />}
+    />
+  );
 }
 
 function ProjectsValue() {

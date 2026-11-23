@@ -12,6 +12,9 @@ const ROOT_EDITORS: Record<string, Place> = { pcb: "pcb", code: "editor", "3d": 
 export function placeOf(pathname: string): Place | null {
   if (pathname === "/") return "home";
   const parts = pathname.split("/").filter(Boolean);
+  // The phone app (/m) has none of the web's places: its own guide strip walks the first product
+  // there (components/mobile/guide), so the web's card, tips and offers stay off it.
+  if (parts[0] === "m") return null;
   if (parts[0] === "chat" && parts[1]) return "chat";
   if (parts[0] === "projects" && parts.length === 2) return "project";
   // Earn and its tabs; its mint flow is a page of its own, without the tabs.

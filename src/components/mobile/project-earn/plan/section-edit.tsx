@@ -10,22 +10,30 @@
 // a changed AI section becomes "Edited by you", never a new version).
 // Leaving with unsaved edits asks first ("Discard your changes?"). Once the
 // project is sold in full while the sheet is open, Save says why it can't.
+// EARN-7 (the web's edit menu and Add section): the section list ends with
+// Add section (section-add.tsx), and "Edit · {Section}" has the section's ⋯ —
+// Move up · Move down · Delete section, written to the version at once
+// (Delete with Undo).
 
 import * as React from "react";
-import { AiMagicIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, ArrowDown01Icon, ArrowUp01Icon, Delete02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
+import { IconButton } from "@/components/ideeza/icon-button";
 import { Tag } from "@/components/ideeza/tag";
 import { TextInput, Textarea } from "@/components/ideeza/text-input";
 import { saveEditedSections } from "@/components/projects/business-plan/plan-edit";
 import { fetchPlanSection } from "@/components/projects/business-plan/plan-runner";
 import { ESTIMATE_NOTE, labelize, provenanceLabel, sectionContextText } from "@/components/projects/business-plan/plan-section";
 import type { PlanSection, PricingTier } from "@/lib/manual/business-plan";
+import { movedSections, withoutSection } from "@/lib/manual/phone-plan-money";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
-import { Sheet } from "../../kit/sheet";
+import { ActionSheet, Sheet, type ActionSheetItem } from "../../kit/sheet";
 import { Chevron } from "../../kit/list";
+import { useToast } from "../../kit/toast";
+import { MORE_ICON } from "../../top-bar";
 import { EARN_NOTE } from "../parts";
 import { FIELD_LABEL } from "./section-view";
 import { T } from "../../type";
@@ -33,17 +41,20 @@ import { T } from "../../type";
 const IMPROVE_CHIPS = ["Make it shorter", "Add more detail", "More formal tone"];
 const BLOCK = "rounded-xl border-[length:var(--border-width-1)] border-solid border-border p-6";
 
-/** ⋯ › Edit: which written section to edit. */
+/** ⋯ › Edit: which written section to edit, and, as the last row, Add section (EARN-7). */
 export function SectionPickSheet({
   open,
   sections,
   onClose,
   onPick,
+  onAdd,
 }: {
   open: boolean;
   sections: readonly PlanSection[];
   onClose: () => void;
   onPick: (id: string) => void;
+  /** Add section: the web's "Add section", a sheet of its own (section-add.tsx). */
+  onAdd: () => void;
 }) {
   return (
     <Sheet open={open} onClose={onClose} title="Edit a section">
@@ -66,6 +77,22 @@ export function SectionPickSheet({
             </button>
           </li>
         ))}
+        <li>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => {
+              onClose();
+              onAdd();
+            }}
+            className="flex min-h-[44px] w-full items-center gap-4 rounded-md px-8 py-3 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <span aria-hidden className="shrink-0 text-text-brand">
+              <Icon icon={PlusSignIcon} size={24} />
+            </span>
+            <span className={cn(T.bodyLg, "min-w-0 flex-1 text-text-brand")}>Add section</span>
+          </button>
+        </li>
       </ul>
     </Sheet>
   );
@@ -277,10 +304,39 @@ export function SectionEditSheet({
   const original = index >= 0 ? sections[index] : null;
   const [draft, setDraft] = React.useState<PlanSection | null>(original);
   const [confirming, setConfirming] = React.useState(false);
+  const [menu, setMenu] = React.useState(false);
+  const toast = useToast();
   const base = React.useId();
   const blockedId = React.useId();
   if (!original || !draft) return null;
   const dirty = JSON.stringify(draft) !== JSON.stringify(original);
+
+  // The section's own ⋯ (the web's edit menu, EARN-7): Move up · Move down · Delete section. They
+  // change the plan's order or drop the section from this version at once, in place (the same
+  // `saveEditedSections`, so no section's provenance changes); the fields being edited stay as they
+  // are until Save changes. Delete closes the sheet, with Undo in its toast.
+  const move = (dir: -1 | 1) => {
+    if (saveBlocked) return;
+    const next = movedSections(sections, original.id, dir);
+    if (!next) return;
+    saveEditedSections(projectId, versionN, sections, next);
+    toast({ title: `${original.title} moved ${dir < 0 ? "up" : "down"}.` });
+  };
+  const remove = () => {
+    if (saveBlocked) return;
+    const before = sections.slice();
+    saveEditedSections(projectId, versionN, before, withoutSection(before, original.id));
+    onClose();
+    toast({
+      title: `${original.title} deleted.`,
+      action: { label: "Undo", onClick: () => saveEditedSections(projectId, versionN, before, before) },
+    });
+  };
+  const menuItems: ActionSheetItem[] = [
+    ...(index > 0 ? [{ label: "Move up", icon: ArrowUp01Icon, onSelect: () => move(-1) }] : []),
+    ...(index < sections.length - 1 ? [{ label: "Move down", icon: ArrowDown01Icon, onSelect: () => move(1) }] : []),
+    { label: "Delete section", icon: Delete02Icon, destructive: true, onSelect: remove },
+  ];
 
   const leave = () => {
     if (dirty) setConfirming(true);
@@ -323,6 +379,20 @@ export function SectionEditSheet({
           </>
         }
       >
+        <div className="-my-3 flex min-h-[44px] items-center justify-between gap-4">
+          <span className={T.meta}>{provenanceLabel(original.origin)}</span>
+          {!saveBlocked && (
+            <IconButton
+              hierarchy="ghost"
+              size="xl"
+              aria-label="Actions for this section"
+              aria-haspopup="dialog"
+              icon={<Icon icon={MORE_ICON} size={20} />}
+              onClick={() => setMenu(true)}
+              className="-mr-4 shrink-0 text-[color:var(--color-icon-default)]"
+            />
+          )}
+        </div>
         {draft.kind === "custom" && (
           <div className="flex flex-col gap-3">
             <label htmlFor={`${base}-title`} className={cn(FIELD_LABEL, "text-text-primary")}>
@@ -348,6 +418,7 @@ export function SectionEditSheet({
           onKeep={(fields) => setDraft({ ...draft, fields, origin: draft.origin === "added" ? "added" : "edited" })}
         />
       </Sheet>
+      <ActionSheet open={menu} onClose={() => setMenu(false)} title={original.title} items={menuItems} />
       <ConfirmSheet
         open={confirming}
         onClose={() => setConfirming(false)}

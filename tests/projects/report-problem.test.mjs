@@ -188,6 +188,26 @@ test("every page has a name in the maker's words", () => {
   for (const [path, page] of cases) assert.equal(pageRefFor(path.split("?")[0], path.split("?")[1] ?? "").page, page, path);
 });
 
+test("a phone screen with a web twin is named like it, with Mobile in front, and keeps its project (SET-2)", () => {
+  const cases = [
+    ["/m/projects/p_1", "Mobile › Project page", "/m/projects/[id]"],
+    ["/m/projects/p_1/products/prd_1", "Mobile › Product page", "/m/projects/[id]/products/[productId]"],
+    ["/m/projects/p_1/products/prd_1?view=market", "Mobile › Marketplace listing › Product", "/m/marketplace/[id]/products/[productId]"],
+    ["/m/projects/p_1/earn/sell", "Mobile › Earn › Sell", "/m/projects/[id]/earn/[section]"],
+    ["/m/projects/p_1/market", "Mobile › Marketplace listing", "/m/marketplace/[id]"],
+    ["/m/ai/chat/c1", "Mobile › AI chat", "/m/chat/[chatId]"],
+    ["/m/projects", "Mobile › Projects", null],
+    ["/m/help", "Mobile › Help", null],
+  ];
+  for (const [path, page, route] of cases) {
+    const r = pageRefFor(path.split("?")[0], path.split("?")[1] ?? "");
+    assert.equal(r.page, page, path);
+    if (route) assert.equal(r.route, route, path);
+  }
+  assert.deepEqual(pageRefFor("/m/projects/p_1/products/prd_1").project, { key: "p_1" });
+  assert.equal(pageRefFor("/m/projects/p_1/products/prd_1").productId, "prd_1");
+});
+
 test("the route pattern carries no ids, and query values other than tabs are never read", () => {
   const r = pageRefFor("/messages/new", "to=ana&as=me&q=secret");
   assert.equal(r.route, "/messages/new");

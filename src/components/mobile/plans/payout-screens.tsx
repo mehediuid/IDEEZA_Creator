@@ -6,18 +6,24 @@
 //   a name — then Review all information, then signed in the wallet sheet
 //   (the web's MethodDialog: addMethod, methodRequest). The Figma's bank
 //   screens ask for account and ID numbers, which the app doesn't take.
-// · Withdraw money (/m/settings/idz-pay/withdraw): the available balance,
-//   the method, Full balance or Other amount, the fee ($0.00) and the total
-//   (the amount you withdraw is the screen's figure; Withdraw $x sits in the
-//   Bottom action bar, the top bar's Back cancels), then the wallet's signature — the web's "confirm it's you", in place of
-//   the Figma's emailed code — and "Withdrawal recorded" with the way to the
-//   history. A withdrawal in IDZ pays out at the app's one IDZ price.
-//   Offline, Withdraw and Add wait with their reason. Identity (Level 1) comes first, as the web asks it at the first
-//   withdrawal; a first withdrawal with no method sets one up first.
+// · Withdraw money (/m/settings/idz-pay/withdraw): the web's Withdraw dialog
+//   (components/settings/get-paid/withdraw-dialog.tsx) as one screen in
+//   steps, asking only what is missing (`withdrawStepsOf`, fixed when the
+//   screen opens): Verify your identity (Level 1, the first time only), Where
+//   the money goes (a first withdrawal with no method: the same fields as
+//   Information setup), then How much — the available balance, Full balance
+//   or Other amount, the method, the fee ($0.00) and the total. Each step's
+//   button sits in the Bottom action bar; the top bar's Back goes to the step
+//   before. One signature in the wallet sheet records the withdrawal and, on a
+//   first withdrawal, saves the new method as your default ("New withdrawal
+//   method · Saved as your default"), as the web does (MON-7) — no second
+//   screen to sign, no hop to KYC. Then "Withdrawal recorded" with the way to
+//   the history. A withdrawal in IDZ pays out at the app's one IDZ price.
+//   Offline, Verify, Withdraw and Add wait with their reason.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckmarkCircle02Icon, PencilEdit02Icon, UserIdVerificationIcon, Wallet02Icon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, PencilEdit02Icon, Wallet02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Radio } from "@/components/ideeza/checkbox";
@@ -28,7 +34,19 @@ import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { methodRequest, useMethodForm } from "@/components/settings/get-paid/method-dialog";
 import { networkName } from "@/components/settings/get-paid/parts";
 import { randomId } from "@/lib/market/sales";
-import { METHOD_LABEL_MAX, addMethod, centsFloor, formatUsd, recordWithdrawal, subtractWithdrawn, withdrawAmountProblem, type PayoutStore, type Withdrawal } from "@/lib/account/payout";
+import {
+  METHOD_LABEL_MAX,
+  addMethod,
+  centsFloor,
+  formatUsd,
+  recordWithdrawal,
+  subtractWithdrawn,
+  withdrawAmountProblem,
+  withdrawStepsOf,
+  type PayoutStore,
+  type Withdrawal,
+  type WithdrawStep,
+} from "@/lib/account/payout";
 import { readPayoutNow, updatePayout } from "@/lib/account/use-payout";
 import { shortAddress } from "@/lib/wallet/demo-wallet";
 import type { Amount } from "@/lib/wallet/types";
@@ -38,16 +56,16 @@ import { useWalletSheet } from "../earn-coin/wallet-sheet";
 import { BottomBar } from "../kit/bottom-bar";
 import { LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { PickSheet } from "../kit/pick-list";
-import { EmptyState } from "../kit/state";
 import { OfflineBanner, useOnline } from "../kit/states";
 import { Sheet } from "../kit/sheet";
 import { SheetSelect } from "../kit/sheet-select";
 import { useToast } from "../kit/toast";
-import { Screen } from "../screen";
+import { SCROLL_ATTR, Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { IDZ_RATE_LINE, SAVE_FAILED, useGetPaid } from "./get-paid-screen";
-import { BulletList, Hero, OFFLINE_REASON, Row, RowsCard, payoutLine } from "./parts";
+import { IdentityFields, useIdentityForm } from "./identity-fields";
+import { Hero, OFFLINE_REASON, Row, RowsCard, payoutLine } from "./parts";
 
 const PAYOUT_NETWORK = "baseSepolia" as const;
 const PROBLEM: Record<"address" | "duplicate" | "full", string> = {
@@ -86,6 +104,82 @@ export function MethodScreen() {
   return <MethodBody store={store} />;
 }
 
+type MethodForm = ReturnType<typeof useMethodForm>;
+
+/** The method being added, on the network the phone pays out on. */
+function draftOf(form: MethodForm) {
+  return { ...form.draft, network: PAYOUT_NETWORK };
+}
+
+/** Where withdrawals go: your demo wallet or another address, the network, a name. Information setup's
+ *  form and the first withdrawal's "Where the money goes" step. */
+function PhoneMethodFields({ form, problem, onEdit }: { form: MethodForm; problem: string | null; onEdit: () => void }) {
+  const ids = useFieldIds(["address", "label"] as const);
+  const { wallet, mineTaken, state, setState } = form;
+  const paste = state.source === "paste";
+  const set = (patch: Partial<typeof state>) => {
+    setState((s) => ({ ...s, ...patch }));
+    onEdit();
+  };
+  const choice = (on: boolean) => cn("flex min-h-[64px] cursor-pointer items-start gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 py-5", on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface");
+  return (
+    <>
+      <fieldset className="flex flex-col gap-4">
+        <legend className="sr-only">Wallet</legend>
+        {!mineTaken && (
+          <label className={choice(!paste)}>
+            <input type="radio" name="source" checked={!paste} onChange={() => set({ source: "mine" })} className="sr-only" />
+            <Radio checked={!paste} decorative className="mt-1" />
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className={T.rowTitle}>Your demo wallet</span>
+              <span className={cn(T.meta, "[overflow-wrap:anywhere]")}>
+                {wallet.label} · <span className="font-mono">{wallet.address}</span>
+              </span>
+            </span>
+          </label>
+        )}
+        <label className={choice(paste)}>
+          <input type="radio" name="source" checked={paste} onChange={() => set({ source: "paste" })} className="sr-only" />
+          <Radio checked={paste} decorative className="mt-1" />
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className={T.rowTitle}>Another wallet address</span>
+            <span className={T.meta}>Any wallet you own, a receive-only one too.</span>
+          </span>
+        </label>
+      </fieldset>
+      {paste && (
+        <Field label="Wallet address" htmlFor={ids.address.id} error={problem ?? undefined} errorId={ids.address.errorId}>
+          <TextInput
+            id={ids.address.id}
+            size="xl"
+            value={state.address}
+            onValueChange={(v) => set({ address: v })}
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder="0x…"
+            className="font-mono"
+            {...errorProps(problem, ids.address.errorId)}
+          />
+        </Field>
+      )}
+      {paste && !problem && <p className={cn(T.caption, "-mt-6 text-text-tertiary")}>Check it carefully: a payment sent to a wrong address can’t be taken back.</p>}
+      {!paste && problem && (
+        <p role="alert" className={cn(T.caption, "text-text-error")}>
+          {problem}
+        </p>
+      )}
+      <Field label="Network" htmlFor="network">
+        <SheetSelect id="network" title="Network" value={PAYOUT_NETWORK} options={[{ value: PAYOUT_NETWORK, label: networkName(PAYOUT_NETWORK) }]} onChange={() => {}} />
+      </Field>
+      <p className={cn(T.caption, "-mt-6 text-text-tertiary")}>Withdrawals to this address are sent on this network.</p>
+      <Field label="Name it (optional)" htmlFor={ids.label.id}>
+        <TextInput id={ids.label.id} size="xl" value={state.label} maxLength={METHOD_LABEL_MAX} onValueChange={(v) => set({ label: v })} autoComplete="off" placeholder={paste ? "Crypto wallet" : wallet.label} />
+      </Field>
+    </>
+  );
+}
+
 function MethodBody({ store }: { store: PayoutStore }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -97,16 +191,8 @@ function MethodBody({ store }: { store: PayoutStore }) {
   const [problem, setProblem] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [failure, setFailure] = React.useState<string | null>(null);
-  const ids = useFieldIds(["address", "label"] as const);
   const next = nextOf(params, "/m/settings/idz-pay");
-  const { wallet, mineTaken, state, setState } = form;
-  const paste = state.source === "paste";
-  const draft = { ...form.draft, network: PAYOUT_NETWORK };
-
-  const set = (patch: Partial<typeof state>) => {
-    setState((s) => ({ ...s, ...patch }));
-    setProblem(null);
-  };
+  const draft = draftOf(form);
 
   const add = async () => {
     if (busy) return;
@@ -136,8 +222,6 @@ function MethodBody({ store }: { store: PayoutStore }) {
       router.replace(next);
     } else if (result.reason !== "rejected") setFailure(result.message ?? "The wallet didn’t confirm it. Nothing was added; try again.");
   };
-
-  const choice = (on: boolean) => cn("flex min-h-[64px] cursor-pointer items-start gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 py-5", on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface");
 
   return (
     <Screen
@@ -172,58 +256,7 @@ function MethodBody({ store }: { store: PayoutStore }) {
         <div className="flex flex-col gap-8">
           <OfflineBanner />
           <h2 className={T.section}>Wallet information</h2>
-          <fieldset className="flex flex-col gap-4">
-            <legend className="sr-only">Wallet</legend>
-            {!mineTaken && (
-              <label className={choice(!paste)}>
-                <input type="radio" name="source" checked={!paste} onChange={() => set({ source: "mine" })} className="sr-only" />
-                <Radio checked={!paste} decorative className="mt-1" />
-                <span className="flex min-w-0 flex-col gap-1">
-                  <span className={T.rowTitle}>Your demo wallet</span>
-                  <span className={cn(T.meta, "[overflow-wrap:anywhere]")}>
-                    {wallet.label} · <span className="font-mono">{wallet.address}</span>
-                  </span>
-                </span>
-              </label>
-            )}
-            <label className={choice(paste)}>
-              <input type="radio" name="source" checked={paste} onChange={() => set({ source: "paste" })} className="sr-only" />
-              <Radio checked={paste} decorative className="mt-1" />
-              <span className="flex min-w-0 flex-col gap-1">
-                <span className={T.rowTitle}>Another wallet address</span>
-                <span className={T.meta}>Any wallet you own, a receive-only one too.</span>
-              </span>
-            </label>
-          </fieldset>
-          {paste && (
-            <Field label="Wallet address" htmlFor={ids.address.id} error={problem ?? undefined} errorId={ids.address.errorId}>
-              <TextInput
-                id={ids.address.id}
-                size="xl"
-                value={state.address}
-                onValueChange={(v) => set({ address: v })}
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                placeholder="0x…"
-                className="font-mono"
-                {...errorProps(problem, ids.address.errorId)}
-              />
-            </Field>
-          )}
-          {paste && !problem && <p className={cn(T.caption, "-mt-6 text-text-tertiary")}>Check it carefully: a payment sent to a wrong address can’t be taken back.</p>}
-          {!paste && problem && (
-            <p role="alert" className={cn(T.caption, "text-text-error")}>
-              {problem}
-            </p>
-          )}
-          <Field label="Network" htmlFor="network">
-            <SheetSelect id="network" title="Network" value={PAYOUT_NETWORK} options={[{ value: PAYOUT_NETWORK, label: networkName(PAYOUT_NETWORK) }]} onChange={() => {}} />
-          </Field>
-          <p className={cn(T.caption, "-mt-6 text-text-tertiary")}>Withdrawals to this address are sent on this network.</p>
-          <Field label="Name it (optional)" htmlFor={ids.label.id}>
-            <TextInput id={ids.label.id} size="xl" value={state.label} maxLength={METHOD_LABEL_MAX} onValueChange={(v) => set({ label: v })} autoComplete="off" placeholder={paste ? "Crypto wallet" : wallet.label} />
-          </Field>
+          <PhoneMethodFields form={form} problem={problem} onEdit={() => setProblem(null)} />
         </div>
       ) : (
         <div className="flex flex-col gap-8">
@@ -266,50 +299,31 @@ function MethodBody({ store }: { store: PayoutStore }) {
 export function WithdrawScreen() {
   const { store, loaded, verified, balance } = useGetPaid();
   if (!loaded || !store || !balance) return <Loading title="Withdraw money" />;
-  if (!verified) return <NeedsIdentity />;
-  if (store.methods.length === 0) return <ToMethod />;
-  return <WithdrawBody store={store} earned={balance.earned} />;
+  return <WithdrawFlow store={store} earned={balance.earned} verified={verified} />;
 }
 
-/** No method yet: where the money goes is set up first, then back here. */
-function ToMethod() {
-  const router = useRouter();
-  React.useEffect(() => {
-    router.replace("/m/settings/idz-pay/method?next=/m/settings/idz-pay/withdraw");
-  }, [router]);
-  return <Loading title="Withdraw money" />;
-}
+/** The web Withdraw dialog's step names (STEP_NAME). */
+const STEP_NAME: Record<WithdrawStep, string> = {
+  identity: "Verify your identity",
+  method: "Where the money goes",
+  amount: "How much",
+};
 
-/** Verify your identity to get paid (Figma Level 1 "Verify your identity to start selling" over the screen). */
-function NeedsIdentity() {
-  const router = useRouter();
-  const [open, setOpen] = React.useState(true);
-  return (
-    <Screen top={<TopBar back="/m/settings/idz-pay" title="Withdraw money" />} className="px-8 pt-4">
-      <EmptyState icon={UserIdVerificationIcon} title="Verify your identity" body="Your first withdrawal asks you to verify your identity." action={{ label: "Verify your identity", onClick: () => setOpen(true) }} />
-      <Sheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Verify your identity to get paid"
-        description="Your first withdrawal asks for it, and so does selling physical copies. It takes a minute or two and keeps the marketplace safe."
-        actions={
-          <Button size="xl" className="w-full" onClick={() => router.push("/m/settings/kyc/1?next=/m/settings/idz-pay/withdraw")}>
-            Continue to verification
-          </Button>
-        }
-      >
-        <p className={T.rowTitle}>What you’ll need:</p>
-        <BulletList items={["Your full legal name", "Your account’s verified email", "Your mobile number, to get a code", "Your country of residence"]} />
-      </Sheet>
-    </Screen>
-  );
-}
+/** Where a withdrawal goes: a method you have, or the first one, typed in this flow (the web's Target). */
+type Target = { label: string; address: string; network: PayoutStore["methods"][number]["network"]; methodId: string | null; isNew: boolean };
 
-function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount }) {
+function WithdrawFlow({ store, earned, verified }: { store: PayoutStore; earned: Amount; verified: boolean }) {
   const router = useRouter();
   const online = useOnline();
   const { request, sheet } = useWalletSheet();
-  const [methodId, setMethodId] = React.useState<string>(store.defaultMethodId ?? store.methods[0].id);
+  // The steps are fixed when the screen opens, so finishing one doesn't renumber the rest.
+  const [steps] = React.useState(() => withdrawStepsOf({ verified, methods: store.methods.length }));
+  const [at, setAt] = React.useState(0);
+  const step = steps[at];
+  const identity = useIdentityForm();
+  const form = useMethodForm(store);
+  const [methodProblem, setMethodProblem] = React.useState<string | null>(null);
+  const [methodId, setMethodId] = React.useState<string | null>(store.defaultMethodId ?? store.methods[0]?.id ?? null);
   const [mode, setMode] = React.useState<"full" | "other">("full");
   const [other, setOther] = React.useState("");
   const [shown, setShown] = React.useState(false);
@@ -323,34 +337,70 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
   const problem = mode === "other" ? withdrawAmountProblem(other, available) : null;
   const amount = mode === "full" ? available : problem ? null : normalizeAmount(other.trim());
   const token = store.getPaidIn;
-  const method = store.methods.find((m) => m.id === methodId) ?? store.methods[0];
   const nothing = compareAmounts(available, "0") <= 0;
+  const firstMethod = steps.includes("method");
+  const draft = draftOf(form);
+  const chosen = store.methods.find((m) => m.id === methodId) ?? store.methods[0] ?? null;
+  // Once it's recorded the new method is one of yours, so the form would read differently: the screen
+  // under the success sheet keeps the target it signed for.
+  const [signedFor, setSignedFor] = React.useState<Target | null>(null);
+  const target: Target | null =
+    signedFor ??
+    (firstMethod
+      ? { label: draft.label.trim() || "Crypto wallet", address: draft.address, network: draft.network, methodId: null, isNew: true }
+      : chosen
+        ? { label: chosen.label, address: chosen.address, network: chosen.network, methodId: chosen.id, isNew: false }
+        : null);
+
+  const topRef = React.useRef<HTMLDivElement>(null);
+  // Each step opens at its top (the screen's own scroller).
+  const go = (i: number) => {
+    setFailure(null);
+    setAt(Math.max(0, Math.min(i, steps.length - 1)));
+    topRef.current?.closest<HTMLElement>(`[${SCROLL_ATTR}]`)?.scrollTo({ top: 0 });
+  };
+
+  const verifyIdentity = () => {
+    if (!online) return;
+    const result = identity.verify();
+    if (result === "invalid") return;
+    if (result === "failed") return setFailure(SAVE_FAILED);
+    go(at + 1);
+  };
+
+  const continueFromMethod = () => {
+    const p = form.problemOf(store);
+    if (p) return setMethodProblem(p);
+    go(at + 1);
+  };
 
   const withdraw = async () => {
     if (busy) return;
     setFailure(null);
     if (!online) return setFailure(OFFLINE_REASON);
-    if (problem || !amount || compareAmounts(amount, "0") <= 0) {
+    if (problem || !amount || compareAmounts(amount, "0") <= 0 || !target) {
       setShown(true);
       if (problem) otherRef.current?.focus();
       return;
     }
     const reference = referenceId();
+    const newId = target.isNew ? randomId("wm_") : null;
     setBusy(true);
     const result = await request(
       {
         kind: "signature",
         purpose: "withdraw",
         identity: "maker",
-        network: method.network,
+        network: target.network,
         title: "Withdraw your earnings",
         summary: [
           { label: "Amount", value: `${formatUsd(amount)} (demo rate)` },
           { label: "You receive", value: payoutLine(amount, token) },
-          { label: "To", value: method.label },
-          { label: "Address", value: method.address },
-          { label: "Network", value: networkName(method.network) },
+          { label: "To", value: target.label },
+          { label: "Address", value: target.address },
+          { label: "Network", value: networkName(target.network) },
           { label: "Withdrawal fee", value: "$0.00" },
+          ...(target.isNew ? [{ label: "New withdrawal method", value: "Saved as your default" }] : []),
         ],
         note: "Testnet demo. Signing records the withdrawal in Get paid; no coins move and nothing is charged.",
         doneLine: "Withdrawal recorded in Get paid.",
@@ -360,137 +410,216 @@ function WithdrawBody({ store, earned }: { store: PayoutStore; earned: Amount })
           const now = subtractWithdrawn(earned, readPayoutNow().withdrawals);
           return compareAmounts(amount, now) > 0 ? `Your balance changed: it’s ${formatUsd(now)} now. Choose a smaller amount.` : null;
         },
+        // One signature, one write: a first withdrawal's new method is saved as your default with it (the web's commit).
         commit: (proof) => {
-          const w: Withdrawal = {
-            id: reference,
-            amount,
-            token,
-            methodId: method.id,
-            to: { label: method.label, address: method.address, network: method.network },
-            at: proof.at,
-            status: "complete",
-          };
-          if (proof.signature) w.signature = proof.signature;
-          return updatePayout((s) => recordWithdrawal(s, w)) ? { ok: true } : { ok: false, message: SAVE_FAILED };
+          let refusal: string | null = null;
+          let methodIdNow = target.methodId;
+          const ok = updatePayout((s) => {
+            let next = s;
+            if (target.isNew && newId) {
+              const r = addMethod(s, draft, proof.at, newId, proof.signature);
+              if (!r.ok) {
+                refusal = r.problem === "duplicate" ? "This address became one of your withdrawal methods meanwhile. Go back and withdraw again." : SAVE_FAILED;
+                return s;
+              }
+              next = r.store;
+              methodIdNow = r.method.id;
+            }
+            const w: Withdrawal = {
+              id: reference,
+              amount,
+              token,
+              methodId: methodIdNow,
+              to: { label: target.label, address: target.address, network: target.network },
+              at: proof.at,
+              status: "complete",
+            };
+            if (proof.signature) w.signature = proof.signature;
+            return recordWithdrawal(next, w);
+          });
+          if (refusal) return { ok: false, message: refusal, conflict: true };
+          return ok ? { ok: true } : { ok: false, message: SAVE_FAILED };
         },
       },
     );
     setBusy(false);
-    if (result.ok)
-      setSent({ id: reference, amount, token, methodId: method.id, to: { label: method.label, address: method.address, network: method.network }, at: result.proof.at, status: "complete" });
-    else if (result.reason !== "rejected") setFailure(result.message ?? "The wallet didn’t confirm it. Nothing was withdrawn; try again.");
+    if (result.ok) {
+      setSignedFor(target);
+      setSent({ id: reference, amount, token, methodId: target.methodId, to: { label: target.label, address: target.address, network: target.network }, at: result.proof.at, status: "complete" });
+    } else if (result.reason !== "rejected") setFailure(result.message ?? "The wallet didn’t confirm it. Nothing was withdrawn; try again.");
   };
 
   const radio = (on: boolean) => cn("flex min-h-[52px] cursor-pointer items-center gap-5 rounded-xl border-[length:var(--border-width-1-5)] border-solid px-6 transition-colors duration-fast", on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface active:bg-bg-subtle");
   const total = amount ? formatUsd(amount) : "$0.00";
-  const why = nothing ? "Nothing to withdraw right now. Your share of each sale lands here." : !online ? OFFLINE_REASON : null;
+
+  // One primary per step, in the thumb zone: the web dialog's Verify and continue / Continue / Sign and withdraw.
+  const why =
+    step === "amount" && nothing ? "Nothing to withdraw right now. Your share of each sale lands here." : (step === "identity" || step === "amount") && !online ? OFFLINE_REASON : null;
+  const footer = (
+    <BottomBar>
+      {(why || failure) && (
+        <p id="withdraw-why" role={failure ? "alert" : "status"} className={cn(T.caption, failure && "text-text-error")}>
+          {failure ?? why}
+        </p>
+      )}
+      {step === "identity" ? (
+        <Button size="xl" className="w-full" disabled={!online} aria-describedby={why || failure ? "withdraw-why" : undefined} onClick={verifyIdentity}>
+          Verify and continue
+        </Button>
+      ) : step === "method" ? (
+        <Button size="xl" className="w-full" aria-describedby={failure ? "withdraw-why" : undefined} onClick={continueFromMethod}>
+          Continue
+        </Button>
+      ) : (
+        <Button size="xl" className="w-full" loading={busy} disabled={nothing || !online} aria-describedby={why || failure ? "withdraw-why" : undefined} onClick={withdraw}>
+          {amount && !nothing ? `Withdraw ${total}` : "Withdraw"}
+        </Button>
+      )}
+    </BottomBar>
+  );
 
   return (
     <Screen
-      top={<TopBar back="/m/settings/idz-pay" title="Withdraw money" />}
+      top={<TopBar back="/m/settings/idz-pay" onBack={(goBack) => (at > 0 ? go(at - 1) : goBack())} title="Withdraw money" />}
       className="px-8 pb-8"
-      footer={
-        <BottomBar>
-          {(why || failure) && (
-            <p id="withdraw-why" role={failure ? "alert" : "status"} className={cn(T.caption, failure && "text-text-error")}>
-              {failure ?? why}
-            </p>
-          )}
-          <Button size="xl" className="w-full" loading={busy} disabled={nothing || !online} aria-describedby={why || failure ? "withdraw-why" : undefined} onClick={withdraw}>
-            {amount && !nothing ? `Withdraw ${total}` : "Withdraw"}
-          </Button>
-        </BottomBar>
-      }
+      footer={footer}
     >
-      <div className="flex flex-col gap-10">
+      <div ref={topRef} className="flex flex-col gap-10">
         <OfflineBanner />
-        <Hero
-          label="You withdraw"
-          meta={
-            <>
-              <TestnetDemoBadge />
-              <span>Available balance {formatUsd(available)}</span>
-            </>
-          }
-        >
-          <span className={cn(T.amountHero, "text-text-brand")}>{total}</span>
-        </Hero>
-        <section aria-labelledby="amount" className="flex flex-col gap-4">
-          <h2 id="amount" className={T.section}>
-            Amount
-          </h2>
-          <label className={radio(mode === "full")}>
-            <input type="radio" name="amount" checked={mode === "full"} onChange={() => setMode("full")} className="sr-only" />
-            <Radio checked={mode === "full"} decorative />
-            <span className={cn(T.body, "flex-1 text-text-primary")}>Full balance</span>
-            <span className={cn(T.body, "tabular-nums")}>{formatUsd(available)}</span>
-          </label>
-          <div className={cn(radio(mode === "other"), "flex-col items-stretch gap-4 py-5")}>
-            <label className="flex cursor-pointer items-center gap-5">
-              <input
-                type="radio"
-                name="amount"
-                checked={mode === "other"}
-                onChange={() => {
-                  setMode("other");
-                  window.setTimeout(() => otherRef.current?.focus(), 0);
-                }}
-                className="sr-only"
-              />
-              <Radio checked={mode === "other"} decorative />
-              <span className={cn(T.body, "text-text-primary")}>Other amount</span>
-            </label>
-            {mode === "other" && (
-              <>
-                <TextInput
-                  ref={otherRef}
-                  size="xl"
-                  inputMode="decimal"
-                  aria-label="Other amount in US dollars"
-                  prefixText="$"
-                  suffix="USD"
-                  value={other}
-                  onValueChange={setOther}
-                  onBlur={() => setShown(true)}
-                  placeholder="0.00"
-                  invalid={shown && !!problem}
-                  aria-describedby={shown && problem ? "other-error" : undefined}
-                />
-                {shown && problem && (
-                  <p id="other-error" className={cn(T.caption, "text-text-error")}>
-                    {problem}
-                  </p>
+        {steps.length > 1 && (
+          <p className={cn(T.meta, "-mb-4 pt-4")}>
+            Step {at + 1} of {steps.length} · {STEP_NAME[step]}
+          </p>
+        )}
+
+        {step === "identity" && (
+          <section aria-labelledby="withdraw-identity" className="flex flex-col gap-8">
+            <header className="flex flex-col gap-2">
+              <h2 id="withdraw-identity" className={T.title}>
+                Verify your identity
+              </h2>
+              <p className={T.body}>Your first withdrawal asks who is withdrawing. You do this once.</p>
+            </header>
+            <IdentityFields {...identity.fields} />
+          </section>
+        )}
+
+        {step === "method" && (
+          <section aria-labelledby="withdraw-method" className="flex flex-col gap-8">
+            <header className="flex flex-col gap-2">
+              <h2 id="withdraw-method" className={T.title}>
+                Where the money goes
+              </h2>
+              <p className={T.body}>Where should withdrawals go? This becomes your default withdrawal method; you can add others later.</p>
+            </header>
+            <PhoneMethodFields form={form} problem={methodProblem} onEdit={() => setMethodProblem(null)} />
+          </section>
+        )}
+
+        {step === "amount" && (
+          <>
+            <Hero
+              label="You withdraw"
+              meta={
+                <>
+                  <TestnetDemoBadge />
+                  <span>Available balance {formatUsd(available)}</span>
+                </>
+              }
+            >
+              <span className={cn(T.amountHero, "text-text-brand")}>{total}</span>
+            </Hero>
+            <section aria-labelledby="amount" className="flex flex-col gap-4">
+              <h2 id="amount" className={T.section}>
+                Amount
+              </h2>
+              <label className={radio(mode === "full")}>
+                <input type="radio" name="amount" checked={mode === "full"} onChange={() => setMode("full")} className="sr-only" />
+                <Radio checked={mode === "full"} decorative />
+                <span className={cn(T.body, "flex-1 text-text-primary")}>Full balance</span>
+                <span className={cn(T.body, "tabular-nums")}>{formatUsd(available)}</span>
+              </label>
+              <div className={cn(radio(mode === "other"), "flex-col items-stretch gap-4 py-5")}>
+                <label className="flex cursor-pointer items-center gap-5">
+                  <input
+                    type="radio"
+                    name="amount"
+                    checked={mode === "other"}
+                    onChange={() => {
+                      setMode("other");
+                      window.setTimeout(() => otherRef.current?.focus(), 0);
+                    }}
+                    className="sr-only"
+                  />
+                  <Radio checked={mode === "other"} decorative />
+                  <span className={cn(T.body, "text-text-primary")}>Other amount</span>
+                </label>
+                {mode === "other" && (
+                  <>
+                    <TextInput
+                      ref={otherRef}
+                      size="xl"
+                      inputMode="decimal"
+                      aria-label="Other amount in US dollars"
+                      prefixText="$"
+                      suffix="USD"
+                      value={other}
+                      onValueChange={setOther}
+                      onBlur={() => setShown(true)}
+                      placeholder="0.00"
+                      invalid={shown && !!problem}
+                      aria-describedby={shown && problem ? "other-error" : undefined}
+                    />
+                    {shown && problem && (
+                      <p id="other-error" className={cn(T.caption, "text-text-error")}>
+                        {problem}
+                      </p>
+                    )}
+                  </>
                 )}
-              </>
+              </div>
+            </section>
+            {target && (
+              <ListCard label="Withdrawal">
+                {target.isNew ? (
+                  // The method typed a step back: new, it becomes your default; tapping it goes back to change it.
+                  <ListRow
+                    icon={Wallet02Icon}
+                    title="Withdrawal method"
+                    meta={`New, becomes your default · ${shortAddress(target.address)}`}
+                    value={target.label}
+                    onClick={() => go(steps.indexOf("method"))}
+                  />
+                ) : store.methods.length > 1 ? (
+                  <ListRow icon={Wallet02Icon} title="Withdrawal method" meta={`${shortAddress(target.address)} · ${networkName(target.network)}`} value={target.label} onClick={() => setPicking(true)} />
+                ) : (
+                  <ListRow icon={Wallet02Icon} title="Withdrawal method" meta={`${shortAddress(target.address)} · ${networkName(target.network)}`} value={target.label} />
+                )}
+                <ListRow
+                  title="You receive"
+                  meta={token === "IDZ" ? `At the demo rate ${IDZ_RATE_LINE}` : undefined}
+                  value={<span className="tabular-nums text-text-primary">{amount ? payoutLine(amount, token) : `— ${token}`}</span>}
+                />
+                <ListRow title="Withdrawal fee" meta="Per withdrawal" value={<span className="tabular-nums text-text-primary">−$0.00</span>} />
+                <li className={cn(LIST_ROW, "hover:bg-transparent")}>
+                  <span className={cn(T.section, "flex-1")}>Total amount</span>
+                  <span className={cn(T.section, "tabular-nums")}>{total}</span>
+                </li>
+              </ListCard>
             )}
-          </div>
-        </section>
-        <ListCard label="Withdrawal">
-          {store.methods.length > 1 ? (
-            <ListRow icon={Wallet02Icon} title="Withdrawal method" meta={`${shortAddress(method.address)} · ${networkName(method.network)}`} value={method.label} onClick={() => setPicking(true)} />
-          ) : (
-            <ListRow icon={Wallet02Icon} title="Withdrawal method" meta={`${shortAddress(method.address)} · ${networkName(method.network)}`} value={method.label} />
-          )}
-          <ListRow
-            title="You receive"
-            meta={token === "IDZ" ? `At the demo rate ${IDZ_RATE_LINE}` : undefined}
-            value={<span className="tabular-nums text-text-primary">{amount ? payoutLine(amount, token) : `— ${token}`}</span>}
-          />
-          <ListRow title="Withdrawal fee" meta="Per withdrawal" value={<span className="tabular-nums text-text-primary">−$0.00</span>} />
-          <li className={cn(LIST_ROW, "hover:bg-transparent")}>
-            <span className={cn(T.section, "flex-1")}>Total amount</span>
-            <span className={cn(T.section, "tabular-nums")}>{total}</span>
-          </li>
-        </ListCard>
+          </>
+        )}
       </div>
-      <PickSheet
-        open={picking}
-        onClose={() => setPicking(false)}
-        title="Withdrawal method"
-        value={method.id}
-        options={store.methods.map((m) => ({ value: m.id, label: `${m.label}${m.id === store.defaultMethodId ? " (default)" : ""}`, helper: `${shortAddress(m.address)} · ${networkName(m.network)}` }))}
-        onPick={setMethodId}
-      />
+      {!firstMethod && store.methods.length > 0 && (
+        <PickSheet
+          open={picking}
+          onClose={() => setPicking(false)}
+          title="Withdrawal method"
+          value={chosen?.id ?? ""}
+          options={store.methods.map((m) => ({ value: m.id, label: `${m.label}${m.id === store.defaultMethodId ? " (default)" : ""}`, helper: `${shortAddress(m.address)} · ${networkName(m.network)}` }))}
+          onPick={setMethodId}
+        />
+      )}
       <Sheet
         open={sent !== null}
         onClose={() => router.replace("/m/settings/idz-pay")}

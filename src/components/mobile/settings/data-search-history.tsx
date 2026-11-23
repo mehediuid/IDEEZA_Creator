@@ -6,13 +6,16 @@
 // cleared, with its toast. The switch and the list are the web's
 // (`privacy.keepSearchHistory`, lib/data/activity-log.ts): off keeps nothing
 // new and doesn't delete the list; Clear does, and it empties the phone
-// Search's Recent searches too (`ideeza:m:search:recent`).
+// Search's Recent searches too (`ideeza:m:search:recent`). Each search runs
+// again from its row, as the web's Innovations and Explore lines do (SET-6):
+// the phone's Search with the words (`?q=`), on the chip of where it was run —
+// Post for the Feed, Marketplace for Explore marketplace.
 
 import * as React from "react";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ideeza/button";
-import { clearSearchHistory, groupByDay, KEEP_DAYS, MAX_ENTRIES, useActivityLog, type SearchSource } from "@/lib/data/activity-log";
-import { RECENT_SEARCHES_KEY } from "@/lib/innovations/search";
+import { clearSearchHistory, groupByDay, KEEP_DAYS, MAX_ENTRIES, useActivityLog, type SearchEntry, type SearchSource } from "@/lib/data/activity-log";
+import { RECENT_SEARCHES_KEY, type SearchKind } from "@/lib/innovations/search";
 import { writeStoredKey } from "@/lib/key-store";
 import { updateSettings } from "@/lib/settings/prefs";
 import { useDates } from "@/lib/settings/use-dates";
@@ -27,6 +30,17 @@ import { SaveFailed, SettingsGroup, SettingsNote, SettingsRow, SettingsScreen, u
 
 /** Where each search was run, in the phone's words (Feed is the phone's Innovations). */
 const SOURCE: Record<SearchSource, string> = { palette: "Search", innovations: "Feed", explore: "Explore marketplace" };
+
+/** Search's chip for where a search was run: the Feed's posts, Explore's marketplace, else every kind. */
+const KIND: Record<SearchSource, SearchKind | null> = { palette: null, innovations: "post", explore: "marketplace" };
+
+/** The phone's Search, running this search again. */
+function againHref(s: Pick<SearchEntry, "source" | "query">): string {
+  const q = new URLSearchParams({ q: s.query });
+  const kind = KIND[s.source];
+  if (kind) q.set("kind", kind);
+  return `/m/search?${q}`;
+}
 
 export function SearchHistorySettings() {
   const on = useSettings().privacy.keepSearchHistory;
@@ -95,11 +109,11 @@ export function SearchHistorySettings() {
                 key={s.id}
                 label={<span className="[overflow-wrap:anywhere]">{s.query}</span>}
                 helper={[SOURCE[s.source], dates.time(s.at), s.opened ? `opened ${s.opened}` : null].filter(Boolean).join(" · ")}
+                href={againHref(s)}
               />
             ))}
           </SettingsGroup>
         ))}
-      {!unreadable && n > 0 && <SettingsNote>You can run these again once Search, Feed and Explore marketplace are on the phone.</SettingsNote>}
 
       <ConfirmSheet
         open={confirm}

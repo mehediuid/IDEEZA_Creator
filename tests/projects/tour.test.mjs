@@ -21,7 +21,7 @@ const {
   withGuide,
   chapterStatus,
 } = await import("../../.tmp-test/lib/tour/state.js");
-const { GUIDE_STEPS, guideNow, guideSteps } = await import("../../.tmp-test/lib/tour/guide.js");
+const { GUIDE_STEPS, guideFactsOf, guideNow, guideSteps } = await import("../../.tmp-test/lib/tour/guide.js");
 const {
   placeOf,
   placeFits,
@@ -316,6 +316,10 @@ test("an address's place", () => {
   assert.equal(placeOf("/projects/p-1/earn/mint"), null, "the mint flow is a page of its own");
   assert.equal(placeOf("/innovations"), "feed");
   assert.equal(placeOf("/innovations/hexapod-robot"), "sidebar");
+  // The phone app walks the first product with its own strip: the web's card, tips and offers stay off it.
+  assert.equal(placeOf("/m"), null);
+  assert.equal(placeOf("/m/ai"), null);
+  assert.equal(placeOf("/m/projects/p-1"), null);
 });
 
 test("where a chapter can run", () => {
@@ -583,4 +587,37 @@ test("the guide moves on by itself as the user does each thing, and waits while 
   assert.deepEqual(at({ hasProject: true, editorSeen: true }), ["mint", 7, 8, false]);
   assert.deepEqual(at({ hasProject: true, editorSeen: true, minted: true }), ["share", 8, 8, false]);
   assert.equal(at({ hasProject: true, editorSeen: true, minted: true, shared: true }), null, "the first product is done");
+});
+
+test("the guide's facts are read from the newest chat, its builds and the user's own projects", () => {
+  const facts = (over) => guideFactsOf({ chat: null, builds: [], projects: [], inEditor: false, phone: true, ...over });
+  assert.deepEqual(facts({}), { ...fresh, phone: true });
+  const chat = (turns) => ({ id: "c1", turns });
+  assert.equal(facts({ chat: chat([{ role: "user" }, { role: "setup", status: "loading" }]) }).reading, true);
+  assert.equal(facts({ chat: chat([{ role: "setup", status: "asking" }]) }).answered, false);
+  assert.equal(facts({ chat: chat([{ role: "setup", status: "answered" }, { role: "assistant", status: "pending" }]) }).drawing, true);
+  assert.equal(facts({ chat: chat([{ role: "assistant", status: "ready" }]) }).answered, true, "a chat that asked nothing");
+  assert.equal(facts({ chat: chat([{ role: "assistant", status: "ready" }]) }).conceptReady, true);
+  const builds = [
+    { chatId: "c1", status: "running" },
+    { chatId: "other", status: "done" },
+  ];
+  const f = facts({ chat: chat([{ role: "assistant", status: "ready" }]), builds });
+  assert.equal(f.buildStarted, true);
+  assert.equal(f.building, true);
+  assert.equal(facts({ builds }).buildStarted, false, "only the newest chat's builds count");
+
+  // The demo projects every account starts with, and a project bought whole, are not the user's first product.
+  const demo = { id: "proj_demo_plant", mint: { tx: "x" }, showcasedAt: 1 };
+  const bought = { id: "proj_bought_p7", mint: { tx: "x" }, showcasedAt: 1 };
+  assert.deepEqual(facts({ projects: [demo, bought] }), { ...fresh, phone: true });
+  assert.deepEqual(guideNow(facts({ projects: [demo, bought] }))?.step.id, "idea");
+  const own = { id: "proj_1", mint: { tx: "x" }, showcasedAt: null, editorOpened: {} };
+  const mine = facts({ projects: [demo, own] });
+  assert.equal(mine.hasProject, true);
+  assert.equal(mine.minted, true);
+  assert.equal(mine.shared, false);
+  assert.deepEqual([guideNow(mine)?.step.id, guideNow(mine)?.index, guideNow(mine)?.total], ["share", 6, 7], "a phone walks 7 steps");
+  assert.equal(facts({ projects: [{ id: "proj_1", editorOpened: { p1: { step: "pcb", at: 1 } } }] }).editorSeen, true, "opened on a computer counts");
+  assert.equal(guideNow(facts({ projects: [{ ...own, showcasedAt: 5 }] })), null);
 });

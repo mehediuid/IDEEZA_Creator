@@ -7,17 +7,20 @@
 // · Share to your Feed — the Feed's own share sheet (clip-share.tsx): your words over the item, with
 //   its creator, on your Timeline; on the Feed too while it is on the Marketplace (a Facebook-style
 //   re-share);
-// · Copy link — this screen's address.
+// · Copy link — this screen's address;
+// · Share via… — the phone's own share sheet with the item's title and this address (the web's
+//   Share on Facebook / LinkedIn / X / WhatsApp, in one row, SOC-5); copied where there is none.
 // A private project (a draft, minted and never shared or listed) has no icon.
 
 import * as React from "react";
-import { Link01Icon, Share01Icon, Share08Icon } from "@hugeicons/core-free-icons";
+import { Link01Icon, Share01Icon, Share08Icon, SentIcon } from "@hugeicons/core-free-icons";
 import { useShareItems } from "@/components/shares/use-share-items";
 import type { ShareItem } from "@/lib/innovations/share-items";
 import { ActionSheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import type { TopBarAction } from "../top-bar";
 import { ClipShare, type ShareTarget } from "./clip-share";
+import { useShareVia } from "./share-via";
 import { useFeedClips } from "./use-clips";
 
 const COPY_FAILED = "Couldn’t copy. Copy the address from your browser instead.";
@@ -27,6 +30,7 @@ export function useShareAction(itemId: string | null): { action: TopBarAction | 
   const items = useShareItems();
   const { byId } = useFeedClips();
   const toast = useToast();
+  const shareVia = useShareVia();
   const [open, setOpen] = React.useState<"menu" | "share" | null>(null);
   const item: ShareItem | null = itemId && items.hydrated ? items.itemOf(itemId) : null;
   const shareable = !!itemId && items.publicOf(itemId);
@@ -52,6 +56,11 @@ export function useShareAction(itemId: string | null): { action: TopBarAction | 
           items={[
             { label: "Share to your Feed", icon: Share01Icon, onSelect: () => setOpen("share") },
             { label: "Copy link", icon: Link01Icon, onSelect: () => void copy() },
+            {
+              label: "Share via…",
+              icon: SentIcon,
+              onSelect: () => shareVia({ url: window.location.href, title: item.title, copied: `Link to ${item.kind} copied to clipboard` }),
+            },
           ]}
         />
         <ClipShare item={target} open={open === "share"} onClose={() => setOpen(null)} />

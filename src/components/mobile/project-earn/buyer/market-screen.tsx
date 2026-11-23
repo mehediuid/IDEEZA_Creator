@@ -29,7 +29,9 @@
 //   holders as choices of one radio group. Then the description.
 // · Tabs Overview · Products · Media (`?tab=`, the kit's client-state tabs);
 //   the Overview holds Project activity, the products, Legal information,
-//   Holder benefits, About and Recent (the web's rail log, public lines).
+//   Holder benefits, About (with Team and Network rows that push read-only
+//   screens when the web shows those tabs, BUY-9) and Recent (the web's rail
+//   log, public lines).
 // · The bottom bar (PickBar): what is picked and its price, with Change, then
 //   Ask the creator (Get creator support for a holder) as a chat icon beside
 //   the one primary for the pick — Buy now (Buy another share), Place bid
@@ -40,8 +42,11 @@
 //   creator alone.
 // · 18d: a confirmed purchase ends on Purchase successful, a bid on its toast.
 // Not on the marketplace (never listed, or listed in another browser): the
-// web's "This project isn't on the marketplace". A Feed sample's market
-// address opens the sample's own page on its Marketplace block, where it sells.
+// web's "This project isn't on the marketplace"; paused by its creator: "This
+// project is off the marketplace for now", unless the buyer already holds part
+// of it (the web's OffMarketGate, BUY-4). A Feed sample's market address opens
+// the sample's own page on its Marketplace block, where it sells, on the kind
+// the address asked for (`?nft=`).
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -59,7 +64,7 @@ import { useClipUrl } from "@/components/video-jobs/video-player";
 import { StatusChip } from "@/components/projects/status-chip";
 import { can } from "@/lib/manual/permissions";
 import { phoneMarketHref } from "@/lib/manual/phone-earn";
-import { sampleProjectOf, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
+import { offMarketNow, sampleProjectOf, VIEWER_TABS, type PhoneTab } from "@/lib/manual/phone-project";
 import { MARKET_VIEW } from "@/lib/manual/phone-product";
 import { detailsRows } from "@/lib/manual/rail-copy";
 import { coverOf } from "@/lib/manual/project-read";
@@ -102,11 +107,13 @@ import { MediaHero } from "../../project/sample-project";
 import { ProductsTab } from "../../project/products-tab";
 import { usePhoneWriteGate } from "../../project/write-gate";
 import { PhoneWalletScope } from "../phone-wallet";
+import { OffMarket } from "../../product/states";
 import { BUY_BOX_ID, PickBar, PickTabs, revealBuyBox, type BarAction, type BarPick } from "./buy-pick";
 import { BuyWordsScope, CopyPanel, copyUseChoicesOf, doneFactsOf, useBuyTitle, type HolderChoiceOf, type UseChoiceOf } from "./copies";
 import { heldCopiesOf } from "./held";
 import { holderFactsOf, useHolderBuy, useHolderListings } from "./holder-offers";
 import { YouOwnRow } from "./you-own";
+import { useBuyerAboutLinks } from "./about-screens";
 import {
   AuctionCard,
   auctionBarLineOf,
@@ -148,6 +155,9 @@ export function MarketScreen({ id }: { id: string }) {
   const data = useProjectPageData(id, "market");
   if (data.state === "loading") return <MarketLoading />;
   if (data.state === "missing") return <NotOnMarketplace id={id} />;
+  // BUY-4: a paused listing is off the marketplace (the web's OffMarketGate), unless the buyer holds part of it.
+  const shopper = data.viewer.kind === "demo-buyer" ? data.viewer.buyerId : null;
+  if (offMarketNow({ listing: data.view.listing.kind, projectId: data.project.id, sales: data.view.sales, buyerId: shopper })) return <OffMarket paused />;
   return (
     <PhoneWalletScope>
       <BuyWordsScope>
@@ -174,10 +184,12 @@ function MarketLoading() {
 function NotOnMarketplace({ id }: { id: string }) {
   const router = useRouter();
   const sample = sampleProjectOf(id) !== null;
+  // The kind a link asked for (Buy another Virtual NFT, BUY-5) goes along, so the sample's box opens on it.
+  const asked = askedTabOf(useSearchParams().get("nft"));
   // A Feed sample sells on its own page (`?tab=marketplace` opens its Marketplace block).
   React.useEffect(() => {
-    if (sample) router.replace(`/m/projects/${encodeURIComponent(id)}?tab=marketplace`);
-  }, [sample, id, router]);
+    if (sample) router.replace(`/m/projects/${encodeURIComponent(id)}?tab=marketplace${asked ? `&nft=${asked}` : ""}`);
+  }, [sample, id, router, asked]);
   if (sample) return <MarketLoading />;
   return (
     <Screen top={<TopBar back />} className="px-8 pb-8">
@@ -404,6 +416,9 @@ function MarketReady({ data }: { data: Ready }) {
     label: latest ? "Get creator support" : "Ask the creator",
   };
 
+  // About's Team and Network rows (BUY-9): the web's Team and Network tabs for this buyer.
+  const aboutLinks = useBuyerAboutLinks(data, "market");
+
   const text = headerText(view.summary, { viewer, context: "market" });
   // The header names the creator: every listing here is the signed-in person's own, shopped by a demo creator.
   const createdBy = (text.createdBy ?? "Created by you").replace(/^Created by you/, `Created by ${creator}`);
@@ -535,6 +550,7 @@ function MarketReady({ data }: { data: Ready }) {
                   label: r.label,
                   value: r.value.map((m) => (m.kind === "time" ? m.time.text : m.text)).join(""),
                 }))}
+                links={aboutLinks}
               />
               <ProjectRecent />
             </div>

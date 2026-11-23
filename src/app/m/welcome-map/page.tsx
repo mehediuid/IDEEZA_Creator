@@ -6,8 +6,14 @@
 // balance, as the web's Welcome reads it, and what a concept uses); the web's five stages as a
 // connected timeline under "How it works"; what a phone is for, beside a laptop icon. Look
 // around first is the primary and starts the phone's tour (components/mobile/account/
-// phone-tour), which ends where they were going; Start with my idea opens the AI tab.
+// phone-tour), which ends on Home; Start with my idea opens the AI tab with the first-product
+// guide on (AUTH-5, the web's Welcome does the same: components/mobile/guide). Either answers
+// the web's Welcome too (`ideeza:tour`), so the web doesn't ask the same account again.
+//
+// Only a plain sign-up comes here (AUTH-4): one that set out for a page goes straight there, as
+// on the web (the Welcome only opens on Home), so a link that still carries `next` goes on to it.
 
+import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Coins01Icon, LaptopIcon } from "@hugeicons/core-free-icons";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
@@ -15,12 +21,14 @@ import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { AccountHeading } from "@/components/mobile/account/parts";
 import { BottomBar } from "@/components/mobile/kit/bottom-bar";
+import { updateTour } from "@/components/tour/use-tour";
 import { Eyebrow } from "@/components/mobile/kit/eyebrow";
 import { LIST_CARD } from "@/components/mobile/kit/list";
 import { Screen } from "@/components/mobile/screen";
 import { T } from "@/components/mobile/type";
 import { mobileNext, updatePhone } from "@/lib/account/phone";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { withGuide, withWelcome } from "@/lib/tour/state";
 import { cn } from "@/lib/utils";
 
 const STAGES = [
@@ -35,6 +43,12 @@ export default function WelcomeMapPage() {
   const router = useRouter();
   const next = mobileNext(useSearchParams().get("next"));
   const credits = useCredits();
+  // Set out for a page: go on to it (never dropped), as the web does after Sign up.
+  const elsewhere = next !== "/m";
+  React.useEffect(() => {
+    if (elsewhere) router.replace(next);
+  }, [elsewhere, next, router]);
+  if (elsewhere) return null;
   return (
     <Screen
       footer={
@@ -43,13 +57,23 @@ export default function WelcomeMapPage() {
             size="xl"
             className="w-full"
             onClick={() => {
+              updateTour((prev) => withWelcome(prev, "started"));
               updatePhone({ tourPending: true });
               router.replace(next);
             }}
           >
             Look around first
           </Button>
-          <Button hierarchy="ghost" size="xl" className="w-full" onClick={() => router.replace("/m/ai")}>
+          <Button
+            hierarchy="ghost"
+            size="xl"
+            className="w-full"
+            onClick={() => {
+              // The web's Start with my idea: the Welcome answered, the first-product guide on.
+              updateTour((prev) => withGuide(withWelcome(prev, "started"), "open"));
+              router.replace("/m/ai");
+            }}
+          >
             Start with my idea
           </Button>
         </BottomBar>

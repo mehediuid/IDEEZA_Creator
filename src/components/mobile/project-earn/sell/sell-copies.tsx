@@ -14,6 +14,9 @@
 //   lazy-mint box and the no-income line; Sign and sell makes the lazy
 //   copies (when new) then signs the listing, each through the phone's
 //   wallet sheet. Closing with anything entered asks first.
+// EARN-5: a video fix on Review leaves for the video screen; Back brings the
+// sheet back on the same step with everything entered (useBackState), as the
+// web's Generate video dialog opens over the Sell copies dialog.
 // CL-030: Sign and sell stays off only while a video it needs hasn't started
 // ("Start every video first: …"; copies of one product need only that
 // product's video). Once every one has, a video still rendering or waiting for
@@ -82,6 +85,7 @@ import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
+import { useBackState } from "../../nav-trail";
 import { Sheet } from "../../kit/sheet";
 import { SheetSelect } from "../../kit/sheet-select";
 import { useEarn } from "../context";
@@ -91,6 +95,9 @@ import { T } from "../../type";
 
 /** Whose copies: the whole project (`PROJECT_SCOPE`), or one product. */
 export type CopyScope = { id: string; name: string; product: ProjectProduct | null };
+
+/** The sheet's form: its step, what was entered, More options open, and whether copies were made here. */
+type SellForm = { step: SellStep; draft: SellDraft; dirty: boolean; more: boolean; created: boolean };
 
 const LADDER_HANDLED = ["videos", "ownership", "wallet"] as const;
 const LADDER_WHAT: Record<EditionKind, string> = { virtual: "sell virtual copies", physical: "sell physical copies" };
@@ -150,9 +157,12 @@ export function SellCopiesSheet({
   const productName = product ? displayProductName(product.name) : scope.name;
   const what = product ? productName : "the whole project";
 
-  const [step, setStep] = React.useState<SellStep>("price");
-  const [draft, setDraft] = React.useState<SellDraft>(() =>
-    draftOf({
+  // What the maker has entered — the step, the fields, More options open, copies already made — is
+  // kept across a trip away and Back (EARN-5): Review's "Generate AI video" / "Make videos" leave for
+  // the video screen, and the sheet comes back as it was, as the web's video dialog opens over it.
+  const [fresh] = React.useState<SellForm>(() => ({
+    step: "price",
+    draft: draftOf({
       productId,
       kind,
       use,
@@ -161,13 +171,23 @@ export function SellCopiesSheet({
       tracks,
       plan: terms.physical[productId] ?? null,
     }),
-  );
-  const [dirty, setDirty] = React.useState(false);
-  const [moreOpen, setMoreOpen] = React.useState(false);
+    dirty: false,
+    more: false,
+    created: false,
+  }));
+  const [kept, keep] = useBackState<SellForm | null>(`copies-form-${scope.id}-${kind}`, null);
+  const form = kept ?? fresh;
+  const { step, draft, dirty, more: moreOpen, created: createdHere } = form;
+  // The last form written, so two changes before the next render (taps in a row) both land.
+  const written = React.useRef<SellForm | null>(null);
+  const update = (patch: Partial<SellForm>) => {
+    const next = { ...(written.current ?? form), ...patch };
+    written.current = next;
+    keep(next);
+  };
   const [problem, setProblem] = React.useState<SellProblem | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
-  const [createdHere, setCreatedHere] = React.useState(false);
   const [discarding, setDiscarding] = React.useState(false);
   const ladder = useCommitCheck(kind === "physical" ? "editionPhysical" : "editionVirtual", earnSourceOf(project, view, brief), { handled: LADDER_HANDLED });
   const prefix = React.useId().replace(/:/g, "");
@@ -196,25 +216,32 @@ export function SellCopiesSheet({
   if (!chain) return null;
 
   const change = (patch: Partial<SellDraft>) => {
-    setDraft((d) => ({ ...d, ...patch }));
-    setDirty(true);
+    update({ draft: { ...(written.current ?? form).draft, ...patch }, dirty: true });
     setProblem(null);
     setError(null);
   };
   const go = (to: SellStep) => {
     setProblem(null);
     setError(null);
-    setStep(to);
+    update({ step: to });
+  };
+  /** Leaving for good (closed, discarded, signed): nothing is kept to come back to. */
+  const leave = () => {
+    written.current = null;
+    keep(null);
   };
   const requestClose = () => {
     if (busy) return;
     if (dirty || index > 0) setDiscarding(true);
-    else onClose();
+    else {
+      leave();
+      onClose();
+    }
   };
   const show = (p: SellProblem) => {
     setProblem(p);
-    if (p.step !== step) setStep(p.step);
-    if (MORE_FIELDS.includes(p.field)) setMoreOpen(true);
+    const opens = MORE_FIELDS.includes(p.field) && !moreOpen;
+    if (p.step !== step || opens) update({ step: p.step, ...(opens ? { more: true } : null) });
     requestAnimationFrame(() => {
       const el = document.getElementById(`${prefix}-${p.field}`);
       const target = el?.matches("input, textarea, button") ? el : el?.querySelector<HTMLElement>("input, textarea, button");
@@ -262,7 +289,7 @@ export function SellCopiesSheet({
         if (failed) setError(failed);
         return;
       }
-      setCreatedHere(true);
+      update({ created: true });
     }
     const track = made.track;
     if (!track) return setBusy(false);
@@ -303,6 +330,7 @@ export function SellCopiesSheet({
     setBusy(false);
     if (result.ok) {
       const n = track.supply.total;
+      leave();
       onDone(
         heldCopies
           ? `Signed: ${n} ${KIND_LABEL[sellKind]} ${n === 1 ? "copy" : "copies"} of ${what}. They go on Explore marketplace when every video is ready.`
@@ -433,7 +461,10 @@ export function SellCopiesSheet({
                         invalid={problem?.field === p.field}
                         describedBy={problem?.field === p.field ? reasonId : undefined}
                         checked={draft.checks[p.field]}
-                        onToggle={() => change({ checks: { ...draft.checks, [p.field]: !draft.checks[p.field] } })}
+                        onToggle={() => {
+                          const checks = (written.current ?? form).draft.checks;
+                          change({ checks: { ...checks, [p.field]: !checks[p.field] } });
+                        }}
                       >
                         {p.text}
                       </CheckRow>
@@ -445,7 +476,7 @@ export function SellCopiesSheet({
                 <button
                   type="button"
                   aria-expanded={moreOpen}
-                  onClick={() => setMoreOpen((o) => !o)}
+                  onClick={() => update({ more: !(written.current ?? form).more })}
                   className={cn(T.rowTitle, "-my-3 inline-flex min-h-[44px] items-center gap-2 self-start outline-none focus-visible:underline")}
                 >
                   More options
@@ -582,7 +613,10 @@ export function SellCopiesSheet({
         verb="Discard"
         cancelLabel="Keep editing"
         destructive
-        onConfirm={onClose}
+        onConfirm={() => {
+          leave();
+          onClose();
+        }}
       />
     </>
   );

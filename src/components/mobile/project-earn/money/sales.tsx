@@ -5,7 +5,8 @@
 // · EarningsSummary — Money's summary, first on its screen once there is a
 //   sale: "Your earnings" with ⓘ (the fee-and-splits line) and the Testnet
 //   demo badge, what was paid to you per coin large, in dollars at the demo
-//   rates under it, and a Withdraw in Get paid row (the phone's Get paid);
+//   rates under it, "Royalties from resales" once a buyer sold a copy on
+//   (CL-036), and a Withdraw in Get paid row (the phone's Get paid);
 // · Sales — "Sales ⓘ" (the web's lead and the demo-purchases note in the
 //   sheet), the Testnet demo badge, "n sales to n people." under it, then
 //   the sales as rows, newest first: who, the price, the item, the date and
@@ -33,6 +34,8 @@ import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
 import { addAmounts, formatAmount } from "@/lib/wallet/money";
+import { useResales } from "@/components/projects/purchased/resales-store";
+import { perTokenText } from "@/lib/market/resale-desk";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { cn } from "@/lib/utils";
 import { Sheet } from "../../kit/sheet";
@@ -138,12 +141,18 @@ function perCoin(earnings: readonly Earning[]): string {
 }
 
 /** Your earnings (the web's ProjectEarnings), Money's summary: what this project's sales paid you.
- *  Shown once there is a sale and the record reads, as the web shows it. */
+ *  Shown once there is a sale and the record reads, as the web shows it. A copy its buyer sold on
+ *  paid this project its royalty into the creator's demo wallet (CL-036): "Royalties from resales",
+ *  per token, shown only when there is one (EARN-3). */
 export function EarningsSummary() {
   const { project, view, viewer } = useEarn();
   const earnings = React.useMemo(
     () => earningsOf(view.sales, [{ id: project.id, name: project.name, contributors: project.contributors ?? [] }]),
     [view.sales, project.id, project.name, project.contributors],
+  );
+  const resales = useResales();
+  const royalties = perTokenText(
+    resales.filter((r) => r.source === "own" && r.projectId === project.id && r.sale).map((r) => ({ amount: r.sale?.royalty ?? "0", token: r.token })),
   );
   if (!can(viewer, "customers.see") || view.marketUnreadable || view.customers.rows.length === 0 || view.sales.length === 0) return null;
   const usd = addAmounts("0", ...earnings.map((e) => e.netUsd));
@@ -173,6 +182,13 @@ export function EarningsSummary() {
             <dt className={T.micro}>In dollars, at demo rates</dt>
             <dd className={cn(T.rowTitle, "tabular-nums")}>{formatUsd(usd)}</dd>
           </div>
+          {royalties && (
+            <div className="flex flex-col gap-1">
+              <dt className={T.micro}>Royalties from resales</dt>
+              <dd className={cn(T.rowTitle, "break-words tabular-nums")}>{royalties}</dd>
+              <dd className={cn(T.meta, "text-text-tertiary")}>Paid into your demo wallet when a buyer sells a copy on</dd>
+            </div>
+          )}
         </dl>
       </div>
       <ul className={cn("flex flex-col border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border", LIST_DIVIDERS)}>

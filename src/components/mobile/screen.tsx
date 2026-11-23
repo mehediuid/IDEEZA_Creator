@@ -9,11 +9,16 @@
 // (kit/dock.tsx): under the header, a running build's bar; above the foot,
 // the video render tray. So neither ever covers the content. Once the
 // content scrolls, a hairline marks the header's edge (kit/scroll-edge.tsx).
+// Above them, on a screen where a step of the first-product guide happens
+// (the AI chat, the project, its Earn), the guide's strip (guide/guide-strip;
+// on the tabs it sits above the tab row instead).
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SplashBody } from "./account/parts";
 import { useHasTabBar } from "./device";
+import { GuideSlot } from "./guide/guide-strip";
 import { HomeIndicator } from "./home-indicator";
 import { DockSlot } from "./kit/dock";
 import { ScrollEdge } from "./kit/scroll-edge";
@@ -37,6 +42,7 @@ export function Screen({
   children: React.ReactNode;
 }) {
   const tabBar = useHasTabBar();
+  const pathname = usePathname();
   const scroll = React.useRef<HTMLDivElement>(null);
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -47,6 +53,7 @@ export function Screen({
       <div ref={scroll} {...{ [SCROLL_ATTR]: "" }} className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", className)}>
         {children}
       </div>
+      {!tabBar && <GuideSlot pathname={pathname} />}
       <DockSlot edge="foot" />
       {footer && (
         <div {...{ [FOOT_ATTR]: "" }} className="shrink-0">

@@ -2,12 +2,14 @@
 
 // The project page's sheets, every one rising from the bottom:
 // · 07 ⋯ Project actions (M12): Edit name and description · Share to Feed (a
-//   Draft's row says "Mint it first" and goes to the mint; the Feed shows only
-//   what is for sale (owner 2026-11-12), so a project with nothing on the
-//   marketplace says "List it first" and goes to Sell) — or, once shared,
-//   View post (its clip on the Feed, while something of it is for sale), Edit
-//   post (the story) and Stop sharing (asks first, the toast offers Undo),
-//   which the web keeps on the post · Delete project…, the red row last;
+//   Draft's row says "Mint it first" and goes to the mint; any minted project
+//   can be shared, as the web's Share to Innovations (owner 2026-11-22, SOC-6):
+//   the post is on your Timeline at once and on the Feed while something of
+//   it is for sale — the Feed itself shows only what is listed) — or, once
+//   shared, View post (its clip on the Feed, while something of it is for
+//   sale), Edit post (the story) and Stop sharing (asks first, the toast
+//   offers Undo), which the web keeps on the post · Delete project…, the red
+//   row last;
 // · 07b Edit name and description (07g–07n): the web's editor — the name
 //   (1–80, a name another project has is a note), the description (counter
 //   from 800, "What it is, and who it is for."), Update with AI with Undo,
@@ -26,12 +28,16 @@
 // · each product's ready video in the readiness rows has a quiet Replace
 //   (CL-015): its form, filled from the take in use;
 // · 08 Publish: Keep private · Give to the community · Sell, each with its
-//   fee line; 08b readiness: Give and Sell first need every product's AI
-//   video and the project video, then go on to the mint (Earn).
+//   fee line; Continue goes straight to the mint with that choice, or a
+//   Private project's Sell to Earn › Sell's listing, as the web's Publish does
+//   (PRJ-2): the videos are asked for once, at the step that signs (CL-030:
+//   only a video not started stops it there; one rendering or waiting for
+//   review never does — the listing or post waits for it).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Bug01Icon,
   Delete02Icon,
   Edit02Icon,
   LockIcon,
@@ -40,6 +46,8 @@ import {
   PlayIcon,
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
+import { REPORT_PROBLEM, reportProblemHref } from "../help/report-link";
+import { forSaleNowOf, shareOffFeedLineOf } from "@/lib/manual/phone-earn";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
@@ -99,8 +107,7 @@ export function ProjectSheets({ sheet, onSheet }: { sheet: ProjectSheet | null; 
       {sheet?.kind === "share" && <ShareSheet onClose={close} />}
       {sheet?.kind === "edit-post" && <EditPostSheet onClose={close} />}
       <StopSharingSheet open={sheet?.kind === "stop-sharing"} onClose={close} />
-      <PublishSheet open={sheet?.kind === "publish"} onClose={close} onSheet={onSheet} />
-      {sheet?.kind === "readiness" && <ReadinessSheet purpose={sheet.purpose} then={sheet.then} onClose={close} />}
+      <PublishSheet open={sheet?.kind === "publish"} onClose={close} />
       <AddProductSheet open={sheet?.kind === "add-product"} onClose={close} />
     </>
   );
@@ -112,20 +119,16 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
   const { project, view, viewer } = useProject();
   const router = useRouter();
   const [mintFirst, setMintFirst] = React.useState(false);
-  const [listFirst, setListFirst] = React.useState(false);
   const canEdit = can(viewer, "project.rename", view.canCtx) || can(viewer, "project.editDescription", view.canCtx);
   const canShare = can(viewer, "project.showcase", view.canCtx);
   const shared = view.summary.showcase;
   // The post signed while videos are still being made (CL-030): it waits for them.
   const waitingShare = useHeldItems(project.id).some((i) => i.kind === "share");
   const onFeed = forSaleNow(view);
-  // Minted with nothing for sale: sharing waits for a listing — unless it can never be listed again.
-  const needsListing = canShare && !onFeed;
-  const canList = can(viewer, "listing.create", view.canCtx);
-  const shareShown =
-    (canShare && (onFeed || canList || shared !== null)) || (view.lock === null && view.summary.status === "draft" && can(viewer, "facts.seeOwnerOnly"));
-  const sellHref =
-    phoneHrefOf(view.summary.status === "draft" ? earnMintHref(project.id, "sell") : earnHref(project.id, "sell", { list: "1" }), project.id) ?? "/m/projects";
+  // The web's rule (project-menu.tsx): any minted project shares; a Draft's row goes to the mint.
+  // Nothing for sale yet is no reason to wait (SOC-6): the post is on your Timeline now, on the
+  // Feed once something of it is listed.
+  const shareShown = canShare || (view.lock === null && view.summary.status === "draft" && can(viewer, "facts.seeOwnerOnly"));
   const items = [
     ...(canEdit ? [{ label: "Edit name and description", icon: PencilEdit01Icon, onSelect: () => onSheet({ kind: "edit" }) }] : []),
     ...(shareShown
@@ -146,15 +149,15 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
               ? [{ label: "Waiting for videos · goes live when they're ready", icon: News01Icon, onSelect: () => openVideosPanel(project.id) }]
               : [
                   {
-                    // A Draft can't share yet, nor a project with nothing for sale: the row says why
-                    // before the tap (Figma 07 10371:2201).
-                    label: !canShare ? "Share to Feed · Mint it first" : needsListing ? "Share to Feed · List it first" : "Share to Feed",
+                    // A Draft can't share yet: the row says why before the tap (Figma 07 10371:2201).
+                    label: canShare ? "Share to Feed" : "Share to Feed · Mint it first",
                     icon: News01Icon,
-                    onSelect: () => (!canShare ? setMintFirst(true) : needsListing ? setListFirst(true) : onSheet({ kind: "share" })),
+                    onSelect: () => (canShare ? onSheet({ kind: "share" }) : setMintFirst(true)),
                   },
                 ]),
         ]
       : []),
+    { label: REPORT_PROBLEM, icon: Bug01Icon, onSelect: () => router.push(reportProblemHref()) },
     ...(can(viewer, "project.delete") ? [{ label: "Delete project…", icon: Delete02Icon, destructive: true, onSelect: () => onSheet({ kind: "delete" }) }] : []),
   ];
   return (
@@ -164,19 +167,6 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
         onClose={onClose}
         title={shared ? (onFeed ? `${project.name} · on Feed since ${formatDate(shared.at)}` : `${project.name} · off the Feed until it’s for sale`) : project.name}
         items={items}
-      />
-      <Sheet
-        open={listFirst}
-        onClose={() => setListFirst(false)}
-        title="List it first"
-        description="The Feed shows only what is for sale. Put the project or a copy of it on the marketplace, then share it to the Feed."
-        actions={
-          <>
-            <Button size="xl" className="w-full" onClick={() => router.push(sellHref)}>
-              Go to Sell
-            </Button>
-          </>
-        }
       />
       <Sheet
         open={mintFirst}
@@ -195,11 +185,8 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
   );
 }
 
-/** Something of it is for sale — a live Main listing or a listed copy — so its clip is on the Feed
- *  (the Feed's own rule, feed/use-clips.ts). */
-function forSaleNow(view: Ready["view"]): boolean {
-  return view.listing.kind === "live" || (view.lock === null && view.editions.some((t) => t.listing !== null));
-}
+/** Something of it is for sale, so its clip is on the Feed (the lib's one rule, SOC-6). */
+const forSaleNow = (view: Ready["view"]): boolean => forSaleNowOf(view);
 
 // ─────────────────────────── 07b · Edit name and description ───────────────────────────
 
@@ -626,7 +613,7 @@ export function ReadinessRows({
 // ─────────────────────────── 07d / 07e · Share to Feed ───────────────────────────
 
 function ShareSheet({ onClose }: { onClose: () => void }) {
-  const { project, brief } = useProject();
+  const { project, view, brief } = useProject();
   const { setShowcase, setOwnerConfirmed } = useManualProjects();
   const toast = useToast();
   const readiness = useLiveReadiness("showcase");
@@ -635,16 +622,19 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
   const [askOwnership] = React.useState(() => ownership?.ok === false);
   const blocker = dialogBlockerOf(readiness) ?? sharePostBlocker({ story });
   const storyId = React.useId();
+  // Minted, nothing for sale yet (SOC-6): it shares all the same — to your Timeline now, onto the
+  // Feed once something of it is listed (the Feed shows only what is for sale).
+  const onFeed = forSaleNow(view);
   const share = () => {
     if (blocker) return;
     // Every video started, some still rendering or waiting for review (CL-030): the post waits off
     // the Feed, then goes live by itself.
     if (videosBlockerOf(readiness)) {
       hold({ id: heldId(), projectId: project.id, kind: "share", at: Date.now(), story: story.trim() });
-      toast({ title: "Your post goes on Feed when every video is ready." });
+      toast({ title: onFeed ? "Your post goes on Feed when every video is ready." : "Your post goes on your Timeline when every video is ready." });
     } else {
       setShowcase(project.id, true, undefined, { story: story.trim() });
-      toast({ title: "Shared to Feed" });
+      toast({ title: onFeed ? "Shared to Feed" : "Shared to your Timeline" });
     }
     onClose();
   };
@@ -664,6 +654,7 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
       }
     >
       <Banner tone="info">{phoneWords(readinessCopy("showcase").info)}</Banner>
+      {!onFeed && <p className={T.meta}>{shareOffFeedLineOf(view.commerce.outcome === "given")}</p>}
       <ReadinessRows readiness={readiness} projectId={project.id} />
       <div className="flex flex-col gap-2">
         <h3 className={T.section}>Write your story</h3>
@@ -783,7 +774,7 @@ function StopSharingSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
 // ─────────────────────────── 08 · Publish ───────────────────────────
 
-function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => void; onSheet: (s: ProjectSheet) => void }) {
+function PublishSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { project, view, brief } = useProject();
   const router = useRouter();
   const [pick, setPick] = React.useState<PublishIntent | null>(null);
@@ -794,12 +785,12 @@ function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () =
     setPick(null);
     onClose();
   };
+  // Straight to the next place, as the web's Publish (publish-dialog.tsx): no video stop here. The
+  // step that signs asks for the videos (PRJ-2, CL-030).
   const go = () => {
     if (!pick) return;
     const href = phoneHrefOf(publishHrefOf(project.id, status, pick)) ?? "/m/projects";
-    const purpose: ReadinessPurpose | null = pick === "give" ? "give" : pick === "sell" ? "sell" : null;
     setPick(null);
-    if (purpose && dialogBlockerOf(view.videos.readiness[purpose])) return onSheet({ kind: "readiness", purpose, then: href });
     onClose();
     router.push(href);
   };
@@ -843,42 +834,6 @@ function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () =
           );
         })}
       </div>
-    </Sheet>
-  );
-}
-
-// ─────────────────────────── 08b · readiness ───────────────────────────
-
-function ReadinessSheet({ purpose, then, onClose }: { purpose: ReadinessPurpose; then: string | null; onClose: () => void }) {
-  const { project } = useProject();
-  const router = useRouter();
-  const readiness = useLiveReadiness(purpose);
-  const copy = readinessCopy(purpose);
-  const blocker = dialogBlockerOf(readiness);
-  return (
-    <Sheet
-      open
-      onClose={onClose}
-      title={copy.title}
-      description={copy.info}
-      actions={
-        <>
-          <Button
-            size="xl"
-            className="w-full"
-            disabled={blocker !== null}
-            onClick={() => {
-              onClose();
-              if (then) router.push(then);
-            }}
-          >
-            {copy.cta}
-          </Button>
-          {blocker && <p className={T.meta}>{blocker}</p>}
-        </>
-      }
-    >
-      <ReadinessRows readiness={readiness} projectId={project.id} />
     </Sheet>
   );
 }

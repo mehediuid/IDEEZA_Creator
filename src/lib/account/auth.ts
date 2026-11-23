@@ -271,20 +271,37 @@ export function passwordProblem(password: string): string {
   return `Your password still needs ${list}.`;
 }
 
-/** What is wrong with each field, in the form's order; empty when it can be sent. */
-export function signUpProblems(input: SignUpInput, now: number): Partial<Record<SignUpField, string>> {
-  const out: Partial<Record<SignUpField, string>> = {};
+/** The part of Sign up a provider (Google, Facebook) doesn't answer: the name (when it shared
+ *  none), the date of birth and the Terms box. */
+export type AccountDetailsInput = Pick<SignUpInput, "firstName" | "lastName" | "day" | "month" | "year" | "consent">;
+export type AccountDetailsField = "firstName" | "lastName" | "birthday" | "consent";
+
+/** What is wrong with the name, the date of birth and the Terms box, in Sign up's own rules and
+ *  words (the phone asks them after a provider made the account, AUTH-2). */
+export function accountDetailsProblems(input: AccountDetailsInput, now: number): Partial<Record<AccountDetailsField, string>> {
+  const out: Partial<Record<AccountDetailsField, string>> = {};
   if (!str(input.firstName, NAME_PART_MAX)) out.firstName = "Enter your first name.";
   if (!str(input.lastName, NAME_PART_MAX)) out.lastName = "Enter your last name.";
+  if (!input.day || !input.month || !input.year) out.birthday = "Choose your day, month and year of birth.";
+  else if (!birthDateOf(input.day, input.month, input.year, now)) out.birthday = "That date doesn't exist.";
+  if (!input.consent) out.consent = "Agree to the Privacy policy and Terms to continue.";
+  return out;
+}
+
+/** What is wrong with each field, in the form's order; empty when it can be sent. */
+export function signUpProblems(input: SignUpInput, now: number): Partial<Record<SignUpField, string>> {
+  const details = accountDetailsProblems(input, now);
+  const out: Partial<Record<SignUpField, string>> = {};
+  if (details.firstName) out.firstName = details.firstName;
+  if (details.lastName) out.lastName = details.lastName;
   if (!input.email.trim()) out.email = "Enter your email.";
   else if (!isEmail(input.email)) out.email = "Enter an email like name@example.com.";
   const pw = passwordProblem(input.password);
   if (pw) out.password = pw;
   if (!input.confirm) out.confirm = "Type the password again.";
   else if (input.confirm !== input.password) out.confirm = "The passwords don't match.";
-  if (!input.day || !input.month || !input.year) out.birthday = "Choose your day, month and year of birth.";
-  else if (!birthDateOf(input.day, input.month, input.year, now)) out.birthday = "That date doesn't exist.";
-  if (!input.consent) out.consent = "Agree to the Privacy policy and Terms to continue.";
+  if (details.birthday) out.birthday = details.birthday;
+  if (details.consent) out.consent = details.consent;
   return out;
 }
 
@@ -401,7 +418,10 @@ export async function createAccount(input: SignUpInput, utmSource: string, now: 
 /** Google or Facebook vouched for this email (the mobile prototype's
  *  demo provider sheet stands in for theirs): its account is signed in, and
  *  an account that has none is made, verified — the provider proved the email —
- *  with a password nobody knows, until one is added in Sign-in & security. */
+ *  with a password nobody knows, until one is added in Sign-in & security.
+ *  A new account's profile takes the name and country, as verifying does; what
+ *  a provider doesn't share (the date of birth, the Terms box) waits for
+ *  `completeAccountDetails` (`needsAccountDetails`). */
 export async function providerSignIn(
   email: string,
   name: { first: string; last: string },
@@ -426,7 +446,8 @@ export async function providerSignIn(
     passwordHash: await hashPassword(newSalt(), salt),
     salt,
     birthDate: "",
-    consentAt: now,
+    // Not ticked yet: the phone asks for the Terms box with the date of birth.
+    consentAt: 0,
     createdAt: now,
     verifiedAt: now,
     source,
@@ -438,7 +459,46 @@ export async function providerSignIn(
   });
   if (!saved.ok) return "refused";
   await comeIn(e, true);
+  const made = accountOf(readAccounts(), e);
+  if (made) fillEmptyProfile(made);
   return startSession(e, now).ok ? "new" : "refused";
+}
+
+/** The profile's name and country from the account, where the profile has none yet (verifying an
+ *  email, a provider making an account, its details completed). */
+function fillEmptyProfile(account: Account): void {
+  const profile = readProfileFields();
+  const patch: { name?: string; location?: string } = {};
+  if (!profile.name) patch.name = `${account.firstName} ${account.lastName}`.trim();
+  if (!profile.location && account.country) patch.location = countryNameOf(account.country);
+  if (patch.name || patch.location) saveProfile(patch);
+}
+
+/** A provider made this account: the name it may not have shared, the date of birth and the Terms
+ *  box are still to come (AUTH-2). An account made by Sign up always has them. */
+export function needsAccountDetails(account: Account): boolean {
+  // Only an account a provider made on the phone and not finished yet (its Terms box never ticked) owes
+  // them; an older account is never stopped for a date of birth the web doesn't ask again.
+  return !account.consentAt;
+}
+
+/** The signed-in account gets what Sign up would have asked (the name, the date of birth, the Terms
+ *  box ticked now), and the profile its name where it has none. */
+export function completeAccountDetails(input: AccountDetailsInput, now: number): "ok" | "invalid" | "refused" {
+  const account = readCurrent();
+  if (!account) return "refused";
+  const birthDate = birthDateOf(input.day, input.month, input.year, now);
+  if (Object.keys(accountDetailsProblems(input, now)).length || !birthDate) return "invalid";
+  const done: Account = {
+    ...account,
+    firstName: str(input.firstName, NAME_PART_MAX),
+    lastName: str(input.lastName, NAME_PART_MAX),
+    birthDate,
+    consentAt: now,
+  };
+  if (!saveAccount(done).ok) return "refused";
+  fillEmptyProfile(done);
+  return "ok";
 }
 
 /** Whether `password` is the account's password now (Reset: "That's your current password"). */
@@ -504,11 +564,7 @@ export async function verifyEmail(now: number): Promise<WriteResult> {
   const saved = saveAccount({ ...account, verifiedAt: account.verifiedAt ?? now, country });
   if (!saved.ok) return saved;
   await comeIn(account.email, account.verifiedAt === null);
-  const profile = readProfileFields();
-  const patch: { name?: string; location?: string } = {};
-  if (!profile.name) patch.name = `${account.firstName} ${account.lastName}`.trim();
-  if (!profile.location && country) patch.location = countryNameOf(country);
-  if (patch.name || patch.location) saveProfile(patch);
+  fillEmptyProfile({ ...account, country });
   writeStoredKey(VERIFY_KEY, null);
   return startSession(account.email, now);
 }

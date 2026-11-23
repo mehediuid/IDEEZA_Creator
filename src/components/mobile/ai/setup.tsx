@@ -20,7 +20,10 @@
 //   Free · Builder gives you 20"), and picking it shows the plan's card in
 //   place of the name field; Start drawing waits with the web's reason, and
 //   nothing is drawn or charged. Start drawing shows the credits and stays
-//   off until there is a project. A chat started
+//   off until there is a project — never for credits (the web's rule, CRE-2):
+//   each concept charges as it is drawn, or fails with "Your credit balance ran
+//   out before this render started. Nothing was charged." Out of credits, the
+//   sheet opens on the out-of-credits row, Buy credits in place. A chat started
 //   from a project's Add a product keeps that project (owner rule: it never
 //   makes a new one): nothing starts ticked, and the product question's
 //   button is Start drawing into it;
@@ -47,7 +50,7 @@ import { Sheet } from "../kit/sheet";
 import { Eyebrow } from "../kit/eyebrow";
 import { LIST_DIVIDERS, ListCard, ListRow } from "../kit/list";
 import { PickList } from "../kit/pick-list";
-import { ProjectLimitCard } from "../plans/upsell";
+import { OutOfCreditsRow, ProjectLimitCard } from "../plans/upsell";
 import { DASHED } from "./parts";
 import type { SetupTurn } from "./use-concept-flow";
 
@@ -153,7 +156,7 @@ export function ProductQuestion({
   onContinue: () => void;
   /** The project this chat adds to: Continue becomes Start drawing, with its credits. */
   addTo?: { id: string; name: string } | null;
-  /** Why Start drawing can't run now (offline, short of credits). */
+  /** Why Start drawing can't run now (offline). Credits never hold it (the web's rule). */
   held?: string | null;
 }) {
   const name = setup.productName?.trim() || "Your product";
@@ -272,7 +275,7 @@ export function ProjectSheet({
   onChangeProducts,
   projects,
   onStart,
-  canAfford,
+  onBuyCredits,
   held,
 }: {
   open: boolean;
@@ -285,7 +288,8 @@ export function ProjectSheet({
   onChangeProducts?: () => void;
   projects: { id: string; name: string; preselect?: boolean; detail?: string }[];
   onStart: (answer: Pick<SetupAnswer, "projectId" | "projectName">) => void;
-  canAfford: (n: number) => boolean;
+  /** Out of credits: the row with Buy credits opens the sheet (null with a credit to draw with). */
+  onBuyCredits?: (() => void) | null;
   /** Why Start drawing can't run now (offline). */
   held?: string | null;
 }) {
@@ -307,7 +311,6 @@ export function ProjectSheet({
   const newBlocked = room.full && isNew;
   const cost = products * CONCEPT_COST;
   const ready = !newBlocked && (isNew ? name.trim().length > 0 : !!choice);
-  const afford = canAfford(cost);
   const reason = newBlocked
     ? choosing && projects.length > 0
       ? "Pick a project you have, or upgrade"
@@ -316,9 +319,7 @@ export function ProjectSheet({
       ? isNew
         ? "Name the project first"
         : "Pick a project first"
-      : !afford
-        ? "Not enough credits to draw these concepts"
-        : (held ?? null);
+      : (held ?? null);
   // "Use a project I have": the choice cleared and the maker's projects brought into view.
   const useExisting = () => {
     setTouched(null);
@@ -378,6 +379,8 @@ export function ProjectSheet({
         </>
       }
     >
+      {/* Out of credits: the web's CL-032 line stays in view while the question is open (CRE-2). */}
+      {onBuyCredits && <OutOfCreditsRow onBuy={onBuyCredits} />}
       {/* The products decided a step back: a row that returns to the question (lens 4). */}
       {productNames && productNames.length > 1 && (
         <ListCard label="Products">

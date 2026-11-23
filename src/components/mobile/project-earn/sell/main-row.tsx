@@ -9,8 +9,8 @@
 //   price large, three facts, All details, "Selling the Main NFT sells the
 //   project."), then
 //   – not on sale: Sell in the bottom bar opens Add to marketplace (the
-//     readiness sheet first while a video is missing, then the listing
-//     screen); under L3 "Before you can list" stands in its place as a state
+//     readiness sheet first only while a video hasn't started — CL-030 — then
+//     the listing screen); under L3 "Before you can list" stands in its place as a state
 //     card; `?list=1` opens it once, on arrival (Publish › Sell of a Private
 //     project);
 //   – Buy now (14b): Edit listing and Remove listing rows; View on marketplace;
@@ -29,7 +29,10 @@
 //     says "Waiting for videos" and the screen leads with the waiting block,
 //     Review videos in the bar and Cancel listing as a row; a relist the same;
 //   – every minted state: Activity and Mint details (Minting, Token, Signature
-//     with Copy signature, Payout wallet and its change while lazy) as rows.
+//     with Copy signature, Payout wallet and its change while lazy) as rows;
+//   – until it is sold in full (EARN-4, the web item panel's): Earned · Bought
+//     by · Last sale under the summary once something sold or is listed, and
+//     Recent sales (the last three, "All sales in Money") at the foot.
 // Remove (14c) asks first and pays the network fee only on chain.
 
 import * as React from "react";
@@ -41,7 +44,7 @@ import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { unlistTracksIfLocked } from "@/components/marketplace/purchase-dialog";
-import { dialogBlockerOf, videosWaitOf } from "@/components/projects/details/readiness-dialog";
+import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
 import { useCommitCheck, useCommitGate } from "@/components/projects/earn/ladder/level-check";
 import { earnSourceOf } from "@/components/projects/earn/ladder/use-earn-facts";
 import { makerShareNow, refusedCopy, sellRecheckOf } from "@/components/projects/listing/listing-dialog";
@@ -81,6 +84,7 @@ import { readMarketNow, settleWithWallets, useMarket } from "@/lib/market/market
 import { makeSale } from "@/lib/market/purchase";
 import { mainSalesOf } from "@/lib/market/sales";
 import { MAIN_SALE_NOTE } from "@/lib/market/sell-flow";
+import { mainTileOf } from "@/lib/market/sell-desk";
 import type { Listing, MarketData } from "@/lib/market/types";
 import { demoAddress, makerId, readWallet } from "@/lib/wallet/demo-wallet";
 import { buyerLabel, DEMO_ACCOUNTS } from "@/lib/wallet/identities";
@@ -103,7 +107,9 @@ import {
   LINK_SM,
   PrimaryBar,
   ReadinessSheet,
+  RecentSales,
   ROWS_CARD,
+  SalesFacts,
   SellListRow,
   StepsCard,
   SUB,
@@ -183,12 +189,12 @@ export function MainRow() {
   const toast = useToast();
   const main = useMainState();
   const { state, add, ready, steps, minted, blocked, heldMain } = main;
-  // The videos sheet opens first while a video is still being made: its rows and the note that the
-  // listing will wait for them (CL-030). It never holds the listing back once each one has started.
-  const firstStep = React.useCallback(
-    (): Open => (dialogBlockerOf(view.videos.readiness.sell) || videosWaitOf(view.videos.readiness.sell) ? "gate" : "form"),
-    [view.videos.readiness.sell],
-  );
+  // CL-030 (PRJ-2 / EARN-10): only a video NOT STARTED stops Sell, so only then does the videos sheet
+  // open first (Continue to listing stays shut, each row starts its video). A video rendering or
+  // waiting for review never stops it: the listing form opens straight away, says the listing
+  // waits ("You don't have to wait. …"), and the signed listing is held until the videos are ready.
+  // So Publish › Sell of a Private project (`?list=1`) never meets a second videos sheet here.
+  const firstStep = React.useCallback((): Open => (dialogBlockerOf(view.videos.readiness.sell) ? "gate" : "form"), [view.videos.readiness.sell]);
   // What was open (the Main NFT screen, the videos gate) comes back after a trip to a product's
   // video and Back / Close (useBackState).
   const [open, setOpen] = useBackState<Open>("sell-main-open", state.action === "list" && !blocked && search.get("list") === "1" ? firstStep() : null);
@@ -265,7 +271,7 @@ function MainNftScreen({
 }: {
   main: ReturnType<typeof useMainState>;
   listing: Listing | null;
-  /** `null`: Sell (the readiness sheet first while a video is missing). */
+  /** `null`: Sell (the readiness sheet first only while a video hasn't started). */
   onOpen: (o: Open) => void;
   onClose: () => void;
 }) {
@@ -283,6 +289,18 @@ function MainNftScreen({
   const relist = useRelist(listing);
   const live = card.kind === "buyNow" || card.kind === "auction";
   const hasProof = outcomeView(view.commerce, view.summary, view.videos.readiness.showcase).minted !== null;
+  // What it has sold and earned, and its last sales (EARN-4, the web item panel's). Sold in full, the
+  // project is theirs: no numbers then, as on the web.
+  const tile = mainTileOf({
+    projectId: project.id,
+    action: state.action,
+    status: view.summary.status,
+    locked: view.lock !== null,
+    listing: view.listing,
+    sales: view.sales,
+    inCheckout,
+  });
+  const selling = main.minted && view.lock === null;
 
   let primary: React.ReactNode = null;
   let reason: string | null = null;
@@ -355,6 +373,7 @@ function MainNftScreen({
         )}
         {steps && <StepsCard check={check} what="list" projectId={project.id} license={brief?.state.license ?? null} announce={announce} />}
         {manage && card.kind === "paused" && listing && !heldMain && (heldRelist ? <HeldCard item={heldRelist} projectId={project.id} products={view.products} /> : <RelistCard relist={relist} />)}
+        {selling && (tile.meter !== null || tile.sales.length > 0) && <SalesFacts tile={tile} label="Main NFT sales" />}
         <ul aria-label="Main NFT" className={ROWS_CARD}>
           {waitingItem && <HeldCancelRow item={waitingItem} onCancelled={cancelled} />}
           <NftActivityRow target={{ kind: "main" }} />
@@ -369,6 +388,7 @@ function MainNftScreen({
             <ActionRow icon={Delete02Icon} title="Remove listing" danger onClick={() => onOpen("remove")} />
           </ul>
         )}
+        {selling && <RecentSales sales={tile.sales} />}
       </div>
     </FullLayer>
   );

@@ -17,10 +17,12 @@
 //   foot;
 // · WalletLine — "Paying from Mira's demo wallet · 0x… · 0.5 test ETH";
 // · NftActivityLine, ProjectActivity (Now + Earlier, or "No journey shared
-//   yet."), LegalSection, HolderBenefits, AboutRows;
+//   yet."), LegalSection, HolderBenefits, AboutRows (its facts, then Team and
+//   Network as rows that push their screens, BUY-9);
 // · PurchaseDoneSheet — 18d, after the wallet sheet confirms.
 
 import * as React from "react";
+import Link from "next/link";
 import { ArrowDown01Icon, CheckmarkCircle01Icon, TestTube01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
@@ -46,7 +48,7 @@ import { useActiveBuyer, useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { Sheet } from "../../kit/sheet";
-import { LIST_CARD, LIST_DIVIDERS, ListCard } from "../../kit/list";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard } from "../../kit/list";
 import { MobileTabs } from "../../kit/tabs";
 import { SectionHeading } from "../../project/parts";
 import { T } from "../../type";
@@ -607,13 +609,34 @@ export function OfferRowsCard({ rows, label }: { rows: readonly OfferRow[]; labe
   );
 }
 
-/** About, as rows of facts (no row opens anything here). */
-export function AboutRows({ rows }: { rows: readonly OfferRow[] }) {
-  if (rows.length === 0) return null;
+/** An About row that pushes a screen of its own (Team, Network: BUY-9). */
+export type AboutLink = { label: string; value: string; href: string };
+
+/** About, as rows of facts, then the rows that push a screen (Team, Network) with their chevron. */
+export function AboutRows({ rows, links = [] }: { rows: readonly OfferRow[]; links?: readonly AboutLink[] }) {
+  if (rows.length === 0 && links.length === 0) return null;
   return (
     <section aria-labelledby="bv-about" className="flex flex-col gap-4">
       <SectionHeading id="bv-about" title="About" />
-      <OfferRowsCard rows={rows} label="About" />
+      <div aria-label="About" className={LIST_CARD}>
+        <ul className={cn("flex flex-col", LIST_DIVIDERS)}>
+          {rows.map((r) => (
+            <li key={r.label} className="flex min-h-[44px] items-start justify-between gap-6 p-6">
+              <span className={cn(T.body, "shrink-0")}>{r.label}</span>
+              <span className={cn(T.body, "min-w-0 break-words text-right text-text-primary")}>{r.value}</span>
+            </li>
+          ))}
+          {links.map((l) => (
+            <li key={l.label}>
+              <Link href={l.href} className={cn(LIST_ROW, "min-h-[44px] gap-4 p-6")}>
+                <span className={cn(T.body, "shrink-0")}>{l.label}</span>
+                <span className={cn(T.body, "min-w-0 flex-1 truncate text-right text-text-primary")}>{l.value}</span>
+                <Chevron />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }

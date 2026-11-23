@@ -23,7 +23,8 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LockIcon, ShoppingBag01Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import { Bug01Icon, LockIcon, ShoppingBag01Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import { REPORT_PROBLEM, reportProblemHref } from "../help/report-link";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { commercialFactsOf, commercialStateOf } from "@/lib/commerce/state";
@@ -165,6 +166,7 @@ function EarnReady({ data, section: opened }: { data: Ready; section: EarnSectio
   const hubItems: ActionSheetItem[] = [
     ...(preview ? [{ label: "Preview as others see it", icon: ViewIcon, onSelect: () => router.push(phonePreviewHref(project.id, "buyer")) }] : []),
     ...(isLive && commercial !== "given" ? [{ label: "Sell copies of a product", icon: ShoppingBag01Icon, onSelect: () => openSection("sell", "copies") }] : []),
+    { label: REPORT_PROBLEM, icon: Bug01Icon, onSelect: () => router.push(reportProblemHref()) },
   ];
   const actions: TopBarAction[] = hub
     ? hubItems.length

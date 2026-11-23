@@ -37,7 +37,7 @@ import { fileFor, save } from "@/components/projects/product/product-deliverable
 import { bomFor, firmwareFor, isSampleModel, netsFor } from "@/lib/create/build-artifacts";
 import { ITEM_LABELS, useCreateHistory, type BuildItem, type BuildItemKind, type BuildProduct } from "@/lib/create/history";
 import { PIECES, isLeftOut } from "@/lib/create/pieces";
-import { sampleProjectOf } from "@/lib/manual/phone-project";
+import { offMarketNow, sampleProjectOf } from "@/lib/manual/phone-project";
 import { copiesFromOf, notBuiltCostLine, notBuiltTitle, parsePiece, phoneProductPath } from "@/lib/manual/phone-product";
 import { trackCardOf } from "@/lib/market/editions";
 import { formatAmount } from "@/lib/wallet/money";
@@ -57,7 +57,7 @@ import { ModelPiece } from "./model-view";
 import { useListedCopies } from "./overview";
 import { PIECE_ICON } from "../ai/build";
 import { CARD, FactGrid } from "./parts";
-import { PieceMissing, ProductLoading, ProductMissing, ProjectMissing } from "./states";
+import { OffMarket, PieceMissing, ProductLoading, ProductMissing, ProjectMissing } from "./states";
 import { ProductProvider, useProduct, useProductData } from "./use-product";
 
 export function PieceScreen({ id, productId, piece }: { id: string; productId: string; piece: string }) {
@@ -71,8 +71,13 @@ export function PieceScreen({ id, productId, piece }: { id: string; productId: s
     return <ProjectMissing />;
   }
   if (data.state === "no-product") return <ProductMissing projectName={data.projectName} back={`/m/projects/${encodeURIComponent(data.projectId)}?tab=products`} />;
+  const { ctx } = data;
+  // A piece is part of the product's page: a paused listing is off the marketplace here too (BUY-4).
+  if (ctx.mode === "market" && offMarketNow({ listing: ctx.view.listing.kind, projectId: ctx.project.id, sales: ctx.view.sales, buyerId: ctx.buyerId })) {
+    return <OffMarket paused />;
+  }
   return (
-    <ProductProvider value={data.ctx}>
+    <ProductProvider value={ctx}>
       <PieceView kind={kind} />
     </ProductProvider>
   );

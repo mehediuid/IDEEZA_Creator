@@ -8,10 +8,12 @@
 //   title with ⓘ (its line in a sheet);
 // · MintChoose — Keep private · Give to the community · Sell;
 // · MintDetails — Sell: the shared listing terms, the license, Share to Feed
-//   and its story; Give: the chain, the collection, Minting type, the license
-//   and the two confirms; Keep private: the chain, the collection and the
-//   confirms. Only Sell offers Share to Feed: the Feed shows only what is for
-//   sale (owner 2026-11-12), and a gift or a private mint lists nothing. Messages show once a field is left, at once for a typed amount,
+//   and its story; Give: the chain, the collection, Minting type, the license,
+//   the owner confirm and Share to Feed; Keep private: the chain, the
+//   collection, the owner confirm and Share to Feed — the web's Share to
+//   Innovations after every intent. A gift or a private mint lists nothing,
+//   so its post is on your Timeline and joins the Feed once something of it is
+//   for sale (SOC-6; the Feed shows only what is). Messages show once a field is left, at once for a typed amount,
 //   all of them once Continue was pressed (13h). An instant mint the wallet
 //   can't pay says so under Minting type (13g);
 // · MintReview — a reject or a failure first (13l); What is minted as a summary
@@ -23,7 +25,9 @@
 //   success head with its date, the ownership proof as a receipt (All details
 //   closed), the listing or what others can do, the videos, then View on
 //   marketplace and Open Earn as rows;
-// · MintShare — Share to Feed from Done, after a Sell (the flow mounts it then).
+// · MintShare — Share to Feed from Done, after any intent (the web's success
+//   step offers Share after all three; SOC-6: with nothing for sale the post is
+//   on your Timeline until it is).
 // CL-030: Review's videos line says what hasn't started ("Start every video
 // first: …"), or that the listing waits ("… You don't have to wait. …"); Done
 // reads "Minted · listing waits for videos" with the waiting block for each
@@ -54,7 +58,7 @@ import { addCollection, readCollections, type WalletCollection } from "@/lib/bri
 import { LISTED_LINE, liveSubline, pendingCardLine, pendingSubline } from "@/lib/brief/success-copy";
 import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { Readiness } from "@/lib/manual/p2-types";
-import { phoneEarnHref, phoneMarketHref, phoneProductVideoHref } from "@/lib/manual/phone-earn";
+import { forSaleNowOf, phoneEarnHref, phoneMarketHref, phoneProductVideoHref, shareOffFeedLineOf } from "@/lib/manual/phone-earn";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import type { ProjectProduct } from "@/lib/manual/project-read";
@@ -189,6 +193,8 @@ const NETWORK_OPTIONS = NETWORKS.map((n) => ({ value: n.value, label: n.label })
 const LICENSE_OPTIONS = LICENSES.map((l) => ({ value: l.value, label: l.label }));
 const NEW_COLLECTION = "__new__";
 const SAVE_SIGNATURE_LINE = "Saved with a free signature — nothing is charged. You can mint it on chain when you list it.";
+/** The web's note on a private mint's post while a video is missing (step-details.tsx). */
+const SHOWCASE_NOTE = "It's shared once every product has a video — the mint doesn't wait for them, and you can make them after.";
 /** Amount fields show a wrong typed value at once; the rest after they're left. */
 const AT_ONCE: ReadonlySet<ListingField> = new Set<ListingField>(["price", "minBid", "auctionBuyNow"]);
 
@@ -219,6 +225,7 @@ export function MintDetails({
   mintAddress,
   shortfall,
   tried,
+  videosReady = true,
 }: {
   state: MintState;
   onChange: (patch: Partial<MintState>) => void;
@@ -226,6 +233,8 @@ export function MintDetails({
   creatorPct: number;
   mintStatus: MintStatus;
   mintAddress?: string;
+  /** Every product has a video (the gate's): a private mint's post says when it's shared otherwise. */
+  videosReady?: boolean;
   /** An instant mint the wallet can't pay: why (13g). */
   shortfall: string | null;
   tried: boolean;
@@ -289,9 +298,20 @@ export function MintDetails({
       />
     </Field>
   );
-  const share = <ShareToggle checked={state.shareToNewsfeed} onChange={(v) => onChange({ shareToNewsfeed: v })} />;
+  // Share to Feed after every intent, as the web's Share to Innovations (SOC-6): a Sell is for sale,
+  // so its post is on the Feed; a gift or a private mint lists nothing, so the toggle says where it goes.
+  const share = (
+    <ShareToggle checked={state.shareToNewsfeed} onChange={(v) => onChange({ shareToNewsfeed: v })} line={intent === "sell" ? null : shareOffFeedLineOf(intent === "give")} />
+  );
   const story = state.shareToNewsfeed && (
-    <StoryPanel id={ids.story.id} value={state.story} onChange={(story) => onChange({ story })} />
+    <StoryPanel
+      id={ids.story.id}
+      value={state.story}
+      onChange={(story) => onChange({ story })}
+      where={intent === "sell" ? "in Feed" : "on your Timeline"}
+      // A private mint never waits for videos (the web's SHOWCASE_NOTE): it's shared once they're there.
+      note={intent === "save" && !videosReady ? SHOWCASE_NOTE : undefined}
+    />
   );
   const lowFunds = shortfall && <Banner tone="attention">{shortfall}</Banner>;
 
@@ -336,6 +356,8 @@ export function MintDetails({
       {intent === "give" && lowFunds}
       {intent === "give" && license}
       <OwnerCheck checked={state.confirmOwnership} onChange={(v) => onChange({ confirmOwnership: v })} error={tried && !state.confirmOwnership ? "Confirm you are the rightful owner of this idea." : undefined} />
+      {share}
+      {story}
     </div>
   );
 }
@@ -365,19 +387,27 @@ function OwnerCheck({ checked, onChange, error }: { checked: boolean; onChange: 
   );
 }
 
-function ShareToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function ShareToggle({ checked, onChange, line }: { checked: boolean; onChange: (v: boolean) => void; line?: string | null }) {
   const id = React.useId();
+  const lineId = React.useId();
   return (
     <div className="flex min-h-[44px] items-center justify-between gap-4">
-      <span id={id} className={cn(T.body, "text-text-primary")}>
-        Share to Feed
+      <span className="flex min-w-0 flex-col gap-1">
+        <span id={id} className={cn(T.body, "text-text-primary")}>
+          Share to Feed
+        </span>
+        {line && (
+          <span id={lineId} className={NOTE}>
+            {line}
+          </span>
+        )}
       </span>
-      <Toggle checked={checked} onChange={() => onChange(!checked)} aria-label="Share to Feed" />
+      <Toggle checked={checked} onChange={() => onChange(!checked)} aria-label="Share to Feed" aria-describedby={line ? lineId : undefined} />
     </div>
   );
 }
 
-function StoryPanel({ id, value, onChange, note }: { id: string; value: string; onChange: (v: string) => void; note?: string }) {
+function StoryPanel({ id, value, onChange, note, where = "in Feed" }: { id: string; value: string; onChange: (v: string) => void; note?: string; where?: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl bg-bg-subtle p-6">
       <label htmlFor={id} className={T.label}>
@@ -392,7 +422,7 @@ function StoryPanel({ id, value, onChange, note }: { id: string; value: string; 
         placeholder="Why did you build this? What should others do with it?"
       />
       <div className={cn(T.meta, "flex justify-between gap-6")}>
-        <span>Shown with your post in Feed.</span>
+        <span>{`Shown with your post ${where}.`}</span>
         <span className="tabular-nums">
           {value.length}/{STORY_MAX}
         </span>
@@ -889,7 +919,7 @@ function DoneRow({ href, icon, title }: { href: string; icon: typeof Store01Icon
 // ─────────────────────────── Share to Feed (from Done) ───────────────────────────
 
 export function MintShare() {
-  const { project: given, brief } = useEarn();
+  const { project: given, view, brief } = useEarn();
   const { projects, setShowcase } = useManualProjects();
   const project = projects.find((p) => p.id === given.id) ?? given;
   const toast = useToast();
@@ -898,12 +928,15 @@ export function MintShare() {
   const [story, setStory] = React.useState(() => project.post?.story ?? brief?.state.story ?? "");
   const storyId = React.useId();
   const waitingShare = useHeldItems(project.id).some((i) => i.kind === "share");
+  // Nothing of it for sale (a gift, a private mint, a listing still waiting for videos): the post is
+  // on your Timeline, and joins the Feed once something of it is for sale (SOC-6).
+  const onFeed = forSaleNowOf(view);
   // Already waiting for its videos: Done's waiting block shows it.
   if (waitingShare) return null;
   if (project.showcasedAt) {
     return (
-      <Link href="/m" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "min-w-0 flex-1")}>
-        View in Feed
+      <Link href={onFeed ? "/m" : "/m/profile"} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "min-w-0 flex-1")}>
+        {onFeed ? "View in Feed" : "View on Timeline"}
       </Link>
     );
   }
@@ -913,10 +946,10 @@ export function MintShare() {
     // A video still being made (CL-030): the post waits off the Feed, then goes live by itself.
     if (videosBlockerOf(readiness)) {
       hold({ id: heldId(), projectId: project.id, kind: "share", at: Date.now(), story: story.trim() });
-      toast({ title: "Your post goes on Feed when every video is ready." });
+      toast({ title: onFeed ? "Your post goes on Feed when every video is ready." : "Your post goes on your Timeline when every video is ready." });
     } else {
       setShowcase(project.id, true, undefined, { story: story.trim() });
-      toast({ title: "Shared to Feed" });
+      toast({ title: onFeed ? "Shared to Feed" : "Shared to your Timeline" });
     }
     setOpen(false);
   };
@@ -939,6 +972,7 @@ export function MintShare() {
           </>
         }
       >
+        {!onFeed && <p className={NOTE}>{shareOffFeedLineOf(view.commerce.outcome === "given")}</p>}
         <p className={NOTE}>{`${readiness.counts.ready} of ${readiness.counts.total} product videos ready`}</p>
         <Field label="The post" htmlFor={storyId}>
           <Textarea id={storyId} rows={4} value={story} maxLength={STORY_MAX} onValueChange={(v) => setStory(v.slice(0, STORY_MAX))} placeholder="Why did you build this? What should others do with it?" />

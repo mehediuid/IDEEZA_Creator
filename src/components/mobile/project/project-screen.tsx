@@ -152,7 +152,7 @@ function ProjectReady({ data }: { data: Ready }) {
   const raw = params.get("tab");
   const view = (SUB_VIEWS as readonly string[]).includes(raw ?? "") ? (raw as SubView) : null;
   const gate = usePhoneWriteGate(project.id);
-  // A sheet that sent the maker away (Publish's video readiness → a product) is open again on Back.
+  // A sheet that sent the maker away (Share to Feed's video rows → a product's video) is open again on Back.
   const [sheet, setSheet] = useBackState<ProjectSheet | null>("project-sheet", null);
   // The Feed's own-clip ⋯ › Share to Feed lands here with `?sheet=share`: the share sheet, once.
   const router = useRouter();

@@ -319,3 +319,33 @@ export function marketHrefOf(projectId: string, scope: string, kind: DeskKind): 
   if (scope === PROJECT_SCOPE) return `/marketplace/${id}?nft=${kind}`;
   return `/marketplace/${id}/products/${encodeURIComponent(scope)}`;
 }
+
+// ───────────────────────── an item's sales (D6–D8) ─────────────────────────
+// The item panel's numbers and Recent sales, in its words, so the web panel and the phone's item
+// screens (EARN-4) read them from one place.
+
+/** "Earned": the tile's payouts to you, per token, or "Nothing yet". */
+export function earnedTextOf(earned: readonly PayoutLine[]): string {
+  return earned.length ? payoutLinesText(earned) : "Nothing yet";
+}
+
+/** "Bought by": how many people bought it, never a type of user. */
+export function boughtByOf(buyers: number): string {
+  return buyers === 0 ? "Nobody yet" : buyers === 1 ? "1 person" : `${buyers} people`;
+}
+
+/** What one sale was: "40% of the project", or "Copy #1 · Business use". */
+export function saleWhatOf(s: Sale): string {
+  if (s.item.nft === "main") return `${s.item.sharePct}% of the project`;
+  return `Copy #${s.item.serial} · ${USE_LABEL[s.item.use]}`;
+}
+
+/** Recent sales shows the last three; the way to every one of them in Money. */
+export const RECENT_SALES_SHOWN = 3;
+export function allSalesLineOf(count: number): string {
+  return count > RECENT_SALES_SHOWN ? `All ${count} sales in Money` : "All sales in Money";
+}
+export const NO_SALES_LINE = "No sales yet. When someone buys, it shows here.";
+
+/** A copies item whose every listed copy is sold. */
+export const SOLD_OUT_NOTE = "Every copy is sold. Add copies to keep selling, or leave it closed.";

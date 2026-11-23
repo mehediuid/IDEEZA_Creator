@@ -35,7 +35,6 @@ import { useUnitsLog } from "@/components/projects/purchased/units-store";
 import { usePurchased } from "@/components/projects/purchased/use-purchased";
 import { useClipUrl } from "@/components/video-jobs/video-player";
 import type { InnovationPost } from "@/lib/innovations/types";
-import { phoneMarketHref } from "@/lib/manual/phone-earn";
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useMarket } from "@/lib/market/market-store";
@@ -83,7 +82,7 @@ import {
   WithPost,
   type PostRead,
 } from "./parts";
-import { copyPath, productPath, PURCHASED_TAB_HREF, purchasedEarnPath, purchasedPhoneHrefOf, receiptsPath } from "./paths";
+import { copyPath, productPath, PURCHASED_TAB_HREF, purchasedEarnPath, purchasedPhoneHrefOf, purchasedShopHref, receiptsPath } from "./paths";
 
 export function PurchasedScreen({ id }: { id: string }) {
   const { ready, buyer, purchases } = usePurchased();
@@ -254,7 +253,7 @@ function YouOwn({ p, buyer }: { p: PurchasedProject; buyer: DemoBuyer }) {
         {earned && <Fact label="Earned selling on" value={earned} success />}
       </dl>
       {p.buyable.map((k) => (
-        <Link key={k} href={phoneMarketHref(p.id)} className={LIST_ROW}>
+        <Link key={k} href={purchasedShopHref(p, k)} className={LIST_ROW}>
           <span className={cn(T.body, "min-w-0 flex-1 text-text-brand")}>Buy another {KIND_NAME[k]}</span>
           <Chevron />
         </Link>

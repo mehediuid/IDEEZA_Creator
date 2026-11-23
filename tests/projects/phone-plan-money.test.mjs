@@ -94,3 +94,34 @@ test("money: a sale row's lines, ?sale= read against the rows", () => {
   assert.equal(p.saleFromQuery(rows, "nope"), null);
   assert.equal(p.saleFromQuery(rows, null), null);
 });
+
+test("adding, moving and deleting a section (the web's edit menu and Add section; the phone's EARN-7)", () => {
+  const a = section("a", "identity", "done");
+  const b = section("b", "brand", "done", "edited");
+  const c = section("c", "market", "failed");
+  const all = [a, b, c];
+  // One place over; nothing at an end, nothing for a section that isn't there.
+  assert.deepEqual(p.movedSections(all, "b", -1).map((s) => s.id), ["b", "a", "c"]);
+  assert.deepEqual(p.movedSections(all, "b", 1).map((s) => s.id), ["a", "c", "b"]);
+  assert.equal(p.movedSections(all, "a", -1), null);
+  assert.equal(p.movedSections(all, "c", 1), null);
+  assert.equal(p.movedSections(all, "zz", 1), null);
+  // The list given is left as it was; a moved section keeps its own words and provenance.
+  assert.deepEqual(all.map((s) => s.id), ["a", "b", "c"]);
+  assert.equal(p.movedSections(all, "b", -1)[0], b);
+  assert.deepEqual(p.withoutSection(all, "b").map((s) => s.id), ["a", "c"]);
+  assert.deepEqual(p.withoutSection(all, "zz").map((s) => s.id), ["a", "b", "c"]);
+  // An added section: custom, Added by you, written; untitled when the title is blank.
+  assert.deepEqual(p.addedSectionOf("bps_1", "  Go-to-market ", { body: ["Launch at fairs."] }), {
+    id: "bps_1",
+    kind: "custom",
+    title: "Go-to-market",
+    fields: { body: ["Launch at fairs."] },
+    origin: "added",
+    state: "done",
+  });
+  assert.equal(p.addedSectionOf("bps_2", "   ", {}).title, "Untitled section");
+  // Written by the maker: a paragraph per block between blank lines.
+  assert.deepEqual(p.writtenSectionFields("First part.\nStill first.\n\n\nSecond part.\n\n  "), { body: ["First part.\nStill first.", "Second part."] });
+  assert.deepEqual(p.writtenSectionFields("   "), { body: [] });
+});

@@ -61,7 +61,7 @@ export const FAQS: readonly FaqItem[] = [
   {
     id: "identity",
     q: "Why do I need to verify my identity?",
-    a: "Your first withdrawal asks for it, and so does selling physical copies. Level 1 asks your legal name, your country and your mobile number. From $1,000 and from $5,000 of total sales, fuller checks with ID documents are asked. Nothing is checked or limited in this demo.",
+    a: "Your first withdrawal asks for it, and so does selling physical copies. Level 1 asks your legal name and your country. From $1,000 and from $5,000 of total sales, fuller checks with ID documents are asked. Nothing is checked or limited in this demo.",
     link: { label: "KYC verification", href: "/m/settings/kyc" },
   },
   {

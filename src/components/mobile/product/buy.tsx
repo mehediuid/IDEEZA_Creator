@@ -24,7 +24,8 @@
 //   each with its price and "n of N sold · you own n" (a use the creator
 //   didn't list reads "Not on sale", a sold-out one "Sold out"; both greyed,
 //   never picked), the copies' activity line, then From holders as choices of
-//   the same group (CL-036). No row has a Buy of its own. No version choice
+//   the same group (CL-036), then NFT details — one row opening the picked
+//   use's facts (BUY-7). No row has a Buy of its own. No version choice
 //   (owner 2026-11-15): one price per use, the listing's Price (`versionless`);
 // - the sheet's foot says what is picked and its price ("Physical NFT ·
 //   Personal use", "0.02 ETH · makes 1 unit") over its one Buy now (every unit
@@ -84,7 +85,7 @@ import { PickSheet } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
 import { tabPanelProps } from "../kit/tabs";
 import { Choice, ChoiceGroup, PickTabs, titled, type BarPick } from "../project-earn/buyer/buy-pick";
-import { SoldBar } from "../project-earn/buyer/copies";
+import { copyFactsOf, NftDetailsRow, SoldBar } from "../project-earn/buyer/copies";
 import { heldCopiesOf } from "../project-earn/buyer/held";
 import { HolderChoice, holderFactsOf, useHolderBuy, useHolderListings } from "../project-earn/buyer/holder-offers";
 import type { DoneFacts } from "../project-earn/buyer/parts";
@@ -420,12 +421,15 @@ function KindPanel({
   picked: CopyChoice | null;
   onPick: (c: CopyChoice) => void;
 }) {
-  const { project, product, name, buyerId } = useProduct();
+  const { project, product, name, buyerId, view } = useProduct();
   const uses = choices.filter((c): c is UseChoiceT => c.type === "use");
   const holders = choices.filter((c): c is HolderChoiceT => c.type === "holder");
   const group = `use-${product.id}-${kind}`;
   // The activity of the picked use's copies, else of the first use the creator lists.
   const shown = (picked?.type === "use" ? picked.track : null) ?? uses.find((c) => c.track)?.track ?? null;
+  // NFT details (BUY-7): the picked use's, else the first that can be bought — the web's copy tab.
+  const detailed = (picked?.type === "use" ? picked.track : null) ?? uses.find((c) => c.open)?.track ?? shown;
+  const chain = editionChainOf(view.mint.record, view.listing.kind === "none" ? null : view.listing.listing, null);
   return (
     <>
       <div className="flex flex-col gap-1">
@@ -451,6 +455,7 @@ function KindPanel({
           ))}
         </ChoiceGroup>
       )}
+      {detailed && chain && <NftDetailsRow offer={`${KIND_LABEL[kind]} · ${USE_LABEL[detailed.use]}`} facts={copyFactsOf(detailed, view.sales, chain)} />}
     </>
   );
 }

@@ -33,6 +33,7 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { ComparePlansSheet, UpgradeUnlockSheet } from "./credit-sheets";
+import { OutOfCreditsRow, useRefillDay } from "./upsell";
 import { Hero, dateOf, n, pct } from "./parts";
 
 /** The credits that end first: every lot ending on the earliest day counts, not only one of them. */
@@ -60,6 +61,7 @@ export function CurrentCreditScreen() {
   const out = hydrated && balance === 0;
   const low = hydrated && runningLow(balance, lowAt);
   const recent = ledger.slice(-3).reverse();
+  const refill = useRefillDay();
 
   // The web's Buy credits, straight away: the fix first, the plan quieter in the sheet's last block (CL-032).
   const buy = () => setBuying(true);
@@ -96,16 +98,23 @@ export function CurrentCreditScreen() {
           >
             <span className={T.amountHero}>{n(balance)} credits</span>
           </Hero>
-          {low && (
-            <div role="status" className="flex items-start gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-[var(--color-border-error)] bg-bg-surface p-6">
-              <span aria-hidden className="text-[color:var(--color-icon-warning)]">
-                <Icon icon={Alert02Icon} size={20} />
-              </span>
-              <span className="flex flex-col gap-1">
-                <span className={T.rowTitle}>{out ? "You’re out of credits" : "Running low on credits"}</span>
-                <span className={T.meta}>{out ? "Buy credits or upgrade to keep creating." : "You may run out soon. Top up to keep creating."}</span>
-              </span>
-            </div>
+          {/* MON-8: the web's words (CL-032). Out: "You're out of credits. They refill on 8 Dec." and the
+              next plan's link — Buy credits is the bar's own button. Low: the web's "Running low on
+              credits" and the day the plan's credits come back. */}
+          {out ? (
+            <OutOfCreditsRow />
+          ) : (
+            low && (
+              <div role="status" className="flex items-start gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-[var(--color-border-error)] bg-bg-surface p-6">
+                <span aria-hidden className="text-[color:var(--color-icon-warning)]">
+                  <Icon icon={Alert02Icon} size={20} />
+                </span>
+                <span className="flex flex-col gap-1">
+                  <span className={T.rowTitle}>Running low on credits</span>
+                  {refill && <span className={T.meta}>They refill on {refill}.</span>}
+                </span>
+              </div>
+            )
           )}
 
           <section aria-labelledby="this-month" className="flex flex-col gap-4">

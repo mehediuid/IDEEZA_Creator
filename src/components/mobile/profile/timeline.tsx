@@ -15,7 +15,10 @@
 //   as its own card — its creator, its picture, title, "from" and Activity — or "no longer available"
 //   once the item is gone. It has its own appreciations, its own comments (the Feed's comments sheet,
 //   opened here) and Save, and ⋯ › Remove from your Feed.
-// · The post's reactions (the Feed's stores).
+// · The post's reactions (the Feed's stores). Its comments open on its clip while it plays on the
+//   Feed, else in the Feed's comments sheet right here (SOC-3: the web's post keeps its comments
+//   whether or not it is on sale); `?post=<postId>&comment=<id>` opens that sheet on a comment, where
+//   a comment notice or a copied comment link of a post off the Feed lands (clip-page.tsx).
 // Ten first, then Show all.
 
 import * as React from "react";
@@ -26,6 +29,8 @@ import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
 import { kindChipOf, sharedLineOf, type TimelinePost } from "@/lib/people/timeline";
+import { clipHref, postItemIdOf } from "@/lib/innovations/clips";
+import { sampleShareItem } from "@/lib/innovations/share-items";
 import { ageOf, shortDateOf } from "@/lib/people/phone-profile";
 import { ME } from "@/lib/innovations/people";
 import { useMe } from "@/lib/people/profile-store";
@@ -33,7 +38,7 @@ import { cn } from "@/lib/utils";
 import { LIST_CARD } from "../kit/list";
 import { MEDIA_CHIP } from "../kit/media";
 import { T } from "../type";
-import { ClipComments } from "../feed/clip-comments";
+import { ClipComments, type CommentTarget } from "../feed/clip-comments";
 import { useGuestGuard } from "../feed/use-guest";
 import { ReactionRow } from "./parts";
 
@@ -173,9 +178,10 @@ function TimelineCard({ post, now, onMore, onComments }: { post: TimelinePost; n
       <ReactionRow
         postId={post.postId}
         base={post.base}
-        // A share has its own appreciations and its own comments (a sheet here); a post's open on its clip.
-        commentsHref={share ? null : post.clipId ? `/m/clip/${encodeURIComponent(post.clipId)}?comment=1` : post.detailsHref}
-        onComments={share ? onComments : undefined}
+        // A share has its own appreciations and its own comments (a sheet here); a post's open on its
+        // clip while it plays on the Feed, else in the same sheet here (SOC-3).
+        commentsHref={!share && post.clipId ? `${clipHref(post.clipId)}?comment=` : null}
+        onComments={share || !post.clipId ? onComments : undefined}
         views={!share}
         onMore={onMore}
         moreLabel={`Actions for this post${post.title ? ` about ${post.title}` : ""}`}
@@ -184,22 +190,37 @@ function TimelineCard({ post, now, onMore, onComments }: { post: TimelinePost; n
   );
 }
 
+/** The thread a post's comments sheet shows: a share's own (you its owner: you made the share), or
+ *  the post's — yours, or its sample maker's. */
+function commentTargetOf(post: TimelinePost, me: { name: string; initials: string }): CommentTarget | null {
+  const you = { ...ME, name: me.name, initials: me.initials };
+  if (post.shareId) return { id: post.shareId, postId: post.postId, source: "mine", creator: you };
+  if (post.postId.startsWith("mine:")) return { id: post.postId, postId: post.postId, source: "mine", creator: you };
+  const item = sampleShareItem(postItemIdOf(post.postId));
+  return item ? { id: item.id, postId: post.postId, source: "sample", creator: item.creator } : null;
+}
+
 /** The posts, newest first: ten, then Show all. `onMore` gives a post ⋯ (your own shares). A share's
- *  Comments open its own thread in the Feed's comments sheet; a copied comment link (`?share=<id>
- *  &comment=<id>`) opens it on that comment. */
+ *  Comments open its own thread in the Feed's comments sheet, and so do a post's while it doesn't play
+ *  on the Feed; a copied comment link (`?share=<id>&comment=<id>`, `?post=<postId>&comment=<id>`)
+ *  opens it on that comment. */
 export function Timeline({ posts, now, onMore }: { posts: readonly TimelinePost[]; now: number; onMore?: (post: TimelinePost) => void }) {
   const params = useSearchParams();
   const pathname = usePathname();
   const me = useMe();
   const { guard, gate } = useGuestGuard();
-  const asked = params.get("share");
-  const askedPost = asked ? posts.find((p) => p.shareId === asked) : undefined;
+  const askedShare = params.get("share");
+  const askedPostId = params.get("post");
+  const askedPost = askedShare
+    ? posts.find((p) => p.shareId === askedShare)
+    : askedPostId
+      ? posts.find((p) => p.via === "post" && p.postId === askedPostId)
+      : undefined;
   const [all, setAll] = React.useState(() => !!askedPost && posts.indexOf(askedPost) >= FIRST);
-  const [commentsFor, setCommentsFor] = React.useState<string | null>(() => askedPost?.shareId ?? null);
+  const [commentsFor, setCommentsFor] = React.useState<string | null>(() => askedPost?.key ?? null);
   const shown = all ? posts : posts.slice(0, FIRST);
-  const open = commentsFor ? posts.find((p) => p.shareId === commentsFor) : undefined;
-  // The share's thread: its own post, you its owner (you made the share).
-  const target = open?.shareId ? { id: open.shareId, postId: open.postId, source: "mine" as const, creator: { ...ME, name: me.name, initials: me.initials } } : null;
+  const open = commentsFor ? posts.find((p) => p.key === commentsFor) : undefined;
+  const target = open ? commentTargetOf(open, me) : null;
   return (
     <div className="flex flex-col gap-4">
       <ol aria-label="Timeline" className="m-0 flex list-none flex-col p-0">
@@ -209,7 +230,7 @@ export function Timeline({ posts, now, onMore }: { posts: readonly TimelinePost[
               post={p}
               now={now}
               onMore={onMore && p.shareId ? () => onMore(p) : undefined}
-              onComments={p.shareId ? () => setCommentsFor(p.shareId) : undefined}
+              onComments={() => setCommentsFor(p.key)}
             />
           </li>
         ))}
@@ -224,15 +245,18 @@ export function Timeline({ posts, now, onMore }: { posts: readonly TimelinePost[
           {all ? "Show less" : `Show all ${posts.length}`}
         </button>
       )}
-      {target && (
+      {open && target && (
         <ClipComments
+          key={open.key}
           clip={target}
           open
           onClose={() => setCommentsFor(null)}
           guard={guard}
-          focusId={open?.shareId === asked ? params.get("comment") : null}
-          link={`${pathname}?share=${encodeURIComponent(target.id)}`}
-          maker={false}
+          focusId={open === askedPost ? params.get("comment") : null}
+          // A share's comment links open it here; a post's open its clip's address, which plays it
+          // while it is on the Feed and comes back here when it isn't.
+          link={open.shareId ? `${pathname}?share=${encodeURIComponent(open.shareId)}` : undefined}
+          maker={!open.shareId}
         />
       )}
       {gate}

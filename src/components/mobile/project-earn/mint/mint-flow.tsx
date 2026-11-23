@@ -293,9 +293,12 @@ export function MintFlow({ projectId }: { projectId: string }) {
         const shareGate = readinessOf(factsOf(s, { videos: videosRef.current, jobs: jobsRef.current, now: at }), "showcase");
         const shareReady = shareGate.rules.every((r) => r.ok);
         const shareStarted = videosStartBlockerOf(shareGate) === null;
-        // The Feed shows only what is for sale: only a Sell shares on the phone. Every video started,
-        // some still rendering or unreviewed (CL-030): the post waits for them.
-        if (s.intent === "sell" && s.shareToNewsfeed && cur.showcasedAt == null) {
+        // Share to Feed ticked shares after any intent, as the web's Share to Innovations (SOC-6): with
+        // nothing for sale (a gift, a private mint) the post is on your Timeline, and joins the Feed once
+        // something of it is for sale. Every video started, some still rendering or unreviewed
+        // (CL-030): the post waits for them; a private mint with a video never started stays unshared,
+        // and Done offers Share.
+        if (s.shareToNewsfeed && cur.showcasedAt == null) {
           if (shareReady) setShowcase(cur.id, true, at, { story: s.story.trim() });
           else if (shareStarted) hold({ id: heldId(), projectId: cur.id, kind: "share", at, story: s.story.trim() });
         }
@@ -395,6 +398,7 @@ export function MintFlow({ projectId }: { projectId: string }) {
             mintAddress={project.mint?.wallet.address}
             shortfall={type === "instant" ? (shortfall?.missing ?? null) : null}
             tried={tried}
+            videosReady={gate.readiness.rules.find((r) => r.id === "videos")?.ok === true}
           />
         )}
         {step === "review" && (
@@ -451,7 +455,7 @@ function MintFooter({
   if (step === "success") {
     return (
       <BottomBar className="flex-row gap-6 pt-8">
-        {state.intent === "sell" && <MintShare />}
+        <MintShare />
         <Button size="xl" className="min-w-0 flex-1" onClick={onDone}>
           Done
         </Button>
@@ -501,5 +505,6 @@ function MintFooter({
 function ctaOf(state: MintState, type: MintType): string {
   const intent = state.intent ?? "sell";
   if (intent === "save") return "Sign and save";
-  return `${type === "instant" ? "Pay" : "Sign"} and ${intent === "sell" ? "list" : "give"}`;
+  const base = `${type === "instant" ? "Pay" : "Sign"} and ${intent === "sell" ? "list" : "give"}`;
+  return intent === "give" && state.shareToNewsfeed ? `${base} · post to Feed` : base;
 }

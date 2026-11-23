@@ -7,7 +7,9 @@
 // The reports are the web's (components/settings/your-reports.tsx,
 // lib/data/reports.ts): every report this browser sent — profiles, posts,
 // comments, messages and problem reports. Nobody reviews them in the app yet,
-// so each reads received, not reviewed; nothing here changes them.
+// so each reads received, not reviewed; nothing here changes them. A report's
+// Open goes to the phone's own screen (lib/data/phone-reports.ts, SET-1): the
+// creator's profile, the conversation, or the post's Feed clip on the comment.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -16,6 +18,7 @@ import { type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { usePostLookup, useStoredThreads } from "@/components/settings/use-data-reads";
+import { phoneReportHrefOf } from "@/lib/data/phone-reports";
 import { normalizeSentReports, reportsYouMade, SENT_REPORTS_KEY, type MadeKind, type ReportRow } from "@/lib/data/reports";
 import { parseStored, useStoredKey } from "@/lib/key-store";
 import { normalizeMessages } from "@/lib/messages/normalize";
@@ -25,6 +28,7 @@ import { REPORTS_KEY, normalizeReports } from "@/lib/people/reports";
 import { useDates } from "@/lib/settings/use-dates";
 import { Sheet } from "../kit/sheet";
 import { cn } from "@/lib/utils";
+import { useFeedClips } from "../feed/use-clips";
 import { EmptyState } from "../kit/state";
 import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
 import { T } from "../type";
@@ -145,8 +149,10 @@ export function YourReportsSettings() {
 function ReportSheet({ row, open, onClose }: { row: ReportRow | null; open: boolean; onClose: () => void }) {
   const router = useRouter();
   const dates = useDates();
+  const { byId } = useFeedClips();
   if (!row) return null;
-  const href = row.href;
+  // The web's address, as the phone's screen (never the website).
+  const href = phoneReportHrefOf(row, (clipId) => byId(clipId) !== null);
   const lines: [string, React.ReactNode][] = [
     ["What", row.what],
     ["Reason", row.reason ?? "Not kept for this kind of report"],

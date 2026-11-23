@@ -66,6 +66,20 @@ const MOBILE_PAGES: Record<string, string> = {
   "welcome-map": "Welcome map",
 };
 
+/** The web screen a phone screen under /m/projects or /m/ai/chat stands for; null for the rest. */
+function mobileTwinOf(rest: string[], search: string): PageRef | null {
+  const [a, b, c, d] = rest;
+  if (a === "ai" && b === "chat" && c) return { page: "AI chat", route: "/chat/[chatId]" };
+  if (a !== "projects" || !b || b === "purchased") return null;
+  const project = { key: b };
+  if (c === "market") return { page: "Marketplace listing", route: "/marketplace/[id]", project };
+  if (c === "preview") return { page: "Project page · Preview as buyer", route: "/projects/[id]", project };
+  if (c === "products" && d && new URLSearchParams(search).get("view") === "market") {
+    return { page: "Marketplace listing › Product", route: "/marketplace/[id]/products/[productId]", project, productId: d };
+  }
+  return pageRefFor(`/${rest.map((s) => encodeURIComponent(s)).join("/")}`, search);
+}
+
 export function pageRefFor(pathname: string, search = ""): PageRef {
   const parts = pathname.split("?")[0].split("#")[0].split("/").filter(Boolean).map(safeDecode);
   const q = new URLSearchParams(search);
@@ -75,6 +89,11 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
 
   switch (a) {
     case "m": {
+      // A phone screen with a web twin reads as that screen, "Mobile › " in front, and names its project and
+      // product as the web's does (SET-2): a project, its product, its Earn and mint; the shop screen is the
+      // marketplace listing; the AI chat.
+      const twin = mobileTwinOf(parts.slice(1), search);
+      if (twin) return { ...twin, page: `Mobile › ${twin.page}`, route: `/m${twin.route}` };
       // A screen this table doesn't name yet still reads as itself ("earn-history" → "Earn history").
       const name = MOBILE_PAGES[b ?? ""] ?? (b ? b.charAt(0).toUpperCase() + b.slice(1).replace(/-/g, " ") : "");
       return { page: name ? `Mobile › ${name}` : "Mobile", route: b ? `/m/${b}` : "/m" };

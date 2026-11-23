@@ -23,12 +23,15 @@
 //   the post sells, opening on the web's tab (an address's ?nft=, else what
 //   the buyer holds, else the first with something to buy). Main NFT =
 //   its box ("Main NFT", the price large, Listing,
-//   Share, Chain, the wallet line, the Testnet demo line), the share-sale
-//   note under it. A copy kind = what it gets you (units behind ⓘ), then
+//   Share, Royalties, Minting, Chain, Collection and what Royalties and Lazy
+//   mean, the wallet line, "No activity yet · listed {date}", the Testnet
+//   demo line), the share-sale note under it (BUY-7, the web's sample facts).
+//   A copy kind = what it gets you (units behind ⓘ), then
 //   Use: Personal use and Business use as radio rows (sample-market.ts
 //   `copyUsesOf`: Business at twice Personal), each with its price, sold
 //   count and last sale (a sold-out use stays, greyed); then From holders as
-//   rows of the same choice (holder-offers.tsx, CL-036);
+//   rows of the same choice (holder-offers.tsx, CL-036); then NFT details,
+//   one row opening its sheet (BUY-7);
 // · the bar says what is picked and its price, with Change, beside Ask the
 //   creator (a chat icon) and the one Buy now — Manage for the buyer's own
 //   holder listing; the wallet sheet's title names it too (D4). Nothing left
@@ -70,7 +73,7 @@ import { holderOf, type Resale } from "@/lib/market/resales";
 import { unitsAllowanceOf, type UnitsUse } from "@/lib/market/units";
 import { lowestOf } from "@/lib/market/market-list";
 import { randomId } from "@/lib/market/sales";
-import { copyUseBlockOf, copyUsesOf, copyUseStateOf, type SampleMarket, type UseOffer } from "@/lib/market/sample-market";
+import { copyUseBlockOf, copyUsesOf, copyUseStateOf, SAMPLE_COLLECTION, SAMPLE_ROYALTIES_PCT, type SampleMarket, type UseOffer } from "@/lib/market/sample-market";
 import type { EditionKind } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
 import { formatAmount } from "@/lib/wallet/money";
@@ -82,10 +85,10 @@ import { BottomBar } from "../../kit/bottom-bar";
 import { PhoneWalletScope } from "../phone-wallet";
 import { tabPanelProps } from "../../kit/tabs";
 import { BUY_BOX_ID, Choice, ChoiceGroup, PickBar, PickTabs, revealBuyBox, titled, type BarAction, type BarPick } from "./buy-pick";
-import { KindHead, SoldBar } from "./copies";
+import { COPY_FACTS_NOTE, KindHead, NftDetailsRow, SoldBar } from "./copies";
 import { HolderChoice, holderFactsOf, useHolderBuy, useHolderListings } from "./holder-offers";
 import { readSampleSales, useSampleSales, writeSampleSales } from "./sample-sales-store";
-import { BuyBox, ClosedCard, DemoShopBanner, IconLine, PurchaseDoneSheet, WalletLine, type DoneFacts } from "./parts";
+import { BuyBox, ClosedCard, DemoShopBanner, IconLine, PurchaseDoneSheet, WalletLine, type BoxFact, type DoneFacts } from "./parts";
 import { YouOwnRow } from "./you-own";
 import { T } from "../../type";
 
@@ -303,7 +306,7 @@ export function SampleMarketSection() {
 
 /** Main NFT: its box, or how it was sold. */
 function MainPanel({ shop }: { shop: Shop }) {
-  const { id, offers, sales, buyerId } = shop;
+  const { id, post, offers, sales, buyerId } = shop;
   const main = offers.find((o) => o.kind === "main");
   if (!main) return null;
   const mainSale = offerStateOf(main, id, sales).soldTo ?? null;
@@ -325,20 +328,25 @@ function MainPanel({ shop }: { shop: Shop }) {
         label="Main NFT"
         overline="Main NFT"
         price={formatAmount(main.price, main.token)}
+        // The web's sample facts (sample-offer-box.tsx, BUY-7): what the royalty is, how it mints, which collection.
         facts={[
           { label: "Listing", value: "Buy now" },
           { label: "Share", value: "100%" },
+          { label: "Royalties", value: `${SAMPLE_ROYALTIES_PCT}%` },
+          { label: "Minting", value: "Lazy" },
           { label: "Chain", value: networkLabelOf(SAMPLE_NETWORK) },
+          { label: "Collection", value: SAMPLE_COLLECTION },
         ]}
+        notes={COPY_FACTS_NOTE}
         foot={
           <>
             <IconLine icon={Wallet01Icon}>
               <WalletLine buyerId={buyerId} token={main.token} network={SAMPLE_NETWORK} verb="buy" />
             </IconLine>
             <IconLine icon={Activity01Icon}>
-              <p className={T.meta}>
+              <p className={cn(T.meta, "tabular-nums")}>
                 <span className="sr-only">Main NFT activity: </span>
-                No sales yet
+                {`No activity yet · listed ${formatDate(post.sharedAt)}`}
               </p>
             </IconLine>
             <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
@@ -359,6 +367,8 @@ function CopyPanel({ shop, kind }: { shop: Shop; kind: EditionKind }) {
   const locked = sales.some((s) => s.kind === "main");
   const token = picked?.type === "use" ? picked.offer.token : picked?.type === "holder" ? picked.resale.token : (uses[0]?.offer.token ?? "ETH");
   const name = `sv-pick-${kind}`;
+  // NFT details (BUY-7): the picked use's, else the first that can be bought, else the first (the web's copy tab).
+  const details = (picked?.type === "use" && picked.tab === kind ? picked.offer : null) ?? uses.find((c) => c.open)?.offer ?? uses[0]?.offer ?? null;
   return (
     <>
       <KindHead id={`sv-copies-${kind}`} kind={kind} name={post.title} />
@@ -380,12 +390,27 @@ function CopyPanel({ shop, kind }: { shop: Shop; kind: EditionKind }) {
           ))}
         </ChoiceGroup>
       )}
+      {details && <NftDetailsRow offer={details.name} facts={sampleCopyFactsOf(details, shop)} />}
       <IconLine icon={Wallet01Icon}>
         <WalletLine buyerId={buyerId} token={token} network={SAMPLE_NETWORK} verb="buy" />
       </IconLine>
       <DemoShopBanner body={SAMPLE_BANNER_BODY} line />
     </>
   );
+}
+
+/** A sample copy's NFT details as the web's sample box reads them (sample-offer-box.tsx): Copies, Use, Royalties,
+ *  Minting, Chain, Collection. */
+function sampleCopyFactsOf(offer: UseOffer, shop: Shop): BoxFact[] {
+  const state = copyUseStateOf(offer, shop.id, shop.sales);
+  return [
+    { label: "Copies", value: state.of !== null ? `${state.of}` : "No limit" },
+    { label: "Use", value: offer.use },
+    { label: "Royalties", value: `${SAMPLE_ROYALTIES_PCT}%` },
+    { label: "Minting", value: "Lazy" },
+    { label: "Chain", value: networkLabelOf(SAMPLE_NETWORK) },
+    { label: "Collection", value: SAMPLE_COLLECTION },
+  ];
 }
 
 /** One use of one kind: its price, how many are sold (and held by this buyer now), its last sale. */

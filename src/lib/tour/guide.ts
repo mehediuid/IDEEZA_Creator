@@ -5,8 +5,9 @@
 // question, a drawn concept, a build, a saved project, an editor opened, a mint, a share), never a
 // Next button, so it is right whichever way the user got there.
 //
-// Pure: the host reads the facts from the stores.
+// Pure: the host reads the facts from the stores (`guideFactsOf` turns what it read into them).
 
+import { takesPlanSlot } from "../create/upsell";
 import type { PageRef } from "./types";
 
 export type GuideStepId = "idea" | "answer" | "concept" | "build" | "save" | "editor" | "mint" | "share";
@@ -127,6 +128,53 @@ const DONE: Record<GuideStepId, (f: GuideFacts) => boolean> = {
   mint: (f) => f.minted,
   share: (f) => f.shared,
 };
+
+/** What the guide reads of a chat: its id and its turns' roles and states. */
+export type GuideChat = { id: string; turns: readonly { role: string; status?: string }[] };
+/** What the guide reads of a build: whose chat it is and how far it got. */
+export type GuideBuild = { chatId: string; status: string };
+/** What the guide reads of a project. */
+export type GuideProject = {
+  id: string;
+  mint?: unknown;
+  showcasedAt?: number | null;
+  editorOpened?: Readonly<Record<string, unknown>> | null;
+};
+
+/** The facts, from the user's newest chat, the builds and the projects: the reading the web's
+ *  TourHost does, for the phone's guide strip (AUTH-5). Only a project of the user's own counts,
+ *  as for the plan's slots (`takesPlanSlot`): the demo projects every account starts with
+ *  (prototype only) and a project bought whole are already built, minted and shared, so counting
+ *  them would finish the guide before the user has made anything. */
+export function guideFactsOf(at: {
+  chat: GuideChat | null;
+  builds: readonly GuideBuild[];
+  projects: readonly GuideProject[];
+  /** An editor is open on this screen. */
+  inEditor: boolean;
+  phone: boolean;
+}): GuideFacts {
+  const chat = at.chat;
+  const turns = chat?.turns ?? [];
+  const setup = turns.find((t) => t.role === "setup");
+  const images = turns.filter((t) => t.role === "assistant");
+  const jobs = chat ? at.builds.filter((b) => b.chatId === chat.id) : [];
+  const own = at.projects.filter((p) => takesPlanSlot(p.id));
+  return {
+    hasChat: !!chat,
+    reading: setup?.status === "loading",
+    answered: setup ? setup.status === "answered" : images.length > 0,
+    drawing: images.some((t) => t.status === "pending"),
+    conceptReady: images.some((t) => t.status === "ready"),
+    buildStarted: jobs.length > 0,
+    building: jobs.some((b) => b.status === "queued" || b.status === "running"),
+    hasProject: own.length > 0,
+    editorSeen: at.inEditor || own.some((p) => Object.keys(p.editorOpened ?? {}).length > 0),
+    minted: own.some((p) => !!p.mint),
+    shared: own.some((p) => typeof p.showcasedAt === "number"),
+    phone: at.phone,
+  };
+}
 
 /** The steps this screen walks: a phone leaves out the editor. */
 export function guideSteps(phone: boolean): GuideStep[] {

@@ -10,7 +10,8 @@
 //   the whole project's copies as Use choices with their prices to pick and
 //   compare, no Buy and no bar; Open in Explore marketplace), Project
 //   activity (Now + Earlier), Products, Legal information, Holder benefits,
-//   About (Source).
+//   About (Source; Team and Network rows that push the buyer's read-only
+//   screens when the web shows those tabs, BUY-9).
 // · 19 · Preview as a contributor (Earn › Money's contributor rows): "Previewing
 //   as Ana Silva" and the role chip; the engineering page, read-only, with the
 //   Activity tab and no owner bar; About reads Created, Parts, Team, Network.
@@ -64,6 +65,7 @@ import { CopyPanel, copyUseChoicesOf } from "./copies";
 import { AuctionCard, BuyNowCard, closedLineOf, MainActivity } from "./main-offer";
 import { ProductsSection } from "./market-screen";
 import { ProductLinkQueryProvider } from "../../project/product-rows";
+import { useBuyerAboutLinks } from "./about-screens";
 import { AboutRows, ClosedCard, HolderBenefits, LegalSection, PreviewBanner, ProjectActivity, ProjectTop, useScrolledPast, ViewerTabs, VIEWER_TABS_ID, type OfferRow } from "./parts";
 
 export function PreviewScreen({ id }: { id: string }) {
@@ -120,6 +122,8 @@ function PreviewReady({ data }: { data: Ready }) {
 
   const fallback = contributor ? phoneEarnHref(project.id, "money") : phoneEarnHref(project.id);
   const exit = useGoBack(fallback);
+  // As others see it, About has the buyer's Team and Network rows (BUY-9), the preview kept on their screens.
+  const aboutLinks = useBuyerAboutLinks(data, "preview", previewQuery(params));
 
   const text = headerText(view.summary, { viewer });
   const time = engineeringMetaOf(view.summary, null)
@@ -168,6 +172,7 @@ function PreviewReady({ data }: { data: Ready }) {
               {contributor ? <ContributorAbout data={data} /> : (
                 <AboutRows
                   rows={detailsRows({ source: view.summary.source, when: view.summary.when, createdAt: project.createdAt, ownerFacts: false }).map(plainRow)}
+                  links={aboutLinks}
                 />
               )}
               <ProjectRecent />

@@ -9,8 +9,13 @@
 //   rows: What's in this video (the scenes, a sheet), Takes (n) (a sheet: In
 //   use, Use this, delete — the take's file goes, 03f) and Regenerate;
 // · Product videos: one whole-row tap per current product (the web shows a
-//   tile): a ready one plays in a sheet, the others say their state with the
-//   web's action word and open the product page, where its video is made;
+//   tile): a ready one plays in a sheet; one with the owner's action (Generate
+//   AI video, Try again, Review) says its state with the web's action word and
+//   opens that product's video maker on the right take, as the web's tile
+//   button opens Generate video and the readiness rows go (PRJ-4,
+//   `phoneVideoActionHref`) — a ready video with a newer take waiting says so
+//   ("Video ready · Take 2 to review") and opens its review; one rendering
+//   shows its progress;
 // · Assembly snapshots (owner): the pictures Product Preview's Snapshot kept,
 //   as the web's Media tab lists them; a tap opens the viewer, where Remove
 //   asks first;
@@ -49,9 +54,10 @@ import { coverOf } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
 import { currentProductsOf } from "@/lib/manual/readiness";
-import { phoneHrefOf, phoneProjectPath } from "@/lib/manual/phone-project";
+import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { describeJoin, projectVideoStatusOf } from "@/lib/video/project-video";
 import { productVideoStatus } from "@/lib/video/product-video";
+import { phoneVideoActionHref } from "@/lib/video/phone-video";
 import { readSnapshots, removeSnapshot, type Snapshot } from "@/lib/manual/snapshots";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY, type VideoTake } from "@/lib/video/types";
@@ -311,8 +317,8 @@ function ProjectVideoSection() {
 
 const ROW_TAP = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
 
-/** Each current product's video as one whole-row tap: a ready one plays in a sheet; the others
- *  open the product page, where its video is made, the web's action word as the row's last line. */
+/** Each current product's video as one whole-row tap: the owner's action (the web's word as the
+ *  row's last line) opens the video maker on the right take; a settled ready one plays in a sheet. */
 function ProductVideosSection() {
   const { project, view, viewer } = useProject();
   const owner = can(viewer, "video.generate", view.canCtx);
@@ -332,12 +338,14 @@ function ProductVideosSection() {
         {shown.map(({ product, name, status }) => {
           const copy = statusCopy(status);
           const take = status.state === "ready" ? status.take : null;
+          // The owner's action in this state (none while it renders or once settled); a ready video
+          // with a newer take waiting has Review, as the web's tile does.
           const label = owner ? actionLabel(copy.action) : null;
-          const href = phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(product.id)}`) ?? "#";
+          const plays = take !== null && !label;
           const body = (
             <>
               <Thumb url={product.built?.product.conceptImageUrl}>
-                {take && (
+                {plays && (
                   <span aria-hidden className={cn(MEDIA_GROUND, MEDIA_INK, "absolute inline-flex size-[28px] items-center justify-center rounded-full")}>
                     <Icon icon={PlayIcon} size={16} />
                   </span>
@@ -348,25 +356,27 @@ function ProductVideosSection() {
                 <span className={cn(T.meta, "flex items-center gap-2", TONE_INK[copy.tone])}>
                   <Icon icon={TONE_ICON[copy.icon] ?? VideoOffIcon} size={14} />
                   <span className="text-text-secondary">
-                    {take ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ") : copy.text}
+                    {plays && take
+                      ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ")
+                      : copy.text}
                   </span>
                 </span>
                 {copy.progress !== null && <ProgressBar value={copy.progress} label={`${name} video render`} />}
-                {!take && label && <span className={cn(T.rowTitle, "text-text-brand")}>{label}</span>}
+                {label && <span className={cn(T.rowTitle, "text-text-brand")}>{label}</span>}
               </span>
-              {!take && owner && <Chevron />}
+              {label && <Chevron />}
             </>
           );
           return (
             <li key={product.id} className={LIST_ROW}>
-              {take ? (
+              {label ? (
+                <Link href={phoneVideoActionHref(project.id, product.id, status)} aria-label={`${name}: ${label}`} className={ROW_TAP}>
+                  {body}
+                </Link>
+              ) : take ? (
                 <button type="button" aria-haspopup="dialog" aria-label={`Play ${name} video`} onClick={() => setWatching({ take, name })} className={ROW_TAP}>
                   {body}
                 </button>
-              ) : owner ? (
-                <Link href={href} className={ROW_TAP}>
-                  {body}
-                </Link>
               ) : (
                 <div className={cn(ROW_TAP, "hover:bg-transparent")}>{body}</div>
               )}

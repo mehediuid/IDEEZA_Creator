@@ -37,7 +37,7 @@ import { fileFor, modelFileOf, save, saveBlob, type DownloadFile } from "@/compo
 import { TIER_WORD } from "@/components/marketplace/purchase-dialog";
 import { bomFor, specOfSource } from "@/lib/create/build-artifacts";
 import { useCredits } from "@/lib/create/credits";
-import { ITEM_LABELS, useCreateHistory, type BuildItemKind, type BuildProduct } from "@/lib/create/history";
+import { ITEM_LABELS, useCreateHistory, type BuildItemKind, type BuildJob, type BuildProduct } from "@/lib/create/history";
 import {
   OPTIMIZE_COST,
   PIECES,
@@ -113,6 +113,12 @@ export type ModelDownload = {
  *  "{product}-3d-model.glb". Whether the viewer may take it is the caller's (`downloads`). */
 export function useModelDownload(): ModelDownload {
   const { job, bp } = useProduct();
+  return useBuildModelDownload(job, bp);
+}
+
+/** The same download for a build read outside the product page — what a holder bought (BUY-8: a Virtual NFT
+ *  licenses the model, the web's purchased page hands it over). */
+export function useBuildModelDownload(job: BuildJob | null, bp: BuildProduct | null): ModelDownload {
   const [state, setState] = React.useState<ModelDownload["state"]>("idle");
   const ready = !!bp?.items.some((i) => i.kind === "3d" && i.status === "ready");
   const file = job && bp && ready ? modelFileOf(job, bp) : null;

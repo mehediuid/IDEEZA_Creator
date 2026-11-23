@@ -18,6 +18,7 @@ import { Badge, type BadgeTone } from "@/components/ideeza/badge";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { cn } from "@/lib/utils";
+import { clipHref, postItemIdOf } from "@/lib/innovations/clips";
 import { useCommentCount } from "@/lib/innovations/comments-store";
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
 import { sampleSeedOf } from "@/lib/innovations/sample-posts";
@@ -282,7 +283,9 @@ export function ProjectCard({ item, maker, onMore }: { item: MadeItem; maker: Ma
       <ReactionRow
         postId={facts.postId}
         base={facts.base}
-        commentsHref={facts.clipId ? `/m/clip/${encodeURIComponent(facts.clipId)}?comment=1` : href}
+        // The post's comments: on its clip while it plays on the Feed; else the clip's address leads to
+        // the post's comments on the Timeline, or to the details when it was never shared (SOC-3).
+        commentsHref={`${clipHref(facts.clipId ?? postItemIdOf(facts.postId))}?comment=`}
         onMore={onMore}
         moreLabel={`Actions for ${item.title}`}
       />

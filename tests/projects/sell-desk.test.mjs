@@ -6,6 +6,13 @@ import assert from "node:assert/strict";
 
 const {
   ATTENTION,
+  NO_SALES_LINE,
+  RECENT_SALES_SHOWN,
+  SOLD_OUT_NOTE,
+  allSalesLineOf,
+  boughtByOf,
+  earnedTextOf,
+  saleWhatOf,
   DESK_KIND_LINE,
   DESK_KIND_PLAIN,
   NO_MAIN_SHORT,
@@ -235,4 +242,24 @@ test("every tile says what its type is; a product's Main slot says why it has no
   assert.equal(NO_MAIN_TITLE, "No Main NFT");
   assert.match(NO_MAIN_WHY, /^Products sell copies only\./);
   assert.equal(NO_MAIN_SHORT, "Copies only");
+});
+
+test("an item's sales: earned, bought by, what each sale was and the way to all of them (CL-028 D6–D8; the phone's EARN-4)", () => {
+  assert.equal(earnedTextOf([]), "Nothing yet");
+  assert.equal(earnedTextOf([{ amount: "0.039", token: "ETH" }, { amount: "9.75", token: "USDC" }]), "0.039 ETH · 9.75 USDC");
+  // People, never a type of user.
+  assert.equal(boughtByOf(0), "Nobody yet");
+  assert.equal(boughtByOf(1), "1 person");
+  assert.equal(boughtByOf(4), "4 people");
+  // A copy by its number and use; a Main sale by its share.
+  assert.equal(saleWhatOf(sale("pa", "0.03", "b1", 5)), "Copy #1 · Personal use");
+  assert.equal(saleWhatOf({ ...sale("pa", "0.03", "b1", 5), item: { nft: "virtual", trackId: "pa", productId: PROJECT_SCOPE, use: "commercial", tier: "regular", serial: 7 } }), "Copy #7 · Business use");
+  assert.equal(saleWhatOf(sale("lst", { amount: "1", share: 40 }, "b1", 5, "main")), "40% of the project");
+  // The last three show; more than that names the count.
+  assert.equal(RECENT_SALES_SHOWN, 3);
+  assert.equal(allSalesLineOf(1), "All sales in Money");
+  assert.equal(allSalesLineOf(3), "All sales in Money");
+  assert.equal(allSalesLineOf(5), "All 5 sales in Money");
+  assert.equal(NO_SALES_LINE, "No sales yet. When someone buys, it shows here.");
+  assert.equal(SOLD_OUT_NOTE, "Every copy is sold. Add copies to keep selling, or leave it closed.");
 });

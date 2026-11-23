@@ -25,7 +25,7 @@ import { useResales } from "@/components/projects/purchased/resales-store";
 import { useUnitsLog } from "@/components/projects/purchased/units-store";
 import { usePurchased } from "@/components/projects/purchased/use-purchased";
 import { acquiredIdOf } from "@/lib/demo/acquired-projects";
-import { phoneEarnHref, phoneMarketHref } from "@/lib/manual/phone-earn";
+import { phoneEarnHref } from "@/lib/manual/phone-earn";
 import { formatDate } from "@/lib/manual/project-summary";
 import { KIND_NAME, wholeProjectOnly, type PurchasedProject } from "@/lib/market/purchases";
 import { earnEventsOf, earnFactsOf, earnNextOf, resaleTilesOf, type ResaleTile } from "@/lib/market/resale-desk";
@@ -42,7 +42,7 @@ import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
 import { T } from "../../type";
 import { holdsWhole, NothingBought, PurchasedLoading, statusOf, UnitsMeter, useScrolledPast } from "../parts";
-import { PURCHASED_TAB_HREF, purchasedEarnPath, purchasedPath, purchasedPhoneHrefOf, resaleItemPath, type PurchasedEarnSection } from "../paths";
+import { PURCHASED_TAB_HREF, purchasedEarnPath, purchasedPath, purchasedPhoneHrefOf, purchasedShopHref, resaleItemPath, type PurchasedEarnSection } from "../paths";
 
 export const STATE_CHIP: Record<ResaleTile["state"], { label: string; tone: BadgeTone }> = {
   held: { label: "Not for sale", tone: "neutral" },
@@ -85,7 +85,7 @@ function HubBody({ p, buyer }: { p: PurchasedProject; buyer: DemoBuyer }) {
   const events = earnEventsOf(p, buyer.id, resales, log);
   const status = statusOf(p);
   const href =
-    next.action?.to === "sell" ? purchasedEarnPath(p.id, "sell") : next.action?.to === "project" ? ownEarnHref(p) : phoneMarketHref(p.id);
+    next.action?.to === "sell" ? purchasedEarnPath(p.id, "sell") : next.action?.to === "project" ? ownEarnHref(p) : purchasedShopHref(p, p.buyable[0]);
   const figures: { label: string; value: string; note?: string }[] = [
     { label: "Earned from selling copies on", value: facts.earned ?? "Nothing yet", note: facts.sold ? `${facts.sold} sold · after royalties and fees` : "After the creator's royalty and IDEEZA's fee" },
     { label: "For sale now", value: facts.forSale ? `${facts.forSale} ${facts.forSale === 1 ? "copy" : "copies"}` : "None", note: facts.asking ? `Asking ${facts.asking}` : undefined },
@@ -204,7 +204,7 @@ function SellBody({ p, buyer }: { p: PurchasedProject; buyer: DemoBuyer }) {
           icon={ShoppingBag01Icon}
           title="No copies to sell"
           body={`You hold no Physical or Virtual copies of ${p.name}.`}
-          action={p.buyable.length ? { label: "Buy a copy", href: phoneMarketHref(p.id) } : undefined}
+          action={p.buyable.length ? { label: "Buy a copy", href: purchasedShopHref(p, p.buyable[0]) } : undefined}
         />
       </Screen>
     );

@@ -15,6 +15,10 @@
 //   primary: Add to marketplace (a made, unlisted use) or Sell … copies too;
 // · Edit (15f) and Add copies (15e) sign through the phone's wallet sheet;
 //   Remove listing (15g) asks first. Each write says so in a toast.
+// · its sales (EARN-4, the web item panel's): Earned · Bought by · Last sale
+//   while something is listed, Recent sales (the last three, "All sales in
+//   Money") once copies are made, and a sold-out use's card says "Every copy
+//   is sold. Add copies to keep selling, or leave it closed."
 // · signed while a video still renders or waits for review (CL-030): the row
 //   says "Waiting for videos" with the price and "Goes live when its videos are
 //   ready"; on the screen the made copies' card is the waiting block, Review
@@ -49,6 +53,7 @@ import {
 import { FEE_LABEL, payoutOf } from "@/lib/market/fee";
 import { PHONE_USES, plainUseWords, withUseWords } from "@/lib/market/phone-sell";
 import { copiesSoldLineOf, copyRowStateOf, KIND_LABEL, PRICE_LABEL, trackNameOf, USE_LABEL } from "@/lib/market/sell-flow";
+import { copyTileOf, SOLD_OUT_NOTE, type DeskTile } from "@/lib/market/sell-desk";
 import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
@@ -58,7 +63,7 @@ import { useToast } from "../../kit/toast";
 import { useEarn } from "../context";
 import { FactRows } from "../parts";
 import { NftActivityRow } from "./nft-activity";
-import { CheckRow, FullLayer, KIND_ICON, PrimaryBar, ROWS_CARD, SellListRow, SUB, SummaryCard } from "./parts";
+import { CheckRow, FullLayer, KIND_ICON, PrimaryBar, RecentSales, ROWS_CARD, SalesFacts, SellListRow, SUB, SummaryCard } from "./parts";
 import { SellCopiesSheet, type CopyScope } from "./sell-copies";
 import { cn } from "@/lib/utils";
 import { useBackState } from "../../nav-trail";
@@ -97,6 +102,8 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
     sales: view.sales,
   });
   const hasCopies = view.editions.some((t) => t.productId === scope.id && t.kind === kind);
+  // This kind's sales across its uses (EARN-4, the web desk's tile): earned, buyers, last sale.
+  const tile = copyTileOf({ projectId: project.id, scope: scope.id, kind, state, tracks: view.editions, sales: view.sales });
   // Signed while a video was still being made (CL-030): waiting, not for sale yet.
   const waiting = useHeldItems(project.id).find((i): i is HeldCopies => i.kind === "copies" && i.scope === scope.id && i.kindOfCopy === kind) ?? null;
   const said = (message: string) => {
@@ -137,6 +144,8 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
           scope={scope}
           chain={chain}
           more={state.kind === "manage" ? state.more : null}
+          tile={tile}
+          selling={state.kind === "manage"}
           waiting={waiting}
           onSell={startSell}
           onNote={said}
@@ -166,6 +175,8 @@ function CopiesScreen({
   scope,
   chain,
   more,
+  tile,
+  selling,
   waiting,
   onSell,
   onNote,
@@ -175,6 +186,10 @@ function CopiesScreen({
   scope: CopyScope;
   chain: { network: Network; collection: string };
   more: EditionUse | null;
+  /** The kind's sales across its uses (`copyTileOf`). */
+  tile: DeskTile;
+  /** Something of this kind is listed (`copyRowStateOf` manage): its numbers show. */
+  selling: boolean;
   /** Its copies' listing, signed and waiting for videos (CL-030). */
   waiting: HeldCopies | null;
   onSell: (use: EditionUse) => void;
@@ -245,10 +260,12 @@ function CopiesScreen({
               />
             );
           })}
+          {selling && <SalesFacts tile={tile} label={`${KIND_LABEL[kind]} sales`} />}
           <ul aria-label={`${KIND_LABEL[kind]} activity`} className={ROWS_CARD}>
             {waiting && <HeldCancelRow item={waiting} onCancelled={onNote} />}
             <NftActivityRow target={{ kind, scope: scope.id }} />
           </ul>
+          {ofKind.length > 0 && <RecentSales sales={tile.sales} />}
           <p className={SUB}>{EDITION_DEMO_LINE}</p>
         </div>
       </FullLayer>
@@ -337,7 +354,8 @@ function TrackCard({ track, onMenu }: { track: EditionTrack; onMenu: (t: Listed)
         { label: "Copies sold", value: card.soldOut ? "Sold out" : `${card.sold} of ${card.total}` },
         { label: "Royalties", value: `${listing.royaltyPct}% on resales` },
       ]}
-      note={hidden ? `Off Explore marketplace: ${project.name} was sold in full.` : null}
+      // Sold out (CL-028's item panel): add copies from ⋯ to keep selling, or leave it closed.
+      note={hidden ? `Off Explore marketplace: ${project.name} was sold in full.` : card.soldOut ? SOLD_OUT_NOTE : null}
     />
   );
 }

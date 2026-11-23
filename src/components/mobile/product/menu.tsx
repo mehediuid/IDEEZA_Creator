@@ -25,7 +25,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { BubbleChatIcon, Delete02Icon, PencilEdit01Icon, Store01Icon, UserMultipleIcon, ViewIcon } from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, Bug01Icon, Delete02Icon, PencilEdit01Icon, Store01Icon, UserMultipleIcon, ViewIcon } from "@hugeicons/core-free-icons";
+import { REPORT_PROBLEM, reportProblemHref } from "../help/report-link";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
@@ -108,6 +109,7 @@ export function ProductMenu({
             <ListRow icon={ViewIcon} title="Preview as others see it" onClick={go(() => router.push(`${base}?view=buyer`))} />
             {team.length > 0 && <ListRow icon={UserMultipleIcon} title="Preview as a contributor" onClick={go(() => setPicking(true))} />}
             {listed && <ListRow icon={Store01Icon} title="See it on the marketplace" onClick={go(() => router.push(`${base}?view=${MARKET_VIEW}`))} />}
+            <ListRow icon={Bug01Icon} title={REPORT_PROBLEM} onClick={go(() => router.push(reportProblemHref()))} />
           </ListCard>
           {can(viewer, "product.edit") && (
             <ListCard label="Delete">

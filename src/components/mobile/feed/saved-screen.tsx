@@ -13,14 +13,20 @@
 // over what you appreciated, with Remove and Undo. The tabs name the lists, so
 // there is no heading over them (the Figma's "Saved Items" is the tab). The
 // hub's Saved Items opens it on Saved.
+//
+// Both lists hold every post on the web's lists (SOC-4): a post with no clip on
+// the Feed (never on the marketplace, or off sale now) is listed as itself —
+// its picture, its title, its maker — and opens its details; its ⋯ keeps View
+// original post (the details), Copy link and Unsave / Remove.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Bookmark01Icon, BookmarkRemove01Icon, Copy01Icon, FavouriteIcon, HeartRemoveIcon, MoreHorizontalIcon, ViewIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { clipHref, type FeedClip } from "@/lib/innovations/clips";
-import { savedRows } from "@/lib/innovations/feed-prefs";
+import { useShareItems } from "@/components/shares/use-share-items";
+import { appreciatedPostRows, clipHref, postItemIdOf, postMarksOf, savedPostRows, type FeedClip, type PostRow } from "@/lib/innovations/clips";
 import { useReactions } from "@/lib/innovations/reactions";
+import { phoneItemHref } from "@/lib/innovations/share-items";
 import { formatDate } from "@/lib/settings/dates";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
@@ -36,7 +42,9 @@ import { useCopyClipLink, useSaveClip } from "./clip-menu";
 import { useFeedClips } from "./use-clips";
 import { useFeedPrefs } from "./use-feed";
 
-type Row = { clip: FeedClip; at: number | null };
+/** One row: a clip on the Feed, or a post with none (`clip` null), with what the row shows, where it
+ *  opens and the address Copy link copies. */
+type Row = { key: string; postId: string; clip: FeedClip | null; title: string; poster: string | null; by: string; at: number | null; href: string; linkId: string };
 type List = "saved" | "appreciated";
 
 const FAILED = "This phone couldn’t save that. Nothing changed.";
@@ -52,28 +60,52 @@ export function SavedScreen() {
   const { hydrated: prefsRead, prefs, update } = useFeedPrefs();
   const { hydrated: clipsRead, all } = useFeedClips();
   const { toggleSave } = useSaveClip();
+  const items = useShareItems();
   const [menu, setMenu] = React.useState<Row | null>(null);
 
-  const savedList = React.useMemo<Row[]>(() => savedRows(reactions.saved, prefs.savedAt, all), [reactions.saved, prefs.savedAt, all]);
-  const appreciatedList = React.useMemo<Row[]>(
-    () =>
-      reactions.appreciated
-        .map((postId) => all.find((c) => c.postId === postId && c.kind === "project"))
-        .filter((c): c is FeedClip => !!c)
-        .reverse()
-        .map((clip) => ({ clip, at: null })),
-    [reactions.appreciated, all],
+  /** A clip as itself; a post with no clip on the Feed as its item (gone: left out). */
+  const rowsOf = React.useCallback(
+    (list: readonly PostRow<FeedClip>[]): Row[] =>
+      list.flatMap((r): Row[] => {
+        if (r.clip) {
+          const c = r.clip;
+          return [{ key: c.id, postId: r.postId, clip: c, title: c.title, poster: c.poster, by: c.creator.name, at: r.at, href: clipHref(c.id), linkId: c.id }];
+        }
+        const item = items.itemOf(postItemIdOf(r.postId));
+        if (!item) return [];
+        return [{ key: r.postId, postId: r.postId, clip: null, title: item.title, poster: item.cover, by: item.creator.name, at: r.at, href: phoneItemHref(item), linkId: item.id }];
+      }),
+    [items],
   );
+  const savedList = React.useMemo(() => rowsOf(savedPostRows(reactions.saved, prefs.savedAt, all)), [rowsOf, reactions.saved, prefs.savedAt, all]);
+  const appreciatedList = React.useMemo(() => rowsOf(appreciatedPostRows(reactions.appreciated, all)), [rowsOf, reactions.appreciated, all]);
   const rows = appreciated ? appreciatedList : savedList;
-  const ready = hydrated && prefsRead && clipsRead;
+  const ready = hydrated && prefsRead && clipsRead && items.hydrated;
 
   const unsave = (r: Row) => {
     if (appreciated) {
-      if (!toggle("appreciated", r.clip.postId)) return toast({ title: FAILED, lead: "error" });
-      toast({ title: "Removed from Appreciated", action: { label: "Undo", onClick: () => toggle("appreciated", r.clip.postId) } });
+      if (!toggle("appreciated", r.postId)) return toast({ title: FAILED, lead: "error" });
+      toast({ title: "Removed from Appreciated", action: { label: "Undo", onClick: () => toggle("appreciated", r.postId) } });
       return;
     }
     const savedAt = prefs.savedAt;
+    if (!r.clip) {
+      // A post with no clip: off the web's list, with the dates this phone kept for it.
+      if (!toggle("saved", r.postId)) return toast({ title: FAILED, lead: "error" });
+      const gone = postMarksOf(savedAt, r.postId);
+      if (gone.length) update((p) => ({ ...p, savedAt: Object.fromEntries(Object.entries(p.savedAt).filter(([k]) => !gone.includes(k))) }));
+      toast({
+        title: "Removed from Saved",
+        action: {
+          label: "Undo",
+          onClick: () => {
+            toggle("saved", r.postId);
+            update((p) => ({ ...p, savedAt }));
+          },
+        },
+      });
+      return;
+    }
     const done = toggleSave(r.clip);
     if (!done.ok) return toast({ title: FAILED, lead: "error" });
     toast({
@@ -82,7 +114,7 @@ export function SavedScreen() {
         label: "Undo",
         onClick: () => {
           // Back as it was: the post on the web's list again, and this clip's date.
-          if (done.postToggled) toggle("saved", r.clip.postId);
+          if (done.postToggled) toggle("saved", r.postId);
           update((p) => ({ ...p, savedAt }));
         },
       },
@@ -119,23 +151,23 @@ export function SavedScreen() {
         ) : (
           <ul className="flex flex-col">
             {rows.map((r) => (
-              <li key={r.clip.id} className="flex items-center gap-4 border-b-[length:var(--border-width-1)] border-solid border-border py-3 last:border-b-0">
+              <li key={r.key} className="flex items-center gap-4 border-b-[length:var(--border-width-1)] border-solid border-border py-3 last:border-b-0">
                 <button
                   type="button"
-                  onClick={() => router.push(clipHref(r.clip.id))}
+                  onClick={() => router.push(r.href)}
                   className="-ml-2 flex min-h-[72px] min-w-0 flex-1 items-center gap-6 rounded-md pl-2 text-left outline-none transition-colors duration-fast active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
                 >
-                  {r.clip.poster ? (
+                  {r.poster ? (
                     // eslint-disable-next-line @next/next/no-img-element -- the clip's picture
-                    <img src={r.clip.poster} alt="" className="size-[56px] shrink-0 rounded-md object-cover" />
+                    <img src={r.poster} alt="" className="size-[56px] shrink-0 rounded-md object-cover" />
                   ) : (
                     <span aria-hidden className="size-[56px] shrink-0 rounded-md bg-bg-subtle" />
                   )}
                   <span className="flex min-w-0 flex-col gap-1">
-                    <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>{r.clip.title}</span>
+                    <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>{r.title}</span>
                     <span className={T.meta}>
                       {appreciated
-                        ? `by ${r.clip.creator.name}`
+                        ? `by ${r.by}`
                         : r.at === null
                           ? "Saved"
                           : `Saved on: ${formatDate(r.at, settings.language.dateLocale, { style: "numeric" })}`}
@@ -144,7 +176,7 @@ export function SavedScreen() {
                 </button>
                 <button
                   type="button"
-                  aria-label={`More for ${r.clip.title}`}
+                  aria-label={`More for ${r.title}`}
                   onClick={() => setMenu(r)}
                   className="-mr-4 inline-flex size-[44px] shrink-0 items-center justify-center rounded-md text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle active:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
                 >
@@ -158,12 +190,12 @@ export function SavedScreen() {
       <ActionSheet
         open={!!menu}
         onClose={() => setMenu(null)}
-        title={menu?.clip.title}
+        title={menu?.title}
         items={
           menu
             ? [
-                { label: "View original post", icon: ViewIcon, onSelect: () => router.push(clipHref(menu.clip.id)) },
-                { label: "Copy link", icon: Copy01Icon, onSelect: () => copy(menu.clip.id) },
+                { label: "View original post", icon: ViewIcon, onSelect: () => router.push(menu.href) },
+                { label: "Copy link", icon: Copy01Icon, onSelect: () => copy(menu.linkId) },
                 appreciated
                   ? { label: "Remove from Appreciated", icon: HeartRemoveIcon, onSelect: () => unsave(menu) }
                   : { label: "Unsave", icon: BookmarkRemove01Icon, onSelect: () => unsave(menu) },

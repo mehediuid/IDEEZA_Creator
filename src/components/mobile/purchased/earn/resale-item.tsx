@@ -31,7 +31,6 @@ import { readResales, useResales, writeResales } from "@/components/projects/pur
 import { useUnitsLog } from "@/components/projects/purchased/units-store";
 import { usePurchased } from "@/components/projects/purchased/use-purchased";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { phoneMarketHref } from "@/lib/manual/phone-earn";
 import { formatDate } from "@/lib/manual/project-summary";
 import { FEE_LABEL } from "@/lib/market/fee";
 import { readMarketNow } from "@/lib/market/market-store";
@@ -67,7 +66,7 @@ import { Screen } from "../../screen";
 import { TopBar } from "../../top-bar";
 import { T } from "../../type";
 import { NothingBought, PurchasedLoading, useScrolledPast } from "../parts";
-import { PURCHASED_TAB_HREF, purchasedEarnPath, purchasedPhoneHrefOf } from "../paths";
+import { PURCHASED_TAB_HREF, purchasedEarnPath, purchasedPhoneHrefOf, purchasedShopHref } from "../paths";
 import { STATE_CHIP } from "./earn-screen";
 
 const STORAGE_FULL = "Your browser didn't save this — storage is full.";
@@ -385,7 +384,7 @@ function ListedBody({
         <ListCard label="Manage the listing">
           <ListRow icon={PencilEdit01Icon} title="Change price" meta="A new price is a free signature." onClick={() => setSheet("price")} />
           <ListRow icon={Delete02Icon} title="Take off sale" meta="Nothing to sign" onClick={() => setSheet("off")} />
-          <ListRow icon={Store01Icon} title="See it on Explore marketplace" href={phoneMarketHref(p.id)} />
+          <ListRow icon={Store01Icon} title="See it on Explore marketplace" href={purchasedShopHref(p, tile.kind)} />
         </ListCard>
       </section>
       {sheet === "price" && <PriceSheet p={p} tile={tile} listing={listing} buyer={buyer} terms={terms} resales={resales} onClose={() => setSheet(null)} />}

@@ -86,11 +86,12 @@ export function PlanLink({ className }: { className?: string }) {
 }
 
 /** C1 on the phone: out of credits, one state row above the composer — what happened and when the plan
- *  refills, Buy credits (the sheet, in place) and the next plan up. The send stays as it was. */
-export function OutOfCreditsRow({ onBuy, className }: { onBuy: () => void; className?: string }) {
+ *  refills, Buy credits (the sheet, in place) and the next plan up. The send stays as it was. Without
+ *  `onBuy` the row has no button: the screen's own bottom bar is already Buy credits (Current credit). */
+export function OutOfCreditsRow({ onBuy, className }: { onBuy?: () => void; className?: string }) {
   const refill = useRefillDay();
   return (
-    <div role="status" className={cn("flex flex-col rounded-xl bg-bg-error-subtle py-3 pl-6 pr-3", className)}>
+    <div role="status" className={cn("flex flex-col rounded-xl bg-bg-error-subtle py-3 pl-6 pr-3", !onBuy && "pt-6", className)}>
       <div className="flex items-center gap-4">
         <span className="shrink-0 text-[color:var(--color-icon-error)]">
           <Icon icon={Coins01Icon} size={18} />
@@ -98,9 +99,11 @@ export function OutOfCreditsRow({ onBuy, className }: { onBuy: () => void; class
         <p className={cn(T.rowTitle, "min-w-0 flex-1")}>
           You&apos;re out of credits.{refill ? ` They refill on ${refill}.` : ""}
         </p>
-        <Button size="lg" className="shrink-0" onClick={onBuy}>
-          Buy credits
-        </Button>
+        {onBuy && (
+          <Button size="lg" className="shrink-0" onClick={onBuy}>
+            Buy credits
+          </Button>
+        )}
       </div>
       <PlanLink className="-mb-1 pl-[26px]" />
     </div>

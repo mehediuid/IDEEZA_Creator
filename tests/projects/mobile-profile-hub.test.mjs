@@ -10,7 +10,6 @@ import {
   PHONE_SETTINGS_OTHERS_HREF,
   curly,
   languageMatches,
-  sampleProfileLocked,
   shortDateOf,
 } from "../../.tmp-test/lib/people/phone-profile.js";
 
@@ -55,12 +54,6 @@ test("a language is found by the name people type for it", () => {
   assert.deepEqual(languageMatches(options, "mandarin"), ["Chinese"]);
   assert.deepEqual(languageMatches(options, "eng"), ["Bangla", "English"]);
   assert.deepEqual(languageMatches(options, "  "), []);
-});
-
-test("one demo creator's profile is locked, and no one else's", () => {
-  assert.equal(sampleProfileLocked("feed:c7"), true);
-  assert.equal(sampleProfileLocked("feed:c1"), false);
-  assert.equal(sampleProfileLocked("me"), false);
 });
 
 test("phone copy takes the typographic apostrophe", () => {

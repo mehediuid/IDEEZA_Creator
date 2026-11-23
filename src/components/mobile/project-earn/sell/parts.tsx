@@ -20,12 +20,15 @@
 //   every video first: …"). Once every one has, it opens even while they render:
 //   "You don't have to wait. It stays off Explore marketplace until …" and,
 //   under the button, "Goes live when all 4 videos are ready · 2 of 4 now".
+// · SalesFacts / RecentSales — an item screen's sales (EARN-4, the web item
+//   panel's): Earned · Bought by · Last sale, then the last three sales and
+//   "All sales in Money", which opens Money's Sales.
 
 import * as React from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { InformationCircleIcon, LockIcon, PlayIcon } from "@hugeicons/core-free-icons";
+import { InformationCircleIcon, LockIcon, PlayIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
@@ -39,7 +42,12 @@ import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
 import { readinessFactsOf, readinessOf, videoCountOf } from "@/lib/manual/readiness";
-import { phoneProductVideoHref } from "@/lib/manual/phone-earn";
+import { phoneEarnHref, phoneProductVideoHref } from "@/lib/manual/phone-earn";
+import { formatShortDate } from "@/lib/manual/project-summary";
+import { allSalesLineOf, boughtByOf, earnedTextOf, NO_SALES_LINE, RECENT_SALES_SHOWN, saleWhatOf, type DeskTile } from "@/lib/market/sell-desk";
+import type { Sale } from "@/lib/market/types";
+import { buyerLabel } from "@/lib/wallet/identities";
+import { formatAmount } from "@/lib/wallet/money";
 import { phoneTakeHref } from "@/lib/video/phone-video";
 import { phoneProjectPath, readyOfLine } from "@/lib/manual/phone-project";
 import { useProjectVideos } from "@/lib/video/store";
@@ -55,7 +63,7 @@ import { PRESSED } from "../../kit/press";
 import { Thumb } from "../../project/parts";
 import { TopBar, type TopBarAction } from "../../top-bar";
 import { useEarn } from "../context";
-import { MissingSteps } from "../parts";
+import { EarnLink, FactGrid, MissingSteps } from "../parts";
 import { T } from "../../type";
 
 /** A card of rows: the kit's list card, its rows split by the kit's line. */
@@ -611,5 +619,72 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
         </>
       )}
     </>
+  );
+}
+
+/** What an item has sold for you (EARN-4; the web item panel's numbers, CL-028 D6): Earned · Bought
+ *  by · Last sale, under the item's summary. How much sold is the summary's own ("Copies sold", the
+ *  share), so it isn't said twice. */
+export function SalesFacts({ tile, label }: { tile: DeskTile; label: string }) {
+  const { now } = useEarn();
+  return (
+    <section aria-label={label} className={cn(LIST_CARD, "p-8")}>
+      <FactGrid
+        facts={[
+          { label: "Earned", value: earnedTextOf(tile.earned) },
+          { label: "Bought by", value: boughtByOf(tile.buyers) },
+          { label: "Last sale", value: tile.lastSaleAt ? formatShortDate(tile.lastSaleAt, now) : "—" },
+        ]}
+      />
+    </section>
+  );
+}
+
+/** Recent sales (EARN-4; the web item panel's, CL-028 D7): the item's last three sales — who bought
+ *  (a person, never a type), what ("Copy #1 · Business use", "40% of the project"), the price and the
+ *  date — then "All sales in Money" as the last row, which opens Money's Sales (`#customers`). With
+ *  none yet, the web's one line. */
+export function RecentSales({ sales }: { sales: readonly Sale[] }) {
+  const { project, now } = useEarn();
+  const headingId = React.useId();
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-4">
+      <h3 id={headingId} className={T.section}>
+        Recent sales
+      </h3>
+      <ul aria-labelledby={headingId} className={ROWS_CARD}>
+        {sales.length === 0 ? (
+          <li className={cn(LIST_ROW, "hover:bg-transparent active:bg-transparent")}>
+            <span className={cn(T.body, "text-text-primary")}>{NO_SALES_LINE}</span>
+          </li>
+        ) : (
+          <>
+            {sales.slice(0, RECENT_SALES_SHOWN).map((s) => (
+              <li key={s.id} className="flex min-h-[48px] flex-col gap-1 px-8 py-6">
+                <span className="flex items-baseline justify-between gap-4">
+                  <span className={cn(T.rowTitle, "min-w-0 truncate")}>{buyerLabel(s.buyerId)}</span>
+                  <span className={cn(T.rowTitle, "shrink-0 tabular-nums")}>{formatAmount(s.price, s.token)}</span>
+                </span>
+                <span className={cn(T.meta, "flex items-baseline justify-between gap-4")}>
+                  <span className="min-w-0 truncate">{saleWhatOf(s)}</span>
+                  <time dateTime={new Date(s.at).toISOString()} className="shrink-0">
+                    {formatShortDate(s.at, now)}
+                  </time>
+                </span>
+              </li>
+            ))}
+            <li>
+              <EarnLink href={`${phoneEarnHref(project.id, "money")}#customers`} className={LIST_ROW}>
+                <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+                  <Icon icon={Wallet01Icon} size={24} />
+                </span>
+                <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>{allSalesLineOf(sales.length)}</span>
+                <Chevron />
+              </EarnLink>
+            </li>
+          </>
+        )}
+      </ul>
+    </section>
   );
 }

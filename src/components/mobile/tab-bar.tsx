@@ -16,6 +16,8 @@
 // remembers where you were in it (this tab of the browser): leaving Earn ›
 // Stake for Messages and coming back opens Stake again; tapping the tab you
 // are on goes to its root, and on its root scrolls the screen to the top.
+// While the first-product guide is on, its strip sits on top of the tab row
+// (guide/guide-strip.tsx, AUTH-5), in the flow, so it never covers a screen.
 
 import * as React from "react";
 import Link from "next/link";
@@ -32,6 +34,7 @@ import { useMessagePeople } from "@/lib/messages/use-people";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { GuestGate } from "./account/guest-gate";
+import { GuideStrip } from "./guide/guide-strip";
 import { HomeIndicator } from "./home-indicator";
 import { PRESSED_DIM } from "./kit/press";
 import { FOOT_ATTR } from "./kit/toast";
@@ -160,6 +163,7 @@ export function TabBar() {
   const attention = useAttention(pathname);
   return (
     <nav aria-label="Tabs" {...{ [FOOT_ATTR]: "" }} className="relative shrink-0 bg-bg-page shadow-overlay">
+      <GuideStrip at="tabs" />
       <ul className="flex h-[64px] items-center justify-between px-6 py-2">
         {TABS.map((t) => {
           const current = isCurrent(t.href, pathname);

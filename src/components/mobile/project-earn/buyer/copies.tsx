@@ -15,11 +15,14 @@
 //   stay, greyed, and can't be picked. While every unit left is in another checkout, the row says
 //   "Someone is buying this now. Try again in a few minutes." and the bar's Buy now waits (CL-016);
 // · From holders (holder-offers.tsx), choices of the same group, when someone sells one on;
+// · NFT details (BUY-7, the web's folded facts): one row that opens a sheet with the picked use's copies,
+//   royalties, minting, chain and collection, and what Royalties and Lazy mean;
 // · the screen's foot (the wallet line and the Testnet demo line).
 // No row has a Buy: the bar's one Buy now buys the picked choice. A preview reads the same rows and
 // prices, pickable, with no holders, no wallet and no bar. Only the lock (sold in full) hides the uses.
 
 import * as React from "react";
+import { ViewIcon } from "@hugeicons/core-free-icons";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
 import { useResales } from "@/components/projects/purchased/resales-store";
 import { useWalletRequest, WalletRequestScope, type WalletRequestApi } from "@/components/wallet/wallet-provider";
@@ -29,7 +32,7 @@ import type { ProjectView } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import type { ManualProject } from "@/lib/manual/projects";
 import { checkoutBlocks, IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-hold";
-import { trackCardOf, tracksOf } from "@/lib/market/editions";
+import { editionChainOf, trackCardOf, tracksOf } from "@/lib/market/editions";
 import { readMarketNow } from "@/lib/market/market-store";
 import { plainUseWords, withUseWords } from "@/lib/market/phone-sell";
 import type { Resale } from "@/lib/market/resales";
@@ -38,14 +41,18 @@ import { listingUnitsLine } from "@/lib/market/units";
 import { PROJECT_SCOPE, type EditionKind, type EditionTrack, type EditionUse, type Sale } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
 import { formatAmount } from "@/lib/wallet/money";
+import { networkLabelOf } from "@/lib/wallet/request-view";
+import type { Network } from "@/lib/brief/types";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
-import { InfoButton } from "../parts";
+import { ListCard, ListRow } from "../../kit/list";
+import { Sheet } from "../../kit/sheet";
+import { FactRows, InfoButton } from "../parts";
 import { T } from "../../type";
 import { Choice, ChoiceGroup, titled } from "./buy-pick";
 import { heldCopiesOf } from "./held";
 import { HolderChoice } from "./holder-offers";
-import type { DoneFacts } from "./parts";
+import type { BoxFact, DoneFacts } from "./parts";
 
 const USES: EditionUse[] = ["private", "commercial"];
 
@@ -146,6 +153,10 @@ export function CopyPanel({
   foot?: React.ReactNode;
 }) {
   const name = `bv-pick-${kind}`;
+  // The facts are the picked use's, else the first that can be bought (the web's copy tab).
+  const picked = uses.find((c) => c.key === pickedKey && c.track)?.track ?? uses.find((c) => c.open)?.track ?? uses.find((c) => c.track)?.track ?? null;
+  const main = view.listing.kind === "none" ? null : view.listing.listing;
+  const chain = editionChainOf(view.mint.record, main, null);
   return (
     <>
       <KindHead id={`bv-copies-${kind}`} kind={kind} name={project.name} />
@@ -165,7 +176,48 @@ export function CopyPanel({
           ))}
         </ChoiceGroup>
       )}
+      {picked && chain && <NftDetailsRow offer={`${KIND_LABEL[kind]} · ${USE_LABEL[picked.use]}`} facts={copyFactsOf(picked, view.sales, chain)} />}
       {foot}
+    </>
+  );
+}
+
+/** The web's words under a copy's NFT details (copy-panel.tsx, sample-offer-box.tsx). */
+export const COPY_FACTS_NOTE = "Royalties are a share of resales, if marketplaces honour them. Lazy: the token is minted when you buy.";
+
+/** A creator's listed copy as the web's NFT details read it (copy-panel.tsx): Copies, Royalties, Minting, Chain,
+ *  Collection. */
+export function copyFactsOf(track: Listed, sales: readonly Sale[], chain: { network: Network; collection: string }): BoxFact[] {
+  const card = trackCardOf(track, [...sales]);
+  return [
+    { label: "Copies", value: `${card.total}` },
+    { label: "Royalties", value: `${track.listing.royaltyPct}%` },
+    { label: "Minting", value: "Lazy" },
+    { label: "Chain", value: networkLabelOf(chain.network) },
+    { label: "Collection", value: chain.collection || "—" },
+  ];
+}
+
+/** BUY-7 · NFT details on a copy tab (the web folds them under its choices): one row — the royalty, which comes out
+ *  of the price if the copy is sold on, and the chain — that opens a sheet with every fact of `offer` and what
+ *  Royalties and Lazy mean. */
+export function NftDetailsRow({ offer, facts, note = COPY_FACTS_NOTE }: { offer: string; facts: readonly BoxFact[]; note?: string }) {
+  const [open, setOpen] = React.useState(false);
+  const meta = facts
+    .filter((f) => f.label === "Royalties" || f.label === "Chain")
+    .map((f) => (f.label === "Royalties" ? `Royalties ${f.value}` : f.value))
+    .join(" · ");
+  return (
+    <>
+      <ListCard label="NFT details">
+        <ListRow icon={ViewIcon} title="NFT details" meta={meta || undefined} onClick={() => setOpen(true)} />
+      </ListCard>
+      <Sheet open={open} onClose={() => setOpen(false)} title="NFT details" description={offer}>
+        <div className="flex flex-col gap-4 pb-8">
+          <FactRows label="NFT details" rows={facts} />
+          <p className={T.meta}>{note}</p>
+        </div>
+      </Sheet>
     </>
   );
 }

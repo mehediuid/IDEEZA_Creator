@@ -160,6 +160,39 @@ export function editableSections(version: PlanVersion): PlanSection[] {
   return version.sections.filter((s) => s.state === "done");
 }
 
+/** Move up / Move down (the web's edit menu, plan-edit.tsx; EARN-7): the sections with `id` one place
+ *  over, or null when it is already at that end (or isn't there). */
+export function movedSections(sections: readonly PlanSection[], id: string, dir: -1 | 1): PlanSection[] | null {
+  const i = sections.findIndex((s) => s.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= sections.length) return null;
+  const next = sections.slice();
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+/** Delete section (the web's edit menu): every section but `id`. */
+export function withoutSection(sections: readonly PlanSection[], id: string): PlanSection[] {
+  return sections.filter((s) => s.id !== id);
+}
+
+/** A section the maker adds (the web's Add section): its own kind, "Added by you", written. With no
+ *  title it is "Untitled section". */
+export function addedSectionOf(id: string, title: string, fields: PlanSection["fields"]): PlanSection {
+  return { id, kind: "custom", title: title.trim() || "Untitled section", fields, origin: "added", state: "done" };
+}
+
+/** "…or write the section yourself": what was typed, as the section's body — one paragraph per block
+ *  between blank lines, as the web splits it. */
+export function writtenSectionFields(text: string): PlanSection["fields"] {
+  return {
+    body: text
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean),
+  };
+}
+
 /** "{n} of 5 versions kept — the oldest is removed when a 6th is made." (the web's versions footer). */
 export function versionsKeptLine(count: number): string {
   return `${count} of 5 versions kept — the oldest is removed when a 6th is made.`;

@@ -6,7 +6,6 @@
 
 import * as React from "react";
 import type { ProjectPageData } from "@/components/projects/details/use-project-page-data";
-import type { ReadinessPurpose } from "@/lib/manual/p2-types";
 import type { PhoneWriteGate } from "./write-gate";
 
 export type Ready = Extract<ProjectPageData, { state: "ready" }>;
@@ -19,7 +18,6 @@ export type ProjectSheet =
   | { kind: "edit-post" }
   | { kind: "stop-sharing" }
   | { kind: "publish" }
-  | { kind: "readiness"; purpose: ReadinessPurpose; then: string | null }
   | { kind: "add-product" };
 
 export type ProjectCtx = Ready & {

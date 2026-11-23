@@ -80,7 +80,8 @@ import { useToast } from "../kit/toast";
 import { T } from "../type";
 import { CopyChip } from "./parts";
 
-type Phase = "connect" | "connecting" | "wrongNetwork" | "switching" | "review" | "signing" | "pending" | "rejected" | "failed";
+export type WalletSheetPhase = "connect" | "connecting" | "wrongNetwork" | "switching" | "review" | "signing" | "pending" | "rejected" | "failed";
+type Phase = WalletSheetPhase;
 
 type Flight = {
   req: WalletRequest;
@@ -91,7 +92,9 @@ type Flight = {
   outcome: { reason: "rejected" | FailReason; message?: string } | null;
 };
 
-type View = {
+/** What the sheet shows; the web wallet dialog's phone form (wallet-dialog-phone.tsx) hands it the
+ *  web provider's request the same way. */
+export type WalletSheetView = {
   phase: Phase;
   req: WalletRequest;
   identity: IdentityId;
@@ -100,6 +103,7 @@ type View = {
   /** The submitted transaction's hash, shown while it confirms. */
   hash: string | null;
 };
+type View = WalletSheetView;
 
 /** Why a request didn't go through, in the web's words (lib/wallet/request.ts). */
 export const FAIL_LINE: Record<FailReason, string> = {
@@ -504,7 +508,8 @@ function reviewRowsOf(req: WalletRequest, identity: IdentityId, ctx: BalanceCtx,
   return rows;
 }
 
-function RequestSheet({
+/** The request's sheet for each phase but confirmed (the flow says that itself). */
+export function RequestSheet({
   view,
   wallet,
   ctx,

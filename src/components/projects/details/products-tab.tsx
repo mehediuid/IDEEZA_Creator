@@ -45,7 +45,7 @@ import {
 import { productsOf, type ChatSession } from "@/lib/create/history";
 import { partChangesOf, partChangesText, specOfSource } from "@/lib/create/build-artifacts";
 import { conceptOf, type ProjectProduct } from "@/lib/manual/project-read";
-import { countLabel, formatShortDate } from "@/lib/manual/project-summary";
+import { countLabel } from "@/lib/manual/project-summary";
 import {
   displayProductName,
   droppedNoteOf,
@@ -53,6 +53,7 @@ import {
   piecesOfItems,
   productFacts,
   productsHeadingOf,
+  versionLineOf,
   type HeadingRow,
   type ProductCardView,
 } from "@/lib/manual/products-tab-view";
@@ -280,11 +281,7 @@ function ProductCard({
     ? null
     : pp.dropped
       ? droppedNoteOf(pp.dropped.current, pp.dropped.lastIn)
-      : pp.version && pp.version.count > 1
-        ? `v${pp.version.current}${
-            built.ref.savedAt !== null ? ` · ${formatShortDate(built.ref.savedAt, now)}` : ""
-          }`
-        : null;
+      : versionLineOf(pp.version, built.ref.savedAt, now);
 
   const note = pp.state === "built" ? null : UNBUILT_NOTE[pp.state];
 

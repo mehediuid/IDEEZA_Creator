@@ -16,6 +16,7 @@ import { startHref, type StartParams } from "@/lib/messages/links";
 import { ME, profileHref, type Person } from "@/lib/people/ids";
 import { curly, firstNameOf } from "@/lib/people/phone-profile";
 import { REPORTS_KEY, REPORT_REASONS, normalizeReports, withReport, type ProfileReportReason } from "@/lib/people/reports";
+import { useShareVia } from "../feed/share-via";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { ReportSheet } from "../kit/report-sheet";
 import { ActionSheet } from "../kit/sheet";
@@ -27,23 +28,10 @@ export const messageHrefOf = (start: StartParams) => `/m${startHref(start)}`;
 
 /** Share profile (PR-07): the phone's share sheet when it has one, else the link is copied. */
 export function useShareProfile(): (person: Pick<Person, "handle" | "name">) => void {
-  const toast = useToast();
+  const shareVia = useShareVia();
   return React.useCallback(
-    (person) => {
-      const url = new URL(profileHref(person), window.location.origin).toString();
-      const copy = () => {
-        if (!navigator.clipboard) return toast({ title: "Couldn’t copy the link", lead: "error" });
-        navigator.clipboard.writeText(url).then(
-          () => toast({ title: "Link copied" }),
-          () => toast({ title: "Couldn’t copy the link", lead: "error" }),
-        );
-      };
-      if (typeof navigator.share !== "function") return copy();
-      navigator.share({ title: `${person.name} on IDEEZA`, url }).catch((e: unknown) => {
-        if (!(e instanceof DOMException && e.name === "AbortError")) copy();
-      });
-    },
-    [toast],
+    (person) => shareVia({ url: profileHref(person), title: `${person.name} on IDEEZA`, copied: "Link copied" }),
+    [shareVia],
   );
 }
 
