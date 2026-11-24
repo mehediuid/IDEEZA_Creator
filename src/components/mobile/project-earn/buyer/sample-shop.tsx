@@ -404,7 +404,8 @@ function CopyPanel({ shop, kind }: { shop: Shop; kind: EditionKind }) {
 function sampleCopyFactsOf(offer: UseOffer, shop: Shop): BoxFact[] {
   const state = copyUseStateOf(offer, shop.id, shop.sales);
   return [
-    { label: "Copies", value: state.of !== null ? `${state.of}` : "No limit" },
+    // Only what the post's row says: a row that names no total has no Copies fact (owner, 2026-11-24).
+    ...(state.of !== null ? [{ label: "Copies", value: `${state.of}` }] : []),
     { label: "Use", value: offer.use },
     { label: "Royalties", value: `${SAMPLE_ROYALTIES_PCT}%` },
     { label: "Minting", value: "Lazy" },

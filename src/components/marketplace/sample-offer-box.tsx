@@ -286,7 +286,8 @@ function CopyPanel({
       <MoreFacts>
         <FactGrid
           facts={[
-            { label: "Copies", value: state.of !== null ? `${state.of}` : "No limit" },
+            // Only what the post's row says: a row that names no total has no Copies fact (owner, 2026-11-24).
+            ...(state.of !== null ? [{ label: "Copies", value: `${state.of}` }] : []),
             { label: "Use", value: offer.use },
             // A Physical copy's units, for the use picked (units.ts).
             ...(kind === "physical" ? [{ label: "Units per copy", value: `${unitsAllowanceOf(offer.use as UnitsUse)}` }] : []),

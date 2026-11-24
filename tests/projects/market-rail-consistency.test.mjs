@@ -203,3 +203,11 @@ test("a Physical copy says how many units it makes, on its Use row and in NFT de
     assert.match(src, /\.\.\.\(kind === "physical" \? \[\{ label: "Units per copy", value: /, `${f}: NFT details`);
   }
 });
+
+test("NFT details say only what the listing says: no invented 'No limit' for copies (owner, 2026-11-24)", () => {
+  for (const f of ["components/marketplace/sample-offer-box.tsx", "components/mobile/project-earn/buyer/sample-shop.tsx"]) {
+    const src = read(f);
+    assert.doesNotMatch(src, /"No limit"/, f);
+    assert.match(src, /\.\.\.\(state\.of !== null \? \[\{ label: "Copies", value: `\$\{state\.of\}` \}\] : \[\]\)/, f);
+  }
+});
