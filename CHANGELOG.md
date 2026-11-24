@@ -8,7 +8,7 @@ to build and how to check it is done, and links to its Jira ticket.
 | --- | --- | --- | --- | --- |
 | [CL-048](#cl-048-buttons-drawn-from-the-design-system-everywhere) | Buttons drawn from the design system everywhere | 24 Nov 2026 | Not created yet | Not started |
 | [CL-047](#cl-047-settings-home-your-account-first-then-where-you-stand) | Settings home: your account first, then where you stand | 24 Nov 2026 | Not created yet | Not started |
-| [CL-046](#cl-046-deactivate-or-delete-your-account-and-signing-in-makes-it-active-again) | Deactivate or delete your account, and signing in makes it active again | 24 Nov 2026 | Not created yet | Not started |
+| [CL-046](#cl-046-deactivate-or-delete-your-account-and-signing-in-makes-it-active-again) | Deactivate or delete your account, and signing in makes it active again | 24 Nov 2026 | [PR-9780](https://ideeza.atlassian.net/browse/PR-9780) | Not started |
 | [CL-045](#cl-045-small-web-fixes-found-while-matching-the-phone) | Small web fixes found while matching the phone | 24 Nov 2026 | Not created yet | Not started |
 | [CL-044](#cl-044-a-profiles-activity-is-only-for-its-owner) | A profile's Activity is only for its owner | 24 Nov 2026 | Not created yet | Not started |
 | [CL-043](#cl-043-the-project-question-after-an-ai-idea-several-products-start-a-new-project) | The project question after an AI idea: several products start a new project | 24 Nov 2026 | Not created yet | Not started |
@@ -169,7 +169,7 @@ A page that was never built, so there is no before.
 
 ## CL-046 Deactivate or delete your account, and signing in makes it active again
 
-**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+**In the prototype:** 24 November 2026 · **Jira:** [PR-9780](https://ideeza.atlassian.net/browse/PR-9780) · **Production:** Not started
 
 **Screen:** Settings › Account › **Sign-in and security** (`/settings/account`), its **Deactivate account** and **Delete account** dialogs, Sign in (`/sign-in`) right after leaving, the first page after signing back in. The mobile app: Settings › **Sign-in & security**, `/m/settings/deactivate`, `/m/settings/delete`, the screen after leaving (`/m/left`) and the note after Log In (`/m/restore`). Web and the mobile app.
 
