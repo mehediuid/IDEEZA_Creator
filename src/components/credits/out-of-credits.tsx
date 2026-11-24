@@ -3,12 +3,13 @@
 // "You're out of credits" with the way out (upgrade plan C1): when a balance
 // can't pay for the next concept, say so where the prompt is, with the two
 // fixes side by side — Buy credits (the dialog, in place) and the next plan up
-// (plan-pitch.tsx). Nothing here stops anyone: the send stays as it was.
+// (plan-pitch.tsx). Nothing here stops anyone: the send stays as it was. When the
+// credits come back is said only on a paid plan: Free's come once (owner 2026-11-24).
 
 import * as React from "react";
 import { CONCEPT_COST } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
-import { creditPeriod } from "@/lib/create/plans";
+import { nextCreditsAt } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { BuyCreditsButton } from "./buy-credits";
 import { PlanPitchLine } from "./plan-pitch";
@@ -19,9 +20,8 @@ const ACTION =
 export function OutOfCreditsLine({ className, need = CONCEPT_COST }: { className?: string; need?: number }) {
   const { hydrated, sub } = useCreatePlan();
   const [now] = React.useState(() => Date.now());
-  const refill = hydrated
-    ? new Date(creditPeriod(sub, now).end).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-    : null;
+  const nextAt = hydrated ? nextCreditsAt(sub, now) : null;
+  const refill = nextAt !== null ? new Date(nextAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : null;
   return (
     <div role="status" className={cn("flex flex-col items-center gap-[4px] text-center", className)}>
       <p className="text-md leading-md text-text-secondary">

@@ -48,7 +48,7 @@ import { checkoutHref } from "@/lib/create/checkout-route";
 import { OFFER_OFF, countdown } from "@/lib/account/welcome-offer";
 import { OfferMark, useWelcomeOffer } from "@/components/credits/welcome-offer";
 import { useCreatePlan } from "@/lib/create/plan";
-import { creditPeriod, planOf } from "@/lib/create/plans";
+import { nextCreditsAt, planOf } from "@/lib/create/plans";
 import { useCredits } from "@/lib/create/credits";
 import { idzCompactOf } from "@/lib/wallet/idz";
 import { formatAmount } from "@/lib/wallet/money";
@@ -552,9 +552,9 @@ function Footer({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => vo
 // Disruptor from Builder — and opens that plan's checkout, on the cycle you pay
 // by. It used to open Plan & pricing, so on that page a press did nothing at
 // all. Gone on the top plan.
-// Under it, the maker's own credits and when the month's credits come back
-// (upgrade plan B1); in the warning ink once the balance is at the low-credit
-// alert (Plan & pricing › Credit alerts and limits).
+// Under it, the maker's own credits and, on a paid plan, when the month's credits come
+// (upgrade plan B1; Free's come once, owner 2026-11-24, so no date there); in the warning
+// ink once the balance is at the low-credit alert (Plan & pricing › Credit alerts and limits).
 function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
   const { hydrated, sub } = useCreatePlan();
   const offer = useWelcomeOffer();
@@ -562,6 +562,7 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
   const { lowAt } = useSettings().credits;
   const [now] = React.useState(() => Date.now());
   if (!hydrated || sub.tier === "disruptor") return null;
+  const nextAt = nextCreditsAt(sub, now);
   if (offer.ready && offer.live && offer.entry?.closedAt !== null) return <OfferCard left={offer.left} collapsed={collapsed} onLeave={onLeave} />;
   const next = planOf(sub.tier === "builder" ? "disruptor" : "builder");
   const label = `Upgrade to ${next.name}`;
@@ -598,8 +599,8 @@ function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: (
               balance <= lowAt ? "font-semibold text-text-warning" : "text-text-secondary",
             )}
           >
-            {balance <= lowAt ? `${credits(balance)} left` : `You have ${credits(balance)}`} · refills{" "}
-            {new Date(creditPeriod(sub, now).end).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+            {balance <= lowAt ? `${credits(balance)} left` : `You have ${credits(balance)}`}
+            {nextAt !== null && ` · refills ${new Date(nextAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
           </span>
         )}
       </span>
