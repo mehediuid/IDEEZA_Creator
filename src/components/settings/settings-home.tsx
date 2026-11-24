@@ -60,9 +60,7 @@ import { SettingsNav } from "./settings-nav";
 /** Phones get 44 px targets. */
 const TAP = "[@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
 const SECTION_TITLE = "m-0 text-lg font-semibold leading-lg text-text-primary";
-// Through cn() as the DS Button does: buttonVariants alone keeps clashing classes
-// (an icon-only button kept the size's side padding and squeezed its icon).
-const ACTION = (hierarchy: "primary" | "tonal" | "ghost") => cn(buttonVariants({ hierarchy, size: "md" }), TAP);
+const ACTION = (hierarchy: "primary" | "tonal" | "ghost") => buttonVariants({ hierarchy, size: "md", className: TAP });
 
 export function SettingsHome() {
   return (
@@ -240,7 +238,7 @@ function StatusCard({
           href={to.href}
           aria-label={`Open ${to.label}`}
           title={to.label}
-          className={cn(buttonVariants({ hierarchy: "ghost", size: "sm", iconOnly: true }), "-my-[4px]", TAP)}
+          className={buttonVariants({ hierarchy: "ghost", size: "sm", iconOnly: true, className: `-my-[4px] ${TAP}` })}
         >
           <Icon icon={ArrowRight01Icon} size={16} />
         </Link>

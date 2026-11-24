@@ -34,7 +34,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
+const buttonCva = cva(
   "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-wide border-[length:var(--border-width-1-5)] border-solid border-transparent transition-[background-color,border-color,box-shadow] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none disabled:cursor-not-allowed disabled:border-transparent disabled:bg-[var(--color-button-disabled-bg)] disabled:bg-none disabled:text-[color:var(--color-button-disabled-text)] disabled:shadow-none disabled:[--btn-icon:var(--color-button-disabled-text)]",
   {
     variants: {
@@ -79,6 +79,18 @@ const buttonVariants = cva(
     defaultVariants: { hierarchy: "primary", size: "md", iconOnly: false },
   },
 );
+
+/**
+ * A01's classes for anything drawn as a button (a Link, an <a>), merged the
+ * way the Button merges them. cva alone keeps the clashing classes side by
+ * side — the base's `border-transparent` beside a hierarchy's stroke, a
+ * size's side padding beside `iconOnly`'s `px-0` — and the stylesheet's
+ * order then picked the wrong one: a secondary or outline-brand Link lost
+ * its stroke and read as plain text, an icon-only Link squeezed its icon.
+ * Merged, a Link looks exactly like the Button. A `className` passed in wins
+ * over the class it clashes with, as it does on the Button.
+ */
+const buttonVariants = (props?: Parameters<typeof buttonCva>[0]): string => cn(buttonCva(props));
 
 /** An icon at the size's A01 slot, in the hierarchy's icon colour. */
 const ICON_SLOT =
