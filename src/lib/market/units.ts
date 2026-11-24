@@ -2,8 +2,9 @@
 // buying one Physical NFT I may be able to manufacture 50. If I make 10 of the 50 and then sell it, how many can
 // the buyer make? — keep that logic clear"; plan 6rPKBgwzQ6r6woYmjfE6Td, D10 + D11).
 //
-// - Each copy carries its own allowance, set by the creator for its listing ("Units per copy"); until the Sell
-//   form asks for it, Personal use allows 1 unit and Business use 50.
+// - Each copy carries its own allowance, by its use: Personal use allows 1 unit, Business use 50. It is IDEEZA's
+//   own rule, never the creator's (owner, 2026-11-24: "how many units a copy can make, the creator can't set —
+//   that is IDEEZA's own logic"); the creator sets only how many copies are sold.
 // - Each copy counts its own units: they never move to another copy and never split, since a copy is one token.
 // - A manufacturing order takes units from one copy, no more than it has left (the flow comes later; the log
 //   below is what an order writes).
@@ -18,8 +19,8 @@ import type { DemoBuyerId } from "../wallet/types";
 
 export type UnitsUse = "Personal use" | "Business use";
 
-/** The allowance until the creator sets one for the listing. */
-export const DEFAULT_UNITS: Record<UnitsUse, number> = { "Personal use": 1, "Business use": 50 };
+/** IDEEZA's allowance per copy, by use. No listing changes it. */
+export const IDEEZA_UNITS: Record<UnitsUse, number> = { "Personal use": 1, "Business use": 50 };
 
 export const UNITS_KEY = "ideeza:market:units";
 
@@ -35,9 +36,9 @@ export type CopyUnits = {
   left: number;
 };
 
-export function unitsAllowanceOf(use: UnitsUse | null, override?: number | null): number {
-  if (typeof override === "number" && Number.isInteger(override) && override > 0) return override;
-  return use ? DEFAULT_UNITS[use] : 0;
+/** A copy's allowance: IDEEZA's number for its use; 0 for no use (a Virtual copy makes nothing). */
+export function unitsAllowanceOf(use: UnitsUse | null): number {
+  return use ? IDEEZA_UNITS[use] : 0;
 }
 
 /** A copy's units: its allowance, what is made with it, what is left. */
@@ -84,7 +85,7 @@ export function unitsUpToOf(n: number): string {
 
 /** What a Physical listing says before anyone buys, so the buyer knows what a copy lets them make. */
 export function listingUnitsLine(): string {
-  const p = DEFAULT_UNITS["Personal use"];
-  const b = DEFAULT_UNITS["Business use"];
+  const p = IDEEZA_UNITS["Personal use"];
+  const b = IDEEZA_UNITS["Business use"];
   return `Each copy lets you make up to ${p} ${p === 1 ? "unit" : "units"} for Personal use or ${b} for Business use. If you sell the copy, the units left go with it.`;
 }
