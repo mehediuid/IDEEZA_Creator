@@ -498,7 +498,7 @@ function OwnProfile({
             pinnedBy={owner ? "you" : (first ?? "this creator")}
             now={data.now}
             onMore={owner ? setPinFor : undefined}
-            allHref="/m/creators/me/projects"
+            allHref="/m/projects"
           />
         ) : (
           <EmptyState
@@ -652,8 +652,7 @@ function OtherProfile({ person }: { person: Person }) {
           <Work
             timeline={posts.length ? { count: posts.length, content: <Timeline posts={posts} now={data.now} /> } : null}
             // Someone else's Activity isn't shown (owner 2026-11-24): Timeline · Projects only.
-            items={data.made} activity={[]} maker={{ name: person.name, initials: person.initials, color: person.color, src: null, pro }} pinnedBy={first} now={data.now}
-            allHref={`/m/creators/${encodeURIComponent(person.handle)}/projects`} />
+            items={data.made} activity={[]} maker={{ name: person.name, initials: person.initials, color: person.color, src: null, pro }} pinnedBy={first} now={data.now} />
         ) : (
           <EmptyState icon={InboxIcon} title="Nothing shared yet" body={`${first} hasn’t shared a project yet.`} action={{ label: "Go to Feed", href: "/m" }} />
         )}

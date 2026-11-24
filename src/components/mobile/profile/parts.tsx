@@ -388,7 +388,7 @@ export function ReactionRow({
 
 /** A More projects tile: the 4:3 cover, the name, then "2 products · Oct 12" and what is for sale
  *  (the web's facts); your own carry ⋯ for pinning. */
-export function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => void }) {
+function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => void }) {
   return (
     <li className="relative flex min-w-0 flex-col gap-2">
       <Link href={phoneProjectHref(item)} className={cn("flex flex-col gap-2 rounded-lg", FOCUS)}>
@@ -420,13 +420,14 @@ export function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => v
 
 const WORK_TABS = ["timeline", "projects", "activity"] as const;
 
-/** More projects shows two rows of tiles; View all projects opens every one. */
+/** Your own More projects shows two rows of tiles; View all projects opens My projects. */
 const MORE_SHOWN = 4;
 type WorkTab = (typeof WORK_TABS)[number];
 
 /** Timeline · Projects · Activity (M14 line tabs, sticky under the top bar). Timeline (owner
  *  2026-11-22) leads: every project and product shared, newest first; Projects is Featured and More
- *  projects (two rows of tiles, then View all projects to every one on its own screen, owner 2026-11-24); Activity the journey rows. Only the tabs with something in them show, the first of them
+ *  projects (on your own profile two rows of tiles, then View all projects, which opens My projects with
+ *  its tabs and filters, owner 2026-11-24; someone else's shows every tile, as the web); Activity the journey rows. Only the tabs with something in them show, the first of them
  *  open; with one, no strip. The tab lives in the address (`?tab=projects`, as on the web), so Back
  *  from a project returns to the tab you left. Nothing at all: nothing renders (the caller's empty
  *  state shows). */
@@ -453,7 +454,8 @@ export function Work({
   now: number;
   /** Your own profile: a card's ⋯ (Pin to top · Open project). */
   onMore?: (item: MadeItem) => void;
-  /** Every project on its own screen (View all projects, owner 2026-11-24). */
+  /** Your own profile: View all projects opens this (My projects, owner 2026-11-24), and More projects
+   *  shows two rows of tiles before it. Without it every tile shows (someone else's profile). */
   allHref?: string;
 }) {
   const lead = featuredOf(items);
@@ -499,11 +501,11 @@ export function Work({
                   More projects
                 </h2>
                 <ul className="m-0 grid list-none grid-cols-2 gap-4 p-0">
-                  {lead.rest.slice(0, MORE_SHOWN).map((m) => (
+                  {(allHref ? lead.rest.slice(0, MORE_SHOWN) : lead.rest).map((m) => (
                     <ProjectTile key={m.key} item={m} onMore={onMore && m.projectId ? () => onMore(m) : undefined} />
                   ))}
                 </ul>
-                {/* Owner 2026-11-24: a way to every project, so the rest are easy to find (with search there). */}
+                {/* Owner 2026-11-24: the way to every project is My projects, with its tabs and filters. */}
                 {allHref && (
                   <Link href={allHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
                     View all projects
