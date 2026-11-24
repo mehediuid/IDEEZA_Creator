@@ -194,6 +194,20 @@ export function listQueryString(q: ListQuery): string {
   return s ? `?${s}` : "";
 }
 
+/** The phone profile's links into My projects (owner 2026-11-24: "the same number everywhere"):
+ *  `profile` keeps the projects your profile shows, `private` the rest of your own; purchases drop
+ *  out of both, so the list counts exactly what the link said (`?on=profile` / `?on=private`). */
+export type ProfileScope = "profile" | "private";
+
+export function profileScopeOf(v: string | null): ProfileScope | null {
+  return v === "profile" || v === "private" ? v : null;
+}
+
+export function inProfileScope<T extends { project: { id: string } }>(items: readonly T[], scope: ProfileScope | null, onProfile: ReadonlySet<string>): T[] {
+  if (!scope) return [...items];
+  return items.filter((i) => onProfile.has(i.project.id) === (scope === "profile"));
+}
+
 // ─────────────────────────── the words ───────────────────────────
 
 function projectsWord(n: number): string {

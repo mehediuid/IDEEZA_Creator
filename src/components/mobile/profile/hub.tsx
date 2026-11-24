@@ -52,6 +52,8 @@ import { runningLow } from "@/lib/create/credit-limits";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { useManualProjects } from "@/lib/manual/projects";
+import { boughtForAll } from "@/components/projects/all-tab";
+import { usePurchased } from "@/components/projects/purchased/use-purchased";
 import { displayNameOf, initialsOf, ownHandleOf, ME } from "@/lib/people/ids";
 import { PHONE_SETTINGS_GENERAL_HREF, PHONE_SETTINGS_OTHERS_HREF, compactCount, phoneProfileHref } from "@/lib/people/phone-profile";
 import { useMyPhoto } from "@/lib/people/photo-store";
@@ -191,10 +193,13 @@ function PlanRow() {
   );
 }
 
+/** The Projects row's number is My projects' All, the page it opens: your projects and the projects
+ *  you bought from (a whole project bought counts once, as yours) — owner 2026-11-24, one number. */
 function ProjectsValue() {
   const { hydrated, projects } = useManualProjects();
-  if (!hydrated) return <Skeleton shape="text" size="md" className="inline-block w-[24px]" />;
-  return <HubValue>{projects.length}</HubValue>;
+  const bought = usePurchased();
+  if (!hydrated || !bought.ready) return <Skeleton shape="text" size="md" className="inline-block w-[24px]" />;
+  return <HubValue>{projects.length + boughtForAll(bought.purchases, new Set(projects.map((p) => p.id))).length}</HubValue>;
 }
 
 /** Your level, as the web's account menu shows it ("Maker", "620 / 1,000 XP" — how far to the next

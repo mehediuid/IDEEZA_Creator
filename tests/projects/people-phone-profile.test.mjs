@@ -99,6 +99,6 @@ test("your phone profile's More projects shows two rows and View all projects op
   assert.match(parts, /View all projects/);
   // Your own: View all projects opens My projects (its tabs and filters), no page of its own.
   const profile = await readFile(new URL("../../src/components/mobile/profile/creator-profile.tsx", import.meta.url), "utf8");
-  assert.match(profile, /allHref="\/m\/projects"/);
+  assert.match(profile, /allHref="\/m\/projects\?on=profile"/);
   assert.doesNotMatch(profile, /\/projects`\}/);
 });

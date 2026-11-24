@@ -428,9 +428,9 @@ function OwnProfile({
           <h2 className={cn(T.meta, "px-2 text-text-tertiary")}>Only you see this</h2>
           <ListCard>
             {made.length > 0 && (
-              <ListRow icon={ViewIcon} title={`${data.counts.shown} ${data.counts.shown === 1 ? "project is" : "projects are"} public`} href="/m/projects" />
+              <ListRow icon={ViewIcon} title={`${data.counts.shown} ${data.counts.shown === 1 ? "project is" : "projects are"} public`} href="/m/projects?on=profile" />
             )}
-            {data.counts.hidden > 0 && <ListRow icon={SquareLock02Icon} title={`${data.counts.hidden} private in My projects`} href="/m/projects" />}
+            {data.counts.hidden > 0 && <ListRow icon={SquareLock02Icon} title={`${data.counts.hidden} private in My projects`} href="/m/projects?on=private" />}
             {followingCount !== null && (made.length > 0 || followingCount > 0) && (
               <ListRow icon={UserGroupIcon} title={`You follow ${followingCount}`} onClick={() => setFollowingOpen(true)} />
             )}
@@ -498,7 +498,7 @@ function OwnProfile({
             pinnedBy={owner ? "you" : (first ?? "this creator")}
             now={data.now}
             onMore={owner ? setPinFor : undefined}
-            allHref="/m/projects"
+            allHref="/m/projects?on=profile"
           />
         ) : (
           <EmptyState

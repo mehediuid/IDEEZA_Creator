@@ -310,3 +310,26 @@ test("LST-27 · page numbers: 1 … n-1 n n+1 … last", () => {
   assert.deepEqual(pageItemsFor(1, 10), [1, 2, "ellipsis", 10]);
   assert.deepEqual(pageItemsFor(10, 10), [1, "ellipsis", 9, 10]);
 });
+
+test("the profile's links into My projects count what the profile said (owner 2026-11-24, one number)", async () => {
+  const { inProfileScope, profileScopeOf } = await import("../../.tmp-test/lib/manual/project-list.js");
+  const items = ["a", "b", "c", "d", "e"].map((id) => ({ project: { id } }));
+  const onProfile = new Set(["b", "d"]);
+  assert.deepEqual(inProfileScope(items, "profile", onProfile).map((i) => i.project.id), ["b", "d"]);
+  assert.deepEqual(inProfileScope(items, "private", onProfile).map((i) => i.project.id), ["a", "c", "e"]);
+  assert.equal(inProfileScope(items, null, onProfile).length, 5);
+  assert.equal(profileScopeOf("profile"), "profile");
+  assert.equal(profileScopeOf("private"), "private");
+  assert.equal(profileScopeOf("x"), null);
+  assert.equal(profileScopeOf(null), null);
+});
+
+test("the phone profile links each number to the list that shows it", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const profile = await readFile(new URL("../../src/components/mobile/profile/creator-profile.tsx", import.meta.url), "utf8");
+  assert.match(profile, /public`\} href="\/m\/projects\?on=profile"/);
+  assert.match(profile, /private in My projects`\} href="\/m\/projects\?on=private"/);
+  assert.match(profile, /allHref="\/m\/projects\?on=profile"/);
+  const hub = await readFile(new URL("../../src/components/mobile/profile/hub.tsx", import.meta.url), "utf8");
+  assert.match(hub, /boughtForAll\(bought\.purchases/, "the Projects row counts what My projects' All lists");
+});

@@ -15,6 +15,10 @@
 // scrolled come back when Back returns from a project. Back goes to the
 // Profile hub. A write the browser refused says so under the top bar.
 //
+// From the profile (owner 2026-11-24, one number everywhere): `?on=profile` lists exactly the
+// projects the profile shows ("4 projects on your profile"), `?on=private` the rest of yours; the
+// tabs count that set, purchases drop out, and "Show all projects" clears it.
+//
 // Web parity (2026-11-22):
 // · Purchased after Sold (`?tab=purchased`, CL-035): what the demo creator you
 //   shop as bought, one card per project (purchased/purchased-card.tsx), the
@@ -52,13 +56,18 @@ import {
   LIST_TABS,
   SORT_OPTIONS,
   countLine,
+  inProfileScope,
   listQueryString,
   parseListQuery,
+  profileScopeOf,
+  type ProfileScope,
   type ListItem,
   type ListTab,
 } from "@/lib/manual/project-list";
 import { PAGE_SIZE, cardText, projectSummary, renderHintOf, type ListQuery, type ProjectSummary } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
+import { useMyProfile } from "@/lib/people/profile-store";
+import { useOwnData } from "../profile/use-profile";
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { useMarket } from "@/lib/market/market-store";
 import { HELD_CHIP, heldOf, useHeld } from "@/lib/market/held";
@@ -143,6 +152,15 @@ export function MyProjectsScreen() {
   const now = useMinuteClock();
   const query = React.useMemo(() => parseListQuery(params), [params]);
   const [view, setView] = React.useState<ListQuery>(query);
+  // The profile's set: the same list the profile reads, so the count is the profile's own.
+  const [scope, setScope] = React.useState<ProfileScope | null>(() => profileScopeOf(params.get("on")));
+  const { fields } = useMyProfile();
+  const own = useOwnData(fields);
+  const onProfile = React.useMemo(() => new Set(own.made.flatMap((m) => (m.projectId ? [m.projectId] : []))), [own.made]);
+  const urlOf = (q: ListQuery, s: ProfileScope | null) => {
+    const base = listQueryString(q);
+    return s ? `${base ? `${base}&` : "?"}on=${s}` : base;
+  };
   const [onPurchased, setOnPurchased] = React.useState(() => params.get("tab") === PURCHASED);
   const keptKey = (purchased: boolean, q: ListQuery) => (purchased ? `?tab=${PURCHASED}` : listQueryString({ ...q, page: 1 }));
   const [kept] = React.useState(() => (typeof window === "undefined" ? null : readKept(keptKey(params.get("tab") === PURCHASED, query))));
@@ -156,7 +174,12 @@ export function MyProjectsScreen() {
     setView(next);
     setOnPurchased(false);
     setShown(PAGE_SIZE);
-    window.history.replaceState(window.history.state, "", `${pathname}${listQueryString(next)}`);
+    window.history.replaceState(window.history.state, "", `${pathname}${urlOf(next, scope)}`);
+  };
+  const clearScope = () => {
+    setScope(null);
+    setShown(PAGE_SIZE);
+    window.history.replaceState(window.history.state, "", `${pathname}${urlOf({ ...view, page: 1 }, null)}`);
   };
   const openPurchased = () => {
     setOnPurchased(true);
@@ -164,7 +187,7 @@ export function MyProjectsScreen() {
   };
 
   const tick = React.useSyncExternalStore(subscribeDrafts, () => draftsVersion, () => -1);
-  const ready = hydrated && buildsHydrated && jobsHydrated && marketHydrated && bought.ready && tick >= 0;
+  const ready = hydrated && buildsHydrated && jobsHydrated && marketHydrated && bought.ready && tick >= 0 && (scope === null || own.ready);
 
   // A project minted with sharing before the flag existed gets its shared date on first read,
   // as the web's list does (COR-105), so Shared only finds it here too.
@@ -191,11 +214,14 @@ export function MyProjectsScreen() {
   // Every match, in order (the web's pages, one after another): the phone shows them twelve at a time.
   // All lists the purchases too (the web's all-tab.ts), so the list waits for them as for the other stores.
   const purchases = bought.purchases;
-  const result = React.useMemo(() => (items ? allTabOf(items, purchases, { ...view, page: 1 }) : null), [items, purchases, view]);
+  // From the profile: only its set, and no purchases, so every count is the one the profile showed.
+  const scoped = React.useMemo(() => (items ? inProfileScope(items, scope, onProfile) : null), [items, scope, onProfile]);
+  const listedPurchases = React.useMemo(() => (scope ? [] : purchases), [scope, purchases]);
+  const result = React.useMemo(() => (scoped ? allTabOf(scoped, listedPurchases, { ...view, page: 1 }) : null), [scoped, listedPurchases, view]);
   const matches = React.useMemo<AllEntry[]>(() => {
-    if (!items || !result) return [];
-    return Array.from({ length: result.pageCount }, (_, i) => (i === 0 ? result.entries : allTabOf(items, purchases, { ...view, page: i + 1 }).entries)).flat();
-  }, [items, purchases, result, view]);
+    if (!scoped || !result) return [];
+    return Array.from({ length: result.pageCount }, (_, i) => (i === 0 ? result.entries : allTabOf(scoped, listedPurchases, { ...view, page: i + 1 }).entries)).flat();
+  }, [scoped, listedPurchases, result, view]);
 
   // Back from a project: the list is where it was left, once its cards are there.
   const scroller = () => listRef.current?.closest<HTMLElement>(`[${SCROLL_ATTR}]`) ?? null;
@@ -301,9 +327,16 @@ export function MyProjectsScreen() {
                 <Icon icon={FilterHorizontalIcon} size={20} />
               </Button>
             </div>
-            <p aria-live="polite" className={T.rowTitle}>
-              {result ? countLine(result) : "—"}
-            </p>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <p aria-live="polite" className={T.rowTitle}>
+                {result ? `${countLine(result)}${scope === "profile" ? " on your profile" : scope === "private" ? " kept private" : ""}` : "—"}
+              </p>
+              {scope && (
+                <button type="button" onClick={clearScope} className={cn(LINK_MD, "-my-3 min-h-[44px]")}>
+                  Show all projects
+                </button>
+              )}
+            </div>
             {!result ? (
               <ul aria-label="Loading" className="flex flex-col gap-6">
                 {[0, 1, 2].map((i) => (
@@ -315,7 +348,13 @@ export function MyProjectsScreen() {
                 ))}
               </ul>
             ) : matches.length === 0 ? (
-              view.tab !== "all" && result.counts[view.tab] === 0 ? (
+              scope && view.tab === "all" && !view.q.trim() && !view.showcase ? (
+                <EmptyState
+                  icon={ICONS.eye}
+                  title={scope === "profile" ? "Nothing on your profile yet" : "No private projects"}
+                  body={scope === "profile" ? "A project shows on your profile once you share it or put it on sale." : undefined}
+                />
+              ) : view.tab !== "all" && result.counts[view.tab] === 0 ? (
                 <EmptyState icon={ICONS[EMPTY_TAB[view.tab].icon]} title={EMPTY_TAB[view.tab].title} body={EMPTY_TAB[view.tab].body} />
               ) : view.q.trim() ? (
                 <>
