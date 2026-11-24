@@ -123,7 +123,10 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
   assert.doesNotMatch(page, /Download04Icon|no files to download/, "no placeholder downloads: a Main NFT opens the project, copies take the pieces' own files");
   assert.match(page, /<PostMediaStage post=\{post\} mine=\{mine\} \/>/, "media first, as the marketplace and Innovations pages");
   assert.match(read("components/innovations/post-product-bits.tsx"), /Open your files/, "the locked pieces lead a holder to them");
-  assert.match(read("components/marketplace/market-rail.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} \/>/);
+  // With the purchase: the foot of every marketplace page's Marketplace block (owner, 2026-11-24: one rail everywhere).
+  assert.match(read("components/marketplace/buyer-rail.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} \/>/);
+  assert.match(read("components/projects/editions/edition-block.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} \/>/);
+  assert.doesNotMatch(read("components/marketplace/market-rail.tsx"), /SeeWhatYouOwn/, "never in the Creator block");
   assert.match(read("components/marketplace/sample-offer-box.tsx"), /<SeeWhatYouOwn projectId=\{feedId\} \/>/);
 
 });

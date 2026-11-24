@@ -29,6 +29,11 @@ export function RailLog({ view, viewer }: SlotProps) {
     () => logLinesOf(view.log, { network: owner, products: view.products }),
     [view.log, owner, view.products],
   );
+  return <RecentBlock lines={lines} />;
+}
+
+/** The Recent block for any lines: a sample's marketplace page words its own (sample-record.ts). */
+export function RecentBlock({ lines }: { lines: LogLine[] }) {
   if (lines.length === 0) return null;
   return (
     <RailBlock title="Recent">

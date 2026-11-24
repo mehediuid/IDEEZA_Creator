@@ -364,7 +364,8 @@ function AboutProject({ text }: { text: string }) {
 }
 
 /** One row per product, each to its product view. */
-export function WhatsInside({ post }: { post: InnovationPost }) {
+/** `hrefOf`: where a row opens — the post's product page, or (Explore marketplace) the shop's. */
+export function WhatsInside({ post, hrefOf }: { post: InnovationPost; hrefOf?: (productId: string) => string }) {
   const id = React.useId();
   return (
     <section aria-labelledby={id} className="flex flex-col gap-6">
@@ -380,7 +381,7 @@ export function WhatsInside({ post }: { post: InnovationPost }) {
       <ul role="list" className="flex flex-col gap-6">
         {post.products.map((p) => (
           <li key={p.id}>
-            <ProductRow slug={post.slug} product={p} />
+            <ProductRow href={hrefOf ? hrefOf(p.id) : postProductHref(post.slug, p.id)} product={p} />
           </li>
         ))}
       </ul>
@@ -388,10 +389,10 @@ export function WhatsInside({ post }: { post: InnovationPost }) {
   );
 }
 
-function ProductRow({ slug, product }: { slug: string; product: InnovationPost["products"][number] }) {
+function ProductRow({ href, product }: { href: string; product: InnovationPost["products"][number] }) {
   return (
     <Link
-      href={postProductHref(slug, product.id)}
+      href={href}
       className="group flex items-center gap-8 rounded-xl border border-solid border-border bg-bg-surface p-6 outline-none transition-colors duration-normal ease-out hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus max-md:gap-6 motion-reduce:transition-none"
     >
       <span className="relative flex aspect-[4/3] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-bg-surface-raised text-text-tertiary max-md:w-[72px]">

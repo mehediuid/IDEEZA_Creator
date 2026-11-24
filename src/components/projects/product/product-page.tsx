@@ -90,6 +90,7 @@ import { DeliverablesAccess } from "./product-deliverables";
 import { ClampedText, ConceptImage } from "./product-identity";
 import { ProductMenu } from "./product-menu";
 import { ProductRail } from "./product-rail";
+import { CreatorRailBlock, StoryRailBlock } from "@/components/marketplace/market-rail";
 import type { ProductSlotProps } from "./product-slots";
 import { LockLine, ProductLoading, ProductMissing, UNBUILT } from "./product-states";
 import { ProductTabs } from "./product-tabs";
@@ -480,6 +481,14 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
             confidence={confidence}
             partChanges={partChanges}
             post={post ? <PostRailBlocks post={post} productName={name} comments={comments} /> : undefined}
+            buyer={
+              market ? (
+                <>
+                  <CreatorRailBlock project={project} view={view} viewer={viewer} />
+                  <StoryRailBlock project={project} viewer={viewer} />
+                </>
+              ) : undefined
+            }
           />
         }
       />

@@ -65,6 +65,12 @@ export function sampleMarketOf(id: string): SampleMarket | null {
   return SAMPLE_MARKETS.find((m) => m.feedId === id) ?? null;
 }
 
+/** A sample product's page on Explore marketplace (owner, 2026-11-24: a product of the shop opens
+ *  in the shop, with the rail every marketplace page has, not on its Innovations post). */
+export function sampleProductHref(feedId: string, productId: string): string {
+  return `/marketplace/${feedId}/products/${encodeURIComponent(productId)}`;
+}
+
 /** Its cover: the post's first picture. */
 export function sampleCoverOf(post: InnovationPost): string | null {
   return post.media.find((m) => m.kind === "image")?.src ?? post.products[0]?.image ?? null;

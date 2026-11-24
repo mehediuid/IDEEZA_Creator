@@ -31,6 +31,8 @@
 // - The way to the creator — "Get creator support" for a holder of any sale of
 //   the project (Main or a copy), about the newest one, else "Ask the
 //   creator", about the listing — is the Creator block's (market-rail.tsx).
+// - "See what you own" closes the block for a buyer who holds any sale of the
+//   project, as on a sample's page (owner, 2026-11-24: one rail everywhere).
 //
 // Every `can()` passes `view.canCtx` (listingLive, auction, holding); an auction
 // asks again at the card's own clock, so Place bid goes the moment it ends.
@@ -57,6 +59,7 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { RailBlock } from "@/components/projects/details/rail-block";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { cn } from "@/lib/utils";
+import { SeeWhatYouOwn } from "@/components/projects/purchased/see-what-you-own";
 import { BidCard, useAfterDialogClose, useAuctionClock } from "./bid-card";
 import { CopyPanel, heldKindOf, listedKindsOf } from "./copy-panel";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
@@ -141,6 +144,10 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
           <PreviewBody project={project} view={view} listing={listing} auction={auction} clock={clock} announce={announce} />
         ) : null}
       </OfferTabs>
+      {/* With the purchase, as on a sample's page (rail-blocks.tsx): what this buyer holds of the project. */}
+      {buyerId !== null && view.sales.some((s) => s.projectId === project.id && s.buyerId === buyerId) && (
+        <SeeWhatYouOwn projectId={project.id} />
+      )}
     </RailBlock>
   );
 }

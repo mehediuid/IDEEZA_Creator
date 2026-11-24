@@ -78,11 +78,6 @@ export function ProjectDescription({
   /** Opens the edit dialog — only when the viewer may edit (`project.editDescription`). */
   onAdd?: () => void;
 }) {
-  const [expanded, setExpanded] = React.useState(false);
-  const textRef = React.useRef<HTMLParagraphElement>(null);
-  const textId = React.useId();
-  const clamps = useClamps(textRef, !expanded, project.description);
-
   if (!project.description.trim()) {
     return onAdd ? (
       <div>
@@ -93,6 +88,17 @@ export function ProjectDescription({
       </div>
     ) : null;
   }
+  return <DescriptionText text={project.description} />;
+}
+
+/** A description as the header reads it: five lines, then Show more. A sample's marketplace page
+ *  shows its post's description this way too (owner, 2026-11-24: every marketplace page the same). */
+export function DescriptionText({ text }: { text: string }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const textRef = React.useRef<HTMLParagraphElement>(null);
+  const textId = React.useId();
+  const clamps = useClamps(textRef, !expanded, text);
+  if (!text.trim()) return null;
 
   const toggles = clamps || expanded;
   return (
@@ -105,7 +111,7 @@ export function ProjectDescription({
           !expanded && "line-clamp-5",
         )}
       >
-        {project.description}
+        {text}
       </p>
       {toggles && (
         <p>

@@ -1,7 +1,9 @@
 "use client";
 
 // The Marketplace box of another creator's sample (sample-market.ts; owner,
-// 2026-11-16: the marketplace always has Innovations' data). The same box as
+// 2026-11-16: the marketplace always has Innovations' data): the rail's first
+// block, a RailBlock on the rail's one surface like a listing's of this
+// browser (owner, 2026-11-24: one rail everywhere). The same box as
 // this browser's own listings (buyer-rail.tsx, copy-panel.tsx): tabs Main NFT /
 // Physical NFT / Virtual NFT, only the ones the post's rows sell, one panel at
 // a time, each the same buy box — what is sold as the overline, the price
@@ -52,9 +54,8 @@ import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { SeeWhatYouOwn } from "@/components/projects/purchased/see-what-you-own";
-import { CARD } from "@/components/innovations/post-bits";
+import { RailBlock } from "@/components/projects/details/rail-block";
 import { readSampleSales, useSampleSales, writeSampleSales } from "@/components/mobile/project-earn/buyer/sample-sales-store";
-import { cn } from "@/lib/utils";
 import { useResales } from "@/components/projects/purchased/resales-store";
 import { sampleSaleKeyOf } from "@/lib/market/purchases";
 import { holderOf } from "@/lib/market/resales";
@@ -71,13 +72,11 @@ export function SampleOfferBox({
   market,
   announce,
   initialTab,
-  className,
 }: {
   market: SampleMarket;
   announce: (message: string) => void;
   /** The tab a card's clicked tag asked for. */
   initialTab?: OfferTab | null;
-  className?: string;
 }) {
   const all = useSampleSales();
   const { buyer } = useActiveBuyer();
@@ -132,10 +131,7 @@ export function SampleOfferBox({
 
   const main = offers.find((o) => o.kind === "main") ?? null;
   return (
-    <section aria-labelledby={`${feedId}-market`} className={cn(CARD, "flex flex-col gap-7", className)}>
-      <h2 id={`${feedId}-market`} className="text-lg font-bold leading-lg text-text-primary">
-        Marketplace
-      </h2>
+    <RailBlock title="Marketplace" collapsible={false}>
       <OfferTabs tabs={tabs} active={tab} onSelect={setPicked}>
         {tab === "main" && main ? (
           <MainPanel market={market} offer={main} sales={sales} buyerId={buyer.id} busy={busy === main.name} now={now} onBuy={() => buy(main)} />
@@ -154,7 +150,7 @@ export function SampleOfferBox({
         )}
       </OfferTabs>
       {held.length > 0 && <SeeWhatYouOwn projectId={feedId} />}
-    </section>
+    </RailBlock>
   );
 }
 

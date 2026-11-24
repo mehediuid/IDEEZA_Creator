@@ -24,6 +24,7 @@ const COMPOSITION = [
   "src/lib/manual/project-summary.ts", // the card and header summary, the status among it
   "src/lib/manual/rail-copy.ts", // the rail blocks' copy, the commerce blocks among them
   "src/lib/manual/rail-rows.ts", // the rail's rows, the commerce rows among them
+  "src/lib/manual/sample-record.ts", // a sample's status and rail rows on Explore marketplace
 ];
 
 /** Temporary exceptions: engineering files that still import commerce, and the later fix. */
