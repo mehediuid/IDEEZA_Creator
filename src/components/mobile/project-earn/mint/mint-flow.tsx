@@ -500,7 +500,7 @@ function MintFooter({
       : step === "details"
         ? detailsReason
         : startVideos
-          ? `${startVideos.left} ${startVideos.left === 1 ? "video" : "videos"} to start, then ${ctaOf(state, type)}`
+          ? `${startVideos.left} ${startVideos.left === 1 ? "video" : "videos"} to generate, then ${ctaOf(state, type)}`
           : reviewReason;
   const primary =
     step === "choose" ? (
@@ -526,7 +526,7 @@ function MintFooter({
       </Button>
     ) : startVideos ? (
       <Button size="xl" className="w-full" aria-describedby={reasonId} onClick={startVideos.onStart}>
-        Start the videos
+        Generate the videos
       </Button>
     ) : (
       <Button size="xl" className="w-full" disabled={!!reviewReason || minting} loading={minting} aria-describedby={reviewReason ? reasonId : undefined} onClick={onSign}>

@@ -20,8 +20,9 @@
 //   gate needs hasn't started, "Start your videos" leads the screen (owner
 //   2026-11-24: the videos are the step's most important job and sat last,
 //   under facts shown louder; then "no coloured card, no box in a box"): a
-//   plain section with how many have started and one list, a row per video
-//   (Start opens its maker), and the foot's primary is Start
+//   plain section, "Generate your videos", how many have started, then
+//   Product videos (a row per product) and Project video (the project's row),
+//   each with Generate video opening its maker, and the foot's primary is Generate
 //   the videos (the next one to start) until all have; What is minted as a
 //   summary card (shared as, the name, its products, the price, share and
 //   royalties large for a Sell); videos still rendering right under it; Terms;
@@ -93,6 +94,7 @@ import { SheetSelect } from "../../kit/sheet-select";
 import { Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
 import { ListCard } from "../../kit/list";
+import { Eyebrow } from "../../kit/eyebrow";
 import { useRouter } from "next/navigation";
 import { useEarn } from "../context";
 import { ListingFields, MintTypeCards } from "../listing-fields";
@@ -594,7 +596,7 @@ export function MintReview({
   // Where the videos sit, by how much they need the maker: a video not started leads the screen; one
   // still rendering or waiting for review comes right under what is minted; ready (or optional) after Terms.
   const videoSpot = gate.gated && videosNotStartedOf(gate.readiness).length > 0 ? "first" : gate.gated && videosBlockerOf(gate.readiness) ? "next" : "last";
-  const videos = <VideosBlock projectId={project.id} readiness={gate.readiness} gated={gate.gated} selling={selling} first={videoSpot === "first"} />;
+  const videos = <VideosBlock projectId={project.id} projectName={project.name} readiness={gate.readiness} gated={gate.gated} selling={selling} first={videoSpot === "first"} />;
 
   return (
     <div className="flex flex-col gap-8">
@@ -644,7 +646,21 @@ export function MintReview({
 
 /** Product videos (and the project video) as the gate reads them; what's missing opens where it's made.
  *  `first`: some haven't started — the screen's lead card, with how many have. */
-function VideosBlock({ projectId, readiness, gated, selling, first = false }: { projectId: string; readiness: Readiness; gated: boolean; selling: boolean; first?: boolean }) {
+function VideosBlock({
+  projectId,
+  projectName,
+  readiness,
+  gated,
+  selling,
+  first = false,
+}: {
+  projectId: string;
+  projectName: string;
+  readiness: Readiness;
+  gated: boolean;
+  selling: boolean;
+  first?: boolean;
+}) {
   const router = useRouter();
   const headingId = React.useId();
   const blocker = videosBlockerOf(readiness);
@@ -658,50 +674,68 @@ function VideosBlock({ projectId, readiness, gated, selling, first = false }: { 
   const pv = readiness.project;
   const pvCopy = pv ? projectRowCopy(pv) : null;
   const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
-  // In the lead variant a video not started reads "No video yet" with a short Start, so the names keep their room.
   const pvNotStarted = !!pv && (pv.state === "make" || pv.state === "failed" || pv.state === "waiting" || pv.state === "outdated");
+  const waiting = readiness.products.filter((p) => p.video.state !== "ready");
+  const productRow = (p: Readiness["products"][number], lead: boolean) => {
+    const copy = statusCopy(p.video);
+    const notStarted = p.video.state === "none" || p.video.state === "failed";
+    return (
+      <VideoFixRow
+        key={p.productId}
+        title={displayProductName(p.name)}
+        line={lead && p.video.state === "none" ? "No video yet" : copy.text}
+        action={lead && notStarted ? GENERATE : actionLabel(copy.action)}
+        onOpen={() => router.push(phoneProductVideoHref(projectId, p.productId))}
+      />
+    );
+  };
+  const openProjectVideo = () => router.push(phoneProjectPath(projectId, "video"));
   const rows = gated && blocker && (
     <ListCard label="Videos">
-      {readiness.products
-        .filter((p) => p.video.state !== "ready")
-        .map((p) => {
-          const copy = statusCopy(p.video);
-          const notStarted = p.video.state === "none" || p.video.state === "failed";
-          return (
-            <VideoFixRow
-              key={p.productId}
-              title={displayProductName(p.name)}
-              line={first && notStarted && p.video.state === "none" ? "No video yet" : copy.text}
-              action={first && notStarted ? "Start" : actionLabel(copy.action)}
-              onOpen={() => router.push(phoneProductVideoHref(projectId, p.productId))}
-            />
-          );
-        })}
-      {pv && pvCopy && !pv.ok && (
-        <VideoFixRow
-          title="Project video"
-          line={first && pv.state === "make" ? "No video yet" : pvCopy.text}
-          action={first && pvNotStarted ? "Start" : pvAction}
-          onOpen={() => router.push(phoneProjectPath(projectId, "video"))}
-        />
-      )}
+      {waiting.map((p) => productRow(p, false))}
+      {pv && pvCopy && !pv.ok && <VideoFixRow title="Project video" line={pvCopy.text} action={pvAction} onOpen={openProjectVideo} />}
     </ListCard>
   );
   if (first) {
     const total = videoCountOf(readiness).total;
     const started = total - videosNotStartedOf(readiness).length;
-    // Plain like the screen's other sections (owner 2026-11-24: no coloured card, no box in a box):
-    // its place at the top and the foot's Start the videos carry it.
+    // Plain like the screen's other sections (owner 2026-11-24: no coloured card, no box in a box),
+    // and it says which is which (owner: "which is a product video, which the project video? and
+    // Start what? — the videos have to be generated"): Product videos, a row per product, and
+    // Project video, the project's one row, each with Generate video. Its place at the top and the
+    // foot's Generate the videos carry it.
     return (
       <section aria-labelledby={headingId} className="flex flex-col gap-4">
         <div className="flex items-baseline justify-between gap-4">
           <h3 id={headingId} className={H3}>
-            Start your videos
+            Generate your videos
           </h3>
           <span className={NOTE}>{`${started} of ${total} started`}</span>
         </div>
-        <p className={NOTE}>{selling ? "Start each one before you sign. They keep rendering after, and the listing goes live once all are ready." : "Start each one before you sign. They keep rendering after."}</p>
-        {rows}
+        <p className={NOTE}>
+          {selling
+            ? "Each product needs its own video, and the project one video of them all. Generate every one before you sign: they keep rendering after, and the listing goes live once all are ready."
+            : "Each product needs its own video, and the project one video of them all. Generate every one before you sign: they keep rendering after."}
+        </p>
+        {waiting.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <Eyebrow tone="tertiary">{waiting.length === 1 && readiness.products.length === 1 ? "Product video" : "Product videos"}</Eyebrow>
+            <ListCard label="Product videos">{waiting.map((p) => productRow(p, true))}</ListCard>
+          </div>
+        )}
+        {pv && pvCopy && !pv.ok && (
+          <div className="flex flex-col gap-3">
+            <Eyebrow tone="tertiary">Project video</Eyebrow>
+            <ListCard label="Project video">
+              <VideoFixRow
+                title={projectName}
+                line={pv.state === "make" ? "All its products in one video · not made yet" : pvCopy.text}
+                action={pvNotStarted ? GENERATE : pvAction}
+                onOpen={openProjectVideo}
+              />
+            </ListCard>
+          </div>
+        )}
       </section>
     );
   }
@@ -723,6 +757,9 @@ function VideosBlock({ projectId, readiness, gated, selling, first = false }: { 
     </section>
   );
 }
+
+/** What a video not started yet offers in the lead list: it is generated (owner 2026-11-24). */
+const GENERATE = "Generate video";
 
 /** A missing video as a row: what, its state, and its action as the row's value; the row opens its maker. */
 function VideoFixRow({ title, line, action, onOpen }: { title: string; line: string; action: string | null; onOpen: () => void }) {

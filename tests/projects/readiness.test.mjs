@@ -394,8 +394,10 @@ test("the phone's mint review leads with the videos while one hasn't started, an
   const steps = await readFile(new URL("../../src/components/mobile/project-earn/mint/mint-steps.tsx", import.meta.url), "utf8");
   const review = steps.slice(steps.indexOf("export function MintReview"), steps.indexOf("function VideosBlock"));
   assert.ok(review.indexOf('{videoSpot === "first" && videos}') < review.indexOf("<SummaryCard"), "videos before what is minted");
-  assert.match(steps, /Start your videos/);
+  assert.match(steps, /Generate your videos/);
+  assert.match(steps, /<Eyebrow tone="tertiary">Project video<\/Eyebrow>/);
+  assert.match(steps, /const GENERATE = "Generate video";/);
   const flow = await readFile(new URL("../../src/components/mobile/project-earn/mint/mint-flow.tsx", import.meta.url), "utf8");
-  assert.match(flow, /Start the videos/);
+  assert.match(flow, /Generate the videos/);
   assert.match(flow, /nextVideoToStartOf\(gated\)/);
 });
