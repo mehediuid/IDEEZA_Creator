@@ -3,21 +3,22 @@
 // AU-40 · Sign-in & security (Settings › Account), in the web's words: How
 // you sign in (Email, Password, Google, Facebook), Protection (2-step
 // sign-in), Your devices (also the sign-in history,
-// D-17) with Sign out of all other devices, and Delete account. Drawn with
+// D-17) with Sign out of all other devices, then Deactivate account and Delete
+// account side by side (owner, 2026-11-24). Drawn with
 // the Settings kit's grouped rows like every other Settings page (the mobile
 // UX pass, 2026-11-15): toggle on the right with one line, the devices as
-// rows, Sign out of all other devices an action row, Delete account the red
-// row on its own at the foot. AU-40b
+// rows, Sign out of all other devices an action row, Deactivate and the red
+// Delete account in their own group at the foot. AU-40b
 // loading, AU-40c couldn't load (the record can't be read), AU-40d offline
 // (what was read stays, changes wait). Sheets: AU-43 disconnect (neutral),
 // AU-43b can't disconnect the last way in, AU-44d turn 2-step off (password
 // to confirm), AU-45 a device, AU-45b sign out of all other devices; the
 // Demo stand-in for a provider's own sheet connects one. AU-42b / AU-33b:
 // the toasts the sub-screens come back with.
-// 2-step sign-in and a scheduled deletion are the phone's own: only the app's
-// gate (account/mobile-gate.tsx, owedOf) asks for the code or offers Restore,
-// and the website's sign-in reads neither yet — so both say they apply in the
-// app only (web-vs-phone SET-5), here and on the screens that turn them on.
+// 2-step sign-in is the phone's own: only the app's gate (account/mobile-gate
+// .tsx, owedOf) asks for the code, and the website's sign-in doesn't — so it
+// says it applies in the app only (web-vs-phone SET-5). Deactivating and
+// deleting work on both: any Log In makes the account active again.
 // "Another phone signed in" (the Shared kit's prototype row) is the only
 // other device, marked Demo on its row and in its sheet.
 
@@ -58,6 +59,7 @@ import {
 import { notifyStores, parseStored, useStoredKey } from "@/lib/key-store";
 import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
+import { leaveRowsOf } from "@/lib/account/closing";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { T } from "../type";
 import { Sheet } from "../kit/sheet";
@@ -69,8 +71,6 @@ import { SignOutSheet } from "./sign-out";
 
 /** Under 2-step sign-in wherever it is turned on: the website's sign-in doesn't ask for the code. */
 export const TWO_STEP_APP_ONLY = "In the app only for now: the website doesn’t ask for the code yet.";
-/** Under Delete account wherever it is asked for: the website's sign-in doesn't know of a deletion. */
-export const DELETE_APP_ONLY = "In the app only for now: the website still signs you in as usual.";
 
 /** What this phone is, read from the browser. */
 export function useThisDevice(): { id: string; name: string; os: string; app: string; where: string } {
@@ -234,15 +234,10 @@ export function SecuritySettings() {
         />
       </SettingsGroup>
 
-      <SettingsGroup footer={DELETE_APP_ONLY}>
-        <SettingsRow
-          id="delete"
-          label="Delete account"
-          helper="You have 30 days to change your mind."
-          danger
-          href="/m/settings/delete"
-          disabled={!online}
-        />
+      {/* The two ways out, side by side (owner, 2026-11-24): both open again on the next Log In. */}
+      <SettingsGroup>
+        <SettingsRow id="deactivate" label="Deactivate account" helper={leaveRowsOf("Log In").deactivate} href="/m/settings/deactivate" disabled={!online} />
+        <SettingsRow id="delete" label="Delete account" helper={leaveRowsOf("Log In").delete} danger href="/m/settings/delete" disabled={!online} />
       </SettingsGroup>
 
       <ConnectSheet

@@ -5,6 +5,7 @@
 // checklist, the M01 alert slot (and the one alert for a browser that won't
 // save), where a new account goes first, and Splash.
 
+import { DELETED_WORDS } from "@/lib/account/closing";
 import * as React from "react";
 import { AiMagicIcon, CheckmarkCircle02Icon, CircleIcon, CpuIcon, Image01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
@@ -89,6 +90,10 @@ export const REFUSED_ALERT: AlertSpec = {
   title: "Couldn’t save",
   body: "This browser wouldn’t save that. Check that it allows this site to store data, then try again.",
 };
+
+/** A Log In after the 30 days that followed Delete account: gone for good (closing.ts, the web's words). */
+export const DELETED_ALERT: AlertSpec = { tone: "error", ...DELETED_WORDS };
+export { DELETED_WORDS };
 
 /** Too many wrong passwords (Log In, Link accounts): this phone's own pause, which the web
  *  doesn't have, so it says plainly that it is this phone's (AUTH-9). */

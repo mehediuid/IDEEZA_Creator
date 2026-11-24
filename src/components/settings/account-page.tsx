@@ -11,9 +11,12 @@
 //     back to it, and an invoice prints it when Billing details names no one.
 //   wallet   — the connected demo wallet, its network and the Testnet demo
 //     badge; Manage or Connect opens the wallet dialog.
-//   sign-in  — the email you're signed in with and Sign out (the demo sign-in,
+//   sign-in  — the email you're signed in with (the demo sign-in,
 //     lib/account/auth.ts); your work lives in this browser, and Download your
-//     information keeps a copy.
+//     information keeps a copy. No Sign out here (owner, 2026-11-24): it lives in
+//     the sidebar's profile menu. At its foot, Deactivate account and Delete
+//     account (rows `deactivate`, `delete-account`), each opening its dialog
+//     (leave-dialogs.tsx); `?leave=deactivate|delete` opens one from a link.
 
 import * as React from "react";
 import Link from "next/link";
@@ -21,7 +24,6 @@ import { CheckmarkCircle02Icon, Copy01Icon, Download04Icon, PencilEdit02Icon, Ti
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar, Button, Skeleton, TestnetDemoBadge, TextInput, buttonVariants } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { useSignOut } from "@/components/auth/auth-gate";
 import { useAuth } from "@/lib/account/auth";
 import { LEGAL_NAME_MAX, saveLegalName, useIdentity } from "@/lib/account/identity";
 import { cleanHandle, HANDLE_MAX } from "@/lib/people/handle";
@@ -31,8 +33,10 @@ import { saveProfile, useMyProfile } from "@/lib/people/profile-store";
 import { demoAddress, makerId, shortAddress } from "@/lib/wallet/demo-wallet";
 import { identityLabelOf, networkLabelOf } from "@/lib/wallet/request-view";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { leaveRowsOf } from "@/lib/account/closing";
 import { cn } from "@/lib/utils";
-import { CardFormActions, SAVE_FAILED, SettingsCard } from "./settings-card";
+import { DeactivateDialog, DeleteDialog, type LeaveDialog } from "./leave-dialogs";
+import { CardFormActions, SAVE_FAILED, SettingsCard, SettingsRow } from "./settings-card";
 import { SettingsFrame } from "./settings-frame";
 
 /** Phones get 44 px targets. */
@@ -399,9 +403,25 @@ function WalletCard() {
 
 // ─────────────────────────── sign-in ───────────────────────────
 
+/** `?leave=deactivate|delete`: the dialog a link or a search asks for, opened once (the address
+ *  drops it, so Back or a reload doesn't open it again). */
+function useAskedLeave(open: (d: LeaveDialog) => void) {
+  React.useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const asked = q.get("leave");
+    if (asked !== "deactivate" && asked !== "delete") return;
+    open(asked);
+    q.delete("leave");
+    const search = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+  }, [open]);
+}
+
 function SignInCard() {
   const { hydrated, account } = useAuth();
-  const signOut = useSignOut();
+  const [leave, setLeave] = React.useState<LeaveDialog | null>(null);
+  useAskedLeave(setLeave);
+  const rows = leaveRowsOf("Sign in");
   return (
     <SettingsCard
       id="sign-in"
@@ -416,16 +436,23 @@ function SignInCard() {
         ) : (
           <Skeleton shape="text" size="md" className="my-[2px] w-[240px] max-w-full" />
         )}
-        <div className="flex flex-wrap gap-[8px]">
-          <Link href="/settings/data#download" className={buttonVariants({ hierarchy: "tonal", size: "md", className: TAP })}>
-            <Icon icon={Download04Icon} size={16} />
-            Download your information
-          </Link>
-          <Button hierarchy="secondary" size="md" onClick={signOut} className={TAP}>
-            Sign out
-          </Button>
-        </div>
+        <Link href="/settings/data#download" className={buttonVariants({ hierarchy: "tonal", size: "md", className: TAP })}>
+          <Icon icon={Download04Icon} size={16} />
+          Download your information
+        </Link>
       </div>
+      <div className="mt-[8px] flex flex-col border-t border-solid border-border">
+        <SettingsRow id="deactivate" label="Deactivate account" help={rows.deactivate} onClick={() => setLeave("deactivate")} disabled={!hydrated} />
+        <SettingsRow
+          id="delete-account"
+          label={<span className="text-text-error">Delete account</span>}
+          help={rows.delete}
+          onClick={() => setLeave("delete")}
+          disabled={!hydrated}
+        />
+      </div>
+      {leave === "deactivate" && <DeactivateDialog onClose={() => setLeave(null)} onSwitch={() => setLeave("delete")} />}
+      {leave === "delete" && <DeleteDialog onClose={() => setLeave(null)} onSwitch={() => setLeave("deactivate")} />}
     </SettingsCard>
   );
 }

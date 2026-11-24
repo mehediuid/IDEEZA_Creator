@@ -8,6 +8,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { Button, buttonVariants } from "@/components/ideeza";
 import {
   ActivityIcon,
   AlertCircleIcon,
@@ -178,20 +179,15 @@ function BuildRow({
           className="flex items-center [@container(min-width:880px)]:col-start-5 [@container(min-width:880px)]:row-start-1"
         >
           {row.status === "failed" && !row.older ? (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-bg-error-subtle px-[14px] text-sm font-semibold text-text-error outline-none transition-colors duration-fast hover:bg-[color-mix(in_srgb,var(--color-bg-error-subtle)_72%,var(--color-bg-surface))] focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              <Icon icon={Refresh01Icon} />
+            <Button type="button" hierarchy="secondary" size="md" onClick={onRetry} iconLeading={<Icon icon={Refresh01Icon} />}>
               Try again
-            </button>
+            </Button>
           ) : (
             <Link
               href={row.href}
-              className="inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand no-underline outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+              className={buttonVariants({ hierarchy: "primary", size: "md", className: "no-underline" })}
             >
-              <Icon icon={EyeIcon} />
+              <Icon icon={EyeIcon} size={16} />
               View
             </Link>
           )}

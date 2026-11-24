@@ -14,10 +14,10 @@ import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Button } from "@/components/ideeza/button";
 import { Spinner } from "@/components/ideeza/spinner";
 import { TextInput } from "@/components/ideeza/text-input";
-import { signOut, useAuth } from "@/lib/account/auth";
+import { comeBack, signOut, useAuth } from "@/lib/account/auth";
 import { clockOf, mobileNext } from "@/lib/account/phone";
 import { checkTwoStepCode, readSecurity, redeemBackupCode, securityOf, thisDeviceId, twoStepLockedFor, updateSecurity, useSecurity } from "@/lib/account/security";
-import { ACCOUNT_CONTENT, AccountAlert, AccountHeading } from "../account/parts";
+import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, DELETED_WORDS } from "../account/parts";
 import { CheckRow } from "../account/ways-in";
 import { BottomBar, TEXT_LINK } from "../kit/bottom-bar";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ import { useOnline } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { useSessionAt } from "./security";
+import { signOutToWelcome } from "./sign-out";
 import { DemoAuthenticator } from "./two-step-parts";
 
 type Phase = "typing" | "checking" | "wrong";
@@ -63,6 +64,9 @@ export function TwoStepSignIn() {
 
   const passed = (s: ReturnType<typeof securityOf>) => {
     updateSecurity(email, () => s);
+    // The sign-in is complete only now: a deactivated account, or one set to be deleted, opens again
+    // here (the password alone never did it) — or, past its 30 days, goes for good.
+    if (comeBack(email, Date.now()) === "deleted") return void signOutToWelcome(DELETED_WORDS.title);
     router.replace(next);
   };
 

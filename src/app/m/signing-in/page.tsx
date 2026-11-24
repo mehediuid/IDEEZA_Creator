@@ -12,7 +12,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { landingAfterSignUp } from "@/components/mobile/account/parts";
+import { DELETED_WORDS, landingAfterSignUp } from "@/components/mobile/account/parts";
+import { toastAfterReload } from "@/components/mobile/kit/toast";
 import { SplashScreen } from "@/components/mobile/screen";
 import { accountOf, providerSignIn, readAccounts } from "@/lib/account/auth";
 import {
@@ -41,8 +42,14 @@ async function finish(a: ProviderAnswer): Promise<string> {
   if (!a.email) return "/m/add-email";
   const existing = accountOf(readAccounts(), a.email);
   if (existing && !phoneAccountOf(readPhoneAccounts(), a.email).providers.includes(a.provider)) return "/m/link";
-  const result = await providerSignIn(a.email, { first: a.first, last: a.last }, Date.now(), readUtm());
+  const result = await providerSignIn(a.email, { first: a.first, last: a.last }, Date.now(), readUtm(), { twoStepFirst: true });
   if (result === "refused") return withError(a.from, a);
+  if (result === "deleted") {
+    // Past the 30 days after Delete account: gone for good, as Log In says.
+    saveProviderAnswer(null);
+    toastAfterReload(DELETED_WORDS.title);
+    return "/m/welcome";
+  }
   linkProvider(a.email, a.provider, result === "new");
   afterPhoneSignIn();
   saveProviderAnswer(null);

@@ -25,7 +25,7 @@ import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { TextInput } from "@/components/ideeza/text-input";
-import { ACCOUNT_CONTENT, AccountAlert, REFUSED_ALERT, signInPausedBody, type AlertSpec } from "@/components/mobile/account/parts";
+import { ACCOUNT_CONTENT, AccountAlert, DELETED_ALERT, REFUSED_ALERT, signInPausedBody, type AlertSpec } from "@/components/mobile/account/parts";
 import { WayMark, useProviderSheet } from "@/components/mobile/account/ways-in";
 import { SwitchLine, TEXT_LINK } from "@/components/mobile/kit/bottom-bar";
 import { useOnline } from "@/components/mobile/kit/states";
@@ -46,7 +46,7 @@ import {
 } from "@/lib/account/phone";
 import { cn } from "@/lib/utils";
 
-type Outcome = null | "wrong" | "unverified" | "suspended" | "refused";
+type Outcome = null | "wrong" | "unverified" | "suspended" | "refused" | "deleted";
 
 /** The time of an action (kept out of render, where reading the clock is impure). */
 const clockNow = () => Date.now();
@@ -94,7 +94,7 @@ export default function SignInPage() {
     if (!email.trim() || !isEmail(email) || !password || !online || lockedFor || suspended) return;
     setBusy(true);
     setFailed(null);
-    const result = await signIn(email, password, clockNow(), next);
+    const result = await signIn(email, password, clockNow(), next, { twoStepFirst: true });
     if (result === "ok") {
       saveTries(afterRightSignIn(readTries(), email));
       return enter(remember);
@@ -124,6 +124,8 @@ export default function SignInPage() {
         ? { tone: "error", title: "Too many tries", body: signInPausedBody(lockedFor) }
         : outcome === "refused"
           ? REFUSED_ALERT
+          : outcome === "deleted"
+          ? DELETED_ALERT
           : outcome === "unverified"
           ? {
               tone: "attention",

@@ -46,7 +46,7 @@ import {
 } from "@/lib/create/history-list";
 import { useManualProjects } from "@/lib/manual/projects";
 import { Icon } from "@/components/dashboard/icon";
-import { ConfirmDialog, IconButton, SearchInput } from "@/components/ideeza";
+import { buttonVariants, ConfirmDialog, IconButton, SearchInput } from "@/components/ideeza";
 import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
 import { BuildsTable } from "./history-builds";
@@ -458,7 +458,7 @@ function EmptyState({ title, body }: { title: string; body: string }) {
       <p className="mx-auto mt-[8px] max-w-[420px] text-sm text-text-secondary">{body}</p>
       <Link
         href="/"
-        className="mt-[16px] inline-flex h-[36px] items-center rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+        className={buttonVariants({ hierarchy: "primary", size: "md", className: "mt-[16px]" })}
       >
         Open Home
       </Link>

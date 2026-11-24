@@ -10,6 +10,7 @@
 import * as React from "react";
 import { ProjectCard } from "./project-card";
 import { EmptyState } from "./empty-state";
+import { Button } from "@/components/ideeza";
 import { PAGE_GRID } from "@/components/ideeza/page";
 import { fetchFeed, followParamOf, isOwnList, type FeedParams, type Project } from "@/lib/feed";
 import { useReactions } from "@/lib/innovations/reactions";
@@ -80,13 +81,9 @@ export function ProjectGrid({
         <p className="max-w-[420px] text-sm text-text-secondary">
           Something went wrong. Try again.
         </p>
-        <button
-          type="button"
-          onClick={() => setReloadToken((t) => t + 1)}
-          className="mt-[8px] inline-flex h-[36px] items-center rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
+        <Button type="button" hierarchy="primary" size="md" onClick={() => setReloadToken((t) => t + 1)} className="mt-[8px]">
           Retry
-        </button>
+        </Button>
       </div>
     );
   }

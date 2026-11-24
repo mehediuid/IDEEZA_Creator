@@ -75,6 +75,8 @@ export function mobileSettingsHref(hit: SettingsHit): string {
   const at = (path: string) => (row ? `${path}#${row}` : path);
   switch (hit.page) {
     case "account":
+      if (row === "deactivate") return "/m/settings/deactivate";
+      if (row === "delete-account") return "/m/settings/delete";
       return row === "sign-in" ? "/m/settings/security" : row === "handle" ? "/m/settings/account/handle" : at("/m/settings/account");
     case "privacy":
       if (row === "blocked") return "/m/settings/privacy/blocked";
@@ -131,7 +133,8 @@ const PHONE_ROWS: PhoneRow[] = [
   { label: "Your devices", page: "Sign-in & security", words: "device phones sessions history signed other", href: "/m/settings/security#devices" },
   { label: "Change email", page: "Sign-in & security", words: "address mail", href: "/m/settings/security/email" },
   { label: "Change password", page: "Sign-in & security", words: "passcode reset", href: "/m/settings/security/password" },
-  { label: "Delete account", page: "Sign-in & security", words: "close remove leave deactivate", href: "/m/settings/delete" },
+  { label: "Deactivate account", page: "Sign-in & security", words: "pause disable hide temporarily deactivate close", href: "/m/settings/deactivate" },
+  { label: "Delete account", page: "Sign-in & security", words: "close remove leave permanently erase", href: "/m/settings/delete" },
   { label: "Sign out", page: "Settings", words: "log logout signout", signOut: true },
   { label: "Wallet balance", page: "Money", words: "idz coins tokens", href: "/m/earn/wallet" },
   { label: "Payment method", page: "Money", words: "pay card paypal wallet connect", href: "/m/settings/payments" },

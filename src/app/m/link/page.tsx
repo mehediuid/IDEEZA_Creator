@@ -14,10 +14,11 @@ import { useRouter } from "next/navigation";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Button } from "@/components/ideeza/button";
 import { TextInput } from "@/components/ideeza/text-input";
-import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, REFUSED_ALERT, signInPausedBody } from "@/components/mobile/account/parts";
+import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, DELETED_WORDS, REFUSED_ALERT, signInPausedBody } from "@/components/mobile/account/parts";
 import { WayButton } from "@/components/mobile/account/ways-in";
 import { BottomBar, TEXT_LINK } from "@/components/mobile/kit/bottom-bar";
 import { useOnline } from "@/components/mobile/kit/states";
+import { toastAfterReload } from "@/components/mobile/kit/toast";
 import { Screen } from "@/components/mobile/screen";
 import { T } from "@/components/mobile/type";
 import { TopBar } from "@/components/mobile/top-bar";
@@ -81,9 +82,17 @@ export default function LinkAccountsPage() {
     if (!password || !online || lockedFor) return;
     setBusy(true);
     setRefused(false);
-    let result = await signIn(answer.email, password, clockNow());
+    let result = await signIn(answer.email, password, clockNow(), "", { twoStepFirst: true });
     // The password is theirs and the provider proved the email: verified, and signed in.
-    if (result === "unverified") result = (await providerSignIn(answer.email, { first: "", last: "" }, clockNow())) === "refused" ? "refused" : "ok";
+    if (result === "unverified") {
+      const p = await providerSignIn(answer.email, { first: "", last: "" }, clockNow(), "", { twoStepFirst: true });
+      result = p === "refused" || p === "deleted" ? p : "ok";
+    }
+    if (result === "deleted") {
+      // Past the 30 days after Delete account: gone for good, as Log In says.
+      toastAfterReload(DELETED_WORDS.title);
+      return window.location.replace("/m/welcome");
+    }
     if (result === "ok") {
       saveTries(afterRightSignIn(readTries(), answer.email));
       return done();
@@ -97,7 +106,12 @@ export default function LinkAccountsPage() {
   };
 
   const linkWithProvider = async (p: Provider) => {
-    if ((await providerSignIn(answer.email, { first: "", last: "" }, clockNow())) !== "refused") done(p);
+    const r = await providerSignIn(answer.email, { first: "", last: "" }, clockNow(), "", { twoStepFirst: true });
+    if (r === "deleted") {
+      toastAfterReload(DELETED_WORDS.title);
+      return window.location.replace("/m/welcome");
+    }
+    if (r !== "refused") done(p);
     else setRefused(true);
   };
 

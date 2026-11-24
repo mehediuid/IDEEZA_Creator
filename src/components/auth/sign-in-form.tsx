@@ -6,11 +6,15 @@
 // back to the page they opened (?next=). Forgot password sends a Demo email
 // whose link sets a new password and signs you in; an email with no account
 // here says so and offers to try another or to create one.
+// Right after Deactivate account or Delete account (Settings › Account,
+// `?left=deactivated` or `?left=deleting&until=<ms>`), the page opens on what
+// happens now — the title, its line and when — with Sign in under it as the
+// way back: signing in makes the account active again (lib/account/auth.ts).
 
 import * as React from "react";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MailOpen01Icon } from "@hugeicons/core-free-icons";
+import { Clock01Icon, MailOpen01Icon, PauseIcon } from "@hugeicons/core-free-icons";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { linkVariants } from "@/components/ideeza/link";
@@ -27,6 +31,8 @@ import {
   signIn,
   useAuth,
 } from "@/lib/account/auth";
+import { DELETED_WORDS, leftHeadingOf, leftTimelineOf, type LeaveKind } from "@/lib/account/closing";
+import { formatDate } from "@/lib/settings/dates";
 import { AuthHeading, DemoEmail, FIELD_ERROR, Field, NewPasswordField, PasswordInput, authHref, errorProps, useFieldIds } from "./auth-parts";
 import { ChangeEmail, DemoCodeStep } from "./demo-code";
 
@@ -34,6 +40,31 @@ type Mode = "sign-in" | "forgot" | "sent" | "code" | "new";
 
 const REFUSED = "This browser wouldn't save that. Check that it allows this site to store data, then try again.";
 const KEYS = ["email", "password", "confirm"] as const;
+
+/** `?left=deactivated` or `?left=deleting&until=<ms>`: what was left and the deletion's date in words,
+ *  or null. */
+function leftOf(left: string | null, until: string | null): { kind: LeaveKind; until: string } | null {
+  if (left === "deactivated") return { kind: "deactivated", until: "" };
+  const at = Number(until);
+  if (left !== "deleting" || !Number.isFinite(at) || at <= 0) return null;
+  return { kind: "deleting", until: formatDate(at, "auto", { style: "medium" }) };
+}
+
+const DELETED = `${DELETED_WORDS.title}. ${DELETED_WORDS.body}`;
+
+/** What happens now, after leaving: when, and how to come back. */
+function LeftTimeline({ kind, until }: { kind: LeaveKind; until: string }) {
+  return (
+    <dl className="m-0 flex flex-col rounded-xl border border-solid border-border bg-bg-surface px-[16px]">
+      {leftTimelineOf(kind, "Sign in", until).map(([term, value]) => (
+        <div key={term} className="flex items-baseline justify-between gap-[16px] border-b border-solid border-border py-[12px] last:border-b-0">
+          <dt className="shrink-0 text-md font-medium leading-md text-text-primary">{term}</dt>
+          <dd className="m-0 min-w-0 text-right text-md leading-md text-text-secondary">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 const textLink =
   "cursor-pointer rounded-sm border-0 bg-transparent p-0 text-sm font-medium leading-sm text-text-brand outline-none hover:underline focus-visible:shadow-focus-brand";
@@ -48,6 +79,8 @@ export function SignInForm() {
     email: params.get("email") ?? "",
     next: safeNext(params.get("next")),
     signedOut: params.get("signed-out") === "1",
+    // Right after Deactivate account or Delete account (Settings › Account): what happens now.
+    left: leftOf(params.get("left"), params.get("until")),
   }));
   const [mode, setMode] = React.useState<Mode>("sign-in");
   const [email, setEmail] = React.useState(arrived.email);
@@ -87,7 +120,7 @@ export function SignInForm() {
     if (result === "ok") return window.location.replace(arrived.next || "/");
     setBusy(false);
     if (result === "unverified") return router.push("/sign-up/check-email");
-    setError(result === "refused" ? REFUSED : "That email and password don't match.");
+    setError(result === "refused" ? REFUSED : result === "deleted" ? DELETED : "That email and password don't match.");
   };
 
   const submitForgot = (e: React.FormEvent) => {
@@ -106,9 +139,10 @@ export function SignInForm() {
     if (passwordProblem(password)) return document.getElementById(ids.password.id)?.focus();
     if (confirm !== password) return document.getElementById(ids.confirm.id)?.focus();
     setBusy(true);
-    if ((await resetPassword(email, password, Date.now())).ok) return window.location.replace(arrived.next || "/");
+    const reset = await resetPassword(email, password, Date.now());
+    if (reset.ok) return window.location.replace(arrived.next || "/");
     setBusy(false);
-    setError(REFUSED);
+    setError(reset.deleted ? DELETED : REFUSED);
   };
 
   const emailField = (autoFocus: boolean) => (
@@ -252,12 +286,24 @@ export function SignInForm() {
   const pwMissing = shown && isEmail(email) && !password ? "Enter your password." : undefined;
   return (
     <>
-      {arrived.signedOut ? (
-        <Banner tone="good" title="You've signed out">
-          Your account and your work are saved in this browser.
-        </Banner>
-      ) : null}
-      <AuthHeading title="Welcome back">Sign in to pick up where you left off.</AuthHeading>
+      {arrived.left ? (
+        <>
+          <AuthHeading title={leftHeadingOf(arrived.left.kind, "Sign in", arrived.left.until).title} icon={arrived.left.kind === "deactivated" ? PauseIcon : Clock01Icon}>
+            {leftHeadingOf(arrived.left.kind, "Sign in", arrived.left.until).line}
+          </AuthHeading>
+          <LeftTimeline kind={arrived.left.kind} until={arrived.left.until} />
+          <h2 className="m-0 pt-[8px] text-lg font-semibold leading-lg text-text-primary">Sign in to come back</h2>
+        </>
+      ) : (
+        <>
+          {arrived.signedOut ? (
+            <Banner tone="good" title="You've signed out">
+              Your account and your work are saved in this browser.
+            </Banner>
+          ) : null}
+          <AuthHeading title="Welcome back">Sign in to pick up where you left off.</AuthHeading>
+        </>
+      )}
       <form noValidate onSubmit={submitSignIn} className="flex flex-col gap-[16px]">
         {emailField(!arrived.email)}
         <Field

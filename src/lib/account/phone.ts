@@ -389,7 +389,7 @@ export function saveProviderAnswer(a: ProviderAnswer | null): WriteResult {
 // ─────────────────────────── where to go ───────────────────────────
 
 /** The way-in screens: open to anyone signed out. */
-export const ENTRY_PATH = /^\/m\/(onboarding|welcome|sign-in|sign-up|verify|reset|signing-in|add-email|link)(\/|$)/;
+export const ENTRY_PATH = /^\/m\/(onboarding|welcome|sign-in|sign-up|verify|reset|signing-in|add-email|link|left)(\/|$)/;
 /** After sign-up, as on the web: the one question (when the link didn't say) and the Welcome map. */
 export const SETUP_PATH = /^\/m\/(source|welcome-map)(\/|$)/;
 

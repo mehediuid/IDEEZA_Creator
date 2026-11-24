@@ -147,7 +147,13 @@ export type DeviceRecord = {
   demo: boolean;
 };
 
-export type Deletion = { at: number; until: number; reason: string };
+/** A paid plan whose renewal was turned off on the way out: its name and the day it ends. */
+export type StoppedPlan = { name: string; endsAt: number };
+export type Deletion = { at: number; until: number; reason: string; plan: StoppedPlan | null };
+/** Deactivated: hidden until the next Log In, with no time limit. */
+export type Deactivation = { at: number; reason: string; plan: StoppedPlan | null };
+/** What a Log In just made active again, for the one note that says so. */
+export type Reopened = { from: "deactivated" | "deletion"; at: number; since: number; plan: StoppedPlan | null };
 
 export type AccountSecurity = {
   /** When the password last changed here; 0 when it never has. */
@@ -161,6 +167,9 @@ export type AccountSecurity = {
   /** Other devices signed in to the account; this phone is read live. */
   devices: DeviceRecord[];
   deletion: Deletion | null;
+  deactivation: Deactivation | null;
+  /** Set by the Log In that made the account active again; cleared once its note is seen. */
+  reopened: Reopened | null;
 };
 
 const EMPTY: AccountSecurity = {
@@ -171,6 +180,8 @@ const EMPTY: AccountSecurity = {
   tries: { wrong: 0, lockedUntil: 0 },
   devices: [],
   deletion: null,
+  deactivation: null,
+  reopened: null,
 };
 
 function normalizeTwoStep(raw: unknown): TwoStep | null {
@@ -205,6 +216,9 @@ export function normalizeAccountSecurity(raw: unknown): AccountSecurity {
   const r = isObj(raw) ? raw : {};
   const t = isObj(r.tries) ? r.tries : {};
   const d = isObj(r.deletion) ? r.deletion : null;
+  const off = isObj(r.deactivation) ? r.deactivation : null;
+  const back = isObj(r.reopened) ? r.reopened : null;
+  const planOf = (v: unknown): StoppedPlan | null => (isObj(v) && num(v.endsAt) && str(v.name, 40) ? { name: str(v.name, 40), endsAt: num(v.endsAt) } : null);
   return {
     passwordChangedAt: num(r.passwordChangedAt),
     twoStep: normalizeTwoStep(r.twoStep),
@@ -212,7 +226,12 @@ export function normalizeAccountSecurity(raw: unknown): AccountSecurity {
     passedAt: num(r.passedAt),
     tries: { wrong: Math.min(TWO_STEP_TRIES, Math.floor(num(t.wrong))), lockedUntil: num(t.lockedUntil) },
     devices: Array.isArray(r.devices) ? r.devices.map(normalizeDevice).filter((x): x is DeviceRecord => !!x).slice(0, 20) : [],
-    deletion: d && num(d.until) ? { at: num(d.at), until: num(d.until), reason: str(d.reason, 600) } : null,
+    deletion: d && num(d.until) ? { at: num(d.at), until: num(d.until), reason: str(d.reason, 600), plan: planOf(d.plan) } : null,
+    deactivation: off && num(off.at) ? { at: num(off.at), reason: str(off.reason, 600), plan: planOf(off.plan) } : null,
+    reopened:
+      back && num(back.at) && (back.from === "deactivated" || back.from === "deletion")
+        ? { from: back.from, at: num(back.at), since: num(back.since), plan: planOf(back.plan) }
+        : null,
   };
 }
 
@@ -397,7 +416,7 @@ export function thisDeviceId(random: () => number = Math.random): string {
   return id;
 }
 
-// ─────────────────────────── deleting the account ───────────────────────────
+// ─────────────────────────── deactivating and deleting ───────────────────────────
 
 export type DeletionState = "none" | "scheduled" | "due";
 
@@ -406,25 +425,65 @@ export function deletionStateOf(s: AccountSecurity, now: number): DeletionState 
   return now < s.deletion.until ? "scheduled" : "due";
 }
 
-/** Restore is asked on a sign-in after Delete account (not in the session that asked for it), and
- *  once the 30 days are over the account goes for good. */
-export function owesRestore(s: AccountSecurity, sessionAt: number, now: number): boolean {
-  const state = deletionStateOf(s, now);
-  return state === "due" || (state === "scheduled" && !!s.deletion && sessionAt > s.deletion.at);
+/** Where the account stands: active, deactivated (no time limit), set to be deleted, or past its
+ *  30 days (deleted for good on its next Log In). */
+export type ClosedState = "active" | "deactivated" | "deleting" | "deleted";
+
+export function closedStateOf(s: AccountSecurity, now: number): ClosedState {
+  const d = deletionStateOf(s, now);
+  if (d === "due") return "deleted";
+  if (d === "scheduled") return "deleting";
+  return s.deactivation ? "deactivated" : "active";
+}
+
+/** Whether the session that asked for it is still the one signed in (its last screen shows). */
+export function closedThisSession(s: AccountSecurity, sessionAt: number): boolean {
+  const at = s.deletion?.at ?? s.deactivation?.at ?? 0;
+  return !!at && at >= sessionAt;
+}
+
+/** The one note after a Log In made the account active again — only for the sign-in that did it
+ *  (a note left from an older one is never shown to whoever signs in next). */
+export function owesRestore(s: AccountSecurity, sessionAt: number): boolean {
+  return !!s.reopened && s.reopened.at >= sessionAt;
 }
 
 /** What a signed-in session still owes before the app opens. */
 export function owedOf(s: AccountSecurity, sessionAt: number, deviceId: string, now: number): "two-step" | "restore" | null {
+  void now;
   if (needsTwoStep(s, sessionAt, deviceId)) return "two-step";
-  return owesRestore(s, sessionAt, now) ? "restore" : null;
+  return owesRestore(s, sessionAt) ? "restore" : null;
 }
 
-export function scheduleDeletion(s: AccountSecurity, now: number, reason: string): AccountSecurity {
-  return { ...s, deletion: { at: now, until: now + DELETE_GRACE_MS, reason: reason.trim().slice(0, 600) } };
+/** Whether this Log In still owes its 2-step code on this device: then the account opens again only
+ *  once the code is right (a password alone never reopens it). */
+export function twoStepPending(s: AccountSecurity, deviceId: string): boolean {
+  return !!s.twoStep && !s.trusted.includes(deviceId);
+}
+
+export function deactivateAccount(s: AccountSecurity, now: number, reason: string, plan: StoppedPlan | null = null): AccountSecurity {
+  return { ...s, deletion: null, deactivation: { at: now, reason: reason.trim().slice(0, 600), plan }, reopened: null };
+}
+
+export function scheduleDeletion(s: AccountSecurity, now: number, reason: string, plan: StoppedPlan | null = null): AccountSecurity {
+  return { ...s, deactivation: null, deletion: { at: now, until: now + DELETE_GRACE_MS, reason: reason.trim().slice(0, 600), plan }, reopened: null };
 }
 
 export function cancelDeletion(s: AccountSecurity): AccountSecurity {
   return { ...s, deletion: null };
+}
+
+/** A Log In: a deactivated account, or one waiting to be deleted, is active again, and the note
+ *  that says so waits for the next screen. Nothing changes for an active one. */
+export function reopenAccount(s: AccountSecurity, now: number): AccountSecurity {
+  if (s.deletion) return { ...s, deletion: null, deactivation: null, reopened: { from: "deletion", at: now, since: s.deletion.at, plan: s.deletion.plan } };
+  if (s.deactivation) return { ...s, deactivation: null, reopened: { from: "deactivated", at: now, since: s.deactivation.at, plan: s.deactivation.plan } };
+  return s;
+}
+
+/** The welcome-back note was seen. */
+export function reopenedSeen(s: AccountSecurity): AccountSecurity {
+  return { ...s, reopened: null };
 }
 
 /** The reasons on step 1 (AU-60), in its order. */
