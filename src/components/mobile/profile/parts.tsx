@@ -402,6 +402,11 @@ function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => void }) 
             <Badge tone="blue">{item.sale === "whole" ? "For sale" : "Copies for sale"}</Badge>
           </span>
         )}
+        {item.isPrivate && (
+          <span className="flex">
+            <Badge tone="neutral">Private</Badge>
+          </span>
+        )}
       </Link>
       {onMore && (
         <span className="absolute right-2 top-2">
@@ -441,6 +446,8 @@ export function Work({
   now,
   onMore,
   allHref,
+  privateItems = [],
+  allCount = null,
 }: {
   /** The Timeline's posts, drawn by the caller (timeline.tsx), and how many. */
   timeline: { count: number; content: React.ReactNode } | null;
@@ -457,15 +464,22 @@ export function Work({
   /** Your own profile: View all projects opens this (My projects, owner 2026-11-24), and More projects
    *  shows two rows of tiles before it. Without it every tile shows (someone else's profile). */
   allHref?: string;
+  /** Your own profile: your private projects, after the public ones, marked Private (owner
+   *  2026-11-24, "count everything": the tab counts every project you made). */
+  privateItems?: readonly MadeItem[];
+  /** My projects' All (yours + what you bought): "8 of 13 in My projects" and the button's number. */
+  allCount?: number | null;
 }) {
   const lead = featuredOf(items);
-  const shown = WORK_TABS.filter((t) => (t === "timeline" ? (timeline?.count ?? 0) > 0 : t === "projects" ? !!lead : activity.length > 0));
+  const others = [...(lead?.rest ?? []), ...privateItems];
+  const mine = items.length + privateItems.length;
+  const shown = WORK_TABS.filter((t) => (t === "timeline" ? (timeline?.count ?? 0) > 0 : t === "projects" ? mine > 0 : activity.length > 0));
   const first: WorkTab = shown[0] ?? "timeline";
   const [tab, setTab] = useTabParam("tab", WORK_TABS, first);
   if (!shown.length) return null;
   const active = shown.includes(tab) ? tab : first;
   const tabs = shown.length > 1;
-  const count = (t: WorkTab) => (t === "timeline" ? (timeline?.count ?? 0) : t === "projects" ? items.length : activity.length);
+  const count = (t: WorkTab) => (t === "timeline" ? (timeline?.count ?? 0) : t === "projects" ? mine : activity.length);
   const LABEL: Record<WorkTab, string> = { timeline: "Timeline", projects: "Projects", activity: "Activity" };
   return (
     <div className="flex flex-col gap-6">
@@ -480,8 +494,9 @@ export function Work({
             {!tabs && <h2 className={T.section}>Timeline</h2>}
             {timeline?.content}
           </>
-        ) : active === "projects" && lead ? (
+        ) : active === "projects" && mine > 0 ? (
           <>
+            {lead && (
             <section aria-labelledby="work-featured" className="flex flex-col gap-4">
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                 <h2 id="work-featured" className={T.section}>
@@ -495,22 +510,30 @@ export function Work({
               </div>
               <ProjectCard item={lead.featured} maker={maker} onMore={onMore && lead.featured.projectId ? () => onMore(lead.featured) : undefined} />
             </section>
-            {lead.rest.length > 0 && (
+            )}
+            {(others.length > 0 || allHref) && (
               <section aria-labelledby="work-more" className="flex flex-col gap-4">
-                <h2 id="work-more" className={T.section}>
-                  More projects
-                </h2>
-                <ul className="m-0 grid list-none grid-cols-2 gap-4 p-0">
-                  {(allHref ? lead.rest.slice(0, MORE_SHOWN) : lead.rest).map((m) => (
-                    <ProjectTile key={m.key} item={m} onMore={onMore && m.projectId ? () => onMore(m) : undefined} />
-                  ))}
-                </ul>
-                {/* Owner 2026-11-24: the way to every project is My projects, with its tabs and filters. */}
+                {others.length > 0 && (
+                  <>
+                    <h2 id="work-more" className={T.section}>
+                      {lead ? "More projects" : "Projects"}
+                    </h2>
+                    <ul className="m-0 grid list-none grid-cols-2 gap-4 p-0">
+                      {(allHref ? others.slice(0, MORE_SHOWN) : others).map((m) => (
+                        <ProjectTile key={m.key} item={m} onMore={onMore && m.projectId && !m.isPrivate ? () => onMore(m) : undefined} />
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {/* Owner 2026-11-24: the way to every project is My projects (All), one number with it. */}
                 {allHref && (
-                  <Link href={allHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
-                    View all projects
-                    <span className="text-text-tertiary">{items.length}</span>
-                  </Link>
+                  <>
+                    {allCount !== null && allCount > mine && <p className={T.meta}>{`${mine} of ${allCount} in My projects, with what you bought`}</p>}
+                    <Link href={allHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
+                      View all projects
+                      <span className="text-text-tertiary">{allCount ?? mine}</span>
+                    </Link>
+                  </>
                 )}
               </section>
             )}

@@ -30,7 +30,9 @@ import type { StartParams } from "@/lib/messages/links";
 import type { ProfileFields } from "@/lib/people/fields";
 import type { Person } from "@/lib/people/ids";
 import { listingFactsOf } from "@/lib/people/listing-facts";
-import { madeOfMine, madeOfSample, ownerCounts, type MadeItem, type MineInput } from "@/lib/people/made";
+import { madeOfMine, madeOfSample, ownerCounts, privateOfMine, type MadeItem, type MineInput } from "@/lib/people/made";
+import { boughtForAll } from "@/components/projects/all-tab";
+import { usePurchased } from "@/components/projects/purchased/use-purchased";
 import { phoneProjectHref } from "@/lib/people/phone-profile";
 import { activityOf, builtWithOf, featuredOf, worksOnOf, type ActivityItem } from "@/lib/people/portfolio";
 import { SAMPLE_PROFILES, type SampleProfile } from "@/lib/people/sample-profiles";
@@ -72,6 +74,8 @@ function useJourneysRaw(ids: readonly string[]): (string | null)[] | null {
 export type OwnData = {
   ready: boolean;
   made: MadeItem[];
+  /** Your private projects, for your own profile only (after the public ones). */
+  privateItems: MadeItem[];
   activity: ActivityItem[];
   builtWith: string[];
   /** Projects others can see, and those only you see. */
@@ -110,8 +114,9 @@ export function useOwnData(fields: ProfileFields): OwnData {
     });
   }, [ready, journeys, projects, builds]);
 
-  const made = React.useMemo(() => {
-    const inputs: MineInput[] = facts.map(({ project: p, refs, journey, products }) => ({
+  const inputs = React.useMemo<MineInput[]>(
+    () =>
+      facts.map(({ project: p, refs, journey, products }) => ({
       id: p.id,
       name: p.name,
       createdAt: p.createdAt,
@@ -122,9 +127,11 @@ export function useOwnData(fields: ProfileFields): OwnData {
       summary: p.post?.story.trim() || p.description.trim(),
       category: null,
       ...listingFactsOf(p.id, market.listings, market.sales, editions.record),
-    }));
-    return madeOfMine(inputs, fields.pins);
-  }, [facts, market, editions.record, fields.pins]);
+      })),
+    [facts, market, editions.record],
+  );
+  const made = React.useMemo(() => madeOfMine(inputs, fields.pins), [inputs, fields.pins]);
+  const privateItems = React.useMemo(() => privateOfMine(inputs), [inputs]);
 
   return React.useMemo(() => {
     const shown = new Map(made.flatMap((m) => (m.projectId ? [[m.projectId, m] as const] : [])));
@@ -134,6 +141,7 @@ export function useOwnData(fields: ProfileFields): OwnData {
     return {
       ready,
       made,
+      privateItems,
       activity: activityOf(
         visible.map((f) => {
           const m = shown.get(f.project.id)!;
@@ -151,7 +159,19 @@ export function useOwnData(fields: ProfileFields): OwnData {
       fallbackCover: featuredOf(made)?.featured.cover ?? null,
       now,
     };
-  }, [ready, made, facts, projects, fields.since, now]);
+  }, [ready, made, privateItems, facts, projects, fields.since, now]);
+}
+
+/** My projects' All count — your projects and the projects you bought from, a whole project bought
+ *  once, as yours (components/projects/all-tab.ts) — the one number for "projects" on the Profile
+ *  tab and your profile (owner 2026-11-24, "count everything"). Null until both stores are read. */
+export function useMyProjectsCount(): number | null {
+  const { hydrated, projects } = useManualProjects();
+  const bought = usePurchased();
+  return React.useMemo(
+    () => (hydrated && bought.ready ? projects.length + boughtForAll(bought.purchases, new Set(projects.map((p) => p.id))).length : null),
+    [hydrated, bought.ready, bought.purchases, projects],
+  );
 }
 
 export type OtherData = {

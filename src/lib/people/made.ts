@@ -27,6 +27,8 @@ export type MadeItem = {
   stageAt: number | null;
   sale: MadeSale | null;
   pinned: boolean;
+  /** Your own private project (not shared, nothing on sale): only you see it, on your profile. */
+  isPrivate?: boolean;
   changedAt: number;
   /** Products in the project. */
   products: number;
@@ -92,6 +94,35 @@ export function madeOfMine(projects: readonly MineInput[], pins: readonly string
     });
   }
   return ordered(items, pins);
+}
+
+/** Your projects the public profile leaves out (`madeOfMine`'s rule), newest first, marked private:
+ *  your own profile lists them after the public ones, so its count is every project you made
+ *  (owner 2026-11-24, "count everything"). Never pinned, never on sale. */
+export function privateOfMine(projects: readonly MineInput[]): MadeItem[] {
+  return projects
+    .filter((p) => p.showcasedAt === null && !p.mainLive && !p.copiesLive)
+    .map((p) => {
+      const { stage, stageId, at } = stageOf(p.journey, p.id, p.createdAt);
+      return {
+        key: `mine:${p.id}`,
+        projectId: p.id,
+        title: p.name.trim() || "Untitled project",
+        href: `/projects/${encodeURIComponent(p.id)}`,
+        cover: p.cover,
+        stage,
+        stageId,
+        stageAt: at,
+        sale: null,
+        pinned: false,
+        isPrivate: true,
+        changedAt: Math.max(at ?? 0, p.createdAt),
+        products: p.products ?? 0,
+        summary: (p.summary ?? "").trim(),
+        category: p.category ?? null,
+      };
+    })
+    .sort((a, b) => b.changedAt - a.changedAt);
 }
 
 function coverOfPost(post: InnovationPost): string | null {

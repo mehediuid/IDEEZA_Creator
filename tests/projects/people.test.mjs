@@ -380,3 +380,22 @@ test("featuredOf: a pin leads; else the furthest along, newer on a tie", async (
   f = featuredOf([{ key: "x", pinned: false, stageId: null }, { key: "y", pinned: false, stageId: "others" }]);
   assert.equal(f.featured.key, "x");
 });
+
+test("count everything (owner 2026-11-24): privateOfMine is exactly what madeOfMine leaves out, marked private", async () => {
+  const { madeOfMine, privateOfMine } = await import("../../.tmp-test/lib/people/made.js");
+  const base = { createdAt: 1, cover: null, journey: { v: 1, activities: [] }, listedAt: null };
+  const inputs = [
+    { ...base, id: "a", name: "Shared", showcasedAt: 5, mainLive: false, copiesLive: false },
+    { ...base, id: "b", name: "On sale", showcasedAt: null, mainLive: true, copiesLive: false },
+    { ...base, id: "c", name: "Copies", showcasedAt: null, mainLive: false, copiesLive: true },
+    { ...base, id: "d", name: "Private one", showcasedAt: null, mainLive: false, copiesLive: false, createdAt: 3 },
+    { ...base, id: "e", name: "", showcasedAt: null, mainLive: false, copiesLive: false, createdAt: 9 },
+  ];
+  const pub = madeOfMine(inputs, []).map((m) => m.projectId).sort();
+  const priv = privateOfMine(inputs);
+  assert.deepEqual(pub, ["a", "b", "c"]);
+  assert.deepEqual(priv.map((m) => m.projectId), ["e", "d"], "newest first");
+  assert.ok(priv.every((m) => m.isPrivate && !m.pinned && m.sale === null));
+  assert.equal(priv[0].title, "Untitled project");
+  assert.equal(pub.length + priv.length, inputs.length, "together: every project you made");
+});

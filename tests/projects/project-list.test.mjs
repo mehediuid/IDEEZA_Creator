@@ -329,7 +329,8 @@ test("the phone profile links each number to the list that shows it", async () =
   const profile = await readFile(new URL("../../src/components/mobile/profile/creator-profile.tsx", import.meta.url), "utf8");
   assert.match(profile, /public`\} href="\/m\/projects\?on=profile"/);
   assert.match(profile, /private in My projects`\} href="\/m\/projects\?on=private"/);
-  assert.match(profile, /allHref="\/m\/projects\?on=profile"/);
   const hub = await readFile(new URL("../../src/components/mobile/profile/hub.tsx", import.meta.url), "utf8");
-  assert.match(hub, /boughtForAll\(bought\.purchases/, "the Projects row counts what My projects' All lists");
+  assert.match(hub, /useMyProjectsCount\(\)/, "the Projects row counts what My projects' All lists");
+  const data = await readFile(new URL("../../src/components/mobile/profile/use-profile.ts", import.meta.url), "utf8");
+  assert.match(data, /boughtForAll\(bought\.purchases/);
 });

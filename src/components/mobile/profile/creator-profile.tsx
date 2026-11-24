@@ -75,7 +75,7 @@ import { About, CoverAndAvatar, Identity, InfoRow, ProfileBones, Prompt, Stats, 
 import { PersonMenu, messageHrefOf, useShareProfile } from "./person-sheets";
 import { PICTURE_FILE_ERROR, usePicturePicker } from "./picture-picker";
 import { Timeline } from "./timeline";
-import { useOtherData, useOwnData } from "./use-profile";
+import { useMyProjectsCount, useOtherData, useOwnData } from "./use-profile";
 import { useOwnTimeline, useSampleTimeline } from "./use-timeline";
 
 const CONTENT = "flex flex-col gap-6 px-8 pb-12 pt-4";
@@ -264,6 +264,7 @@ function OwnProfile({
   const settings = useSettings();
   const { locale } = useDates();
   const data = useOwnData(fields);
+  const allCount = useMyProjectsCount();
   const timeline = useOwnTimeline(data.made, publicView);
   const feedPrefs = useFeedPrefs();
   const [postFor, setPostFor] = React.useState<TimelinePost | null>(null);
@@ -483,7 +484,7 @@ function OwnProfile({
           <ViewerActions person={person} messageHref={null} reason={PUBLIC_VIEW_REASON} off />
         )}
         {ownerRows}
-        {made.length > 0 || timeline.posts.length > 0 ? (
+        {made.length > 0 || timeline.posts.length > 0 || (owner && data.privateItems.length > 0) ? (
           <Work
             timeline={
               timeline.posts.length
@@ -498,7 +499,9 @@ function OwnProfile({
             pinnedBy={owner ? "you" : (first ?? "this creator")}
             now={data.now}
             onMore={owner ? setPinFor : undefined}
-            allHref="/m/projects?on=profile"
+            allHref={owner ? "/m/projects" : undefined}
+            privateItems={owner ? data.privateItems : []}
+            allCount={owner ? allCount : null}
           />
         ) : (
           <EmptyState
