@@ -91,3 +91,21 @@ test("More about's summary names the first two groups with something in them, Sk
   assert.equal(moreAboutSummaryOf({ ...EMPTY, specialities: [{ skill: "Firmware", years: "5+" }] }), "Skills");
   assert.equal(moreAboutSummaryOf({ ...EMPTY, languages: ["English"] }), "Languages");
 });
+
+test("View all projects: search keeps the projects whose name holds every word, in order (owner 2026-11-24)", async () => {
+  const { projectsMatching } = await import("../../.tmp-test/lib/people/phone-profile.js");
+  const items = [{ title: "Hexapod walking robot" }, { title: "Door + window contact sensor" }, { title: "Solar MPPT controller" }];
+  assert.deepEqual(projectsMatching(items, "  ").map((m) => m.title), items.map((m) => m.title));
+  assert.deepEqual(projectsMatching(items, "SENSOR").map((m) => m.title), ["Door + window contact sensor"]);
+  assert.deepEqual(projectsMatching(items, "window door").map((m) => m.title), ["Door + window contact sensor"]);
+  assert.deepEqual(projectsMatching(items, "zzz"), []);
+});
+
+test("the phone profile's More projects shows two rows and View all projects opens every one", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const parts = await readFile(new URL("../../src/components/mobile/profile/parts.tsx", import.meta.url), "utf8");
+  assert.match(parts, /const MORE_SHOWN = 4;/);
+  assert.match(parts, /View all projects/);
+  const page = await readFile(new URL("../../src/app/m/creators/[handle]/projects/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /CreatorProjectsScreen/);
+});

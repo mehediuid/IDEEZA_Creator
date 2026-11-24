@@ -15,6 +15,7 @@ import { Bookmark02Icon, Comment01Icon, CpuIcon, FavouriteIcon, MoreHorizontalIc
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
+import { buttonVariants } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { cn } from "@/lib/utils";
@@ -387,7 +388,7 @@ export function ReactionRow({
 
 /** A More projects tile: the 4:3 cover, the name, then "2 products · Oct 12" and what is for sale
  *  (the web's facts); your own carry ⋯ for pinning. */
-function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => void }) {
+export function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => void }) {
   return (
     <li className="relative flex min-w-0 flex-col gap-2">
       <Link href={phoneProjectHref(item)} className={cn("flex flex-col gap-2 rounded-lg", FOCUS)}>
@@ -418,11 +419,14 @@ function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => void }) 
 }
 
 const WORK_TABS = ["timeline", "projects", "activity"] as const;
+
+/** More projects shows two rows of tiles; View all projects opens every one. */
+const MORE_SHOWN = 4;
 type WorkTab = (typeof WORK_TABS)[number];
 
 /** Timeline · Projects · Activity (M14 line tabs, sticky under the top bar). Timeline (owner
  *  2026-11-22) leads: every project and product shared, newest first; Projects is Featured and More
- *  projects; Activity the journey rows. Only the tabs with something in them show, the first of them
+ *  projects (two rows of tiles, then View all projects to every one on its own screen, owner 2026-11-24); Activity the journey rows. Only the tabs with something in them show, the first of them
  *  open; with one, no strip. The tab lives in the address (`?tab=projects`, as on the web), so Back
  *  from a project returns to the tab you left. Nothing at all: nothing renders (the caller's empty
  *  state shows). */
@@ -435,6 +439,7 @@ export function Work({
   pinnedBy,
   now,
   onMore,
+  allHref,
 }: {
   /** The Timeline's posts, drawn by the caller (timeline.tsx), and how many. */
   timeline: { count: number; content: React.ReactNode } | null;
@@ -448,6 +453,8 @@ export function Work({
   now: number;
   /** Your own profile: a card's ⋯ (Pin to top · Open project). */
   onMore?: (item: MadeItem) => void;
+  /** Every project on its own screen (View all projects, owner 2026-11-24). */
+  allHref?: string;
 }) {
   const lead = featuredOf(items);
   const shown = WORK_TABS.filter((t) => (t === "timeline" ? (timeline?.count ?? 0) > 0 : t === "projects" ? !!lead : activity.length > 0));
@@ -492,10 +499,17 @@ export function Work({
                   More projects
                 </h2>
                 <ul className="m-0 grid list-none grid-cols-2 gap-4 p-0">
-                  {lead.rest.map((m) => (
+                  {lead.rest.slice(0, MORE_SHOWN).map((m) => (
                     <ProjectTile key={m.key} item={m} onMore={onMore && m.projectId ? () => onMore(m) : undefined} />
                   ))}
                 </ul>
+                {/* Owner 2026-11-24: a way to every project, so the rest are easy to find (with search there). */}
+                {allHref && (
+                  <Link href={allHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
+                    View all projects
+                    <span className="text-text-tertiary">{items.length}</span>
+                  </Link>
+                )}
               </section>
             )}
           </>

@@ -188,3 +188,14 @@ export function languageMatches(options: readonly string[], typed: string): stri
 export function shortDateOf(at: number, year = false): string {
   return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}) });
 }
+
+/** All projects' search (owner 2026-11-24, View all projects): the projects whose name holds every
+ *  word typed, in the list's own order. */
+export function projectsMatching<T extends { title: string }>(items: readonly T[], query: string): T[] {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [...items];
+  return items.filter((m) => {
+    const title = m.title.toLowerCase();
+    return words.every((w) => title.includes(w));
+  });
+}
