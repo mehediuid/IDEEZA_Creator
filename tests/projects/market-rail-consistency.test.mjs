@@ -74,7 +74,21 @@ test("a sample's page uses the listing page's frame and one rail surface, never 
   assert.match(page, /<StatusChip status=\{status\.status\} word=\{status\.word\} \/>/);
   assert.match(page, /<DescriptionText text=\{post\.description\} \/>/);
   assert.match(page, /heading="Project activity"/);
-  assert.match(page, /hrefOf=\{\(productId\) => sampleProductHref\(feedId, productId\)\}/, "a product opens in the shop");
+  // The Products part as a listing's page has it (owner, 2026-11-24): the same tab strip, cards and image grid.
+  assert.match(page, /main=\{<SampleTabs post=\{post\} feedId=\{feedId\} \/>\}/);
+  assert.match(page, /const SAMPLE_TABS = \["products", "media"\] as const;/);
+  assert.match(page, /<TabStrip\s+label="Project sections"/);
+  assert.match(page, /\{active === "media" \? <SampleMediaTab post=\{post\} \/> : <SampleProductsTab post=\{post\} feedId=\{feedId\} \/>\}/);
+  assert.doesNotMatch(page, /WhatsInside/, "no What's inside rows on the shop page");
+  const products = read(MARKET + "sample-products.tsx");
+  assert.match(products, /<ProductsSection line=/);
+  assert.match(products, /<ProductCardFrame/);
+  assert.match(products, /href=\{sampleProductHref\(feedId, p\.id\)\}/, "a product opens in the shop");
+  assert.match(products, /<MediaTileCard key=\{tile\.key\}/);
+  const tab = read("components/projects/details/products-tab.tsx");
+  assert.match(tab, /<ProductsSection\s/, "a listing's Products tab is drawn by the same frame");
+  assert.match(tab, /<ProductCardFrame name=\{name\} href=\{href\}/);
+  assert.match(read("components/projects/details/media-tab.tsx"), /\{ownerFacts \? "From your builds" : "Images"\}/, "a buyer never reads 'your builds'");
   for (const f of ["sample-market-page.tsx", "sample-offer-box.tsx", "sample-product-page.tsx", "rail-blocks.tsx", "market-rail.tsx"]) {
     assert.doesNotMatch(read(MARKET + f), /\bCARD\b|NARROW_ONLY|WIDE_ONLY/, `${f}: no card per block, no second copy for a narrow page`);
   }

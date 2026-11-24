@@ -16,7 +16,8 @@
 //   Marketplace box (sample-offer-box.tsx) and the Creator block lead it —
 //   under the header in one column, so the price is never below the fold —
 //   then On Innovations and Recent (lib/manual/sample-record.ts);
-// - What's inside: the post's rows, each opening the product's marketplace
+// - the tabs a listing's page has, Products and Media, the same cards and
+//   image grid (sample-products.tsx), each product opening its marketplace
 //   page (sample-product-page.tsx);
 // - the story and the conversation stay on the post: "On Innovations" says
 //   how many and links there, never a copy.
@@ -25,6 +26,8 @@
 // networks (shares/share-button.tsx).
 
 import * as React from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { TabStrip } from "@/components/projects/details/tab-strip";
 import { PersonName } from "@/components/profile/person-name";
 import { LiveRegion, usePageArrival } from "@/components/projects/details/arrival";
 import { Breadcrumb } from "@/components/projects/details/breadcrumb";
@@ -36,7 +39,6 @@ import { useMinuteClock } from "@/components/projects/details/use-project-page-d
 import { StatusChip } from "@/components/projects/status-chip";
 import { partsLabel, productsLabel } from "@/components/innovations/post-bits";
 import { PostMediaStage } from "@/components/innovations/post-media";
-import { WhatsInside } from "@/components/innovations/post-page";
 import { PostToastProvider } from "@/components/innovations/toast";
 import { useSampleSales } from "@/components/mobile/project-earn/buyer/sample-sales-store";
 import { MarketShareButton } from "@/components/shares/share-button";
@@ -46,21 +48,60 @@ import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import { sampleSeedOf } from "@/lib/innovations/sample-posts";
 import { postHref } from "@/lib/innovations/slug";
 import type { InnovationPost } from "@/lib/innovations/types";
-import { marketDocTitle } from "@/lib/manual/project-route";
+import { marketDocTitle, parseProjectTab, PROJECT_TAB_LABEL, withTab, type ProjectTabId } from "@/lib/manual/project-route";
 import { formatDate } from "@/lib/manual/project-summary";
 import { sampleLogLinesOf, sampleStatusOf } from "@/lib/manual/sample-record";
-import { sampleProductHref, type SampleMarket } from "@/lib/market/sample-market";
+import type { SampleMarket } from "@/lib/market/sample-market";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
 import type { OfferTab } from "./offer-parts";
 import { OnInnovationsBlock, SampleCreatorBlock } from "./rail-blocks";
 import { SampleOfferBox } from "./sample-offer-box";
+import { SampleMediaTab, SampleProductsTab } from "./sample-products";
 
 export function SampleMarketPage({ market, initialTab = null }: { market: SampleMarket; initialTab?: OfferTab | null }) {
   // The toast (Link copied, Shared to Innovations) sits outside the page container, so it is the window's.
+  // useSearchParams (the tab) needs a boundary so the route can still be pre-rendered.
   return (
     <PostToastProvider>
-      <SampleMarketBody market={market} initialTab={initialTab} />
+      <React.Suspense fallback={null}>
+        <SampleMarketBody market={market} initialTab={initialTab} />
+      </React.Suspense>
     </PostToastProvider>
+  );
+}
+
+/** The tabs a listing's page shows a buyer (shell.tsx): Products and Media, a history entry each
+ *  (COR-20), the panel as the shell draws it. */
+const SAMPLE_TABS = ["products", "media"] as const;
+
+function SampleTabs({ post, feedId }: { post: InnovationPost; feedId: string }) {
+  const search = useSearchParams();
+  const pathname = usePathname();
+  const asked = parseProjectTab(search.get("tab"));
+  const active = (SAMPLE_TABS as readonly string[]).includes(asked) ? asked : "products";
+  const select = (id: ProjectTabId) => {
+    if (id === active) return;
+    const qs = withTab(search.toString(), id);
+    window.history.pushState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  };
+  return (
+    <>
+      <TabStrip
+        label="Project sections"
+        groups={[SAMPLE_TABS.map((id) => ({ id, label: PROJECT_TAB_LABEL[id] }))]}
+        active={active}
+        onSelect={select}
+      />
+      <div
+        id={`panel-${active}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${active}`}
+        tabIndex={0}
+        className="rounded-lg pt-10 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        {active === "media" ? <SampleMediaTab post={post} /> : <SampleProductsTab post={post} feedId={feedId} />}
+      </div>
+    </>
   );
 }
 
@@ -127,11 +168,7 @@ function SampleMarketBody({ market, initialTab }: { market: SampleMarket; initia
             <SampleCreatorBlock post={post} />
           </div>
         }
-        main={
-          post.products.length > 0 ? (
-            <WhatsInside post={post} hrefOf={(productId) => sampleProductHref(feedId, productId)} />
-          ) : null
-        }
+        main={<SampleTabs post={post} feedId={feedId} />}
         rail={
           <RailRest label="Project record">
             <SampleStoryBlock post={post} />

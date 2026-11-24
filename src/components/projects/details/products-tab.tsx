@@ -56,6 +56,7 @@ import {
   versionLineOf,
   type HeadingRow,
   type ProductCardView,
+  type StagePill,
 } from "@/lib/manual/products-tab-view";
 import { cn } from "@/lib/utils";
 
@@ -129,13 +130,9 @@ export function ProductsTab({
     : null;
 
   return (
-    <div className="[container-type:inline-size]">
-      <div className="mb-8 flex flex-col gap-2">
-        <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Products</h2>
-        {/* A `<p>` here would be invalid HTML: ConfidenceBadge's open panel
-            (ConfidenceIssuesPanel) renders block content — div/section/ul —
-            and a <p> can't contain block children (breaks hydration). */}
-        <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
+    <ProductsSection
+      line={
+        <>
           <span>
             {countLabel(heading.count)}
             {piecesLine ? ` · ${piecesLine}` : ""}
@@ -147,15 +144,11 @@ export function ProductsTab({
               <ConfidenceBadge confidence={headlineConfidence} />
             </span>
           )}
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {(canAddProduct || products.length > 0) && (
-        <ul
-          role="list"
-          aria-label="Products"
-          className="grid grid-cols-1 gap-8 [@container(min-width:520px)]:grid-cols-2 [@container(min-width:880px)]:grid-cols-3"
-        >
+        <>
           {canAddProduct && <AddProductTile projectId={projectId} projectName={projectName} />}
           {products.map((pp) => (
             <ProductCard
@@ -168,6 +161,34 @@ export function ProductsTab({
               now={now}
             />
           ))}
+        </>
+      )}
+    </ProductsSection>
+  );
+}
+
+/** The Products tab's frame: the heading, the count line, the grid of cards. A sample's Explore
+ *  marketplace page draws its products in it too, with ProductCardFrame (owner, 2026-11-24: the
+ *  Products part the same on every marketplace page). No grid when there are no cards. */
+export function ProductsSection({ line, children }: { line: React.ReactNode; children: React.ReactNode }) {
+  const cards = React.Children.toArray(children).filter(Boolean);
+  return (
+    <div className="[container-type:inline-size]">
+      <div className="mb-8 flex flex-col gap-2">
+        <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Products</h2>
+        {/* A `<p>` here would be invalid HTML: ConfidenceBadge's open panel
+            (ConfidenceIssuesPanel) renders block content — div/section/ul —
+            and a <p> can't contain block children (breaks hydration). */}
+        <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">{line}</div>
+      </div>
+
+      {cards.length > 0 && (
+        <ul
+          role="list"
+          aria-label="Products"
+          className="grid grid-cols-1 gap-8 [@container(min-width:520px)]:grid-cols-2 [@container(min-width:880px)]:grid-cols-3"
+        >
+          {children}
         </ul>
       )}
     </div>
@@ -286,9 +307,52 @@ function ProductCard({
   const note = pp.state === "built" ? null : UNBUILT_NOTE[pp.state];
 
   return (
+    <ProductCardFrame name={name} href={href} image={built?.product.conceptImageUrl ?? null} stage={card.stage}>
+      {confidence && <BuildCheckPill tier={confidence.tier} />}
+      {note && <p className="text-md text-text-secondary">{note}</p>}
+      {!built && pp.description && (
+        <p className="line-clamp-3 text-md text-text-tertiary">{pp.description}</p>
+      )}
+      <CardFacts facts={facts} />
+      {pieces && pieces.ready < pieces.total && (
+        <p className="text-sm text-text-secondary">
+          {pieces.ready} of {pieces.total} pieces ready
+        </p>
+      )}
+      {card.video && <p className="text-sm text-text-secondary">{card.video}</p>}
+      {card.sale && <p className="text-sm font-medium text-text-primary">{card.sale}</p>}
+      {versionLine && <p className="text-sm text-text-tertiary">{versionLine}</p>}
+      {partChangesLine && (
+        <p className="text-md text-text-secondary">
+          Built with your part changes: {partChangesLine}
+        </p>
+      )}
+    </ProductCardFrame>
+  );
+}
+
+/** One product card's frame: its picture, its name (the card's one link, stretched over it) with
+ *  the stage pill, then what the caller puts under them. A sample's marketplace page uses it too. */
+export function ProductCardFrame({
+  name,
+  href,
+  image,
+  imageAlt,
+  stage,
+  children,
+}: {
+  name: string;
+  href: string;
+  image: string | null;
+  /** The picture's words; "{name} concept image" by default. */
+  imageAlt?: string;
+  stage: StagePill | null;
+  children?: React.ReactNode;
+}) {
+  return (
     <li>
       <div data-tour="project-product" className={CARD}>
-        <ProductImage url={built?.product.conceptImageUrl ?? null} name={name} />
+        <ProductImage url={image} name={name} alt={imageAlt} />
         <div className="flex flex-1 flex-col gap-4 p-7">
           <div className="flex min-w-0 items-start gap-4">
             <h3 title={name} className="line-clamp-2 min-w-0 flex-1 text-md font-semibold text-text-primary">
@@ -299,44 +363,32 @@ function ProductCard({
                 {name}
               </Link>
             </h3>
-            {card.stage && (
+            {stage && (
               <span className="inline-flex shrink-0 items-center rounded-full bg-bg-subtle px-4 py-1 text-sm font-medium leading-sm text-text-secondary">
-                <span aria-hidden>{card.stage.short}</span>
-                <span className="sr-only">{card.stage.ariaLabel}</span>
+                <span aria-hidden>{stage.short}</span>
+                <span className="sr-only">{stage.ariaLabel}</span>
               </span>
             )}
           </div>
-          {confidence && <BuildCheckPill tier={confidence.tier} />}
-          {note && <p className="text-md text-text-secondary">{note}</p>}
-          {!built && pp.description && (
-            <p className="line-clamp-3 text-md text-text-tertiary">{pp.description}</p>
-          )}
-          {facts.length > 0 && (
-            <dl className="mt-1 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 items-baseline text-sm">
-              {facts.map((f) => (
-                <React.Fragment key={f.label}>
-                  <dt className="font-medium text-text-tertiary">{f.label}</dt>
-                  <dd className="min-w-0 text-md text-text-secondary">{f.value}</dd>
-                </React.Fragment>
-              ))}
-            </dl>
-          )}
-          {pieces && pieces.ready < pieces.total && (
-            <p className="text-sm text-text-secondary">
-              {pieces.ready} of {pieces.total} pieces ready
-            </p>
-          )}
-          {card.video && <p className="text-sm text-text-secondary">{card.video}</p>}
-          {card.sale && <p className="text-sm font-medium text-text-primary">{card.sale}</p>}
-          {versionLine && <p className="text-sm text-text-tertiary">{versionLine}</p>}
-          {partChangesLine && (
-            <p className="text-md text-text-secondary">
-              Built with your part changes: {partChangesLine}
-            </p>
-          )}
+          {children}
         </div>
       </div>
     </li>
+  );
+}
+
+/** A card's labelled facts (Size, Board, Power…), label beside value. */
+export function CardFacts({ facts }: { facts: readonly { label: string; value: string }[] }) {
+  if (facts.length === 0) return null;
+  return (
+    <dl className="mt-1 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 items-baseline text-sm">
+      {facts.map((f) => (
+        <React.Fragment key={f.label}>
+          <dt className="font-medium text-text-tertiary">{f.label}</dt>
+          <dd className="min-w-0 text-md text-text-secondary">{f.value}</dd>
+        </React.Fragment>
+      ))}
+    </dl>
   );
 }
 
@@ -354,7 +406,7 @@ function BuildCheckPill({ tier }: { tier: Tier }) {
   );
 }
 
-function ProductImage({ url, name }: { url: string | null; name: string }) {
+function ProductImage({ url, name, alt }: { url: string | null; name: string; alt?: string }) {
   const [ok, setOk] = React.useState(true);
   const broken = Boolean(url) && !ok;
   return (
@@ -363,7 +415,7 @@ function ProductImage({ url, name }: { url: string | null; name: string }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={url}
-          alt={`${name} concept image`}
+          alt={alt ?? `${name} concept image`}
           loading="lazy"
           decoding="async"
           onError={() => setOk(false)}

@@ -364,8 +364,7 @@ function AboutProject({ text }: { text: string }) {
 }
 
 /** One row per product, each to its product view. */
-/** `hrefOf`: where a row opens — the post's product page, or (Explore marketplace) the shop's. */
-export function WhatsInside({ post, hrefOf }: { post: InnovationPost; hrefOf?: (productId: string) => string }) {
+export function WhatsInside({ post }: { post: InnovationPost }) {
   const id = React.useId();
   return (
     <section aria-labelledby={id} className="flex flex-col gap-6">
@@ -381,7 +380,7 @@ export function WhatsInside({ post, hrefOf }: { post: InnovationPost; hrefOf?: (
       <ul role="list" className="flex flex-col gap-6">
         {post.products.map((p) => (
           <li key={p.id}>
-            <ProductRow href={hrefOf ? hrefOf(p.id) : postProductHref(post.slug, p.id)} product={p} />
+            <ProductRow href={postProductHref(post.slug, p.id)} product={p} />
           </li>
         ))}
       </ul>
