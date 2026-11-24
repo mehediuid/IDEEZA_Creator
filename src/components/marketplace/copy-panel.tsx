@@ -26,7 +26,7 @@
 import * as React from "react";
 import { Button, TestnetDemoBadge } from "@/components/ideeza";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
-import { listingUnitsLine } from "@/lib/market/units";
+import { listingUnitsLine, unitsAllowanceOf, unitsUpToOf, type UnitsUse } from "@/lib/market/units";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { historyOf, labelOf } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
@@ -150,7 +150,14 @@ export function CopyPanel({
           const t = offers.find((o) => o.use === use);
           if (!t) return { value: `none:${use}`, label: USE_LABEL[use], aside: "Not on sale", disabled: true };
           const soldOut = trackCardOf(t, view.sales).soldOut;
-          return { value: t.id, label: USE_LABEL[use], aside: soldOut ? "Sold out" : formatAmount(t.listing.regular, t.listing.token), disabled: soldOut, owned: ownedOn(t.id) };
+          return {
+            value: t.id,
+            label: USE_LABEL[use],
+            aside: soldOut ? "Sold out" : formatAmount(t.listing.regular, t.listing.token),
+            disabled: soldOut,
+            owned: ownedOn(t.id),
+            detail: kind === "physical" ? unitsUpToOf(unitsAllowanceOf(USE_LABEL[use] as UnitsUse)) : undefined,
+          };
         })}
       />
 
@@ -184,6 +191,8 @@ export function CopyPanel({
         <FactGrid
           facts={[
             { label: "Copies", value: `${card.total}` },
+            // A Physical copy's units, for the use picked (units.ts).
+            ...(kind === "physical" ? [{ label: "Units per copy", value: `${unitsAllowanceOf(USE_LABEL[track.use] as UnitsUse)}` }] : []),
             { label: "Royalties", value: `${track.listing.royaltyPct}%` },
             { label: "Minting", value: "Lazy" },
             { label: "Chain", value: networkLabelOf(chain.network) },

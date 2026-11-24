@@ -76,6 +76,12 @@ export const ownCopyKeyOf = (projectId: string, trackId: string, serial: number)
 /** A copy's key for another creator's sample: its feed id, its kind and use, its number. */
 export const sampleCopyKeyOf = (feedId: string, kind: string, use: string, serial: number) => `${feedId}:${kind}:${use}:#${serial}`;
 
+/** A Physical copy's allowance on its Use row (owner, 2026-11-24: "how many can a Personal or Business copy
+ *  make? say it where I pick"): "Makes up to 1 unit" · "Makes up to 50 units". */
+export function unitsUpToOf(n: number): string {
+  return `Makes up to ${n} ${n === 1 ? "unit" : "units"}`;
+}
+
 /** What a Physical listing says before anyone buys, so the buyer knows what a copy lets them make. */
 export function listingUnitsLine(): string {
   const p = DEFAULT_UNITS["Personal use"];

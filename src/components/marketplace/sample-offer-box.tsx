@@ -21,7 +21,7 @@ import * as React from "react";
 import { Button } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
-import { listingUnitsLine } from "@/lib/market/units";
+import { listingUnitsLine, unitsAllowanceOf, unitsUpToOf, type UnitsUse } from "@/lib/market/units";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { formatDate } from "@/lib/manual/project-summary";
 import {
@@ -269,6 +269,7 @@ function CopyPanel({
             aside: why ? (copyUseStateOf(o, feedId, sales).locked ? "Not for sale" : "Sold out") : formatAmount(o.price, o.token),
             disabled: why !== null,
             owned: ownedOf(o),
+            detail: kind === "physical" ? unitsUpToOf(unitsAllowanceOf(o.use as UnitsUse)) : undefined,
           };
         })}
       />
@@ -287,6 +288,8 @@ function CopyPanel({
           facts={[
             { label: "Copies", value: state.of !== null ? `${state.of}` : "No limit" },
             { label: "Use", value: offer.use },
+            // A Physical copy's units, for the use picked (units.ts).
+            ...(kind === "physical" ? [{ label: "Units per copy", value: `${unitsAllowanceOf(offer.use as UnitsUse)}` }] : []),
             { label: "Royalties", value: `${SAMPLE_ROYALTIES_PCT}%` },
             { label: "Minting", value: "Lazy" },
             { label: "Chain", value: networkLabelOf(SAMPLE_NETWORK) },

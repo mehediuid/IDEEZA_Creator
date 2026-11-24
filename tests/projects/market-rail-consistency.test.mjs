@@ -188,3 +188,18 @@ test("Report: the ⋯ beside Share on every marketplace page reports the project
   assert.match(read(MARKET + "sample-product-page.tsx"), /<MarketReportMenu reportId=\{productReportIdOf\(post\.id, product\.id\)\} target="product" \/>/);
   assert.match(read("components/projects/product/product-page.tsx"), /<MarketReportMenu reportId=\{productReportIdOf\(postIdOfProject\(project\.id\), product\.id\)\} target="product" \/>/);
 });
+
+const units = await import("../../.tmp-test/lib/market/units.js");
+
+test("a Physical copy says how many units it makes, on its Use row and in NFT details (owner, 2026-11-24)", () => {
+  assert.equal(units.unitsUpToOf(1), "Makes up to 1 unit");
+  assert.equal(units.unitsUpToOf(50), "Makes up to 50 units");
+  assert.equal(units.unitsUpToOf(units.unitsAllowanceOf("Personal use")), "Makes up to 1 unit");
+  assert.equal(units.unitsUpToOf(units.unitsAllowanceOf("Business use")), "Makes up to 50 units");
+  assert.match(read(MARKET + "offer-parts.tsx"), /\{o\.detail \? <span className="text-sm text-text-secondary">\{o\.detail\}<\/span> : null\}/);
+  for (const f of ["copy-panel.tsx", "sample-offer-box.tsx"]) {
+    const src = read(MARKET + f);
+    assert.match(src, /detail: kind === "physical" \? unitsUpToOf\(unitsAllowanceOf\(/, `${f}: each Physical Use row`);
+    assert.match(src, /\.\.\.\(kind === "physical" \? \[\{ label: "Units per copy", value: /, `${f}: NFT details`);
+  }
+});
