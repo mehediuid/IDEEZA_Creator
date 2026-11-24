@@ -49,7 +49,7 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { useCredits } from "@/lib/create/credits";
 import { fitsYou, takesPlanSlot, usageOf } from "@/lib/create/upsell";
 import { useManualProjects } from "@/lib/manual/projects";
-import { HIGH_VIDEO_TIER, PLANS, YEARLY_OFF, planOf, priceOf, relationOf, type Plan, type PlanTier, type Subscription } from "@/lib/create/plans";
+import { HIGH_VIDEO_TIER, PLANS, YEARLY_OFF, creditsMonthly, planOf, priceOf, relationOf, type Plan, type PlanTier, type Subscription } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { FaqList } from "../help/faq-list";
 import { BottomBar } from "../kit/bottom-bar";
@@ -345,7 +345,7 @@ function PlanCard({
           <Icon icon={AiMagicIcon} size={16} />
         </span>
         <span>
-          AI credits: <CreditChip value={p.credits} /> / month
+          AI credits: <CreditChip value={p.credits} /> {creditsMonthly(p.tier) ? "/ month" : "once"}
         </span>
       </span>
     </RadioCard>

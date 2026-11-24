@@ -7,8 +7,8 @@
 // It replaced the daily prompt quota ("5 prompts a day", Free/Plus/Pro): that
 // meter never stopped a generation, and credits are the one meter now.
 //
-// <PlanCredits /> sits inside the credits provider and writes each monthly
-// period's plan credits into the ledger, once per period (`grantDue`).
+// <PlanCredits /> sits inside the credits provider and writes a paid plan's credits
+// into the ledger once per monthly period, Free's once ever (`grantDue`).
 
 import * as React from "react";
 import { discountFor, type BillingCycle } from "./credit-pricing";
@@ -18,6 +18,7 @@ import {
   cancelPlan,
   freeSubscription,
   grantDue,
+  grantedIdsOf,
   keepPlan,
   planOf,
   scheduleSwitch,
@@ -114,14 +115,11 @@ export function useCreditDiscount(): number {
   return discountFor(sub.tier, sub.cycle);
 }
 
-/** Writes the plan's credits for the current monthly period, once. Renders nothing. */
+/** Writes the plan credits owed now (a paid plan's for this month, Free's once ever). Renders nothing. */
 export function PlanCredits() {
   const { hydrated: planReady, sub } = useCreatePlan();
   const { hydrated: creditsReady, ledger, grant } = useCredits();
-  const granted = React.useMemo(
-    () => new Set(ledger.filter((e) => e.reason === "grant" && e.orderId).map((e) => e.orderId as string)),
-    [ledger],
-  );
+  const granted = React.useMemo(() => grantedIdsOf(ledger), [ledger]);
   const [tick, setTick] = React.useState(0);
 
   React.useEffect(() => {

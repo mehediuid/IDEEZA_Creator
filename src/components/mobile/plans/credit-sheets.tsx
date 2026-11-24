@@ -16,7 +16,7 @@ import { Button } from "@/components/ideeza/button";
 import { CREDIT_PACKS, MAX_DISCOUNT, discountRows, packPrice, usd, type CreditPack } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import { pitchCycle, pitchPlan } from "@/lib/create/upsell";
-import { PLANS, planOf, priceOf, relationOf, type Plan } from "@/lib/create/plans";
+import { PLANS, creditsMonthly, planOf, priceOf, relationOf, type Plan } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
 import { T } from "../type";
@@ -83,7 +83,8 @@ export function BetterDealSheet({
   );
 }
 
-/** You've reached your limit: this month's plan credits are all spent. Current credit's Buy more credits
+/** You've reached your limit: the plan's credits are all spent (a paid plan's for this month, Free's
+ *  one-time credits, owner 2026-11-24). Current credit's Buy more credits
  *  opens it when there is a plan to offer (the phone's own step, kept by the owner's rule 2026-11-23);
  *  the plan it names and opens is the web's pitch, so Free reads Builder (CL-032). */
 export function ReachedLimitSheet({ open, onClose, allowance, onBuy }: { open: boolean; onClose: () => void; allowance: number; onBuy: () => void }) {
@@ -95,7 +96,11 @@ export function ReachedLimitSheet({ open, onClose, allowance, onBuy }: { open: b
       open={open}
       onClose={onClose}
       title="You’ve reached your limit"
-      description={`You’ve used all ${n(allowance)} monthly AI credits on the ${plan.name} plan.`}
+      description={
+        creditsMonthly(plan.tier)
+          ? `You’ve used all ${n(allowance)} monthly AI credits on the ${plan.name} plan.`
+          : `You’ve used all ${n(allowance)} AI credits the ${plan.name} plan gives once.`
+      }
       actions={
         <>
           {next && (
@@ -207,7 +212,7 @@ export function DiscountsSheet({ open, onClose }: { open: boolean; onClose: () =
   );
 }
 
-/** Compare plans: how many AI credits each plan adds every month, and its price. */
+/** Compare plans: how many AI credits each plan gives (Free once, the others every month), and its price. */
 export function ComparePlansSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { sub, plan } = useCreatePlan();
   const next = useNextPlan();
@@ -219,7 +224,7 @@ export function ComparePlansSheet({ open, onClose }: { open: boolean; onClose: (
       open={open}
       onClose={onClose}
       title="Compare plans"
-      description="See how many AI credits each plan includes every month."
+      description="See how many AI credits each plan gives: Free once, the others every month."
       actions={
         upgrade ? (
           <Button size="xl" className="w-full" onClick={() => router.push(checkoutPath(upgrade.tier, cycle))}>
@@ -235,7 +240,7 @@ export function ComparePlansSheet({ open, onClose }: { open: boolean; onClose: (
               Plan
             </th>
             <th scope="col" className="px-4 py-5 text-right font-regular">
-              Credits/mo
+              AI credits
             </th>
             <th scope="col" className="px-8 py-5 text-right font-regular">
               Price
@@ -249,7 +254,10 @@ export function ComparePlansSheet({ open, onClose }: { open: boolean; onClose: (
                 {p.name}
                 {p.tier === plan.tier && <span className={cn(T.meta, "ml-3")}>· yours</span>}
               </th>
-              <td className="border-t-[length:var(--border-width-1)] border-solid border-border px-4 py-4 text-right tabular-nums text-text-brand">{n(p.credits)}</td>
+              <td className="border-t-[length:var(--border-width-1)] border-solid border-border px-4 py-4 text-right tabular-nums text-text-brand">
+                {n(p.credits)}
+                <span className="text-text-tertiary">{creditsMonthly(p.tier) ? "/mo" : " once"}</span>
+              </td>
               <td className="border-t-[length:var(--border-width-1)] border-solid border-border px-8 py-4 text-right tabular-nums text-text-primary">
                 {dollars(priceOf(p.tier, "monthly").perMonth)}
               </td>

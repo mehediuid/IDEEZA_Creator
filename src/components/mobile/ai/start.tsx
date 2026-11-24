@@ -5,8 +5,8 @@
 // idea" with Shuffle as two-line chips right above the composer, and the
 // Prompt Box pinned at the foot, with no credits line under it (owner 2026-11-22:
 // the web's Home box says no price; a concept's cost shows where it is drawn); out of
-// credits, one slim state row sits above the box: "You're out of credits.
-// They refill on 8 Dec.", Buy credits (the sheet, Starter picked) and the next
+// credits, one slim state row sits above the box: "You're out of credits."
+// (on a paid plan "They refill on 8 Dec." too), Buy credits (the sheet, Starter picked) and the next
 // plan's line (CL-032). Typing hides the ideas so the box can grow (02–04).
 // The box takes an inspiration image beside the mic (CL-027): Generate stores
 // it, then starts the web's chat (createChat, with the Quality picked here and

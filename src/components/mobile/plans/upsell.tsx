@@ -6,7 +6,8 @@
 // in the phone's own parts, so every screen that needs one takes it from here:
 //
 // · OutOfCreditsRow — the state row above the composer (AI tab, chat): "You're out
-//   of credits. They refill on 8 Dec.", Buy credits, and the next plan's link;
+//   of credits." (on a paid plan "They refill on 8 Dec." too; Free's credits come once), Buy
+//   credits, and the next plan's link;
 // · PlanLink — "Or get 300 credits every month with Builder →", a 44 px link row;
 // · PlanPitchRow — the last block of the Buy credits sheet (plan, perks, the
 //   month's spend when it's true, MAKER20 once the welcome offer ended unused);
@@ -39,7 +40,7 @@ import { usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { statusOf, useCreateHistory } from "@/lib/create/history";
 import { useCreatePlan } from "@/lib/create/plan";
-import { creditPeriod, planOf, priceOf } from "@/lib/create/plans";
+import { nextCreditsAt, planOf, priceOf } from "@/lib/create/plans";
 import { RETURN_COUPON, pitchCycle, pitchPerks, pitchPlan, savingsNudge } from "@/lib/create/upsell";
 import { cn } from "@/lib/utils";
 import { ListCard, ListRow } from "../kit/list";
@@ -67,11 +68,13 @@ export function usePhonePitch() {
   };
 }
 
-/** "8 Dec": the day this month's plan credits come back (the web's OutOfCreditsLine). */
+/** "8 Dec": the day a paid plan's next monthly credits come (the web's OutOfCreditsLine). Null on
+ *  Free: its credits come once, there is no refill (owner 2026-11-24). */
 export function useRefillDay(): string | null {
   const { hydrated, sub } = useCreatePlan();
   const [now] = React.useState(() => Date.now());
-  return hydrated ? new Date(creditPeriod(sub, now).end).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : null;
+  const at = hydrated ? nextCreditsAt(sub, now) : null;
+  return at === null ? null : new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 /** C1 — "Or get 300 credits every month with Builder →"; nothing on Disruptor. */
@@ -85,8 +88,8 @@ export function PlanLink({ className }: { className?: string }) {
   );
 }
 
-/** C1 on the phone: out of credits, one state row above the composer — what happened and when the plan
- *  refills, Buy credits (the sheet, in place) and the next plan up. The send stays as it was. Without
+/** C1 on the phone: out of credits, one state row above the composer — what happened and, on a paid
+ *  plan, when it refills, Buy credits (the sheet, in place) and the next plan up. The send stays as it was. Without
  *  `onBuy` the row has no button: the screen's own bottom bar is already Buy credits (Current credit). */
 export function OutOfCreditsRow({ onBuy, className }: { onBuy?: () => void; className?: string }) {
   const refill = useRefillDay();

@@ -197,7 +197,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
         summary: "How AI credits are spent, where to buy more, and what each plan gives you.",
         blocks: [
           p(
-            "AI credits pay for the work AI does for you, such as drawing concepts and running builds. Plans add credits every month. You manage both in Settings, under Plan & pricing.",
+            "AI credits pay for the work AI does for you, such as drawing concepts and running builds. Free gives its credits once; paid plans add credits every month. You manage both in Settings, under Plan & pricing.",
           ),
           video("set-up-ideeza/plans-and-credits/1", "Buying credits and choosing a plan"),
           h2("What costs credits"),
@@ -223,7 +223,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
           ),
           h2("Choose a plan"),
           p(
-            "The Upgrade card in the sidebar opens Pricing. It lists four plans, billed monthly or yearly with 20% off: Free with 10 AI credits a month, Tinkerer with 50 for $8 a month, Builder with 300 for $10, and Disruptor with 1,200 for $20. Bigger plans add a faster queue, room for more projects and contributors, and a discount on credit packs. No plan ever stands between you and minting, listing or selling.",
+            "The Upgrade card in the sidebar opens Pricing. It lists four plans, billed monthly or yearly with 20% off: Free with 10 AI credits once, Tinkerer with 50 for $8 a month, Builder with 300 for $10, and Disruptor with 1,200 for $20. Bigger plans add a faster queue, room for more projects and contributors, and a discount on credit packs. No plan ever stands between you and minting, listing or selling.",
           ),
           h2("Paying in the demo"),
           p(

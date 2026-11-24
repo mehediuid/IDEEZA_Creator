@@ -7,7 +7,7 @@
 // (a tab root, so no Back), your card (photo, name, headline, "@handle · View
 // profile", your level and its XP against the next level) that opens your
 // profile, then Wallet with your IDZ, Refer and Earn and Plan & pricing with
-// your credits and the day they refill (the web sidebar's card) and the web account
+// your credits (on a paid plan the day they refill, the web sidebar's card) and the web account
 // menu's plan line ("Free plan · Upgrade to Builder", CL-032), which opens
 // Plans on that plan (MON-4); while the welcome offer runs and its sheet is
 // closed, the row is the offer instead, as the web sidebar's Upgrade card
@@ -134,8 +134,9 @@ function WalletValue() {
 }
 
 /** PR-01 "Plan & pricing · 28 credits", in the warning ink once credits run low (the web's rule), and
- *  under it the day the plan's credits come back, as the web sidebar's card says it ("· refills 8 Dec",
- *  CL-032, MON-16). The plan itself is the row's meta line (usePlanLine). */
+ *  on a paid plan under it the day its monthly credits come back, as the web sidebar's card says it
+ *  ("· refills 8 Dec", CL-032, MON-16). Free has no such line: its credits come once (owner
+ *  2026-11-24). The plan itself is the row's meta line (usePlanLine). */
 function PlanValue() {
   const { hydrated: planRead } = useCreatePlan();
   const { hydrated: creditsRead, ledger } = useCredits();

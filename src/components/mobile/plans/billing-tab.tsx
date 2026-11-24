@@ -32,7 +32,7 @@ import { filterInvoices, invoiceYears, invoicesOf } from "@/lib/account/invoices
 import { usd } from "@/lib/create/credit-pricing";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
-import { PLANS, creditPeriod, planOf, priceOf } from "@/lib/create/plans";
+import { PLANS, creditPeriod, creditsMonthly, creditsWordsOf, planOf, priceOf } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { Sheet } from "../kit/sheet";
@@ -248,7 +248,7 @@ function CurrentPlan() {
           </li>
         )}
         {paid && <ListRow icon={CheckmarkCircle02Icon} title="Benefits" meta={`${n(usage.projects)}/${n(plan.projects)} projects created`} onClick={() => setBenefitsOpen(true)} />}
-        <ListRow icon={AiMagicIcon} title="AI credits" value={`${n(plan.credits)} / month`} />
+        <ListRow icon={AiMagicIcon} title="AI credits" value={`${n(plan.credits)} ${creditsMonthly(plan.tier) ? "/ month" : "once"}`} />
         <ListRow icon={Wallet02Icon} title="Payment method" meta={wallet.connected ? `Demo wallet ${wallet.short} · ${token}` : "No wallet connected"} href="/m/settings/payments" />
         <li id="billing-details" className="scroll-mt-8">
           <ListCardRowLink href="/m/settings/billing" icon={Invoice03Icon} title="Billing details" meta={billedTo ? billedTo : "Not set"} />
@@ -256,7 +256,7 @@ function CurrentPlan() {
       </ListCard>
       {!paid ? (
         <ListCard label="Upgrade">
-          <ListRow icon={CrownIcon} title="Upgrade now" meta={`${plan.name} · ${n(plan.credits)} AI credits a month`} onClick={() => router.push("/m/plans")} />
+          <ListRow icon={CrownIcon} title="Upgrade now" meta={`${plan.name} · ${creditsWordsOf(plan)}`} onClick={() => router.push("/m/plans")} />
         </ListCard>
       ) : !pending ? (
         <ListCard label="Change plan">

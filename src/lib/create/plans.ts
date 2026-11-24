@@ -13,9 +13,12 @@
 // - At the end of a period a plan renews (auto-renew on) or the scheduled
 //   change starts. Payments aren't on, so a renewal is recorded as not
 //   charged (testnet demo) rather than pretending money moved.
-// - Every plan, Free included, adds its AI credits at the start of each
-//   monthly period, counted from the day the plan started; they last until
-//   the period ends. `grantDue` names the one grant missing now.
+// - Free's AI credits come ONCE, when the account starts, and never run out of
+//   time (owner 2026-11-24: "there is no refill; a free user gets it all one
+//   time"). Every paid plan adds its AI credits at the start of each monthly
+//   period, counted from the day the plan started; they last until the period
+//   ends. `grantDue` names the one grant missing now, `nextCreditsAt` when the
+//   next one comes (null on Free).
 //
 // Pure, relative imports only.
 
@@ -58,6 +61,16 @@ export function planOf(tier: PlanTier): Plan {
 const pct = (d: number) => `${Math.round(d * 100)}%`;
 const count = (v: number) => v.toLocaleString("en-US");
 
+/** Whether a plan's credits come every month (every paid plan) or once (Free, owner 2026-11-24). */
+export function creditsMonthly(tier: PlanTier): boolean {
+  return tier !== "free";
+}
+
+/** A plan's credits in words: "300 AI credits a month", Free "10 AI credits, once". */
+export function creditsWordsOf(p: Plan): string {
+  return `${count(p.credits)} AI credits${creditsMonthly(p.tier) ? " a month" : ", once"}`;
+}
+
 /** 720p AI video comes with Disruptor only (lib/video/types `qualityOpen`). */
 export const HIGH_VIDEO_TIER: PlanTier = "disruptor";
 
@@ -65,7 +78,7 @@ export const HIGH_VIDEO_TIER: PlanTier = "disruptor";
 export function featuresOf(p: Plan): string[] {
   const discount = discountFor(p.tier, "monthly");
   return [
-    `${count(p.credits)} AI credits a month`,
+    creditsWordsOf(p),
     p.queue,
     `${count(p.projects)} ${p.projects === 1 ? "project" : "projects"} · ${count(p.exports)} exports a month`,
     p.contributors === 0 ? "Just you, no contributors" : `${count(p.contributors)} ${p.contributors === 1 ? "contributor" : "contributors"}`,
@@ -74,12 +87,14 @@ export function featuresOf(p: Plan): string[] {
   ];
 }
 
-/** What gets smaller moving from one plan to another: "AI credits: 300 → 10 a month". Empty when nothing does. */
+/** What gets smaller moving from one plan to another: "AI credits: 300 → 50 a month", to Free
+ *  "Monthly AI credits: 300 → none" (Free's come once). Empty when nothing does. */
 export function lossesOf(from: Plan, to: Plan): string[] {
   const out: string[] = [];
   const queueName = (q: string) => q.split(",")[0].replace(/ queue$/, "");
   const people = (n: number) => (n === 0 ? "none" : count(n));
-  if (to.credits < from.credits) out.push(`AI credits: ${count(from.credits)} → ${count(to.credits)} a month`);
+  if (creditsMonthly(from.tier) && !creditsMonthly(to.tier)) out.push(`Monthly AI credits: ${count(from.credits)} → none`);
+  else if (to.credits < from.credits) out.push(`AI credits: ${count(from.credits)} → ${count(to.credits)} a month`);
   if (rank(to.tier) < rank(from.tier) && to.queue !== from.queue) out.push(`AI queue: ${queueName(from.queue)} → ${queueName(to.queue)}`);
   if (to.projects < from.projects) out.push(`Projects: ${count(from.projects)} → ${count(to.projects)}`);
   if (to.exports < from.exports) out.push(`Exports: ${count(from.exports)} → ${count(to.exports)} a month`);
@@ -282,13 +297,43 @@ export function creditPeriod(sub: Subscription, now: number): { index: number; s
   return { index, start: addMonths(sub.startedAt, index), end: addMonths(sub.startedAt, index + 1) };
 }
 
-export type Grant = { orderId: string; credits: number; plan: string; ts: number; expiresAt: number };
+/** A grant's credits: its period's end, or null for Free's one grant, which never runs out of time. */
+export type Grant = { orderId: string; credits: number; plan: string; ts: number; expiresAt: number | null };
 
-/** The credit grant this period is owed and doesn't have yet; null when it has it. */
+/** Free's one grant, whatever the subscription (an account gets it once, ever). */
+export const FREE_GRANT_ID = "grant_free";
+
+/** The grant ids a ledger already holds, for `grantDue`. Any Free grant counts as Free's one grant:
+ *  ledgers from before 2026-11-24 hold one a month, and those accounts have had theirs. */
+export function grantedIdsOf(lines: readonly { reason: string; orderId?: string; pack?: string }[]): Set<string> {
+  const ids = new Set<string>();
+  const free = planOf("free").name;
+  for (const l of lines) {
+    if (l.reason !== "grant" || !l.orderId) continue;
+    ids.add(l.orderId);
+    if (l.pack === free) ids.add(FREE_GRANT_ID);
+  }
+  return ids;
+}
+
+/** The credit grant owed now and not had yet; null when it has it. Free: its one grant, once ever;
+ *  a paid plan: this monthly period's. */
 export function grantDue(sub: Subscription, granted: ReadonlySet<string>, now: number): Grant | null {
+  const plan = planOf(sub.tier);
+  if (!creditsMonthly(sub.tier)) {
+    return granted.has(FREE_GRANT_ID) ? null : { orderId: FREE_GRANT_ID, credits: plan.credits, plan: plan.name, ts: now, expiresAt: null };
+  }
   const period = creditPeriod(sub, now);
   const orderId = `grant_${sub.id}_${period.index}`;
   if (granted.has(orderId)) return null;
-  const plan = planOf(sub.tier);
   return { orderId, credits: plan.credits, plan: plan.name, ts: now, expiresAt: period.end };
+}
+
+/** When the next plan credits come: the monthly period's end on a paid plan that goes on past it;
+ *  null on Free (its credits come once) and when the plan turns Free at that end. */
+export function nextCreditsAt(sub: Subscription, now: number): number | null {
+  if (!creditsMonthly(sub.tier)) return null;
+  const end = creditPeriod(sub, now).end;
+  const turnsFree = sub.renewsAt !== null && end >= sub.renewsAt && (sub.pending ? sub.pending.tier === "free" : !sub.autoRenew);
+  return turnsFree ? null : end;
 }

@@ -33,13 +33,13 @@ export const FAQS: readonly FaqItem[] = [
   {
     id: "credits",
     q: "What does a credit pay for?",
-    a: `AI work. A concept drawing (a first draft, a refine or a regenerate) uses 1 credit, and a build uses ${WHOLE_PRODUCT_COSTS} for each product in it, by its Quality (Low, Medium or High), less when you pick fewer pieces. Your plan adds credits every month, and you can buy more any time.`,
+    a: `AI work. A concept drawing (a first draft, a refine or a regenerate) uses 1 credit, and a build uses ${WHOLE_PRODUCT_COSTS} for each product in it, by its Quality (Low, Medium or High), less when you pick fewer pieces. Free gives its credits once; a paid plan adds credits every month, and you can buy more any time.`,
     link: { label: "See your credits", href: "/m/plans/credits" },
   },
   {
     id: "pricing",
     q: "Pricing & availability",
-    a: "Free is $0 with 10 AI credits a month. Tinkerer is $8 a month (50 credits), Builder $10 (300 credits) and Disruptor $20 (1,200 credits). Paying yearly takes 20% off. Every plan, Free included, can mint, list and buy.",
+    a: "Free is $0 with 10 AI credits, once. Tinkerer is $8 a month (50 credits), Builder $10 (300 credits) and Disruptor $20 (1,200 credits). Paying yearly takes 20% off. Every plan, Free included, can mint, list and buy.",
     link: { label: "Compare plans", href: "/m/plans" },
   },
   {
