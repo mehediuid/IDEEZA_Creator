@@ -16,11 +16,16 @@
 //   for sale (SOC-6; the Feed shows only what is). Messages show once a field is left, at once for a typed amount,
 //   all of them once Continue was pressed (13h). An instant mint the wallet
 //   can't pay says so under Minting type (13g);
-// · MintReview — a reject or a failure first (13l); What is minted as a summary
-//   card (shared as, the name, its products, the price, share and royalties
-//   large for a Sell); Terms; Product videos (the gate's) with their fixes as
-//   rows; one card with the cost, the wallet's line and Each sale; the
-//   ladder's missing steps as a state card;
+// · MintReview — a reject or a failure first (13l); then, while a video the
+//   gate needs hasn't started, "Start your videos" leads the screen (owner
+//   2026-11-24: the videos are the step's most important job and sat last,
+//   under facts shown louder): a brand card with how many have started and
+//   each video as a row opening its maker, and the foot's primary is Start
+//   the videos (the next one to start) until all have; What is minted as a
+//   summary card (shared as, the name, its products, the price, share and
+//   royalties large for a Sell); videos still rendering right under it; Terms;
+//   ready or optional videos as one line after Terms; one card with the cost,
+//   the wallet's line and Each sale; the ladder's missing steps as a state card;
 // · MintDone — Mint complete (13d) / Given to the community (08d): the
 //   success head with its date, the ownership proof as a receipt (All details
 //   closed), the listing or what others can do, the videos, then View on
@@ -64,7 +69,7 @@ import { displayProductName } from "@/lib/manual/products-tab-view";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { videoCountOf, videosBlockerOf, videosStartBlockerOf } from "@/lib/manual/readiness";
+import { videoCountOf, videosBlockerOf, videosNotStartedOf, videosStartBlockerOf } from "@/lib/manual/readiness";
 import { hold, heldId } from "@/lib/market/held";
 import { STORY_MAX, sharePostBlocker } from "@/lib/manual/share-post";
 import { FEE_LABEL } from "@/lib/market/fee";
@@ -585,10 +590,15 @@ export function MintReview({
   const terms = termsOf(state, intent, type, input);
   const summary = selling ? terms.filter((r) => SUMMARY_TERMS.has(r.label) && r.label !== "Shared as") : [];
   const rest = terms.filter((r) => r.label !== "Shared as" && !(selling && SUMMARY_TERMS.has(r.label)));
+  // Where the videos sit, by how much they need the maker: a video not started leads the screen; one
+  // still rendering or waiting for review comes right under what is minted; ready (or optional) after Terms.
+  const videoSpot = gate.gated && videosNotStartedOf(gate.readiness).length > 0 ? "first" : gate.gated && videosBlockerOf(gate.readiness) ? "next" : "last";
+  const videos = <VideosBlock projectId={project.id} readiness={gate.readiness} gated={gate.gated} selling={selling} first={videoSpot === "first"} />;
 
   return (
     <div className="flex flex-col gap-8">
       {mintError && <Banner tone="error">{mintError}</Banner>}
+      {videoSpot === "first" && videos}
 
       <SummaryCard
         label="What is minted"
@@ -601,13 +611,15 @@ export function MintReview({
         <p className={cn(T.meta, "line-clamp-3")}>{project.description.trim() || "No description yet."}</p>
       </SummaryCard>
 
+      {videoSpot === "next" && videos}
+
       <section className="flex flex-col gap-4">
         <h3 className={H3}>Terms</h3>
         <FactRows rows={rest} label="Terms" />
         {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
       </section>
 
-      <VideosBlock projectId={project.id} readiness={gate.readiness} gated={gate.gated} selling={selling} />
+      {videoSpot === "last" && videos}
 
       <section aria-label="Cost" className={cn(LIST_CARD, "gap-6 p-8")}>
         {intent !== "save" && <CostCard type={type} network={state.network} intent={intent} listing={selling ? listingCostRow(input) : undefined} />}
@@ -629,9 +641,11 @@ export function MintReview({
   );
 }
 
-/** Product videos (and the project video) as the gate reads them; what's missing opens where it's made. */
-function VideosBlock({ projectId, readiness, gated, selling }: { projectId: string; readiness: Readiness; gated: boolean; selling: boolean }) {
+/** Product videos (and the project video) as the gate reads them; what's missing opens where it's made.
+ *  `first`: some haven't started — the screen's lead card, with how many have. */
+function VideosBlock({ projectId, readiness, gated, selling, first = false }: { projectId: string; readiness: Readiness; gated: boolean; selling: boolean; first?: boolean }) {
   const router = useRouter();
+  const headingId = React.useId();
   const blocker = videosBlockerOf(readiness);
   // Every video started first (CL-030); one still rendering or waiting for review doesn't stop the
   // signature — a Sell's listing waits for it.
@@ -643,6 +657,56 @@ function VideosBlock({ projectId, readiness, gated, selling }: { projectId: stri
   const pv = readiness.project;
   const pvCopy = pv ? projectRowCopy(pv) : null;
   const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
+  const rows = gated && blocker && (
+    <ListCard label="Videos">
+      {readiness.products
+        .filter((p) => p.video.state !== "ready")
+        .map((p) => {
+          const copy = statusCopy(p.video);
+          const label = actionLabel(copy.action);
+          return (
+            <VideoFixRow
+              key={p.productId}
+              title={displayProductName(p.name)}
+              line={copy.text}
+              action={label}
+              onOpen={() => router.push(phoneProductVideoHref(projectId, p.productId))}
+            />
+          );
+        })}
+      {pv && pvCopy && !pv.ok && <VideoFixRow title="Project video" line={pvCopy.text} action={pvAction} onOpen={() => router.push(phoneProjectPath(projectId, "video"))} />}
+    </ListCard>
+  );
+  if (first) {
+    const total = videoCountOf(readiness).total;
+    const started = total - videosNotStartedOf(readiness).length;
+    return (
+      <section aria-labelledby={headingId} className="flex flex-col gap-6 rounded-xl border-[length:var(--border-width-1-5)] border-solid border-border-brand bg-bg-brand-subtle p-8">
+        <div className="flex flex-col gap-3">
+          <span className="w-fit">
+            <Badge tone="brand">Before you sign</Badge>
+          </span>
+          <h3 id={headingId} className={T.title}>
+            Start your videos
+          </h3>
+          <p className={cn(T.body, "text-text-primary")}>
+            {selling
+              ? "Buyers see each product in its video. Start every one now: they keep rendering while you sign, and the listing goes live once each is ready."
+              : "Every product needs its video. Start every one now: they keep rendering while you sign."}
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <div aria-hidden className="flex gap-2">
+            {Array.from({ length: total }, (_, n) => (
+              <span key={n} className={cn("h-[4px] flex-1 rounded-full", n < started ? "bg-bg-brand" : "bg-bg-subtle")} />
+            ))}
+          </div>
+          <p className={T.meta}>{`${started} of ${total} started`}</p>
+        </div>
+        {rows}
+      </section>
+    );
+  }
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-4">
@@ -657,26 +721,7 @@ function VideosBlock({ projectId, readiness, gated, selling }: { projectId: stri
         )}
         {line}
       </p>
-      {gated && blocker && (
-        <ListCard label="Videos">
-          {readiness.products
-            .filter((p) => p.video.state !== "ready")
-            .map((p) => {
-              const copy = statusCopy(p.video);
-              const label = actionLabel(copy.action);
-              return (
-                <VideoFixRow
-                  key={p.productId}
-                  title={displayProductName(p.name)}
-                  line={copy.text}
-                  action={label}
-                  onOpen={() => router.push(phoneProductVideoHref(projectId, p.productId))}
-                />
-              );
-            })}
-          {pv && pvCopy && !pv.ok && <VideoFixRow title="Project video" line={pvCopy.text} action={pvAction} onOpen={() => router.push(phoneProjectPath(projectId, "video"))} />}
-        </ListCard>
-      )}
+      {rows}
     </section>
   );
 }

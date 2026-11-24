@@ -370,3 +370,32 @@ test("videosStartBlockerOf: a video never started holds the maker; rendering or 
   );
   assert.equal(videosStartBlockerOf(failed), "Start every video first: PlantPal hasn't started yet.");
 });
+
+test("nextVideoToStartOf: the first product not started, then the project video, then none (owner 2026-11-24)", async () => {
+  const { nextVideoToStartOf } = await import("../../.tmp-test/lib/manual/readiness.js");
+  const abc = [product("a", "PlantPal"), product("b", "WaveLight"), product("c", "LogTag")];
+  const some = readinessOf(facts({ products: abc, videos: { a: reviewVideo("t_a"), b: renderingVideo("t_b") }, jobs: [renderingJob("t_b", 45)] }), "sell");
+  assert.deepEqual(nextVideoToStartOf(some), { kind: "product", productId: "c", name: "LogTag" });
+  const p = { takes: [pendingTake("t_p")], inUseId: null };
+  const productsStarted = readinessOf(
+    facts({ products: abc, videos: { a: reviewVideo("t_a"), b: renderingVideo("t_b"), c: renderingVideo("t_c") }, jobs: [renderingJob("t_b", 45), renderingJob("t_c", 45)] }),
+    "sell",
+  );
+  assert.deepEqual(nextVideoToStartOf(productsStarted), { kind: "project" });
+  const all = readinessOf(
+    facts({ products: abc, videos: { a: reviewVideo("t_a"), b: renderingVideo("t_b"), c: renderingVideo("t_c"), project: p }, jobs: [renderingJob("t_b", 45), renderingJob("t_c", 45), renderingJob("t_p", 45)] }),
+    "sell",
+  );
+  assert.equal(nextVideoToStartOf(all), null);
+});
+
+test("the phone's mint review leads with the videos while one hasn't started, and its foot opens the next one", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const steps = await readFile(new URL("../../src/components/mobile/project-earn/mint/mint-steps.tsx", import.meta.url), "utf8");
+  const review = steps.slice(steps.indexOf("export function MintReview"), steps.indexOf("function VideosBlock"));
+  assert.ok(review.indexOf('{videoSpot === "first" && videos}') < review.indexOf("<SummaryCard"), "videos before what is minted");
+  assert.match(steps, /Start your videos/);
+  const flow = await readFile(new URL("../../src/components/mobile/project-earn/mint/mint-flow.tsx", import.meta.url), "utf8");
+  assert.match(flow, /Start the videos/);
+  assert.match(flow, /nextVideoToStartOf\(gated\)/);
+});
