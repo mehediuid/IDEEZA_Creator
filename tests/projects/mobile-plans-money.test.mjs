@@ -70,3 +70,14 @@ test("the phone says when credits refill only on a paid plan: the day comes from
   const screens = await readFile(new URL("../../src/components/mobile/plans/credit-screens.tsx", import.meta.url), "utf8");
   assert.match(screens, /once \? "Free credits" : "This month"/);
 });
+
+test("several products start a new project; one product picks New project or A project I have (owner 2026-11-24)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const setup = await readFile(new URL("../../src/components/mobile/ai/setup.tsx", import.meta.url), "utf8");
+  assert.match(setup, /const choosing = \(!multi && projects\.length > 0\) \|\| addTo !== null;/);
+  assert.match(setup, />New project</);
+  assert.match(setup, />A project I have</);
+  assert.doesNotMatch(setup, /go in one project: one you have, or a new one/);
+  const flow = await readFile(new URL("../../src/components/mobile/ai/use-concept-flow.ts", import.meta.url), "utf8");
+  assert.match(flow, /projects: gateMulti \? \[\] : setupProjects/);
+});

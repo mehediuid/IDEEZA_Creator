@@ -30,7 +30,7 @@ From "AI create · 2026 update" on the web's create stores and routes (`lib/crea
 
 - **Start** (`/m/ai`): the hero, the five pieces a build makes, Start from an idea (the web's nine, three at a time, Shuffle), the Prompt Box (Enter sends, grows to five lines, Enhance, Quality Low · Medium · High kept like Home), the credits line with "How credits are spent"; out of credits the send is held with Buy credits; ⋯ History, Buy credits.
 - **Voice**: Listening…, the words as they come, the mic-level waveform, ✕ to discard, ✓ to put them in the box; a blocked microphone says "Microphone is off" with Try again.
-- **The question** (`/m/ai/chat/<id>`): the idea bubble (Show full prompt), the reading card, What should we build for several products, then Which project is this for? (one you have, or a new name) or What should the project be called?; Start drawing shows its credits and waits for a project; closing it unanswered leaves a Required step card.
+- **The question** (`/m/ai/chat/<id>`): the idea bubble (Show full prompt), the reading card, What should we build for several products, then Which project is this for? (ONE product only: New project or A project I have) or What should the project be called? (several products always start a new project, owner 2026-11-24); Start drawing shows its credits and waits for a project; closing it unanswered leaves a Required step card.
 - **Concepts**: a card per product — drawing (real elapsed time), ready (View & refine), failed (the reason, Try again for 1 credit) — with a tick for whether an extra product is in the build and suggested products; the product sheet (drawing, prompt, spec facts, Edit spec, what will be built with its Quality, Refine / Regenerate for 1 credit, dots between products); Refine lands as Concept N.M.
 - **Edit spec**: Size, Power, Add a part, Wireless, Case, Brain, Inside, saved as you go, free; a built product is read only. **Network**: optional links between products with Change link and Remove network.
 - **Build**: the Build line (cost, time, held with its reason), the Build sheet (pieces and credits per product, balance before and after, Buy credits when short), then the build card in the web's words — queued (Cancel), running, a failed piece retried free, stopped (Try again), paused (Buy credits), overrun (Stop and refund); a tab per product.
@@ -315,7 +315,7 @@ Owner: "the mobile app must work the way mobile UX works, not the web made respo
 - **The question**:
   - the reading card folds once the question is asked;
   - What should we build? is one grouped list (whole-row ticks, trash, "Always included"), with the web's note behind ⓘ and Continue / Start drawing in a foot that sticks to the screen's foot;
-  - Which project…? lists "+ Start a new project" (its name field under it) and the existing projects as pick rows in the sheet, with the decided products as a row back to the question.
+  - Which project…? (one product, owner 2026-11-24) is two radio cards: **New project** (picked first, its name field inside; the plan's card there when every project is in use) and **A project I have** (the projects as pick rows inside). Several products get What should the project be called? with the decided products as a row back to the question; at the Build gate their limit card offers no project to build into.
 - **History**:
   - each tab is one grouped list: thumb, title with its time, one line of prompt or pieces, then project and build count;
   - a failed build has a "Steps · k of n ready" row (each failed step with Retry) and Try again.

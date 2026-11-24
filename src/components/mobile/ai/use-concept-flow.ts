@@ -267,12 +267,18 @@ export function useConceptFlow(chatId: string) {
       builds.filter((b) => b.chatId === chat.id).map((b) => b.projectId),
     );
   }, [chat, answeredSetupId, projects, builds]);
+  // "Use a project I have" only for one product: several always start a new project (owner 2026-11-24),
+  // so their card offers the plan and room in My projects, never a project to build into.
+  const gateMulti = React.useMemo(() => {
+    const t = chat?.turns.find((x) => x.id === answeredSetupId);
+    return t?.role === "setup" && !!t.answer && t.answer.picked.length > 0;
+  }, [chat, answeredSetupId]);
   const gateLimit = React.useMemo(
     () =>
       room.full && gateNeedsRoom && chat && answeredSetupId
-        ? { projects: setupProjects, onUse: (projectId: string) => setSetupProject(chat.id, answeredSetupId, projectId) }
+        ? { projects: gateMulti ? [] : setupProjects, onUse: (projectId: string) => setSetupProject(chat.id, answeredSetupId, projectId) }
         : null,
-    [room.full, gateNeedsRoom, chat, answeredSetupId, setupProjects, setSetupProject],
+    [room.full, gateNeedsRoom, gateMulti, chat, answeredSetupId, setupProjects, setSetupProject],
   );
 
   // ── renders ──────────────────────────────────────────────────────
