@@ -24,10 +24,13 @@
 //   Product videos (a row per product) and Project video (the project's row),
 //   each with Generate video opening its maker, and the foot's primary is Generate
 //   the videos (the next one to start) until all have; What is minted as a
-//   summary card (shared as, the name, its products, the price, share and
-//   royalties large for a Sell); videos still rendering right under it; Terms;
-//   ready or optional videos as one line after Terms; one card with the cost,
-//   the wallet's line and Each sale; the ladder's missing steps as a state card;
+//   videos still rendering in the same place; the ladder's missing steps as a
+//   state card; then ONE closed row, Listing details (Mint details), whose line
+//   is the gist ("car · Buy now 1 USDC · 100% of the project · nothing to pay
+//   now") — inside: the products and every term in one list, the share-sale
+//   note, ready or optional videos, and one card with the cost, the wallet's
+//   line and Each sale (owner 2026-11-24: on a phone only what needs acting on
+//   stays open; the maker set the rest in the steps before);
 // · MintDone — Mint complete (13d) / Given to the community (08d): the
 //   success head with its date, the ownership proof as a receipt (All details
 //   closed), the listing or what others can do, the videos, then View on
@@ -43,7 +46,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertCircleIcon, CheckmarkCircle01Icon, Coins01Icon, CircleIcon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, ArrowDown01Icon, CheckmarkCircle01Icon, Coins01Icon, CircleIcon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field, useFieldIds } from "@/components/auth/auth-parts";
 import { INTENTS } from "@/components/brief/step-choose";
@@ -587,59 +590,75 @@ export function MintReview({
     { handled: selling ? LIST_HANDLED : MINT_HANDLED },
   );
   const names = products.map((p) => displayProductName(p.name));
-  const detail = `${names.length} ${names.length === 1 ? "product" : "products"}${names.length ? ` · ${names.join(", ")}` : ""}`;
   const priced = (toMicros(input.price.trim()) ?? BigInt(0)) > BigInt(0);
   const eachSale = input.type === "buyNow" && !priced ? [{ label: FEE_LABEL, value: "taken from the price of each sale" }] : listingSummaryRows(input, ctx);
   const terms = termsOf(state, intent, type, input);
   const summary = selling ? terms.filter((r) => SUMMARY_TERMS.has(r.label) && r.label !== "Shared as") : [];
   const rest = terms.filter((r) => r.label !== "Shared as" && !(selling && SUMMARY_TERMS.has(r.label)));
-  // Where the videos sit, by how much they need the maker: a video not started leads the screen; one
-  // still rendering or waiting for review comes right under what is minted; ready (or optional) after Terms.
+  // Only what the maker has to act on stays open (owner 2026-11-24: "it's a mobile app — show the
+  // needed content; this much confuses the user"): videos still to generate or still rendering, and
+  // the ladder's missing steps. Everything they already set (what is minted, the terms, the cost,
+  // each sale, ready videos) folds into one closed row whose line says the gist.
   const videoSpot = gate.gated && videosNotStartedOf(gate.readiness).length > 0 ? "first" : gate.gated && videosBlockerOf(gate.readiness) ? "next" : "last";
   const videos = <VideosBlock projectId={project.id} projectName={project.name} readiness={gate.readiness} gated={gate.gated} selling={selling} first={videoSpot === "first"} />;
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
+  const detailsId = React.useId();
+  const price = summary.find((r) => r.label === "Buy now" || r.label === "Auction");
+  const share = summary.find((r) => r.label === "Selling");
+  const gist = [
+    project.name,
+    ...(selling ? [price ? `${price.label} ${price.value}` : null, share ? share.value : null] : [SHARED_AS[intent]]),
+    type === "instant" ? "you pay on chain now" : "nothing to pay now",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const detailRows = [{ label: "Products", value: names.join(", ") || "None yet" }, ...summary, ...rest];
 
   return (
     <div className="flex flex-col gap-8">
       {mintError && <Banner tone="error">{mintError}</Banner>}
-      {videoSpot === "first" && videos}
-
-      <SummaryCard
-        label="What is minted"
-        overline={SHARED_AS[intent]}
-        headline={project.name}
-        amount={false}
-        sub={detail}
-        facts={summary.map((r) => ({ label: r.label, value: r.label === "Selling" ? r.value.replace(" of the project", "") : r.value }))}
-      >
-        <p className={cn(T.meta, "line-clamp-3")}>{project.description.trim() || "No description yet."}</p>
-      </SummaryCard>
-
-      {videoSpot === "next" && videos}
-
-      <section className="flex flex-col gap-4">
-        <h3 className={H3}>Terms</h3>
-        <FactRows rows={rest} label="Terms" />
-        {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
-      </section>
-
-      {videoSpot === "last" && videos}
-
-      <section aria-label="Cost" className={cn(LIST_CARD, "gap-6 p-8")}>
-        {intent !== "save" && <CostCard type={type} network={state.network} intent={intent} listing={selling ? listingCostRow(input) : undefined} />}
-        <WalletLine type={type} network={state.network} badge={intent === "save"} ruled={intent !== "save"} />
-        {selling && (
-          <div aria-label="Each sale" className="flex flex-col gap-2 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
-            <h3 className={H3}>Each sale</h3>
-            {eachSale.map((r, i) => (
-              <p key={i} className={NOTE}>
-                {r.label ? `${r.label} · ${r.value}` : r.value}
-              </p>
-            ))}
-          </div>
-        )}
-      </section>
+      {videoSpot !== "last" && videos}
 
       <StepsCard check={ladder} what={selling ? "mint and list" : "mint"} projectId={project.id} license={state.license} />
+
+      <section aria-labelledby={detailsId} className="flex flex-col gap-6">
+        <button
+          type="button"
+          aria-expanded={detailsOpen}
+          aria-controls={`${detailsId}-panel`}
+          onClick={() => setDetailsOpen((o) => !o)}
+          className="-my-3 flex min-h-[44px] w-full items-center gap-4 text-left outline-none focus-visible:underline"
+        >
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span id={detailsId} className={T.rowTitle}>
+              {selling ? "Listing details" : "Mint details"}
+            </span>
+            {!detailsOpen && <span className={cn(NOTE, "line-clamp-2 break-words")}>{gist}</span>}
+          </span>
+          <span aria-hidden className={cn("inline-flex shrink-0 text-[color:var(--color-icon-default)] transition-transform duration-fast motion-reduce:transition-none", detailsOpen && "rotate-180")}>
+            <Icon icon={ArrowDown01Icon} size={20} />
+          </span>
+        </button>
+        <div id={`${detailsId}-panel`} hidden={!detailsOpen} className={cn("flex-col gap-8", detailsOpen ? "flex" : "hidden")}>
+          <FactRows rows={detailRows} label={selling ? "Listing details" : "Mint details"} />
+          {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
+          {videoSpot === "last" && videos}
+          <section aria-label="Cost" className={cn(LIST_CARD, "gap-6 p-8")}>
+            {intent !== "save" && <CostCard type={type} network={state.network} intent={intent} listing={selling ? listingCostRow(input) : undefined} />}
+            <WalletLine type={type} network={state.network} badge={intent === "save"} ruled={intent !== "save"} />
+            {selling && (
+              <div aria-label="Each sale" className="flex flex-col gap-2 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
+                <h3 className={H3}>Each sale</h3>
+                {eachSale.map((r, i) => (
+                  <p key={i} className={NOTE}>
+                    {r.label ? `${r.label} · ${r.value}` : r.value}
+                  </p>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </section>
     </div>
   );
 }

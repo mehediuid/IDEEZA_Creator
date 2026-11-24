@@ -393,11 +393,22 @@ test("the phone's mint review leads with the videos while one hasn't started, an
   const { readFile } = await import("node:fs/promises");
   const steps = await readFile(new URL("../../src/components/mobile/project-earn/mint/mint-steps.tsx", import.meta.url), "utf8");
   const review = steps.slice(steps.indexOf("export function MintReview"), steps.indexOf("function VideosBlock"));
-  assert.ok(review.indexOf('{videoSpot === "first" && videos}') < review.indexOf("<SummaryCard"), "videos before what is minted");
+  assert.ok(review.indexOf('{videoSpot !== "last" && videos}') < review.indexOf("aria-expanded={detailsOpen}"), "videos to act on before the details");
   assert.match(steps, /Generate your videos/);
   assert.match(steps, /<Eyebrow tone="tertiary">Project video<\/Eyebrow>/);
   assert.match(steps, /const GENERATE = "Generate video";/);
   const flow = await readFile(new URL("../../src/components/mobile/project-earn/mint/mint-flow.tsx", import.meta.url), "utf8");
   assert.match(flow, /Generate the videos/);
   assert.match(flow, /nextVideoToStartOf\(gated\)/);
+});
+
+test("the phone's mint review folds what the maker already set into one closed Listing details row (owner 2026-11-24)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const steps = await readFile(new URL("../../src/components/mobile/project-earn/mint/mint-steps.tsx", import.meta.url), "utf8");
+  const review = steps.slice(steps.indexOf("export function MintReview"), steps.indexOf("function VideosBlock"));
+  assert.doesNotMatch(review, /<SummaryCard/, "no big What is minted card");
+  assert.match(review, /useState\(false\)/, "starts closed");
+  assert.match(review, /"Listing details" : "Mint details"/);
+  assert.ok(review.indexOf("<StepsCard") < review.indexOf("aria-expanded={detailsOpen}"), "missing steps stay open, above the fold");
+  assert.ok(review.indexOf('aria-label="Cost"') > review.indexOf("aria-expanded={detailsOpen}"), "the cost is inside the fold");
 });
