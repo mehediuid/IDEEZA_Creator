@@ -25,6 +25,7 @@ import {
   ACCOUNT_CONTENT,
   AccountAlert,
   AccountHeading,
+  DELETED_WORDS,
   PasswordChecklist,
   REFUSED_ALERT,
 } from "@/components/mobile/account/parts";
@@ -90,7 +91,13 @@ export default function ResetPage() {
     }
     setRefused(false);
     const now = clockNow();
-    if (!(await resetPassword(email, password, now, phonePasswordProblem)).ok) {
+    const reset = await resetPassword(email, password, now, phonePasswordProblem, { twoStepFirst: true });
+    if (!reset.ok) {
+      if ("deleted" in reset && reset.deleted) {
+        // Past the 30 days after Delete account: gone for good, as Log In says.
+        toastAfterReload(DELETED_WORDS.title);
+        return window.location.replace("/m/welcome");
+      }
       setBusy(false);
       return setRefused(true);
     }

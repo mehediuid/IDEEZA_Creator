@@ -57,7 +57,7 @@ export function AccountSettings() {
         <WalletRow />
       </SettingsGroup>
       <SettingsGroup label="Security">
-        <SettingsRow id="sign-in" icon={Shield01Icon} label="Sign-in & security" helper="Password, 2-step sign-in, devices" href="/m/settings/security" />
+        <SettingsRow id="sign-in" icon={Shield01Icon} label="Sign-in & security" helper="Password, 2-step sign-in, devices, deactivate or delete" href="/m/settings/security" />
       </SettingsGroup>
     </SettingsScreen>
   );

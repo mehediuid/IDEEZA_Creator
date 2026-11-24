@@ -117,20 +117,47 @@ test("devices: what the browser says, signing out the others, the demo phone", (
   assert.equal(sec.thisDeviceId(() => 0.1), id, "made once");
 });
 
-test("a deletion waits 30 days, then is due; restoring cancels it", () => {
+test("a deletion waits 30 days, then is due; cancelling it clears it", () => {
   const s = sec.scheduleDeletion(sec.normalizeAccountSecurity({}), NOW, "  Privacy worries ");
   assert.equal(s.deletion.until - NOW, 30 * 24 * 60 * 60_000);
   assert.equal(s.deletion.reason, "Privacy worries");
   assert.equal(sec.deletionStateOf(s, NOW + 1000), "scheduled");
   assert.equal(sec.deletionStateOf(s, s.deletion.until), "due");
   assert.equal(sec.deletionStateOf(sec.cancelDeletion(s), NOW), "none");
-  assert.equal(sec.owesRestore(s, NOW - 5, NOW + 1000), false, "not in the session that asked for it");
-  assert.equal(sec.owesRestore(s, NOW + 500, NOW + 1000), true, "on the next sign-in");
-  assert.equal(sec.owesRestore(s, NOW - 5, s.deletion.until + 1), true, "once due, whatever the session");
-  assert.equal(sec.owedOf(s, NOW + 500, "d", NOW + 1000), "restore");
-  const both = sec.twoStepOn(s, "JBSWY3DPEHPK3PXP", sec.newBackupCodes(), NOW, 1);
+  assert.equal(sec.closedStateOf(s, NOW + 1000), "deleting");
+  assert.equal(sec.closedStateOf(s, s.deletion.until), "deleted");
+});
+
+test("deactivating has no time limit; deleting and deactivating replace each other", () => {
+  const off = sec.deactivateAccount(sec.normalizeAccountSecurity({}), NOW, " A break ");
+  assert.deepEqual(off.deactivation, { at: NOW, reason: "A break", plan: null });
+  assert.equal(sec.closedStateOf(off, NOW + 10 * 365 * 24 * 60 * 60_000), "deactivated", "years later still only deactivated");
+  const del = sec.scheduleDeletion(off, NOW + 5, "");
+  assert.equal(del.deactivation, null);
+  assert.equal(sec.closedStateOf(del, NOW + 6), "deleting");
+  assert.equal(sec.deactivateAccount(del, NOW + 7, "").deletion, null);
+  assert.equal(sec.closedThisSession(off, NOW - 1), true, "the session that asked for it");
+  assert.equal(sec.closedThisSession(off, NOW + 1), false, "a later sign-in");
+  // Kept through a save.
+  const back = sec.normalizeAccountSecurity(JSON.parse(JSON.stringify(off)));
+  assert.deepEqual(back.deactivation, off.deactivation);
+});
+
+test("a Log In reopens the account once, and the gate owes its welcome-back note", () => {
+  const off = sec.deactivateAccount(sec.normalizeAccountSecurity({}), NOW, "");
+  const open = sec.reopenAccount(off, NOW + 1000);
+  assert.equal(open.deactivation, null);
+  assert.deepEqual(open.reopened, { from: "deactivated", at: NOW + 1000, since: NOW, plan: null });
+  assert.equal(sec.owedOf(open, NOW + 1000, "d", NOW + 1000), "restore");
+  const both = sec.twoStepOn(open, "JBSWY3DPEHPK3PXP", sec.newBackupCodes(), NOW, 1);
   assert.equal(sec.owedOf(both, NOW + 500, "d", NOW + 1000), "two-step", "the code comes first");
-  assert.equal(sec.owedOf(sec.normalizeAccountSecurity({}), NOW, "d", NOW), null);
+  assert.equal(sec.owedOf(sec.reopenedSeen(open), NOW + 1000, "d", NOW + 1000), null);
+  const del = sec.reopenAccount(sec.scheduleDeletion(sec.normalizeAccountSecurity({}), NOW, ""), NOW + 99);
+  assert.equal(del.deletion, null);
+  assert.equal(del.reopened.from, "deletion");
+  const active = sec.normalizeAccountSecurity({});
+  assert.equal(sec.reopenAccount(active, NOW), active, "nothing changes for an active account");
+  assert.equal(sec.owedOf(active, NOW, "d", NOW), null);
 });
 
 const signUp = async (email, password = "Old-Horse-77") => {
@@ -186,4 +213,71 @@ test("a provider can't be disconnected while it is the only way in", () => {
   assert.deepEqual(phone.phoneAccountOf(phone.readPhoneAccounts(), "rafi@mail.com").providers, ["google"]);
   assert.ok(phone.movePhoneAccount("rafi@mail.com", "rafi.ahmed@mail.com").ok);
   assert.deepEqual(phone.phoneAccountOf(phone.readPhoneAccounts(), "rafi.ahmed@mail.com").providers, ["google"]);
+});
+
+test("every Log In makes a closed account active again; past 30 days it is deleted for good", async () => {
+  await signUp("rafi@mail.com");
+  await auth.signOut();
+  sec.updateSecurity("rafi@mail.com", (s) => sec.deactivateAccount(s, NOW, ""));
+  assert.equal(await auth.signIn("rafi@mail.com", "Old-Horse-77", NOW + 1000), "ok");
+  const opened = sec.securityOf(sec.readSecurity(), "rafi@mail.com");
+  assert.equal(opened.deactivation, null);
+  assert.equal(opened.reopened.from, "deactivated");
+
+  await auth.signOut();
+  sec.updateSecurity("rafi@mail.com", (s) => sec.scheduleDeletion(sec.reopenedSeen(s), NOW, ""));
+  assert.equal(await auth.signIn("rafi@mail.com", "wrong-password", NOW + 2000), "wrong", "a wrong password changes nothing");
+  assert.equal(sec.closedStateOf(sec.securityOf(sec.readSecurity(), "rafi@mail.com"), NOW + 2000), "deleting");
+  assert.equal((await auth.providerSignIn("rafi@mail.com", { first: "", last: "" }, NOW + 3000)), "in", "Google or Facebook reopens it too");
+  assert.equal(sec.securityOf(sec.readSecurity(), "rafi@mail.com").reopened.from, "deletion");
+
+  await auth.signOut();
+  sec.updateSecurity("rafi@mail.com", (s) => sec.scheduleDeletion(sec.reopenedSeen(s), NOW, ""));
+  assert.ok((await auth.resetPassword("rafi@mail.com", "New-horse-7!", NOW + 4000)).ok, "a reset link reopens it");
+  assert.equal(sec.securityOf(sec.readSecurity(), "rafi@mail.com").deletion, null);
+
+  await auth.signOut();
+  sec.updateSecurity("rafi@mail.com", (s) => sec.scheduleDeletion(s, NOW, ""));
+  store.set("ideeza:m:accounts", JSON.stringify({ "rafi@mail.com": { providers: [] } }));
+  const due = NOW + 30 * 24 * 60 * 60_000 + 1;
+  assert.equal(await auth.signIn("rafi@mail.com", "New-horse-7!", due), "deleted");
+  assert.equal(auth.accountOf(auth.readAccounts(), "rafi@mail.com"), null);
+  assert.equal(auth.readSession(), null);
+  assert.equal(sec.readSecurity()["rafi@mail.com"], undefined);
+  assert.equal(JSON.parse(store.get("ideeza:m:accounts"))["rafi@mail.com"], undefined);
+  assert.equal(await auth.signIn("rafi@mail.com", "New-horse-7!", due + 1), "wrong", "gone: like any unknown email");
+});
+
+test("the phone's 2-step code comes before the account opens again", async () => {
+  await signUp("rafi@mail.com");
+  await auth.signOut();
+  sec.updateSecurity("rafi@mail.com", (s) => sec.twoStepOn(sec.deactivateAccount(s, NOW, ""), "JBSWY3DPEHPK3PXP", sec.newBackupCodes(), NOW, 1));
+  assert.equal(await auth.signIn("rafi@mail.com", "Old-Horse-77", NOW + 1000, "", { twoStepFirst: true }), "ok");
+  assert.equal(sec.closedStateOf(sec.securityOf(sec.readSecurity(), "rafi@mail.com"), NOW + 1000), "deactivated", "a password alone never reopens it");
+  assert.equal(auth.comeBack("rafi@mail.com", NOW + 2000), "open", "the code's screen does");
+  assert.equal(sec.securityOf(sec.readSecurity(), "rafi@mail.com").reopened.from, "deactivated");
+  await auth.signOut();
+  sec.updateSecurity("rafi@mail.com", (s) => sec.deactivateAccount(s, NOW, ""));
+  assert.equal(await auth.signIn("rafi@mail.com", "Old-Horse-77", NOW + 3000), "ok", "the website asks no code");
+  assert.equal(sec.securityOf(sec.readSecurity(), "rafi@mail.com").deactivation, null);
+});
+
+test("a welcome-back note is only for the sign-in that made it", () => {
+  const open = sec.reopenAccount(sec.deactivateAccount(sec.normalizeAccountSecurity({}), NOW, ""), NOW + 1000);
+  assert.equal(sec.owesRestore(open, NOW + 1000), true);
+  assert.equal(sec.owesRestore(open, NOW + 5000), false, "a later sign-in never sees an old note");
+  const kept = sec.normalizeAccountSecurity(JSON.parse(JSON.stringify(sec.reopenAccount(sec.scheduleDeletion(sec.normalizeAccountSecurity({}), NOW, "", { name: "Builder", endsAt: NOW + 9 }), NOW + 1))));
+  assert.deepEqual(kept.reopened.plan, { name: "Builder", endsAt: NOW + 9 }, "the plan that stopped renewing rides along");
+});
+
+test("every account past its 30 days goes when IDEEZA opens", async () => {
+  await signUp("old@mail.com");
+  await auth.signOut();
+  await signUp("rafi@mail.com");
+  sec.updateSecurity("old@mail.com", (s) => sec.scheduleDeletion(s, NOW, ""));
+  sec.updateSecurity("rafi@mail.com", (s) => sec.deactivateAccount(s, NOW, ""));
+  assert.deepEqual(auth.sweepDeletedAccounts(NOW + 29 * 24 * 60 * 60_000), [], "not yet");
+  assert.deepEqual(auth.sweepDeletedAccounts(NOW + 30 * 24 * 60 * 60_000), ["old@mail.com"]);
+  assert.equal(auth.accountOf(auth.readAccounts(), "old@mail.com"), null);
+  assert.ok(auth.accountOf(auth.readAccounts(), "rafi@mail.com"), "a deactivated account is never swept");
 });

@@ -37,11 +37,11 @@ function useHolds(): Record<CategoryId, string> | null {
   return holds;
 }
 
-type Where = "download" | "erase" | "restore";
+export type Where = "download" | "erase" | "restore" | "leave";
 type Made = { name: string; files: number; bytes: number };
 
-/** One download at a time, said where it was started. */
-function useDownload() {
+/** One download at a time, said where it was started (also Delete account's, beside its button). */
+export function useDownload() {
   const [busy, setBusy] = React.useState<ExportProgress | null>(null);
   const [from, setFrom] = React.useState<Where>("download");
   const [made, setMade] = React.useState<Made | null>(null);
@@ -72,10 +72,10 @@ function useDownload() {
   return { busy, from, made, error, start };
 }
 
-type Download = ReturnType<typeof useDownload>;
+export type Download = ReturnType<typeof useDownload>;
 
 /** The download's progress, its result or its error, under the button that started it. */
-function DownloadStatus({ dl, where }: { dl: Download; where: Where }) {
+export function DownloadStatus({ dl, where }: { dl: Download; where: Where }) {
   if (dl.from !== where) return null;
   return (
     <div aria-live="polite" className="flex flex-col gap-[8px] empty:hidden">

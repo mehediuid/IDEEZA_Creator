@@ -13,7 +13,9 @@
 //     badge; Manage or Connect opens the wallet dialog.
 //   sign-in  — the email you're signed in with and Sign out (the demo sign-in,
 //     lib/account/auth.ts); your work lives in this browser, and Download your
-//     information keeps a copy.
+//     information keeps a copy. At its foot, Deactivate account and Delete
+//     account (rows `deactivate`, `delete-account`), each opening its dialog
+//     (leave-dialogs.tsx); `?leave=deactivate|delete` opens one from a link.
 
 import * as React from "react";
 import Link from "next/link";
@@ -31,8 +33,10 @@ import { saveProfile, useMyProfile } from "@/lib/people/profile-store";
 import { demoAddress, makerId, shortAddress } from "@/lib/wallet/demo-wallet";
 import { identityLabelOf, networkLabelOf } from "@/lib/wallet/request-view";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { leaveRowsOf } from "@/lib/account/closing";
 import { cn } from "@/lib/utils";
-import { CardFormActions, SAVE_FAILED, SettingsCard } from "./settings-card";
+import { DeactivateDialog, DeleteDialog, type LeaveDialog } from "./leave-dialogs";
+import { CardFormActions, SAVE_FAILED, SettingsCard, SettingsRow } from "./settings-card";
 import { SettingsFrame } from "./settings-frame";
 
 /** Phones get 44 px targets. */
@@ -399,9 +403,26 @@ function WalletCard() {
 
 // ─────────────────────────── sign-in ───────────────────────────
 
+/** `?leave=deactivate|delete`: the dialog a link or a search asks for, opened once (the address
+ *  drops it, so Back or a reload doesn't open it again). */
+function useAskedLeave(open: (d: LeaveDialog) => void) {
+  React.useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const asked = q.get("leave");
+    if (asked !== "deactivate" && asked !== "delete") return;
+    open(asked);
+    q.delete("leave");
+    const search = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+  }, [open]);
+}
+
 function SignInCard() {
   const { hydrated, account } = useAuth();
   const signOut = useSignOut();
+  const [leave, setLeave] = React.useState<LeaveDialog | null>(null);
+  useAskedLeave(setLeave);
+  const rows = leaveRowsOf("Sign in");
   return (
     <SettingsCard
       id="sign-in"
@@ -426,6 +447,18 @@ function SignInCard() {
           </Button>
         </div>
       </div>
+      <div className="mt-[8px] flex flex-col border-t border-solid border-border">
+        <SettingsRow id="deactivate" label="Deactivate account" help={rows.deactivate} onClick={() => setLeave("deactivate")} disabled={!hydrated} />
+        <SettingsRow
+          id="delete-account"
+          label={<span className="text-text-error">Delete account</span>}
+          help={rows.delete}
+          onClick={() => setLeave("delete")}
+          disabled={!hydrated}
+        />
+      </div>
+      {leave === "deactivate" && <DeactivateDialog onClose={() => setLeave(null)} onSwitch={() => setLeave("delete")} />}
+      {leave === "delete" && <DeleteDialog onClose={() => setLeave(null)} onSwitch={() => setLeave("deactivate")} />}
     </SettingsCard>
   );
 }

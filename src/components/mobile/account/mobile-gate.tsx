@@ -10,7 +10,8 @@
 //   first may browse; anyone else goes to Welcome, carrying where they were
 //   going. The Shared kit is open to all.
 // Signed in, a sign-in that still owes something goes there first: the 2-step
-// code (AU-07), then Restore for an account set to be deleted (AU-65), then a
+// code (AU-07), then the one note that a deactivated account, or one set to be
+// deleted, is active again (AU-65, /m/restore), then a
 // Google / Facebook account's Finish your account (AUTH-2: the date of birth
 // and the Terms box the web never lets an account in without).
 // Signed in, on a tab screen, one thing at a time and in this order: the tour
@@ -20,7 +21,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { SESSION_KEY, needsAccountDetails, signOut, useAuth } from "@/lib/account/auth";
+import { SESSION_KEY, needsAccountDetails, signOut, sweepDeletedAccounts, useAuth } from "@/lib/account/auth";
 import {
   ENTRY_PATH,
   SETUP_PATH,
@@ -31,6 +32,7 @@ import {
   usePhone,
 } from "@/lib/account/phone";
 import { owedOf, readDeviceId, useSecurity } from "@/lib/account/security";
+import { isLeaving } from "@/components/account-leave/leave";
 import { parseStored, useStoredKey } from "@/lib/key-store";
 import { ForcedThemeContext } from "../kit/sheet";
 import { SplashScreen } from "../screen";
@@ -107,11 +109,14 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   // that says so is on its way, so the signed-out redirect below stands aside.
   const forgetting = React.useRef(false);
   React.useEffect(() => {
-    if (target && !forgetting.current) router.replace(target);
+    // Deactivate / Delete account is ending this session on its way to /m/left: stand aside.
+    if (target && !forgetting.current && !isLeaving()) router.replace(target);
   }, [target, router]);
 
   // The campaign tag of the link that opened the app, for the account made from it.
   React.useEffect(() => keepUtm(window.location.search), []);
+  // Accounts past their 30 days after Delete account go whenever the app opens, signed in or not.
+  React.useEffect(() => void sweepDeletedAccounts(Date.now()), []);
 
   const [holding, setHolding] = React.useState(true);
   React.useEffect(() => {
@@ -132,10 +137,12 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   // Logged in without Remember me: a cold start (a new tab) ends that sign-in, on Welcome as after
   // any sign-out — never silently (AUTH-8): it says "Your session expired", and Log In goes back to
   // the page that was opened.
-  const forget = ready && signedIn && phone.forgetSession && !isAlive();
+  // Not on the way-in screens: a sign-in is finishing there (signing in clears this tab's memory a
+  // moment before it marks the tab alive), so its own new session is never taken for an old one.
+  const forget = ready && signedIn && phone.forgetSession && !isAlive() && !ENTRY_PATH.test(pathname);
   const expiredTo = forget ? sessionExpiredHref(pathname, window.location.search) : null;
   React.useEffect(() => {
-    if (!expiredTo || forgetting.current) return;
+    if (!expiredTo || forgetting.current || isLeaving()) return;
     forgetting.current = true;
     void signOut().then(() => window.location.replace(expiredTo));
   }, [expiredTo]);

@@ -5,5 +5,7 @@ export const accountRows: SettingsRowEntry[] = [
   { id: "handle", label: "Handle", help: "Your profile address", keywords: ["username", "url", "profile link", "address", "copy link"] },
   { id: "legal-name", label: "Legal name", help: "Private. Used for the identity check and on invoices", keywords: ["real name", "full name", "first name", "last name"] },
   { id: "wallet", label: "Wallet", help: "The wallet connected to your account", keywords: ["crypto", "address", "connect wallet", "network"] },
-  { id: "sign-in", label: "Sign-in and security", help: "Your email and Sign out", keywords: ["password", "2fa", "two-factor", "2-step", "log out", "logout", "sign out", "delete account", "deactivate", "devices", "sessions", "seed phrase"] },
+  { id: "sign-in", label: "Sign-in and security", help: "Your email and Sign out", keywords: ["password", "2fa", "two-factor", "2-step", "log out", "logout", "sign out", "devices", "sessions", "seed phrase"] },
+  { id: "deactivate", label: "Deactivate account", help: "Hide your account for now. Sign in any time to come back.", keywords: ["deactivate", "pause", "disable", "hide account", "temporarily", "close account", "take a break from account"] },
+  { id: "delete-account", label: "Delete account", help: "You have 30 days to change your mind.", keywords: ["delete account", "close account", "remove account", "leave", "permanently", "erase account"] },
 ];

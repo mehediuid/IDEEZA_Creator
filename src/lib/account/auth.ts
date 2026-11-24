@@ -16,6 +16,7 @@ import * as React from "react";
 import { parseStored, readStoredKey, storedUnreadable, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
 import { readProfileFields, saveProfile } from "../people/profile-store";
 import { countryCodeOf, countryNameOf } from "./countries";
+import { closedStateOf, dropSecurity, readDeviceId, readSecurity, reopenAccount, securityOf, twoStepPending, updateSecurity } from "./security";
 import { enterWork, isWorkKey, parkWork, parkedPrefix } from "./work-vault";
 import { ZONE_COUNTRIES } from "./zone-countries";
 
@@ -427,12 +428,16 @@ export async function providerSignIn(
   name: { first: string; last: string },
   now: number,
   utmSource = "",
-): Promise<"in" | "new" | "refused"> {
+  opts: SignInOpts = {},
+): Promise<"in" | "new" | "refused" | "deleted"> {
   const e = normalizeEmail(email);
   if (!isEmail(e)) return "refused";
   const found = accountOf(readAccounts(), e);
   if (found) {
     if (found.verifiedAt === null && !saveAccount({ ...found, verifiedAt: now }).ok) return "refused";
+    const back = comeBack(e, now, opts);
+    if (back === "deleted") return "deleted";
+    if (back === "refused") return "refused";
     await comeIn(e, found.verifiedAt === null);
     return startSession(e, now).ok ? "in" : "refused";
   }
@@ -532,6 +537,55 @@ export function changeAccountEmail(newEmail: string): EmailChange {
   return writeStoredKey(SESSION_KEY, { v: 1, email: e, at: session?.at ?? Date.now() } satisfies Session).ok ? "ok" : "refused";
 }
 
+/** Logging in makes a deactivated account, or one waiting to be deleted, active again (owner,
+ *  2026-11-24), on every way in: here, so no screen can forget it. Past its 30 days the account is
+ *  deleted for good instead, and the Log In fails with "deleted". */
+export function comeBack(email: string, now: number, opts: SignInOpts = {}): "open" | "deleted" | "refused" {
+  const e = normalizeEmail(email);
+  const s = securityOf(readSecurity(), e);
+  // The phone asks its 2-step code after this: the code's screen calls comeBack once it is right.
+  if (opts.twoStepFirst && twoStepPending(s, readDeviceId())) return "open";
+  const state = closedStateOf(s, now);
+  if (state === "deleted") {
+    deleteForGood(e);
+    return "deleted";
+  }
+  if (state === "active") return "open";
+  return updateSecurity(e, (s) => reopenAccount(s, now)).ok ? "open" : "refused";
+}
+
+/** phone.ts's PHONE_ACCOUNTS_KEY, written out: phone.ts imports this file, and reads it while loading. */
+const PHONE_ACCOUNTS_KEY = "ideeza:m:accounts";
+
+/** How a way in is used: the phone's screens ask the 2-step code after signing in, so they pass
+ *  `twoStepFirst` (the website asks no code). */
+export type SignInOpts = { twoStepFirst?: boolean };
+
+/** Whenever IDEEZA opens (web and phone): every account past its 30 days goes, signed in or not. */
+export function sweepDeletedAccounts(now: number): string[] {
+  const gone: string[] = [];
+  for (const [email, s] of Object.entries(readSecurity())) {
+    if (closedStateOf(s, now) !== "deleted") continue;
+    if (deleteForGood(email).ok) gone.push(email);
+  }
+  return gone;
+}
+
+/** The 30 days after Delete account are over: the account, its work, its sign-in methods and its
+ *  security record go. */
+export function deleteForGood(email: string): WriteResult {
+  const e = normalizeEmail(email);
+  const gone = removeAccount(e);
+  if (!gone.ok) return gone;
+  const phones = parseStored(readStoredKey(PHONE_ACCOUNTS_KEY)).value;
+  if (phones && typeof phones === "object" && !Array.isArray(phones) && e in phones) {
+    const rest = { ...(phones as Record<string, unknown>) };
+    delete rest[e];
+    writeStoredKey(PHONE_ACCOUNTS_KEY, rest);
+  }
+  return dropSecurity(e);
+}
+
 /** Deleted for good (the 30 days after Delete account are over): the account, its parked work and
  *  its session go. */
 export function removeAccount(email: string): WriteResult {
@@ -582,17 +636,19 @@ export function discardUnverified(): WriteResult {
   return writeStoredKey(VERIFY_KEY, null);
 }
 
-export type SignInResult = "ok" | "wrong" | "unverified" | "refused";
+export type SignInResult = "ok" | "wrong" | "unverified" | "refused" | "deleted";
 
 /** One answer for an unknown email and a wrong password alike. An account
  *  whose email isn't verified yet becomes the one waiting, and goes back to
  *  Check your email. */
 /** Signs in with the account's own work. Reload the page after "ok". */
-export async function signIn(email: string, password: string, now: number, next = ""): Promise<SignInResult> {
+export async function signIn(email: string, password: string, now: number, next = "", opts: SignInOpts = {}): Promise<SignInResult> {
   const account = accountOf(readAccounts(), email);
   if (!account) return "wrong";
   if ((await hashPassword(password, account.salt)) !== account.passwordHash) return "wrong";
   if (account.verifiedAt === null) return writeStoredKey(VERIFY_KEY, { v: 1, email: account.email, next: safeNext(next) }).ok ? "unverified" : "refused";
+  const back = comeBack(account.email, now, opts);
+  if (back !== "open") return back;
   await comeIn(account.email, false);
   return startSession(account.email, now).ok ? "ok" : "refused";
 }
@@ -612,9 +668,13 @@ export async function resetPassword(
   password: string,
   now: number,
   problem: (password: string) => string = passwordProblem,
-): Promise<WriteResult> {
+  opts: SignInOpts = {},
+): Promise<WriteResult & { deleted?: true }> {
   const account = accountOf(readAccounts(), email);
   if (!account || problem(password)) return { ok: false };
+  const back = comeBack(account.email, now, opts);
+  if (back === "deleted") return { ok: false, deleted: true };
+  if (back === "refused") return { ok: false };
   const salt = newSalt();
   const saved = saveAccount({ ...account, salt, passwordHash: await hashPassword(password, salt), verifiedAt: account.verifiedAt ?? now });
   if (!saved.ok) return saved;

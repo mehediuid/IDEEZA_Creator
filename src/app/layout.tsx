@@ -29,6 +29,7 @@ import { SIDEBAR_PREPAINT } from "@/components/dashboard/sidebar-state";
 import { APPEARANCE_PREPAINT } from "@/lib/settings/appearance";
 import { AppearanceSync } from "@/components/settings/appearance-sync";
 import { AuthGate } from "@/components/auth/auth-gate";
+import { WelcomeBack } from "@/components/auth/welcome-back";
 import { AUTH_PREPAINT } from "@/lib/account/auth";
 import { DemoProjectsSeed } from "@/components/projects/demo-projects-seed";
 
@@ -182,6 +183,10 @@ export default function RootLayout({
                               {/* The welcome offer: on Home after the Welcome, once
                                   (components/credits/welcome-offer.tsx). */}
                               <WelcomeOfferHost />
+                              {/* Your account is active again: once, after a sign-in
+                                  reopened a deactivated account or cancelled its
+                                  deletion (components/auth/welcome-back.tsx). */}
+                              <WelcomeBack />
                             </BuyCreditsProvider>
                           </WalletProvider>
                           {/* A build is a background job: it has to keep

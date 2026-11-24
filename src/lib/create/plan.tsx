@@ -45,6 +45,19 @@ function loadStored(now: number): Subscription {
   return freeSubscription(now);
 }
 
+/** Deactivate or Delete account, right before signing out: the stored plan stops renewing (it runs to
+ *  the end of its period). What it was, for the words; null when nothing renews. */
+export function stopRenewalNow(now: number): { name: string; endsAt: number } | null {
+  const sub = advance(loadStored(now), now);
+  if (sub.tier === "free" || !sub.autoRenew || sub.renewsAt === null) return null;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cancelPlan(sub)));
+  } catch {
+    return null;
+  }
+  return { name: planOf(sub.tier).name, endsAt: sub.renewsAt };
+}
+
 type Ctx = {
   hydrated: boolean;
   sub: Subscription;
