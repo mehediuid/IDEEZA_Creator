@@ -20,6 +20,7 @@ import {
   EyeIcon,
   Package01Icon,
 } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/ideeza";
 import { Icon, type IconValue } from "./icon";
 
 const STAGES: Array<{
@@ -91,15 +92,16 @@ export function BuildManuallyInfo({
           </span>{" "}
           any time.
         </p>
-        <button
+        <Button
           type="button"
+          hierarchy="primary"
+          size="xl"
           data-tour="home-create"
           onClick={onCreate}
-          className="inline-flex h-[44px] items-center gap-[8px] rounded-lg bg-violet-600 px-[20px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+          iconTrailing={<Icon icon={ArrowRight01Icon} />}
         >
           Create Project
-          <Icon icon={ArrowRight01Icon} />
-        </button>
+        </Button>
       </div>
     </section>
   );

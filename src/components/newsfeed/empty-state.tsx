@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { Bookmark02Icon, Compass01Icon, FavouriteIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { buttonVariants } from "@/components/ideeza";
 
 export function EmptyState({
   variant,
@@ -38,7 +39,7 @@ export function EmptyState({
         </p>
         <Link
           href="/innovations"
-          className="mt-[8px] inline-flex h-[36px] items-center rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+          className={buttonVariants({ hierarchy: "primary", size: "md", className: "mt-[8px]" })}
         >
           Discover projects
         </Link>
@@ -64,7 +65,7 @@ export function EmptyState({
         </p>
         <Link
           href="/innovations"
-          className="mt-[8px] inline-flex h-[36px] items-center rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+          className={buttonVariants({ hierarchy: "primary", size: "md", className: "mt-[8px]" })}
         >
           Discover creators
         </Link>

@@ -8,6 +8,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { buttonVariants } from "@/components/ideeza";
 import {
   ActivityIcon,
   AlertCircleIcon,
@@ -189,9 +190,9 @@ function BuildRow({
           ) : (
             <Link
               href={row.href}
-              className="inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand no-underline outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+              className={buttonVariants({ hierarchy: "primary", size: "md", className: "no-underline" })}
             >
-              <Icon icon={EyeIcon} />
+              <Icon icon={EyeIcon} size={16} />
               View
             </Link>
           )}
