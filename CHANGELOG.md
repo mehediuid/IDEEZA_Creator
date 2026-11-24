@@ -6,6 +6,12 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-045](#cl-045-small-web-fixes-found-while-matching-the-phone) | Small web fixes found while matching the phone | 24 Nov 2026 | Not created yet | Not started |
+| [CL-044](#cl-044-a-profiles-activity-is-only-for-its-owner) | A profile's Activity is only for its owner | 24 Nov 2026 | Not created yet | Not started |
+| [CL-043](#cl-043-the-project-question-after-an-ai-idea-several-products-start-a-new-project) | The project question after an AI idea: several products start a new project | 24 Nov 2026 | Not created yet | Not started |
+| [CL-042](#cl-042-the-free-plans-ai-credits-come-once) | The Free plan's AI credits come once | 24 Nov 2026 | Not created yet | Not started |
+| [CL-041](#cl-041-share-any-project-or-product-on-the-marketplace) | Share any project or product on the Marketplace | 24 Nov 2026 | Not created yet | Not started |
+| [CL-040](#cl-040-mobile-app-the-same-as-the-website-a-to-z) | Mobile app: the same as the website, A to Z | 24 Nov 2026 | Not created yet | Not started |
 | [CL-039](#cl-039-earn--sell-every-tile-says-which-nft-it-is) | Earn › Sell: every tile says which NFT it is | 19 Nov 2026 | Not created yet | Not started |
 | [CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase) | A whole project you bought opens as your project, with its Purchase | 19 Nov 2026 | Not created yet | Not started |
 | [CL-037](#cl-037-my-projects--all-what-you-bought-is-there-too) | My projects › All: what you bought is there too | 19 Nov 2026 | Not created yet | Not started |
@@ -67,6 +73,343 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-045 Small web fixes found while matching the phone
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the AI chat's concept canvas (its **Network** section); Settings › **Get paid** (`/settings/get-paid`), its **Withdraw** dialog and the statement download; the words about build prices in Help (FAQ), Tutorials, **Buy credits** and the Plan & pricing FAQ; the **Tour Guide**. Web.
+
+While the phone app was checked against the website screen by screen (CL-040), a few places on the website itself turned out wrong or out of step. These are those fixes.
+
+### What to build
+
+**A project of one product has no Network in the AI flow**
+
+- [ ] With one product, the concept canvas shows no **Network** section, and saving the build writes no network for the project.
+- [ ] With two or more products the Network section shows as before. When none of the products link to each other, it shows the main product's app or cloud link.
+- [ ] A one-product project's app or cloud link is set on the project's own **Network** tab only.
+
+**One IDZ price for payouts**
+
+- [ ] IDZ is paid out at the one demo IDZ price the Balance page and credits already use: *1 IDZ ≈ $0.025* (it was *1 IDZ = $1*).
+- [ ] Get paid's rates line: *Sales in test coins count at fixed demo rates: 1 ETH or WETH = $3,750.00, 1 MATIC = $0.50; USDT and USDC = $1.00; 1 IDZ ≈ $0.025. Withdrawals are recorded here and no coins move.*
+- [ ] The IDZ choice's hint: *IDEEZA's token, at the demo rate 1 IDZ ≈ $0.025*.
+- [ ] Withdraw: **You receive** shows the coins, *≈ 398.96 IDZ* for $10.00 (USDT stays *10 USDT*); the line under it: *Paid in IDZ at the demo rate 1 IDZ ≈ $0.025. You sign it in the demo wallet.* The receipt and the statement download show the same IDZ amount.
+
+**What a build costs, in words**
+
+- [ ] Every sentence that says what a build costs says *5, 8 or 11 credits per product, by its Quality* (Low, Medium or High), *less when you pick fewer pieces*. No text says "4 credits per product" any more. Places: Help FAQ (*What does a credit pay for?*), Tutorials (*book a build*, *AI credits*), the Buy credits dialog's line and the Plan & pricing FAQ.
+- [ ] The five pieces are named as the editors name them: *the PCB, Code, 3D Module, Assembly and Wiring, with a free Parts list*.
+- [ ] Help FAQ on identity checks: *Level 1 asks your legal name and your country.*
+
+**The Tour Guide counts only your own projects**
+
+- [ ] The sample projects every new account starts with do not count for the guide. A step such as *Mint it* or *Share it* is done only when one of the maker's own projects did it.
+
+### Design
+
+- No new components. Words only, in the places' existing styles.
+
+### Screenshots
+
+A fix to pages that were never built, so there is no before.
+
+| After |
+| --- |
+| ![Get paid with the demo rates line: 1 IDZ ≈ $0.025](docs/changelog/2026-11-24-idz-rate-after.png) |
+
+---
+
+## CL-044 A profile's Activity is only for its owner
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** a creator's profile (`/creators/<handle>`, and your own at `/creators/me`) on the web, and the profile in the mobile app (`/m/creators/<handle>`, `/m/creators/me`). Settings › Privacy › **Lock your profile**.
+
+A profile's **Activity** tab (the updates the maker logs on their projects) is for the maker. Other people see the maker's projects, not their activity.
+
+### What to build
+
+- [ ] Someone else's profile shows **Projects** only, with no tab strip (web). On the phone it shows **Timeline · Projects**.
+- [ ] Your own profile as others see it (**View as public**) shows the same: no Activity.
+- [ ] A link to someone's `?tab=activity` opens their Projects.
+- [ ] Your own profile keeps the **Activity** tab, and the tab opens with the line *Only you see your Activity.* Like every profile tab, it shows only when it has something in it.
+- [ ] A locked profile's card says *Only people who work with Tomas on a project can see their projects.* (no "and activity").
+- [ ] Settings › Privacy › **Lock your profile**: *Only your project teams see your projects*.
+
+### Design
+
+- The line *Only you see your Activity.*: `text-sm`, `text-tertiary`, above the first entry.
+- Without the tab strip, the projects grid starts right under the Featured project (web).
+
+### Screenshots
+
+A new rule for a profile page that was never built, so there is no before.
+
+| After |
+| --- |
+| ![Naim Rahman's profile seen by someone else: Featured, then the projects grid, no Activity tab](docs/changelog/2026-11-24-activity-only-you-others-after.png) |
+
+---
+
+## CL-043 The project question after an AI idea: several products start a new project
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the AI chat's **Project** question (`/chat/<id>`, opened from Home's **Generate with AI**), and the build gate (**Build this product?** / **Build 2 products?**). The same question in the mobile app's AI tab (`/m/ai/chat/<id>`), as a sheet. This changes [CL-034](#cl-034-projects-per-plan-a-new-project-waits-until-theres-room).
+
+When the AI's answer has several products, they belong together, so they always start one new project: the maker only names it. Only a single product can go into a project the maker already has, and that choice is two clear cards.
+
+### What to build
+
+**Several products**
+
+- [ ] The question is *What should the project be called?* with *2 products belong together, so they start one new project.* and one field, **Project name**. There is no list of the maker's projects.
+- [ ] **Start drawing** stays off with *Name the project first* until there is a name.
+- [ ] The build gate never offers **Use a project I have** for several products. When every project on the plan is in use, its card offers the bigger plan and *Make room in My projects*, as CL-034.
+- [ ] A chat started from a project's **Add a product** keeps that project, as before (*Which project are these for?* with that project chosen).
+
+**One product**
+
+- [ ] With no project yet: *What should the project be called?* · *This product starts a new project.* and **Project name**.
+- [ ] With projects: *Which project is this for?* · *Start a new project with it, or add it to one you have.* and two radio cards:
+  - **New project** · *This product starts it.*, picked first, with **New project name** inside the card. When every project on the plan is in use, CL-034's card takes the field's place inside this card.
+  - **A project I have** · *Add it to one of your 7 projects.*, with the project list inside the card (*Choose a project*).
+- [ ] The arrow keys move between the two cards. No "+ Start a new project" row and no bare list.
+- [ ] **Start drawing** stays off with *Name the project first* (New project) or *Pick a project first* (A project I have).
+
+**Save**
+
+- [ ] Saving is unchanged: a build that was paid for always saves. An older chat in which several products were already pointed at a project still saves there.
+
+**Mobile app**
+
+- [ ] The same rules in a sheet. Several products: *What should the project be called?*, the line, a **Products · 2** row (the names, **Change** ›), **New project name**, and **Start drawing** with its credit cost in the foot, off with *Name the project first*.
+- [ ] One product with projects: the same two radio cards, **New project** (name inside) and **A project I have** (list inside).
+
+### Design
+
+- Radio cards: the DS Radio inside a card (radius `xl`, 1 px `border`; picked: `border-brand`; hover on the other: `bg-subtle`), title `text-md` semibold, line `text-sm` `text-tertiary`; the field or the list opens inside the picked card.
+- Everything else as CL-034.
+
+### Screenshots
+
+A change to a question that was never built (CL-034 has no ticket yet: build this one), so there is no before.
+
+| After |
+| --- |
+| ![Two products: What should the project be called? with only the name field](docs/changelog/2026-11-24-project-question-several-after.png) |
+| ![One product: Which project is this for? with New project and A project I have as two radio cards](docs/changelog/2026-11-24-project-question-one-after.png) |
+| ![Mobile app: the same question as a sheet, with the products row and Start drawing](docs/changelog/2026-11-24-m-project-question-after.png) |
+
+---
+
+## CL-042 The Free plan's AI credits come once
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Settings › **Plan & pricing** (`/settings/plan`: the plan cards, **Compare plans**, the FAQ), the sidebar's **Upgrade** card, the *You're out of credits* line (Home and the concept chat), the bell's notices, Help and Tutorials. In the mobile app: Profile › Plan & pricing row, **Current credit** (`/m/plans/credits`), **Compare plans**, Plans and Billing. This changes [CL-032](#cl-032-upgrade-nudges-the-next-plan-shown-where-a-maker-runs-short).
+
+Free gives its 10 AI credits once, when the account starts, and they never expire. There is no refill on Free. Paid plans add their credits every monthly period, as before.
+
+### What to build
+
+**The rule**
+
+- [ ] A Free account gets its 10 plan credits once in its life. They never expire. Moving from Free to a paid plan and back does not give them again.
+- [ ] Tinkerer, Builder and Disruptor add their credits at the start of every monthly period, as before.
+- [ ] Moving from a paid plan to Free lists what gets smaller as *Monthly AI credits: 300 → none*.
+
+**Where Free says it**
+
+- [ ] Plan cards: *AI credits: 10 once* on Free; *AI credits: 300 / month* on the paid plans.
+- [ ] **Compare plans**: the row is named *AI credits* (10, 50, 300, 1,200) and a new row under it, *AI credits given*: **Once** · **Monthly** · **Monthly** · **Monthly**.
+- [ ] FAQ: *When do I get my plan's credits?* · *Free gives its credits once, when your account starts, and they never expire. A paid plan adds its credits at the start of each monthly period, and they last until the period ends. Credits you buy last 12 months. The credits that expire first are spent first.* The general answer: *Both, kept simple. Free gives its AI credits once; a paid plan adds AI credits every month. …*
+- [ ] Help and Tutorials say *Free is $0 with 10 AI credits, once.* and *Free gives its credits once; paid plans add credits every month.*
+
+**No refill day on Free**
+
+- [ ] Sidebar Upgrade card, third line: *You have 31 credits* on Free. A paid plan that stays paid adds the day: *You have 18 credits · refills 8 Dec*.
+- [ ] Out of credits on Free: *You're out of credits.* (no *They refill on …*). On a paid plan that stays paid: *You're out of credits. They refill on 8 Dec.*
+- [ ] A plan that ends at the period's end (moving to Free) shows no refill day either.
+- [ ] The bell sends no *Your free credits are back* notice. A paid plan still gets *Your 300 credits for this month are here*. The low-credits notice names a refill day only on a paid plan.
+
+**Mobile app**
+
+- [ ] Profile › Plan & pricing row, the out-of-credits row and the *Running low* notice: no *refills* on Free.
+- [ ] Current credit: the plan's part is headed *Free credits* with **Given once · Used · Remaining** and no end date (a paid plan: *This month* with its allowance and end date).
+- [ ] Compare plans, the plan card and Billing: Free reads *10 once*.
+
+### Design
+
+- No new components: the compare row is a row like the others; *Once* and *Monthly* in the table's value style.
+
+### Screenshots
+
+A change to plan pages that were never built (CL-032 has no ticket yet: build this one), so there is no before.
+
+| After |
+| --- |
+| ![Compare plans: AI credits given, Once on Free and Monthly on the paid plans; the sidebar card has no refill day](docs/changelog/2026-11-24-free-credits-once-after.png) |
+| ![Mobile app: Current credit with Free credits, Given once](docs/changelog/2026-11-24-m-free-credits-after.png) |
+
+---
+
+## CL-041 Share any project or product on the Marketplace
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** web: a marketplace page (`/marketplace/<id>`, a sample's shop page and your own listing), a product's marketplace page, your own product page, the Innovations post page's **Share** menu, and **Innovations › Shared by you**. Mobile app: the same pages' **Share** icon, the profile's **Timeline** (`/m/creators/me`) and the Feed.
+
+Anyone can share any project or product that is on Innovations or the Marketplace, anyone's or their own, bought or not, the way a re-share works on Facebook: the sharer's words on top, the original under them with its creator. A private project can never be shared.
+
+### What to build
+
+**Who can share what**
+
+- [ ] Any project, or one product of it, that is live on Innovations or on the Marketplace can be shared by anyone signed in, whether they bought it or not, their own included.
+- [ ] A private project (not on Innovations, nothing on sale) has no share.
+- [ ] A share is never a copy of the item and never the creator's own post: posting your own project (**⋯ › Share to Innovations** on the web, **⋯ › Share to Feed** on the phone) stays as it is.
+
+**Web: the Share button**
+
+- [ ] A quiet secondary **Share** button beside the page's title (never inside the buy box): on a sample's shop page, your own listing's page, a product's marketplace page and your own product page.
+- [ ] It opens the Share menu: **Share to Innovations** first, then **Copy link** and **Share on Facebook**, **Share on LinkedIn**, **Share on X**, **Share on WhatsApp**. The link is the page's own address.
+- [ ] The Innovations post page's Share menu gets **Share to Innovations** too.
+
+**Web: Share to Innovations**
+
+- [ ] A dialog **Share to Innovations**: the sharer (avatar and name) with the audience picker (**Public** or **Only me**), the field *Say something about this project…* (*…product…*), and under it the original as a framed card: picture, title, *by Tomas Berg*. One button, **Share now**.
+- [ ] After sharing, a toast *Shared to Innovations* (*Shared to Innovations. Only you can see it.* for Only me) with **View**.
+
+**Web: Innovations › Shared by you**
+
+- [ ] Every share shows as a card: *You shared Diego Alvarez's project* (*…product*), how long ago, *Only me* when only you see it, the words, then the original framed with its creator, picture, title and stage.
+- [ ] **⋯ › Remove from Innovations** takes the share off, with **Undo** in the toast.
+- [ ] When the item has left the Marketplace the share stays and shows it as it is now. When the item is gone: *This project is no longer available.*
+
+**Mobile app**
+
+- [ ] A **Share** icon in the top bar of a sample's project and product pages and of your own listing and product pages: **Share to your Feed** (someone else's item) and **Copy link**.
+- [ ] Share to your Feed: a sheet with the words, the audience and the framed original, and one **Share now** button (*Share again* for an item you shared before).
+- [ ] The profile opens on **Timeline**: every share and every project you shared, newest first. A share reads *Shared Diego Alvarez's project · 1 d*, the words, the original framed with its creator and a **Project** or **Product** chip, then appreciate, comments (each share has its own thread), **⋯ › Remove from your Feed** (with Undo) and save. No prices and no product list on a Timeline post.
+- [ ] A share shows on the Feed while its item is on the Marketplace, as one small chip *↻ You shared* (the audience only when it isn't Public) and the words in the description's one line with *more*.
+- [ ] Only me shares are hidden in **View as public** and from everyone else.
+
+### Design
+
+- Web Share button: A01 Button secondary md with the Share icon. The menu is the post page's Share menu (M12).
+- Dialog: the DS dialog (title, ✕, one primary in the foot); audience picker as the post composer's; the framed original: 1 px `border`, radius `lg`, picture 48 px.
+- Shared by you cards: the Innovations card frame; the head line `text-md` semibold, the time `text-sm` `text-tertiary`; the original framed inside, its creator as an avatar row.
+- Mobile: the share sheet (M09), the Timeline post as a list card; the Feed chip is the media chip style.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| After |
+| --- |
+| ![A sample's shop page: Share beside the title opens Share to Innovations, Copy link and the four networks](docs/changelog/2026-11-24-share-menu-after.png) |
+| ![Share to Innovations: the words, the audience and the original framed with its creator](docs/changelog/2026-11-24-share-dialog-after.png) |
+| ![Innovations, Shared by you: each share with its words and the framed original](docs/changelog/2026-11-24-shared-by-you-after.png) |
+| ![Mobile app: the profile's Timeline with a share of Diego Alvarez's project](docs/changelog/2026-11-24-m-timeline-after.png) |
+
+---
+
+## CL-040 Mobile app: the same as the website, A to Z
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** the mobile app at `/m`. This changes [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere).
+
+Everything the website gained after CL-010 (CL-011 to CL-039) is now in the mobile app, in a phone's own form, and every place where the phone worked or spoke differently from the website was checked (145 differences) and matched. Two rules hold for all of it: the phone uses the website's words and rules exactly (Main NFT, Physical NFT, Virtual NFT, Personal use, Business use; never "Whole project"), and nothing the phone already had was removed.
+
+### What to build
+
+**Keep what the phone has**
+
+- [ ] These stay on the phone even where the website has no twin: the sample locked profile (Tomas Berg), appreciate, save and comment on your own post, the *You've reached your limit* sheet (naming Builder), Level 1 asking a mobile number and an SMS code (in Withdraw too), and **Rebuild this piece** on a piece (with **Open chat** beside it).
+
+**Product page (yours)**
+
+- [ ] The bottom bar's primary is **Earn**, with one line under it about this product's copies (*Not selling copies yet*, *Physical copies on sale · 2 sold*, *Sold out · 5 sold*). It opens Earn › Sell on this product's copies (a one-product project: the project's copies).
+- [ ] **⋯** in the top bar opens the product's actions: **Edit name and description**, **Preview as others see it**, **See it on the marketplace** (when listed) and **Delete product** (type the product name to confirm; the website's checks).
+- [ ] Rows: **Sales** (who bought, *{n} sales to {m} people.*), **Network**, and on the 3D piece, download the model (.glb) and **Replace**.
+
+**AI tab and Add a product**
+
+- [ ] The prompt box keeps the mic, the picture, **Quality** (Low, Medium, High), **Enhance** and send on one row; under 320 px **Enhance** shows only its wand.
+- [ ] A picture can go with the idea (inspiration image, as CL-027).
+- [ ] No credits line under the box. Out of credits: a row above the box with **Buy credits**.
+- [ ] **Redeem a code** as a row that opens a sheet (CL-011).
+- [ ] The plan's project limit (CL-034) and the project question as CL-043, in the question sheet and in the build sheet.
+- [ ] Add a product › **Build with AI** is the same box, with no cost line. **Build manually** opens *Build manually on a computer*: the editors are on the website, with the project's web address and **Copy link**.
+- [ ] A project of one product has no Network card in the AI flow (CL-045).
+
+**My projects and what you bought**
+
+- [ ] *2 of 3 projects used* under the title (the plan's projects), then tabs **All · Draft · Minted · Listed · Sold · Purchased** with their counts.
+- [ ] **All** holds what you bought, after your own projects: a card with the **Purchased** chip, *By Tomas Berg · 1 product · Bought Nov 21* and *You own 3 NFTs · 1 for sale · 1 sold ›*. A whole project bought shows once, as your project, with *Bought from Tomas Berg*.
+- [ ] A purchased project opens on its own screen: the media, the **Purchased** chip, *Bought as Mira (demo creator) · last bought Nov 21, 2026*, a **You own 3 NFTs** card (Physical NFT · 2 copies, Virtual NFT · 1 copy, Paid in all, For sale, Earned selling on, **Buy another Physical NFT** ›), then the products (each opens the pieces this NFT gives), the copies (each opens its copy: use, units, *Send to manufacturing*, **Sell this copy**) and **Receipts**.
+- [ ] The bottom bar: **Earn**, with a line (*1 copy for sale · 0.0525 ETH earned from 1 sold*). Earn lists the copies to sell on: set a price → sign → *For sale*; **Change price**; **Take off sale** (CL-036).
+
+**Buying: one buy box**
+
+- [ ] The buy page has one box with a tab per NFT on sale: **Main NFT · Physical NFT · Virtual NFT** (only the kinds on sale; one kind, no tabs). It opens on the kind the link names, else the one you hold, else the first on sale.
+- [ ] Main NFT: *Main NFT* (or *Main NFT · 40% of the project*), the price large, then Listing, Share, Royalties, Minting, Chain, Collection three to a row, the royalties note, the wallet line, the activity line and *Testnet demo · shopping as Mira · Change*.
+- [ ] Physical and Virtual NFTs: **Personal use** and **Business use** as radio rows with their prices (*Not on sale* or *Sold out* greyed), and copies other holders sell (**From holders**) as choices in their kind. No Buy button per row and no version sheet.
+- [ ] The bottom bar names the pick and its price (*Main NFT · 0.3 ETH · 100% of the project*), **Change** while the box is scrolled away, *Ask the creator* as a chat icon, and one primary: **Buy now**, **Buy another share**, **Place bid**, **Bid again** or **Manage**.
+- [ ] *You own 3 NFTs · Physical NFT ×2 · Virtual NFT ×1 · For sale ×1 · Sold ×1* with **See what you own** above the tabs when you hold some.
+- [ ] The wallet names the item (*Buy Virtual NFT · Personal use*). A copy someone is paying for shows *In checkout*. The seller of an auction can **Cancel auction** while nobody has bid.
+- [ ] A product row on a buy page opens the product's marketplace view, not your own product page. Holding a Physical NFT opens the product's PCB, Code and Wiring (a **You own** row, no lock).
+
+**Videos**
+
+- [ ] Every video is started before the maker moves on (CL-030): **Next video: {name}** on the render screen, a **Videos** button with a sheet in place of progress toasts, and what the maker signs (a listing, copies, a share) waits with *Waiting for videos* and goes live once every video is in use.
+- [ ] The project video is drawn from the products and can start right away.
+- [ ] *Add to marketplace*: a product's video row (**Generate AI video**, **Review**, **Try again**) opens that product's video maker, and Close comes back to the sheet.
+- [ ] The mint's **Review** step, while a video isn't started, leads with *Generate your videos* · *1 of 3 started*, one line, then **Product videos** and **Project video** as rows (the project video's row is titled with the project's name, *All its products in one video · not made yet*), each with **Generate video**.
+- [ ] What the maker already set folds into one closed row, **Listing details** (or **Mint details**), with a gist (*RC Car · Buy now 1 USDC · 100% of the project · nothing to pay now*). Opening it shows the products, every term, the videos already done and the cost, wallet and each-sale lines.
+- [ ] The step's button names the next step, **Sign and list**, and stays off with *Start every video first: RC Car hasn't started yet.* until every video has started.
+- [ ] The listing form's **Listing type** is two radio cards, **Buy now** and **Auction**, each with its line.
+
+**Profile**
+
+- [ ] Your profile opens on **Timeline** (CL-041), then **Projects**, and **Activity** only on your own (CL-044). Tabs show only when they have something.
+- [ ] Your **Projects** tab lists every project you made: the public ones first, then the private ones marked **Private** (only you see these). Under the tiles: *8 of 13 in My projects, with what you bought* and **View all projects · 13**, which opens My projects › All (13). Others and **View as public** see the public projects only, with no button.
+- [ ] Pins are public: others see your first pin as Featured with *Pinned by Naim* (you see *Pinned by you*); with no pins, the project furthest along.
+- [ ] *4 projects are public* opens My projects with exactly those (*4 projects on your profile*), *4 private in My projects* opens the rest (*4 projects kept private*); each has **Show all projects**.
+- [ ] The Profile tab's **Projects** row shows My projects › All's number (13).
+- [ ] **Edit profile** is a secondary button under the profile's facts. On someone else's profile, **Follow** and **Message** sit side by side there too. None of them is sticky.
+
+**Money, plans and settings**
+
+- [ ] Buy credits asks above the maker's *Ask before a purchase over* amount. Credit packs and plan pitches as the website (CL-032, CL-033; Free pitches **Builder**). Free credits come once (CL-042). One IDZ price, *1 IDZ ≈ $0.025* (CL-045).
+- [ ] Following works as on the website: your own choices, else the sample people you follow.
+- [ ] Sign in with a wrong email or password: *That email and password don't match.*
+- [ ] An account made with Google or Facebook finishes its details on one screen (the website's fields), once.
+- [ ] **Report a problem** in the ⋯ of a project, a product, the AI chat and Earn; the report names the screen and the project or product.
+- [ ] Guest prompts say *Log In to …*; a comment's **Copy link** is the post's web page link to that comment.
+
+Demo stand-ins (prototype only): testnet money, the demo buyers (Mira, Leo, Sam), sample projects and shares.
+
+### Design
+
+- Mobile design system only, as CL-010: list cards and rows, bottom sheets (M09), the bottom bar with one primary, radio cards, badges (*Purchased*, *Private*), the media chip.
+- No new colours or tokens; light and dark.
+
+### Screenshots
+
+The mobile app was never built (CL-008 to CL-010 have no ticket in development), so this is its current state, with no before.
+
+| After | After |
+| --- | --- |
+| ![The buy page: You own 3 NFTs, tabs for Main, Physical and Virtual NFT, and the bar naming the pick](docs/changelog/2026-11-24-m-buy-box-after.png) | ![My projects › All with a purchased project: Purchased chip, Bought Nov 21, You own 3 NFTs](docs/changelog/2026-11-24-m-my-projects-after.png) |
+| ![A purchased project: You own 3 NFTs, and Earn in the bar](docs/changelog/2026-11-24-m-purchased-after.png) | ![Your product page: the pieces and Earn with Not selling copies yet](docs/changelog/2026-11-24-m-product-earn-after.png) |
+| ![Your profile's Projects: the private one marked Private, 8 of 13 in My projects and View all projects 13](docs/changelog/2026-11-24-m-profile-projects-after.png) | ![The profile's Timeline with a share](docs/changelog/2026-11-24-m-timeline-after.png) |
 
 ---
 
@@ -420,6 +763,8 @@ A new feature, so there is no before.
 
 **In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
 
+**Changed by [CL-043](#cl-043-the-project-question-after-an-ai-idea-several-products-start-a-new-project)** (24 November 2026): several products always start a new project (the question asks only its name, and the build gate offers no *Use a project I have* for them); one product picks between two radio cards, **New project** and **A project I have**. Build the project question from CL-043; the plan's card stays as here.
+
 **Screen:** the AI chat (`/chat/<id>`, opened from Home's **Generate with AI**): its **Project** question, and the build gate (**Build this product?**) that **Build** opens; the save dialog after a build and its saved notice; the **Project Information** dialog (Home › **Build manually** › **Create Project**, and the PCB editor's **File › New › Project**); **My projects** (`/projects`); Settings › **Plan & pricing** (`/settings/plan`). Web.
 
 Every plan comes with a number of projects: Free 3, Tinkerer 5, Builder 20, Disruptor 50. It is the one plan amount that stops anything, and it stops only a new project. The maker hears it where a new project would start, before the build's credits move (at the project question, and again at Build), always with a way on: a bigger plan, a project they already have, or making room. A build that was paid for always saves.
@@ -569,6 +914,8 @@ The packs gave more credits for the money than the plans did: Pro was 550 credit
 ## CL-032 Upgrade nudges: the next plan, shown where a maker runs short
 
 **In the prototype:** 18 November 2026 · **Jira:** Not created yet · **Production:** Not started
+
+**Changed by [CL-042](#cl-042-the-free-plans-ai-credits-come-once)** (24 November 2026): Free's credits come once, so Free shows no refill day: the sidebar line is *You have 18 credits* and out of credits is *You're out of credits.*; only a paid plan that stays paid says *refills 8 Dec* and *They refill on 8 Dec.* Build those lines from CL-042.
 
 **Screen:** the sidebar's Upgrade card and the account menu (every Creator Panel page); Home's AI box (`/`); the concept chat (`/chat/<id>`), its build bar and the finished build's review (also `/build/<jobId>`); a project's **Add a product › Build with AI** and **Team** tab (`/projects/<id>`); the **Buy credits** dialog; the video **Quality** field in Generate video and Project video; the bell; Settings › **Plan & pricing** (`/settings/plan`, Plans and Credits tabs); the PCB editor (`/pcb`). Web.
 
@@ -1900,6 +2247,8 @@ Demo stand-ins (prototype only): the codes IDEEZA100 (100 credits), WELCOME50 (5
 ## CL-010 Mobile app: native mobile UX everywhere
 
 **In the prototype:** 15 November 2026 · **Jira:** none (the owner asked for no ticket) · **Production:** Not started
+
+**Changed by [CL-040](#cl-040-mobile-app-the-same-as-the-website-a-to-z)** (24 November 2026): the buy page's box (a tab per NFT, the bar names the pick), My projects with what you bought, the profile (Timeline, Projects), the mint's Review step and the other places listed there now follow the website. Build those parts from CL-040.
 
 **Screen:** the whole mobile app at `/m`. The owner reviewed it and asked that it work the way a phone app works, not like the website made smaller. Every screen was reworked by area. Nothing was removed: things moved, were grouped, or went one tap deeper.
 
