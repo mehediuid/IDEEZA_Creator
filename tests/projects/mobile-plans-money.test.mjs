@@ -81,3 +81,10 @@ test("several products start a new project; one product picks New project or A p
   const flow = await readFile(new URL("../../src/components/mobile/ai/use-concept-flow.ts", import.meta.url), "utf8");
   assert.match(flow, /projects: gateMulti \? \[\] : setupProjects/);
 });
+
+test("the phone's Listing type is two radio cards, not a button group that reads as tabs (owner 2026-11-24)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(new URL("../../src/components/mobile/project-earn/listing-fields.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /ButtonGroup/);
+  assert.match(src, /role="radiogroup" aria-labelledby=\{ids\.type\}/);
+});
