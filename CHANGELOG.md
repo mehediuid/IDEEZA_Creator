@@ -6,6 +6,9 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-048](#cl-048-buttons-drawn-from-the-design-system-everywhere) | Buttons drawn from the design system everywhere | 24 Nov 2026 | Not created yet | Not started |
+| [CL-047](#cl-047-settings-home-your-account-first-then-where-you-stand) | Settings home: your account first, then where you stand | 24 Nov 2026 | Not created yet | Not started |
+| [CL-046](#cl-046-deactivate-or-delete-your-account-and-signing-in-makes-it-active-again) | Deactivate or delete your account, and signing in makes it active again | 24 Nov 2026 | Not created yet | Not started |
 | [CL-045](#cl-045-small-web-fixes-found-while-matching-the-phone) | Small web fixes found while matching the phone | 24 Nov 2026 | Not created yet | Not started |
 | [CL-044](#cl-044-a-profiles-activity-is-only-for-its-owner) | A profile's Activity is only for its owner | 24 Nov 2026 | Not created yet | Not started |
 | [CL-043](#cl-043-the-project-question-after-an-ai-idea-several-products-start-a-new-project) | The project question after an AI idea: several products start a new project | 24 Nov 2026 | Not created yet | Not started |
@@ -73,6 +76,162 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-048 Buttons drawn from the design system everywhere
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** History (`/history`, both tabs and its page numbers), Innovations (`/innovations`: the search field, Saved and Following when empty, the feed when it can't load), Home › **Build manually**, and every link that is drawn as a button (Settings › Account › **Edit profile**, your profile's **Back to your view**, Get paid's **Back to your project**, the parts library's **Browse the library**, the editors' **View project**, the blog's project picker, the hackathon join dialog). Web.
+
+Every button is the design system's button (A01), with nothing drawn by hand. A link that looks like a button looks exactly like the button.
+
+### What to build
+
+**A link drawn as a button**
+
+- [ ] A **secondary** link button has the secondary button's 1.5 px stroke, and an **outline brand** one (Account › **Edit profile**) its brand stroke, exactly like a button of the same kind (Account's **Edit** buttons beside it).
+- [ ] An icon-only link button keeps its icon at the button's icon size (16 px in a 32 px button).
+
+**History**
+
+- [ ] Prompts, empty: **Open Home** is a primary button, MD.
+- [ ] Builds: each row's **View** is a primary button, MD, with the eye icon; a failed build's **Try again** is a secondary button, MD, with the refresh icon.
+- [ ] Page numbers: the current page is a primary button, the other pages ghost buttons, the arrows secondary icon-only buttons, all MD (36 px).
+
+**Innovations**
+
+- [ ] **Search** inside the search field is a primary button, MD.
+- [ ] Saved and Following, when empty: **Discover projects** and **Discover creators** are primary buttons, MD.
+- [ ] The feed when it can't load: **Retry** is a primary button, MD.
+
+**Home**
+
+- [ ] **Build manually**: **Create Project** is a primary button, XL (44 px), with the arrow after the words.
+
+### Design
+
+- A01 Button only: primary, secondary, ghost by place; MD everywhere except **Create Project** (XL). No palette colours (violet-600 and the like), no hand-set font size or weight.
+
+### Screenshots
+
+A fix to pages that were never built, so there is no before.
+
+| After |
+| --- |
+| ![History, no prompts yet: Open Home as the primary button](docs/changelog/2026-11-24-history-button-after.png) |
+
+---
+
+## CL-047 Settings home: your account first, then where you stand
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Settings (`/settings`). Web.
+
+Settings opens on whose settings these are, with the search right there, and then four short cards that say where the maker stands, each with the one thing to do there.
+
+### What to build
+
+**Your account**
+
+- [ ] At the top, one box: the maker's photo, their name (a link to their profile), a **Free plan** badge (the plan's name), and under the name the email they are signed in with, then *· @handle* when they have a handle.
+- [ ] **Edit profile** on the right opens their profile with the Edit profile dialog open. On a phone it drops under the name.
+- [ ] **Find a setting** is in the same box, under the name. Typing lists the matching settings under it (the setting, then its page and a line of help, with an arrow); Enter opens the first. No match: *No setting matches "…". Try one word, like "theme", "messages" or "backup".*
+- [ ] On a phone the page list (**All settings**) comes next; on a wider screen it is the side list.
+
+**Where you stand**
+
+- [ ] Four cards, two side by side when the page is 900 px or wider, one under the other below that. Cards side by side have their buttons on one line.
+- [ ] Each card's head: the icon of its Settings page, the card's title, and an arrow on the right that opens that page (*Open Plan & pricing* for assistive tech).
+- [ ] **Plan and credits** (opens Plan & pricing): *Plan* (Free), *Renewal* (*No renewal on Free*, *Renews 8 Dec 2026* or *Ends 8 Dec 2026*), *Credits left* (18, with a *Running low* badge at the maker's low mark). Button: **Buy credits**.
+- [ ] **Get paid** (opens Get paid), only once something of the maker's is listed or sold: *Available to withdraw* ($822.65), *Withdrawn so far* ($0.00), *Withdrawal methods* (the number, or *None yet* with *Asked at your first withdrawal* under the words). Button: **Withdraw**, and on the right *In dollars at demo rates.*
+- [ ] **This browser** (opens AI & your data): *Everything you make is kept in this browser only. Clearing its data, or opening IDEEZA in another browser, starts empty unless you restore a backup.* *Last backup* (a date, or *Never* in warning colour with the warning icon), *The browser keeps it* (*Until you clear it* or *Until space runs low*, when the browser says). Buttons: **Download a backup** (the primary button while there has never been a backup) and **Restore**.
+- [ ] **Privacy at a glance** (opens Privacy & safety): *Your profile* (*Open to everyone* or *Locked*), *Who can message you* (*Anyone*, *People you work with* or *No one new*), *Location and local time* (*Shown* or *Hidden*), and *Taking a break* (*Until …*) while a break is on. Button: **View as public**.
+- [ ] While a value loads it shows a skeleton bone, never a made-up value.
+
+### Design
+
+- The account box is drawn as a Settings card (radius xl, 1 px border, surface fill, 16 px padding). A16 Avatar LG, A17 Badge brand, name in H4 (20 px semibold).
+- The cards are the Settings card with a foot for its buttons. Rows: term in Body/SM secondary, value Body/SM medium, 1 px border between rows.
+- Buttons: A01 MD, **tonal** for each card's button and **Edit profile**, **primary** for **Download a backup** while never backed up, **ghost** for **Restore**, ghost icon-only SM for the arrow.
+
+### Screenshots
+
+A page that was never built, so there is no before.
+
+| After |
+| --- |
+| ![Settings: the account box with Find a setting, then Plan and credits, Get paid, This browser](docs/changelog/2026-11-24-settings-home-after.png) |
+
+---
+
+## CL-046 Deactivate or delete your account, and signing in makes it active again
+
+**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Settings › Account › **Sign-in and security** (`/settings/account`), its **Deactivate account** and **Delete account** dialogs, Sign in (`/sign-in`) right after leaving, the first page after signing back in. The mobile app: Settings › **Sign-in & security**, `/m/settings/deactivate`, `/m/settings/delete`, the screen after leaving (`/m/left`) and the note after Log In (`/m/restore`). Web and the mobile app.
+
+A maker can step away for a while (Deactivate, no time limit) or leave for good (Delete, after 30 days). Either way, signing in again makes the account active again, with everything where it was.
+
+### What to build
+
+**Where it is**
+
+- [ ] Settings › Account › **Sign-in and security**: *Signed in as* the email, **Download your information**, then two rows: **Deactivate account** (*Hide your account for now. Sign in any time to come back.*) and **Delete account** in red (*You have 30 days to change your mind.*). Each row opens its dialog. There is no **Sign out** here; it is in the sidebar's account menu.
+- [ ] Settings search finds both rows (deactivate, pause, close account; delete, remove, erase account).
+- [ ] Mobile app: the same two rows in Settings › **Sign-in & security**, with *Log In* in place of *Sign in*.
+
+**Deactivate account**
+
+- [ ] One step. Under the title: *Sign in any time and it's active again. There's no time limit.*
+- [ ] *What happens*: *Your profile* — *Hidden, with your projects, shares and comments*; *On sale* — *7 hidden · back when you sign in* (only when something is on sale); *Messages* — *Kept · here when you sign in*; a paid plan — *Builder won't renew · ends 8 Dec 2026*; *Your money* — *Stays · withdraw it any time you're back* (only when there is money or IDZ).
+- [ ] *Confirm it's you*: the password. A wrong one: *That's not your password.* An account made with Google or Facebook has no password: *You joined with Google or Facebook, so we'll send a code to tania@example.com.* with **Send code**, then the code, then *Verified. It's you.*
+- [ ] *Want to leave for good? Delete account* switches to the Delete dialog.
+- [ ] **Cancel** and **Deactivate account** (primary, unavailable until the maker is confirmed).
+- [ ] An auction someone has bid on stops it: *Close your auction first* — *Someone bid on it. Close it once it ends, then deactivate.*, with a link to the auction.
+
+**Delete account, in three steps**
+
+- [ ] The line under the title says the step: *Step 1 of 3: Why you're leaving*, *Step 2 of 3: What you'll lose*, *Step 3 of 3: Confirm it's you*.
+- [ ] Step 1 (optional): *Optional. It helps us make IDEEZA better.*; one of *I don't use it any more*, *I have another account*, *Privacy worries*, *It's hard to use on a phone*, *Something else*; *Tell us more (optional)*, up to 500 characters with a counter; *Need a pause? Deactivate instead*. **Cancel**, **Continue**.
+- [ ] Step 2: *After 24 Dec 2026 this can't be undone.* Then *Projects* (*6 · 2 shared*), *Minted NFTs* (*5 · stay with holders*), *On sale* (*7 · hidden now*), *Plan & credits* (*18 credits*, or *Builder won't renew · ends 8 Dec 2026 · 18 credits*), *Available balance*, *IDZ balance* (when there are any), *Messages* (*Stay with the people you sent them to*), *Comments* (*Deleted with your account*). With money left: *After 24 Dec 2026 your available balance is gone with your account.* and *Withdraw money first* (Get paid). **Back**, **Cancel**, **Continue**.
+- [ ] Step 2 stops at money that is still moving or an auction someone bid on: *Finish these first* — *Money that's still moving has to settle before you can delete.*, with a link to each; **Continue** is unavailable.
+- [ ] Step 3: *Confirm it's you* as in Deactivate, then *Deleted on 24 Dec 2026* — *Sign in before then and it's active again.* Footer: **Back**, **Download your information** right beside **Delete account** (red). After the download: **Download again**, and the file's progress shows above.
+- [ ] Offline: *You're offline. Try again when you're back online.* A failed write: *Couldn't delete your account. Nothing changed. Try again.* (*Couldn't deactivate …* for Deactivate).
+- [ ] Mobile app: the same in full screens; Delete's three steps with **Download your information** in the bottom bar beside **Delete account**.
+
+**What leaving does**
+
+- [ ] Confirming signs the maker out at once.
+- [ ] Nothing they made changes: projects, listings, copies, messages and settings are hidden with the account and come back as they were. Listings are not taken down.
+- [ ] A paid plan stops renewing; it runs to the end of the period already paid.
+- [ ] Sign in then says what happens now. Deactivated: *Your account is deactivated* — *Sign in any time and it's active again.*, with *Now: Hidden, with everything you made*, *Any time: Sign in and it's active again*, *Time limit: None*. Deleting: *Your account will be deleted on 24 Dec 2026* — *Sign in before then and it's active again. After that it's deleted for good.*, with *Now*, *Until 24 Dec 2026*, *After 24 Dec 2026: Deleted for good*. Then *Sign in to come back*.
+- [ ] Mobile app: the same on its own screen (`/m/left`), with **Done**.
+
+**Coming back**
+
+- [ ] Every way in makes the account active again: password, Google or Facebook, and a password reset. On the mobile app with 2-step sign-in, only after the right code.
+- [ ] Once, after that sign-in: *Your account is active again* — *You deactivated it on 24 Nov 2026. Everything is where you left it.* or *You asked to delete it on 24 Nov 2026. Signing in cancelled that, so it won't be deleted. Everything is where you left it.* With a stopped plan: *Builder won't renew. It ends on 8 Dec 2026 unless you keep it in Plan & pricing.* On the mobile app *Logging in* in place of *Signing in*, with *Wasn't you? Change your password* when the account has a password.
+- [ ] 30 days after Delete the account and its work are deleted for good (checked whenever IDEEZA opens). Signing in then: *This account was deleted* — *It was deleted for good 30 days after you asked. You can create a new account with this email.*
+
+### Design
+
+- Both dialogs are the M11 Confirm Dialog: the intent badge in the header's icon row (Delete account: danger, trash icon; Deactivate account: info, pause icon), the title, the line under it, then A01 MD buttons in the footer (**Delete account** danger, **Deactivate account** primary, **Download your information** secondary, **Back** ghost on the left).
+- Fact rows in a 1 px bordered box with rows between; reasons as Radio rows (44 px); Textarea; Banner info for *Deleted on …*, Banner error for what stops leaving.
+- Account rows are Settings rows with a chevron; **Delete account** in the error ink.
+- Mobile app: full screens, one primary in the bottom bar.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| After |
+| --- |
+| ![Settings › Account › Sign-in and security with Download your information, Deactivate account and Delete account](docs/changelog/2026-11-24-account-leave-rows-after.png) |
+| ![Deactivate account: what happens, Confirm it's you, Cancel and Deactivate account](docs/changelog/2026-11-24-deactivate-dialog-after.png) |
+| ![Delete account, step 3 of 3: password, Deleted on 24 Dec 2026, Back, Download your information beside Delete account](docs/changelog/2026-11-24-delete-dialog-after.png) |
 
 ---
 
@@ -2704,6 +2863,8 @@ and its buttons lead through Sign up / Sign in ([CL-002](#cl-002-sign-up-and-sig
 ## CL-002 Sign up and sign in
 
 **In the prototype:** 4 November 2026 · **Jira:** [PR-9011](https://ideeza.atlassian.net/browse/PR-9011) · **Production:** Ready for development
+
+**Changed by [CL-046](#cl-046-deactivate-or-delete-your-account-and-signing-in-makes-it-active-again)** (24 November 2026): Settings › Account › **Sign-in and security** has no **Sign out** any more (it stays in the account menus) and adds **Deactivate account** and **Delete account**; signing in to a deactivated account, or one waiting to be deleted, makes it active again. Build those from CL-046.
 
 **Screen:** Sign up (`/sign-up`), Check your email (`/sign-up/check-email`), the
 one question (`/sign-up/welcome`), Sign in (`/sign-in`, with Forgot password),
