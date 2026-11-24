@@ -6,15 +6,27 @@
 //   live value and the chevron: Activity (the web's `view.current`, "Now: …"),
 //   Media (the project video's state), Versions (the current version and when
 //   it was saved, 05), Team and Network (`aboutRowsOf`, 06);
-// · About: Created, Parts, Stored;
+// · About: Created, Parts, Stored; on a project bought whole (CL-038, the
+//   owner only) a Purchase row → a sheet with the web's Purchase facts (Bought
+//   from → its listing, Price paid, Bought on, Your share, Token, Blockchain,
+//   Transaction, Bought as with the Testnet demo badge);
 // · Recent (20b): the web's rail log, once the project has gone out.
 
 import * as React from "react";
-import { Activity01Icon, GitBranchIcon, ShareKnowledgeIcon, UserGroupIcon, Video01Icon } from "@hugeicons/core-free-icons";
+import { Activity01Icon, GitBranchIcon, ShareKnowledgeIcon, ShoppingBag01Icon, UserGroupIcon, Video01Icon } from "@hugeicons/core-free-icons";
+import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
+import { useSampleSales } from "../project-earn/buyer/sample-sales-store";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { can } from "@/lib/manual/permissions";
 import { engineeringMetaOf, stageLineOf } from "@/lib/manual/project-header";
 import { formatDate } from "@/lib/manual/project-summary";
+import type { Token } from "@/lib/brief/types";
+import { phoneMarketHref } from "@/lib/manual/phone-earn";
+import { SAMPLE_COLLECTION } from "@/lib/market/sample-market";
+import { shortAddress } from "@/lib/wallet/demo-wallet";
+import { buyerLabel } from "@/lib/wallet/identities";
+import { formatAmount } from "@/lib/wallet/money";
+import { networkLabelOf } from "@/lib/wallet/request-view";
 import { labelOf } from "@/lib/manual/journey";
 import { currentProductsOf } from "@/lib/manual/readiness";
 import { aboutRowsOf } from "@/lib/manual/rail-copy";
@@ -28,6 +40,7 @@ import { useProjectVideos } from "@/lib/video/store";
 import { projectRowCopy, resolutionOf, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { ListCard as KitListCard, ListRow } from "../kit/list";
+import { Sheet } from "../kit/sheet";
 import { T } from "../type";
 import { useProject } from "./context";
 import { InfoRow, LINK_MD, ListCard, SectionHeading } from "./parts";
@@ -114,26 +127,77 @@ export function ProjectHub() {
 }
 
 export function ProjectAbout() {
+  const { project, viewer } = useProject();
   const about = useAboutRows();
   const rows = (["created", "parts", "stored"] as const).map((k) => about[k]).filter((r): r is { label: string; value: string } => !!r);
+  // A project bought whole: what was paid for it, the owner's only, never in a preview (CL-038).
+  const bought = viewer.kind === "local-owner" ? (project.acquired ?? null) : null;
+  const [purchase, setPurchase] = React.useState(false);
   return (
     <section aria-labelledby="ov-about" className="flex flex-col gap-4">
       <SectionHeading id="ov-about" title="About" />
+      {bought && (
+        <KitListCard label="Purchase">
+          <ListRow icon={ShoppingBag01Icon} title="Purchase" meta={`Bought from ${bought.from}`} onClick={() => setPurchase(true)} />
+        </KitListCard>
+      )}
       <ListCard label="About">
         {rows.map((r) => (
           <InfoRow key={r.label} label={r.label} value={r.value} />
         ))}
       </ListCard>
+      {bought && <PurchaseSheet open={purchase} onClose={() => setPurchase(false)} bought={bought} tokenId={project.mint?.tokenId ?? null} />}
     </section>
   );
 }
 
+/** The web's Purchase block (rail-purchase.tsx) as a sheet: the line, then its facts. */
+function PurchaseSheet({
+  open,
+  onClose,
+  bought,
+  tokenId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  bought: NonNullable<ReturnType<typeof useProject>["project"]["acquired"]>;
+  tokenId: string | number | null;
+}) {
+  const sales = useSampleSales();
+  const sale = sales.find((x) => x.id === bought.saleId) ?? null;
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Purchase"
+      description="You bought the whole project, so it's one of yours: open it, edit it, build it and sell it again."
+    >
+      <div className="flex flex-col gap-4 pb-8">
+        {sale && <TestnetDemoBadge className="self-start" />}
+        <ListCard label="Purchase">
+          <InfoRow label="Bought from" value={bought.from} href={phoneMarketHref(bought.feedId)} />
+          <InfoRow label="Price paid" value={<span className="tabular-nums">{formatAmount(bought.price, bought.token as Token)}</span>} />
+          <InfoRow label="Bought on" value={formatDate(bought.at)} />
+          <InfoRow label="Your share" value="100% · Main NFT" />
+          {tokenId !== null && <InfoRow label="Token" value={`#${tokenId} · ${SAMPLE_COLLECTION}`} />}
+          {sale && <InfoRow label="Blockchain" value={networkLabelOf(sale.network)} />}
+          {sale?.txHash && <InfoRow label="Transaction" value={<span title={sale.txHash}>{shortAddress(sale.txHash)}</span>} />}
+          {sale && <InfoRow label="Bought as" value={buyerLabel(sale.buyerId)} />}
+        </ListCard>
+      </div>
+    </Sheet>
+  );
+}
+
+/** The web's rail log ("Recent", RailLog): the owner's whenever it has lines, a Draft too ("Created
+ *  by hand", "Business plan written" — the web's rule, PRJ-10); a buyer's (Explore marketplace,
+ *  Preview as buyer) with the public lines only — no network, as the web. */
 export function ProjectRecent() {
   const { view, viewer } = useProject();
   const owner = can(viewer, "facts.seeOwnerOnly");
-  const lines = React.useMemo(() => logLinesOf(view.log, { network: true, products: view.products }), [view.log, view.products]);
+  const lines = React.useMemo(() => logLinesOf(view.log, { network: owner, products: view.products }), [view.log, owner, view.products]);
   const [all, setAll] = React.useState(false);
-  if (!owner || view.summary.status === "draft" || lines.length === 0) return null;
+  if (lines.length === 0) return null;
   const shown = all ? lines : lines.slice(0, LOG_SHOWN);
   return (
     <section aria-labelledby="ov-recent" className="flex flex-col gap-4">

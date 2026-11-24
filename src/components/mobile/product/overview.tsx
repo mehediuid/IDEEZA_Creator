@@ -3,20 +3,27 @@
 // The buyer's Overview tab (Product Details 10, 10e, 10u, 10x, 29a, 31b) and
 // the blocks the owner's object page shares with it:
 // · Marketplace (the buyer's side, 10x): its copies on sale as one list —
-//   a Physical or Virtual mark, "Physical NFT · Private use", Regular price ·
-//   Extended price · Royalties and the sold line (the web's EditionBlock in its
-//   buyer's words); the collection and chain as one line; what each kind of
+//   a Physical or Virtual mark, "Physical NFT · Personal use", its one Price ·
+//   Royalties and the sold line, and "Not on sale" for a use not listed (CL-018:
+//   one price per use, no version); the collection and chain as one line; what each kind of
 //   NFT is in the ⓘ (owner 2026-11-15: no tab strip inside the page's tabs).
-//   One buy path: the sticky bar;
+//   One buy path: the sticky bar. In Preview as others see it, a quiet "View
+//   on Explore marketplace" under it opens the live product shop (the web's
+//   edition block, CL-018; BUY-15);
 // · Specs: the booked facts (`productFacts`) as a grouped list, with "Worked
 //   out from the parts." for a build that predates the spec and the owner's
-//   part changes (29a) as its footer lines;
+//   part changes (29a) as its footer lines; when the project has a network
+//   (CL-015) a Network row names it ("Unnamed Network" without a name) — the
+//   owner's opens the project's Network screen, as the project page's About
+//   row does; a preview reads it; the marketplace view has no network screen
+//   on a phone, so no row. A product no build stands behind still shows Specs
+//   for that row;
 // · Build check: one row — the web's line, its chip at the end — that opens
 //   See why (the grouped checks in a sheet, 10q, 29b, with the web's credit
 //   note) while the build is a Draft.
 
 import * as React from "react";
-import { CubeIcon, InformationCircleIcon, PackageIcon, Shield01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUpRight01Icon, CubeIcon, InformationCircleIcon, PackageIcon, ShareKnowledgeIcon, Shield01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
 import { buttonVariants } from "@/components/ideeza/button";
@@ -33,25 +40,30 @@ import {
   type ProductConfidence,
 } from "@/lib/create/confidence";
 import { productFacts } from "@/lib/manual/products-tab-view";
-import { editionChainOf, KIND_WORD, trackCardOf, tracksOf, USE_WORD } from "@/lib/market/editions";
+import { MARKET_VIEW, phoneProductPath } from "@/lib/manual/phone-product";
+import { phoneProjectPath } from "@/lib/manual/phone-project";
+import { projectTabsFor } from "@/lib/manual/project-route";
+import { useProjectNetwork } from "@/lib/network/store";
+import { editionChainOf, KIND_WORD, trackCardOf, tracksOf } from "@/lib/market/editions";
+import { USE_LABEL } from "@/lib/market/sell-flow";
 import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { Chevron, LIST_ROW, ListCard } from "../kit/list";
+import { Chevron, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { T } from "../type";
-import { CARD, FactCard, InfoButton, ListFooter, SectionHead } from "./parts";
+import { CARD, FactCard, InfoButton, LINK, ListFooter, SectionHead } from "./parts";
 import { useProduct } from "./use-product";
 
 /** The buyer's Overview (the owner's page lays these out itself). */
 export function OverviewTab() {
-  const { buyer, bp, confidence } = useProduct();
+  const { buyer, confidence } = useProduct();
   return (
     <div className="flex flex-col gap-12">
       {buyer && <MarketplaceBlock />}
-      {bp && <SpecsSection />}
+      <SpecsSection />
       {confidence && (
         <section aria-labelledby="pd-check" className="flex flex-col gap-4">
           <SectionHead id="pd-check" title="Build check" />
@@ -66,17 +78,43 @@ export function OverviewTab() {
 
 // ─────────────────────────── Specs (10, 29a) ───────────────────────────
 
+/** The project's network as the product's Specs names it (the web's `useNetworkFact`): its name,
+ *  and the phone's Network screen for the owner; null with no network, on the marketplace view,
+ *  or for a viewer whose project page has no Network. */
+function useNetworkRow(): { name: string; href: string | null } | null {
+  const { project, viewer, mode } = useProduct();
+  const { network } = useProjectNetwork(mode === "market" ? null : project.id);
+  if (!network || mode === "market") return null;
+  if (!projectTabsFor(viewer, { networkReadable: true, contributors: project.contributors?.length ?? 0 }).includes("network")) return null;
+  return { name: network.name.trim() || "Unnamed Network", href: mode === "owner" ? phoneProjectPath(project.id, "network") : null };
+}
+
 export function SpecsSection() {
   const { bp, partChanges } = useProduct();
-  if (!bp) return null;
-  const facts = productFacts(specOfSource(bp), bp.parts);
-  if (!facts.length && !partChanges) return null;
+  const network = useNetworkRow();
+  const facts = bp ? productFacts(specOfSource(bp), bp.parts) : [];
+  if (!facts.length && !partChanges && !network) return null;
+  const title = (
+    <>
+      Network
+      {network?.href && <span className="sr-only"> · View network</span>}
+    </>
+  );
   return (
     <section aria-labelledby="pd-specs" className="flex flex-col gap-4">
       <SectionHead id="pd-specs" title="Specs" />
       {facts.length > 0 && <FactCard label="Specs" inset="row" rows={facts.map((f) => [f.label, f.value])} />}
-      {!bookedSpec(bp) && facts.length > 0 && <ListFooter>Worked out from the parts.</ListFooter>}
+      {bp && !bookedSpec(bp) && facts.length > 0 && <ListFooter>Worked out from the parts.</ListFooter>}
       {partChanges && <ListFooter>Built with your part changes: {partChanges}</ListFooter>}
+      {network && (
+        <ListCard label="Network">
+          {network.href ? (
+            <ListRow href={network.href} icon={ShareKnowledgeIcon} title={title} value={network.name} />
+          ) : (
+            <ListRow icon={ShareKnowledgeIcon} title={title} value={network.name} />
+          )}
+        </ListCard>
+      )}
     </section>
   );
 }
@@ -203,7 +241,7 @@ export function useListedCopies(): Listed[] {
 }
 
 function MarketplaceBlock() {
-  const { view, name } = useProduct();
+  const { view, name, mode, project, product } = useProduct();
   const tracks = useListedCopies();
   if (!tracks.length) return null;
   const main = view.listing.kind === "none" ? null : view.listing.listing;
@@ -244,18 +282,30 @@ function MarketplaceBlock() {
               </li>,
             ];
           }
-          return ofKind.map((t) => {
+          // Both uses, always (CL-018): a use the creator didn't list reads "Not on sale".
+          return USES.map((use) => {
+            const t = ofKind.find((x) => x.use === use);
+            if (!t) {
+              return (
+                <li key={`${kind}-${use}`} aria-label={`${KIND_WORD[kind]} NFT · ${USE_LABEL[use]}: not on sale`} className={cn(LIST_ROW, "items-start opacity-60 hover:bg-transparent")}>
+                  <KindMark kind={kind} />
+                  <span className={cn(T.rowTitle, "min-w-0 flex-1")}>
+                    {KIND_WORD[kind]} NFT · {USE_LABEL[use]}
+                  </span>
+                  <span className={cn(T.meta, "shrink-0 text-right")}>Not on sale</span>
+                </li>
+              );
+            }
             const card = trackCardOf(t, view.sales);
             return (
-              <li key={t.id} aria-label={`${KIND_WORD[t.kind]} NFT · ${USE_WORD[t.use]}`} className={cn(LIST_ROW, "items-start hover:bg-transparent")}>
+              <li key={t.id} aria-label={`${KIND_WORD[t.kind]} NFT · ${USE_LABEL[t.use]}`} className={cn(LIST_ROW, "items-start hover:bg-transparent")}>
                 <KindMark kind={t.kind} />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className={T.rowTitle}>
-                    {KIND_WORD[t.kind]} NFT · {USE_WORD[t.use]}
+                    {KIND_WORD[t.kind]} NFT · {USE_LABEL[t.use]}
                   </span>
                   <span className={T.meta}>
-                    Regular price {formatAmount(t.listing.regular, t.listing.token)} · Extended price{" "}
-                    {formatAmount(t.listing.extended, t.listing.token)} · Royalties {t.listing.royaltyPct}% on resales
+                    {formatAmount(t.listing.regular, t.listing.token)} · Royalties {t.listing.royaltyPct}% on resales
                   </span>
                 </span>
                 <span className={cn(T.meta, "shrink-0 text-right", card.soldOut && "text-text-success")}>{card.soldLine}</span>
@@ -264,6 +314,12 @@ function MarketplaceBlock() {
           });
         })}
       </ul>
+      {mode === "preview" && (
+        <Link href={`${phoneProductPath(project.id, product.id)}?view=${MARKET_VIEW}`} className={cn(LINK, "gap-2 self-start")}>
+          View on Explore marketplace
+          <Icon icon={ArrowUpRight01Icon} size={14} />
+        </Link>
+      )}
     </section>
   );
 }

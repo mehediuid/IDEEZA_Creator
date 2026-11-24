@@ -12,32 +12,39 @@
 //
 // Add a product is the web's dialog as one sheet with three steps:
 // · Choose (02b): Build with AI · Build manually;
-// · Build with AI (02c, 02e): the AI tab's Prompt Box (mic, Enhance, ✦), the
-//   web's cost line ("1 concept [credit] · you have n") and, out of credits,
-//   Top up credits; ✦ starts the chat that adds it (`createChat(prompt,
-//   { addTo })`), which opens on the AI tab — the web opens the chat too; Back;
-// · Build manually (02d, 02g, 02h): the name ("Give the product a name."),
-//   then `addProduct` behind the edit gate. The editors need a computer
-//   (D3), so the phone adds it here and says so with a toast.
+// · Build with AI (02c, 02e): the AI tab's Prompt Box — the mic, the
+//   inspiration image (CL-027), Quality (CL-021, the level picked last, here
+//   or on the AI tab), Enhance and ✦, with no cost line under it — the AI
+//   tab's box says none either (owner 2026-11-22: one rule for the box on the
+//   phone); out of credits, the AI tab's own row above the box ("You're out of
+//   credits.", Buy credits → Plan & pricing › Credits, the next plan up,
+//   CL-032); ✦ stores the picture, then starts the chat that adds it
+//   (`createChat(prompt, { quality, addTo, ...image })`), which opens on the AI
+//   tab — the web opens the chat too; Back;
+// · Build manually: nothing is built by hand on the phone (owner 2026-11-22:
+//   "Build manually works nowhere on the mobile app"), so the option stays in
+//   the list but says so, and pressing it shows where it works: a state card
+//   ("Build manually on a computer" — the editors open in IDEEZA on the web),
+//   this project's web address to open there, and Copy link as the footer's
+//   one primary, with Back.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Add01Icon, AiMagicIcon, ArrowRight01Icon, PackageIcon, PencilEdit01Icon, SortingDownIcon } from "@hugeicons/core-free-icons";
+import { Add01Icon, AiMagicIcon, Copy01Icon, LaptopIcon, PackageIcon, PencilEdit01Icon, SortingDownIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Field, errorProps, useFieldIds } from "@/components/auth/auth-parts";
-import { CreditBadge } from "@/components/credits/credit-badge";
 import { Button } from "@/components/ideeza/button";
 import { SearchInput } from "@/components/ideeza/search-input";
-import { TextInput } from "@/components/ideeza/text-input";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { productsOf, statusOf, useCreateHistory } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { piecesOf } from "@/lib/manual/project-read";
-import { PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
 import { PRODUCT_SORTS, PRODUCT_TOOLS_FROM, filterProductRows, parseProductSort, phoneProjectHref, type ProductSort } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
+import type { PromptImage } from "@/components/dashboard/prompt-card";
 import { PromptBox } from "../ai/prompt-box";
+import { QualityPicker, useLastQuality } from "../ai/quality";
+import { OutOfCreditsRow } from "../plans/upsell";
 import { BottomBar } from "../kit/bottom-bar";
 import { PickSheet } from "../kit/pick-list";
 import { Sheet } from "../kit/sheet";
@@ -47,7 +54,7 @@ import { PRESSED } from "../kit/press";
 import { T } from "../type";
 import { useProject } from "./context";
 import { BuildCheckLine, useProductRows } from "./product-rows";
-import { Chevron, LIST_ROW, ListCard, ProductRow, SubLine, TapLink } from "./parts";
+import { Chevron, LIST_ROW, ListCard, ProductRow, SubLine } from "./parts";
 
 /** 02f · A product a chat is building for this project (started from Build with AI): its newest
  *  build that isn't saved anywhere yet. The row opens that chat, where it is saved to the project. */
@@ -275,7 +282,8 @@ export function AddProductSheet({ open, onClose }: { open: boolean; onClose: () 
     onClose();
   };
   const title = step === "ai" ? "Build with AI" : step === "manual" ? "Build manually" : `Add a product to ${project.name}`;
-  const description = step === "choose" ? "Pick how you want to make it." : `It's added to ${project.name}.`;
+  // Build manually adds nothing on the phone: its card says where it works, so no "It's added" line.
+  const description = step === "choose" ? "Pick how you want to make it." : step === "ai" ? `It's added to ${project.name}.` : undefined;
   return (
     <Sheet
       open={open}
@@ -301,26 +309,28 @@ export function AddProductSheet({ open, onClose }: { open: boolean; onClose: () 
             </span>
             <span className="flex min-w-0 flex-col gap-1">
               <span className={T.name}>Build manually</span>
-              <span className={T.body}>Start an empty product here; design it in the editors on a computer.</span>
+              <span className={T.body}>On a computer: design it yourself in the editors, on the web.</span>
             </span>
           </button>
         </div>
       )}
       {step === "ai" && <BuildWithAi onStarted={close} />}
-      {step === "manual" && <BuildManually onAdded={close} />}
+      {step === "manual" && <ManualOnComputer />}
     </Sheet>
   );
 }
 
 /** The sheet's footer per step: Back alone for Build with AI (✦ in the prompt box starts it, 02c);
- *  Create product + Back for Build manually (02d). */
+ *  Copy link + Back for Build manually (it works on a computer). */
 function StepActions({ step, onBack, onDone }: { step: Step; onBack: () => void; onDone: () => void }) {
+  const { project } = useProject();
+  const toast = useToast();
   void onDone;
   return (
     <>
       {step === "manual" && (
-        <Button size="xl" className="w-full" type="submit" form="m-add-manual">
-          Create product
+        <Button size="xl" className="w-full" iconLeading={<Icon icon={Copy01Icon} size={20} />} onClick={() => void copyWebLink(project.id, toast)}>
+          Copy link
         </Button>
       )}
       <Button hierarchy="secondary" size="xl" className="w-full" onClick={onBack}>
@@ -338,14 +348,17 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
   const { createChat } = useCreateHistory();
   const { hydrated, balance } = useCredits();
   const [prompt, setPrompt] = React.useState("");
+  // The AI tab's Quality, remembered across both boxes: the next idea starts at the one picked last.
+  const [quality, setQuality] = useLastQuality();
   const [starting, setStarting] = React.useState(false);
   const canRender = !hydrated || balance >= CONCEPT_COST;
   const short = `You need ${CONCEPT_COST} credit to start. You have ${balance}.`;
 
-  const start = (text: string) => {
+  // `image`: the inspiration image, already stored by the box; the new product's concept is drawn from it.
+  const start = (text: string, image?: PromptImage) => {
     if (starting || !canRender) return false;
     setStarting(true);
-    const chat = createChat(text, { addTo: project.id });
+    const chat = createChat(text, { quality, addTo: project.id, ...image });
     onStarted();
     router.push(`/m/ai/chat/${encodeURIComponent(chat.id)}`);
     return true;
@@ -353,89 +366,59 @@ function BuildWithAi({ onStarted }: { onStarted: () => void }) {
 
   return (
     <div className="flex flex-col gap-4 pb-4">
+      {/* Out of credits: the AI tab's row, above the box (never a warning under the form). */}
+      {hydrated && !canRender && <OutOfCreditsRow onBuy={() => router.push("/m/plans?tab=credits")} />}
       {/* The AI tab's Prompt Box (it brings its own 16 px sides): the mic, Enhance and ✦. */}
       <div className="-mx-8">
         <PromptBox
           value={prompt}
           onChange={(v) => setPrompt(v.slice(0, PROMPT_MAX))}
           onSubmit={start}
-          placeholder="Describe your device"
+          placeholder="e.g. A solar battery pack that charges this desk charger at night"
           canSend={canRender}
           sendReason={short}
           busy={starting}
+          takesImage
+          extra={<QualityPicker value={quality} onChange={setQuality} />}
         />
       </div>
-      {canRender ? (
-        <p className={cn(T.meta, "flex flex-wrap items-center gap-2")}>
-          1 concept <CreditBadge credits={CONCEPT_COST} />
-          {hydrated ? ` · you have ${balance}` : ""}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <p className={cn(T.body, "text-text-error")}>{short}</p>
-          <div>
-            <TapLink href="/m/plans?tab=credits">Top up credits</TapLink>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function BuildManually({ onAdded }: { onAdded: () => void }) {
-  const { project, gate } = useProject();
-  const { addProduct } = useManualProjects();
-  const toast = useToast();
-  const ids = useFieldIds(["name"] as const);
-  const [name, setName] = React.useState("");
-  const [tried, setTried] = React.useState(false);
-  const [refused, setRefused] = React.useState<string | null>(null);
-  const clean = name.trim();
-  const fieldError =
-    clean === "" ? "Give the product a name." : Array.from(clean).length > PROJECT_NAME_MAX ? `Keep it to ${PROJECT_NAME_MAX} characters.` : null;
-  const shown = tried ? fieldError : null;
-  const blocked = gate.reasonOf("addProduct") ?? refused;
+/** This project on the web, where Build manually works: the same site without the phone's /m. */
+function webProjectHref(projectId: string): string {
+  return `${window.location.origin}/projects/${encodeURIComponent(projectId)}`;
+}
 
-  const create = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (fieldError) return setTried(true);
-    const out = gate.guard("addProduct", () => {
-      const rowId = addProduct(project.id, clean);
-      if (!rowId) return setRefused("This browser's storage is full — the product wasn't added.");
-      onAdded();
-      toast({ title: `${clean} added to ${project.name}` });
-    });
-    setRefused(out.kind === "refused" ? out.reason : null);
-  };
+/** Copy the web address; where the browser refuses, the address stays on screen to select. */
+async function copyWebLink(projectId: string, toast: ReturnType<typeof useToast>) {
+  try {
+    await navigator.clipboard.writeText(webProjectHref(projectId));
+    toast({ title: "Link copied. Open it on your computer." });
+  } catch {
+    toast({ title: "Couldn't copy. Select the address above and copy it." });
+  }
+}
 
+/** Build manually on the phone: where it works instead — the editors on a computer — and the address to open there. */
+function ManualOnComputer() {
+  const { project } = useProject();
+  // Shown only after a press in the open sheet, so it is always in the browser, where the origin is known.
+  const href = typeof window === "undefined" ? null : webProjectHref(project.id);
   return (
-    <form id="m-add-manual" onSubmit={create} noValidate className="flex flex-col gap-6 pb-4">
-      <Field label="Product name" htmlFor={ids.name.id} error={shown} errorId={ids.name.errorId}>
-        <TextInput
-          id={ids.name.id}
-          size="xl"
-          value={name}
-          onValueChange={(v) => {
-            setName(v);
-            setTried(false);
-          }}
-          autoComplete="off"
-          enterKeyHint="done"
-          {...errorProps(shown, ids.name.errorId)}
-        />
-      </Field>
-      <p className={T.meta}>You can describe it later on its own page.</p>
-      <p className={cn(T.body, "flex items-start gap-2")}>
-        <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-          <Icon icon={ArrowRight01Icon} size={14} />
-        </span>
-        The editors open on a computer. On your phone the product is added to this project.
-      </p>
-      {blocked && (
-        <p role="alert" className={cn(T.body, "text-text-error")}>
-          {blocked}
-        </p>
+    <div className="flex flex-col gap-6 pb-4">
+      <EmptyState
+        icon={LaptopIcon}
+        title="Build manually on a computer"
+        body={`The editors for PCB, code, 3D and wiring open in IDEEZA on the web. On a computer, open ${project.name} and choose Add a product › Build manually.`}
+      />
+      {href && (
+        <div className="flex flex-col gap-2">
+          <span className={T.label}>This project on the web</span>
+          <p className={cn(T.body, "select-all break-all rounded-md border-[length:var(--border-width-1)] border-solid border-border px-6 py-4 text-text-primary")}>{href}</p>
+        </div>
       )}
-    </form>
+    </div>
   );
 }

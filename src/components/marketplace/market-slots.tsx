@@ -23,34 +23,17 @@ import * as React from "react";
 import { useCreateHistory } from "@/lib/create/history";
 import { useJourney } from "@/lib/manual/journey-store";
 import { productsTabView } from "@/lib/manual/products-tab-view";
-import type { Token } from "@/lib/brief/types";
-import { tracksOf } from "@/lib/market/editions";
-import { KIND_LABEL } from "@/lib/market/sell-flow";
-import { compareAmounts, formatAmount } from "@/lib/wallet/money";
 import { ProductsTab } from "@/components/projects/details/products-tab";
 import { SLOTS } from "@/components/projects/details/project-page";
 import type { ProjectSlots, SlotProps } from "@/components/projects/details/slots";
 import { BuyerRail } from "./buyer-rail";
-import { listedKindsOf } from "./copy-panel";
+import { saleLineOf } from "./copy-panel";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
 import { MarketHeader } from "./market-header";
 import { CreatorRailBlock, StoryRailBlock } from "./market-rail";
 
 function DemoBannerSlot({ project }: SlotProps) {
   return <DemoBuyerBanner className="mb-10" projectId={project.id} />;
-}
-
-/** "Physical NFT on sale · from 0.008 ETH": what of a product's own is listed, at its lowest This version price. */
-function saleLineOf(view: SlotProps["view"], productId: string): string | null {
-  const kinds = listedKindsOf(view, productId);
-  if (!kinds.length) return null;
-  let low: { regular: string; token: Token } | null = null;
-  for (const t of tracksOf(productId, view.editions)) {
-    if (!t.listing || !kinds.includes(t.kind)) continue;
-    if (!low || (t.listing.token === low.token && compareAmounts(t.listing.regular, low.regular) < 0)) low = t.listing;
-  }
-  const what = kinds.length > 1 ? "Physical and Virtual NFTs" : KIND_LABEL[kinds[0]];
-  return low ? `${what} on sale · from ${formatAmount(low.regular, low.token)}` : `${what} on sale`;
 }
 
 /** The Products tab with the marketplace's own links. A buyer sees no owner-only fact and adds nothing. */

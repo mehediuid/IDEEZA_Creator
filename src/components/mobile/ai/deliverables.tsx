@@ -30,7 +30,8 @@ import { useBuildModel } from "@/components/create/use-build-model";
 import { bomFor, isSampleModel } from "@/lib/create/build-artifacts";
 import { checkBuild } from "@/lib/create/confidence";
 import { ITEM_LABELS, productsOf, statusOf, useCreateHistory, type BuildItemKind, type BuildJob } from "@/lib/create/history";
-import { isLeftOut } from "@/lib/create/pieces";
+import { PIECES, isLeftOut } from "@/lib/create/pieces";
+import { notBuiltCostLine } from "@/lib/manual/phone-product";
 import { deriveAssembly, enclosureOnly } from "@/lib/three/assembly";
 import { cn } from "@/lib/utils";
 import { Screen } from "../screen";
@@ -41,6 +42,9 @@ import { LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { NotFoundState } from "../kit/state";
 import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
+import { AddPiecesSheet } from "../product/build-tab";
+import { ProductProvider, type ProductCtx } from "../product/use-product";
+import { PIECE_ICON } from "./build";
 import { ModelView } from "./model-view";
 import { ProgressRing } from "./parts";
 
@@ -74,6 +78,7 @@ function Pieces({ job, back }: { job: BuildJob; back: string }) {
   const { retryBuildItem, setBuildModelFailed } = useCreateHistory();
   const [switching, setSwitching] = React.useState(false);
   const [reviewOpen, setReviewOpen] = React.useState(false);
+  const [adding, setAdding] = React.useState<BuildItemKind[] | null>(null);
   const strip = React.useRef<HTMLDivElement>(null);
   useBuildModel(job);
   const products = productsOf(job);
@@ -134,8 +139,26 @@ function Pieces({ job, back }: { job: BuildJob; back: string }) {
         </div>
 
         <section {...tabPanelProps("pieces", tab)} className={cn(LIST_CARD, "gap-6 p-6 outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}>
-          {!item || isLeftOut(item) ? (
+          {!item ? (
             <p className={cn(T.body, "p-4")}>This piece wasn&apos;t in this build.</p>
+          ) : isLeftOut(item) ? (
+            // A piece the maker left out: the line it always had, then (the web review's "· Not built" tab,
+            // CRE-13) what it adds, its price and time, and Add pieces — the product page's sheet, booked
+            // into this build.
+            <div className="flex flex-col items-center gap-4 p-8 text-center">
+              <span className="text-[color:var(--color-icon-disabled)]">
+                <Icon icon={PIECE_ICON[tab]} size={28} />
+              </span>
+              <p className={T.rowTitle}>This piece wasn&apos;t in this build.</p>
+              <p className={T.meta}>{PIECES[tab].addsLater}</p>
+              <p className={cn(T.meta, "tabular-nums text-text-tertiary")}>{notBuiltCostLine(tab)}</p>
+              {/* The Parts list comes with the other pieces; it isn't added on its own. */}
+              {tab !== "parts" && !systemFailure && statusOf(job) !== "failed" && (
+                <Button hierarchy="secondary" size="lg" onClick={() => setAdding([tab])}>
+                  Add pieces
+                </Button>
+              )}
+            </div>
           ) : item.status !== "ready" ? (
             <div className="flex flex-col items-center gap-4 p-8 text-center">
               {item.status === "building" ? (
@@ -252,19 +275,17 @@ function Pieces({ job, back }: { job: BuildJob; back: string }) {
           })}
         </ul>
       </Sheet>
-      <Sheet
-        open={reviewOpen && !!confidence}
-        onClose={() => setReviewOpen(false)}
-        title="What needs review"
-        description={product.name}
-        actions={
-          <Button size="xl" className="w-full" onClick={() => setReviewOpen(false)}>
-            Done
-          </Button>
-        }
-      >
+      {/* ✕, swipe and the scrim close it: no Done that only closes (kit rule). */}
+      <Sheet open={reviewOpen && !!confidence} onClose={() => setReviewOpen(false)} title="What needs review" description={product.name}>
         {confidence && <ConfidenceIssuesPanel confidence={confidence} />}
       </Sheet>
+      {/* The product page's Add pieces sheet (CRE-13). It reads only the build and the product's name from
+          the product page's context, so it gets those two here, where no project page is open yet. */}
+      {adding && (
+        <ProductProvider value={{ job, name: product.name } as unknown as ProductCtx}>
+          <AddPiecesSheet bp={product} preselect={adding} onClose={() => setAdding(null)} />
+        </ProductProvider>
+      )}
     </Screen>
   );
 }

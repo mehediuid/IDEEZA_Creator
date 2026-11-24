@@ -48,8 +48,9 @@ function usePitch() {
   };
 }
 
-/** F2: the return coupon, when the welcome offer ended unused and the caps allow it today. */
-function useReturnCoupon(): string | null {
+/** F2: the return coupon, when the welcome offer ended unused and the caps allow it today.
+ *  Exported for the phone's Buy credits sheet (components/mobile/plans/upsell.tsx). */
+export function useReturnCoupon(): string | null {
   const offer = useWelcomeOffer();
   const { hydrated, entry } = useNudgeEntry(offer.email);
   const [now] = React.useState(() => Date.now());

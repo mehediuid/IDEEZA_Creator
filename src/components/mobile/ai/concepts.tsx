@@ -16,6 +16,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Alert02Icon,
   Cancel01Icon,
@@ -39,7 +40,7 @@ import { CreditBadge } from "@/components/credits/credit-badge";
 import { elapsedLabel } from "@/components/create/use-clock";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
 import { companionId } from "@/lib/create/companions";
-import { CONCEPT_COST } from "@/lib/create/credits";
+import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { aboutTime, cleanPick, pickCost, qualityOf, withQuality, type PiecePick, type PieceQuality } from "@/lib/create/pieces";
 import { QUALITIES, QUALITY_INFO } from "@/lib/create/quality";
 import type { RailRow } from "@/lib/create/project-state";
@@ -55,7 +56,13 @@ import { LIST_CARD, LIST_DIVIDERS } from "../kit/list";
 import { DASHED, FAIL_COPY, FAIL_FALLBACK, OFFLINE_REASON } from "./parts";
 import { PickList } from "../kit/pick-list";
 import { PromptBox } from "./prompt-box";
+import { BuyCreditsSheet } from "./buy-credits-sheet";
+import { OutOfCreditsRow, PLAN_LINK, PlanLink, ShortOfCreditsLine } from "../plans/upsell";
+import { CREDIT_ALERTS_HREF } from "../settings/kit";
 import type { AssistantTurn, ConceptFlow } from "./use-concept-flow";
+
+/** Why a concept can't be drawn while short of credits — the web's words (image-turn NO_RENDER, CL-032). */
+const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
 
 /** One line of facts for a product's drawing: up to three of the spec's card facts. */
 function factsLine(flow: ConceptFlow, turn: AssistantTurn | undefined): string {
@@ -100,7 +107,7 @@ function AddProductSheet({ flow, open, onClose, onAdded }: { flow: ConceptFlow; 
         : !flow.online
           ? OFFLINE_REASON
           : !flow.canRender
-            ? "You are out of credits — top them up to draw another concept."
+            ? NO_RENDER
             : null;
   const close = () => {
     setName("");
@@ -291,6 +298,16 @@ function ConceptHero({
             <Eyebrow className="text-text-error">Couldn&apos;t draft that concept</Eyebrow>
             <span className={cn(T.rowTitle, "truncate")}>{row.name}</span>
             <span className={T.meta}>{turn?.failReason ? FAIL_COPY[turn.failReason] : FAIL_FALLBACK}</span>
+            {/* Stopped by the maker's own monthly limit: the way to change it, right under the reason (the web's
+                "Change your limit →", CRE-12). */}
+            {turn?.failReason === "cap" && CREDIT_ALERTS_HREF && (
+              <Link
+                href={CREDIT_ALERTS_HREF}
+                className={cn(PLAN_LINK, "-my-2 w-fit")}
+              >
+                Change your limit&nbsp;→
+              </Link>
+            )}
           </span>
         </div>
         <Button
@@ -303,7 +320,11 @@ function ConceptHero({
         >
           Try again <CreditBadge credits={CONCEPT_COST} />
         </Button>
-        {!flow.online && <p className={cn(T.meta, "text-center")}>{OFFLINE_REASON}</p>}
+        {!flow.online ? (
+          <p className={cn(T.meta, "text-center")}>{OFFLINE_REASON}</p>
+        ) : (
+          !flow.canRender && <p className={cn(T.meta, "text-center")}>{NO_RENDER}</p>
+        )}
         {/* An extra product that won't draw doesn't hold the build: it can be left out (and put back). */}
         {row.productId !== "primary" && !flow.held && (
           <Button hierarchy="ghost" size="lg" className="w-full" onClick={() => flow.toggleInBuild(row.productId)}>
@@ -391,8 +412,16 @@ function DrawingRing({ since, now, label }: { since: number; now: number; label:
 
 // ─────────────────────────── the Build line ───────────────────────────
 
+/** The Build line. Short of credits with every concept drawn (CL-032, no warning hung under it): Buy
+ *  credits is the line's one button (the sheet in place, the smallest pack that covers the shortfall picked),
+ *  with one line on what's missing and the next plan up under it. Once the credits cover the build, Build
+ *  is back. While the line has a reason of its own (a concept still draws, or one failed) and there isn't
+ *  a credit left to draw with, the chat's out-of-credits row sits above it — the web keeps that line under
+ *  its composer the whole way through — so a top-up is always one tap away. */
 export function BuildBar({ flow, onBuild, onOptions }: { flow: ConceptFlow; onBuild: () => void; onOptions?: () => void }) {
   const { state } = flow;
+  const { hydrated, balance } = useCredits();
+  const [buying, setBuying] = React.useState(false);
   const n = state.selected.length;
   const waiting = !state.allReady;
   const failedRow = state.failedChoice ? flow.rail.rows.find((r) => r.turnId === state.failedChoice!.id) : undefined;
@@ -406,38 +435,69 @@ export function BuildBar({ flow, onBuild, onOptions }: { flow: ConceptFlow; onBu
         : !flow.online
           ? OFFLINE_REASON
           : null;
+  const short = hydrated && balance < state.cost && !reason && !flow.preparing;
+  // While a concept still draws (or one failed) the line keeps its reason, and a shortfall is said now
+  // too — the web puts it first (CL-032, CRE-11) — so the maker doesn't learn it only after the wait.
+  // Offline holds everything, buying too, so it says nothing more; with no credit at all the
+  // out-of-credits row above already says it.
+  const shortToo = hydrated && balance < state.cost && !!reason && flow.online && flow.canRender;
   const qualities = new Set(state.selected.map((t) => qualityOf(pickOf(flow, t.companionOf ?? "primary"))));
   const quality = qualities.size === 1 ? QUALITY_INFO[[...qualities][0]].label : "Mixed quality";
   const off = !!reason || flow.preparing;
+  const outOfCredits = hydrated && !flow.canRender && !short;
   return (
+    <>
+    {outOfCredits && <OutOfCreditsRow className="mb-4" onBuy={() => setBuying(true)} />}
     <section
       aria-label="Build"
-      className={cn(DASHED, "flex items-center gap-6 p-6", off && !flow.preparing ? "border-border bg-bg-subtle" : "border-border-brand bg-bg-brand-subtle")}
+      className={cn(DASHED, "flex flex-col gap-4 p-6", off && !flow.preparing ? "border-border bg-bg-subtle" : "border-border-brand bg-bg-brand-subtle")}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className={cn(T.rowTitle, reason ? "text-text-tertiary" : "text-text-brand")}>
-          {n} {n === 1 ? "product" : "products"} · {state.cost} credits
-        </p>
-        <p className={T.meta}>
-          {reason ?? `${quality} · ${aboutTime(state.seconds).replace(/^about/, "About")}`}
-          {onOptions && (
-            <>
-              {" · "}
-              <button
-                type="button"
-                onClick={onOptions}
-                className={cn(T.label, "-my-3 inline-flex min-h-[40px] items-center text-text-brand underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
-              >
-                Options
-              </button>
-            </>
+      <div className="flex items-center gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p className={cn(T.rowTitle, reason ? "text-text-tertiary" : "text-text-brand")}>
+            {n} {n === 1 ? "product" : "products"} · {state.cost} credits
+          </p>
+          {shortToo && (
+            <p role="status" className={cn(T.meta, "text-text-primary")}>
+              Not enough credits — this build costs {state.cost}, you have {balance}
+            </p>
           )}
-        </p>
+          <p className={T.meta}>
+            {reason ?? `${quality} · ${aboutTime(state.seconds).replace(/^about/, "About")}`}
+            {onOptions && (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={onOptions}
+                  className={cn(T.label, "-my-3 inline-flex min-h-[40px] items-center text-text-brand underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus")}
+                >
+                  Options
+                </button>
+              </>
+            )}
+          </p>
+        </div>
+        {short ? (
+          <Button size="md" className="shrink-0" onClick={() => setBuying(true)}>
+            Buy credits
+          </Button>
+        ) : (
+          <Button size="md" className="shrink-0" onClick={onBuild} disabled={!!reason} loading={flow.preparing} aria-label={flow.preparing ? "Preparing the build" : undefined}>
+            {/* The web's three labels (CRE-8): a build of this chat exists, so this books the next one. */}
+            {flow.activeBuild ? "Build again" : n === 1 ? "Build this product" : `Build ${n} products`}
+          </Button>
+        )}
       </div>
-      <Button size="md" className="shrink-0" onClick={onBuild} disabled={!!reason} loading={flow.preparing} aria-label={flow.preparing ? "Preparing the build" : undefined}>
-        {n === 1 ? "Build" : `Build ${n} products`}
-      </Button>
+      {short && (
+        <div role="status" className="flex flex-col gap-1 border-t-[length:var(--border-width-1)] border-solid border-border-brand pt-4">
+          <ShortOfCreditsLine cost={state.cost} balance={balance} />
+          <PlanLink className="-mb-3 self-start" />
+        </div>
+      )}
     </section>
+    <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={short ? state.cost : CONCEPT_COST} />
+    </>
   );
 }
 
@@ -713,7 +773,7 @@ export function ConceptSheet({
           {!locked && !flow.online ? (
             <p className={cn(T.meta, "text-center")}>{OFFLINE_REASON}</p>
           ) : (
-            !locked && !flow.canRender && <p className={cn(T.meta, "text-center")}>You are out of credits — top them up to draw another concept.</p>
+            !locked && !flow.canRender && <p className={cn(T.meta, "text-center")}>{NO_RENDER}</p>
           )}
           {locked && <p className={T.meta}>This is what was built. To change it, save the build and change the product from its page.</p>}
         </>
@@ -804,7 +864,7 @@ export function RefineSheet({ flow, turnId, onClose }: { flow: ConceptFlow; turn
               sendKind="send"
               enhanceMode="change"
               canSend={flow.canRender}
-              sendReason="You are out of credits — top them up to draw another concept."
+              sendReason={NO_RENDER}
               onSubmit={(t) => {
                 if (!flow.refine(turn.id, t)) return false;
                 setText("");

@@ -82,13 +82,57 @@ test("a renewal keeps the plan and is recorded as not charged", () => {
   assert.equal(P.advance(P.freeSubscription(T0), T0 + 400 * DAY).orders.length, 0); // Free never renews
 });
 
-test("each monthly period owes one grant of the plan's credits, ending with the period", () => {
+test("a paid plan owes one grant each monthly period, ending with the period", () => {
+  const builder = P.startPlan(P.freeSubscription(T0, "sub_a"), "builder", "monthly", T0, pay("o"));
+  const g = P.grantDue(builder, new Set(), T0 + DAY);
+  assert.deepEqual({ id: g.orderId, credits: g.credits, plan: g.plan }, { id: `grant_${builder.id}_0`, credits: 300, plan: "Builder" });
+  assert.equal(g.expiresAt, addMonths(T0, 1));
+  assert.equal(P.grantDue(builder, new Set([`grant_${builder.id}_0`]), T0 + DAY), null);
+  assert.equal(P.grantDue(builder, new Set([`grant_${builder.id}_0`]), addMonths(T0, 1) + DAY).orderId, `grant_${builder.id}_1`);
+});
+
+test("Free's credits come once, ever, and never run out of time — no refill (owner 2026-11-24)", () => {
   const free = P.freeSubscription(T0, "sub_a");
   const g = P.grantDue(free, new Set(), T0 + DAY);
-  assert.deepEqual({ id: g.orderId, credits: g.credits, plan: g.plan }, { id: "grant_sub_a_0", credits: 10, plan: "Free" });
-  assert.equal(g.expiresAt, addMonths(T0, 1));
-  assert.equal(P.grantDue(free, new Set(["grant_sub_a_0"]), T0 + DAY), null);
-  assert.equal(P.grantDue(free, new Set(["grant_sub_a_0"]), addMonths(T0, 1) + DAY).orderId, "grant_sub_a_1");
+  assert.deepEqual({ id: g.orderId, credits: g.credits, plan: g.plan, expiresAt: g.expiresAt }, { id: P.FREE_GRANT_ID, credits: 10, plan: "Free", expiresAt: null });
+  // Had once: nothing more, next month or a year on, nor on a fresh Free subscription after a paid plan.
+  const had = new Set([P.FREE_GRANT_ID]);
+  assert.equal(P.grantDue(free, had, addMonths(T0, 1) + DAY), null);
+  assert.equal(P.grantDue(P.freeSubscription(addMonths(T0, 6), "sub_b"), had, addMonths(T0, 13)), null);
+  // An older ledger's monthly Free grants count as the one grant.
+  const legacy = P.grantedIdsOf([
+    { reason: "seed" },
+    { reason: "grant", orderId: "grant_sub_a_0", pack: "Free" },
+    { reason: "grant", orderId: "grant_sub_c_0", pack: "Builder" },
+  ]);
+  assert.ok(legacy.has(P.FREE_GRANT_ID) && legacy.has("grant_sub_c_0"));
+  assert.equal(P.grantDue(free, legacy, addMonths(T0, 2)), null);
+  assert.equal(P.grantedIdsOf([{ reason: "grant", orderId: "grant_sub_c_0", pack: "Builder" }]).has(P.FREE_GRANT_ID), false);
+  // On the ledger: a lot with no end date, spent after credits that do end.
+  let s = { balance: 0, ledger: [] };
+  s = C.grantState(s, g);
+  assert.equal(s.ledger.at(-1).expiresAt, undefined);
+  assert.equal(L.lotsOf(s.ledger)[0].expiresAt, null);
+  assert.equal(L.expiryOf({ id: "x", delta: 10, reason: "grant", pack: "Free", ts: T0, expiresAt: addMonths(T0, 1) }), null); // older Free grants too
+  assert.equal(L.expiryOf({ id: "y", delta: 300, reason: "grant", pack: "Builder", ts: T0, expiresAt: addMonths(T0, 1) }), addMonths(T0, 1));
+});
+
+test("the next plan credits: a paid plan's period end, none on Free or when the plan turns Free there", () => {
+  const free = P.freeSubscription(T0, "sub_a");
+  assert.equal(P.nextCreditsAt(free, T0 + DAY), null);
+  const builder = P.startPlan(free, "builder", "monthly", T0, pay("o"));
+  assert.equal(P.nextCreditsAt(builder, T0 + DAY), addMonths(T0, 1));
+  assert.equal(P.nextCreditsAt(P.cancelPlan(builder), T0 + DAY), null);
+  const yearly = P.startPlan(free, "builder", "yearly", T0, pay("y"));
+  assert.equal(P.nextCreditsAt(P.cancelPlan(yearly), T0 + DAY), addMonths(T0, 1)); // the year still runs
+});
+
+test("a plan's credits in words: Free once, the others a month", () => {
+  assert.equal(P.creditsWordsOf(P.planOf("free")), "10 AI credits, once");
+  assert.equal(P.creditsWordsOf(P.planOf("builder")), "300 AI credits a month");
+  assert.equal(P.featuresOf(P.planOf("free"))[0], "10 AI credits, once");
+  assert.ok(P.lossesOf(P.planOf("builder"), P.planOf("free")).includes("Monthly AI credits: 300 → none"));
+  assert.ok(P.lossesOf(P.planOf("builder"), P.planOf("tinkerer")).includes("AI credits: 300 → 50 a month"));
 });
 
 test("a grant on the ledger: a lot that expires with its period, spent before bought credits", () => {

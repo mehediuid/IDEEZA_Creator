@@ -13,7 +13,9 @@
 //   kind always there) — Physical for Business use (Sam) and Personal use
 //   (Leo), Virtual for Personal use (Leo) and Business use (Mira), and its
 //   product's Virtual copy (Mira) — and shared on Innovations (Showcase);
-// - Gesture LED Lamp: Sold. Its Main NFT bought in full by Leo;
+// - Gesture LED Lamp: Sold. Its Main NFT bought in full by Leo; shared on
+//   Innovations too (owner, 2026-11-22: the profile's Timeline shows several
+//   posts — with the demo re-shares of demo-shares.ts);
 // - Heart Rate Band: Minted (private), nothing listed;
 // - BLE Data Logger: Draft. Built, not minted.
 // Each is a finished AI build (all six pieces ready) with its concept image
@@ -45,9 +47,10 @@ export const DEMO_PROJECT_PREFIX = "proj_demo_";
 /** The seed's version: 2 added the second use of each whole-project copy; 3 the sales of every kind and the
  *  demo creators' purchases of sample listings (demo-purchases.ts); 4 the units already made with some copies
  *  (units.ts); 5 Mira's Physical copies of a two-product project; 6 its Virtual copy and a Virtual copy of
- *  another two-product project; 7 copies put up for sale and one sold on (resales.ts). An older planting is
- *  topped up. */
-export const DEMO_SEED_VERSION = 7;
+ *  another two-product project; 7 copies put up for sale and one sold on (resales.ts); 8 the lamp shared on
+ *  Innovations and the clips shared to the Feed (demo-shares.ts), for the profile's Timeline. An older planting
+ *  is topped up. */
+export const DEMO_SEED_VERSION = 8;
 
 const DAY = 86_400_000;
 const NETWORK: Network = "baseSepolia";
@@ -111,6 +114,8 @@ const DEMOS: Demo[] = [
     ],
     age: 20,
     outcome: "sold",
+    story:
+      "Waving at a lamp turned out to be the nicest way to dim it. The gesture sensor sits under the base, so there is nothing to press and nothing to lose.",
   },
   {
     key: "band",
@@ -411,6 +416,21 @@ export function withDemoSales(existing: readonly Sale[], add: readonly Sale[], t
   }
   return sales;
 }
+
+/** An older planting's projects with the Innovations shares a later seed added (`ids`): only a project
+ *  still there and not shared yet gets its share and story; nothing else changes. */
+export function withDemoShowcases(existing: readonly unknown[], seed: readonly ManualProject[], ids: readonly string[]): unknown[] {
+  return existing.map((x) => {
+    if (typeof x !== "object" || x === null) return x;
+    const p = x as Partial<ManualProject>;
+    if (typeof p.id !== "string" || !ids.includes(p.id) || typeof p.showcasedAt === "number") return x;
+    const s = seed.find((q) => q.id === p.id);
+    return s && typeof s.showcasedAt === "number" ? { ...p, showcasedAt: s.showcasedAt, post: s.post } : x;
+  });
+}
+
+/** The projects version 8 shared on Innovations (the lamp). */
+export const DEMO_SHOWCASED_V8: readonly string[] = [`${DEMO_PROJECT_PREFIX}lamp`];
 
 /** The demo projects' ids, for a check that they are there. */
 export const DEMO_PROJECT_IDS: readonly string[] = DEMOS.map(idOf);

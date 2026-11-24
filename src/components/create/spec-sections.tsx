@@ -325,14 +325,14 @@ function LinkNotes({
 
 /** A part's name as it reads in a sentence: "2 × N20 gear motor" — and a
  *  part the model named only by its designator, by what kind it is. */
-function counted(p: ConceptPart): string {
+export function counted(p: ConceptPart): string {
   const m = p.name.match(/^(.*?)\s*\(x(\d+)\)$/);
   return m ? `${m[2]} × ${m[1]}` : readableName(p);
 }
 
 /** What a picker shows for a part the catalog doesn't list: the concept's
  *  own, said to be the concept's — the list holds the catalog's choices. */
-const fromConcept = (p: ConceptPart | undefined, none: string) =>
+export const fromConcept = (p: ConceptPart | undefined, none: string) =>
   p ? `From the concept: ${p.name}` : none;
 
 /** −/+ over a whole number 0–8. A half-typed value stays in the field; only
@@ -703,7 +703,7 @@ export function PowerSection({ product, edit, onOpen }: Props) {
 }
 
 /** A charger's cells in words a maker knows them by. */
-const CELL_WORDS: Record<string, string> = {
+export const CELL_WORDS: Record<string, string> = {
   "1S Li-Po": "1S Li-Po (one cell, 3.7 V)",
   "2S Li-Po": "2S Li-Po (two cells, 7.4 V)",
   "3S Li-Po": "3S Li-Po (three cells, 11.1 V)",
@@ -713,7 +713,7 @@ const CELL_WORDS: Record<string, string> = {
 /** What the cells menu offers: each of the catalog's cells, with the part
  *  that fills them as its sub — the concept's own charger for the cells it
  *  fills already, since picking those keeps it (withCharges). */
-function cellOptions(conceptParts: ConceptPart[]): SelectOption<ChargeCellKey>[] {
+export function cellOptions(conceptParts: ConceptPart[]): SelectOption<ChargeCellKey>[] {
   const own = chargerOf(conceptParts);
   const ownCells = chargeCellsOf(conceptParts);
   return CHARGE_CELL_KEYS.map((k) => {
@@ -1049,7 +1049,7 @@ const motorSelectId = `${sectionId("moves")}-motor`;
 
 /** "A motor driver chip (TB6612FNG) is added to run it." — the part the
  *  motors bring with them, by what it is and then its number. */
-function driverNote(driver: ConceptPart, kind: MotorKey | null, motors: number): string {
+export function driverNote(driver: ConceptPart, kind: MotorKey | null, motors: number): string {
   const drivers = qtyOf(driver.name);
   const bare = driver.name.replace(/\s*\(x\d+\)$/, "");
   const known = kind ? MOTORS[kind].driver.part : undefined;

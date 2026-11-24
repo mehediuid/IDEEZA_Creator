@@ -19,6 +19,9 @@ export const AUDIENCES: readonly { id: ShareAudience; label: string }[] = [
   { id: "only-me", label: "Only me" },
 ];
 
+/** A share: your words over an item. `clipId` is the shared item's id (share-items.ts): a clip's id
+ *  where it has one ("p12", "mine:<projectId>~<productId>"), so a share made on a marketplace page
+ *  and one made on the Feed are the same thing. */
 export type FeedShare = { id: string; clipId: string; caption: string; audience: ShareAudience; at: number };
 
 /** "auto" or a height the clip may be drawn at ("720"). */
@@ -185,6 +188,11 @@ export function withShare(p: FeedPrefs, share: FeedShare): FeedPrefs {
 
 /** How many times this phone shared a clip to its Feed. */
 export const sharesOf = (p: FeedPrefs, clipId: string) => p.shares.filter((s) => s.clipId === clipId).length;
+
+/** Takes one share off (the Timeline's ⋯ › Remove from your Feed). */
+export function withoutShare(p: FeedPrefs, shareId: string): FeedPrefs {
+  return { ...p, shares: p.shares.filter((s) => s.id !== shareId) };
+}
 
 /** Takes a clip off your Feed's shares (every share of it). */
 export function withoutShares(p: FeedPrefs, clipId: string): FeedPrefs {

@@ -9,14 +9,20 @@
 //   rows: What's in this video (the scenes, a sheet), Takes (n) (a sheet: In
 //   use, Use this, delete — the take's file goes, 03f) and Regenerate;
 // · Product videos: one whole-row tap per current product (the web shows a
-//   tile): a ready one plays in a sheet, the others say their state with the
-//   web's action word and open the product page, where its video is made;
+//   tile): a ready one plays in a sheet; one with the owner's action (Generate
+//   AI video, Try again, Review) says its state with the web's action word and
+//   opens that product's video maker on the right take, as the web's tile
+//   button opens Generate video and the readiness rows go (PRJ-4,
+//   `phoneVideoActionHref`) — a ready video with a newer take waiting says so
+//   ("Video ready · Take 2 to review") and opens its review; one rendering
+//   shows its progress;
 // · Assembly snapshots (owner): the pictures Product Preview's Snapshot kept,
 //   as the web's Media tab lists them; a tap opens the viewer, where Remove
 //   asks first;
 // · From your builds: the concept images in a 3-column grid, the Cover chip
 //   on the cover; a tap opens the image viewer (03b), where "Use as cover"
-//   lives (03g "This image is the cover", 03h the toast). The page's cover
+//   lives (03g "This image is the cover", 03h the toast); on the maker's own
+//   pick it reads the web's "Stop using as cover" (PRJ-5). The page's cover
 //   opens the same viewer (`BuildImagesViewer`).
 // Every picture opens in the kit's one full-screen viewer (kit/image-viewer:
 // dark in both themes, white text, ✕, "n of N", the caption, ← action →).
@@ -26,6 +32,7 @@ import Link from "next/link";
 import {
   Alert02Icon,
   Bookmark02Icon,
+  BookmarkRemove02Icon,
   CheckmarkCircle02Icon,
   Delete02Icon,
   Film01Icon,
@@ -45,13 +52,14 @@ import { mediaTilesOf } from "@/components/projects/details/media-tab";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import { coverOf } from "@/lib/manual/project-read";
+import { coverOf, type BuildRef } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
-import { useManualProjects } from "@/lib/manual/projects";
+import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { currentProductsOf } from "@/lib/manual/readiness";
-import { phoneHrefOf, phoneProjectPath } from "@/lib/manual/phone-project";
+import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { describeJoin, projectVideoStatusOf } from "@/lib/video/project-video";
 import { productVideoStatus } from "@/lib/video/product-video";
+import { phoneVideoActionHref } from "@/lib/video/phone-video";
 import { readSnapshots, removeSnapshot, type Snapshot } from "@/lib/manual/snapshots";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY, type VideoTake } from "@/lib/video/types";
@@ -311,8 +319,8 @@ function ProjectVideoSection() {
 
 const ROW_TAP = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
 
-/** Each current product's video as one whole-row tap: a ready one plays in a sheet; the others
- *  open the product page, where its video is made, the web's action word as the row's last line. */
+/** Each current product's video as one whole-row tap: the owner's action (the web's word as the
+ *  row's last line) opens the video maker on the right take; a settled ready one plays in a sheet. */
 function ProductVideosSection() {
   const { project, view, viewer } = useProject();
   const owner = can(viewer, "video.generate", view.canCtx);
@@ -332,12 +340,14 @@ function ProductVideosSection() {
         {shown.map(({ product, name, status }) => {
           const copy = statusCopy(status);
           const take = status.state === "ready" ? status.take : null;
+          // The owner's action in this state (none while it renders or once settled); a ready video
+          // with a newer take waiting has Review, as the web's tile does.
           const label = owner ? actionLabel(copy.action) : null;
-          const href = phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(product.id)}`) ?? "#";
+          const plays = take !== null && !label;
           const body = (
             <>
               <Thumb url={product.built?.product.conceptImageUrl}>
-                {take && (
+                {plays && (
                   <span aria-hidden className={cn(MEDIA_GROUND, MEDIA_INK, "absolute inline-flex size-[28px] items-center justify-center rounded-full")}>
                     <Icon icon={PlayIcon} size={16} />
                   </span>
@@ -348,25 +358,27 @@ function ProductVideosSection() {
                 <span className={cn(T.meta, "flex items-center gap-2", TONE_INK[copy.tone])}>
                   <Icon icon={TONE_ICON[copy.icon] ?? VideoOffIcon} size={14} />
                   <span className="text-text-secondary">
-                    {take ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ") : copy.text}
+                    {plays && take
+                      ? [take.clip ? `0:${String(Math.round(take.clip.durationMs / 1000)).padStart(2, "0")}` : null, resolutionOf(take.quality)].filter(Boolean).join(" · ")
+                      : copy.text}
                   </span>
                 </span>
                 {copy.progress !== null && <ProgressBar value={copy.progress} label={`${name} video render`} />}
-                {!take && label && <span className={cn(T.rowTitle, "text-text-brand")}>{label}</span>}
+                {label && <span className={cn(T.rowTitle, "text-text-brand")}>{label}</span>}
               </span>
-              {!take && owner && <Chevron />}
+              {label && <Chevron />}
             </>
           );
           return (
             <li key={product.id} className={LIST_ROW}>
-              {take ? (
+              {label ? (
+                <Link href={phoneVideoActionHref(project.id, product.id, status)} aria-label={`${name}: ${label}`} className={ROW_TAP}>
+                  {body}
+                </Link>
+              ) : take ? (
                 <button type="button" aria-haspopup="dialog" aria-label={`Play ${name} video`} onClick={() => setWatching({ take, name })} className={ROW_TAP}>
                   {body}
                 </button>
-              ) : owner ? (
-                <Link href={href} className={ROW_TAP}>
-                  {body}
-                </Link>
               ) : (
                 <div className={cn(ROW_TAP, "hover:bg-transparent")}>{body}</div>
               )}
@@ -393,7 +405,8 @@ function BuildImagesSection() {
     return (
       <section aria-label="From your builds" className="flex flex-col gap-4">
         <SectionHeading title="From your builds" />
-        <p className={T.body}>No images yet. A build&apos;s concept images show here once it is saved to this project.</p>
+        {/* The web's words (EmptyMedia, PRJ-12). */}
+        <p className={T.body}>No images yet — concept images from AI builds appear here.</p>
       </section>
     );
   }
@@ -434,6 +447,7 @@ function BuildImagesSection() {
           tiles={tiles}
           index={at}
           coverUrl={coverUrl}
+          pinned={pinnedCoverOf(project, view.refs, coverUrl)}
           canCover={can(viewer, "product.edit", view.canCtx)}
           gate={gate}
           projectId={project.id}
@@ -447,17 +461,25 @@ function BuildImagesSection() {
 
 type Tile = ReturnType<typeof mediaTilesOf>[number];
 
+/** The web's rule (PRJ-5): the cover is the maker's own pick — not the image
+ *  coverOf() would show anyway — so "Stop using as cover" can change it. */
+function pinnedCoverOf(project: ManualProject, refs: BuildRef[], coverUrl: string | null): boolean {
+  return project.cover != null && coverUrl !== null && coverUrl !== coverOf({ ...project, cover: null }, refs);
+}
+
 /** The build images full size, opened at `startUrl` (the page's cover): Use as cover lives here. */
 export function BuildImagesViewer({ startUrl, onClose }: { startUrl: string | null; onClose: () => void }) {
   const { project, view, viewer, gate } = useProject();
   const tiles = React.useMemo(() => mediaTilesOf(view.refs), [view.refs]);
   const [at, setAt] = React.useState(() => Math.max(0, tiles.findIndex((t) => t.url === startUrl)));
   if (tiles.length === 0) return null;
+  const coverUrl = coverOf(project, view.refs);
   return (
     <BuildImageViewer
       tiles={tiles}
       index={Math.min(at, tiles.length - 1)}
-      coverUrl={coverOf(project, view.refs)}
+      coverUrl={coverUrl}
+      pinned={pinnedCoverOf(project, view.refs, coverUrl)}
       canCover={can(viewer, "product.edit", view.canCtx)}
       gate={gate}
       projectId={project.id}
@@ -559,11 +581,13 @@ function SnapshotsSection() {
 
 // ─────────────────────────── 03b · the image viewer ───────────────────────────
 
-/** 03b · a build's concept images full size, with Use as cover (03g, 03h). */
+/** 03b · a build's concept images full size, with Use as cover (03g, 03h) and,
+ *  on the maker's own pick, the web's Stop using as cover (PRJ-5). */
 function BuildImageViewer({
   tiles,
   index,
   coverUrl,
+  pinned,
   canCover,
   gate,
   projectId,
@@ -573,6 +597,8 @@ function BuildImageViewer({
   tiles: Tile[];
   index: number;
   coverUrl: string | null;
+  /** The cover is the maker's pick (not the default image): Stop using as cover. */
+  pinned: boolean;
   canCover: boolean;
   gate: ReturnType<typeof useProject>["gate"];
   projectId: string;
@@ -593,6 +619,15 @@ function BuildImageViewer({
     });
     if (out.kind === "refused") setRefused(out.reason);
   };
+  // Back to coverOf()'s default image — the web's words (media-tab.tsx).
+  const stopUsingAsCover = () => {
+    setRefused(null);
+    const out = gate.guard("cover", () => {
+      setCover(projectId, null);
+      toast({ title: "The cover is back to the default image" });
+    });
+    if (out.kind === "refused") setRefused(out.reason);
+  };
 
   return (
     <ImageViewer
@@ -610,7 +645,11 @@ function BuildImageViewer({
       caption={`${tile.name} · v${tile.version}`}
       note={refused}
       action={
-        !canCover ? undefined : isCover ? (
+        !canCover ? undefined : isCover && pinned ? (
+          <Button hierarchy="secondary" size="xl" className="flex-1" iconLeading={<Icon icon={BookmarkRemove02Icon} size={20} />} onClick={stopUsingAsCover}>
+            Stop using as cover
+          </Button>
+        ) : isCover ? (
           <p className={cn(T.bodyStrong, MEDIA_INK, "flex h-[44px] flex-1 items-center justify-center gap-2")}>
             <Icon icon={Tick02Icon} size={20} />
             This image is the cover

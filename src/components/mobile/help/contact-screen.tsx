@@ -3,9 +3,11 @@
 // Contact support (/m/help/contact; mobile Figma "Contact support · Live
 // chat"). IDEEZA has no live agents, so nobody pretends to type: each message
 // goes to the IDEEZA team as a report (/api/reports, kind "other", with up
-// to 3 screenshots), and the thread answers with its reference and that the
-// team replies by email (lib/support/support-chat.ts keeps the thread in
-// this browser). A message that didn't arrive says so and can be sent again;
+// to 3 screenshots), and the thread answers with its reference in the web's
+// words (support/report-problem.tsx): the team can't reply in the app yet and
+// Settings › Your reports keeps it — no email is promised, as on the web
+// (SET-3; lib/support/support-chat.ts keeps the thread in this browser).
+// A message that didn't arrive says so and can be sent again;
 // after a reload its screenshots are gone (they are never stored), and it
 // says so before sending the words alone. The Figma's composer is kept:
 // the emoji button opens a sheet that types at the cursor, and the mic sits
@@ -17,10 +19,10 @@ import { Cancel01Icon, Image01Icon, Mic01Icon, SentIcon, SmileIcon, Tick02Icon, 
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Textarea } from "@/components/ideeza/text-input";
-import { useAuth } from "@/lib/account/auth";
 import { rememberSentReport } from "@/lib/data/reports";
 import { IMAGES_MAX, admitImages, titleOf } from "@/lib/support/problem-report";
 import { imageFilesOf, shrinkFile, type ReportImage } from "@/lib/support/report-images";
+import { useDates, type Dates } from "@/lib/settings/use-dates";
 import { MESSAGE_MAX, putMessage, readChat, writeChat, type ChatMessage } from "@/lib/support/support-chat";
 import { cn } from "@/lib/utils";
 import { Sheet } from "../kit/sheet";
@@ -31,11 +33,10 @@ import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { newReportId, phoneContext, postReport } from "./report-screen";
 
-const time = (ts: number) => new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-const day = (ts: number) => {
-  const d = new Date(ts);
-  const today = new Date();
-  return d.toDateString() === today.toDateString() ? "Today" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+/** A message's day in the thread, in Settings › Language & region's format and zone (SET-18): "Today", else its date. */
+const dayOf = (dates: Dates, ts: number) => {
+  const d = dates.date(ts);
+  return d === dates.date(Date.now()) ? "Today" : d;
 };
 
 type Shot = ReportImage & { url: string };
@@ -48,8 +49,9 @@ const ICON_BTN =
   "inline-flex size-[44px] shrink-0 items-center justify-center rounded-full text-[color:var(--color-icon-default)] outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus disabled:text-[color:var(--color-icon-disabled)] disabled:hover:bg-transparent";
 
 export function ContactScreen() {
-  const { account } = useAuth();
   const online = useOnline();
+  const dates = useDates();
+  const day = (ts: number) => dayOf(dates, ts);
   const toast = useToast();
   const [thread, setThread] = React.useState<ChatMessage[] | null>(null);
   const [text, setText] = React.useState("");
@@ -153,7 +155,6 @@ export function ContactScreen() {
     void deliver({ id: m.id, text: m.text, at: m.at, state: m.state }, []);
   };
 
-  const email = account?.email ?? "your account’s email";
   return (
     <Screen
       top={<TopBar back="/m/help" title="Contact support" />}
@@ -240,13 +241,13 @@ export function ContactScreen() {
         </div>
       }
     >
-      <p className={cn(T.meta, "-mt-2 pb-6 text-center")}>IDEEZA team · replies by email</p>
+      <p className={cn(T.meta, "-mt-2 pb-6 text-center")}>IDEEZA team · can’t reply in the app yet</p>
       <div className="pb-6">
         <OfflineBanner />
       </div>
       <ol className="flex flex-col gap-6" aria-live="polite">
         <TeamBubble>
-          Hi, this is IDEEZA support. Tell us what you need: each message goes to the team, and we answer by email at {email}.
+          Hi, this is IDEEZA support. Tell us what you need: each message goes to the IDEEZA team. We can’t reply in the app yet.
         </TeamBubble>
         {(thread ?? []).map((m, i, all) => (
           <React.Fragment key={m.id}>
@@ -262,7 +263,7 @@ export function ContactScreen() {
                 {m.text && <p className="whitespace-pre-wrap">{m.text}</p>}
                 {m.images ? <p className={T.meta}>{m.images} {m.images === 1 ? "screenshot" : "screenshots"}</p> : null}
                 <p className={cn(T.micro, "flex items-center justify-end gap-2 pt-1 text-text-tertiary")}>
-                  {time(m.at)}
+                  {dates.time(m.at)}
                   {m.state === "sent" ? <Icon icon={TickDouble02Icon} size={14} aria-label="Sent" /> : m.state === "sending" ? <Icon icon={Tick02Icon} size={14} aria-label="Sending" /> : null}
                 </p>
               </div>
@@ -279,7 +280,7 @@ export function ContactScreen() {
             </li>
             {m.state === "sent" && m.ref && (
               <TeamBubble at={m.at}>
-                Got it: it’s with the IDEEZA team as <span className="font-mono">{m.ref}</span>. We’ll answer by email at {email}. Settings › Your reports keeps it.
+                It’s with the IDEEZA team as <span className="font-mono">{m.ref}</span>. We can’t reply in the app yet. Settings › Your reports keeps it.
               </TeamBubble>
             )}
           </React.Fragment>
@@ -307,6 +308,7 @@ export function ContactScreen() {
 }
 
 function TeamBubble({ children, at }: { children: React.ReactNode; at?: number }) {
+  const dates = useDates();
   return (
     <li className="flex items-end gap-3">
       <span aria-hidden className="inline-flex size-[28px] shrink-0 items-center justify-center rounded-full bg-bg-surface ring-[length:var(--border-width-1)] ring-border">
@@ -314,7 +316,7 @@ function TeamBubble({ children, at }: { children: React.ReactNode; at?: number }
       </span>
       <div className={cn(T.body, "max-w-[85%] rounded-xl rounded-bl-sm bg-bg-surface px-6 py-4 text-text-primary ring-[length:var(--border-width-1)] ring-border")}>
         <p>{children}</p>
-        {at !== undefined && <p className={cn(T.micro, "pt-1 text-right text-text-tertiary")}>{time(at)}</p>}
+        {at !== undefined && <p className={cn(T.micro, "pt-1 text-right text-text-tertiary")}>{dates.time(at)}</p>}
       </div>
     </li>
   );

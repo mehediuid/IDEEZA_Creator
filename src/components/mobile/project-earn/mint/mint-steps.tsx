@@ -8,26 +8,45 @@
 //   title with ⓘ (its line in a sheet);
 // · MintChoose — Keep private · Give to the community · Sell;
 // · MintDetails — Sell: the shared listing terms, the license, Share to Feed
-//   and its story; Give: the chain, the collection, Minting type, the license
-//   and the two confirms; Keep private: the chain, the collection and the
-//   confirms. Only Sell offers Share to Feed: the Feed shows only what is for
-//   sale (owner 2026-11-12), and a gift or a private mint lists nothing. Messages show once a field is left, at once for a typed amount,
+//   and its story; Give: the chain, the collection, Minting type, the license,
+//   the owner confirm and Share to Feed; Keep private: the chain, the
+//   collection, the owner confirm and Share to Feed — the web's Share to
+//   Innovations after every intent. A gift or a private mint lists nothing,
+//   so its post is on your Timeline and joins the Feed once something of it is
+//   for sale (SOC-6; the Feed shows only what is). Messages show once a field is left, at once for a typed amount,
 //   all of them once Continue was pressed (13h). An instant mint the wallet
 //   can't pay says so under Minting type (13g);
-// · MintReview — a reject or a failure first (13l); What is minted as a summary
-//   card (shared as, the name, its products, the price, share and royalties
-//   large for a Sell); Terms; Product videos (the gate's) with their fixes as
-//   rows; one card with the cost, the wallet's line and Each sale; the
-//   ladder's missing steps as a state card;
+// · MintReview — a reject or a failure first (13l); then, while a video the
+//   gate needs hasn't started, "Generate your videos" leads the screen (owner
+//   2026-11-24: the videos are the step's most important job and sat last,
+//   under facts shown louder; then "no coloured card, no box in a box"): a
+//   plain section with how many have started, then
+//   Product videos (a row per product) and Project video (the project's row),
+//   each with Generate video opening its maker; the foot stays the next step's
+//   name (Sign and list), off with its reason until every video has started
+//   (the web's rule, owner 2026-11-24); videos still rendering in the same place; the ladder's missing steps as a
+//   state card; then ONE closed row, Listing details (Mint details), whose line
+//   is the gist ("car · Buy now 1 USDC · 100% of the project · nothing to pay
+//   now") — inside: the products and every term in one list, the share-sale
+//   note, ready or optional videos, and one card with the cost, the wallet's
+//   line and Each sale (owner 2026-11-24: on a phone only what needs acting on
+//   stays open; the maker set the rest in the steps before);
 // · MintDone — Mint complete (13d) / Given to the community (08d): the
 //   success head with its date, the ownership proof as a receipt (All details
 //   closed), the listing or what others can do, the videos, then View on
 //   marketplace and Open Earn as rows;
-// · MintShare — Share to Feed from Done, after a Sell (the flow mounts it then).
+// · MintShare — Share to Feed from Done, after any intent (the web's success
+//   step offers Share after all three; SOC-6: with nothing for sale the post is
+//   on your Timeline until it is).
+// CL-030: Review's videos line says what hasn't started ("Start every video
+// first: …"), or that the listing waits ("… You don't have to wait. …"); Done
+// reads "Minted · listing waits for videos" with the waiting block for each
+// thing it signed; a share from Done while a video is still being made waits
+// off the Feed too.
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertCircleIcon, CheckmarkCircle01Icon, Coins01Icon, CircleIcon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, ArrowDown01Icon, CheckmarkCircle01Icon, Coins01Icon, CircleIcon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field, useFieldIds } from "@/components/auth/auth-parts";
 import { INTENTS } from "@/components/brief/step-choose";
@@ -49,13 +68,14 @@ import { addCollection, readCollections, type WalletCollection } from "@/lib/bri
 import { LISTED_LINE, liveSubline, pendingCardLine, pendingSubline } from "@/lib/brief/success-copy";
 import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { Readiness } from "@/lib/manual/p2-types";
-import { phoneEarnHref, phoneMarketHref, phoneProductVideoHref } from "@/lib/manual/phone-earn";
+import { forSaleNowOf, phoneEarnHref, phoneMarketHref, phoneProductVideoHref, shareOffFeedLineOf } from "@/lib/manual/phone-earn";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
-import { videosBlockerOf } from "@/lib/manual/readiness";
+import { videoCountOf, videosBlockerOf, videosNotStartedOf, videosStartBlockerOf } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
 import { STORY_MAX, sharePostBlocker } from "@/lib/manual/share-post";
 import { FEE_LABEL } from "@/lib/market/fee";
 import { listingViewOf } from "@/lib/market/listing";
@@ -66,7 +86,7 @@ import type { ListingMetadata } from "@/lib/market/types";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import { PROJECT_VIDEO_KEY } from "@/lib/video/types";
-import { actionLabel, projectActionLabel, projectRowCopy, statusCopy } from "@/lib/video/video-copy";
+import { actionLabel, heldNoteOf, projectActionLabel, projectRowCopy, statusCopy } from "@/lib/video/video-copy";
 import { mintCostRows, mintProofRows } from "@/lib/wallet/mint";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { walletFactLineOf } from "@/lib/wallet/request-view";
@@ -77,6 +97,7 @@ import { SheetSelect } from "../../kit/sheet-select";
 import { Sheet } from "../../kit/sheet";
 import { useToast } from "../../kit/toast";
 import { ListCard } from "../../kit/list";
+import { Eyebrow } from "../../kit/eyebrow";
 import { useRouter } from "next/navigation";
 import { useEarn } from "../context";
 import { ListingFields, MintTypeCards } from "../listing-fields";
@@ -85,6 +106,7 @@ import { InfoButton, StepsCard, SummaryCard, useLiveReadiness } from "../sell/pa
 import { LIST_CARD, LIST_ROW, Chevron } from "../../kit/list";
 import { PRESSED } from "../../kit/press";
 import { T } from "../../type";
+import { HeldCard, useHeldItems } from "../video/held";
 
 export type MintGate = {
   /** Every current product's video state, and — when `gated` — whether the commit may go ahead. */
@@ -179,9 +201,13 @@ export function MintChoose({ intent, onPick }: { intent: Intent | null; onPick: 
 // ─────────────────────────── details ───────────────────────────
 
 const NETWORK_OPTIONS = NETWORKS.map((n) => ({ value: n.value, label: n.label }));
-const LICENSE_OPTIONS = LICENSES.map((l) => ({ value: l.value, label: l.label }));
+// Each licence's ⓘ line under its name (EARN-17, the web's step-details.tsx): the names alone don't
+// tell a maker them apart. The pick-one sheet draws `helper` as the row's line.
+const LICENSE_OPTIONS = LICENSES.map((l) => ({ value: l.value, label: l.label, helper: l.info }));
 const NEW_COLLECTION = "__new__";
 const SAVE_SIGNATURE_LINE = "Saved with a free signature — nothing is charged. You can mint it on chain when you list it.";
+/** The web's note on a private mint's post while a video is missing (step-details.tsx). */
+const SHOWCASE_NOTE = "It's shared once every product has a video — the mint doesn't wait for them, and you can make them after.";
 /** Amount fields show a wrong typed value at once; the rest after they're left. */
 const AT_ONCE: ReadonlySet<ListingField> = new Set<ListingField>(["price", "minBid", "auctionBuyNow"]);
 
@@ -212,6 +238,7 @@ export function MintDetails({
   mintAddress,
   shortfall,
   tried,
+  videosReady = true,
 }: {
   state: MintState;
   onChange: (patch: Partial<MintState>) => void;
@@ -219,6 +246,8 @@ export function MintDetails({
   creatorPct: number;
   mintStatus: MintStatus;
   mintAddress?: string;
+  /** Every product has a video (the gate's): a private mint's post says when it's shared otherwise. */
+  videosReady?: boolean;
   /** An instant mint the wallet can't pay: why (13g). */
   shortfall: string | null;
   tried: boolean;
@@ -282,9 +311,20 @@ export function MintDetails({
       />
     </Field>
   );
-  const share = <ShareToggle checked={state.shareToNewsfeed} onChange={(v) => onChange({ shareToNewsfeed: v })} />;
+  // Share to Feed after every intent, as the web's Share to Innovations (SOC-6): a Sell is for sale,
+  // so its post is on the Feed; a gift or a private mint lists nothing, so the toggle says where it goes.
+  const share = (
+    <ShareToggle checked={state.shareToNewsfeed} onChange={(v) => onChange({ shareToNewsfeed: v })} line={intent === "sell" ? null : shareOffFeedLineOf(intent === "give")} />
+  );
   const story = state.shareToNewsfeed && (
-    <StoryPanel id={ids.story.id} value={state.story} onChange={(story) => onChange({ story })} />
+    <StoryPanel
+      id={ids.story.id}
+      value={state.story}
+      onChange={(story) => onChange({ story })}
+      where={intent === "sell" ? "in Feed" : "on your Timeline"}
+      // A private mint never waits for videos (the web's SHOWCASE_NOTE): it's shared once they're there.
+      note={intent === "save" && !videosReady ? SHOWCASE_NOTE : undefined}
+    />
   );
   const lowFunds = shortfall && <Banner tone="attention">{shortfall}</Banner>;
 
@@ -329,6 +369,8 @@ export function MintDetails({
       {intent === "give" && lowFunds}
       {intent === "give" && license}
       <OwnerCheck checked={state.confirmOwnership} onChange={(v) => onChange({ confirmOwnership: v })} error={tried && !state.confirmOwnership ? "Confirm you are the rightful owner of this idea." : undefined} />
+      {share}
+      {story}
     </div>
   );
 }
@@ -358,19 +400,27 @@ function OwnerCheck({ checked, onChange, error }: { checked: boolean; onChange: 
   );
 }
 
-function ShareToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function ShareToggle({ checked, onChange, line }: { checked: boolean; onChange: (v: boolean) => void; line?: string | null }) {
   const id = React.useId();
+  const lineId = React.useId();
   return (
     <div className="flex min-h-[44px] items-center justify-between gap-4">
-      <span id={id} className={cn(T.body, "text-text-primary")}>
-        Share to Feed
+      <span className="flex min-w-0 flex-col gap-1">
+        <span id={id} className={cn(T.body, "text-text-primary")}>
+          Share to Feed
+        </span>
+        {line && (
+          <span id={lineId} className={NOTE}>
+            {line}
+          </span>
+        )}
       </span>
-      <Toggle checked={checked} onChange={() => onChange(!checked)} aria-label="Share to Feed" />
+      <Toggle checked={checked} onChange={() => onChange(!checked)} aria-label="Share to Feed" aria-describedby={line ? lineId : undefined} />
     </div>
   );
 }
 
-function StoryPanel({ id, value, onChange, note }: { id: string; value: string; onChange: (v: string) => void; note?: string }) {
+function StoryPanel({ id, value, onChange, note, where = "in Feed" }: { id: string; value: string; onChange: (v: string) => void; note?: string; where?: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl bg-bg-subtle p-6">
       <label htmlFor={id} className={T.label}>
@@ -385,7 +435,7 @@ function StoryPanel({ id, value, onChange, note }: { id: string; value: string; 
         placeholder="Why did you build this? What should others do with it?"
       />
       <div className={cn(T.meta, "flex justify-between gap-6")}>
-        <span>Shown with your post in Feed.</span>
+        <span>{`Shown with your post ${where}.`}</span>
         <span className="tabular-nums">
           {value.length}/{STORY_MAX}
         </span>
@@ -540,65 +590,174 @@ export function MintReview({
     { handled: selling ? LIST_HANDLED : MINT_HANDLED },
   );
   const names = products.map((p) => displayProductName(p.name));
-  const detail = `${names.length} ${names.length === 1 ? "product" : "products"}${names.length ? ` · ${names.join(", ")}` : ""}`;
   const priced = (toMicros(input.price.trim()) ?? BigInt(0)) > BigInt(0);
   const eachSale = input.type === "buyNow" && !priced ? [{ label: FEE_LABEL, value: "taken from the price of each sale" }] : listingSummaryRows(input, ctx);
   const terms = termsOf(state, intent, type, input);
   const summary = selling ? terms.filter((r) => SUMMARY_TERMS.has(r.label) && r.label !== "Shared as") : [];
   const rest = terms.filter((r) => r.label !== "Shared as" && !(selling && SUMMARY_TERMS.has(r.label)));
+  // Only what the maker has to act on stays open (owner 2026-11-24: "it's a mobile app — show the
+  // needed content; this much confuses the user"): videos still to generate or still rendering, and
+  // the ladder's missing steps. Everything they already set (what is minted, the terms, the cost,
+  // each sale, ready videos) folds into one closed row whose line says the gist.
+  const videoSpot = gate.gated && videosNotStartedOf(gate.readiness).length > 0 ? "first" : gate.gated && videosBlockerOf(gate.readiness) ? "next" : "last";
+  const videos = <VideosBlock projectId={project.id} projectName={project.name} readiness={gate.readiness} gated={gate.gated} selling={selling} first={videoSpot === "first"} />;
+  const [detailsOpen, setDetailsOpen] = React.useState(false);
+  const detailsId = React.useId();
+  const price = summary.find((r) => r.label === "Buy now" || r.label === "Auction");
+  const share = summary.find((r) => r.label === "Selling");
+  const gist = [
+    project.name,
+    ...(selling ? [price ? `${price.label} ${price.value}` : null, share ? share.value : null] : [SHARED_AS[intent]]),
+    type === "instant" ? "you pay on chain now" : "nothing to pay now",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const detailRows = [{ label: "Products", value: names.join(", ") || "None yet" }, ...summary, ...rest];
 
   return (
     <div className="flex flex-col gap-8">
       {mintError && <Banner tone="error">{mintError}</Banner>}
-
-      <SummaryCard
-        label="What is minted"
-        overline={SHARED_AS[intent]}
-        headline={project.name}
-        amount={false}
-        sub={detail}
-        facts={summary.map((r) => ({ label: r.label, value: r.label === "Selling" ? r.value.replace(" of the project", "") : r.value }))}
-      >
-        <p className={cn(T.meta, "line-clamp-3")}>{project.description.trim() || "No description yet."}</p>
-      </SummaryCard>
-
-      <section className="flex flex-col gap-4">
-        <h3 className={H3}>Terms</h3>
-        <FactRows rows={rest} label="Terms" />
-        {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
-      </section>
-
-      <VideosBlock projectId={project.id} readiness={gate.readiness} gated={gate.gated} />
-
-      <section aria-label="Cost" className={cn(LIST_CARD, "gap-6 p-8")}>
-        {intent !== "save" && <CostCard type={type} network={state.network} intent={intent} listing={selling ? listingCostRow(input) : undefined} />}
-        <WalletLine type={type} network={state.network} badge={intent === "save"} ruled={intent !== "save"} />
-        {selling && (
-          <div aria-label="Each sale" className="flex flex-col gap-2 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
-            <h3 className={H3}>Each sale</h3>
-            {eachSale.map((r, i) => (
-              <p key={i} className={NOTE}>
-                {r.label ? `${r.label} · ${r.value}` : r.value}
-              </p>
-            ))}
-          </div>
-        )}
-      </section>
+      {videoSpot !== "last" && videos}
 
       <StepsCard check={ladder} what={selling ? "mint and list" : "mint"} projectId={project.id} license={state.license} />
+
+      <section aria-labelledby={detailsId} className="flex flex-col gap-6">
+        <button
+          type="button"
+          aria-expanded={detailsOpen}
+          aria-controls={`${detailsId}-panel`}
+          onClick={() => setDetailsOpen((o) => !o)}
+          className="-my-3 flex min-h-[44px] w-full items-center gap-4 text-left outline-none focus-visible:underline"
+        >
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span id={detailsId} className={T.rowTitle}>
+              {selling ? "Listing details" : "Mint details"}
+            </span>
+            {!detailsOpen && <span className={cn(NOTE, "line-clamp-2 break-words")}>{gist}</span>}
+          </span>
+          <span aria-hidden className={cn("inline-flex shrink-0 text-[color:var(--color-icon-default)] transition-transform duration-fast motion-reduce:transition-none", detailsOpen && "rotate-180")}>
+            <Icon icon={ArrowDown01Icon} size={20} />
+          </span>
+        </button>
+        <div id={`${detailsId}-panel`} hidden={!detailsOpen} className={cn("flex-col gap-8", detailsOpen ? "flex" : "hidden")}>
+          <FactRows rows={detailRows} label={selling ? "Listing details" : "Mint details"} />
+          {selling && <p className={NOTE}>{SHARE_SALE_NOTE}</p>}
+          {videoSpot === "last" && videos}
+          <section aria-label="Cost" className={cn(LIST_CARD, "gap-6 p-8")}>
+            {intent !== "save" && <CostCard type={type} network={state.network} intent={intent} listing={selling ? listingCostRow(input) : undefined} />}
+            <WalletLine type={type} network={state.network} badge={intent === "save"} ruled={intent !== "save"} />
+            {selling && (
+              <div aria-label="Each sale" className="flex flex-col gap-2 border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border pt-6">
+                <h3 className={H3}>Each sale</h3>
+                {eachSale.map((r, i) => (
+                  <p key={i} className={NOTE}>
+                    {r.label ? `${r.label} · ${r.value}` : r.value}
+                  </p>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </section>
     </div>
   );
 }
 
-/** Product videos (and the project video) as the gate reads them; what's missing opens where it's made. */
-function VideosBlock({ projectId, readiness, gated }: { projectId: string; readiness: Readiness; gated: boolean }) {
+/** Product videos (and the project video) as the gate reads them; what's missing opens where it's made.
+ *  `first`: some haven't started — the screen's lead card, with how many have. */
+function VideosBlock({
+  projectId,
+  projectName,
+  readiness,
+  gated,
+  selling,
+  first = false,
+}: {
+  projectId: string;
+  projectName: string;
+  readiness: Readiness;
+  gated: boolean;
+  selling: boolean;
+  first?: boolean;
+}) {
   const router = useRouter();
+  const headingId = React.useId();
   const blocker = videosBlockerOf(readiness);
-  const line = !gated ? VIDEOS_OPTIONAL : (blocker ?? VIDEOS_READY);
+  // Every video started first (CL-030); one still rendering or waiting for review doesn't stop the
+  // signature — a Sell's listing waits for it.
+  const startBlocker = gated ? videosStartBlockerOf(readiness) : null;
+  const line = !gated
+    ? VIDEOS_OPTIONAL
+    : (startBlocker ?? (blocker ? (selling ? `${blocker} ${heldNoteOf("Explore marketplace", videoCountOf(readiness).total)}` : blocker) : VIDEOS_READY));
   const ok = gated && !blocker;
   const pv = readiness.project;
   const pvCopy = pv ? projectRowCopy(pv) : null;
   const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
+  const pvNotStarted = !!pv && (pv.state === "make" || pv.state === "failed" || pv.state === "waiting" || pv.state === "outdated");
+  const waiting = readiness.products.filter((p) => p.video.state !== "ready");
+  const productRow = (p: Readiness["products"][number], lead: boolean) => {
+    const copy = statusCopy(p.video);
+    const notStarted = p.video.state === "none" || p.video.state === "failed";
+    return (
+      <VideoFixRow
+        key={p.productId}
+        title={displayProductName(p.name)}
+        line={lead && p.video.state === "none" ? "No video yet" : copy.text}
+        action={lead && notStarted ? GENERATE : actionLabel(copy.action)}
+        onOpen={() => router.push(phoneProductVideoHref(projectId, p.productId))}
+      />
+    );
+  };
+  const openProjectVideo = () => router.push(phoneProjectPath(projectId, "video"));
+  const rows = gated && blocker && (
+    <ListCard label="Videos">
+      {waiting.map((p) => productRow(p, false))}
+      {pv && pvCopy && !pv.ok && <VideoFixRow title="Project video" line={pvCopy.text} action={pvAction} onOpen={openProjectVideo} />}
+    </ListCard>
+  );
+  if (first) {
+    const total = videoCountOf(readiness).total;
+    const started = total - videosNotStartedOf(readiness).length;
+    // Plain like the screen's other sections (owner 2026-11-24: no coloured card, no box in a box),
+    // and it says which is which (owner: "which is a product video, which the project video? and
+    // Start what? — the videos have to be generated"): Product videos, a row per product, and
+    // Project video, the project's one row, each with Generate video. Its place at the top carries it;
+    // the foot stays Sign and list, off until every video has started (the web's rule).
+    return (
+      <section aria-labelledby={headingId} className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between gap-4">
+          <h3 id={headingId} className={H3}>
+            Generate your videos
+          </h3>
+          <span className={NOTE}>{`${started} of ${total} started`}</span>
+        </div>
+        <p className={NOTE}>
+          {selling
+            ? "Each product needs its own video, and the project one video of them all. Generate every one before you sign: they keep rendering after, and the listing goes live once all are ready."
+            : "Each product needs its own video, and the project one video of them all. Generate every one before you sign: they keep rendering after."}
+        </p>
+        {waiting.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <Eyebrow tone="tertiary">{waiting.length === 1 && readiness.products.length === 1 ? "Product video" : "Product videos"}</Eyebrow>
+            <ListCard label="Product videos">{waiting.map((p) => productRow(p, true))}</ListCard>
+          </div>
+        )}
+        {pv && pvCopy && !pv.ok && (
+          <div className="flex flex-col gap-3">
+            <Eyebrow tone="tertiary">Project video</Eyebrow>
+            <ListCard label="Project video">
+              <VideoFixRow
+                title={projectName}
+                line={pv.state === "make" ? "All its products in one video · not made yet" : pvCopy.text}
+                action={pvNotStarted ? GENERATE : pvAction}
+                onOpen={openProjectVideo}
+              />
+            </ListCard>
+          </div>
+        )}
+      </section>
+    );
+  }
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-4">
@@ -613,29 +772,13 @@ function VideosBlock({ projectId, readiness, gated }: { projectId: string; readi
         )}
         {line}
       </p>
-      {gated && blocker && (
-        <ListCard label="Videos">
-          {readiness.products
-            .filter((p) => p.video.state !== "ready")
-            .map((p) => {
-              const copy = statusCopy(p.video);
-              const label = actionLabel(copy.action);
-              return (
-                <VideoFixRow
-                  key={p.productId}
-                  title={displayProductName(p.name)}
-                  line={copy.text}
-                  action={label}
-                  onOpen={() => router.push(phoneProductVideoHref(projectId, p.productId))}
-                />
-              );
-            })}
-          {pv && pvCopy && !pv.ok && <VideoFixRow title="Project video" line={pvCopy.text} action={pvAction} onOpen={() => router.push(phoneProjectPath(projectId, "video"))} />}
-        </ListCard>
-      )}
+      {rows}
     </section>
   );
 }
+
+/** What a video not started yet offers in the lead list: it is generated (owner 2026-11-24). */
+const GENERATE = "Generate video";
 
 /** A missing video as a row: what, its state, and its action as the row's value; the row opens its maker. */
 function VideoFixRow({ title, line, action, onOpen }: { title: string; line: string; action: string | null; onOpen: () => void }) {
@@ -757,9 +900,20 @@ export function MintDone({
   const listing = intent === "sell" ? listingViewOf(project.id, { ...market, now: clock, current: NO_METADATA }) : null;
   const listed = listing && listing.kind !== "none" ? listing.listing : null;
   const onMarket = listing?.kind === "live" || listing?.kind === "paused";
-  const badge = live ? DONE_BADGE[intent] : null;
-  const title = intent === "give" ? "Given to the community" : "Mint complete";
-  const subline = live ? (intent === "sell" ? LISTED_LINE : liveSubline(intent, ready > 0 || own.state === "ready")) : pendingSubline();
+  // A Sell signed while its videos still render or wait for review (CL-030): minted, and the listing
+  // waits off the marketplace — never "Listed" until it is.
+  const waiting = useHeldItems(project.id);
+  const toast = useToast();
+  const waitingSale = intent === "sell" && waiting.some((i) => i.kind === "main");
+  const badge = live && !waitingSale ? DONE_BADGE[intent] : null;
+  const title = waitingSale ? "Minted · listing waits for videos" : intent === "give" ? "Given to the community" : "Mint complete";
+  const subline = waitingSale
+    ? "It goes on Explore marketplace by itself when every video is ready — we'll tell you."
+    : live
+      ? intent === "sell"
+        ? LISTED_LINE
+        : liveSubline(intent, ready > 0 || own.state === "ready")
+      : pendingSubline();
   const licenseLabel = LICENSES.find((l) => l.value === state.license)?.label;
 
   const proof = project.mint ? mintProofRows(project.mint, { owner: true }, intent) : [];
@@ -822,7 +976,15 @@ export function MintDone({
         </section>
       )}
 
-      {!live && <Banner tone="info">{pendingCardLine(rendering)}</Banner>}
+      {waiting.length > 0 && (
+        <section aria-label="Waiting for videos" className="flex flex-col gap-4">
+          {waiting.map((item) => (
+            <HeldCard key={item.id} item={item} projectId={project.id} products={products} actions="inline" onCancelled={(title) => toast({ title })} />
+          ))}
+        </section>
+      )}
+
+      {!live && waiting.length === 0 && <Banner tone="info">{pendingCardLine(rendering)}</Banner>}
 
       <ul aria-label="Next" className={cn(LIST_CARD, "[&>*+*]:border-t-[length:var(--border-width-1)] [&>*+*]:border-solid [&>*+*]:border-border")}>
         <li className={cn(LIST_ROW, "hover:bg-transparent")}>
@@ -858,7 +1020,7 @@ function DoneRow({ href, icon, title }: { href: string; icon: typeof Store01Icon
 // ─────────────────────────── Share to Feed (from Done) ───────────────────────────
 
 export function MintShare() {
-  const { project: given, brief } = useEarn();
+  const { project: given, view, brief } = useEarn();
   const { projects, setShowcase } = useManualProjects();
   const project = projects.find((p) => p.id === given.id) ?? given;
   const toast = useToast();
@@ -866,18 +1028,35 @@ export function MintShare() {
   const readiness = useLiveReadiness("showcase");
   const [story, setStory] = React.useState(() => project.post?.story ?? brief?.state.story ?? "");
   const storyId = React.useId();
+  const waitingShare = useHeldItems(project.id).some((i) => i.kind === "share");
+  // Nothing of it for sale (a gift, a private mint, a listing still waiting for videos): the post is
+  // on your Timeline, and joins the Feed once something of it is for sale (SOC-6).
+  const onFeed = forSaleNowOf(view);
+  // One product has no project video (CL-025): the post shows that product's video.
+  const only = readiness.products.length === 1 ? readiness.products[0] : null;
+  const shows = only
+    ? `Your post shows ${displayProductName(only.name)}'s video, with your story.`
+    : "Your post shows the project video and each product's video, with your story.";
+  // Already waiting for its videos: Done's waiting block shows it.
+  if (waitingShare) return null;
   if (project.showcasedAt) {
     return (
-      <Link href="/m" className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "min-w-0 flex-1")}>
-        View in Feed
+      <Link href={onFeed ? "/m" : "/m/profile"} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "min-w-0 flex-1")}>
+        {onFeed ? "View in Feed" : "View on Timeline"}
       </Link>
     );
   }
   const blocker = dialogBlockerOf(readiness) ?? sharePostBlocker({ story });
   const share = () => {
     if (blocker) return;
-    setShowcase(project.id, true, undefined, { story: story.trim() });
-    toast({ title: "Shared to Feed" });
+    // A video still being made (CL-030): the post waits off the Feed, then goes live by itself.
+    if (videosBlockerOf(readiness)) {
+      hold({ id: heldId(), projectId: project.id, kind: "share", at: Date.now(), story: story.trim() });
+      toast({ title: onFeed ? "Your post goes on Feed when every video is ready." : "Your post goes on your Timeline when every video is ready." });
+    } else {
+      setShowcase(project.id, true, undefined, { story: story.trim() });
+      toast({ title: onFeed ? "Shared to Feed" : "Shared to your Timeline" });
+    }
     setOpen(false);
   };
   return (
@@ -889,7 +1068,7 @@ export function MintShare() {
         open={open}
         onClose={() => setOpen(false)}
         title="Share to Feed"
-        description="Your post shows the project video and each product's video, with your story."
+        description={shows}
         actions={
           <>
             <Button size="xl" className="w-full" disabled={!!blocker} onClick={share}>
@@ -899,6 +1078,7 @@ export function MintShare() {
           </>
         }
       >
+        {!onFeed && <p className={NOTE}>{shareOffFeedLineOf(view.commerce.outcome === "given")}</p>}
         <p className={NOTE}>{`${readiness.counts.ready} of ${readiness.counts.total} product videos ready`}</p>
         <Field label="The post" htmlFor={storyId}>
           <Textarea id={storyId} rows={4} value={story} maxLength={STORY_MAX} onValueChange={(v) => setStory(v.slice(0, STORY_MAX))} placeholder="Why did you build this? What should others do with it?" />

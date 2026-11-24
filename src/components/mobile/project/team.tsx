@@ -6,6 +6,9 @@
 // (Viewer / Editor / Co-owner) and a 44 px Message button; "Add people or
 // change shares in Splits" as a row. With nobody else: "Just you so far" +
 // Open Splits. Shares are Splits' (Earn), so no row shows a percentage here.
+// For the maker who can add people, with the plan's contributors in use, a row
+// says which plans include more (CL-032 C7; soft — adding still works, and
+// Splits itself says nothing about plans).
 
 import * as React from "react";
 import Link from "next/link";
@@ -21,6 +24,7 @@ import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
 import { cn } from "@/lib/utils";
 import { ListCard as KitListCard, ListRow } from "../kit/list";
+import { ContributorsPlanRow } from "../plans/upsell";
 import { EmptyState } from "../kit/state";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
@@ -47,12 +51,15 @@ export function TeamScreen({ projectId }: { projectId: string }) {
       <div className="flex flex-col gap-8">
         <p className={cn(T.meta, "min-w-0 truncate")}>{project.name}</p>
         {team.length === 0 ? (
-          <EmptyState
-            icon={UserGroupIcon}
-            title="Just you so far"
-            body="People you add to this project show here with their role. You add them, and any share of ownership, in Earn › Money › Splits."
-            action={manages ? { label: "Open Splits", href: splits } : undefined}
-          />
+          <>
+            <EmptyState
+              icon={UserGroupIcon}
+              title="Just you so far"
+              body="People you add to this project show here with their role. You add them, and any share of ownership, in Earn › Money › Splits."
+              action={manages ? { label: "Open Splits", href: splits } : undefined}
+            />
+            {manages && <ContributorsPlanRow count={0} />}
+          </>
         ) : (
           <>
             {owner && (
@@ -92,6 +99,7 @@ export function TeamScreen({ projectId }: { projectId: string }) {
                 <ListRow href={splits} icon={UserAdd01Icon} title="Add people or change shares in Splits" />
               </KitListCard>
             )}
+            {manages && <ContributorsPlanRow count={team.length} />}
           </>
         )}
       </div>

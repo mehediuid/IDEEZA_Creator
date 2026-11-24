@@ -10,7 +10,9 @@
 //   first may browse; anyone else goes to Welcome, carrying where they were
 //   going. The Shared kit is open to all.
 // Signed in, a sign-in that still owes something goes there first: the 2-step
-// code (AU-07), then Restore for an account set to be deleted (AU-65).
+// code (AU-07), then Restore for an account set to be deleted (AU-65), then a
+// Google / Facebook account's Finish your account (AUTH-2: the date of birth
+// and the Terms box the web never lets an account in without).
 // Signed in, on a tab screen, one thing at a time and in this order: the tour
 // when Look around first asked for it, then the welcome offer (on Home, once
 // per account, as on the web).
@@ -18,13 +20,14 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { SESSION_KEY, signOut, useAuth } from "@/lib/account/auth";
+import { SESSION_KEY, needsAccountDetails, signOut, useAuth } from "@/lib/account/auth";
 import {
   ENTRY_PATH,
   SETUP_PATH,
   isAlive,
   keepUtm,
   mobileNext,
+  sessionExpiredHref,
   usePhone,
 } from "@/lib/account/phone";
 import { owedOf, readDeviceId, useSecurity } from "@/lib/account/security";
@@ -43,7 +46,7 @@ function redirectFor(
   search: string,
   signedIn: boolean,
   explored: boolean,
-  owes: "two-step" | "restore" | null,
+  owes: "two-step" | "restore" | "source" | null,
   onboarded = true,
 ): string | null {
   if (/^\/m\/kit(\/|$)/.test(pathname)) return null;
@@ -96,11 +99,15 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   const [openedAt] = React.useState(() => Date.now());
   // All are read from this browser, so `ready` is never true on the server.
   const ready = hydrated && phoneRead && securityRead && session.hydrated;
-  const owes = ready && signedIn ? owedOf(security, sessionAt, readDeviceId(), Math.max(openedAt, sessionAt)) : null;
+  const owes =
+    ready && signedIn ? (owedOf(security, sessionAt, readDeviceId(), Math.max(openedAt, sessionAt)) ?? (account && needsAccountDetails(account) ? "source" : null)) : null;
   const target = ready ? redirectFor(pathname, window.location.search, signedIn, phone.explored, owes, phone.onboarded) : null;
 
+  // Set while a sign-in that ended with its tab is being signed out (AUTH-8): the reload to Welcome
+  // that says so is on its way, so the signed-out redirect below stands aside.
+  const forgetting = React.useRef(false);
   React.useEffect(() => {
-    if (target) router.replace(target);
+    if (target && !forgetting.current) router.replace(target);
   }, [target, router]);
 
   // The campaign tag of the link that opened the app, for the account made from it.
@@ -122,12 +129,16 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(id);
   }, []);
 
-  // Logged in without Remember me: a cold start (a new tab) ends that sign-in.
+  // Logged in without Remember me: a cold start (a new tab) ends that sign-in, on Welcome as after
+  // any sign-out — never silently (AUTH-8): it says "Your session expired", and Log In goes back to
+  // the page that was opened.
   const forget = ready && signedIn && phone.forgetSession && !isAlive();
+  const expiredTo = forget ? sessionExpiredHref(pathname, window.location.search) : null;
   React.useEffect(() => {
-    if (!forget) return;
-    void signOut().then(() => window.location.replace("/m/welcome"));
-  }, [forget]);
+    if (!expiredTo || forgetting.current) return;
+    forgetting.current = true;
+    void signOut().then(() => window.location.replace(expiredTo));
+  }, [expiredTo]);
 
   if (!ready || target || holding || forget) return <SplashScreen />;
 

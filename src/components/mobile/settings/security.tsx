@@ -14,6 +14,12 @@
 // to confirm), AU-45 a device, AU-45b sign out of all other devices; the
 // Demo stand-in for a provider's own sheet connects one. AU-42b / AU-33b:
 // the toasts the sub-screens come back with.
+// 2-step sign-in and a scheduled deletion are the phone's own: only the app's
+// gate (account/mobile-gate.tsx, owedOf) asks for the code or offers Restore,
+// and the website's sign-in reads neither yet — so both say they apply in the
+// app only (web-vs-phone SET-5), here and on the screens that turn them on.
+// "Another phone signed in" (the Shared kit's prototype row) is the only
+// other device, marked Demo on its row and in its sheet.
 
 import * as React from "react";
 import { ComputerIcon, Logout01Icon, SmartPhone01Icon, Tablet01Icon } from "@hugeicons/core-free-icons";
@@ -60,6 +66,11 @@ import { useOnline } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { PageBones, SettingsGroup, SettingsRow, SettingsScreen } from "./kit";
 import { SignOutSheet } from "./sign-out";
+
+/** Under 2-step sign-in wherever it is turned on: the website's sign-in doesn't ask for the code. */
+export const TWO_STEP_APP_ONLY = "In the app only for now: the website doesn’t ask for the code yet.";
+/** Under Delete account wherever it is asked for: the website's sign-in doesn't know of a deletion. */
+export const DELETE_APP_ONLY = "In the app only for now: the website still signs you in as usual.";
 
 /** What this phone is, read from the browser. */
 export function useThisDevice(): { id: string; name: string; os: string; app: string; where: string } {
@@ -181,7 +192,7 @@ export function SecuritySettings() {
         })}
       </SettingsGroup>
 
-      <SettingsGroup id="protection" label="Protection">
+      <SettingsGroup id="protection" label="Protection" footer={TWO_STEP_APP_ONLY}>
         {/* The full sentence ("…when you sign in on a new device") opens the setup screen. */}
         <SettingsRow
           id="two-step"
@@ -223,7 +234,7 @@ export function SecuritySettings() {
         />
       </SettingsGroup>
 
-      <SettingsGroup>
+      <SettingsGroup footer={DELETE_APP_ONLY}>
         <SettingsRow
           id="delete"
           label="Delete account"

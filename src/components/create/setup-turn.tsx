@@ -16,7 +16,11 @@
 //
 // The order follows the decision, not the data: what you are building comes
 // first, because it is what decides whether the next question is "which
-// project" or "name the project".
+// project" or "name the project". Several products always start a new project
+// (owner 2026-11-24: "with several products from AI I can only create a
+// project, I can't pick one I have"), so they are only asked its name; one
+// product gets two clear choices, New project or A project I have (owner: a
+// "+ Start a new project" row over a list of projects confused people).
 
 import * as React from "react";
 import {
@@ -25,9 +29,10 @@ import {
   Loading03Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { SelectMenu } from "@/components/ideeza";
+import { Radio, SelectMenu } from "@/components/ideeza";
 import { CreditBadge } from "@/components/credits/credit-badge";
 import { ProjectLimitCard, useNewProjectHint, useProjectRoom } from "@/components/projects/project-limit";
+import { cn } from "@/lib/utils";
 import { CanvasFooter } from "./canvas-footer";
 import type { Companion } from "@/lib/create/companions";
 import type { SetupAnswer } from "@/lib/create/history";
@@ -45,10 +50,6 @@ export type SetupProject = {
    *  The companions still start unticked — the page asked for one product. */
   preselect?: boolean;
 };
-
-/** The chooser's own value for "not one of these" — no project can carry it,
- *  since every id is generated with a prefix. */
-const NEW_PROJECT = "__new__";
 
 export function SetupTurn({
   prompt,
@@ -69,7 +70,8 @@ export function SetupTurn({
   productName?: string;
   productSummary?: string;
   answer?: SetupAnswer;
-  /** Existing projects the build could join — one product or several (create-flow study D3). */
+  /** Existing projects one product could join; several products always start a new project
+   *  (owner 2026-11-24), unless the chat came from a project's Add a product (`preselect`). */
   projects: SetupProject[];
   onAnswer: (answer: SetupAnswer) => void;
 }) {
@@ -93,9 +95,11 @@ export function SetupTurn({
   const [step, setStep] = React.useState<"products" | "project">("products");
   // Derived like `picked`: the project store can land after this card, so the
   // "Add a product" project is read, not copied into state on mount.
+  const [touchedMode, setMode] = React.useState<"new" | "existing" | null>(null);
+  const mode = touchedMode ?? (addTo ? "existing" : "new");
   const [chosenId, setProjectId] = React.useState<string | null>(null);
+  const projectId = chosenId ?? addTo?.id ?? "";
   const [projectName, setProjectName] = React.useState("");
-  const projectId = chosenId ?? (projectName === "" ? (addTo?.id ?? "") : "");
   // The plan's projects (upgrade plan C5): when they're all in use, a new project
   // can't start — the card takes the name field's place, before any credit is spent.
   const room = useProjectRoom();
@@ -131,10 +135,9 @@ export function SetupTurn({
     return <AnsweredCard answer={answer} companions={companions} projects={projects} />;
   }
 
-  // More than one product means one project holding all of them (§4.4.8) — a
-  // new one, or one the maker already has (create-flow study D3: with every
-  // project slot in use, a system must still be able to go into a project
-  // the maker has, instead of meeting only Upgrade).
+  // More than one product means one NEW project holding all of them (§4.4.8; owner
+  // 2026-11-24, which withdrew the create-flow study's D3 default that let them join
+  // a project the maker has).
   const extra = companions.filter((c) => picked.has(c.id));
   const multi = extra.length > 0;
 
@@ -198,19 +201,27 @@ export function SetupTurn({
     );
   }
 
-  // With no project to pick from, several products only need a name for their new project;
-  // otherwise the question is which project — the one this chat was started from, unless the
-  // maker picks another.
-  const choosing = !multi || addTo !== null || projects.length > 0;
-  const newChosen = choosing ? projectId === "" && projectName !== "" : true;
-  const newBlocked = room.full && newChosen;
-  const ready =
-    !newBlocked && (choosing ? projectId !== "" || projectName.trim().length > 0 : projectName.trim().length > 0);
+  // Several products only need a name for their new project, and so does one product when the
+  // maker has no project to add it to. Otherwise the question is which project: New project or
+  // A project I have — the one this chat was started from, unless the maker picks another.
+  const choosing = (!multi && projects.length > 0) || addTo !== null;
+  const isNew = !choosing || mode === "new";
+  const newBlocked = room.full && isNew;
+  const ready = !newBlocked && (isNew ? projectName.trim().length > 0 : projectId !== "");
+  // "Use a project I have" on the plan's card: A project I have picked, its list opened.
   const useExisting = () => {
-    setProjectName("");
-    setProjectId(null);
+    setMode("existing");
     window.requestAnimationFrame(() => pickerRef.current?.querySelector<HTMLElement>("[role=combobox]")?.click());
   };
+  const nameField = (
+    <NameField
+      label={choosing ? "New project name" : "Project name"}
+      value={projectName}
+      onChange={setProjectName}
+      placeholder={multi ? "e.g. Field survey drone" : "e.g. Bench tools"}
+      className={choosing ? undefined : "mt-[12px]"}
+    />
+  );
 
   return (
     <Card>
@@ -231,77 +242,40 @@ export function SetupTurn({
           multi
             ? addTo
               ? `You're adding ${extra.length + 1} products to ${addTo.name}. You can pick another project, or start a new one.`
-              : choosing
-              ? `${extra.length + 1} products belong together, so they go in one project: one you have, or a new one.`
-              : `${extra.length + 1} products belong together, so they go in one new project.`
+              : `${extra.length + 1} products belong together, so they start one new project.`
             : addTo
               ? `You're adding a product to ${addTo.name}. You can pick another project, or start a new one.`
-              : "A single product can join a project you already have, or start a new one."
+              : choosing
+                ? "Start a new project with it, or add it to one you have."
+                : "This product starts a new project."
         }
       >
         {!choosing ? (
-          newBlocked ? (
-            <ProjectLimitCard className="mt-[12px]" />
-          ) : (
-            <NameField
-              label="Project name"
-              value={projectName}
-              onChange={setProjectName}
-              placeholder="e.g. Field survey drone"
-            />
-          )
+          newBlocked ? <ProjectLimitCard className="mt-[12px]" /> : nameField
         ) : (
-          <>
-            {/* A dropdown, not a row per project. The rows were fine for the
-                three products above — a list you read once and tick — but a
-                maker with fifty projects got fifty radio rows in the middle
-                of a chat, and the question they were answering scrolled off
-                the top. Same control the Brief's own project chooser uses, so
-                picking a project reads the same in both places. */}
-            <div ref={pickerRef}>
-              <SelectMenu
-                placeholder="Choose a project"
-                ariaLabel="Project"
-                value={
-                  projectId ? projectId : projectName !== "" ? NEW_PROJECT : null
-                }
-                onChange={(v) => {
-                  if (v === NEW_PROJECT) {
-                    setProjectId("");
-                    setProjectName((n) => n || " ");
-                  } else {
-                    setProjectId(v);
-                    setProjectName("");
-                  }
-                }}
-                options={[
-                  {
-                    value: NEW_PROJECT,
-                    label: "+ Start a new project",
-                    sub: newHint ?? (multi ? "These products become its first." : "This product becomes its first."),
-                  },
-                  // Two projects can share a name, so each row says what it
-                  // holds and when it last changed — four "Drone" rows with
-                  // nothing else on them could not be told apart.
-                  ...projects.map((pr) => ({
-                    value: pr.id,
-                    label: pr.name,
-                    sub: pr.detail,
-                    section: "Existing projects",
-                  })),
-                ]}
-              />
-            </div>
-            {newChosen && !newBlocked && (
-              <NameField
-                label="New project name"
-                value={projectName.trim()}
-                onChange={setProjectName}
-                placeholder="e.g. Bench tools"
-              />
-            )}
-            {newBlocked && <ProjectLimitCard className="mt-[12px]" onUseExisting={projects.length > 0 ? useExisting : undefined} />}
-          </>
+          <ProjectChoices
+            label={multi ? "Where these products go" : "Where this product goes"}
+            mode={mode}
+            onMode={setMode}
+            newWhy={newHint ?? (multi ? "These products start it." : "This product starts it.")}
+            existingWhy={`Add ${multi ? "them" : "it"} to one of your ${projects.length} ${projects.length === 1 ? "project" : "projects"}.`}
+            newBody={newBlocked ? <ProjectLimitCard onUseExisting={useExisting} /> : nameField}
+            existingBody={
+              /* A dropdown, not a row per project: a maker with fifty projects got fifty rows in the
+                 middle of a chat, and the question scrolled off the top. Same control the Brief's
+                 own project chooser uses. Two projects can share a name, so each row says what it
+                 holds and when it last changed. */
+              <div ref={pickerRef}>
+                <SelectMenu
+                  placeholder="Choose a project"
+                  ariaLabel="Your projects"
+                  value={projectId || null}
+                  onChange={setProjectId}
+                  options={projects.map((pr) => ({ value: pr.id, label: pr.name, sub: pr.detail }))}
+                />
+              </div>
+            }
+          />
         )}
       </Question>
       <Footer
@@ -312,19 +286,19 @@ export function SetupTurn({
         ready={ready}
         reason={
           newBlocked
-            ? choosing && projects.length > 0
+            ? choosing
               ? "Pick a project you have, or upgrade"
               : `Upgrade to start a new project`
-            : choosing
-              ? "Pick a project first"
-              : "Name the project first"
+            : isNew
+              ? "Name the project first"
+              : "Pick a project first"
         }
         onGo={() =>
-          onAnswer({
-            projectId: choosing ? projectId : "",
-            projectName: projectName.trim(),
-            picked: extra.map((c) => c.id),
-          })
+          onAnswer(
+            isNew
+              ? { projectId: "", projectName: projectName.trim(), picked: extra.map((c) => c.id) }
+              : { projectId, projectName: "", picked: extra.map((c) => c.id) },
+          )
         }
       />
     </Card>
@@ -569,6 +543,82 @@ function Row({
   );
 }
 
+/** "Which project is this for?" as two clear choices (owner 2026-11-24): New project (its name
+ *  field) and A project I have (the list of projects). Each is a card whose head is the radio;
+ *  what the picked one needs sits under it in the same card. Arrow keys move between them. */
+function ProjectChoices({
+  label,
+  mode,
+  onMode,
+  newWhy,
+  existingWhy,
+  newBody,
+  existingBody,
+}: {
+  label: string;
+  mode: "new" | "existing";
+  onMode: (m: "new" | "existing") => void;
+  newWhy: string;
+  existingWhy: string;
+  newBody: React.ReactNode;
+  existingBody: React.ReactNode;
+}) {
+  const refs = React.useRef<Record<"new" | "existing", HTMLButtonElement | null>>({ new: null, existing: null });
+  const choices = [
+    { id: "new" as const, title: "New project", why: newWhy, body: newBody },
+    { id: "existing" as const, title: "A project I have", why: existingWhy, body: existingBody },
+  ];
+  const go = (to: "new" | "existing") => {
+    onMode(to);
+    refs.current[to]?.focus();
+  };
+  return (
+    <div role="radiogroup" aria-label={label} className="flex flex-col gap-[12px]">
+      {choices.map((c) => {
+        const on = mode === c.id;
+        const other = c.id === "new" ? "existing" : "new";
+        return (
+          <div
+            key={c.id}
+            className={cn(
+              "flex flex-col rounded-xl border border-solid bg-bg-surface transition-colors duration-fast",
+              on ? "border-border-brand" : "border-border",
+            )}
+          >
+            <button
+              ref={(el) => {
+                refs.current[c.id] = el;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              tabIndex={on ? 0 : -1}
+              onClick={() => onMode(c.id)}
+              onKeyDown={(e) => {
+                if (["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+                  e.preventDefault();
+                  go(other);
+                }
+              }}
+              className={cn(
+                "flex w-full items-start gap-[12px] rounded-xl px-[16px] py-[12px] text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+                !on && "hover:bg-bg-subtle",
+              )}
+            >
+              <Radio checked={on} decorative size="sm" className="mt-[2px] shrink-0" />
+              <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
+                <span className="text-md font-medium text-text-primary">{c.title}</span>
+                <span className="text-sm leading-relaxed text-text-tertiary">{c.why}</span>
+              </span>
+            </button>
+            {on && <div className="flex flex-col gap-[12px] pb-[16px] pl-[48px] pr-[16px]">{c.body}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // A visible label, and as wide as the chooser above it — it was a 380 px box
 // with only a placeholder to say what it was for, under a 640 px dropdown.
 function NameField({
@@ -576,15 +626,17 @@ function NameField({
   value,
   onChange,
   placeholder,
+  className,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  className?: string;
 }) {
   const id = React.useId();
   return (
-    <div className="mt-[12px] flex flex-col gap-[6px]">
+    <div className={cn("flex flex-col gap-[6px]", className)}>
       <label htmlFor={id} className="text-sm font-medium text-text-primary">
         {label}
       </label>
@@ -600,8 +652,9 @@ function NameField({
 }
 
 /** The product the maker described, named from their own words — the model
- *  has not run yet, so this is their phrasing, not an invention. */
-function titleFromPrompt(prompt: string): string {
+ *  has not run yet, so this is their phrasing, not an invention. (Exported for
+ *  the phone's question, the same fallback.) */
+export function titleFromPrompt(prompt: string): string {
   const first = prompt.trim().split(/[.,\n]/)[0].trim();
   const short = first.length > 52 ? `${first.slice(0, 52).trimEnd()}…` : first;
   return short.charAt(0).toUpperCase() + short.slice(1);

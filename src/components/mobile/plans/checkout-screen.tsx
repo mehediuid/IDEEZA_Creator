@@ -12,9 +12,10 @@
 // info line in the wallet row), so the method is Crypto from the Demo wallet,
 // USDT or IDZ, signed in the kit's wallet sheet (KIT-WS) — the plan or the
 // credits land in the same commit as the debit. A token the wallet can't pay
-// with is off and says what you have. The total and the one button sit in
-// the Bottom action bar: Connect wallet while none is connected, then Pay
-// $x. Offline, Pay is off with its reason and nothing is bought. Then the
+// with is off and says what you have. Due today and the one button sit in
+// the Bottom action bar: Connect wallet while none is connected, then the
+// web's words with the amount — Upgrade to Builder · $10.00 (Confirm upgrade
+// from a paid plan), Pay $x for credits (MON-11). Offline, Pay is off with its reason and nothing is bought. Then the
 // full-screen result: Upgrade completed / Credits added (kept in the address
 // as `?done=<order>`, so a reload shows the result, not the form again), or
 // Payment failed with the wallet's own reason.
@@ -142,7 +143,7 @@ function Done({ order, orderId }: { order: CheckoutOrder; orderId: string }) {
           { label: "Amount paid", value: usd(invoice.paid) },
         ]}
         primary={{ label: "Start creating", href: "/m/ai" }}
-        secondary={{ label: "View receipt", href: invoicePath(invoice.id) }}
+        secondary={{ label: "View invoice", href: invoicePath(invoice.id) }}
         onClose={() => router.replace("/m/plans?tab=credits")}
       />
     </Screen>
@@ -303,7 +304,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
     setCoupon(null);
     setCouponDraft(couponApplied.code);
     setCouponMsg({ text: r.message, tone: "error" });
-    setNote("Your coupon was taken off, so the price changed. Nothing was charged. Check the total, then pay again.");
+    setNote("Your coupon was taken off, so the price changed. Nothing was charged. Check Due today, then pay again.");
     return false;
   };
 
@@ -384,7 +385,9 @@ function Checkout({ order }: { order: CheckoutOrder }) {
   const fromPaid = isPlan && sub.tier !== "free";
   const per = isPlan ? priceOf(order.tier, cycle) : null;
   const summary = isPlan ? planSummaryOf(target!.monthly, order.tier, cycle) : null;
-  const ctaLabel = due === 0 ? "Confirm upgrade" : `Pay ${usd(due)}`;
+  // The web's button words (checkout-page.tsx), with the amount the phone's bar pays.
+  const verb = isPlan ? (fromPaid ? "Confirm upgrade" : `Upgrade to ${target!.name}`) : null;
+  const ctaLabel = verb ? (due > 0 ? `${verb} · ${usd(due)}` : verb) : `Pay ${usd(due)}`;
   const noWallet = due > 0 && !wallet.connected;
   const reason = !online ? OFFLINE_REASON : noWallet ? null : due > 0 && noFunds ? "Your demo wallet doesn’t hold enough test USDT or IDZ for this." : null;
 
@@ -395,7 +398,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
       footer={
         <BottomBar>
           <p className={cn(T.section, "flex items-center justify-between")}>
-            Total <span className="tabular-nums">{usd(due)}</span>
+            Due today <span className="tabular-nums">{usd(due)}</span>
           </p>
           {(reason || note) && (
             <p id="pay-why" role="status" className={T.caption}>
@@ -454,8 +457,8 @@ function Checkout({ order }: { order: CheckoutOrder }) {
               Confirm your upgrade
             </SectionHead>
             <div className="grid grid-cols-2 gap-4">
-              <PlanTile label="From" name={current.name} line={`${usd(priceOf(sub.tier, sub.cycle).perMonth)} / month`} />
-              <PlanTile label="Upgrading to" name={target!.name} line={`${usd(per!.perMonth)} / month`} brand />
+              <PlanTile label="From" name={current.name} line={`${usd(priceOf(sub.tier, sub.cycle).perMonth)} / month${sub.cycle === "yearly" ? " · annual" : ""}`} />
+              <PlanTile label="Upgrading to" name={target!.name} line={`${usd(per!.perMonth)} / month${cycle === "yearly" ? " · annual" : ""}`} brand />
             </div>
             <p className={T.meta}>Starts now · next billing {dateOf(quote!.renewsAt)}</p>
           </section>
@@ -611,7 +614,7 @@ function Checkout({ order }: { order: CheckoutOrder }) {
             <Row label="Tax">{usd(0)}</Row>
           </dl>
           <p className={cn(T.section, HAIRLINE, "mt-3 flex items-center justify-between border-t-[length:var(--border-width-1)] pt-6")}>
-            Total <span className="tabular-nums">{usd(due)}</span>
+            Due today <span className="tabular-nums">{usd(due)}</span>
           </p>
         </section>
       </div>

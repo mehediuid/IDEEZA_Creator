@@ -5,25 +5,29 @@
 // email, a password with its live checklist, the re-typed password, date of
 // birth (day, month and year, each from a bottom sheet), and the consent line.
 // As on the web, Create account checks everything: each field says what is
-// wrong under it (the password through its checklist) and the first one gets
-// the focus; a field also says so once it is left. An email that is already used says so with Sign in instead
-// (10f); creating (10g); offline keeps the input (10h). The Terms open in a
+// wrong under it (the password through its checklist, its unmet rules then in
+// red; each date picker its own "Choose a day." — AUTH-14) and the first one
+// gets the focus; a field also says so once it is left. An email that is
+// already used says so with Log In instead (10f); creating (10g); offline
+// keeps the input (10h). "Have an Account? Log In" carries the email typed, as
+// the web's Sign in link does (AUTH-12). The Terms open in a
 // full-height sheet (AU-11). Next: the 6-digit code (AU-12), then the web's
 // one question and the Welcome map. A link's utm_source is kept with the
 // account, as on the web, so the question can be skipped. `?email=` fills the
-// email (from Log In, or Verify's "Wrong email?").
+// email (from Log In, or Verify's "Wrong email?"); Verify's "Wrong email?" also
+// brings back the first and last name, as the web's does, and the date of birth
+// (`?first=&last=&day=&month=&year=`, AUTH-6).
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FIELD_ERROR, FIELD_LABEL, Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
+import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Button } from "@/components/ideeza/button";
-import { Checkbox } from "@/components/ideeza/checkbox";
 import { TextInput } from "@/components/ideeza/text-input";
 import { ACCOUNT_CONTENT, AccountAlert, PasswordChecklist, REFUSED_ALERT } from "@/components/mobile/account/parts";
+import { BirthDateField, ConsentCheck, birthDateFromQuery } from "@/components/mobile/account/sign-up-fields";
 import { TermsSheet } from "@/components/mobile/account/terms-sheet";
 import { SwitchLine } from "@/components/mobile/kit/bottom-bar";
-import { SheetSelect } from "@/components/mobile/kit/sheet-select";
 import { useOnline } from "@/components/mobile/kit/states";
 import { Screen } from "@/components/mobile/screen";
 import { T } from "@/components/mobile/type";
@@ -32,16 +36,13 @@ import {
   NAME_PART_MAX,
   PASSWORD_MAX,
   createAccount,
+  isEmail,
   signUpProblems,
   type SignUpField,
   type SignUpInput,
 } from "@/lib/account/auth";
 import { issueCode, mobileNext, readUtm } from "@/lib/account/phone";
 import { cn } from "@/lib/utils";
-
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }));
-const MONTH_OPTIONS = MONTHS.map((m, i) => ({ value: String(i + 1), label: m }));
 
 const KEYS = ["firstName", "lastName", "email", "password", "rules", "confirm", "day", "month", "year", "birthday", "consent"] as const;
 
@@ -54,15 +55,14 @@ export default function SignUpPage() {
   const next = mobileNext(params.get("next"));
   const online = useOnline();
   const ids = useFieldIds(KEYS);
+  // Filled from the link when Log In or Verify's "Wrong email?" sent you here.
   const [input, setInput] = React.useState<SignUpInput>(() => ({
-    firstName: "",
-    lastName: "",
+    firstName: params.get("first") ?? "",
+    lastName: params.get("last") ?? "",
     email: params.get("email") ?? "",
     password: "",
     confirm: "",
-    day: "",
-    month: "",
-    year: "",
+    ...birthDateFromQuery(params, clockNow()),
     consent: false,
   }));
   // Fields left once (each says what is wrong from then on); `tried`: Create account was pressed.
@@ -74,10 +74,6 @@ export default function SignUpPage() {
   const [terms, setTerms] = React.useState(false);
   // Today, for "not in the future": fixed while the form is open.
   const [now] = React.useState(clockNow);
-  const yearOptions = React.useMemo(() => {
-    const year = new Date(now).getFullYear();
-    return Array.from({ length: year - 1899 }, (_, i) => ({ value: String(year - i), label: String(year - i) }));
-  }, [now]);
 
   const set = <K extends keyof SignUpInput>(k: K) => (v: SignUpInput[K]) => setInput((p) => ({ ...p, [k]: v }));
   const leave = (k: SignUpField) => () => setLeft((l) => ({ ...l, [k]: true }));
@@ -94,13 +90,12 @@ export default function SignUpPage() {
       <>
         There’s already an account with this email.{" "}
         <Link href={signInHref(true)} className="font-medium text-text-brand hover:underline">
-          Sign in instead
+          Log In instead
         </Link>
       </>
     ) : (
       show("email")
     );
-  const birthdayError = show("birthday");
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +125,7 @@ export default function SignUpPage() {
     <Screen
       footer={
         <div className="px-8 pb-4 pt-4">
-          <SwitchLine text="Have an Account?" link="Log In" href={signInHref(false)} />
+          <SwitchLine text="Have an Account?" link="Log In" href={signInHref(isEmail(input.email))} />
         </div>
       }
     >
@@ -205,7 +200,7 @@ export default function SignUpPage() {
                 {...(tried && problems.password ? { invalid: true, "aria-invalid": true as const } : {})}
               />
             </Field>
-            <PasswordChecklist password={input.password} id={ids.rules.id} />
+            <PasswordChecklist password={input.password} id={ids.rules.id} invalid={tried && !!problems.password} />
           </div>
           <Field label="Re-type password" htmlFor={ids.confirm.id} error={show("confirm")} errorId={ids.confirm.errorId}>
             <PasswordInput
@@ -219,52 +214,15 @@ export default function SignUpPage() {
               {...errorProps(show("confirm"), ids.confirm.errorId)}
             />
           </Field>
-          <fieldset className="m-0 flex min-w-0 flex-col gap-[6px] border-0 p-0" aria-describedby={birthdayError ? ids.birthday.errorId : undefined}>
-            <legend className={cn(FIELD_LABEL, "mb-[6px] p-0")}>Date of birth</legend>
-            <div className="grid grid-cols-[1fr_1.4fr_1.2fr] gap-4">
-              <SheetSelect id={ids.day.id} title="Day" placeholder="Day" value={input.day} options={DAY_OPTIONS} onChange={set("day")} invalid={!!birthdayError && (!input.day || dateChosen)} />
-              <SheetSelect id={ids.month.id} title="Month" placeholder="Month" value={input.month} options={MONTH_OPTIONS} onChange={set("month")} invalid={!!birthdayError && !input.month} />
-              <SheetSelect id={ids.year.id} title="Year" placeholder="Year" value={input.year} options={yearOptions} onChange={set("year")} invalid={!!birthdayError && !input.year} />
-            </div>
-            {birthdayError && (
-              <p id={ids.birthday.errorId} className={FIELD_ERROR}>
-                {birthdayError}
-              </p>
-            )}
-          </fieldset>
+          <BirthDateField
+            value={{ day: input.day, month: input.month, year: input.year }}
+            onChange={(part, v) => set(part)(v)}
+            shown={tried || dateChosen}
+            now={now}
+            ids={ids}
+          />
         </div>
-        <div className="flex flex-col gap-[6px]">
-          <label className="relative flex cursor-pointer items-start gap-6 rounded-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus">
-            <input
-              id={ids.consent.id}
-              type="checkbox"
-              className="sr-only"
-              checked={input.consent}
-              onChange={(e) => set("consent")(e.target.checked)}
-              {...(show("consent") ? { "aria-invalid": true, "aria-describedby": ids.consent.errorId } : {})}
-            />
-            <Checkbox checked={input.consent} decorative className="mt-[2px]" />
-            <span className={T.meta}>
-              I agree to the IDEEZA Privacy policy and{" "}
-              <button
-                type="button"
-                className="font-medium text-text-brand hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setTerms(true);
-                }}
-              >
-                Terms and conditions
-              </button>
-              .
-            </span>
-          </label>
-          {show("consent") && (
-            <p id={ids.consent.errorId} className={FIELD_ERROR}>
-              {show("consent")}
-            </p>
-          )}
-        </div>
+        <ConsentCheck checked={input.consent} onChange={set("consent")} error={show("consent")} ids={ids.consent} onTerms={() => setTerms(true)} />
         <Button type="submit" size="xl" className="w-full" loading={busy} disabled={!online}>
           Create account
         </Button>

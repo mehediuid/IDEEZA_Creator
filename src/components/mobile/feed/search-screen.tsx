@@ -810,8 +810,8 @@ function PartRow({ item, q }: { item: Extract<SearchItem, { type: "part" }>; q: 
 function PersonRow({ item, q, onOpen }: { item: Extract<SearchItem, { type: "person" }>; q: string; onOpen: () => void }) {
   const { reactions, setFollow, hydrated } = useReactions();
   const toast = useToast();
-  // Your own choice only: a new account starts following no one.
-  const on = item.followKey ? follows(reactions, item.followKey, false) : false;
+  // The web's rule (person-actions): your own choice, else the sample dataset's — as the profile says.
+  const on = item.followKey ? follows(reactions, item.followKey, CREATORS.find((c) => c.id === item.followKey)?.following ?? false) : false;
   return (
     <li className="flex items-center gap-4 border-b-[length:var(--border-width-1)] border-solid border-border py-2 last:border-b-0">
       <button

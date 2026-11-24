@@ -15,12 +15,16 @@
 //   IconLine puts a small mark before a foot line;
 // · OfferCard / OfferRows — a seller's card: its price line, Info rows and a
 //   foot;
-// · WalletLine — "Paying from Mira's demo wallet · 0x… · 0.5 test ETH";
+// · WalletLine — "Paying from Mira's demo wallet · 0x… · 0.5 test ETH ·
+//   Manage", Manage opening the Demo wallet (the web's "Manage demo wallets"
+//   under every wallet line, BUY-11);
 // · NftActivityLine, ProjectActivity (Now + Earlier, or "No journey shared
-//   yet."), LegalSection, HolderBenefits, AboutRows;
+//   yet."), LegalSection, HolderBenefits, AboutRows (its facts, then Team and
+//   Network as rows that push their screens, BUY-9);
 // · PurchaseDoneSheet — 18d, after the wallet sheet confirms.
 
 import * as React from "react";
+import Link from "next/link";
 import { ArrowDown01Icon, CheckmarkCircle01Icon, TestTube01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
@@ -28,7 +32,7 @@ import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import type { Network, Token } from "@/lib/brief/types";
-import { historyOf, labelOf } from "@/lib/manual/journey";
+import { ageOf, historyOf, labelOf } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { RIGHT_LABEL, rightsOf } from "@/lib/manual/legal";
 import type { ProjectLegal } from "@/lib/manual/p2-types";
@@ -43,10 +47,11 @@ import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { testCoin } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer, useDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { Sheet } from "../../kit/sheet";
-import { LIST_CARD, LIST_DIVIDERS, ListCard } from "../../kit/list";
+import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW, ListCard } from "../../kit/list";
 import { MobileTabs } from "../../kit/tabs";
 import { SectionHeading } from "../../project/parts";
 import { T } from "../../type";
@@ -391,10 +396,14 @@ export function OfferCard({
   );
 }
 
-/** The wallet a purchase or a bid pays from, with what it has free of the listing's coin. */
+/** The wallet a purchase or a bid pays from, with what it has free of the listing's coin, then Manage: the Demo
+ *  wallet (connect, test tokens) without leaving the shop — the web's "Manage demo wallets" (offer-parts.tsx),
+ *  in the Change pattern of the Testnet demo line. Inside PhoneWalletScope it is that scope's sheet; elsewhere on
+ *  /m the root provider draws the same phone sheet (MON-9). */
 export function WalletLine({ buyerId, token, network, verb }: { buyerId: DemoBuyerId; token: Token; network: Network; verb: "buy" | "bid" }) {
   const wallet = useDemoWallet();
   const { data } = useMarket();
+  const { openManage } = useWalletRequest();
   const now = useMinuteClock();
   const name = DEMO_BUYERS.find((b) => b.id === buyerId)?.name ?? "Demo creator";
   const connected = wallet?.identities[buyerId]?.connected === true;
@@ -406,6 +415,11 @@ export function WalletLine({ buyerId, token, network, verb }: { buyerId: DemoBuy
         : connected
           ? `Paying from ${name}'s demo wallet · ${shortAddress(demoAddress(buyerId))} · ${testCoin(have, token)}`
           : `${name}'s demo wallet isn't connected — you'll connect it when you ${verb}.`}
+      <span aria-hidden> · </span>
+      {/* Inline, so it follows the sentence; the kit's 44 px tap area with its -my-6 keeps the line's height. */}
+      <button type="button" aria-haspopup="dialog" onClick={openManage} className={cn(TEXT_ACTION, T.meta, "font-medium text-text-brand")}>
+        Manage<span className="sr-only"> demo wallets</span>
+      </button>
     </p>
   );
 }
@@ -469,26 +483,30 @@ export function Disclosure({
 
 // ─────────────────────────── the project's own sections ───────────────────────────
 
-/** The project's journey as a visitor reads it: the newest entry (Now), Earlier (n) opening the rest.
- *  With nothing shared beyond the default Planning: "No journey shared yet." */
+/** The project's journey as a visitor reads it, as the web's header (ActivityNow) shows it: the
+ *  newest entry (Now) — the default Planning ("Project created.") while nothing else is shared —
+ *  with its age ("today"), Earlier (n) opening the rest. "No journey shared yet." only when there
+ *  is no entry at all. */
 export function ProjectActivity({ projectId, createdAt }: { projectId: string; createdAt: number }) {
   const { hydrated, record } = useJourney(projectId);
   const [open, setOpen] = React.useState(false);
   const listId = React.useId();
+  const now = useMinuteClock();
   const history = hydrated ? historyOf(record, projectId, { kind: "project" }, createdAt) : [];
-  const shared = history.some((e) => !e.isDefault);
   const [current, ...earlier] = history;
   return (
     <section aria-labelledby="bv-activity" className="flex flex-col gap-4">
       <SectionHeading id="bv-activity" title="Project activity" />
-      {!hydrated ? null : !shared || !current ? (
+      {!hydrated ? null : !current ? (
         <p className={NOTE}>No journey shared yet.</p>
       ) : (
         <div className={cn(LIST_CARD, "gap-3 px-8 py-6")}>
           <span className="flex flex-wrap items-center gap-4">
             <span className={T.meta}>Now</span>
             <Badge tone="brand-outline">{labelOf(current)}</Badge>
-            <span className={T.body}>{formatDate(current.createdAt)}</span>
+            <span className={T.body} title={formatDate(current.createdAt)}>
+              {ageOf(current.createdAt, now)}
+            </span>
           </span>
           {current.description && <p className={cn(T.body, "line-clamp-3 text-text-primary")}>{current.description}</p>}
           {earlier.length > 0 && (
@@ -507,7 +525,9 @@ export function ProjectActivity({ projectId, createdAt }: { projectId: string; c
                   <li key={e.id} className="flex flex-col gap-1 border-t-[length:var(--border-width-1)] border-solid border-border py-4 last:pb-0">
                     <span className="flex flex-wrap items-center gap-4">
                       <span className={T.rowTitle}>{labelOf(e)}</span>
-                      <span className={T.meta}>{formatDate(e.createdAt)}</span>
+                      <span className={T.meta} title={formatDate(e.createdAt)}>
+                        {ageOf(e.createdAt, now)}
+                      </span>
                     </span>
                     {e.description && <span className={T.body}>{e.description}</span>}
                   </li>
@@ -601,13 +621,34 @@ export function OfferRowsCard({ rows, label }: { rows: readonly OfferRow[]; labe
   );
 }
 
-/** About, as rows of facts (no row opens anything here). */
-export function AboutRows({ rows }: { rows: readonly OfferRow[] }) {
-  if (rows.length === 0) return null;
+/** An About row that pushes a screen of its own (Team, Network: BUY-9). */
+export type AboutLink = { label: string; value: string; href: string };
+
+/** About, as rows of facts, then the rows that push a screen (Team, Network) with their chevron. */
+export function AboutRows({ rows, links = [] }: { rows: readonly OfferRow[]; links?: readonly AboutLink[] }) {
+  if (rows.length === 0 && links.length === 0) return null;
   return (
     <section aria-labelledby="bv-about" className="flex flex-col gap-4">
       <SectionHeading id="bv-about" title="About" />
-      <OfferRowsCard rows={rows} label="About" />
+      <div aria-label="About" className={LIST_CARD}>
+        <ul className={cn("flex flex-col", LIST_DIVIDERS)}>
+          {rows.map((r) => (
+            <li key={r.label} className="flex min-h-[44px] items-start justify-between gap-6 p-6">
+              <span className={cn(T.body, "shrink-0")}>{r.label}</span>
+              <span className={cn(T.body, "min-w-0 break-words text-right text-text-primary")}>{r.value}</span>
+            </li>
+          ))}
+          {links.map((l) => (
+            <li key={l.label}>
+              <Link href={l.href} className={cn(LIST_ROW, "min-h-[44px] gap-4 p-6")}>
+                <span className={cn(T.body, "shrink-0")}>{l.label}</span>
+                <span className={cn(T.body, "min-w-0 flex-1 truncate text-right text-text-primary")}>{l.value}</span>
+                <Chevron />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }

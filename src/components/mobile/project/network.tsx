@@ -1,9 +1,15 @@
 "use client";
 
 // 06b / 06h · Network (About › Network) and 06c–06g, 06j–06l · Add network.
-// The project's one network (lib/network), read-only on the phone: none yet
-// says what a network is with Create Network; once added, its name and meta,
-// the summary, the connections and the products with their roles.
+// The project's one network (lib/network): none yet says what a network is
+// with Create Network; once added, its name and meta, the summary, the
+// connections and the products with their roles. For whoever manages it, the
+// web's Connection Map Settings (PRJ-1, network-settings-dialog.tsx): a
+// Network settings row under the summary opens a sheet with the web's
+// whole-network fields and Save settings (a new Master that breaks links asks
+// first), and Delete network is the red row at the end (asks first). The map
+// itself — links, roles, interfaces, sensors — is edited on a computer, as
+// the wizard's Manual Canvas is; an ⓘ line says so.
 //
 // Add network is the web's wizard as full-screen steps (M33 stepper, ← back,
 // ✕ discard, the action pinned at the foot): Setup (the goal and the products
@@ -18,7 +24,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Cancel01Icon, CheckmarkCircle02Icon, ShareKnowledgeIcon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, CheckmarkCircle02Icon, Delete02Icon, InformationCircleIcon, Settings02Icon, ShareKnowledgeIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { FIELD_LABEL, Field, useFieldIds } from "@/components/auth/auth-parts";
 import { PasswordInput } from "@/components/auth/auth-parts";
@@ -34,17 +40,20 @@ import { PROTOCOL_OPTIONS } from "@/components/network/link-panel";
 import { networkMeta, networkSummaryRows } from "@/components/network/summary";
 import { can } from "@/lib/manual/permissions";
 import { PHONE_ROLE_LABEL, phoneProjectHref, phoneProjectPath } from "@/lib/manual/phone-project";
-import { CARRIES, CLOUD_TYPES, INTENTS, SENSORS, intentInfo, labelOf, protocolInfo } from "@/lib/network/catalog";
-import { createBlocker, linkTitle, nodeName, pickMaster, productChip, productStatus, protocolsUsed, rolesOf, settingsFor } from "@/lib/network/derive";
+import { CARRIES, CLOUD_TYPES, INTENTS, REPEATERS, SENSORS, TOPOLOGIES, intentInfo, labelOf, protocolInfo } from "@/lib/network/catalog";
+import { createBlocker, linkTitle, masterChange, nodeName, pickMaster, productChip, productStatus, protocolsUsed, rolesOf, settingsFor } from "@/lib/network/derive";
 import { arrangeFor, layoutNodes, planLinks, validateAiLinks } from "@/lib/network/planner";
 import { networkProducts } from "@/lib/network/products";
-import { saveNetwork, useProjectNetwork } from "@/lib/network/store";
-import type { CloudType, Frequency, Intent, MapLink, MapNode, MapSource, NetProduct, Network, ProductSettings, ProtocolKey, Topology } from "@/lib/network/types";
+import { deleteNetwork, saveNetwork, useProjectNetwork } from "@/lib/network/store";
+import type { CloudType, Frequency, Intent, MapLink, MapNode, MapSource, NetProduct, Network, ProductSettings, ProtocolKey, Repeater, Topology } from "@/lib/network/types";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
+import { ListCard as KitListCard, ListRow } from "../kit/list";
+import { Sheet } from "../kit/sheet";
 import { SheetSelect } from "../kit/sheet-select";
 import { EmptyState } from "../kit/state";
+import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
@@ -73,20 +82,25 @@ export function NetworkScreen({ projectId }: { projectId: string }) {
           action={canManage ? { label: "Create Network", href: phoneProjectPath(project.id, "network/new") } : undefined}
         />
       ) : (
-        <NetworkView network={network} products={products} />
+        <NetworkView network={network} products={products} projectId={project.id} canManage={canManage} />
       )}
     </Screen>
   );
 }
 
-function NetworkView({ network, products }: { network: Network; products: NetProduct[] }) {
+function NetworkView({ network, products, projectId, canManage }: { network: Network; products: NetProduct[]; projectId: string; canManage: boolean }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const members = products.filter((p) => network.productIds.includes(p.id));
   const roles = rolesOf(network.productIds, network.links, network.masterId);
   const name = (id: string) => nodeName(id, products, network.cloudType);
+  const title = network.name || "Unnamed Network";
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-1">
-        <h2 className={T.section}>{network.name || "Unnamed Network"}</h2>
+        <h2 className={T.section}>{title}</h2>
         <p className={T.meta}>{networkMeta(network)}</p>
       </div>
       <ListCard label="Summary">
@@ -97,6 +111,19 @@ function NetworkView({ network, products }: { network: Network; products: NetPro
           </li>
         ))}
       </ListCard>
+      {canManage && (
+        <div className="flex flex-col gap-4">
+          <KitListCard label="Manage the network">
+            <ListRow icon={Settings02Icon} title="Network settings" meta="Name, cloud, topology, frequency" onClick={() => setSettingsOpen(true)} />
+          </KitListCard>
+          <p className={cn(T.meta, "flex items-start gap-2")}>
+            <span aria-hidden className="mt-[1px] shrink-0 text-[color:var(--color-icon-secondary)]">
+              <Icon icon={InformationCircleIcon} size={16} />
+            </span>
+            <span>Edit the map on a computer: its links, and each product&apos;s role, interfaces and sensors.</span>
+          </p>
+        </div>
+      )}
       <section aria-label="Connections" className="flex flex-col gap-4">
         <h3 className={T.section}>Connections</h3>
         <ListCard label="Connections">
@@ -122,7 +149,166 @@ function NetworkView({ network, products }: { network: Network; products: NetPro
           ))}
         </ListCard>
       </section>
+      {canManage && (
+        <KitListCard label="Delete">
+          <ListRow icon={Delete02Icon} title="Delete network" danger onClick={() => setDeleting(true)} />
+        </KitListCard>
+      )}
+      {settingsOpen && (
+        <NetworkSettingsSheet
+          network={network}
+          members={members}
+          onClose={() => setSettingsOpen(false)}
+          onSave={(next) => {
+            saveNetwork(next);
+            setSettingsOpen(false);
+            toast({ title: "Network settings saved" });
+          }}
+        />
+      )}
+      <ConfirmSheet
+        open={deleting}
+        onClose={() => setDeleting(false)}
+        title={`Delete “${title}”?`}
+        body={`The map, its ${network.links.length} ${network.links.length === 1 ? "link" : "links"} and the network settings of all ${members.length} ${members.length === 1 ? "product" : "products"} are removed. The products themselves stay in the project. This cannot be undone.`}
+        verb="Delete network"
+        destructive
+        onConfirm={() => {
+          deleteNetwork(projectId);
+          toast({ title: "Network deleted" });
+          router.replace(phoneProjectHref(projectId));
+        }}
+      />
     </div>
+  );
+}
+
+/** The web's Network settings (network-settings-dialog.tsx, Figma 16) as a sheet: what applies to
+ *  the whole network, in the web's fields and words (Master, as the summary above says it). A new
+ *  Master the links can't keep asks first (Figma 15, spec D7). */
+function NetworkSettingsSheet({
+  network,
+  members,
+  onClose,
+  onSave,
+}: {
+  network: Network;
+  members: NetProduct[];
+  onClose: () => void;
+  onSave: (next: Network) => void;
+}) {
+  const ids = useFieldIds(["name", "cloudName", "password"] as const);
+  const [name, setName] = React.useState(network.name);
+  const [cloudName, setCloudName] = React.useState(network.cloudName);
+  const [cloudType, setCloudType] = React.useState<CloudType>(network.cloudType);
+  const [topology, setTopology] = React.useState<Topology>(network.topology);
+  const [masterId, setMasterId] = React.useState<string>(network.masterId ?? "");
+  const [frequency, setFrequency] = React.useState<Frequency>(network.frequency);
+  const [password, setPassword] = React.useState(network.cloudPassword);
+  const [repeater, setRepeater] = React.useState<Repeater>(network.repeater);
+  const [breaking, setBreaking] = React.useState<{ links: MapLink[]; removed: MapLink[] } | null>(null);
+  const nm = (id: string) => nodeName(id, members, cloudType);
+  const passwordMissing = cloudType !== "none" && !password.trim();
+
+  const commit = (links: MapLink[]) => {
+    const next: Network = {
+      ...network,
+      name: name.trim(),
+      cloudName: cloudName.trim(),
+      cloudType,
+      topology,
+      masterId: masterId || null,
+      frequency,
+      cloudPassword: password,
+      repeater,
+      links,
+    };
+    onSave({ ...next, products: settingsFor(members, next) });
+  };
+  const save = () => {
+    if (passwordMissing) return;
+    const result = masterChange(network.links, network.masterId, masterId || null);
+    if (result.removed.length) setBreaking(result);
+    else commit(result.links);
+  };
+  const removed = breaking?.removed ?? [];
+  const kept = network.links.length - removed.length;
+
+  return (
+    <>
+      <Sheet
+        open
+        onClose={onClose}
+        title="Network settings"
+        description="These apply to the whole network. Role, interfaces and sensor settings belong to each product and are edited on the map."
+        actions={
+          <>
+            <Button size="xl" className="w-full" disabled={passwordMissing} onClick={save}>
+              Save settings
+            </Button>
+            {passwordMissing && <p className={T.meta}>Add a cloud password first.</p>}
+          </>
+        }
+      >
+        <Field label="Network name" htmlFor={ids.name.id}>
+          <TextInput id={ids.name.id} size="xl" value={name} onValueChange={setName} placeholder="Unnamed Network" autoComplete="off" />
+        </Field>
+        <div className="flex flex-col gap-2">
+          <span className={FIELD_LABEL}>Cloud type</span>
+          <SheetSelect title="Cloud type" value={cloudType} options={CLOUD_TYPES} onChange={(v) => setCloudType(v as CloudType)} />
+        </div>
+        {cloudType !== "none" && (
+          <>
+            <Field label="Cloud name" htmlFor={ids.cloudName.id}>
+              <TextInput id={ids.cloudName.id} size="xl" value={cloudName} onValueChange={setCloudName} placeholder="Add a cloud name" autoComplete="off" autoCapitalize="off" />
+            </Field>
+            <Field label="Cloud password" htmlFor={ids.password.id}>
+              <PasswordInput id={ids.password.id} value={password} onValueChange={setPassword} invalid={passwordMissing} autoComplete="new-password" />
+            </Field>
+          </>
+        )}
+        <div className="flex flex-col gap-2">
+          <span className={FIELD_LABEL}>Topology</span>
+          <SheetSelect title="Topology" value={topology} options={TOPOLOGIES} onChange={(v) => setTopology(v as Topology)} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className={FIELD_LABEL}>Master</span>
+          <SheetSelect
+            title="Master"
+            value={masterId}
+            options={members.map((p) => ({ value: p.id, label: p.name }))}
+            placeholder="No master"
+            onChange={setMasterId}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className={FIELD_LABEL}>Network frequency</span>
+          <SheetSelect title="Network frequency" value={frequency} options={frequencyOptions(network.protocol)} onChange={(v) => setFrequency(v as Frequency)} />
+          <span className={T.caption}>Filtered by {protocolInfo(network.protocol).name}</span>
+        </div>
+        <div className="flex flex-col gap-2 pb-4">
+          <span className={FIELD_LABEL}>Add repeater</span>
+          <SheetSelect title="Add repeater" value={repeater} options={REPEATERS} onChange={(v) => setRepeater(v as Repeater)} />
+        </div>
+      </Sheet>
+      <ConfirmSheet
+        open={breaking !== null}
+        onClose={() => setBreaking(null)}
+        title={`Changing Master will remove ${removed.length} ${removed.length === 1 ? "link" : "links"}`}
+        body={
+          <>
+            {nm(masterId)} becomes the Master of this network.{" "}
+            {removed.length === 1 ? "One link no longer makes sense and will be removed" : `${removed.length} links no longer make sense and will be removed`}:{" "}
+            {removed.map((l) => `${linkTitle(l, nm)} (${l.label})`).join(" and ")}. The other {kept} {kept === 1 ? "link" : "links"} and every product setting stay as they are.
+          </>
+        }
+        verb="Apply anyway"
+        onConfirm={() => {
+          if (breaking) commit(breaking.links);
+          setBreaking(null);
+        }}
+      />
+    </>
   );
 }
 

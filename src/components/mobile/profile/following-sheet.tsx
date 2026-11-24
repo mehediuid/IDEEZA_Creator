@@ -6,14 +6,16 @@
 // list keeps who it opened with until it closes, so an Unfollow can be taken
 // back on the spot (the row turns to Follow, the toast offers Undo). Rows are
 // the M26 person row (PR-40): brand-subtle initials, the name in Body/MD
-// Medium, small Follow buttons.
+// Medium, small Follow buttons. A row's line counts that creator's projects
+// that play on the Feed now (only what is listed is on the Feed, SOC-16), not
+// every post they have on Innovations. ✕, a swipe or the scrim close it.
 
 import * as React from "react";
 import Link from "next/link";
 import { useFollowing } from "@/components/profile/following-dialog";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Button } from "@/components/ideeza/button";
-import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
+import { feedProjectCountOf } from "@/lib/innovations/clips";
 import type { Person } from "@/lib/people/ids";
 import { cn } from "@/lib/utils";
 import { phoneProfileHref } from "@/lib/people/phone-profile";
@@ -25,7 +27,7 @@ import { useFollow } from "./follow";
 function lineOf(p: Person): string {
   if (p.kind !== "feed") return "Nothing in the Feed right now";
   const id = p.id.slice("feed:".length);
-  const n = SAMPLE_POSTS.filter((post) => post.creator.id === id).length;
+  const n = feedProjectCountOf(id);
   return n > 0 ? `${n} ${n === 1 ? "project" : "projects"} in the Feed` : "Nothing in the Feed right now";
 }
 
@@ -42,11 +44,6 @@ export function FollowingSheet({ open, onClose }: { open: boolean; onClose: () =
       onClose={onClose}
       title="Following"
       description="Their new shares show in Feed › Following. Only you see this list."
-      actions={
-        <Button size="xl" className="w-full" onClick={onClose}>
-          Done
-        </Button>
-      }
     >
       {rows === null ? (
         <ListBones rows={4} />

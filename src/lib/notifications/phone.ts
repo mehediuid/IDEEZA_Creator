@@ -148,7 +148,7 @@ export type SecurityFacts = {
   passwordChangedAt: number;
   twoStepSince: number | null;
   /** Other devices signed in to the account (this phone is not one of them). */
-  devices: readonly { id: string; name: string; os: string; where: string; signedInAt: number }[];
+  devices: readonly { id: string; name: string; os: string; where: string; signedInAt: number; demo?: boolean }[];
 };
 
 /** The phone's account and security notices (mobile Figma Notification: a new sign-in with It's
@@ -161,7 +161,8 @@ export function securityNotices(f: SecurityFacts): Notice[] {
     kind: "other",
     tag,
     title: `New sign-in on ${d.name}`,
-    body: [d.os, d.where].filter(Boolean).join(" · ") + ". Was this you?",
+    // The Shared kit's stand-in phone says it is one (SET-5): no real device signed in.
+    body: d.demo ? `Demo · ${[d.os, d.where].filter(Boolean).join(" · ")}. No real device signed in.` : [d.os, d.where].filter(Boolean).join(" · ") + ". Was this you?",
     href: "/settings/security",
     at: d.signedInAt,
   }));

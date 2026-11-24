@@ -196,6 +196,24 @@ export function parseViewerTab(raw: string | null | undefined): PhoneTab {
   return VIEWER_TABS.some((t) => t.id === raw) ? (raw as PhoneTab) : "overview";
 }
 
+// ─────────────────────────── off the marketplace (32b) ───────────────────────────
+
+/**
+ * A paused listing is off Explore marketplace (the web's OffMarketGate, marketplace/[id]/off-market.tsx, which wraps
+ * the project's address and each product's): the shop and its product pages say "This project is off the marketplace
+ * for now" — unless the active demo buyer already bought part of it, whose purchase and files stay theirs (BUY-4).
+ */
+export function offMarketNow(input: {
+  /** `view.listing.kind`. */
+  listing: string;
+  projectId: string;
+  sales: readonly { projectId: string; buyerId: string }[];
+  buyerId: string | null;
+}): boolean {
+  if (input.listing !== "paused") return false;
+  return !input.sales.some((s) => s.projectId === input.projectId && s.buyerId === input.buyerId);
+}
+
 /** Buying is Explore marketplace's, which the phone hasn't opened yet. */
 export const BUY_LATER = "Buying from the phone opens with Explore marketplace. For now, buy it on the web.";
 

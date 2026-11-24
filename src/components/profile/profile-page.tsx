@@ -6,7 +6,9 @@
 // project's picture), then an identity column (who, where, since when, what they
 // are open to, four counts, About, the parts they build with, what they work
 // on, links) beside their work, under two tabs: Projects (a featured project
-// and the rest) and Activity. Your own adds Edit profile, a prompt where a
+// and the rest) and Activity. Activity is yours alone (owner 2026-11-24, "hide it
+// from others"): someone else's profile, and yours as others see it, show Projects
+// only; yours says "Only you see your Activity.". Your own adds Edit profile, a prompt where a
 // field is empty, and one owner-only line. Every count and chip is read from
 // work already public; nothing is typed in for you or guessed. A skeleton holds the place until the
 // stores are read, so Follow never flashes on your own page. Settings adds (spec
@@ -30,9 +32,7 @@ import { useCreateHistory } from "@/lib/create/history";
 import { readStoredKey, subscribeStores } from "@/lib/key-store";
 import { partsOf } from "@/lib/innovations/mine-post";
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
-import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
-import { postHref } from "@/lib/innovations/slug";
 import { JOURNEY_KEY, type ProjectJourney } from "@/lib/manual/journey";
 import { decodeJourney } from "@/lib/manual/journey-store";
 import { buildsOf, coverOf, productsOfProject } from "@/lib/manual/project-read";
@@ -48,7 +48,7 @@ import { ME, canonicalId, directory, personByHandle, profileHref, type Person } 
 import { listingFactsOf } from "@/lib/people/listing-facts";
 import { madeOfMine, madeOfSample, ownerCounts, type MadeItem, type MineInput } from "@/lib/people/made";
 import { useMyCover, useMyPhoto } from "@/lib/people/photo-store";
-import { activityOf, builtWithOf, featuredOf, inProduction, localTimeOf, worksOnOf, type ActivityItem } from "@/lib/people/portfolio";
+import { activityOf, builtWithOf, featuredOf, inProduction, localTimeOf, worksOnOf } from "@/lib/people/portfolio";
 import { useMyProfile } from "@/lib/people/profile-store";
 import { SAMPLE_PROFILES } from "@/lib/people/sample-profiles";
 import { tiesOf } from "@/lib/people/ties";
@@ -395,7 +395,7 @@ function OwnProfile({
                 tone="empty"
                 icon={<Icon icon={SquareLock02Icon} size={36} />}
                 title="This profile is locked"
-                body={`Only people who work with ${fields.name.trim() ? firstNameOf(person.name) : "this creator"} on a project can see their projects and activity.`}
+                body={`Only people who work with ${fields.name.trim() ? firstNameOf(person.name) : "this creator"} on a project can see their projects.`}
               />
             </div>
           </div>
@@ -499,7 +499,9 @@ function OwnProfile({
           <div className={WORK}>
             <WorkTabs
               items={made}
-              activity={portfolio.activity}
+              // Only you see your Activity: as others see it (`?view=public`, acting) it's left out.
+              activity={owner ? portfolio.activity : []}
+              activityOnlyYou={owner}
               own={owner}
               ownerName={shownName}
               onTogglePin={owner ? onTogglePin : undefined}
@@ -572,21 +574,13 @@ function OtherProfile({ person }: { person: Person }) {
 
   const portfolio = React.useMemo(() => {
     const appreciations = new Map(posts.map((p) => [p.id, countsOf(reactions, p.id, p.base).appreciations]));
-    const activity: ActivityItem[] =
-      now > 0
-        ? activityOf(
-            posts.map((p) => ({ id: p.id, title: p.title, href: postHref(p.slug), journey: sampleJourneyOf(p, now) })),
-            20,
-          )
-        : [];
     return {
       appreciations,
       total: [...appreciations.values()].reduce((a, b) => a + b, 0),
       builtWith: builtWithOf(posts.map((p) => p.products.flatMap((x) => x.parts.map((r) => r.name)))),
       worksOn: worksOnOf(made),
-      activity,
     };
-  }, [posts, made, reactions, now]);
+  }, [posts, made, reactions]);
 
   const tie = React.useMemo(
     () =>
@@ -693,7 +687,8 @@ function OtherProfile({ person }: { person: Person }) {
           <div className={WORK}>
             <WorkTabs
               items={made}
-              activity={portfolio.activity}
+              // Someone else's Activity isn't shown (owner 2026-11-24): Projects only.
+              activity={[]}
               own={false}
               ownerName={person.name}
               appreciationsOf={(m) => portfolio.appreciations.get(m.key) ?? null}

@@ -14,12 +14,10 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { Radio } from "@/components/ideeza/checkbox";
 import { SearchInput } from "@/components/ideeza/search-input";
-import { coinAmount } from "@/lib/create/credit-pricing";
 import type { Network } from "@/lib/brief/types";
 import { useMarket } from "@/lib/market/market-store";
 import { availableOf } from "@/lib/wallet/balances";
 import { makerId } from "@/lib/wallet/demo-wallet";
-import { formatAmount } from "@/lib/wallet/money";
 import type { Amount } from "@/lib/wallet/types";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
@@ -50,11 +48,8 @@ export function newOrderId(prefix: "plan" | "order"): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Dollars as the token a withdrawal pays out in, at the one IDZ price: "10 USDT", "≈ 398.96 IDZ". */
-export function payoutLine(usdAmount: Amount, token: "USDT" | "IDZ"): string {
-  if (token === "USDT") return formatAmount(usdAmount, "USDT");
-  return `≈ ${coinAmount(Number(usdAmount), "IDZ").toLocaleString("en-US")} IDZ`;
-}
+/** Dollars as the token a withdrawal pays out in, at the one IDZ price: "10 USDT", "≈ 398.96 IDZ" (lib/account/payout). */
+export { payoutLine } from "@/lib/account/payout";
 
 /** What the maker's connected demo wallet can pay with on `network`; null while it is read or not connected. */
 export function usePayBalances(network: Network): Record<"USDT" | "IDZ", Amount> | null {

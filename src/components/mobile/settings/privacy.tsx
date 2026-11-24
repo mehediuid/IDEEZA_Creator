@@ -145,7 +145,7 @@ export function PrivacySettings() {
         <SettingsRow
           id="lock"
           label="Lock your profile"
-          helper="Only your project teams see your projects and activity"
+          helper="Only your project teams see your projects"
           toggle={{ checked: a.locked, onChange: toggleLock }}
           disabled={off}
         />
@@ -153,8 +153,8 @@ export function PrivacySettings() {
           id="local-time"
           label="Show my location and local time"
           toggle={{ checked: a.showLocalTime, onChange: () => saver.run("profile", () => updateSettings("audience", { showLocalTime: !a.showLocalTime })) }}
-          // With no city there is nothing to show: the switch waits for one (it can still be turned off).
-          disabled={off || (noCity && !a.showLocalTime)}
+          // The web's rule: the switch always works; with no city its line asks for one (SET-12).
+          disabled={off}
           reason={cityHint}
           helper={cityHint}
         />

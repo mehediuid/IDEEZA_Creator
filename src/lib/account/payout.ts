@@ -27,7 +27,7 @@
 import type { Network } from "../brief/types";
 import type { Sale } from "../market/types";
 import { IDZ_USD_PRICE } from "../wallet/idz-price";
-import { addAmounts, compareAmounts, fromMicros, subAmounts, toMicros } from "../wallet/money";
+import { addAmounts, compareAmounts, formatAmount, fromMicros, subAmounts, toMicros } from "../wallet/money";
 import type { Amount, Coin } from "../wallet/types";
 
 export const PAYOUT_KEY = "ideeza:account:payout";
@@ -336,6 +336,21 @@ export const DEMO_USD_RATES: Record<Coin, Amount> = {
   MATIC: "0.5",
 };
 
+/** The demo IDZ price in words, wherever IDZ is picked or paid out: "1 IDZ ≈ $0.025". */
+export const IDZ_RATE_LINE = `1 IDZ ≈ $${Number(IDZ_USD_PRICE).toFixed(3)}`;
+
+/** What a withdrawal of `usd` dollars pays out in its token, at the demo rates: USDT one for one; IDZ at the one IDZ
+ *  price, to the cent ($10 → 398.96 IDZ) — the same figure on the web, on the phone and in the statement. */
+export function payoutCoinAmount(usd: Amount, token: PayoutToken): Amount {
+  if (token !== "IDZ") return usd;
+  return String(Math.round(Number(usd) * (1 / Number(IDZ_USD_PRICE)) * 100) / 100);
+}
+
+/** A withdrawal in its token, as it is shown: "10 USDT", "≈ 398.96 IDZ". */
+export function payoutLine(usd: Amount, token: PayoutToken): string {
+  return token === "IDZ" ? `≈ ${formatAmount(payoutCoinAmount(usd, "IDZ"), "IDZ")}` : formatAmount(usd, token);
+}
+
 const ZERO = BigInt(0);
 const MICROS = BigInt(1_000_000);
 const CENT = BigInt(10_000);
@@ -500,6 +515,17 @@ export function recordWithdrawal(store: PayoutStore, w: Withdrawal): PayoutStore
   return { ...store, withdrawals: [...store.withdrawals, w] };
 }
 
+/** Letters and digits nobody misreads: no 0/O, no 1/I. */
+const REFERENCE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** "WD7K2M9QX4LP": a withdrawal's reference to quote — WD, then ten of the letters above, the same on the
+ *  web (withdraw-dialog.tsx) and the phone (MON-20). `random` is ten random bytes (a test passes its own). */
+export function withdrawalReference(random: Uint8Array = globalThis.crypto.getRandomValues(new Uint8Array(10))): string {
+  let id = "WD";
+  for (const b of random) id += REFERENCE_LETTERS[b % REFERENCE_LETTERS.length];
+  return id;
+}
+
 const pad = (n: number) => String(n).padStart(2, "0");
 /** The local calendar day, "2026-10-19". */
 const dayOf = (t: number) => {
@@ -603,7 +629,8 @@ export function statementCsv(p: StatementPeriod, earnings: readonly Earning[], w
   for (const w of withdrawals) {
     if (!inPeriod(w.at, p)) continue;
     const to = w.to.address ? `To ${w.to.label} (${w.to.address})` : w.to.label;
-    rows.push({ at: w.at, order: 2, cells: [stampOf(w.at), "Withdrawal", "", cell(to), neg(w.amount), w.token, neg(w.amount), STATUS_WORD[w.status], cell(w.id)] });
+    // Amount is in the token it paid out in (IDZ at the demo IDZ price); the next column is its dollars.
+    rows.push({ at: w.at, order: 2, cells: [stampOf(w.at), "Withdrawal", "", cell(to), neg(payoutCoinAmount(w.amount, w.token)), w.token, neg(w.amount), STATUS_WORD[w.status], cell(w.id)] });
   }
   rows.sort((a, b) => a.at - b.at || a.order - b.order);
   const header = "Date,Type,Project,Details,Amount,Token,Amount (USD at demo rate),Status,Reference";

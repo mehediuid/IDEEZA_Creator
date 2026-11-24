@@ -3,12 +3,14 @@
 // Current credit and Credit history (mobile Figma "v2 · AI Credits /
 // Balance" and "/ History"), on the web's credits ledger
 // (lib/create/credits.tsx) and its lots (credit-lots.ts): the balance and
-// what it buys, Running low at your low mark (Settings' credit alerts), this
-// monthly period's plan credits, the latest movements, and every lot —
+// what it buys, Running low at your low mark (Settings' credit alerts), the
+// plan's credits (a paid plan's this month; Free's, which come once and never
+// run out of time, owner 2026-11-24), the latest movements, and every lot —
 // starting balance, plan credits, packs and custom credits — Active, Used
 // up or Expired. Buy more credits (the Bottom action bar) is the AI tab's
-// Buy credits sheet; with this month's plan credits spent it offers a bigger
-// plan first. This month reads as three figures, then its rows.
+// Buy credits sheet — its last block names the next plan (CL-032); with the
+// plan's credits spent it offers that plan first (You've reached your
+// limit). The plan's credits read as three figures, then their rows.
 
 import * as React from "react";
 import { Alert02Icon, Calendar03Icon, DiscountTag01Icon, Invoice03Icon, Table02Icon } from "@hugeicons/core-free-icons";
@@ -20,8 +22,10 @@ import { allowanceOf, lotStateOf, type LotState } from "@/lib/account/money-phon
 import { runningLow } from "@/lib/create/credit-limits";
 import { lotsOf, type Lot } from "@/lib/create/credit-lots";
 import { usd } from "@/lib/create/credit-pricing";
-import { BUILD_COST, describeEntry, useCredits, type CreditEntry } from "@/lib/create/credits";
+import { describeEntry, useCredits, type CreditEntry } from "@/lib/create/credits";
+import { wholeProductCost } from "@/lib/create/pieces";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
+import { creditsMonthly } from "@/lib/create/plans";
 import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { BuyCreditsSheet } from "../ai/buy-credits-sheet";
@@ -33,6 +37,7 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { ComparePlansSheet, ReachedLimitSheet, UpgradeUnlockSheet, useNextPlan } from "./credit-sheets";
+import { OutOfCreditsRow, useRefillDay } from "./upsell";
 import { Hero, dateOf, n, pct } from "./parts";
 
 /** The credits that end first: every lot ending on the earliest day counts, not only one of them. */
@@ -62,7 +67,13 @@ export function CurrentCreditScreen() {
   const out = hydrated && balance === 0;
   const low = hydrated && runningLow(balance, lowAt);
   const recent = ledger.slice(-3).reverse();
+  const refill = useRefillDay();
+  // Free's credits come once: their own heading, no end date (owner 2026-11-24).
+  const once = !creditsMonthly(sub.tier);
+  const heading = once ? "Free credits" : "This month";
 
+  // Buy credits (the web's sheet, its plan in the last block, CL-032); with this month's plan credits
+  // spent and a plan to offer, You've reached your limit comes first — Upgrade plan or Buy credits instead.
   const buy = () => {
     if (month && month.remaining === 0 && next) setLimit(true);
     else setBuying(true);
@@ -93,36 +104,43 @@ export function CurrentCreditScreen() {
             label="Current balance"
             meta={
               <span>
-                ≈ {n(balance)} concept drawings or {n(Math.floor(balance / BUILD_COST))} one-product builds
+                ≈ {n(balance)} concept drawings or {n(Math.floor(balance / wholeProductCost()))} one-product builds
                 {expiring ? ` · ${n(expiring.credits)} expire ${dateOf(expiring.expiresAt)}` : ""}
               </span>
             }
           >
             <span className={T.amountHero}>{n(balance)} credits</span>
           </Hero>
-          {low && (
-            <div role="status" className="flex items-start gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-[var(--color-border-error)] bg-bg-surface p-6">
-              <span aria-hidden className="text-[color:var(--color-icon-warning)]">
-                <Icon icon={Alert02Icon} size={20} />
-              </span>
-              <span className="flex flex-col gap-1">
-                <span className={T.rowTitle}>{out ? "You’re out of credits" : "Running low on credits"}</span>
-                <span className={T.meta}>{out ? "Buy credits or upgrade to keep creating." : "You may run out soon. Top up to keep creating."}</span>
-              </span>
-            </div>
+          {/* MON-8: the web's words (CL-032). Out: "You're out of credits." (a paid plan: "They refill on
+              8 Dec.") and the next plan's link — Buy credits is the bar's own button. Low: the web's
+              "Running low on credits" and, on a paid plan, the day its credits come back. */}
+          {out ? (
+            <OutOfCreditsRow />
+          ) : (
+            low && (
+              <div role="status" className="flex items-start gap-4 rounded-xl border-[length:var(--border-width-1)] border-solid border-[var(--color-border-error)] bg-bg-surface p-6">
+                <span aria-hidden className="text-[color:var(--color-icon-warning)]">
+                  <Icon icon={Alert02Icon} size={20} />
+                </span>
+                <span className="flex flex-col gap-1">
+                  <span className={T.rowTitle}>Running low on credits</span>
+                  {refill && <span className={T.meta}>They refill on {refill}.</span>}
+                </span>
+              </div>
+            )
           )}
 
           <section aria-labelledby="this-month" className="flex flex-col gap-4">
             <h2 id="this-month" className={T.section}>
-              This month
+              {heading}
             </h2>
             <dl className="grid grid-cols-3 gap-4">
-              <Fact label={`${plan.name} plan allowance`} value={n(month?.allowance ?? plan.credits)} />
+              <Fact label={once ? "Given once" : `${plan.name} plan allowance`} value={n(month?.allowance ?? plan.credits)} />
               <Fact label="Used" value={n(month?.used ?? 0)} tone={month && month.used > 0 ? "error" : undefined} />
               <Fact label="Remaining" value={n(month?.remaining ?? plan.credits)} tone="success" />
             </dl>
-            <ListCard label="This month">
-              {month && <ListRow icon={Calendar03Icon} title="Plan credits end" value={dateOf(month.endsAt)} />}
+            <ListCard label={heading}>
+              {month?.endsAt != null && <ListRow icon={Calendar03Icon} title="Plan credits end" value={dateOf(month.endsAt)} />}
               {discount > 0 ? (
                 <ListRow icon={DiscountTag01Icon} title="Credit discount" value={`${pct(discount)} off`} />
               ) : (

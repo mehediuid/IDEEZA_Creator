@@ -32,7 +32,7 @@ import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { SettingsGroup, SettingsRow, leaveTo } from "./kit";
-import { useSessionAt } from "./security";
+import { TWO_STEP_APP_ONLY, useSessionAt } from "./security";
 import { DemoAuthenticator } from "./two-step-parts";
 
 const BACK = "/m/settings/security";
@@ -250,7 +250,7 @@ export function TwoStepSettings() {
           When you sign in on a new device, you’ll also enter a code from an authenticator app.
         </AccountHeading>
         <AccountAlert alert={online ? null : { tone: "attention", title: "You’re offline", body: "Turn it on when you’re back online." }} />
-        <SettingsGroup>
+        <SettingsGroup footer={TWO_STEP_APP_ONLY}>
           {needs.map(([icon, line]) => (
             <SettingsRow key={line} icon={icon} label={line} />
           ))}

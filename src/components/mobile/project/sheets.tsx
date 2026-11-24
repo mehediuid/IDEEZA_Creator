@@ -2,37 +2,53 @@
 
 // The project page's sheets, every one rising from the bottom:
 // · 07 ⋯ Project actions (M12): Edit name and description · Share to Feed (a
-//   Draft's row says "Mint it first" and goes to the mint; the Feed shows only
-//   what is for sale (owner 2026-11-12), so a project with nothing on the
-//   marketplace says "List it first" and goes to Sell) — or, once shared,
-//   View post (its clip on the Feed, while something of it is for sale), Edit
-//   post (the story) and Stop sharing (asks first, the toast offers Undo),
-//   which the web keeps on the post · Delete project…, the red row last;
+//   Draft's row says "Mint it first" and goes to the mint; any minted project
+//   can be shared, as the web's Share to Innovations (owner 2026-11-22, SOC-6):
+//   the post is on your Timeline at once and on the Feed while something of
+//   it is for sale — the Feed itself shows only what is listed) — or, once
+//   shared, View post (its clip on the Feed, while something of it is for
+//   sale), Edit post (the story) and Stop sharing (asks first, the toast
+//   offers Undo), which the web keeps on the post · Delete project…, the red
+//   row last;
 // · 07b Edit name and description (07g–07n): the web's editor — the name
 //   (1–80, a name another project has is a note), the description (counter
 //   from 800, "What it is, and who it is for."), Update with AI with Undo,
-//   Save through the edit gate (a live listing pauses first, 21), Discard
+//   Save through the edit gate (a live listing pauses first, 21; an auction
+//   or the lock turns Save off with the reason under it, PRJ-9), Discard
 //   changes? on the way out, the storage error kept in the sheet;
 // · 07c / 22a–22i Delete: What goes and What stays, the typed name when work
 //   would be lost; blocked (web order: couldn't check → sold → auction →
 //   listed → co-owners), it says why and where to fix it;
 // · 07d / 07e Share to Feed: every product's video, the project video, the
-//   story (500) and the owner's box; Share stays off with its reason;
+//   story (500) and the owner's box; Share stays off with its reason — a video
+//   never started ("Start every video first: …", CL-030). With every video
+//   started but some still rendering or waiting for review, the post waits off
+//   the Feed (lib/market/held.ts) and goes live by itself once they're ready;
+//   meanwhile the ⋯ row reads "Waiting for videos · goes live when they're
+//   ready" and opens the Videos sheet;
+// · each product's ready video in the readiness rows has a quiet Replace
+//   (CL-015): its form, filled from the take in use;
 // · 08 Publish: Keep private · Give to the community · Sell, each with its
-//   fee line; 08b readiness: Give and Sell first need every product's AI
-//   video and the project video, then go on to the mint (Earn).
+//   fee line; Continue goes straight to the mint with that choice, or a
+//   Private project's Sell to Earn › Sell's listing, as the web's Publish does
+//   (PRJ-2): the videos are asked for once, at the step that signs (CL-030:
+//   only a video not started stops it there; one rendering or waiting for
+//   review never does — the listing or post waits for it).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Bug01Icon,
   Delete02Icon,
   Edit02Icon,
-  LockIcon,
   News01Icon,
   PencilEdit01Icon,
   PlayIcon,
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
+import { REPORT_PROBLEM, reportProblemHref } from "../help/report-link";
+import { ProjectVideoSection } from "../project-earn/sell/parts";
+import { forSaleNowOf, shareOffFeedLineOf } from "@/lib/manual/phone-earn";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button } from "@/components/ideeza/button";
@@ -44,6 +60,11 @@ import { useDescriptionAiAssist } from "@/components/projects/description-ai-ass
 import { useStoreWrite } from "@/components/projects/details/use-store-write";
 import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { openVideosPanel } from "@/components/video-jobs/videos-panel-store";
+import { hold, heldId } from "@/lib/market/held";
+import { phoneTakeHref, phoneVideoActionHref } from "@/lib/video/phone-video";
+import { displayProductName } from "@/lib/manual/products-tab-view";
+import { useHeldItems } from "../project-earn/video/held";
 import { useCreateHistory } from "@/lib/create/history";
 import { postIdOfProject } from "@/lib/innovations/slug";
 import { deletePlanOf, matchesTypedName } from "@/lib/manual/delete-plan";
@@ -56,13 +77,13 @@ import { DESCRIPTION_SAVED, WRITE_FAILED, checkDescription, checkProjectName, re
 import { deleteFactsOf, productRowsOf } from "@/lib/manual/project-read";
 import { formatDate, projectSummary } from "@/lib/manual/project-summary";
 import { PROJECT_DESC_COUNTER_FROM, PROJECT_DESC_MAX, PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
-import { STORY_MAX, sharePostBlocker } from "@/lib/manual/share-post";
-import { deleteFixOf, phoneHrefOf, phoneProjectPath, publishLineOf, readyOfLine } from "@/lib/manual/phone-project";
+import { readinessFactsOf, readinessOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { STOPPED_SHARING, STORY_MAX, sharePostBlocker, stopSharingBodyOf } from "@/lib/manual/share-post";
+import { deleteFixOf, phoneHrefOf, phoneWords, publishLineOf, readyOfLine } from "@/lib/manual/phone-project";
 import { readMarketNow } from "@/lib/market/market-store";
 import { readNetwork } from "@/lib/network/store";
 import { useProjectVideos } from "@/lib/video/store";
-import { actionLabel, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
+import { REPLACE_LABEL, actionLabel, readinessCopy, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { MEDIA_GROUND, MEDIA_INK } from "../kit/media";
@@ -87,8 +108,7 @@ export function ProjectSheets({ sheet, onSheet }: { sheet: ProjectSheet | null; 
       {sheet?.kind === "share" && <ShareSheet onClose={close} />}
       {sheet?.kind === "edit-post" && <EditPostSheet onClose={close} />}
       <StopSharingSheet open={sheet?.kind === "stop-sharing"} onClose={close} />
-      <PublishSheet open={sheet?.kind === "publish"} onClose={close} onSheet={onSheet} />
-      {sheet?.kind === "readiness" && <ReadinessSheet purpose={sheet.purpose} then={sheet.then} onClose={close} />}
+      <PublishSheet open={sheet?.kind === "publish"} onClose={close} />
       <AddProductSheet open={sheet?.kind === "add-product"} onClose={close} />
     </>
   );
@@ -100,18 +120,16 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
   const { project, view, viewer } = useProject();
   const router = useRouter();
   const [mintFirst, setMintFirst] = React.useState(false);
-  const [listFirst, setListFirst] = React.useState(false);
   const canEdit = can(viewer, "project.rename", view.canCtx) || can(viewer, "project.editDescription", view.canCtx);
   const canShare = can(viewer, "project.showcase", view.canCtx);
   const shared = view.summary.showcase;
+  // The post signed while videos are still being made (CL-030): it waits for them.
+  const waitingShare = useHeldItems(project.id).some((i) => i.kind === "share");
   const onFeed = forSaleNow(view);
-  // Minted with nothing for sale: sharing waits for a listing — unless it can never be listed again.
-  const needsListing = canShare && !onFeed;
-  const canList = can(viewer, "listing.create", view.canCtx);
-  const shareShown =
-    (canShare && (onFeed || canList || shared !== null)) || (view.lock === null && view.summary.status === "draft" && can(viewer, "facts.seeOwnerOnly"));
-  const sellHref =
-    phoneHrefOf(view.summary.status === "draft" ? earnMintHref(project.id, "sell") : earnHref(project.id, "sell", { list: "1" }), project.id) ?? "/m/projects";
+  // The web's rule (project-menu.tsx): any minted project shares; a Draft's row goes to the mint.
+  // Nothing for sale yet is no reason to wait (SOC-6): the post is on your Timeline now, on the
+  // Feed once something of it is listed.
+  const shareShown = canShare || (view.lock === null && view.summary.status === "draft" && can(viewer, "facts.seeOwnerOnly"));
   const items = [
     ...(canEdit ? [{ label: "Edit name and description", icon: PencilEdit01Icon, onSelect: () => onSheet({ kind: "edit" }) }] : []),
     ...(shareShown
@@ -128,17 +146,19 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
                     ]
                   : []),
               ]
-            : [
-                {
-                  // A Draft can't share yet, nor a project with nothing for sale: the row says why
-                  // before the tap (Figma 07 10371:2201).
-                  label: !canShare ? "Share to Feed · Mint it first" : needsListing ? "Share to Feed · List it first" : "Share to Feed",
-                  icon: News01Icon,
-                  onSelect: () => (!canShare ? setMintFirst(true) : needsListing ? setListFirst(true) : onSheet({ kind: "share" })),
-                },
-              ]),
+            : waitingShare
+              ? [{ label: "Waiting for videos · goes live when they're ready", icon: News01Icon, onSelect: () => openVideosPanel(project.id) }]
+              : [
+                  {
+                    // A Draft can't share yet: the row says why before the tap (Figma 07 10371:2201).
+                    label: canShare ? "Share to Feed" : "Share to Feed · Mint it first",
+                    icon: News01Icon,
+                    onSelect: () => (canShare ? onSheet({ kind: "share" }) : setMintFirst(true)),
+                  },
+                ]),
         ]
       : []),
+    { label: REPORT_PROBLEM, icon: Bug01Icon, onSelect: () => router.push(reportProblemHref()) },
     ...(can(viewer, "project.delete") ? [{ label: "Delete project…", icon: Delete02Icon, destructive: true, onSelect: () => onSheet({ kind: "delete" }) }] : []),
   ];
   return (
@@ -148,19 +168,6 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
         onClose={onClose}
         title={shared ? (onFeed ? `${project.name} · on Feed since ${formatDate(shared.at)}` : `${project.name} · off the Feed until it’s for sale`) : project.name}
         items={items}
-      />
-      <Sheet
-        open={listFirst}
-        onClose={() => setListFirst(false)}
-        title="List it first"
-        description="The Feed shows only what is for sale. Put the project or a copy of it on the marketplace, then share it to the Feed."
-        actions={
-          <>
-            <Button size="xl" className="w-full" onClick={() => router.push(sellHref)}>
-              Go to Sell
-            </Button>
-          </>
-        }
       />
       <Sheet
         open={mintFirst}
@@ -179,11 +186,8 @@ function MenuSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => v
   );
 }
 
-/** Something of it is for sale — a live Main listing or a listed copy — so its clip is on the Feed
- *  (the Feed's own rule, feed/use-clips.ts). */
-function forSaleNow(view: Ready["view"]): boolean {
-  return view.listing.kind === "live" || (view.lock === null && view.editions.some((t) => t.listing !== null));
-}
+/** Something of it is for sale, so its clip is on the Feed (the lib's one rule, SOC-6). */
+const forSaleNow = (view: Ready["view"]): boolean => forSaleNowOf(view);
 
 // ─────────────────────────── 07b · Edit name and description ───────────────────────────
 
@@ -206,6 +210,10 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
   const descChanged = descCheck.value !== initial.description.trim();
   const dirty = name !== initial.name || description !== initial.description;
   const change = nameChanged ? "rename" : "description";
+  // Why a save can't go ahead right now (an auction, the lock), before the press — the web's
+  // edit-details and the phone's product sheet (PRJ-9): Save off, the reason under it.
+  const blocked = gate.reasonOf(change);
+  const reason = denied ?? blocked;
   const rows = React.useMemo(() => productRowsOf(project).map((r) => ({ name: r.name, description: r.description })), [project]);
   const ai = useDescriptionAiAssist({ products: rows, value: description, onReplace: setDescription, pillClassName: "min-h-[44px] rounded-xl leading-md tracking-wide" });
   const started = React.useRef(false);
@@ -231,7 +239,7 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
   const save = () => {
     if (write.saving) return;
     setTried(true);
-    if (nameCheck.error || descCheck.tooLong) return;
+    if (nameCheck.error || descCheck.tooLong || blocked) return;
     if (!nameChanged && !descChanged && !write.failed) {
       if (ai.wrote) setDescriptionHint(project.id, { dismissedAt: stamp(), productCount: rows.length });
       ai.reset();
@@ -267,9 +275,10 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
         description="People who buy it and the community see these."
         actions={
           <>
-            <Button size="xl" className="w-full" loading={write.saving || ai.running} onClick={save}>
+            <Button size="xl" className="w-full" disabled={blocked !== null} loading={write.saving || ai.running} onClick={save}>
               {write.failed ? "Try again" : "Save"}
             </Button>
+            {reason && <p className={T.meta}>{reason}</p>}
           </>
         }
       >
@@ -310,7 +319,7 @@ function EditSheet({ ai: startAi, onClose }: { ai: boolean; onClose: () => void 
             {ai.status}
           </div>
         )}
-        {(denied || write.failed) && <Banner tone="error">{denied ?? WRITE_FAILED}</Banner>}
+        {write.failed && <Banner tone="error">{WRITE_FAILED}</Banner>}
       </Sheet>
       <ConfirmSheet
         open={discarding}
@@ -508,24 +517,25 @@ function useLiveReadiness(purpose: ReadinessPurpose) {
 
 const READY_ROW = cn("flex w-full items-center gap-6 p-6 text-left outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:bg-bg-subtle", PRESSED);
 
-/** Each product with its video's state and the web's action (Generate AI video…) as one row tap,
- *  then the project video's row. `projectVideo={false}` leaves that row out (the Project video
- *  screen). */
+/** Each product with its video's state and the web's action (Generate AI video…) as one row tap
+ *  that opens that product's video maker, as the web's row opens Generate video over its dialog;
+ *  Back or Close there returns here with this sheet open again (useBackState), so the maker goes
+ *  on to the listing. Then the project video's row. `projectVideo={false}` leaves that row out
+ *  (the Project video screen). */
 export function ReadinessRows({
   readiness,
   projectId,
+  projectName,
   projectVideo = true,
 }: {
   readiness: ReturnType<typeof useReadinessOf>;
   projectId: string;
+  /** The name the project video's row shows. */
+  projectName?: string;
   projectVideo?: boolean;
 }) {
   const project = { id: projectId };
-  const productHref = (pid: string) => phoneHrefOf(`/projects/${encodeURIComponent(project.id)}/products/${encodeURIComponent(pid)}`) ?? "#";
   const router = useRouter();
-  const pv = projectVideo ? readiness.project : null;
-  const pvCopy = pv ? projectRowCopy(pv) : null;
-  const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
   return (
     <>
       <div className="flex items-baseline justify-between">
@@ -537,6 +547,8 @@ export function ReadinessRows({
           const copy = statusCopy(p.video);
           const label = actionLabel(copy.action);
           const ready = p.video.state === "ready";
+          // A settled ready video: a new take, while the one in use stays until the maker chooses (CL-015).
+          const replaceFrom = p.video.state === "ready" && !p.video.next && !p.video.review ? p.video.take.id : null;
           const body = (
             <>
               <Thumb url={p.thumb}>
@@ -554,38 +566,36 @@ export function ReadinessRows({
               {label && <Chevron />}
             </>
           );
-          // A product whose video is still to make is one whole-row tap to its page, where it is made.
+          // A product whose video is still to make (or to review, or to try again) is one whole-row
+          // tap to its video maker.
           return (
             <li key={p.productId} className={LIST_ROW}>
               {label ? (
-                <button type="button" onClick={() => router.push(productHref(p.productId))} className={READY_ROW}>
+                <button type="button" aria-label={`${displayProductName(p.name)}: ${label}`} onClick={() => router.push(phoneVideoActionHref(project.id, p.productId, p.video))} className={READY_ROW}>
                   {body}
                 </button>
               ) : (
-                <div className={cn(READY_ROW, "hover:bg-transparent")}>{body}</div>
+                <div className={cn(READY_ROW, "hover:bg-transparent")}>
+                  {body}
+                  {replaceFrom && (
+                    <Button
+                      hierarchy="ghost"
+                      size="lg"
+                      className="min-h-[44px] shrink-0"
+                      aria-label={`Replace ${p.name} video`}
+                      onClick={() => router.push(phoneTakeHref(project.id, p.productId, { from: replaceFrom }))}
+                    >
+                      {REPLACE_LABEL}
+                    </Button>
+                  )}
+                </div>
               )}
             </li>
           );
         })}
       </ListCard>
-      {pv && pvCopy && (
-        <>
-          <h3 className={T.section}>Project video</h3>
-          <div className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-dashed border-border p-6">
-            <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-              <Icon icon={LockIcon} size={16} />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className={T.meta}>{pvCopy.text}</span>
-              {pvAction && (
-                <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(phoneProjectPath(project.id, "video"))}>
-                  {pvAction}
-                </Button>
-              )}
-            </span>
-          </div>
-        </>
-      )}
+      {/* The project video as a row like a product's, never drawn locked (EARN-19; the Sell sheet's own). */}
+      {projectVideo && <ProjectVideoSection projectId={projectId} projectName={projectName ?? "Project video"} readiness={readiness} />}
     </>
   );
 }
@@ -593,7 +603,7 @@ export function ReadinessRows({
 // ─────────────────────────── 07d / 07e · Share to Feed ───────────────────────────
 
 function ShareSheet({ onClose }: { onClose: () => void }) {
-  const { project, brief } = useProject();
+  const { project, view, brief } = useProject();
   const { setShowcase, setOwnerConfirmed } = useManualProjects();
   const toast = useToast();
   const readiness = useLiveReadiness("showcase");
@@ -602,10 +612,20 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
   const [askOwnership] = React.useState(() => ownership?.ok === false);
   const blocker = dialogBlockerOf(readiness) ?? sharePostBlocker({ story });
   const storyId = React.useId();
+  // Minted, nothing for sale yet (SOC-6): it shares all the same — to your Timeline now, onto the
+  // Feed once something of it is listed (the Feed shows only what is for sale).
+  const onFeed = forSaleNow(view);
   const share = () => {
     if (blocker) return;
-    setShowcase(project.id, true, undefined, { story: story.trim() });
-    toast({ title: "Shared to Feed" });
+    // Every video started, some still rendering or waiting for review (CL-030): the post waits off
+    // the Feed, then goes live by itself.
+    if (videosBlockerOf(readiness)) {
+      hold({ id: heldId(), projectId: project.id, kind: "share", at: Date.now(), story: story.trim() });
+      toast({ title: onFeed ? "Your post goes on Feed when every video is ready." : "Your post goes on your Timeline when every video is ready." });
+    } else {
+      setShowcase(project.id, true, undefined, { story: story.trim() });
+      toast({ title: onFeed ? "Shared to Feed" : "Shared to your Timeline" });
+    }
     onClose();
   };
   const reason = !story.trim() && ownership?.ok === false ? "Write your story and tick the box to share." : blocker;
@@ -623,8 +643,9 @@ function ShareSheet({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <Banner tone="info">Every product needs an AI video, and the post needs your story.</Banner>
-      <ReadinessRows readiness={readiness} projectId={project.id} />
+      <Banner tone="info">{phoneWords(readinessCopy("showcase").info)}</Banner>
+      {!onFeed && <p className={T.meta}>{shareOffFeedLineOf(view.commerce.outcome === "given")}</p>}
+      <ReadinessRows readiness={readiness} projectId={project.id} projectName={project.name} />
       <div className="flex flex-col gap-2">
         <h3 className={T.section}>Write your story</h3>
         <label htmlFor={storyId} className={T.label}>
@@ -725,15 +746,15 @@ function StopSharingSheet({ open, onClose }: { open: boolean; onClose: () => voi
     <ConfirmSheet
       open={open}
       onClose={onClose}
-      title="Stop sharing to Feed?"
-      body="The post leaves Feed, and only you can open it. Its comments are kept and come back if you share again."
+      title="Stop sharing?"
+      body={stopSharingBodyOf(forSaleNow(view))}
       verb="Stop sharing"
       onConfirm={() => {
         const at = view.summary.showcase?.at;
         const post = project.post;
         setShowcase(project.id, false);
         toast({
-          title: "Stopped sharing. The post left Feed.",
+          title: STOPPED_SHARING,
           action: { label: "Undo", onClick: () => setShowcase(project.id, true, at, post) },
         });
       }}
@@ -743,7 +764,7 @@ function StopSharingSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
 // ─────────────────────────── 08 · Publish ───────────────────────────
 
-function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () => void; onSheet: (s: ProjectSheet) => void }) {
+function PublishSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { project, view, brief } = useProject();
   const router = useRouter();
   const [pick, setPick] = React.useState<PublishIntent | null>(null);
@@ -754,12 +775,12 @@ function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () =
     setPick(null);
     onClose();
   };
+  // Straight to the next place, as the web's Publish (publish-dialog.tsx): no video stop here. The
+  // step that signs asks for the videos (PRJ-2, CL-030).
   const go = () => {
     if (!pick) return;
     const href = phoneHrefOf(publishHrefOf(project.id, status, pick)) ?? "/m/projects";
-    const purpose: ReadinessPurpose | null = pick === "give" ? "give" : pick === "sell" ? "sell" : null;
     setPick(null);
-    if (purpose && dialogBlockerOf(view.videos.readiness[purpose])) return onSheet({ kind: "readiness", purpose, then: href });
     onClose();
     router.push(href);
   };
@@ -803,42 +824,6 @@ function PublishSheet({ open, onClose, onSheet }: { open: boolean; onClose: () =
           );
         })}
       </div>
-    </Sheet>
-  );
-}
-
-// ─────────────────────────── 08b · readiness ───────────────────────────
-
-function ReadinessSheet({ purpose, then, onClose }: { purpose: ReadinessPurpose; then: string | null; onClose: () => void }) {
-  const { project } = useProject();
-  const router = useRouter();
-  const readiness = useLiveReadiness(purpose);
-  const copy = readinessCopy(purpose);
-  const blocker = dialogBlockerOf(readiness);
-  return (
-    <Sheet
-      open
-      onClose={onClose}
-      title={copy.title}
-      description={copy.info}
-      actions={
-        <>
-          <Button
-            size="xl"
-            className="w-full"
-            disabled={blocker !== null}
-            onClick={() => {
-              onClose();
-              if (then) router.push(then);
-            }}
-          >
-            {copy.cta}
-          </Button>
-          {blocker && <p className={T.meta}>{blocker}</p>}
-        </>
-      }
-    >
-      <ReadinessRows readiness={readiness} projectId={project.id} />
     </Sheet>
   );
 }

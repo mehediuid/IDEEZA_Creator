@@ -13,6 +13,12 @@
 //   are written; a refused listing write puts the record back.
 // · Edit — a free signature for a lazy listing, the network fee for an
 //   on-chain one; it may not change once sold or closed.
+// CL-030: once every video has started, a video still rendering or waiting
+// for review doesn't stop Add — the form says "You don't have to wait. …", the
+// wallet's done line says it waits, and the listing is kept off Explore
+// marketplace (lib/market/held.ts) until every video is ready, then goes live
+// by itself. CL-016: closing with any field changed asks "Discard this
+// listing?" first (Cancel · Discard); with nothing changed it closes at once.
 
 import * as React from "react";
 import { Banner } from "@/components/ideeza/banner";
@@ -21,6 +27,10 @@ import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import type { ListingField } from "@/components/projects/listing/listing-fields";
 import { makerShareNow, refusedCopy, sellRecheckOf } from "@/components/projects/listing/listing-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { readinessFactsOf, readinessOf, videoCountOf, videosBlockerOf } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
+import { readProjectVideos } from "@/lib/video/store";
+import { heldNoteOf } from "@/lib/video/video-copy";
 import { useMintShortfall } from "@/components/wallet/mint-cost";
 import { useMint } from "@/components/wallet/use-mint";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
@@ -33,6 +43,8 @@ import { createListing, editListing, listingViewOf } from "@/lib/market/listing"
 import {
   COLLECTION_UNKNOWN,
   DEMO_LINE,
+  HELD_ANNOUNCEMENT,
+  HELD_DONE_LINE,
   STORAGE_FULL,
   VIDEOS_READY_LINE,
   addInputOf,
@@ -50,6 +62,7 @@ import type { Listing, ListingMetadata } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import type { RequestResult } from "@/lib/wallet/types";
 import { BottomBar } from "../../kit/bottom-bar";
+import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { useEarn } from "../context";
 import { ListingFields } from "../listing-fields";
 import { CostCard, WalletLine } from "../mint/mint-steps";
@@ -82,6 +95,9 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
       ? listingInputFromListing(editing)
       : addInputOf({ listing: view.listing, record: view.mint.record, mintStatus, draft: brief?.state ?? null, creatorPct, now }),
   );
+  // What the form opened with: closing asks first once anything differs from it (CL-016).
+  const [opening] = React.useState(input);
+  const [discarding, setDiscarding] = React.useState(false);
   const [left, setLeft] = React.useState<ReadonlySet<ListingField>>(() => new Set());
   const [submitted, setSubmitted] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -94,6 +110,8 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
     latest.current = { projects, jobs };
   }, [projects, jobs]);
   const find = () => latest.current.projects.find((p) => p.id === project.id) ?? null;
+  // A video still being made: the listing will wait for it (CL-030).
+  const videosWait = !editing ? videosBlockerOf(view.videos.readiness.sell) : null;
 
   const network = input.network;
   const mints = !editing && mintStatus !== "onChain" && !(mintStatus === "lazyMinted" && input.mintingType === "lazy");
@@ -113,19 +131,24 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
   };
   const leave = (field: ListingField) => setLeft((s) => (s.has(field) ? s : new Set(s).add(field)));
   const close = () => {
-    if (!busy) onClose();
+    if (busy) return;
+    if (JSON.stringify(input) !== JSON.stringify(opening)) setDiscarding(true);
+    else onClose();
   };
 
-  const runAdd = async (): Promise<{ result: RequestResult; written: Listing | null }> => {
+  const runAdd = async (): Promise<{ result: RequestResult; written: Listing | null; held: boolean }> => {
     const net = input.network!;
     const collection = input.collection;
     const chosen = input.mintingType;
     const plan = mint.plan({ projectId: project.id, intent: "sell", type: chosen, network: net, collection, current: mintStatus });
-    if (!plan) return { result: { ok: false, reason: "recheck", message: GONE }, written: null };
+    if (!plan) return { result: { ok: false, reason: "recheck", message: GONE }, written: null, held: false };
     const endsAt = input.type === "auction" ? new Date(input.endsAt).getTime() : null;
-    const req = listRequestOf({ projectName: project.name, network: net, collection, tokenId: plan.tokenId, input, endsAt, mintRequest: plan.request });
+    const built = listRequestOf({ projectName: project.name, network: net, collection, tokenId: plan.tokenId, input, endsAt, mintRequest: plan.request });
+    // A video still being made: the wallet says it waits (CL-030).
+    const req = videosWait ? { ...built, doneLine: HELD_DONE_LINE } : built;
     const newMint = plan.request?.purpose === "lazyMint" || plan.request?.purpose === "instantMint";
     let written: Listing | null = null;
+    let held = false;
     const result = await request(req, {
       recheck: () => {
         const m = readMarketNow();
@@ -143,11 +166,19 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
         const terms: ListingInput = { ...input, network: net, collection, mintingType: listedMintingType(mintStatus, chosen), benefits: cleanBenefits(input.benefits) };
         const created = createListing(m.listings, p.id, terms, listingMetadataOf(p, view.products, proof.at), "page", proof.at, { listing: () => randomId("lst_") });
         if (!created.ok) return { ok: false, message: created.reason };
+        // A video still missing, rendering or unreviewed (CL-030): signed now, the listing waits off
+        // Explore marketplace until every video is ready, then goes live by itself.
+        const waitFor = videosBlockerOf(readinessOf(readinessFactsOf(p, view, brief, readProjectVideos(p.id), latest.current.jobs, proof.at), "sell"));
         const prior = p.mint ?? null;
         const record = plan.request ? plan.nextRecord(proof) : null;
         if (plan.request && !record) return { ok: false, conflict: true, message: NO_MINT_RECORD };
         if (record && !setMint(p.id, record)) return { ok: false, message: STORAGE_FULL };
-        const w = writeListings(created.listings);
+        const made = created.listings[created.listings.length - 1];
+        const w = waitFor
+          ? hold({ id: heldId(), projectId: p.id, kind: "main", at: proof.at, listing: made }).ok
+            ? ({ ok: true } as const)
+            : ({ ok: false, reason: "storage" } as const)
+          : writeListings(created.listings);
         if (!w.ok) {
           if (record) {
             if (prior) setMint(p.id, prior);
@@ -157,11 +188,15 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
         }
         if (newMint) bumpMinted(net, collection);
         if (typeof p.ownerConfirmedAt !== "number") setOwnerConfirmed(p.id, proof.at);
-        written = created.listings[created.listings.length - 1];
+        written = made;
+        held = waitFor !== null;
         return { ok: true };
       },
+      // "Use lazy mint instead" when an instant mint can't be paid (EARN-13, the web's listing
+      // dialog): the wallet sheet closes, back on the form with Lazy chosen.
+      onUseLazy: mints && chosen === "instant" ? () => change({ mintingType: "lazy" }) : undefined,
     });
-    return { result, written };
+    return { result, written, held };
   };
 
   const runEdit = async (l: Listing): Promise<{ result: RequestResult; written: Listing | null }> => {
@@ -197,9 +232,10 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
     }
     setError(null);
     setBusy(true);
-    const { result, written } = editing ? await runEdit(editing) : await runAdd();
+    const run = editing ? { ...(await runEdit(editing)), held: false } : await runAdd();
+    const { result, written } = run;
     setBusy(false);
-    if (result.ok && written) return onDone(editing ? updatedAnnouncement(written) : listedAnnouncement(written));
+    if (result.ok && written) return onDone(editing ? updatedAnnouncement(written) : run.held ? HELD_ANNOUNCEMENT : listedAnnouncement(written));
     if (!result.ok && result.reason !== "rejected") setError(result.message || STORAGE_FULL);
   };
 
@@ -246,7 +282,14 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
             <span className="min-w-0 break-words">{`Main NFT · ${project.name}`}</span>
             <TestnetDemoBadge />
           </p>
-          {!editing && <p className={cn(T.meta, "text-text-success")}>{VIDEOS_READY_LINE}</p>}
+          {!editing &&
+            (videosWait ? (
+              <p className={cn(T.body, "rounded-xl border-[length:var(--border-width-1)] border-solid border-border-brand bg-bg-brand-subtle p-6 text-text-primary")}>
+                {heldNoteOf("Explore marketplace", videoCountOf(view.videos.readiness.sell).total)}
+              </p>
+            ) : (
+              <p className={cn(T.meta, "text-text-success")}>{VIDEOS_READY_LINE}</p>
+            ))}
         </div>
         {error && <Banner tone="error">{error}</Banner>}
         <ListingFields
@@ -305,6 +348,18 @@ export function ListingFormLayer({ listing, onClose, onDone }: { listing: Listin
           <p className={T.meta}>{DEMO_LINE}</p>
         </section>
       </div>
+      <ConfirmSheet
+        open={discarding}
+        onClose={() => setDiscarding(false)}
+        title="Discard this listing?"
+        body="Nothing entered here is saved yet. Closing now throws it away."
+        verb="Discard"
+        destructive
+        onConfirm={() => {
+          setDiscarding(false);
+          onClose();
+        }}
+      />
     </FullLayer>
   );
 }

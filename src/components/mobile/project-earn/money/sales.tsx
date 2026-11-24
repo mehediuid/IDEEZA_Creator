@@ -5,21 +5,23 @@
 // · EarningsSummary — Money's summary, first on its screen once there is a
 //   sale: "Your earnings" with ⓘ (the fee-and-splits line) and the Testnet
 //   demo badge, what was paid to you per coin large, in dollars at the demo
-//   rates under it, and a Withdraw in Get paid row (the phone's Get paid);
+//   rates under it, "Royalties from resales" once a buyer sold a copy on
+//   (CL-036), and a Withdraw in Get paid row (the phone's Get paid);
 // · Sales — "Sales ⓘ" (the web's lead and the demo-purchases note in the
 //   sheet), the Testnet demo badge, "n sales to n people." under it, then
 //   the sales as rows, newest first: who, the price, the item, the date and
 //   benefits, and the sentence that points to Activity. A row opens its
 //   detail sheet (17e): who bought it, then the web's detail lines (the
 //   wallet with Copy, Bought, Paid, the fee, You received, When, Minted,
-//   Network, Benefits), the demo line, Message {buyer} · Close. `?sale=<id>`
+//   Network, Benefits), the demo line, See {buyer}'s profile while they
+//   have one (EARN-14) and Message {buyer}. `?sale=<id>`
 //   opens that sale's sheet once, on arrival. With none: a "No sales yet."
 //   row and, while nothing is for sale, a Go to Sell row.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Copy01Icon, Store01Icon, Tick02Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { Copy01Icon, Store01Icon, Tick02Icon, UserCircleIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { buttonVariants } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
@@ -32,7 +34,10 @@ import { saleFromQuery, saleItemLine, saleWhenLine } from "@/lib/manual/phone-pl
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { startHref } from "@/lib/messages/links";
 import { ME } from "@/lib/messages/types";
+import { profileHrefOf } from "@/lib/people/ids";
 import { addAmounts, formatAmount } from "@/lib/wallet/money";
+import { useResales } from "@/components/projects/purchased/resales-store";
+import { perTokenText } from "@/lib/market/resale-desk";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { cn } from "@/lib/utils";
 import { Sheet } from "../../kit/sheet";
@@ -138,12 +143,18 @@ function perCoin(earnings: readonly Earning[]): string {
 }
 
 /** Your earnings (the web's ProjectEarnings), Money's summary: what this project's sales paid you.
- *  Shown once there is a sale and the record reads, as the web shows it. */
+ *  Shown once there is a sale and the record reads, as the web shows it. A copy its buyer sold on
+ *  paid this project its royalty into the creator's demo wallet (CL-036): "Royalties from resales",
+ *  per token, shown only when there is one (EARN-3). */
 export function EarningsSummary() {
   const { project, view, viewer } = useEarn();
   const earnings = React.useMemo(
     () => earningsOf(view.sales, [{ id: project.id, name: project.name, contributors: project.contributors ?? [] }]),
     [view.sales, project.id, project.name, project.contributors],
+  );
+  const resales = useResales();
+  const royalties = perTokenText(
+    resales.filter((r) => r.source === "own" && r.projectId === project.id && r.sale).map((r) => ({ amount: r.sale?.royalty ?? "0", token: r.token })),
   );
   if (!can(viewer, "customers.see") || view.marketUnreadable || view.customers.rows.length === 0 || view.sales.length === 0) return null;
   const usd = addAmounts("0", ...earnings.map((e) => e.netUsd));
@@ -173,6 +184,13 @@ export function EarningsSummary() {
             <dt className={T.micro}>In dollars, at demo rates</dt>
             <dd className={cn(T.rowTitle, "tabular-nums")}>{formatUsd(usd)}</dd>
           </div>
+          {royalties && (
+            <div className="flex flex-col gap-1">
+              <dt className={T.micro}>Royalties from resales</dt>
+              <dd className={cn(T.rowTitle, "break-words tabular-nums")}>{royalties}</dd>
+              <dd className={cn(T.meta, "text-text-tertiary")}>Paid into your demo wallet when a buyer sells a copy on</dd>
+            </div>
+          )}
         </dl>
       </div>
       <ul className={cn("flex flex-col border-[length:var(--border-width-1)] border-x-0 border-b-0 border-solid border-border", LIST_DIVIDERS)}>
@@ -208,6 +226,8 @@ function SaleSheet({ row, onClose }: { row: CustomerRow; onClose: () => void }) 
       .catch(() => {});
   };
   const lines = [{ term: "Bought by", value: text.buyer }, ...text.detail];
+  // The buyer's profile on the phone, when they have one (EARN-14, the web's customers-tab.tsx).
+  const profile = profileHrefOf(row.buyerId);
   return (
     <Sheet
       open
@@ -249,6 +269,19 @@ function SaleSheet({ row, onClose }: { row: CustomerRow; onClose: () => void }) 
         ))}
       </dl>
       <p className={EARN_NOTE}>Testnet demo: bought with a demo wallet in this browser. No transaction was sent.</p>
+      {profile && (
+        <ListCard label={`About ${buyerName}`}>
+          <li>
+            <Link href={`/m${profile}`} className={LIST_ROW}>
+              <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+                <Icon icon={UserCircleIcon} size={24} />
+              </span>
+              <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>{`See ${buyerName}'s profile`}</span>
+              <Chevron />
+            </Link>
+          </li>
+        </ListCard>
+      )}
     </Sheet>
   );
 }

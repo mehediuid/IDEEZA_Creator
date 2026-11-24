@@ -5,11 +5,17 @@
 // (10674:659) folded in, laid out as grouped inset lists (the iOS Settings
 // pattern, mobile UX pass 2026-11-15): the top bar with settings and search
 // (a tab root, so no Back), your card (photo, name, headline, "@handle · View
-// profile", your level) that opens your profile, then Wallet with your IDZ,
-// Refer and Earn and Plan & pricing with your plan and credits; Projects with
-// how many you have and Saved Items; Settings, which opens in place on General
-// · Payments · $IDZ Pay · Security · Help and Support · Others; and Sign out as
-// a row. Every row that opens something carries the chevron. No Friends (D-1).
+// profile", your level and its XP against the next level) that opens your
+// profile, then Wallet with your IDZ, Refer and Earn and Plan & pricing with
+// your credits (on a paid plan the day they refill, the web sidebar's card) and the web account
+// menu's plan line ("Free plan · Upgrade to Builder", CL-032), which opens
+// Plans on that plan (MON-4); while the welcome offer runs and its sheet is
+// closed, the row is the offer instead, as the web sidebar's Upgrade card
+// becomes it (CL-004, AUTH-3); Projects with how many you have and Saved
+// Items; Settings, which opens in place on General · Payment method · Get paid
+// · Sign-in & security · Help · Others — each row named as the screen it
+// opens (SET-4); and Sign out as a row. Every row that opens something
+// carries the chevron. No Friends (D-1).
 
 import * as React from "react";
 import Link from "next/link";
@@ -17,7 +23,7 @@ import { useRouter } from "next/navigation";
 import {
   AllBookmarkIcon,
   ArrowDown01Icon,
-  CreditCardIcon,
+  CreditCardPosIcon,
   Globe02Icon,
   HelpCircleIcon,
   Logout01Icon,
@@ -28,6 +34,7 @@ import {
   Settings01Icon,
   Share01Icon,
   Tag01Icon,
+  Wallet01Icon,
   Wallet03Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
@@ -36,13 +43,14 @@ import { Avatar } from "@/components/ideeza/avatar";
 import { Badge } from "@/components/ideeza/badge";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
+import { OfferSticker, useWelcomeOffer } from "@/components/credits/welcome-offer";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/account/auth";
+import { OFFER_OFF, countdown } from "@/lib/account/welcome-offer";
 import { creditTotals, levelOf, xpOf } from "@/lib/account/summary";
 import { runningLow } from "@/lib/create/credit-limits";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
-import { useManualProjects } from "@/lib/manual/projects";
 import { displayNameOf, initialsOf, ownHandleOf, ME } from "@/lib/people/ids";
 import { PHONE_SETTINGS_GENERAL_HREF, PHONE_SETTINGS_OTHERS_HREF, compactCount, phoneProfileHref } from "@/lib/people/phone-profile";
 import { useMyPhoto } from "@/lib/people/photo-store";
@@ -53,18 +61,22 @@ import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { SignOutSheet } from "../settings/sign-out";
+import { usePhonePitch, usePlanLine, useRefillDay } from "../plans/upsell";
+import { useMyProjectsCount } from "./use-profile";
 
 /** A row's value at its end ("Free · 28 credits", "5"); the warning ink once credits run low. */
 export function HubValue({ children, warning }: { children: React.ReactNode; warning?: boolean }) {
   return <span className={cn("tabular-nums", warning && "text-text-warning")}>{children}</span>;
 }
 
+// The Figma's in-place list, each row named (and drawn) as the screen it opens and as Settings
+// itself names it — "Get paid", not "$IDZ Pay" (SET-4; lib/settings/registry.ts, settings/root.tsx).
 const SETTINGS: readonly { href: string; icon: IconValue; label: string }[] = [
   { href: PHONE_SETTINGS_GENERAL_HREF, icon: Globe02Icon, label: "General" },
-  { href: "/m/settings/payments", icon: CreditCardIcon, label: "Payments" },
-  { href: "/m/settings/idz-pay", icon: CreditCardIcon, label: "$IDZ Pay" },
-  { href: "/m/settings/security", icon: SecurityPasswordIcon, label: "Security" },
-  { href: "/m/help", icon: HelpCircleIcon, label: "Help and Support" },
+  { href: "/m/settings/payments", icon: CreditCardPosIcon, label: "Payment method" },
+  { href: "/m/settings/idz-pay", icon: Wallet01Icon, label: "Get paid" },
+  { href: "/m/settings/security", icon: SecurityPasswordIcon, label: "Sign-in & security" },
+  { href: "/m/help", icon: HelpCircleIcon, label: "Help" },
   { href: PHONE_SETTINGS_OTHERS_HREF, icon: MenuSquareIcon, label: "Others" },
 ];
 
@@ -121,35 +133,83 @@ function WalletValue() {
   );
 }
 
-/** PR-01 "Plan & pricing · Free · 28 credits", in the warning ink once credits run low (the web's rule). */
+/** PR-01 "Plan & pricing · 28 credits", in the warning ink once credits run low (the web's rule), and
+ *  on a paid plan under it the day its monthly credits come back, as the web sidebar's card says it
+ *  ("· refills 8 Dec", CL-032, MON-16). Free has no such line: its credits come once (owner
+ *  2026-11-24). The plan itself is the row's meta line (usePlanLine). */
 function PlanValue() {
-  const { hydrated: planRead, plan } = useCreatePlan();
+  const { hydrated: planRead } = useCreatePlan();
   const { hydrated: creditsRead, ledger } = useCredits();
   const { lowAt } = useSettings().credits;
-  if (!planRead || !creditsRead) return <Skeleton shape="text" size="md" className="inline-block w-[96px]" />;
+  const refill = useRefillDay();
+  if (!planRead || !creditsRead) return <Skeleton shape="text" size="md" className="inline-block w-[72px]" />;
   const credits = creditTotals(ledger).remaining;
   return (
-    <HubValue warning={runningLow(credits, lowAt)}>
-      {plan.name} · {credits.toLocaleString("en-US")} {credits === 1 ? "credit" : "credits"}
-    </HubValue>
+    <span className="inline-flex flex-col items-end">
+      <HubValue warning={runningLow(credits, lowAt)}>
+        {credits.toLocaleString("en-US")} {credits === 1 ? "credit" : "credits"}
+      </HubValue>
+      {refill && <span className={cn(T.micro, "tabular-nums")}>refills {refill}</span>}
+    </span>
   );
 }
 
-function ProjectsValue() {
-  const { hydrated, projects } = useManualProjects();
-  if (!hydrated) return <Skeleton shape="text" size="md" className="inline-block w-[24px]" />;
-  return <HubValue>{projects.length}</HubValue>;
+const OFF = `${Math.round(OFFER_OFF * 100)}%`;
+
+/** The Plan & pricing row: the web account menu's plan line as its meta ("Builder plan · Upgrade to
+ *  Disruptor", CL-032). It opens Plans on the plan that line names, so its bar reads "Upgrade to
+ *  Disruptor" — the web's link opens that plan's checkout (MON-4); on Disruptor, Plans as it is.
+ *  While the welcome offer runs and its sheet has been closed, the row is the offer, as the web
+ *  sidebar's Upgrade card becomes it (CL-004, AUTH-3): the gift and its clock as the meta, the OFF
+ *  sticker at the end, opening Plans, where every plan shows its offer price. */
+function PlanRow() {
+  const line = usePlanLine();
+  const pitch = usePhonePitch();
+  const offer = useWelcomeOffer();
+  if (offer.ready && offer.live && offer.entry?.closedAt != null)
+    return (
+      <ListRow
+        href="/m/plans"
+        icon={Tag01Icon}
+        title="Plan & pricing"
+        meta={
+          <>
+            Welcome gift: {OFF} off · ends in <span className="tabular-nums">{countdown(offer.left)}</span>
+          </>
+        }
+        trailing={<OfferSticker size="sm" />}
+      />
+    );
+  return (
+    <ListRow
+      href={pitch ? `/m/plans?pick=${pitch.plan.tier}` : "/m/plans"}
+      icon={Tag01Icon}
+      title="Plan & pricing"
+      meta={line ?? undefined}
+      value={<PlanValue />}
+    />
+  );
 }
 
-/** Your level, as the web's account menu shows it ("Maker", 620 XP); only you see it. */
+/** The Projects row's number is My projects' All, the page it opens: your projects and the projects
+ *  you bought from (a whole project bought counts once, as yours) — owner 2026-11-24, one number. */
+function ProjectsValue() {
+  const count = useMyProjectsCount();
+  if (count === null) return <Skeleton shape="text" size="md" className="inline-block w-[24px]" />;
+  return <HubValue>{count}</HubValue>;
+}
+
+/** Your level, as the web's account menu shows it ("Maker", "620 / 1,000 XP" — how far to the next
+ *  level, SET-19; just the XP at the top level); only you see it. */
 function LevelBadge() {
   const { hydrated, ledger } = useCredits();
   if (!hydrated) return null;
   const level = levelOf(xpOf(ledger));
+  const xp = level.cap === null ? `${level.xp.toLocaleString("en-US")} XP` : `${level.xp.toLocaleString("en-US")} / ${level.cap.toLocaleString("en-US")} XP`;
   return (
     <span className="flex shrink-0 flex-col items-end gap-1">
       <Badge tone="brand">{level.name}</Badge>
-      <span className={cn(T.micro, "tabular-nums")}>{level.xp.toLocaleString("en-US")} XP</span>
+      <span className={cn(T.micro, "tabular-nums")}>{xp}</span>
     </span>
   );
 }
@@ -208,7 +268,7 @@ export function ProfileHub() {
           <ListCard label="Money">
             <ListRow href="/m/earn/wallet" icon={Wallet03Icon} title="Wallet" value={<WalletValue />} />
             <ListRow href="/m/earn/refer" icon={Share01Icon} title="Refer and Earn" />
-            <ListRow href="/m/plans" icon={Tag01Icon} title="Plan & pricing" value={<PlanValue />} />
+            <PlanRow />
           </ListCard>
           <ListCard label="Your work">
             <ListRow href="/m/projects" icon={Note03Icon} title="Projects" value={<ProjectsValue />} />

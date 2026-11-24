@@ -7,6 +7,10 @@
 // → Connect a wallet), and Security › Sign-in & security. ST-11…11c, the
 // handle editor, is account-handle.tsx. The web's Account page
 // (components/settings/account-page.tsx) decides the words and the stores.
+// The connected Wallet sheet also has the web manage view's switches
+// (wallet-dialog.tsx): Switch account and Switch network rows that open
+// pick-one sheets (walletSwitchAccount / walletSwitchNetwork, SET-16), so a
+// wrong network is changed here, not only inside a signing request.
 
 import * as React from "react";
 import { Copy01Icon, Shield01Icon } from "@hugeicons/core-free-icons";
@@ -24,11 +28,16 @@ import { displayNameOf, initialsOf, ownHandleOf } from "@/lib/people/ids";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMyProfile } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
-import { demoAddress, makerId, readWallet, shortAddress, walletConnect, walletDisconnect } from "@/lib/wallet/demo-wallet";
-import { networkLabelOf } from "@/lib/wallet/request-view";
+import { NETWORKS, type Network } from "@/lib/brief/types";
+import { demoAddress, makerId, readWallet, shortAddress, walletConnect, walletDisconnect, walletSwitchAccount, walletSwitchNetwork } from "@/lib/wallet/demo-wallet";
+import { DEMO_ACCOUNTS } from "@/lib/wallet/identities";
+import { balanceLineOf, identityLabelOf, networkLabelOf } from "@/lib/wallet/request-view";
+import type { AccountIndex, DemoWallet } from "@/lib/wallet/types";
 import { useDemoWallet, writeDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { ConfirmSheet } from "../kit/confirm-sheet";
-import { Chevron, LIST_ROW } from "../kit/list";
+import { useEarnState } from "../earn-coin/parts";
+import { Chevron, LIST_ROW, ListCard, ListRow } from "../kit/list";
+import { PickSheet } from "../kit/pick-list";
 import { T } from "../type";
 import { Sheet } from "../kit/sheet";
 import { useOnline } from "../kit/states";
@@ -173,6 +182,7 @@ function WalletRow() {
   const toast = useToast();
   const [open, setOpen] = React.useState(false);
   const [confirm, setConfirm] = React.useState(false);
+  const [picking, setPicking] = React.useState<"account" | "network" | null>(null);
   const id = wallet ? makerId(wallet.account) : null;
   const state = wallet && id ? wallet.identities[id] : undefined;
   const connected = !!(id && state?.connected);
@@ -190,6 +200,11 @@ function WalletRow() {
     if (!id) return false;
     const w = readWallet();
     return writeDemoWallet(change === "connect" ? walletConnect(w, id) : walletDisconnect(w, id));
+  };
+  /** An account or network switch, on the wallet as it is now (another tab's change is never overwritten). */
+  const save = (change: (w: DemoWallet) => DemoWallet, done: string) => {
+    if (writeDemoWallet(change(readWallet()))) toast({ title: done });
+    else toast({ title: "Couldn’t save. Nothing changed.", lead: "error" });
   };
 
   return (
@@ -258,6 +273,10 @@ function WalletRow() {
               <TestnetDemoBadge />
             </p>
             <p className={T.body}>This is a test network. Nothing here has real value yet.</p>
+            <ListCard label="Switch account or network">
+              <ListRow title="Switch account" meta={identityLabelOf(id!)} onClick={() => setPicking("account")} />
+              <ListRow title="Switch network" meta={networkLabelOf(state.network)} onClick={() => setPicking("network")} />
+            </ListCard>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
@@ -268,6 +287,27 @@ function WalletRow() {
           </div>
         )}
       </Sheet>
+      {picking === "account" && wallet && (
+        <AccountPick
+          account={wallet.account}
+          network={state?.network ?? "baseSepolia"}
+          onClose={() => setPicking(null)}
+          onPick={(a) => {
+            const label = DEMO_ACCOUNTS.find((x) => x.index === a)?.label ?? `Demo account ${a}`;
+            if (a !== wallet.account) save((w) => walletSwitchAccount(w, a), `${label} chosen`);
+          }}
+        />
+      )}
+      {picking === "network" && id && state && (
+        <PickSheet
+          open
+          onClose={() => setPicking(null)}
+          title="Network"
+          options={NETWORKS.map((n) => ({ value: n.value, label: n.label }))}
+          value={state.network}
+          onPick={(n: Network) => n !== state.network && save((w) => walletSwitchNetwork(w, makerId(w.account), n), `Wallet on ${networkLabelOf(n)}`)}
+        />
+      )}
       <ConfirmSheet
         open={confirm}
         onClose={() => setConfirm(false)}
@@ -280,5 +320,26 @@ function WalletRow() {
         }}
       />
     </>
+  );
+}
+
+/** The demo account to use, with its address and what it holds on the wallet's network (the web's Account
+ *  radio rows, accountRowOf). Mounted only while open: its balances follow the clock. */
+function AccountPick({ account, network, onClose, onPick }: { account: AccountIndex; network: Network; onClose: () => void; onPick: (a: AccountIndex) => void }) {
+  const { wallet, market, now } = useEarnState();
+  const ctx = { wallet, market, now };
+  return (
+    <PickSheet
+      open
+      onClose={onClose}
+      title="Account"
+      options={DEMO_ACCOUNTS.map((a) => ({
+        value: String(a.index),
+        label: a.label,
+        helper: `${shortAddress(a.address)} · ${balanceLineOf(makerId(a.index), network, ctx)}`,
+      }))}
+      value={String(account)}
+      onPick={(v) => onPick(Number(v) as AccountIndex)}
+    />
   );
 }

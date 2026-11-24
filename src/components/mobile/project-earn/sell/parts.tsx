@@ -16,30 +16,44 @@
 //   top bar; stacked layers answer Escape top first;
 // · useLiveReadiness / ReadinessSheet — the web's readiness gate as a sheet
 //   (Sell, Relist, a product's copies): every product's video, the project
-//   video, Continue off until they are ready.
+//   video; Continue stays off only while a video hasn't started (CL-030: "Start
+//   every video first: …"). Once every one has, it opens even while they render:
+//   "You don't have to wait. It stays off Explore marketplace until …" and,
+//   under the button, "Goes live when all 4 videos are ready · 2 of 4 now".
+//   The project video is never drawn locked (EARN-19, CL-030: it can start
+//   now): its products' pictures in place of the lock, its state and its button.
+// · SalesFacts / RecentSales — an item screen's sales (EARN-4, the web item
+//   panel's): Earned · Bought by · Last sale, then the last three sales and
+//   "All sales in Money", which opens Money's Sales.
 
 import * as React from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { InformationCircleIcon, LockIcon, PlayIcon } from "@hugeicons/core-free-icons";
+import { InformationCircleIcon, LockIcon, PlayIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { IconButton } from "@/components/ideeza/icon-button";
 import type { LevelCheck as Check } from "@/lib/commerce/ladder";
 import type { License } from "@/lib/brief/types";
-import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
+import { dialogBlockerOf, videosWaitOf } from "@/components/projects/details/readiness-dialog";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
-import type { ReadinessPurpose } from "@/lib/manual/p2-types";
+import type { Readiness, ReadinessPurpose } from "@/lib/manual/p2-types";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
-import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
-import { phoneProductVideoHref } from "@/lib/manual/phone-earn";
-import { phoneProjectPath, readyOfLine } from "@/lib/manual/phone-project";
+import { readinessFactsOf, readinessOf, videoCountOf } from "@/lib/manual/readiness";
+import { phoneEarnHref, phoneProductVideoHref } from "@/lib/manual/phone-earn";
+import { formatShortDate } from "@/lib/manual/project-summary";
+import { allSalesLineOf, boughtByOf, earnedTextOf, NO_SALES_LINE, RECENT_SALES_SHOWN, saleWhatOf, type DeskTile } from "@/lib/market/sell-desk";
+import type { Sale } from "@/lib/market/types";
+import { buyerLabel } from "@/lib/wallet/identities";
+import { formatAmount } from "@/lib/wallet/money";
+import { phoneProjectVideoHref, phoneTakeHref } from "@/lib/video/phone-video";
+import { readyOfLine } from "@/lib/manual/phone-project";
 import { useProjectVideos } from "@/lib/video/store";
-import { actionLabel, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
+import { REPLACE_LABEL, actionLabel, heldCountLine, heldNoteOf, projectActionLabel, projectRowCopy, readinessCopy, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { MOBILE_APP_ID } from "../../mobile-root";
 import { BottomBar } from "../../kit/bottom-bar";
@@ -51,7 +65,7 @@ import { PRESSED } from "../../kit/press";
 import { Thumb } from "../../project/parts";
 import { TopBar, type TopBarAction } from "../../top-bar";
 import { useEarn } from "../context";
-import { MissingSteps } from "../parts";
+import { EarnLink, FactGrid, MissingSteps } from "../parts";
 import { T } from "../../type";
 
 /** A card of rows: the kit's list card, its rows split by the kit's line. */
@@ -90,10 +104,13 @@ export function SellListRow({
   onClick,
   disabled = false,
   label,
+  chip,
 }: {
   icon: IconValue;
   title: string;
   state: readonly string[];
+  /** A status chip beside the title ("Waiting for videos"). */
+  chip?: React.ReactNode;
   live?: boolean;
   /** A line under the state (how many steps before you can list, why it waits). */
   extra?: string | null;
@@ -110,7 +127,14 @@ export function SellListRow({
         <Icon icon={icon} size={20} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={cn(T.rowTitle, disabled && "text-text-disabled")}>{title}</span>
+        {chip ? (
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className={cn(T.rowTitle, disabled && "text-text-disabled")}>{title}</span>
+            {chip}
+          </span>
+        ) : (
+          <span className={cn(T.rowTitle, disabled && "text-text-disabled")}>{title}</span>
+        )}
         <StateLines lines={state} live={live} />
         {extra && <span className={cn(T.meta, "break-words")}>{extra}</span>}
       </span>
@@ -459,6 +483,12 @@ export function ReadinessSheet({
   const readiness = useLiveReadiness(purpose, product);
   const copy = readinessCopy(purpose, product ? displayProductName(product.name) : undefined);
   const blocker = dialogBlockerOf(readiness);
+  // A video rendering or waiting for review no longer holds it (CL-030): what it leads to waits.
+  const waiting = videosWaitOf(readiness);
+  const count = videoCountOf(readiness);
+  const where = purpose === "showcase" || purpose === "give" ? "Feed" : "Explore marketplace";
+  const rendering =
+    readiness.products.some((p) => p.video.state === "rendering" || (p.video.state === "ready" && !!p.video.next)) || readiness.project?.state === "rendering";
   return (
     <Sheet
       open
@@ -470,11 +500,16 @@ export function ReadinessSheet({
           <Button size="xl" className="w-full" disabled={blocker !== null} onClick={onPass}>
             {copy.cta}
           </Button>
-          {blocker && <p className={SUB}>{blocker}</p>}
+          {blocker ? <p className={SUB}>{blocker}</p> : waiting ? <p className={SUB}>{heldCountLine(count.ready, count.total)}</p> : null}
         </>
       }
     >
       <ReadinessRows readiness={readiness} />
+      {waiting && !blocker ? (
+        <p className={cn(T.body, "rounded-xl border-[length:var(--border-width-1)] border-solid border-border-brand bg-bg-brand-subtle p-6 text-text-primary")}>{heldNoteOf(where, count.total)}</p>
+      ) : (
+        rendering && <p className={cn(T.meta, "rounded-xl bg-bg-surface-raised p-6")}>Renders keep going if you close this. Their progress shows in Videos, at the bottom of the screen.</p>
+      )}
       {extra}
     </Sheet>
   );
@@ -489,7 +524,7 @@ export function MakeVideosSheet({ onClose }: { onClose: () => void }) {
       open
       onClose={onClose}
       title="Make videos"
-      description="Each product needs its own video before the project can be sold."
+      description={readinessCopy("videos").info}
     >
       <ReadinessRows readiness={readiness} />
     </Sheet>
@@ -500,9 +535,6 @@ export function MakeVideosSheet({ onClose }: { onClose: () => void }) {
 function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveReadiness> }) {
   const { project } = useEarn();
   const router = useRouter();
-  const pv = readiness.project;
-  const pvCopy = pv ? projectRowCopy(pv) : null;
-  const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
   return (
     <>
       <div className="flex items-baseline justify-between">
@@ -515,6 +547,8 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
           const label = actionLabel(c.action);
           const ready = p.video.state === "ready";
           const name = displayProductName(p.name);
+          // A settled ready video: a new take, while the one in use stays until the maker chooses (CL-015).
+          const replaceFrom = p.video.state === "ready" && !p.video.next && !p.video.review ? p.video.take.id : null;
           // One compact row per product (owner 2026-11-15: two products didn't fit the sheet): the
           // video's state, and its action as the row's last line — the whole row opens the video maker.
           const body = (
@@ -546,30 +580,141 @@ function ReadinessRows({ readiness }: { readiness: ReturnType<typeof useLiveRead
                   {body}
                 </button>
               ) : (
-                <div className={cn(LIST_ROW, "items-center hover:bg-transparent active:bg-transparent")}>{body}</div>
+                <div className={cn(LIST_ROW, "items-center hover:bg-transparent active:bg-transparent")}>
+                  {body}
+                  {replaceFrom && (
+                    <Button
+                      hierarchy="ghost"
+                      size="lg"
+                      className="min-h-[44px] shrink-0"
+                      aria-label={`Replace ${name} video`}
+                      onClick={() => router.push(phoneTakeHref(project.id, p.productId, { from: replaceFrom }))}
+                    >
+                      {REPLACE_LABEL}
+                    </Button>
+                  )}
+                </div>
               )}
             </li>
           );
         })}
       </ListCard>
-      {pv && pvCopy && (
-        <>
-          <h3 className={T.section}>Project video</h3>
-          <div className="flex items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-dashed border-border p-6">
-            <span aria-hidden className="mt-1 text-[color:var(--color-icon-secondary)]">
-              <Icon icon={LockIcon} size={16} />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-2">
-              <span className={SUB}>{pvCopy.text}</span>
-              {pvAction && (
-                <Button hierarchy="secondary" size="xl" className="self-start" onClick={() => router.push(phoneProjectPath(project.id, "video"))}>
-                  {pvAction}
-                </Button>
-              )}
-            </span>
-          </div>
-        </>
-      )}
+      <ProjectVideoSection projectId={project.id} projectName={project.name} readiness={readiness} />
     </>
+  );
+}
+
+/** "Project video" and its state (EARN-19; CL-030: it can start now, so it is never drawn locked):
+ *  the phone's block keeps its words and its button, drawn like a product's row — its products'
+ *  pictures as the Media tab draws them (no lock), the project's name, its state, then the button
+ *  that opens the Project video screen (on the take waiting for review, as the Media tab's action
+ *  does). Nothing with one product (its video is the project's). */
+export function ProjectVideoSection({ projectId, projectName, readiness }: { projectId: string; projectName: string; readiness: Readiness }) {
+  const router = useRouter();
+  const pv = readiness.project;
+  if (!pv) return null;
+  const copy = projectRowCopy(pv);
+  const action = projectActionLabel(copy.action);
+  const ready = pv.state === "ready";
+  return (
+    <>
+      <h3 className={T.section}>Project video</h3>
+      <section aria-label={`${projectName} project video`} className={cn(LIST_CARD, "flex-row items-start gap-6 p-6")}>
+        <span className="relative flex size-[56px] shrink-0 items-center justify-center">
+          <span aria-hidden className="grid size-full grid-cols-2 grid-rows-2 gap-[1px] overflow-hidden rounded-md bg-bg-surface-raised">
+            {readiness.products.slice(0, 4).map((p) => (
+              <Thumb key={p.productId} url={p.thumb} className="size-full rounded-none" />
+            ))}
+          </span>
+          {ready && (
+            <span aria-hidden className={cn(MEDIA_CHIP, "absolute size-[28px] justify-center p-0")}>
+              <Icon icon={PlayIcon} size={16} />
+            </span>
+          )}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-2">
+          <span className={cn(T.rowTitle, "truncate")}>{projectName}</span>
+          <span className={cn(T.meta, ready ? "text-text-success" : "text-text-secondary")}>{copy.text}</span>
+          {copy.sub && <span className={T.meta}>{copy.sub}</span>}
+          {action && (
+            <Button
+              hierarchy="secondary"
+              size="xl"
+              className="self-start"
+              onClick={() => router.push(phoneProjectVideoHref(projectId, copy.action === "review" ? pv.review?.id : undefined))}
+            >
+              {action}
+            </Button>
+          )}
+        </span>
+      </section>
+    </>
+  );
+}
+
+/** What an item has sold for you (EARN-4; the web item panel's numbers, CL-028 D6): Earned · Bought
+ *  by · Last sale, under the item's summary. How much sold is the summary's own ("Copies sold", the
+ *  share), so it isn't said twice. */
+export function SalesFacts({ tile, label }: { tile: DeskTile; label: string }) {
+  const { now } = useEarn();
+  return (
+    <section aria-label={label} className={cn(LIST_CARD, "p-8")}>
+      <FactGrid
+        facts={[
+          { label: "Earned", value: earnedTextOf(tile.earned) },
+          { label: "Bought by", value: boughtByOf(tile.buyers) },
+          { label: "Last sale", value: tile.lastSaleAt ? formatShortDate(tile.lastSaleAt, now) : "—" },
+        ]}
+      />
+    </section>
+  );
+}
+
+/** Recent sales (EARN-4; the web item panel's, CL-028 D7): the item's last three sales — who bought
+ *  (a person, never a type), what ("Copy #1 · Business use", "40% of the project"), the price and the
+ *  date — then "All sales in Money" as the last row, which opens Money's Sales (`#customers`). With
+ *  none yet, the web's one line. */
+export function RecentSales({ sales }: { sales: readonly Sale[] }) {
+  const { project, now } = useEarn();
+  const headingId = React.useId();
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-4">
+      <h3 id={headingId} className={T.section}>
+        Recent sales
+      </h3>
+      <ul aria-labelledby={headingId} className={ROWS_CARD}>
+        {sales.length === 0 ? (
+          <li className={cn(LIST_ROW, "hover:bg-transparent active:bg-transparent")}>
+            <span className={cn(T.body, "text-text-primary")}>{NO_SALES_LINE}</span>
+          </li>
+        ) : (
+          <>
+            {sales.slice(0, RECENT_SALES_SHOWN).map((s) => (
+              <li key={s.id} className="flex min-h-[48px] flex-col gap-1 px-8 py-6">
+                <span className="flex items-baseline justify-between gap-4">
+                  <span className={cn(T.rowTitle, "min-w-0 truncate")}>{buyerLabel(s.buyerId)}</span>
+                  <span className={cn(T.rowTitle, "shrink-0 tabular-nums")}>{formatAmount(s.price, s.token)}</span>
+                </span>
+                <span className={cn(T.meta, "flex items-baseline justify-between gap-4")}>
+                  <span className="min-w-0 truncate">{saleWhatOf(s)}</span>
+                  <time dateTime={new Date(s.at).toISOString()} className="shrink-0">
+                    {formatShortDate(s.at, now)}
+                  </time>
+                </span>
+              </li>
+            ))}
+            <li>
+              <EarnLink href={`${phoneEarnHref(project.id, "money")}#customers`} className={LIST_ROW}>
+                <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+                  <Icon icon={Wallet01Icon} size={24} />
+                </span>
+                <span className={cn(T.body, "min-w-0 flex-1 text-text-primary")}>{allSalesLineOf(sales.length)}</span>
+                <Chevron />
+              </EarnLink>
+            </li>
+          </>
+        )}
+      </ul>
+    </section>
   );
 }

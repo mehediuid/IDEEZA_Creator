@@ -24,6 +24,24 @@ export function parsePhoneEarnSection(segment: string | null | undefined): Exclu
   return segment === "sell" || segment === "plan" || segment === "money" ? segment : null;
 }
 
+/** Share to Feed of a project with nothing for sale (SOC-6, owner 2026-11-22): the post is on your
+ *  Timeline now and joins the Feed once something of it is for sale (the Feed shows only what is). */
+export const SHARE_OFF_FEED_LINE = "Nothing of it is for sale yet, so the post shows on your Timeline. It joins the Feed once it’s for sale.";
+
+/** The same for a project given to the community: it is never for sale, so its post stays on your Timeline. */
+export const SHARE_GIVEN_LINE = "A project given to the community is never for sale, so the post shows on your Timeline.";
+
+/** Where a share of a project with nothing for sale goes, in words: a gift's never reaches the Feed. */
+export function shareOffFeedLineOf(given: boolean): string {
+  return given ? SHARE_GIVEN_LINE : SHARE_OFF_FEED_LINE;
+}
+
+/** Something of the project is for sale — a live Main listing, or a listed copy while it isn't sold in
+ *  full — so its post is on the Feed (the Feed's own rule, feed/use-clips.ts); otherwise on your Timeline. */
+export function forSaleNowOf(view: { listing: { kind: string }; lock: unknown; editions: readonly { listing: unknown }[] }): boolean {
+  return view.listing.kind === "live" || (view.lock === null && view.editions.some((t) => t.listing !== null));
+}
+
 /** The mint flow on the phone. `private` is read as `save`, the web's Keep private. */
 export function phoneMintHref(projectId: string, intent?: PublishIntent): string {
   return `/m/projects/${enc(projectId)}/earn/mint${intent ? `?intent=${intent}` : ""}`;

@@ -315,7 +315,7 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
     setReporting(null);
     if (!c) return;
     if (!save(comments, reported.includes(c.id) ? reported : [...reported, c.id])) return failed();
-    toast("Report sent. We'll review it.");
+    toast("Report sent. In this demo nobody reviews reports yet.");
   };
 
   // ───── what threads and comments read ─────
@@ -346,7 +346,7 @@ export function PostComments({ post, owner, seed, focusComposer }: PostCommentsP
         icon: <Icon icon={ACTION_ICON[a]} size={20} />,
         danger: a === "delete",
         disabled: a === "reported",
-        hint: a === "reported" ? "You reported this. We'll review it." : undefined,
+        hint: a === "reported" ? "You reported this." : undefined,
         onSelect: () => run(a, c),
       })),
     like: (c) => {

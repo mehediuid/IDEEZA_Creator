@@ -14,10 +14,14 @@
 // · failed (10o), waiting (33b), still being built (33c, with its bar) and
 //   not built (33a: what it adds, its price and time) as the kit's clean
 //   states, their one action in the Bottom action bar — Rebuild this piece
-//   (the review's free retry) with Open chat, or Add pieces (D2);
+//   for a failed one (the review's free retry, in place; the phone's own,
+//   kept by the owner's rule 2026-11-23) with Open chat under it, the web's
+//   way (COR-36 / PRJ-11: retry it in the chat), or Add pieces (D2);
 // then "What this covers" (`coversFor`, the web's words) as a grouped list,
 // and the ready piece's file as the bar's primary — or, for a buyer, "Buy a
-// copy to download" (off in a preview, with the reason). A piece the build
+// copy to download" (off in a preview, with the reason). The 3D Module's file
+// is the build's own 3D model, Download 3D model (.glb) (CL-015), for whoever
+// may take the files, when the build made one for this product. A piece the build
 // doesn't have is a state card with Back to Build; a buyer without a copy who
 // opens the firmware is told it comes with a copy. Back is the top bar's
 // (back, or replace to the product's Build section): it never pushes, so Back
@@ -35,7 +39,7 @@ import { fileFor, save } from "@/components/projects/product/product-deliverable
 import { bomFor, firmwareFor, isSampleModel, netsFor } from "@/lib/create/build-artifacts";
 import { ITEM_LABELS, useCreateHistory, type BuildItem, type BuildItemKind, type BuildProduct } from "@/lib/create/history";
 import { PIECES, isLeftOut } from "@/lib/create/pieces";
-import { sampleProjectOf } from "@/lib/manual/phone-project";
+import { offMarketNow, sampleProjectOf } from "@/lib/manual/phone-project";
 import { copiesFromOf, notBuiltCostLine, notBuiltTitle, parsePiece, phoneProductPath } from "@/lib/manual/phone-product";
 import { trackCardOf } from "@/lib/market/editions";
 import { formatAmount } from "@/lib/wallet/money";
@@ -49,13 +53,13 @@ import { useToast } from "../kit/toast";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { AddPiecesSheet } from "./build-tab";
+import { AddPiecesSheet, MODEL_FAILED, MODEL_LABEL, useModelDownload } from "./build-tab";
 import { BuyCopy, PREVIEW_BUY_OFF } from "./buy";
 import { ModelPiece } from "./model-view";
 import { useListedCopies } from "./overview";
 import { PIECE_ICON } from "../ai/build";
 import { CARD, FactGrid } from "./parts";
-import { PieceMissing, ProductLoading, ProductMissing, ProjectMissing } from "./states";
+import { OffMarket, PieceMissing, ProductLoading, ProductMissing, ProjectMissing } from "./states";
 import { ProductProvider, useProduct, useProductData } from "./use-product";
 
 export function PieceScreen({ id, productId, piece }: { id: string; productId: string; piece: string }) {
@@ -69,15 +73,20 @@ export function PieceScreen({ id, productId, piece }: { id: string; productId: s
     return <ProjectMissing />;
   }
   if (data.state === "no-product") return <ProductMissing projectName={data.projectName} back={`/m/projects/${encodeURIComponent(data.projectId)}?tab=products`} />;
+  const { ctx } = data;
+  // A piece is part of the product's page: a paused listing is off the marketplace here too (BUY-4).
+  if (ctx.mode === "market" && offMarketNow({ listing: ctx.view.listing.kind, projectId: ctx.project.id, sales: ctx.view.sales, buyerId: ctx.buyerId })) {
+    return <OffMarket paused />;
+  }
   return (
-    <ProductProvider value={data.ctx}>
+    <ProductProvider value={ctx}>
       <PieceView kind={kind} />
     </ProductProvider>
   );
 }
 
 function PieceView({ kind }: { kind: BuildItemKind | null }) {
-  const { job, bp, name, version, downloads, mode, path, canEdit } = useProduct();
+  const { job, bp, name, version, downloads, mode, path, canEdit, chat } = useProduct();
   const back = path("", { tab: "build" });
   const item = kind && bp ? (bp.items.find((i) => i.kind === kind) ?? null) : null;
   // A left-out piece is the maker's to add: anyone who can't build finds it isn't in the build.
@@ -115,14 +124,9 @@ function PieceView({ kind }: { kind: BuildItemKind | null }) {
             <p className={cn(T.meta, "text-center")}>{notBuiltCostLine(kind)}</p>
           </div>
         ) : state === "failed" ? (
-          <ErrorState
-            title="This piece failed in this build"
-            body={
-              job.failure === "system"
-                ? "The whole build stopped on our side — try it again from the chat."
-                : "Rebuild it, or ask in the chat what went wrong. The other pieces are unaffected, and retrying costs no extra credits."
-            }
-          />
+          // Both ways back, as the bar offers them: Rebuild this piece here (the maker's, not after a
+          // failure on our side) and the web's "Retry it in the chat" (product-deliverables PieceNotReady).
+          <ErrorState title="This piece failed in this build" body={failedLine(canRebuild(canEdit, job), !!chat, job?.failure === "system")} />
         ) : state === "building" ? (
           <div className="flex flex-col items-center gap-4">
             {/* 33c: the Build row's own sentence, then that the screen may be left. */}
@@ -375,15 +379,31 @@ function PartsTable({ bp }: { bp: BuildProduct }) {
 
 // ─────────────────────────── the footer ───────────────────────────
 
+/** A failed piece can be rebuilt in place by its maker, unless the whole build stopped on our side. */
+function canRebuild(canEdit: boolean, job: { failure?: string } | null | undefined): boolean {
+  return canEdit && !!job && job.failure !== "system";
+}
+
+/** The failed card's line, fitting the ways the bar offers: Rebuild this piece, Open chat, or both. */
+function failedLine(rebuild: boolean, chat: boolean, system: boolean): string | undefined {
+  const free = "The other pieces are unaffected, and retrying costs no extra credits.";
+  if (rebuild && chat) return `Rebuild it here, or retry it in the chat. ${free}`;
+  if (rebuild) return `Rebuild it here. ${free}`;
+  if (chat) return system ? "The whole build stopped on our side — try it again from the chat." : "Retry it in the chat.";
+  return undefined;
+}
+
 /** The screen's one action, in the thumb zone: the ready piece's file (or Buy a copy to download),
- *  Rebuild this piece with Open chat for a failed one, Add pieces for one that isn't built. */
+ *  Rebuild this piece for a failed one with Open chat as the second way (the web's: retry it in the
+ *  chat, PRJ-11; the primary when there's nothing to rebuild), Add pieces for one that isn't built. */
 function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduct; state: BuildItem["status"] | "notBuilt" }) {
   const { downloads, job, chat, canEdit } = useProduct();
   const { retryBuildItem } = useCreateHistory();
   const toast = useToast();
   const [adding, setAdding] = React.useState(false);
+  const model = useModelDownload();
   if (state === "failed") {
-    const rebuild = canEdit && job?.failure !== "system" && job;
+    const rebuild = canRebuild(canEdit, job) && job;
     if (!rebuild && !chat) return null;
     return (
       <BottomBar>
@@ -392,7 +412,7 @@ function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduc
             size="xl"
             className="w-full"
             onClick={() => {
-              retryBuildItem(job.id, kind, bp.id);
+              retryBuildItem(rebuild.id, kind, bp.id);
               toast({ title: `Rebuilding ${ITEM_LABELS[kind]}` });
             }}
           >
@@ -400,7 +420,10 @@ function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduc
           </Button>
         )}
         {chat && (
-          <Link href={`/m/ai/chat/${encodeURIComponent(chat.id)}`} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
+          <Link
+            href={`/m/ai/chat/${encodeURIComponent(chat.id)}`}
+            className={cn(buttonVariants({ hierarchy: rebuild ? "secondary" : "primary", size: "xl" }), "w-full", rebuild && "border-solid")}
+          >
             Open chat
           </Link>
         )}
@@ -419,6 +442,18 @@ function PieceFooter({ kind, bp, state }: { kind: BuildItemKind; bp: BuildProduc
     );
   }
   if (state !== "ready") return null;
+  if (kind === "3d" && downloads && model.file) {
+    return (
+      <BottomBar>
+        <Button size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} loading={model.state === "busy"} onClick={model.run}>
+          {MODEL_LABEL}
+        </Button>
+        <p aria-live="polite" className={cn(T.meta, "text-text-error empty:hidden")}>
+          {model.state === "failed" ? MODEL_FAILED : ""}
+        </p>
+      </BottomBar>
+    );
+  }
   const file = fileFor(kind, bp);
   if (!file) return null;
   if (downloads) {

@@ -12,9 +12,12 @@
 //   the owner who can still build, Not built with + Add (nobody else reads the
 //   maker's left-out pieces) — each a whole-row tap to its view-only screen;
 // - Downloads as rows: the firmware, the parts list and the netlist, made from
-//   this product's parts in this browser, for whoever may take them away; for
-//   anyone else "Firmware and downloads come with a purchase." (O12). The
-//   owner's page opens them in a sheet (`DownloadsSheet`);
+//   this product's parts in this browser, and — when the build made its own
+//   3D model for this product — Download 3D model (.glb) (CL-015, a spinner
+//   while it downloads, "The 3D model couldn't be downloaded. Try again." when
+//   it fails), for whoever may take them away; for anyone else "Firmware and
+//   downloads come with a purchase." (O12). The owner's page opens them in a
+//   sheet (`DownloadsSheet`);
 // - the seed caption (the web Editor block's "Opens with version {n}'s …"),
 //   which the owner's page keeps in its Build ⓘ (`useSeedCaption`).
 
@@ -27,13 +30,14 @@ import { Banner } from "@/components/ideeza/banner";
 import { Button, buttonVariants } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { ProgressBar } from "@/components/ideeza/progress-bar";
+import { Spinner } from "@/components/ideeza/spinner";
 import { Segmented } from "@/components/ideeza/segmented";
 import { Toggle } from "@/components/ideeza/toggle";
-import { fileFor, save, type DownloadFile } from "@/components/projects/product/product-deliverables";
+import { fileFor, modelFileOf, save, saveBlob, type DownloadFile } from "@/components/projects/product/product-deliverables";
 import { TIER_WORD } from "@/components/marketplace/purchase-dialog";
 import { bomFor, specOfSource } from "@/lib/create/build-artifacts";
 import { useCredits } from "@/lib/create/credits";
-import { ITEM_LABELS, useCreateHistory, type BuildItemKind, type BuildProduct } from "@/lib/create/history";
+import { ITEM_LABELS, useCreateHistory, type BuildItemKind, type BuildJob, type BuildProduct } from "@/lib/create/history";
 import {
   OPTIMIZE_COST,
   PIECES,
@@ -97,6 +101,47 @@ export function filesOf(bp: BuildProduct): DownloadFile[] {
   return out;
 }
 
+export type ModelDownload = {
+  /** The build's own 3D model of this product, once its 3D piece is ready; null otherwise. */
+  file: { url: string; filename: string } | null;
+  state: "idle" | "busy" | "failed";
+  run: () => void;
+};
+
+/** CL-015 · Download 3D model (.glb): the web's `modelFileOf` (only the build's main product wears
+ *  the generated model; the bundled sample mesh never downloads), fetched and saved as
+ *  "{product}-3d-model.glb". Whether the viewer may take it is the caller's (`downloads`). */
+export function useModelDownload(): ModelDownload {
+  const { job, bp } = useProduct();
+  return useBuildModelDownload(job, bp);
+}
+
+/** The same download for a build read outside the product page — what a holder bought (BUY-8: a Virtual NFT
+ *  licenses the model, the web's purchased page hands it over). */
+export function useBuildModelDownload(job: BuildJob | null, bp: BuildProduct | null): ModelDownload {
+  const [state, setState] = React.useState<ModelDownload["state"]>("idle");
+  const ready = !!bp?.items.some((i) => i.kind === "3d" && i.status === "ready");
+  const file = job && bp && ready ? modelFileOf(job, bp) : null;
+  const run = () => {
+    if (!file || state === "busy") return;
+    setState("busy");
+    void (async () => {
+      try {
+        const res = await fetch(file.url);
+        if (!res.ok) throw new Error(String(res.status));
+        saveBlob(await res.blob(), file.filename);
+        setState("idle");
+      } catch {
+        setState("failed");
+      }
+    })();
+  };
+  return { file, state, run };
+}
+
+export const MODEL_LABEL = "Download 3D model (.glb)";
+export const MODEL_FAILED = "The 3D model couldn't be downloaded. Try again.";
+
 /** The web Editor block's caption for the version on screen (the owner's only), or null. */
 export function useSeedCaption(): string | null {
   const { project, product, version, bp, mode } = useProduct();
@@ -136,6 +181,7 @@ export function PieceRows({ bp, onAdd }: { bp: BuildProduct; onAdd: (k: BuildIte
 export function BuildTab() {
   const { bp, downloads, copies } = useProduct();
   const [adding, setAdding] = React.useState<BuildItemKind[] | null>(null);
+  const model = useModelDownload();
   if (!bp) return null;
   const files = filesOf(bp);
 
@@ -147,16 +193,18 @@ export function BuildTab() {
       </ListCard>
       <section aria-labelledby="pd-downloads" className="flex flex-col gap-4">
         <SectionHeading id="pd-downloads" title="Downloads" />
-        {downloads ? <FileRows files={files} /> : <p className={T.body}>Firmware and downloads come with a purchase.</p>}
+        {downloads ? <FileRows files={files} model={model} /> : <p className={T.body}>Firmware and downloads come with a purchase.</p>}
       </section>
       {adding && <AddPiecesSheet bp={bp} preselect={adding} onClose={() => setAdding(null)} />}
     </div>
   );
 }
 
-/** Each file as a row with its download mark; a tap saves it. */
-function FileRows({ files }: { files: DownloadFile[] }) {
-  if (!files.length) return <p className={T.body}>Nothing to download yet — the files come once their pieces are ready.</p>;
+/** Each file as a row with its download mark; a tap saves it. The 3D model last, its spinner in
+ *  place of the mark while it downloads and the web's failure line under it. */
+function FileRows({ files, model }: { files: DownloadFile[]; model: ModelDownload }) {
+  const glb = model.file;
+  if (!files.length && !glb) return <p className={T.body}>Nothing to download yet — the files come once their pieces are ready.</p>;
   return (
     <ListCard label="Downloads">
       {files.map((f) => (
@@ -172,16 +220,32 @@ function FileRows({ files }: { files: DownloadFile[] }) {
           </button>
         </li>
       ))}
+      {glb && (
+        <li>
+          <button type="button" aria-busy={model.state === "busy" || undefined} onClick={model.run} className={LIST_ROW}>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className={cn(T.body, "text-text-primary")}>{MODEL_LABEL}</span>
+              <span className={cn(T.meta, "break-all")}>{glb.filename}</span>
+              <span aria-live="polite" className={cn(T.meta, "text-text-error empty:hidden")}>
+                {model.state === "failed" ? MODEL_FAILED : ""}
+              </span>
+            </span>
+            <span aria-hidden className="shrink-0 text-[color:var(--color-icon-default)]">
+              {model.state === "busy" ? <Spinner size={24} /> : <Icon icon={Download04Icon} size={24} />}
+            </span>
+          </button>
+        </li>
+      )}
     </ListCard>
   );
 }
 
 /** The owner's Downloads, from the Build section's row. */
-export function DownloadsSheet({ open, onClose, bp }: { open: boolean; onClose: () => void; bp: BuildProduct }) {
+export function DownloadsSheet({ open, onClose, bp, model }: { open: boolean; onClose: () => void; bp: BuildProduct; model: ModelDownload }) {
   return (
     <Sheet open={open} onClose={onClose} title="Downloads">
       <div className="pb-8">
-        <FileRows files={filesOf(bp)} />
+        <FileRows files={filesOf(bp)} model={model} />
       </div>
     </Sheet>
   );

@@ -13,10 +13,15 @@
 // picks are the web's draft (`ideeza:report-draft`), so leaving the screen
 // or reloading loses nothing but the screenshots (kept in memory only, and
 // it says so); a link may fill an empty draft (`?details=`, `?kind=`).
+// As on the web (SET-10): while there is a draft, Clear (the top bar's
+// eraser) starts a fresh one; "It's confusing" points at the Tutorials; and
+// "Report sent" says nobody can reply in the app yet, with Your reports as a
+// link.
 
 import * as React from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CheckmarkCircle02Icon, Delete02Icon, Upload04Icon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, Delete02Icon, Eraser01Icon, Upload04Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza/button";
 import { Checkbox, Radio } from "@/components/ideeza/checkbox";
@@ -24,7 +29,8 @@ import { Spinner } from "@/components/ideeza/spinner";
 import { Textarea } from "@/components/ideeza/text-input";
 import { Field, useFieldIds } from "@/components/auth/auth-parts";
 import { rememberSentReport } from "@/lib/data/reports";
-import { deviceOf, pageRefFor } from "@/lib/support/page-context";
+import { deviceOf, namesFor, pageRefFor, placeLine } from "@/lib/support/page-context";
+import { useManualProjects } from "@/lib/manual/projects";
 import {
   DETAILS_COUNTER_FROM,
   DETAILS_MAX,
@@ -63,7 +69,8 @@ export function newReportId(): string {
 
 /** What the phone can say about where you were: the screen you came from, this browser, this window. */
 export function phoneContext(from: string): ReportContext {
-  const ref = pageRefFor(from);
+  const [path, query = ""] = from.split("?");
+  const ref = pageRefFor(path, query);
   const { browser, os } = deviceOf(navigator.userAgent, navigator.maxTouchPoints);
   const dark = document.documentElement.getAttribute("data-theme") === "dark" || window.matchMedia?.("(prefers-color-scheme: dark)").matches;
   return {
@@ -133,7 +140,13 @@ export function ReportScreen() {
   const raw = params.get("from") ?? "";
   const from = raw.startsWith("/m") ? raw : "/m/help";
   const done = useGoBack(from);
-  const [context] = React.useState(() => phoneContext(from));
+  const [taken] = React.useState(() => phoneContext(from));
+  // The project and product it is about, by name, as the web's report says them (once this browser's projects are read).
+  const { projects } = useManualProjects();
+  const context = React.useMemo(() => {
+    const [path, query = ""] = from.split("?");
+    return { ...taken, ...namesFor(pageRefFor(path, query), projects, null) };
+  }, [taken, from, projects]);
   const ids = useFieldIds(["kind", "impact", "details", "images"] as const);
   // The draft as kept; a link's `?details=` / `?kind=` fill only what it leaves empty (the web's prefill rule).
   const [start] = React.useState<Draft>(() => {
@@ -160,6 +173,8 @@ export function ReportScreen() {
   const [sent, setSent] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const shotsRef = React.useRef<Shot[]>([]);
+  // The web's isBlank: nothing picked, nothing typed, no screenshot.
+  const blank = !kind && !impact && !details.trim() && shots.length === 0;
 
   React.useEffect(() => {
     shotsRef.current = shots;
@@ -237,10 +252,31 @@ export function ReportScreen() {
     }
   };
 
+  /** The web's Clear: a fresh draft (a new id), the screenshots let go, back to the first field. */
+  const clear = () => {
+    shots.forEach((s) => URL.revokeObjectURL(s.url));
+    setShots([]);
+    setId(newReportId());
+    setKind(null);
+    setImpact(null);
+    setDetails("");
+    setIncludeContext(false);
+    setTried(false);
+    setSendError(null);
+    setImageNote(null);
+    requestAnimationFrame(() => document.getElementById(ids.kind.id)?.focus());
+  };
+
   const count = details.trim().length;
   return (
     <Screen
-      top={<TopBar back={from} title="Report a problem" />}
+      top={
+        <TopBar
+          back={from}
+          title="Report a problem"
+          actions={!blank && !sending && sent === null ? [{ icon: Eraser01Icon, label: "Clear", onClick: clear }] : []}
+        />
+      }
       className="px-8 pb-8 pt-4"
       footer={
         <BottomBar>
@@ -299,7 +335,18 @@ export function ReportScreen() {
           />
         </Field>
         <p id={`${ids.details.id}-hint`} className={cn(T.caption, "-mt-6 flex justify-between gap-4 text-text-tertiary")}>
-          {copy.hint}
+          <span>
+            {copy.hint}
+            {kind === "confusing" && (
+              <>
+                {" "}A tutorial may already show how:{" "}
+                <Link href="/m/tutorials" className="font-medium text-text-brand underline underline-offset-2">
+                  Tutorials
+                </Link>
+                .
+              </>
+            )}
+          </span>
           {count >= DETAILS_COUNTER_FROM && (
             <span className={cn("tabular-nums", count > DETAILS_MAX && "text-text-error")}>
               {count}/{DETAILS_MAX}
@@ -308,7 +355,7 @@ export function ReportScreen() {
         </p>
         <div className="flex flex-col gap-3">
           <span className={T.label}>Page</span>
-          <p className={cn(T.bodyLg, "flex h-[44px] items-center rounded-xl bg-bg-subtle px-6 text-text-secondary")}>{context.page}</p>
+          <p className={cn(T.bodyLg, "flex h-[44px] items-center rounded-xl bg-bg-subtle px-6 text-text-secondary")}>{placeLine(context)}</p>
         </div>
         <div className="flex flex-col gap-4">
           <input
@@ -368,7 +415,7 @@ export function ReportScreen() {
           <span className="flex flex-col gap-1">
             <span className={cn(T.body, "text-text-primary")}>Send page and device details</span>
             <span className={T.meta}>
-              {context.page} · {context.browser} on {context.os}
+              {placeLine(context)} · {context.browser} on {context.os}
             </span>
           </span>
         </label>
@@ -387,8 +434,13 @@ export function ReportScreen() {
         <span aria-hidden className="self-center text-text-success">
           <Icon icon={CheckmarkCircle02Icon} size={40} />
         </span>
-        <p className={cn(T.body, "text-center text-text-primary")}>
-          Your reference is <span className="font-mono font-medium">{sent}</span>. Settings › Your reports keeps it.
+        {/* The web's no-reply line (support/report-problem.tsx), and Your reports as a link. */}
+        <p role="status" className={cn(T.body, "text-center text-text-primary")}>
+          Your reference is <span className="font-mono font-medium">{sent}</span>. We can’t reply in the app yet. Settings ›{" "}
+          <Link href="/m/settings/privacy/reports" className="font-medium text-text-brand underline underline-offset-2">
+            Your reports
+          </Link>{" "}
+          keeps it.
         </p>
       </Sheet>
     </Screen>

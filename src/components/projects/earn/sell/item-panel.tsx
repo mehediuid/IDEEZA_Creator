@@ -33,7 +33,20 @@ import { payoutLinesText } from "@/lib/commerce/payout";
 import { earnHref, earnMintHref } from "@/lib/manual/earn-route";
 import { formatShortDate, formatDate, type NextAction } from "@/lib/manual/project-summary";
 import { marketItemsOf } from "@/lib/market/market-list";
-import { DESK_KIND_LINE, deskTitleOf, marketHrefOf, type DeskKind, type DeskTile } from "@/lib/market/sell-desk";
+import {
+  allSalesLineOf,
+  boughtByOf,
+  DESK_KIND_LINE,
+  deskTitleOf,
+  earnedTextOf,
+  marketHrefOf,
+  NO_SALES_LINE,
+  RECENT_SALES_SHOWN,
+  saleWhatOf,
+  SOLD_OUT_NOTE,
+  type DeskKind,
+  type DeskTile,
+} from "@/lib/market/sell-desk";
 import { USE_LABEL, type CopyRowState } from "@/lib/market/sell-flow";
 import type { EditionKind, EditionUse, Sale } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
@@ -129,8 +142,8 @@ function Head({ kind, title, sub, chip, lines }: { kind: DeskKind; title: string
 function Numbers({ tile, now, soldValue }: { tile: DeskTile; now: number; soldValue: string }) {
   const facts: { label: string; value: string; meter?: boolean }[] = [
     { label: "Sold", value: soldValue, meter: true },
-    { label: "Earned", value: tile.earned.length ? payoutLinesText(tile.earned) : "Nothing yet" },
-    { label: "Bought by", value: tile.buyers === 0 ? "Nobody yet" : tile.buyers === 1 ? "1 person" : `${tile.buyers} people` },
+    { label: "Earned", value: earnedTextOf(tile.earned) },
+    { label: "Bought by", value: boughtByOf(tile.buyers) },
     { label: "Last sale", value: tile.lastSaleAt ? formatShortDate(tile.lastSaleAt, now) : "—" },
   ];
   return (
@@ -146,22 +159,17 @@ function Numbers({ tile, now, soldValue }: { tile: DeskTile; now: number; soldVa
   );
 }
 
-function saleWhat(s: Sale): string {
-  if (s.item.nft === "main") return `${s.item.sharePct}% of the project`;
-  return `Copy #${s.item.serial} · ${USE_LABEL[s.item.use]}`;
-}
-
 /** The item's last three sales, each by the buyer's relation (a person, never a type), with the way to all of them. */
 function RecentSales({ sales, now, projectId }: { sales: Sale[]; now: number; projectId: string }) {
   return (
     <div className={SECTION}>
       <h4 className={LABEL}>Recent sales</h4>
       {sales.length === 0 ? (
-        <p className={NOTE}>No sales yet. When someone buys, it shows here.</p>
+        <p className={NOTE}>{NO_SALES_LINE}</p>
       ) : (
         <>
           <ul className="m-0 flex list-none flex-col gap-4 p-0">
-            {sales.slice(0, 3).map((s) => {
+            {sales.slice(0, RECENT_SALES_SHOWN).map((s) => {
               const who = buyerLabel(s.buyerId);
               return (
                 <li key={s.id} className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-x-5">
@@ -170,7 +178,7 @@ function RecentSales({ sales, now, projectId }: { sales: Sale[]; now: number; pr
                   </span>
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-md leading-md text-text-primary">{who}</span>
-                    <span className="truncate text-sm leading-sm text-text-tertiary">{saleWhat(s)}</span>
+                    <span className="truncate text-sm leading-sm text-text-tertiary">{saleWhatOf(s)}</span>
                   </span>
                   <span className="flex flex-col items-end">
                     <span className="text-md font-semibold leading-md text-text-primary tabular-nums">{formatAmount(s.price, s.token)}</span>
@@ -181,7 +189,7 @@ function RecentSales({ sales, now, projectId }: { sales: Sale[]; now: number; pr
             })}
           </ul>
           <Link href={earnHref(projectId, "customers")} className={EARN_LINK}>
-            {sales.length > 3 ? `All ${sales.length} sales in Money` : "All sales in Money"}
+            {allSalesLineOf(sales.length)}
             <Icon icon={ArrowRight01Icon} size={14} />
           </Link>
         </>
@@ -374,7 +382,7 @@ export function CopyPanel(props: SlotProps & { desk: CopyDesk }) {
 
       {state.kind === "manage" && (
         <div className={SECTION}>
-          {soldOut && <p className={NOTE}>Every copy is sold. Add copies to keep selling, or leave it closed.</p>}
+          {soldOut && <p className={NOTE}>{SOLD_OUT_NOTE}</p>}
           <Numbers tile={tile} now={now} soldValue={tile.soldLine?.replace(" sold", "") ?? "—"} />
         </div>
       )}

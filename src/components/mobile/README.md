@@ -21,7 +21,9 @@ The `/m` prototype's own screens and parts, from the mobile Figma (`fKXxJ25dXvxW
 | `kit/bottom-bar.tsx`, `kit/code-cells.tsx`, `kit/sheet-select.tsx` | The Bottom action bar and its text link, six code cells, A06 Select as a pick-one sheet |
 | `account/mobile-gate.tsx` | Where the phone may go (way-in, setup, tabs, guest Home), Splash |
 | `account/ways-in.tsx`, `account/guest-gate.tsx` | Continue with Google · Facebook · email, the Demo provider sheet, the guest gate |
-| `account/code-step.tsx`, `account/parts.tsx`, `account/terms-sheet.tsx` | The six-digit code step and Demo email; heading, checklist, alert, Splash; the Terms viewer |
+| `account/code-step.tsx`, `account/parts.tsx`, `account/terms-sheet.tsx` | The six-digit code step and Demo email; heading, checklist, alert, Splash, where a new account goes (`landingAfterSignUp`); the Terms viewer |
+| `account/sign-up-fields.tsx`, `account/details-step.tsx` | Create account's date of birth and consent line; Finish your account after Google or Facebook (the date of birth and Terms a provider doesn't share) |
+| `guide/` | The first-product guide strip (the web's guide, `lib/tour/guide.ts`): above the tab row, and above the foot where a step happens; its sheet |
 | `ai/` | The AI tab: start, the concept chat (`use-concept-flow.ts`), build, pieces, history, the build pill (logic: `lib/mobile-ai/flow.ts`) |
 | `feed/` | Home: the Feed's clips, comments, ⋯ menu, share, Saved, Marketplace activity, Global Search, Notifications |
 | `project/`, `project-earn/`, `product/` | My projects and the project page; its Earn side (mint, sell, listing, business plan, money, buying, product video, AR); the product page and its build viewers |

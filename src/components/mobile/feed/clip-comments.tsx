@@ -21,8 +21,15 @@
 // hide, blocked people's words hidden, links and @mentions drawn as the web
 // draws them. A copied comment link opens its thread, brings it into view and
 // marks it a moment. A write the phone refuses keeps the words and says so.
+// On your own post a line over the composer says who can comment now, or that
+// your break holds comments, with Change opening that setting (SOC-14, the
+// web's line over its composer): the same rules already decide what shows.
+// A share on the profile's Timeline has its own thread too (owner 2026-11-22, Facebook's re-share:
+// the share has its own comments): the same sheet over the share's post (`share:<id>`), the sharer
+// its owner, its comment links opening the share on the Timeline (`link`).
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ArrowDown01Icon,
   AtIcon,
@@ -47,7 +54,7 @@ import { Skeleton } from "@/components/ideeza/skeleton";
 import { downscalePhoto } from "@/components/innovations/comments/comment-dom";
 import { CommentText } from "@/components/innovations/comments/comment-text";
 import { formatCount } from "@/lib/feed";
-import { clipHref, type FeedClip } from "@/lib/innovations/clips";
+import { clipHref, webCommentHrefOf, type FeedClip } from "@/lib/innovations/clips";
 import {
   actionsFor,
   addComment,
@@ -83,6 +90,9 @@ import { sampleSeedOf } from "@/lib/innovations/sample-posts";
 import { ME_ID } from "@/lib/innovations/types";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMe } from "@/lib/people/profile-store";
+import { commentRuleOf, quietEndLabel } from "@/lib/settings/audience";
+import { quietModeOn, type Reach } from "@/lib/settings/prefs";
+import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { PickSheet } from "../kit/pick-list";
@@ -90,7 +100,7 @@ import { ReportSheet } from "../kit/report-sheet";
 import { ActionSheet, Sheet, type ActionSheetItem } from "../kit/sheet";
 import { useToast } from "../kit/toast";
 import { T } from "../type";
-import { VIDEO_REPORT_REASONS } from "./clip-menu";
+import { VIDEO_REPORT_REASONS, useWebLinkOf } from "./clip-menu";
 import { newId, useMinuteNow } from "./use-feed";
 import type { Guard } from "./use-guest";
 
@@ -106,8 +116,36 @@ const rowId = (id: string) => `m-comment-${id}`;
 /** The time of a write, read when the write happens (never during render). */
 const writeTime = () => Date.now();
 
+/** The web's words for who can comment (post-comments.tsx). */
+const RULE_WORD: Record<Reach, string> = { everyone: "Anyone", work: "People you work with", nobody: "Only you" };
+
+/** On your own post: who can comment now, from Settings › Privacy & safety, as the web says it over its
+ *  composer — or that your break holds comments from people you don't work with. Change opens it. */
+function CommentRuleLine() {
+  const settings = useSettings();
+  const now = useMinuteNow();
+  const rule = commentRuleOf(settings, now);
+  const quiet = quietModeOn(settings, now) && rule !== settings.audience.comment;
+  return (
+    <p className={cn(T.body, "px-2")}>
+      {quiet && settings.audience.quietUntil !== null
+        ? `You’re taking a break until ${quietEndLabel(settings.audience.quietUntil)}, so only people you work with can comment.`
+        : `Who can comment: ${RULE_WORD[rule]}.`}{" "}
+      <Link
+        href="/m/settings/privacy?open=comment"
+        className={cn(T.rowTitle, "relative text-text-brand outline-none after:absolute after:-inset-x-2 after:-inset-y-[12px] after:content-[''] hover:underline focus-visible:underline")}
+      >
+        Change
+      </Link>
+    </p>
+  );
+}
+
 /** "12 comments" — the sheet's title. */
 export const commentsTitle = (n: number) => `${n} ${n === 1 ? "comment" : "comments"}`;
+
+/** What the comments are on: a clip, or a share on the Timeline (its post, its owner). */
+export type CommentTarget = Pick<FeedClip, "id" | "postId" | "source" | "creator">;
 
 export function ClipComments({
   clip,
@@ -115,8 +153,14 @@ export function ClipComments({
   onClose,
   guard,
   focusId = null,
+  link,
+  maker = true,
 }: {
-  clip: FeedClip;
+  clip: CommentTarget;
+  /** The post's owner is its maker (their comments say "Maker"); a share's owner only shared it. */
+  maker?: boolean;
+  /** Where a comment's copied link opens (`?comment=` is added); the clip's own page by default. */
+  link?: string;
   open: boolean;
   onClose: () => void;
   guard: Guard;
@@ -214,7 +258,7 @@ export function ClipComments({
       toast({ title: problem, lead: "error" });
       return;
     }
-    guard("Sign in to comment", () => {
+    guard("Log In to comment", () => {
       const now = Date.now();
       let next: PostComment[];
       let id: string | null = null;
@@ -241,20 +285,26 @@ export function ClipComments({
   };
 
   const like = (c: PostComment) =>
-    guard("Sign in to like this comment", () => {
+    guard("Log In to like this comment", () => {
       if (!save(toggleLike(comments, c.id))) toast({ title: FAILED, lead: "error" });
     });
 
   const reply = (c: PostComment) =>
-    guard("Sign in to reply", () => {
+    guard("Log In to reply", () => {
       setMode({ kind: "reply", target: c });
       setText("");
       setPhoto(null);
       setFocusAsk((n) => n + 1);
     });
 
+  const webLinkOf = useWebLinkOf();
+  /** The web's post page on the comment when the web shows this thread (SOC-19); a share's own
+   *  thread (`link`) and an item only on the marketplace keep the phone address. */
   const copyLink = (c: PostComment) => {
-    const url = new URL(`${clipHref(clip.id)}?comment=${encodeURIComponent(c.id)}`, window.location.origin).toString();
+    const base = link ?? clipHref(clip.id);
+    const web = link ? null : webCommentHrefOf(webLinkOf(clip.id), c.id);
+    const path = web ?? `${base}${base.includes("?") ? "&" : "?"}comment=${encodeURIComponent(c.id)}`;
+    const url = new URL(path, window.location.origin).toString();
     const ok = () => toast({ title: "Link to comment copied to clipboard" });
     const no = () => toast({ title: "Couldn’t copy the link", lead: "error" });
     if (!navigator.clipboard) return no();
@@ -292,7 +342,7 @@ export function ClipComments({
         case "unhide":
           return [{ label: "Unhide comment", icon: ViewIcon, onSelect: () => setHiddenTo(c, false) }];
         case "report":
-          return [{ label: "Report", icon: Flag02Icon, onSelect: () => guard("Sign in to report this comment", () => setReporting(c)) }];
+          return [{ label: "Report", icon: Flag02Icon, onSelect: () => guard("Log In to report this comment", () => setReporting(c)) }];
         case "reported":
           return [{ label: "Reported", icon: Flag02Icon, onSelect: () => toast({ title: "You reported this comment. We’re looking into it." }) }];
         case "delete":
@@ -350,6 +400,8 @@ export function ClipComments({
     <p className={cn(T.body, "px-2 py-4")}>{refusal}</p>
   ) : (
     <div className="flex flex-col gap-2">
+      {/* Your own post (its maker's rules apply): who can comment now. */}
+      {owner && rules && <CommentRuleLine />}
       {mode.kind !== "comment" && (
         <div className="flex min-h-[44px] items-center justify-between gap-4 pl-[44px]">
           {mode.kind === "reply" ? (
@@ -487,7 +539,7 @@ export function ClipComments({
                     root={c}
                     comments={comments}
                     viewer={viewer}
-                    makerId={clip.creator.id}
+                    makerId={maker ? clip.creator.id : ""}
                     shown={shownOf(c.id)}
                     onShown={(n) => setReplies((r) => ({ ...r, [c.id]: n }))}
                     nameOf={nameOf}

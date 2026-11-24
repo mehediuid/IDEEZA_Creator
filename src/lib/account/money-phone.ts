@@ -6,7 +6,7 @@
 //
 // Pure, relative imports only.
 
-import { creditPeriod, priceOf, type Subscription } from "../create/plans";
+import { creditPeriod, creditsMonthly, planOf, priceOf, type Subscription } from "../create/plans";
 import type { Lot } from "../create/credit-lots";
 import type { BillingCycle } from "../create/credit-pricing";
 import { addAmounts } from "../wallet/money";
@@ -16,21 +16,26 @@ import type { Withdrawal, WithdrawalStatus } from "./payout";
 const cents = (n: number) => Math.round(n * 100) / 100;
 
 /** A ledger line as far as this reads it. */
-export type GrantLine = { id: string; reason: string; orderId?: string };
+export type GrantLine = { id: string; reason: string; orderId?: string; pack?: string };
 
-/** This monthly period's plan credits: what the plan added, what is spent of them and what is left.
- *  Null until the period's grant is in the ledger. */
+/** The plan's credits: what it added, what is spent of them and what is left. A paid plan: this
+ *  monthly period's, ending with it; Free: its one grant (the latest Free grant on older ledgers),
+ *  `endsAt` null as it never runs out of time. Null until that grant is in the ledger. */
 export function allowanceOf(
   ledger: readonly GrantLine[],
   lots: readonly Lot[],
-  sub: Pick<Subscription, "id" | "startedAt">,
+  sub: Pick<Subscription, "id" | "startedAt"> & { tier?: Subscription["tier"] },
   now: number,
-): { allowance: number; used: number; remaining: number; endsAt: number } | null {
-  const period = creditPeriod(sub as Subscription, now);
-  const line = ledger.find((e) => e.reason === "grant" && e.orderId === `grant_${sub.id}_${period.index}`);
+): { allowance: number; used: number; remaining: number; endsAt: number | null } | null {
+  const monthly = !sub.tier || creditsMonthly(sub.tier);
+  const period = monthly ? creditPeriod(sub as Subscription, now) : null;
+  const free = planOf("free").name;
+  const line = period
+    ? ledger.find((e) => e.reason === "grant" && e.orderId === `grant_${sub.id}_${period.index}`)
+    : ledger.findLast((e) => e.reason === "grant" && e.pack === free);
   const lot = line ? lots.find((l) => l.id === line.id) : undefined;
   if (!lot) return null;
-  return { allowance: lot.amount, used: lot.amount - lot.remaining, remaining: lot.remaining, endsAt: period.end };
+  return { allowance: lot.amount, used: lot.amount - lot.remaining, remaining: lot.remaining, endsAt: period ? period.end : null };
 }
 
 export type LotState = "active" | "used" | "expired";

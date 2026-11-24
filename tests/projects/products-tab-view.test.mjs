@@ -5,6 +5,7 @@ import {
   productFacts,
   displayProductName,
   droppedNoteOf,
+  versionLineOf,
   productsHeadingOf,
   headlineConfidenceOf,
 } from "../../.tmp-test/lib/manual/products-tab-view.js";
@@ -121,6 +122,14 @@ test("displayProductName: an empty or blank name reads 'Not named yet'", () => {
 
 test("droppedNoteOf: COR-108's exact wording", () => {
   assert.equal(droppedNoteOf(2, 1), "Not in version 2 · from version 1");
+});
+
+test("versionLineOf: the version only once a lineage has more than one (PRJ-3), dated when saved", () => {
+  const now = new Date(2026, 10, 23, 12, 0).getTime();
+  assert.equal(versionLineOf(null, null, now), null);
+  assert.equal(versionLineOf({ current: 1, count: 1 }, now, now), null);
+  assert.equal(versionLineOf({ current: 2, count: 2 }, new Date(2026, 10, 3, 9, 0).getTime(), now), "v2 · Nov 3");
+  assert.equal(versionLineOf({ current: 1, count: 3 }, null, now), "v1");
 });
 
 test("productsHeadingOf: counts every row, tallies pieces from the current version only", () => {

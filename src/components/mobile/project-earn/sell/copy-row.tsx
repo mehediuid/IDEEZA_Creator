@@ -15,9 +15,21 @@
 //   primary: Add to marketplace (a made, unlisted use) or Sell … copies too;
 // · Edit (15f) and Add copies (15e) sign through the phone's wallet sheet;
 //   Remove listing (15g) asks first. Each write says so in a toast.
+// · its sales (EARN-4, the web item panel's): Earned · Bought by · Last sale
+//   while something is listed, Recent sales (the last three, "All sales in
+//   Money") once copies are made, and a sold-out use's card says "Every copy
+//   is sold. Add copies to keep selling, or leave it closed."
+// · signed while a video still renders or waits for review (CL-030): the row
+//   says "Waiting for videos" with the price and "Goes live when its videos are
+//   ready"; on the screen the made copies' card is the waiting block, Review
+//   videos is the bar's primary and Cancel listing a row.
+// · while a use is on sale (EARN-8, the web item panel's): View on
+//   marketplace opens what buyers see — the project's market screen on this
+//   kind's tab, or the product's market view.
 
 import * as React from "react";
-import { Add01Icon, Delete02Icon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { useRouter } from "next/navigation";
+import { Add01Icon, Delete02Icon, MoreHorizontalIcon, PencilEdit01Icon, Store01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Field } from "@/components/auth/auth-parts";
 import { Badge } from "@/components/ideeza/badge";
@@ -31,6 +43,8 @@ import { listRequestOf, termsOf, termsProblem, type TermsField, type TermsInput 
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { ROYALTY_MAX, ROYALTY_MIN, TOKENS_BY_NETWORK, type Network, type Token } from "@/lib/brief/types";
 import { can } from "@/lib/manual/permissions";
+import { phoneMarketHref } from "@/lib/manual/phone-earn";
+import { MARKET_VIEW, phoneProductPath } from "@/lib/manual/phone-product";
 import {
   addToSupply,
   checkAddNfts,
@@ -45,7 +59,8 @@ import {
 import { FEE_LABEL, payoutOf } from "@/lib/market/fee";
 import { PHONE_USES, plainUseWords, withUseWords } from "@/lib/market/phone-sell";
 import { copiesSoldLineOf, copyRowStateOf, KIND_LABEL, PRICE_LABEL, trackNameOf, USE_LABEL } from "@/lib/market/sell-flow";
-import type { EditionKind, EditionTrack, EditionUse } from "@/lib/market/types";
+import { copyTileOf, SOLD_OUT_NOTE, type DeskTile } from "@/lib/market/sell-desk";
+import { PROJECT_SCOPE, type EditionKind, type EditionTrack, type EditionUse } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { ConfirmSheet } from "../../kit/confirm-sheet";
 import { ActionSheet, Sheet } from "../../kit/sheet";
@@ -54,13 +69,29 @@ import { useToast } from "../../kit/toast";
 import { useEarn } from "../context";
 import { FactRows } from "../parts";
 import { NftActivityRow } from "./nft-activity";
-import { CheckRow, FullLayer, KIND_ICON, PrimaryBar, ROWS_CARD, SellListRow, SUB, SummaryCard } from "./parts";
+import { ActionRow, CheckRow, FullLayer, KIND_ICON, PrimaryBar, RecentSales, ROWS_CARD, SalesFacts, SellListRow, SUB, SummaryCard } from "./parts";
 import { SellCopiesSheet, type CopyScope } from "./sell-copies";
 import { cn } from "@/lib/utils";
 import { useBackState } from "../../nav-trail";
 import { T } from "../../type";
+import { HeldCancelRow, HeldCard, HeldChip, ReviewVideosButton, useHeldItems } from "../video/held";
+import type { HeldCopies } from "@/lib/market/held";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
+
+/** Where buyers see a scope's copies of a kind on the phone (the web's `marketHrefOf`): the
+ *  project's market screen on that kind's tab, or the product's market view. */
+function phoneCopiesMarketHref(projectId: string, scope: string, kind: EditionKind): string {
+  if (scope === PROJECT_SCOPE) return `${phoneMarketHref(projectId)}?nft=${kind}`;
+  return `${phoneProductPath(projectId, scope)}?view=${MARKET_VIEW}`;
+}
+
+/** "Personal use · 0.03 ETH" — the waiting copies' use and price. */
+function heldTrackLine(item: HeldCopies, tracks: readonly EditionTrack[]): string {
+  const use = tracks.find((t) => t.id === item.trackId)?.use;
+  const price = formatAmount(item.terms.regular, item.terms.token);
+  return use ? `${USE_LABEL[use]} · ${price}` : price;
+}
 type Dialog = { kind: "edit"; track: Listed } | { kind: "add"; track: EditionTrack } | { kind: "remove"; track: EditionTrack } | null;
 
 export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }) {
@@ -84,6 +115,10 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
     sales: view.sales,
   });
   const hasCopies = view.editions.some((t) => t.productId === scope.id && t.kind === kind);
+  // This kind's sales across its uses (EARN-4, the web desk's tile): earned, buyers, last sale.
+  const tile = copyTileOf({ projectId: project.id, scope: scope.id, kind, state, tracks: view.editions, sales: view.sales });
+  // Signed while a video was still being made (CL-030): waiting, not for sale yet.
+  const waiting = useHeldItems(project.id).find((i): i is HeldCopies => i.kind === "copies" && i.scope === scope.id && i.kindOfCopy === kind) ?? null;
   const said = (message: string) => {
     announce(message);
     toast({ title: message });
@@ -93,7 +128,17 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
 
   return (
     <>
-      {state.kind === "manage" ? (
+      {waiting ? (
+        <SellListRow
+          icon={KIND_ICON[kind]}
+          title={KIND_LABEL[kind]}
+          chip={<HeldChip />}
+          state={[heldTrackLine(waiting, view.editions)]}
+          extra="Goes live when its videos are ready"
+          onClick={() => setScreen(true)}
+          label={`${name}: waiting for videos`}
+        />
+      ) : state.kind === "manage" ? (
         <SellListRow icon={KIND_ICON[kind]} title={KIND_LABEL[kind]} state={state.lines} live onClick={() => setScreen(true)} label={`${name}: ${state.lines.join(", ")}`} />
       ) : state.kind === "sell" ? (
         <SellListRow
@@ -107,7 +152,18 @@ export function CopyRow({ kind, scope }: { kind: EditionKind; scope: CopyScope }
         <SellListRow icon={KIND_ICON[kind]} title={KIND_LABEL[kind]} state={[state.line]} disabled />
       )}
       {screen && chain && (
-        <CopiesScreen kind={kind} scope={scope} chain={chain} more={state.kind === "manage" ? state.more : null} onSell={startSell} onNote={said} onClose={() => setScreen(false)} />
+        <CopiesScreen
+          kind={kind}
+          scope={scope}
+          chain={chain}
+          more={state.kind === "manage" ? state.more : null}
+          tile={tile}
+          selling={state.kind === "manage"}
+          waiting={waiting}
+          onSell={startSell}
+          onNote={said}
+          onClose={() => setScreen(false)}
+        />
       )}
       {sell && (
         <SellCopiesSheet
@@ -132,6 +188,9 @@ function CopiesScreen({
   scope,
   chain,
   more,
+  tile,
+  selling,
+  waiting,
   onSell,
   onNote,
   onClose,
@@ -140,11 +199,18 @@ function CopiesScreen({
   scope: CopyScope;
   chain: { network: Network; collection: string };
   more: EditionUse | null;
+  /** The kind's sales across its uses (`copyTileOf`). */
+  tile: DeskTile;
+  /** Something of this kind is listed (`copyRowStateOf` manage): its numbers show. */
+  selling: boolean;
+  /** Its copies' listing, signed and waiting for videos (CL-030). */
+  waiting: HeldCopies | null;
   onSell: (use: EditionUse) => void;
   onNote: (message: string) => void;
   onClose: () => void;
 }) {
   const { project, view } = useEarn();
+  const router = useRouter();
   const toast = useToast();
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const [menu, setMenu] = React.useState<Listed | null>(null);
@@ -160,7 +226,9 @@ function CopiesScreen({
 
   let primary: React.ReactNode = null;
   let reason: string | null = null;
-  if (unlisted) {
+  if (waiting) {
+    primary = <ReviewVideosButton projectId={project.id} />;
+  } else if (unlisted) {
     reason = lockReason;
     primary = (
       <Button size="xl" className="w-full" aria-haspopup="dialog" aria-disabled={lockReason ? true : undefined} aria-describedby={lockReason ? reasonId : undefined} onClick={() => !lockReason && onSell(unlisted.use)}>
@@ -192,6 +260,7 @@ function CopiesScreen({
           <p className={cn(T.meta, "break-words")}>{scope.product ? `Product · ${scope.name}` : `Whole project · ${project.name}`}</p>
           {PHONE_USES.map((use) => {
             const t = ofKind.find((x) => x.use === use);
+            if (t && waiting?.trackId === t.id) return <HeldCard key={use} item={waiting} projectId={project.id} products={view.products} />;
             if (t) return <TrackCard key={use} track={t} onMenu={setMenu} />;
             if (open !== use) return null;
             return (
@@ -205,9 +274,13 @@ function CopiesScreen({
               />
             );
           })}
+          {selling && <SalesFacts tile={tile} label={`${KIND_LABEL[kind]} sales`} />}
           <ul aria-label={`${KIND_LABEL[kind]} activity`} className={ROWS_CARD}>
+            {waiting && <HeldCancelRow item={waiting} onCancelled={onNote} />}
             <NftActivityRow target={{ kind, scope: scope.id }} />
+            {tile.live && <ActionRow icon={Store01Icon} title="View on marketplace" onClick={() => router.push(phoneCopiesMarketHref(project.id, scope.id, kind))} />}
           </ul>
+          {ofKind.length > 0 && <RecentSales sales={tile.sales} />}
           <p className={SUB}>{EDITION_DEMO_LINE}</p>
         </div>
       </FullLayer>
@@ -296,7 +369,8 @@ function TrackCard({ track, onMenu }: { track: EditionTrack; onMenu: (t: Listed)
         { label: "Copies sold", value: card.soldOut ? "Sold out" : `${card.sold} of ${card.total}` },
         { label: "Royalties", value: `${listing.royaltyPct}% on resales` },
       ]}
-      note={hidden ? `Off Explore marketplace: ${project.name} was sold in full.` : null}
+      // Sold out (CL-028's item panel): add copies from ⋯ to keep selling, or leave it closed.
+      note={hidden ? `Off Explore marketplace: ${project.name} was sold in full.` : card.soldOut ? SOLD_OUT_NOTE : null}
     />
   );
 }

@@ -4,9 +4,10 @@
 // credits left and the expiry date). Derived from the ledger by replaying it,
 // never stored beside it, so it can't drift from the balance.
 //
-// - The starting balance never expires. A top-up or a purchase expires
+// - The starting balance never expires, nor do Free's plan credits (they come once, owner
+//   2026-11-24; older ledgers' monthly Free grants included). A top-up or a purchase expires
 //   VALIDITY_MONTHS after it came in, as does a redeemed code's (its `expiresAt`, or that rule for a
-//   ledger written before purchases had one); a plan's monthly grant at the
+//   ledger written before purchases had one); a paid plan's monthly grant at the
 //   end of its period (`expiresAt`).
 // - A charge (a build, a concept render) takes from the earliest-expiring lot
 //   still live when it was charged. A refund puts the credits back where its
@@ -48,8 +49,12 @@ export type Lot = {
 const INCOMING = new Set(["seed", "topup", "purchase", "grant", "redeem"]);
 const SPENDING = new Set(["build", "concept"]);
 
+/** A grant's `pack` is its plan's name: Free's never run out of time. */
+const FREE_PLAN = "Free";
+
 export function expiryOf(line: LotLine): number | null {
   if (line.reason === "seed") return null;
+  if (line.reason === "grant" && (line.pack === FREE_PLAN || line.expiresAt == null)) return null;
   return line.expiresAt ?? addMonths(line.ts, VALIDITY_MONTHS);
 }
 

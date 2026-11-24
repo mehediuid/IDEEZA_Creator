@@ -91,3 +91,14 @@ test("More about's summary names the first two groups with something in them, Sk
   assert.equal(moreAboutSummaryOf({ ...EMPTY, specialities: [{ skill: "Firmware", years: "5+" }] }), "Skills");
   assert.equal(moreAboutSummaryOf({ ...EMPTY, languages: ["English"] }), "Languages");
 });
+
+test("your phone profile's More projects shows two rows and View all projects opens My projects All", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const parts = await readFile(new URL("../../src/components/mobile/profile/parts.tsx", import.meta.url), "utf8");
+  assert.match(parts, /const MORE_SHOWN = 4;/);
+  assert.match(parts, /View all projects/);
+  // Your own: View all projects opens My projects (its tabs and filters), no page of its own.
+  const profile = await readFile(new URL("../../src/components/mobile/profile/creator-profile.tsx", import.meta.url), "utf8");
+  assert.match(profile, /allHref=\{owner \? "\/m\/projects" : undefined\}/);
+  assert.doesNotMatch(profile, /\/projects`\}/);
+});

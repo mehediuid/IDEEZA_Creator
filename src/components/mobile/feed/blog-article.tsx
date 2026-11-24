@@ -2,24 +2,42 @@
 
 // A blog, as Global Search opens it (mobile Figma "Blog" reader): Back,
 // "Blog"; the cover first, full width (a phone's reader leads with the
-// picture), then the title (H3), the writer and the date, then the body drawn
-// by the web's reader (ArticleBody: the same type ladder and the same
-// images). Only a blog readers can open is shown: one not on the IDEEZA Blog
-// says so in the web's words; one that isn't there is the kit's not-found page.
+// picture), then the title (H3); the writer (a link to their profile, as on
+// the web), the read time and the date in the web's words ("● n minutes to
+// read · 24 Mar 2025"); the category and the tags as chips under it; then
+// "On this page" as one row that opens a sheet of the headings (the web's
+// rail list and its one-column disclosure, the phone's way: a pick goes to
+// that heading and the sheet marks the one being read), from two headings as
+// on the web; then the body drawn by the web's reader (ArticleBody: the same
+// type ladder and the same images). The words and rules are the web's
+// (blog/article/article-reader.tsx, lib/blog/article-view.ts; SET-7). Only a
+// blog readers can open is shown: one not on the IDEEZA Blog says so in the
+// web's words; one that isn't there is the kit's not-found page. A blog the
+// IDEEZA team removed still reads for its writer, under the web's banner
+// (blog/article/article-read.tsx; SET-8), never as "not approved yet".
 
 import * as React from "react";
+import Link from "next/link";
 import { News01Icon } from "@hugeicons/core-free-icons";
 import { Avatar } from "@/components/ideeza/avatar";
+import { Badge } from "@/components/ideeza/badge";
+import { Banner } from "@/components/ideeza/banner";
 import { Skeleton } from "@/components/ideeza/skeleton";
+import { Tag } from "@/components/ideeza/tag";
 import { ArticleBody, ArticleBodySkeleton } from "@/components/blog/article/article-body";
 import { CoverImage } from "@/components/blog/cover-image";
+import { minRead, showContents } from "@/lib/blog/article-view";
+import { categoryLabel } from "@/lib/blog/categories";
 import { dayDate } from "@/lib/blog/dates";
+import { headingsOf, isEmptyDoc, readingMinutes } from "@/lib/blog/doc";
 import { findBySlug } from "@/lib/blog/slug";
 import { useBlog, useBody } from "@/lib/blog/store";
+import type { ArticleMeta } from "@/lib/blog/types";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMe } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
 import { EmptyState, ErrorState, NotFoundState } from "../kit/state";
+import { PageContents } from "../help/page-contents";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
@@ -27,7 +45,9 @@ import { T } from "../type";
 export function BlogArticleScreen({ slug }: { slug: string }) {
   const { hydrated, data } = useBlog();
   const article = hydrated ? findBySlug(data, slug) : null;
-  const live = article?.live && !article.takenDown ? article.live : null;
+  // A removed blog keeps its live copy: the writer still reads it, under the web's banner.
+  const live = article?.live ?? null;
+  const removedAt = article?.takenDown?.at ?? null;
 
   return (
     <Screen top={<TopBar back="/m/search?kind=blog" title="Blog" />}>
@@ -51,34 +71,71 @@ export function BlogArticleScreen({ slug }: { slug: string }) {
           />
         </div>
       ) : (
-        <Reader id={article.id} title={live.title.trim() || "Untitled blog"} at={live.approvedAt} cover={live.cover} />
+        <Reader id={article.id} meta={live} at={live.approvedAt} removedAt={removedAt} />
       )}
     </Screen>
   );
 }
 
-function Reader({ id, title, at, cover }: { id: string; title: string; at: number; cover: Parameters<typeof CoverImage>[0]["cover"] }) {
+function Reader({ id, meta, at, removedAt }: { id: string; meta: ArticleMeta; at: number; removedAt: number | null }) {
   const body = useBody(id, "live");
   const me = useMe();
   const photo = useMyPhoto();
+  const ref = React.useRef<HTMLElement>(null);
+  const doc = body.body.doc;
+  const ready = body.hydrated && !body.unreadable;
+  const headings = React.useMemo(() => (ready ? headingsOf(doc) : []), [ready, doc]);
+  const title = meta.title.trim() || "Untitled blog";
+  const byline = [ready && !isEmptyDoc(doc) ? minRead(readingMinutes(doc)) : null, dayDate(at)].filter(Boolean).join(" · ");
+  const category = categoryLabel(meta.categoryId);
   return (
-    <article className="flex flex-col gap-8 px-8 pb-10">
-      {cover && <CoverImage cover={cover} className="w-full rounded-lg" />}
+    <article ref={ref} className="flex flex-col gap-8 px-8 pb-10">
+      {meta.cover && <CoverImage cover={meta.cover} className="w-full rounded-lg" />}
       <header className="flex flex-col gap-4">
         <h2 className={T.display}>{title}</h2>
-        <p className={cn(T.meta, "flex items-center gap-4")}>
-          <Avatar size="xs" initials={me.initials} src={photo.url ?? undefined} />
-          {me.name}
-          <span aria-hidden>•</span>
-          {dayDate(at)}
+        <p className={cn(T.meta, "flex flex-wrap items-center gap-x-4 gap-y-1")}>
+          {/* The writer links to their profile, as on the web (yours: /m/creators/me). */}
+          <Link
+            href="/m/creators/me"
+            className="-my-6 inline-flex min-h-[44px] items-center gap-4 text-text-primary outline-none hover:underline focus-visible:underline"
+          >
+            <Avatar size="xs" initials={me.initials} src={photo.url ?? undefined} />
+            {me.name}
+          </Link>
+          <span aria-hidden className="size-[8px] shrink-0 rounded-full bg-bg-brand" />
+          {byline}
         </p>
+        {(category || meta.topics.length > 0) && (
+          <ul aria-label="Category and tags" className="flex flex-wrap items-center gap-3">
+            {category && (
+              <li>
+                <Badge tone="brand">
+                  <span className="sr-only">Category: </span>
+                  {category}
+                </Badge>
+              </li>
+            )}
+            {meta.topics.map((t) => (
+              <li key={t}>
+                <Tag size="sm">{t}</Tag>
+              </li>
+            ))}
+          </ul>
+        )}
+        {/* The web's notice for a removed blog, under the title and byline as there (SET-8). */}
+        {removedAt != null && (
+          <Banner tone="attention" title="Readers can’t see this blog">
+            The IDEEZA team removed it from the IDEEZA Blog on {dayDate(removedAt)}. Only you can read it here.
+          </Banner>
+        )}
       </header>
+      {showContents(headings.length) && <PageContents headings={headings} within={ref} label="On this page" />}
       {!body.hydrated ? (
         <ArticleBodySkeleton />
       ) : body.unreadable ? (
         <ErrorState title="Couldn’t read this blog" body="This browser’s copy of it can’t be read." />
       ) : (
-        <ArticleBody doc={body.body.doc} />
+        <ArticleBody doc={doc} />
       )}
     </article>
   );

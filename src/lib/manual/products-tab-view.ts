@@ -22,6 +22,7 @@ import { batteryOf } from "../spec/batteries";
 import { mm3, runtimeLabel } from "../spec/units";
 import type { ProductVideoStatus } from "../video/types";
 import { currentOf, labelOf, shortOf, type ProjectJourney } from "./journey";
+import { formatShortDate } from "./project-summary";
 import { productAddedAt } from "./journey-dates";
 import type { BuildRef, ProjectProduct } from "./project-read";
 import type { ProductReadiness } from "./p2-types";
@@ -89,6 +90,15 @@ export function displayProductName(name: string): string {
 /** COR-108: the dropped card's version line, in place of "v{n} · {date}". */
 export function droppedNoteOf(current: number, lastIn: number): string {
   return `Not in version ${current} · from version ${lastIn}`;
+}
+
+/** "v2 · Nov 3": a current product's version on its card, said only once its lineage has more
+ *  than one (the web's Products tab card, the phone's product row — PRJ-3). The date is when that
+ *  version was saved, when known. Null for a lineage of one; a dropped product says
+ *  `droppedNoteOf` instead. */
+export function versionLineOf(version: { current: number; count: number } | null, savedAt: number | null, now: number): string | null {
+  if (!version || version.count <= 1) return null;
+  return `v${version.current}${savedAt !== null ? ` · ${formatShortDate(savedAt, now)}` : ""}`;
 }
 
 /** One row per card (COR-42: the current version, plus products a later

@@ -7,7 +7,8 @@
 // · what the mint already fixed (Blockchain, Collection; Edit adds Listing
 //   type and Minting type) as one read-only list, "Set when it was minted."
 //   once; on a Brief, Blockchain and the collection picker;
-// · Listing type (the A15 Button Group) and its one line;
+// · Listing type: Buy now · Auction as two radio cards with their line, as Minting type (owner
+//   2026-11-24: the Button Group read as two tabs, and a pick-one choice is a radio);
 // · the price with its Token beside it (Auction: Minimum bid, Buy now price,
 //   Auction ends);
 // · Selling percentage (13i) with its line and the share-sale note as one
@@ -22,7 +23,6 @@ import { ArrowDown01Icon, Calendar03Icon, Cancel01Icon, InformationCircleIcon, L
 import { Icon } from "@/components/dashboard/icon";
 import { Field } from "@/components/auth/auth-parts";
 import { Button } from "@/components/ideeza/button";
-import { ButtonGroup } from "@/components/ideeza/button-group";
 import { Checkbox, Radio } from "@/components/ideeza/checkbox";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
@@ -216,14 +216,27 @@ export function ListingFields({
           <span id={ids.type} className={T.label}>
             Listing type
           </span>
-          <ButtonGroup
-            size="xl"
-            className="w-full [&>button]:flex-1"
-            value={value.type}
-            onChange={(t) => onChange({ type: t as ListingType })}
-            items={LISTING_TYPES.map((t) => ({ value: t.id, label: t.label }))}
-          />
-          <span className={HINT}>{LISTING_TYPES.find((t) => t.id === value.type)?.sub}</span>
+          <div role="radiogroup" aria-labelledby={ids.type} className="flex flex-col gap-4">
+            {LISTING_TYPES.map((t) => {
+              const on = t.id === value.type;
+              return (
+                <label
+                  key={t.id}
+                  className={cn(
+                    "relative flex min-h-[44px] cursor-pointer items-start gap-6 rounded-xl border-[length:var(--border-width-1)] border-solid p-6 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-border-focus",
+                    on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface",
+                  )}
+                >
+                  <input type="radio" name={ids.type} className="sr-only" checked={on} onChange={() => onChange({ type: t.id as ListingType })} />
+                  <Radio checked={on} decorative className="mt-1" />
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={T.rowTitle}>{t.label}</span>
+                    <span className={T.meta}>{t.sub}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         </div>
       )}
 

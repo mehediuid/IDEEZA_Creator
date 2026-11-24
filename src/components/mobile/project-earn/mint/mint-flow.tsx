@@ -20,11 +20,18 @@
 // listing, then the draft's `mintedAt` and the project's writes; a refused
 // write puts back what came before it. A reject or a failure writes nothing
 // and says why at the top of the review (13l).
+// CL-030 (the web's mint): Sign stays shut only while a video it needs hasn't
+// started ("Start every video first: …"). Once every one has, a video still
+// rendering or waiting for review doesn't stop it: the mint happens now and the
+// listing — and the Feed post a Sell shares — wait (lib/market/held.ts) until
+// every video is ready, then go live by themselves; the wallet's done line and
+// Done ("Minted · listing waits for videos") say so.
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { refusedCopy } from "@/components/projects/listing/listing-dialog";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
+import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useMintShortfall } from "@/components/wallet/mint-cost";
 import { useMint } from "@/components/wallet/use-mint";
@@ -50,9 +57,10 @@ import { phoneEarnHref, phoneMintIntentOf } from "@/lib/manual/phone-earn";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { buildsOf, listingMetadataOf, productsOfProject, type ProjectProduct } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
-import { currentProductsOf, readinessOf, type ReadinessFacts } from "@/lib/manual/readiness";
+import { currentProductsOf, readinessOf, videosBlockerOf, videosStartBlockerOf, type ReadinessFacts } from "@/lib/manual/readiness";
+import { hold, heldId } from "@/lib/market/held";
 import { createListing, listingViewOf } from "@/lib/market/listing";
-import { cleanBenefits, listRequestOf, listedMintingType } from "@/lib/market/listing-flow";
+import { HELD_DONE_LINE, cleanBenefits, listRequestOf, listedMintingType } from "@/lib/market/listing-flow";
 import { listingInputFromBrief, type ListingInput } from "@/lib/market/listing-form";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import { mainSalesOf, randomId } from "@/lib/market/sales";
@@ -202,7 +210,9 @@ export function MintFlow({ projectId }: { projectId: string }) {
   const shortfall = useMintShortfall(type, state.network);
   const gated = gate.gated ? gate.readiness : null;
   const detailsReason = detailsMissing(state, { now, creatorPct, readiness: gated });
-  const reviewReason = state.intent ? reviewMissing({ intent: state.intent, details: detailsReason, shortfall: shortfall?.missing ?? null, readiness: gated }) : null;
+  const reviewReason = state.intent
+    ? reviewMissing({ intent: state.intent, details: detailsReason, shortfall: shortfall?.missing ?? null, readiness: gated, holdVideos: true })
+    : null;
 
   const commit = async () => {
     const p = project;
@@ -234,6 +244,8 @@ export function MintFlow({ projectId }: { projectId: string }) {
             mintRequest: plan.request,
           })
         : plan.request;
+      // A video still being made: the listing waits, and the wallet says so (CL-030).
+      if (req && terms && purpose && videosBlockerOf(gate.readiness)) req.doneLine = HELD_DONE_LINE;
       const newMint = plan.request?.purpose === "lazyMint" || plan.request?.purpose === "instantMint";
       let mintedAt: number | null = null;
 
@@ -250,6 +262,20 @@ export function MintFlow({ projectId }: { projectId: string }) {
         const record = proof && plan.request ? plan.nextRecord(proof) : null;
         if (record && !normalizeMintRecord(record)) return { ok: false, message: RECORD_INCOMPLETE };
         if (record && !setMint(cur.id, record)) return { ok: false, message: STORAGE_FAILED };
+        // A video still being made (CL-030): the mint happens now and the listing waits off Explore
+        // marketplace until every video is ready, then goes live by itself.
+        const videosWait = purpose ? videosBlockerOf(readinessOf(factsOf(s, { videos: readProjectVideos(cur.id), jobs: jobsRef.current, now: at }), purpose)) : null;
+        if (listings && videosWait) {
+          const made = listings[listings.length - 1];
+          if (!hold({ id: heldId(), projectId: cur.id, kind: "main", at, listing: made }).ok) {
+            if (record) {
+              if (prior) setMint(cur.id, prior);
+              else updateProject(cur.id, { mint: undefined });
+            }
+            return { ok: false, message: refusedCopy("storage") };
+          }
+          listings = null;
+        }
         if (listings) {
           const wrote = writeListings(listings);
           if (!wrote.ok) {
@@ -265,14 +291,25 @@ export function MintFlow({ projectId }: { projectId: string }) {
         markStepCompleted(cur.id, "brief");
         setStatus(cur.id, "completed");
         if (typeof cur.ownerConfirmedAt !== "number") setOwnerConfirmed(cur.id, at);
-        const shareReady = readinessOf(factsOf(s, { videos: videosRef.current, jobs: jobsRef.current, now: at }), "showcase").rules.every((r) => r.ok);
-        // The Feed shows only what is for sale: only a Sell shares on the phone.
-        if (s.intent === "sell" && s.shareToNewsfeed && shareReady && cur.showcasedAt == null) setShowcase(cur.id, true, at, { story: s.story.trim() });
+        const shareGate = readinessOf(factsOf(s, { videos: videosRef.current, jobs: jobsRef.current, now: at }), "showcase");
+        const shareReady = shareGate.rules.every((r) => r.ok);
+        const shareStarted = videosStartBlockerOf(shareGate) === null;
+        // Share to Feed ticked shares after any intent, as the web's Share to Innovations (SOC-6): with
+        // nothing for sale (a gift, a private mint) the post is on your Timeline, and joins the Feed once
+        // something of it is for sale. Every video started, some still rendering or unreviewed
+        // (CL-030): the post waits for them; a private mint with a video never started stays unshared,
+        // and Done offers Share.
+        if (s.shareToNewsfeed && cur.showcasedAt == null) {
+          if (shareReady) setShowcase(cur.id, true, at, { story: s.story.trim() });
+          else if (shareStarted) hold({ id: heldId(), projectId: cur.id, kind: "share", at, story: s.story.trim() });
+        }
         mintedAt = at;
         return { ok: true };
       };
 
       let result: RequestResult | null = null;
+      // "Use lazy mint instead" from the wallet sheet: not a reject, so no "Not minted" line.
+      let switchedToLazy = false;
       if (!req) {
         const wrote = writeAll(Date.now(), null);
         if (!wrote.ok) setMintError(notMintedLine(wrote.message));
@@ -286,13 +323,27 @@ export function MintFlow({ projectId }: { projectId: string }) {
             }
             if (purpose) {
               const fresh = readinessOf(factsOf(s, { videos: readProjectVideos(p.id), jobs: jobsRef.current, now: Date.now() }), purpose);
-              if (!fresh.ok) return fresh.blocker;
+              // A video rendering or unreviewed no longer stops it (CL-030): what it holds waits for
+              // it. A video never started still does.
+              const start = videosStartBlockerOf(fresh);
+              if (start) return start;
+              const other = fresh.rules.find((r) => !r.ok && r.id !== "videos" && r.id !== "projectVideo");
+              if (other) return other.reason;
             }
             return null;
           },
           commit: (proof) => writeAll(proof.at, proof),
+          // "Use lazy mint instead" when an instant mint can't be paid (EARN-13, the web's mint):
+          // the wallet sheet closes, still on Review with Lazy chosen.
+          onUseLazy:
+            type === "instant"
+              ? () => {
+                  switchedToLazy = true;
+                  patch({ mintType: "lazy" });
+                }
+              : undefined,
         });
-        if (!result.ok) {
+        if (!result.ok && !switchedToLazy) {
           setMintError(
             result.reason === "rejected" ? NOT_MINTED_REJECTED : notMintedLine(result.message || requestCopy("failed", req, readWallet(), result.reason).body[0]),
           );
@@ -346,6 +397,8 @@ export function MintFlow({ projectId }: { projectId: string }) {
       }
     >
       <OfflineBanner />
+      {/* A write the browser refused says so (EARN-18), as on the project screen. */}
+      <StorageErrorBanner className="mx-8 mb-6" />
       <div ref={topRef} className="flex flex-col gap-8 px-8 pb-12 pt-2">
         {step !== "success" && <MintIntro step={step} intent={state.intent} skipChoose={asked !== null} />}
         {step === "choose" && <MintChoose intent={state.intent} onPick={(i) => patch({ intent: i })} />}
@@ -359,6 +412,7 @@ export function MintFlow({ projectId }: { projectId: string }) {
             mintAddress={project.mint?.wallet.address}
             shortfall={type === "instant" ? (shortfall?.missing ?? null) : null}
             tried={tried}
+            videosReady={gate.readiness.rules.find((r) => r.id === "videos")?.ok === true}
           />
         )}
         {step === "review" && (
@@ -415,13 +469,15 @@ function MintFooter({
   if (step === "success") {
     return (
       <BottomBar className="flex-row gap-6 pt-8">
-        {state.intent === "sell" && <MintShare />}
+        <MintShare />
         <Button size="xl" className="min-w-0 flex-1" onClick={onDone}>
           Done
         </Button>
       </BottomBar>
     );
   }
+  // The step's primary is always the next step's own name (the web's rule, owner 2026-11-24): on
+  // Review "Sign and list", off with its reason under it until every video has started.
   const reason = step === "choose" ? (state.intent ? null : "Pick how it goes out.") : step === "details" ? detailsReason : reviewReason;
   const primary =
     step === "choose" ? (
@@ -465,5 +521,6 @@ function MintFooter({
 function ctaOf(state: MintState, type: MintType): string {
   const intent = state.intent ?? "sell";
   if (intent === "save") return "Sign and save";
-  return `${type === "instant" ? "Pay" : "Sign"} and ${intent === "sell" ? "list" : "give"}`;
+  const base = `${type === "instant" ? "Pay" : "Sign"} and ${intent === "sell" ? "list" : "give"}`;
+  return intent === "give" && state.shareToNewsfeed ? `${base} · post to Feed` : base;
 }

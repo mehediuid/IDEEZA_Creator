@@ -9,9 +9,13 @@
 // · media first: the project video in use, else the cover (the buyer page's
 //   MediaHero); a tap on the cover opens the build images (Use as cover);
 // · one header: the name once, one line with the status chip (the Shared eye
-//   inside it) and the stage words, the description clamped to 3 lines (Show
-//   more) or Add a description, the lock line as a row to the sale, a newer
-//   version's notice with Review version n (05b / 05c);
+//   inside it), "Waiting for videos" while something signed waits for them
+//   (CL-030, owner only) and the stage words — led by "Bought from {creator}"
+//   on a project bought whole (CL-038) — the description clamped to 3 lines
+//   (Show more) or Add a description, what waits as one row ("Main NFT listing
+//   · goes live when all 4 videos are ready · 2 of 4", Review videos opens the
+//   Videos sheet), the lock line as a row to the sale, a newer version's
+//   notice with Review version n (05b / 05c);
 // · Products, the main content: the rows, Add a product, All n products;
 // · the description tip (07o), slim, after the products;
 // · a hub of rows that push: Activity, Media, Versions, Team, Network; About;
@@ -29,7 +33,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AiMagicIcon, Cancel01Icon, Coins01Icon, Image02Icon, InformationCircleIcon, PencilEdit01Icon, Rocket01Icon } from "@hugeicons/core-free-icons";
+import { AiMagicIcon, Cancel01Icon, Clock01Icon, Coins01Icon, Image02Icon, InformationCircleIcon, PencilEdit01Icon, Rocket01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza/banner";
 import { Button, buttonVariants } from "@/components/ideeza/button";
@@ -41,12 +45,15 @@ import { useProjectPageData } from "@/components/projects/details/use-project-pa
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { useClipUrl } from "@/components/video-jobs/video-player";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { openVideosPanel } from "@/components/video-jobs/videos-panel-store";
 import { earnHref, publishOptionsOf } from "@/lib/manual/earn-route";
 import { earnButtonOf } from "@/lib/manual/earn-view";
 import { can } from "@/lib/manual/permissions";
 import { pendingNoticesOf, stageLineOf } from "@/lib/manual/project-header";
 import { headerText } from "@/lib/manual/project-summary";
 import { coverOf, productRowsOf } from "@/lib/manual/project-read";
+import { videoCountOf } from "@/lib/manual/readiness";
+import { heldLabelOf } from "@/lib/market/held";
 import { useManualProjects } from "@/lib/manual/projects";
 import {
   PHONE_TABS,
@@ -77,6 +84,7 @@ import { ProjectAbout, ProjectHub, ProjectRecent } from "./overview";
 import { LINK_SM, PhoneStatusChip, TapLink } from "./parts";
 import { ProductsBar, ProductsSection, ProductsTab } from "./products-tab";
 import { MediaHero, SampleProject } from "./sample-project";
+import { HeldChip, useHeldItems } from "../project-earn/video/held";
 import { ProjectSheets } from "./sheets";
 import { usePhoneWriteGate } from "./write-gate";
 
@@ -144,8 +152,18 @@ function ProjectReady({ data }: { data: Ready }) {
   const raw = params.get("tab");
   const view = (SUB_VIEWS as readonly string[]).includes(raw ?? "") ? (raw as SubView) : null;
   const gate = usePhoneWriteGate(project.id);
-  // A sheet that sent the maker away (Publish's video readiness → a product) is open again on Back.
+  // A sheet that sent the maker away (Share to Feed's video rows → a product's video) is open again on Back.
   const [sheet, setSheet] = useBackState<ProjectSheet | null>("project-sheet", null);
+  // The Feed's own-clip ⋯ › Share to Feed lands here with `?sheet=share`: the share sheet, once.
+  const router = useRouter();
+  const askedShare = params.get("sheet") === "share";
+  React.useEffect(() => {
+    if (!askedShare) return;
+    setSheet({ kind: "share" });
+    const rest = new URLSearchParams(window.location.search);
+    rest.delete("sheet");
+    router.replace(`${window.location.pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
+  }, [askedShare, setSheet, router]);
   const ctx = { ...data, gate, open: setSheet };
   return (
     <ProjectProvider value={ctx}>
@@ -318,12 +336,21 @@ function usePending() {
 
 function ProjectHeader({ titleRef }: { titleRef: React.RefObject<HTMLHeadingElement | null> }) {
   const { project, view, open } = useProject();
-  const { text, review, notices, canDescribe } = usePending();
+  const { text, owner, review, notices, canDescribe } = usePending();
   const { summary } = view;
   // One line under the name: the stage words and the count ("Built · 3 products"); the version
   // and the saved time are the Versions row's, "Now: …" the Activity row's.
   const stage = stageLineOf(view.engineering, summary).split(" · ");
   if (view.engineering.state !== "empty") stage.pop();
+  // A project bought whole says whose it was (CL-038).
+  if (summary.boughtFrom) stage.unshift(`Bought from ${summary.boughtFrom}`);
+  // What the maker signed while videos were still being made (CL-030), the owner's only.
+  const held = useHeldItems(project.id);
+  const waiting = owner ? held : [];
+  const waitCount = videoCountOf(view.videos.readiness.sell);
+  const waitingLine = `${[...new Set(waiting.map(heldLabelOf))].join(", ")} · goes live when ${
+    waitCount.total === 1 ? "the video is" : `all ${waitCount.total} videos are`
+  } ready · ${waitCount.ready} of ${waitCount.total}`;
 
   return (
     <header className="flex flex-col gap-6 px-8 pb-12">
@@ -333,11 +360,34 @@ function ProjectHeader({ titleRef }: { titleRef: React.RefObject<HTMLHeadingElem
         </h1>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <PhoneStatusChip status={summary.status} word={text.chip.word} shared={text.chip.badge !== null} />
+          {waiting.length > 0 && <HeldChip />}
           <p className={T.meta}>{stage.join(" · ")}</p>
         </div>
       </div>
 
       <Description text={project.description} onAdd={canDescribe ? () => open({ kind: "edit" }) : undefined} />
+
+      {waiting.length > 0 && (
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => openVideosPanel(project.id)}
+          className={cn(
+            LIST_CARD,
+            "flex-row items-center gap-4 border-[color:var(--color-border-warning)] bg-bg-warning-subtle px-8 py-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+            PRESSED,
+          )}
+        >
+          <span aria-hidden className="shrink-0 text-text-warning">
+            <Icon icon={Clock01Icon} size={20} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className={cn(T.body, "break-words text-text-warning")}>{waitingLine}</span>
+            <span className={cn(T.rowTitle, "text-text-brand")}>Review videos</span>
+          </span>
+          <Chevron />
+        </button>
+      )}
 
       {text.lockLine && (
         <Link

@@ -8,7 +8,9 @@
 // and the videos that match, from Global Search's own index. A creator opens
 // their profile, a video its clip. Recent searches stay on this phone, apart
 // from Global Search's. What you typed stays in the address (`?q=`), so Back
-// from a result finds the same results.
+// from a result finds the same results. Recent searches are kept only while
+// Settings › Data › "Keep my search history" is on, as in Global Search (the
+// web's rule, SOC-8).
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,6 +24,7 @@ import { parseStored, readStoredKey, useStoredKey, writeStoredKey } from "@/lib/
 import { clipHref } from "@/lib/innovations/clips";
 import { recentIn, recentKeyOf, searchEntries, withRecent, withoutRecent, type RecentSearch } from "@/lib/innovations/search";
 import { PROFILE_SEARCH_RECENT_KEY, RECENT_SHOWN } from "@/lib/people/phone-profile";
+import { useSettings } from "@/lib/settings/use-settings";
 import { ActionSheet } from "../kit/sheet";
 import { EmptyState } from "../kit/state";
 import { ListBones } from "../kit/states";
@@ -69,6 +72,7 @@ export function ProfileSearchScreen() {
   const [menuFor, setMenuFor] = React.useState<RecentSearch | null>(null);
   const { hydrated, entries } = useSearchIndex();
   const { hydrated: recentRead, recent, update } = useRecent();
+  const keep = useSettings().privacy.keepSearchHistory;
   const q = text.trim();
 
   const results = React.useMemo(
@@ -76,9 +80,9 @@ export function ProfileSearchScreen() {
     [entries, q],
   );
   const failed = () => toast({ title: "This phone couldn’t save that. Nothing changed.", lead: "error" });
-  /** Puts a search first in Recent, stamped now. */
+  /** Puts a search first in Recent, stamped now: only while "Keep my search history" is on. */
   const remember = (make: (at: number) => RecentSearch) => {
-    if (!update((list) => withRecent(list, make(Date.now())))) failed();
+    if (keep && !update((list) => withRecent(list, make(Date.now())))) failed();
   };
 
   const open = (e: SearchEntry<SearchItem>) => {
@@ -133,7 +137,10 @@ export function ProfileSearchScreen() {
           <ListBones rows={4} />
         ) : !q ? (
           recent.length === 0 ? (
-            <EmptyState title="Find a creator or a video" body="What you search for stays here." />
+            <EmptyState
+              title="Find a creator or a video"
+              body={keep ? "What you search for stays here." : "Search history is off. Nothing new is kept."}
+            />
           ) : (
             <section aria-labelledby="recent-heading" className="flex flex-col gap-2">
               <h2 id="recent-heading" className={T.section}>

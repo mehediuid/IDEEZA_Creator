@@ -4,8 +4,9 @@
 // PR-10): the cover with the photo over its lower edge, the identity block
 // (name, headline, where and since when, how they are tied to you, what they
 // are open to), the four counts, About with Show more, Mobile / Info rows,
-// the M14 line tabs, the Mobile / Project card, the More projects grid and the
-// Activity rows. Layout and spacing from those frames; every fact comes from
+// the M14 line tabs (Timeline · Projects · Activity), the Mobile / Project card,
+// the reactions row, the More projects grid and the Activity rows. Layout and
+// spacing from those frames; every fact comes from
 // the web's profile logic (use-profile.ts).
 
 import * as React from "react";
@@ -14,9 +15,11 @@ import { Bookmark02Icon, Comment01Icon, CpuIcon, FavouriteIcon, MoreHorizontalIc
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
 import { Badge, type BadgeTone } from "@/components/ideeza/badge";
+import { buttonVariants } from "@/components/ideeza/button";
 import { IconButton } from "@/components/ideeza/icon-button";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { cn } from "@/lib/utils";
+import { clipHref, postItemIdOf } from "@/lib/innovations/clips";
 import { useCommentCount } from "@/lib/innovations/comments-store";
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
 import { sampleSeedOf } from "@/lib/innovations/sample-posts";
@@ -243,14 +246,8 @@ export type Maker = { name: string; initials: string; color: string | null; src:
  *  and its stage, the maker with the product count, then Appreciate · Comments · Views · Save —
  *  the Feed's own stores, so the card, the Feed and the web agree. */
 export function ProjectCard({ item, maker, onMore }: { item: MadeItem; maker: Maker; onMore?: () => void }) {
-  const toast = useToast();
   const facts = React.useMemo(() => cardFactsOf(item), [item]);
-  const { reactions, toggle, hydrated } = useReactions();
-  const counts = countsOf(reactions, facts.postId, facts.base);
-  const seed = React.useMemo(() => (item.projectId ? () => [] : sampleSeedOf(facts.postId)), [item.projectId, facts.postId]);
-  const comments = useCommentCount(facts.postId, seed);
   const href = phoneProjectHref(item);
-  const failed = () => toast({ title: "This phone couldn’t save that. Nothing changed.", lead: "error" });
   return (
     <article aria-label={item.title} className="flex flex-col gap-4">
       <Link href={href} className={cn("rounded-lg", FOCUS)} aria-label={`Open ${item.title}`}>
@@ -284,28 +281,84 @@ export function ProjectCard({ item, maker, onMore }: { item: MadeItem; maker: Ma
         {item.products > 0 && <span className={cn(T.meta, "shrink-0 text-text-tertiary")}>· {plural(item.products, "product", "products")}</span>}
       </div>
       <p className={cn(T.meta, "text-text-tertiary")}>updated {shortDateOf(item.changedAt, true)}</p>
-      <div className="flex items-center">
-        <IconButton
-          hierarchy="ghost"
-          size="xl"
-          aria-label={counts.appreciated ? "Remove appreciation" : "Appreciate"}
-          aria-pressed={counts.appreciated}
-          disabled={!hydrated}
-          className={counts.appreciated ? "text-text-brand" : undefined}
-          icon={<Icon icon={FavouriteIcon} size={22} />}
-          onClick={() => {
-            if (!toggle("appreciated", facts.postId)) failed();
-          }}
-        />
-        <span className={cn(T.meta, "tabular-nums")}>{compactCount(counts.appreciations)}</span>
-        <Link
-          href={facts.clipId ? `/m/clip/${encodeURIComponent(facts.clipId)}?comment=1` : href}
+      <ReactionRow
+        postId={facts.postId}
+        base={facts.base}
+        // The post's comments: on its clip while it plays on the Feed; else the clip's address leads to
+        // the post's comments on the Timeline, or to the details when it was never shared (SOC-3).
+        commentsHref={`${clipHref(facts.clipId ?? postItemIdOf(facts.postId))}?comment=`}
+        onMore={onMore}
+        moreLabel={`Actions for ${item.title}`}
+      />
+    </article>
+  );
+}
+
+/** Appreciate · Comments · Views · (⋯) · Save under a post or a project card — the Feed's own stores,
+ *  keyed by the post, so the card, the Timeline, the Feed and the web agree. */
+export function ReactionRow({
+  postId,
+  base,
+  commentsHref,
+  onComments,
+  views = true,
+  onMore,
+  moreLabel,
+}: {
+  postId: string;
+  base: { appreciations: number; views: number };
+  /** Where Comments opens: a page (a post's clip), or `onComments` opens its sheet here (a share). */
+  commentsHref: string | null;
+  onComments?: () => void;
+  /** Views are a post's (the Feed counts them); a share shows none. */
+  views?: boolean;
+  onMore?: () => void;
+  moreLabel?: string;
+}) {
+  const toast = useToast();
+  const { reactions, toggle, hydrated } = useReactions();
+  const counts = countsOf(reactions, postId, base);
+  // A sample post has its sample comments; yours start with none.
+  const seed = React.useMemo(() => (postId.startsWith("sample:") ? sampleSeedOf(postId) : () => []), [postId]);
+  const comments = useCommentCount(postId, seed);
+  const failed = () => toast({ title: "This phone couldn’t save that. Nothing changed.", lead: "error" });
+  return (
+    <div className="flex items-center">
+      <IconButton
+        hierarchy="ghost"
+        size="xl"
+        aria-label={counts.appreciated ? "Remove appreciation" : "Appreciate"}
+        aria-pressed={counts.appreciated}
+        disabled={!hydrated}
+        className={counts.appreciated ? "text-text-brand" : undefined}
+        icon={<Icon icon={FavouriteIcon} size={22} />}
+        onClick={() => {
+          if (!toggle("appreciated", postId)) failed();
+        }}
+      />
+      <span className={cn(T.meta, "tabular-nums")}>{compactCount(counts.appreciations)}</span>
+      {onComments ? (
+        <button
+          type="button"
+          onClick={onComments}
           aria-label={`Comments${comments !== null ? `, ${comments}` : ""}`}
           className={cn("ml-2 inline-flex size-[44px] items-center justify-center rounded-xl text-[color:var(--color-icon-default)] hover:bg-bg-subtle", FOCUS)}
         >
           <Icon icon={Comment01Icon} size={22} />
-        </Link>
-        <span className={cn(T.meta, "tabular-nums")}>{comments === null ? "" : compactCount(comments)}</span>
+        </button>
+      ) : (
+        commentsHref !== null && (
+          <Link
+            href={commentsHref}
+            aria-label={`Comments${comments !== null ? `, ${comments}` : ""}`}
+            className={cn("ml-2 inline-flex size-[44px] items-center justify-center rounded-xl text-[color:var(--color-icon-default)] hover:bg-bg-subtle", FOCUS)}
+          >
+            <Icon icon={Comment01Icon} size={22} />
+          </Link>
+        )
+      )}
+      {(onComments || commentsHref !== null) && <span className={cn(T.meta, "tabular-nums")}>{comments === null ? "" : compactCount(comments)}</span>}
+      {views && (
         <span className={cn(T.meta, "flex items-center gap-2 px-6 tabular-nums")}>
           <span className="text-[color:var(--color-icon-default)]">
             <Icon icon={ViewIcon} size={16} />
@@ -313,25 +366,23 @@ export function ProjectCard({ item, maker, onMore }: { item: MadeItem; maker: Ma
           <span className="sr-only">Views</span>
           {compactCount(counts.views)}
         </span>
-        <span className="flex-1" />
-        {onMore && (
-          <IconButton hierarchy="ghost" size="xl" aria-label={`Actions for ${item.title}`} icon={<Icon icon={MoreHorizontalIcon} size={22} />} onClick={onMore} />
-        )}
-        <IconButton
-          hierarchy="ghost"
-          size="xl"
-          aria-label={counts.saved ? "Unsave" : "Save"}
-          aria-pressed={counts.saved}
-          disabled={!hydrated}
-          className={counts.saved ? "text-text-brand" : undefined}
-          icon={<Icon icon={Bookmark02Icon} size={22} />}
-          onClick={() => {
-            if (!toggle("saved", facts.postId)) failed();
-            else toast({ title: counts.saved ? "Removed from Saved" : "Saved" });
-          }}
-        />
-      </div>
-    </article>
+      )}
+      <span className="flex-1" />
+      {onMore && <IconButton hierarchy="ghost" size="xl" aria-label={moreLabel ?? "More actions"} icon={<Icon icon={MoreHorizontalIcon} size={22} />} onClick={onMore} />}
+      <IconButton
+        hierarchy="ghost"
+        size="xl"
+        aria-label={counts.saved ? "Unsave" : "Save"}
+        aria-pressed={counts.saved}
+        disabled={!hydrated}
+        className={counts.saved ? "text-text-brand" : undefined}
+        icon={<Icon icon={Bookmark02Icon} size={22} />}
+        onClick={() => {
+          if (!toggle("saved", postId)) failed();
+          else toast({ title: counts.saved ? "Removed from Saved" : "Saved" });
+        }}
+      />
+    </div>
   );
 }
 
@@ -351,6 +402,11 @@ function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => void }) 
             <Badge tone="blue">{item.sale === "whole" ? "For sale" : "Copies for sale"}</Badge>
           </span>
         )}
+        {item.isPrivate && (
+          <span className="flex">
+            <Badge tone="neutral">Private</Badge>
+          </span>
+        )}
       </Link>
       {onMore && (
         <span className="absolute right-2 top-2">
@@ -367,53 +423,80 @@ function ProjectTile({ item, onMore }: { item: MadeItem; onMore?: () => void }) 
   );
 }
 
-const WORK_TABS = ["projects", "activity"] as const;
+const WORK_TABS = ["timeline", "projects", "activity"] as const;
 
-/** Projects · Activity (M14 line tabs, sticky under the top bar), Featured and More projects, or
- *  the Activity rows. The tab lives in the address (`?tab=activity`, as on the web), so Back from
- *  a project returns to the tab you left. With no Activity the projects show without the strip. */
+/** Your own More projects shows two rows of tiles; View all projects opens My projects. */
+const MORE_SHOWN = 4;
+type WorkTab = (typeof WORK_TABS)[number];
+
+/** Timeline · Projects · Activity (M14 line tabs, sticky under the top bar). Timeline (owner
+ *  2026-11-22) leads: every project and product shared, newest first; Projects is Featured and More
+ *  projects (on your own profile two rows of tiles, then View all projects, which opens My projects with
+ *  its tabs and filters, owner 2026-11-24; someone else's shows every tile, as the web); Activity the journey rows. Only the tabs with something in them show, the first of them
+ *  open; with one, no strip. The tab lives in the address (`?tab=projects`, as on the web), so Back
+ *  from a project returns to the tab you left. Nothing at all: nothing renders (the caller's empty
+ *  state shows). */
 export function Work({
+  timeline,
   items,
   activity,
+  activityOnlyYou = false,
   maker,
   pinnedBy,
   now,
   onMore,
+  allHref,
+  privateItems = [],
+  allCount = null,
 }: {
+  /** The Timeline's posts, drawn by the caller (timeline.tsx), and how many. */
+  timeline: { count: number; content: React.ReactNode } | null;
   items: readonly MadeItem[];
   activity: readonly ActivityItem[];
+  /** Your own profile: the Activity tab says only you see it (others never get the tab). */
+  activityOnlyYou?: boolean;
   maker: Maker;
   /** "you" or a first name: "Pinned by …". */
   pinnedBy: string;
   now: number;
   /** Your own profile: a card's ⋯ (Pin to top · Open project). */
   onMore?: (item: MadeItem) => void;
+  /** Your own profile: View all projects opens this (My projects, owner 2026-11-24), and More projects
+   *  shows two rows of tiles before it. Without it every tile shows (someone else's profile). */
+  allHref?: string;
+  /** Your own profile: your private projects, after the public ones, marked Private (owner
+   *  2026-11-24, "count everything": the tab counts every project you made). */
+  privateItems?: readonly MadeItem[];
+  /** My projects' All (yours + what you bought): "8 of 13 in My projects" and the button's number. */
+  allCount?: number | null;
 }) {
-  const [tab, setTab] = useTabParam("tab", WORK_TABS, "projects");
   const lead = featuredOf(items);
-  const tabs = items.length > 0 && activity.length > 0;
-  const active = tabs ? tab : "projects";
-  if (!lead) return null;
+  const others = [...(lead?.rest ?? []), ...privateItems];
+  const mine = items.length + privateItems.length;
+  const shown = WORK_TABS.filter((t) => (t === "timeline" ? (timeline?.count ?? 0) > 0 : t === "projects" ? mine > 0 : activity.length > 0));
+  const first: WorkTab = shown[0] ?? "timeline";
+  const [tab, setTab] = useTabParam("tab", WORK_TABS, first);
+  if (!shown.length) return null;
+  const active = shown.includes(tab) ? tab : first;
+  const tabs = shown.length > 1;
+  const count = (t: WorkTab) => (t === "timeline" ? (timeline?.count ?? 0) : t === "projects" ? mine : activity.length);
+  const LABEL: Record<WorkTab, string> = { timeline: "Timeline", projects: "Projects", activity: "Activity" };
   return (
     <div className="flex flex-col gap-6">
       {tabs && (
         <div className="sticky top-0 z-sticky -mx-8 bg-bg-page px-8">
-          <MobileTabs
-            label="Work"
-            idBase="work"
-            width="hug"
-            value={active}
-            onChange={setTab}
-            tabs={[
-              { value: "projects", label: "Projects", count: items.length },
-              { value: "activity", label: "Activity", count: activity.length },
-            ]}
-          />
+          <MobileTabs label="Work" idBase="work" width="hug" value={active} onChange={setTab} tabs={shown.map((t) => ({ value: t, label: LABEL[t], count: count(t) }))} />
         </div>
       )}
       <div {...(tabs ? tabPanelProps("work", active) : {})} className="flex flex-col gap-6 outline-none">
-        {active === "projects" ? (
+        {active === "timeline" ? (
           <>
+            {!tabs && <h2 className={T.section}>Timeline</h2>}
+            {timeline?.content}
+          </>
+        ) : active === "projects" && mine > 0 ? (
+          <>
+            {lead && (
             <section aria-labelledby="work-featured" className="flex flex-col gap-4">
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                 <h2 id="work-featured" className={T.section}>
@@ -427,21 +510,39 @@ export function Work({
               </div>
               <ProjectCard item={lead.featured} maker={maker} onMore={onMore && lead.featured.projectId ? () => onMore(lead.featured) : undefined} />
             </section>
-            {lead.rest.length > 0 && (
+            )}
+            {(others.length > 0 || allHref) && (
               <section aria-labelledby="work-more" className="flex flex-col gap-4">
-                <h2 id="work-more" className={T.section}>
-                  More projects
-                </h2>
-                <ul className="m-0 grid list-none grid-cols-2 gap-4 p-0">
-                  {lead.rest.map((m) => (
-                    <ProjectTile key={m.key} item={m} onMore={onMore && m.projectId ? () => onMore(m) : undefined} />
-                  ))}
-                </ul>
+                {others.length > 0 && (
+                  <>
+                    <h2 id="work-more" className={T.section}>
+                      {lead ? "More projects" : "Projects"}
+                    </h2>
+                    <ul className="m-0 grid list-none grid-cols-2 gap-4 p-0">
+                      {(allHref ? others.slice(0, MORE_SHOWN) : others).map((m) => (
+                        <ProjectTile key={m.key} item={m} onMore={onMore && m.projectId && !m.isPrivate ? () => onMore(m) : undefined} />
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {/* Owner 2026-11-24: the way to every project is My projects (All), one number with it. */}
+                {allHref && (
+                  <>
+                    {allCount !== null && allCount > mine && <p className={T.meta}>{`${mine} of ${allCount} in My projects, with what you bought`}</p>}
+                    <Link href={allHref} className={cn(buttonVariants({ hierarchy: "secondary", size: "xl" }), "w-full border-solid")}>
+                      View all projects
+                      <span className="text-text-tertiary">{allCount ?? mine}</span>
+                    </Link>
+                  </>
+                )}
               </section>
             )}
           </>
         ) : (
-          <ActivityRows items={activity} now={now} />
+          <>
+            {activityOnlyYou && <p className={T.meta}>Only you see your Activity.</p>}
+            <ActivityRows items={activity} now={now} />
+          </>
         )}
       </div>
     </div>

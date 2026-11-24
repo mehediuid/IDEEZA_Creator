@@ -4,23 +4,32 @@
 // 10h, 10n, 10t–10wb, 10x–10z, 23d, 28, 31a–32b). The same product as the
 // web's /projects/[id]/products/[productId], read through the web's one
 // derivation, laid out as a native object page (owner 2026-11-15):
-// · the top bar: Back and the owner's ⋯ (an M12 action sheet, 10c); the name
-//   comes into the bar once the title scrolls away;
+// · the top bar: Back and the owner's ⋯ (menu.tsx, 10c, CL-015: Edit name and
+//   description, Open chat, the previews, Delete product… with the web's
+//   rules); the name comes into the bar once the title scrolls away;
 // · the media on top (hero.tsx): the take in use, else the concept image of
 //   the version on screen;
-// · one header: the name (with "You own copy #n" as its one chip for a buyer
-//   who does, 23d), one meta line ("{project} · AI build · {date}", or the
-//   line of a product no build stands behind), the lock line once sold in
-//   full (10u), the description (3 lines, Show more), and the version notice
-//   while an older version is on screen (10e, 28a–28c); a buyer reads the
-//   product's activity here (10h);
+// · one header: the name, one meta line ("{project} · AI build · {date}", or
+//   the line of a product no build stands behind; a buyer's "Part of
+//   {project} · Created by {creator}", the project opening its shop, BUY-3),
+//   the lock line once sold in
+//   full (10u), the description (3 lines, Show more) — the maker's words on
+//   the current version, the build's on an older one — or, for the owner
+//   with none, Add a description (CL-015), and the version notice while an
+//   older version is on screen (10e, 28a–28c); a buyer reads the product's
+//   activity here (10h);
 // · the owner (and a contributor preview) then reads one scroll of sections —
-//   Build, Media, Activity, Specs (owner-page.tsx); the pieces line, Add the
-//   rest, the version pick and the computer note live there now;
-// · a buyer keeps the tabs pinned under the top bar (`?tab=`, the kit's
-//   MobileTabs: a tap makes no request, so it works offline): Media ·
-//   Overview · Build · Contributors, and the sticky bar (D1): Copies from ·
-//   Buy a copy, or You own copy · See your files.
+//   Build, Media and Sales, Activity, Specs (owner-page.tsx); the pieces line,
+//   Add the rest, the version pick and the computer note live there now; the
+//   owner's Bottom action bar holds Earn with its copies line (CL-031,
+//   earn-bar.tsx);
+// · a buyer who holds copies reads "You own copy #n" with its kind and use
+//   and See your files › right under the header (buy.tsx OwnedCopiesRow, D6
+//   of 2026-11-22: the bar keeps selling to a holder too); a buyer keeps the
+//   tabs pinned under the top bar (`?tab=`, the kit's MobileTabs: a tap makes
+//   no request, so it works offline): Media · Overview · Build · Contributors,
+//   and the sticky bar (D1): Copies from · Buy a copy while any copy is on
+//   sale, else, for a holder, You own copy · See your files.
 // The marketplace's "Testnet demo · shopping as Mira" (10h) sits under the
 // header, not over the name; the previews' "Previewing as …" with Exit preview
 // stays pinned under the top bar (31a, 31b). A Feed sample's product is
@@ -29,16 +38,17 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { LockIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, LockIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar } from "@/components/ideeza/avatar";
-import { Badge } from "@/components/ideeza/badge";
 import { Banner } from "@/components/ideeza/banner";
 import { can } from "@/lib/manual/permissions";
 import { formatDate } from "@/lib/manual/project-summary";
 import { ROLE_WORD, initialsOf, teamOf } from "@/lib/manual/contributors";
 import { madeByHand, parseProductTab, productTabsOf, type ProductTab } from "@/lib/manual/phone-product";
-import { phoneProjectHref, sampleProjectOf } from "@/lib/manual/phone-project";
+import { offMarketNow, phoneProjectHref, sampleProjectOf } from "@/lib/manual/phone-project";
+import { phoneMarketHref, phonePreviewHref } from "@/lib/manual/phone-earn";
+import { useCreatorName } from "@/components/marketplace/use-creator-name";
 import { productRowsOf } from "@/lib/manual/project-read";
 import { useMe } from "@/lib/people/profile-store";
 import { cn } from "@/lib/utils";
@@ -46,14 +56,18 @@ import { OfflineBanner } from "../kit/states";
 import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
 import { Screen } from "../screen";
 import { MORE_ICON, TopBar } from "../top-bar";
+import { useShareAction } from "../feed/share-action";
+import { shareItemId } from "@/lib/innovations/share-items";
 import { T } from "../type";
 import { usePhoneWriteGate } from "../project/write-gate";
 import { HeaderActivity } from "./activity";
 import { BuildTab } from "./build-tab";
-import { BuyBar, BuyCopy, DemoBuyerBanner } from "./buy";
+import { BuyBar, BuyCopy, DemoBuyerBanner, OwnedCopiesRow } from "./buy";
 import { MediaTab } from "./media-tab";
-import { ProductMenu, RenameSheet } from "./menu";
-import { OverviewTab, useListedCopies } from "./overview";
+import { DeleteProductSheet } from "./delete-sheet";
+import { ProductEarnBar } from "./earn-bar";
+import { EditDetailsSheet, ProductMenu, useCanEditDetails } from "./menu";
+import { OverviewTab } from "./overview";
 import { SampleProduct } from "./sample-product";
 import { OffMarket, ProductLoading, ProductMissing, ProjectMissing } from "./states";
 import { ProductProvider, useProduct, useProductData, type ProductCtx } from "./use-product";
@@ -81,10 +95,12 @@ export function ProductScreen({ id, productId }: { id: string; productId: string
   );
 }
 
-/** 32b: on the marketplace, a project its creator paused, with none of this product's copies on sale. */
+/** 32b: on the marketplace, a project its creator paused is off it for now — the pause alone decides, as on the
+ *  web (OffMarketGate, BUY-4) — unless the buyer already holds part of it. */
 function MarketGate({ ctx }: { ctx: ProductCtx }) {
-  const listed = useListedCopies().length > 0;
-  if (ctx.mode === "market" && ctx.view.listing.kind === "paused" && !listed && ctx.copies.length === 0) return <OffMarket paused />;
+  if (ctx.mode === "market" && offMarketNow({ listing: ctx.view.listing.kind, projectId: ctx.project.id, sales: ctx.view.sales, buyerId: ctx.buyerId })) {
+    return <OffMarket paused />;
+  }
   return <ProductReady />;
 }
 
@@ -93,11 +109,14 @@ function ProductReady() {
   const { project, viewer, bp, mode, buyer, name } = ctx;
   const params = useSearchParams();
   const gate = usePhoneWriteGate(project.id);
-  const [sheet, setSheet] = React.useState<"menu" | "rename" | "buy" | null>(() => (params.get("buy") === "1" && buyer ? "buy" : null));
+  const [sheet, setSheet] = React.useState<"menu" | "edit" | "delete" | "buy" | null>(() => (params.get("buy") === "1" && buyer ? "buy" : null));
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const tabsRef = React.useRef<HTMLDivElement>(null);
   const titleRef = React.useRef<HTMLHeadingElement>(null);
   const titleGone = useScrolledPast(titleRef, scrollRef);
+  // Share (owner 2026-11-22): the product can be shared to your Feed while it is on the Marketplace
+  // (not from a preview of it).
+  const share = useShareAction(mode === "preview" || mode === "contributor" ? null : shareItemId("mine", project.id, ctx.product.id));
 
   // An old link's `?buy=1` opens Buy a copy once: the address drops it, so a reload or Back doesn't reopen it.
   React.useEffect(() => {
@@ -135,7 +154,10 @@ function ProductReady() {
               back={phoneProjectHref(project.id, "products")}
               title={titleGone ? name : undefined}
               titleAs="p"
-              actions={owner ? [{ icon: MORE_ICON, label: "Product actions", onClick: () => setSheet("menu") }] : []}
+              actions={[
+                ...(share.action ? [share.action] : []),
+                ...(owner ? [{ icon: MORE_ICON, label: "Product actions", onClick: () => setSheet("menu") }] : []),
+              ]}
             />
             {preview && (
               <div className="shrink-0 px-8 pb-4">
@@ -144,12 +166,13 @@ function ProductReady() {
             )}
           </>
         }
-        footer={buyer ? <BuyBar onBuy={() => setSheet("buy")} onFiles={toFiles} /> : undefined}
+        footer={buyer ? <BuyBar onBuy={() => setSheet("buy")} onFiles={toFiles} /> : owner ? <ProductEarnBar /> : undefined}
       >
         <ScrollHost scrollRef={scrollRef}>
           <OfflineBanner />
           <ProductHero />
-          <ProductHeader titleRef={titleRef} />
+          <ProductHeader titleRef={titleRef} onEdit={() => setSheet("edit")} />
+          {buyer && <OwnedCopiesRow onFiles={toFiles} />}
           {mode === "market" && (
             <div className="px-8 pb-8">
               <DemoBuyerBanner />
@@ -181,9 +204,13 @@ function ProductReady() {
           )}
         </ScrollHost>
       </Screen>
-      {owner && <ProductMenu open={sheet === "menu"} onClose={() => setSheet(null)} onRename={() => setSheet("rename")} />}
-      {owner && sheet === "rename" && <RenameSheet open onClose={() => setSheet(null)} gate={gate} />}
+      {owner && (
+        <ProductMenu open={sheet === "menu"} onClose={() => setSheet(null)} onEdit={() => setSheet("edit")} onDelete={() => setSheet("delete")} />
+      )}
+      {owner && sheet === "edit" && <EditDetailsSheet onClose={() => setSheet(null)} gate={gate} />}
+      {owner && sheet === "delete" && <DeleteProductSheet onClose={() => setSheet(null)} />}
       {buyer && <BuyCopy open={sheet === "buy"} onClose={() => setSheet(null)} onFiles={toFiles} />}
+      {share.sheets}
       {gate.sheet}
     </>
   );
@@ -239,13 +266,16 @@ function PreviewBanner() {
 
 // ─────────────────────────── the header ───────────────────────────
 
-function ProductHeader({ titleRef }: { titleRef: React.RefObject<HTMLHeadingElement | null> }) {
-  const { project, view, product, name, mode, buyer, job, bp, version, copies } = useProduct();
+function ProductHeader({ titleRef, onEdit }: { titleRef: React.RefObject<HTMLHeadingElement | null>; onEdit: () => void }) {
+  const { project, view, product, name, mode, buyer, job, bp, version } = useProduct();
   const owner = mode === "owner";
-  const description = bp?.description?.trim() || product.description.trim();
-  const lockLine = owner ? (view.lock?.line ?? null) : null;
-  const latestCopy = copies.length ? copies.reduce((a, s) => (s.at > a.at ? s : a), copies[0]) : null;
+  const canEditDetails = useCanEditDetails();
   const home = version?.home ?? 1;
+  // The maker's words on the version the product is at (an edit writes them there); an older
+  // version keeps its build's (the web's H-7).
+  const kept = product.description.trim();
+  const description = (version?.shown ?? home) === home ? kept : bp?.description?.trim() || kept;
+  const lockLine = owner ? (view.lock?.line ?? null) : null;
   // A version is picked in place, like a tab: no request, so it works offline.
   const showVersion = (n: number) => replaceQuery({ v: n === home ? null : String(n) });
   const unbuilt =
@@ -256,17 +286,10 @@ function ProductHeader({ titleRef }: { titleRef: React.RefObject<HTMLHeadingElem
   return (
     <header className="flex flex-col gap-4 px-8 pb-8">
       <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 ref={titleRef} className={cn(T.title, "min-w-0 break-words")}>
-            {name}
-          </h1>
-          {latestCopy && latestCopy.item.nft !== "main" && (
-            <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} />}>
-              You own copy #{latestCopy.item.serial}
-            </Badge>
-          )}
-        </div>
-        <p className={T.meta}>{meta}</p>
+        <h1 ref={titleRef} className={cn(T.title, "min-w-0 break-words")}>
+          {name}
+        </h1>
+        {mode === "market" || mode === "preview" ? <PartOfLine /> : <p className={T.meta}>{meta}</p>}
       </div>
 
       {lockLine && (
@@ -278,12 +301,41 @@ function ProductHeader({ titleRef }: { titleRef: React.RefObject<HTMLHeadingElem
         </p>
       )}
 
-      {description && <Description text={description} />}
+      {description ? (
+        <Description text={description} />
+      ) : canEditDetails ? (
+        <div>
+          <LinkButton onClick={onEdit} className="gap-2">
+            <Icon icon={Add01Icon} size={16} />
+            Add a description
+          </LinkButton>
+        </div>
+      ) : null}
 
       {owner && version?.notice && <VersionNotice onShow={showVersion} />}
 
       {buyer && <HeaderActivity />}
     </header>
+  );
+}
+
+/** BUY-3 · the buyer's line (the web's product page on Explore marketplace, CL-018): "Part of {project} · Created by
+ *  {creator}" — what the product belongs to and who made it; how it was built is the maker's. "Part of {project}"
+ *  opens the project's shop, where its offers are (a product with no copies of its own sells none); in Preview as
+ *  others see it, the preview's project page. The creator is named as a buyer knows them, never "you". */
+function PartOfLine() {
+  const { project, mode } = useProduct();
+  const creator = useCreatorName();
+  const href = mode === "preview" ? phonePreviewHref(project.id, "buyer") : phoneMarketHref(project.id);
+  return (
+    <p className={cn(T.meta, "break-words")}>
+      <Link href={href} className="-my-[13px] inline-flex min-h-[44px] items-center rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus">
+        <span>
+          Part of <span className="font-medium text-text-brand">{project.name}</span>
+        </span>
+      </Link>
+      {` · Created by ${creator}`}
+    </p>
   );
 }
 

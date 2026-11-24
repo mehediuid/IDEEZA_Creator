@@ -15,7 +15,7 @@ import { updateBlog, useBlog } from "@/lib/blog/store";
 import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
 import { useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
-import { creditPeriod, planOf } from "@/lib/create/plans";
+import { nextCreditsAt, planOf } from "@/lib/create/plans";
 import { pitchPlan } from "@/lib/create/upsell";
 import { OFFER_MS } from "@/lib/account/welcome-offer";
 import { useWelcomeOffer } from "@/components/credits/welcome-offer";
@@ -183,7 +183,7 @@ export function useNotices(): NoticeFeed {
                   },
             now,
             // The upgrade plan's C4, D3 and F1.
-            refillAt: creditPeriod(sub, now).end,
+            refillAt: nextCreditsAt(sub, now),
             pitch: (() => {
               const p = pitchPlan(sub.tier);
               return p ? { name: p.name, credits: p.credits } : null;

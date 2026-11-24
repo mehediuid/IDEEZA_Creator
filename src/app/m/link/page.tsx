@@ -1,11 +1,12 @@
 "use client";
 
-// AU-06 · Link accounts: the provider's email already has an account. Sign in
+// AU-06 · Link accounts: the provider's email already has an account. Log In
 // to it once — with its password, or the way it signed in before — and the
 // provider is linked, so either works from then on. Wrong passwords count
 // toward Log In's five tries (AU-05g), so the lock can't be got round here. An
 // account still waiting for its email is theirs once the password is right:
-// the provider proved the email, so it is verified and linked.
+// the provider proved the email, so it is verified and linked. The phone's
+// way in says "Log In" throughout (AUTH-16).
 
 import * as React from "react";
 import Link from "next/link";
@@ -13,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
 import { Button } from "@/components/ideeza/button";
 import { TextInput } from "@/components/ideeza/text-input";
-import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, REFUSED_ALERT } from "@/components/mobile/account/parts";
+import { ACCOUNT_CONTENT, AccountAlert, AccountHeading, REFUSED_ALERT, signInPausedBody } from "@/components/mobile/account/parts";
 import { WayButton } from "@/components/mobile/account/ways-in";
 import { BottomBar, TEXT_LINK } from "@/components/mobile/kit/bottom-bar";
 import { useOnline } from "@/components/mobile/kit/states";
@@ -26,7 +27,6 @@ import {
   afterPhoneSignIn,
   afterRightSignIn,
   afterWrongSignIn,
-  clockOf,
   linkProvider,
   phoneAccountOf,
   readPhoneAccounts,
@@ -109,7 +109,7 @@ export default function LinkAccountsPage() {
         before.passwordless ? undefined : (
           <BottomBar>
             <Button type="submit" form="link" size="xl" className="w-full" loading={busy} disabled={!online || !!lockedFor}>
-              Link and sign in
+              Link and Log In
             </Button>
           </BottomBar>
         )
@@ -117,14 +117,14 @@ export default function LinkAccountsPage() {
     >
       <form id="link" noValidate onSubmit={linkWithPassword} className={ACCOUNT_CONTENT}>
         <AccountHeading title="This email already has an account">
-          Sign in once to link {PROVIDER_WORDS[answer.provider]}. Then you can use either.
+          Log In once to link {PROVIDER_WORDS[answer.provider]}. Then you can use either.
         </AccountHeading>
         <AccountAlert
           alert={
             !online
-              ? { tone: "attention", title: "You’re offline", body: "Your details are kept. Sign in when you’re back online." }
+              ? { tone: "attention", title: "You’re offline", body: "Your details are kept. Log In when you’re back online." }
               : lockedFor
-                ? { tone: "error", title: "Too many tries", body: `Try again in ${clockOf(lockedFor)}, or reset your password.` }
+                ? { tone: "error", title: "Too many tries", body: signInPausedBody(lockedFor) }
                 : refused
                   ? REFUSED_ALERT
                   : wrong
@@ -161,7 +161,7 @@ export default function LinkAccountsPage() {
         </div>
         {before.providers.length > 0 && (
           <div className="flex flex-col gap-4">
-            <p className={cn(T.meta, "text-center text-text-tertiary")}>Or sign in the way you did before</p>
+            <p className={cn(T.meta, "text-center text-text-tertiary")}>Or Log In the way you did before</p>
             {before.providers.map((p) => (
               <WayButton key={p} way={p} onClick={() => void linkWithProvider(p)} />
             ))}

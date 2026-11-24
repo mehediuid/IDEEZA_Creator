@@ -5,6 +5,7 @@
 //
 // Data only, with relative imports, so node:test reads the same content.
 
+import { WHOLE_PRODUCT_COSTS } from "../create/pieces";
 import type { TutorialBlock, TutorialCategory } from "./types";
 
 const VIDEO_REWARD = "2";
@@ -36,7 +37,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
             "IDEEZA is a hardware creation platform that runs in your browser. You do not need to know how to draw a circuit board to start. A sentence such as “a pocket air-quality monitor with a small screen” is enough to begin.",
           ),
           p(
-            "Each build gives every product five pieces: a 3D model, a PCB, firmware code, wiring and a parts list. Each piece opens in its own editor, so you can change anything the AI made.",
+            "Each build gives every product five pieces: the PCB, Code, 3D Module, Assembly and Wiring, with a free Parts list. Each piece opens in its own editor, so you can change anything the AI made.",
           ),
           h2("Where things live"),
           p("The sidebar on the left takes you everywhere:"),
@@ -74,7 +75,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
           ),
           h2("Build"),
           p(
-            "When the concepts look right, you book a build. It costs 4 credits per product and usually takes about a minute. It runs inside the same chat, and the Build log records each step. When it is ready, you review the five pieces and save the project.",
+            `When the concepts look right, you book a build. It costs ${WHOLE_PRODUCT_COSTS} credits per product, by its Quality, and usually takes about a minute. It runs inside the same chat, and the Build log records each step. When it is ready, you review the five pieces and save the project.`,
           ),
           h2("Earn"),
           p(
@@ -196,13 +197,13 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
         summary: "How AI credits are spent, where to buy more, and what each plan gives you.",
         blocks: [
           p(
-            "AI credits pay for the work AI does for you, such as drawing concepts and running builds. Plans add credits every month. You manage both in Settings, under Plan & pricing.",
+            "AI credits pay for the work AI does for you, such as drawing concepts and running builds. Free gives its credits once; paid plans add credits every month. You manage both in Settings, under Plan & pricing.",
           ),
           video("set-up-ideeza/plans-and-credits/1", "Buying credits and choosing a plan"),
           h2("What costs credits"),
           list(
             "Drawing a concept costs 1 credit. Refine and Regenerate cost 1 credit each.",
-            "A build costs 4 credits for each product in it.",
+            `A build costs ${WHOLE_PRODUCT_COSTS} credits for each product in it, by its Quality.`,
             "Editing a spec is free, and so is retrying one piece of a build that failed.",
           ),
           p(
@@ -222,7 +223,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
           ),
           h2("Choose a plan"),
           p(
-            "The Upgrade card in the sidebar opens Pricing. It lists four plans, billed monthly or yearly with 20% off: Free with 10 AI credits a month, Tinkerer with 50 for $8 a month, Builder with 300 for $10, and Disruptor with 1,200 for $20. Bigger plans add a faster queue, room for more projects and contributors, and a discount on credit packs. No plan ever stands between you and minting, listing or selling.",
+            "The Upgrade card in the sidebar opens Pricing. It lists four plans, billed monthly or yearly with 20% off: Free with 10 AI credits once, Tinkerer with 50 for $8 a month, Builder with 300 for $10, and Disruptor with 1,200 for $20. Bigger plans add a faster queue, room for more projects and contributors, and a discount on credit packs. No plan ever stands between you and minting, listing or selling.",
           ),
           h2("Paying in the demo"),
           p(
@@ -309,7 +310,7 @@ export const TUTORIAL_CATEGORIES: readonly TutorialCategory[] = [
         summary: "Start the build, follow it in the Build log, review the five pieces and save your project.",
         blocks: [
           p(
-            "A build turns your concepts into real design files. It costs 4 credits per product and usually takes about a minute. You can leave while it runs, and IDEEZA tells you when it is ready.",
+            `A build turns your concepts into real design files. It costs ${WHOLE_PRODUCT_COSTS} credits per product, by its Quality, and usually takes about a minute. You can leave while it runs, and IDEEZA tells you when it is ready.`,
           ),
           video("first-product/book-a-build/1", "Booking your first build"),
           h2("Book the build"),

@@ -13,7 +13,10 @@
 //
 // It starts on the first tab screen after Look around first (this phone
 // remembers it is owed, so a reload keeps it) and ends where the person was
-// going. While it plays, the welcome offer waits, as on the web.
+// going. Ending it (Skip, Escape or Done) points once at where it lives, as
+// the web's "Tours live here" does: a toast, "Take the tour again any time in
+// Help › Tour guide" (AUTH-18). While it plays, the welcome offer waits, as
+// on the web.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -25,6 +28,7 @@ import { PopoverArrow } from "@/components/ideeza/popover";
 import { updatePhone } from "@/lib/account/phone";
 import { CONCEPT_COST } from "@/lib/create/credits";
 import { cn } from "@/lib/utils";
+import { useToast } from "../kit/toast";
 import { TAB_ATTR } from "../tab-bar";
 import { T } from "../type";
 
@@ -98,6 +102,7 @@ function tabOf(href: string): HTMLElement | null {
 export function PhoneTour() {
   const router = useRouter();
   const pathname = usePathname();
+  const toast = useToast();
   // Where they were going when the tour began: it ends there.
   const [start] = React.useState(() => pathname + window.location.search);
   const [at, setAt] = React.useState(0);
@@ -119,7 +124,8 @@ export function PhoneTour() {
   const end = React.useCallback(() => {
     updatePhone({ tourPending: false });
     if (window.location.pathname + window.location.search !== start) router.replace(start);
-  }, [router, start]);
+    toast({ title: "Take the tour again any time in Help › Tour guide" });
+  }, [router, start, toast]);
   const next = React.useCallback(() => (last ? end() : setAt((i) => i + 1)), [last, end]);
 
   // Where the stop's tab is, now and as the screen changes size; waits for the tab bar to be drawn.

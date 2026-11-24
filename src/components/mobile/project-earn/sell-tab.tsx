@@ -7,19 +7,24 @@
 //   note) and the Testnet demo chip; the product names on one line;
 // · its rows — Main NFT, Physical NFT, Virtual NFT — each with its live state;
 //   a row opens what comes next (the mint, the item's screen, the sell sheet).
-//   Before the mint the copies fold into one line: they use the project's
-//   collection and blockchain;
+//   Before the mint the copies fold into one row: they use the project's
+//   collection and blockchain, so it opens the mint with Keep private —
+//   "Mint privately, sell copies later" (EARN-6, the web desk's DraftPanel);
 // · One product at a time (`#copies`): each product's Physical and Virtual
-//   rows, or the one folded line before the mint.
+//   rows, or the one folded row before the mint. The web desk's rule
+//   (`deskProductsOf`, CL-028): in a one-product project the whole project's
+//   copies are that product's, so it gets no second row unless it already has
+//   copy tracks of its own — and the section isn't there.
 // Each row is listed on its own, never asking the Main listing.
 
 import * as React from "react";
 import { PackageIcon } from "@hugeicons/core-free-icons";
 import { Badge } from "@/components/ideeza/badge";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
-import { editionProductsOf } from "@/lib/manual/earn-view";
+import { phoneMintHref } from "@/lib/manual/phone-earn";
 import { phoneProjectHref } from "@/lib/manual/phone-project";
 import { displayProductName } from "@/lib/manual/products-tab-view";
+import { deskProductsOf } from "@/lib/market/sell-desk";
 import { PROJECT_SCOPE } from "@/lib/market/types";
 import { preMintCopiesLine } from "@/lib/market/phone-sell";
 import { MAIN_SALE_DETAIL, MAIN_SALE_NOTE, SELL_RULES, SELL_RULES_LEAD } from "@/lib/market/sell-flow";
@@ -77,9 +82,25 @@ function useMinted(): boolean {
   return view.summary.status !== "draft" && view.mint.status !== "notMinted";
 }
 
-/** A folded row before the mint: what it is and why it waits. */
+/** The web desk's second way before the mint (DraftPanel, item-panel.tsx): keep the project and sell
+ *  copies after the mint — copies never need the Main NFT listed. */
+const MINT_PRIVATELY = "Mint privately, sell copies later";
+
+/** A folded copies row before the mint (EARN-6): copies need the project minted first, so the row
+ *  opens the mint with Keep private (nothing goes on sale), the web's "Mint privately" — the Main
+ *  NFT row above is the other way, the mint with Sell. Its line says why it waits. */
 function WaitingRow({ label, line }: { label: string; line: string }) {
-  return <SellListRow icon={KIND_ICON.physical} title={label} state={[line]} disabled />;
+  const { project } = useEarn();
+  return (
+    <SellListRow
+      icon={KIND_ICON.physical}
+      title={label}
+      state={[MINT_PRIVATELY]}
+      extra={line}
+      href={phoneMintHref(project.id, "save")}
+      label={`${label}: ${MINT_PRIVATELY}`}
+    />
+  );
 }
 
 function WholeProject() {
@@ -115,7 +136,10 @@ function WholeProject() {
 function EachProduct() {
   const { project, view } = useEarn();
   const minted = useMinted();
-  const products = editionProductsOf(view.products, view.editions);
+  const products = deskProductsOf(view.products, view.editions);
+  const current = view.products.filter((p) => p.dropped === null).length;
+  // One product and no copies of its own: the Whole project rows above are its copies.
+  if (current > 0 && products.length === 0) return null;
   return (
     <section id="copies" aria-labelledby="sell-products" className="flex scroll-mt-8 flex-col gap-4">
       <h2 id="sell-products" className={T.section}>

@@ -13,7 +13,9 @@
 // creators' purchases of sample listings (demo-purchases.ts; owner, 2026-11-19:
 // My projects › Purchased always has every kind). A later seed version only
 // tops up what it added (copy tracks a planted project lacks, the sales and
-// purchases it lacks while their listings can still take them). Nothing is
+// purchases it lacks while their listings can still take them; version 8 the
+// lamp's Innovations share and the clips shared to the Feed, for the profile's
+// Timeline — demo-shares.ts). Nothing is
 // written over a store that doesn't read (an unreadable list stays as it is),
 // and a project already there is never replaced.
 
@@ -21,7 +23,9 @@ import * as React from "react";
 import { commerceKey } from "@/lib/commerce/record";
 import { BUILDS_KEY } from "@/lib/create/history";
 import { notifyStores } from "@/lib/key-store";
-import { DEMO_PROJECT_IDS, DEMO_SEED_KEY, DEMO_SEED_VERSION, demoSeedOf, withDemoSales } from "@/lib/demo/demo-projects";
+import { DEMO_PROJECT_IDS, DEMO_SEED_KEY, DEMO_SEED_VERSION, DEMO_SHOWCASED_V8, demoSeedOf, withDemoSales, withDemoShowcases } from "@/lib/demo/demo-projects";
+import { withDemoShares } from "@/lib/demo/demo-shares";
+import { FEED_PREFS_KEY } from "@/lib/innovations/feed-prefs";
 import { withDemoResales, withDemoSampleSales, withDemoUnits } from "@/lib/demo/demo-purchases";
 import { normalizeResales, RESALES_KEY } from "@/lib/market/resales";
 import { normalizeUnits, UNITS_KEY } from "@/lib/market/units";
@@ -105,15 +109,42 @@ function plantResales(storage: Storage, now: number): boolean {
   return true;
 }
 
+/** The clips shared to the Feed with words (demo-shares.ts) the phone's Feed prefs lack; nothing when
+ *  the stored prefs don't read. */
+function plantShares(storage: Storage, now: number): boolean {
+  const raw = storage.getItem(FEED_PREFS_KEY);
+  let stored: unknown = undefined;
+  if (raw !== null) {
+    try {
+      stored = JSON.parse(raw);
+    } catch {
+      return false;
+    }
+  }
+  const next = withDemoShares(stored, now);
+  if (!next) return false;
+  storage.setItem(FEED_PREFS_KEY, JSON.stringify(next));
+  return true;
+}
+
 /** An older planting gets what a later seed added: copy tracks it lacks, on projects still there whose copies
  *  read; the sales it lacks, while what they sold is still there; the sample purchases. Nothing the maker changed
  *  is replaced. True when it wrote. */
-function topUp(storage: Storage, now: number): boolean {
+function topUp(storage: Storage, now: number, planted: number): boolean {
   const projects = readList(storage, PROJECTS_KEY);
   if (!projects) return false;
   const seed = demoSeedOf(now);
   let wrote = false;
   try {
+    if (planted < 8) {
+      // Version 8: the lamp shared on Innovations (unless it is gone or shared already) and the shares.
+      const shared = withDemoShowcases(projects, seed.projects, DEMO_SHOWCASED_V8);
+      if (shared.some((x, i) => x !== projects[i])) {
+        storage.setItem(PROJECTS_KEY, JSON.stringify(shared));
+        wrote = true;
+      }
+      if (plantShares(storage, now)) wrote = true;
+    }
     for (const [projectId, tracks] of Object.entries(seed.editions)) {
       if (!hasId(projects, projectId)) continue;
       const held = readList(storage, EDITIONS_KEY(projectId));
@@ -148,7 +179,7 @@ function topUp(storage: Storage, now: number): boolean {
 export function plantDemoProjects(storage: Storage, now: number): boolean {
   const planted = plantedVersion(storage);
   if (planted >= DEMO_SEED_VERSION) return false;
-  if (planted > 0) return topUp(storage, now);
+  if (planted > 0) return topUp(storage, now, planted);
   const lists = [PROJECTS_KEY, BUILDS_KEY, LISTINGS_KEY, SALES_KEY].map((k) => readList(storage, k));
   const [projects, builds, listings, sales] = lists;
   if (!projects || !builds || !listings || !sales) return false;
@@ -169,6 +200,7 @@ export function plantDemoProjects(storage: Storage, now: number): boolean {
     plantSamplePurchases(storage, now);
     plantUnits(storage, now);
     plantResales(storage, now);
+    plantShares(storage, now);
     storage.setItem(DEMO_SEED_KEY, JSON.stringify({ v: DEMO_SEED_VERSION, at: now, ids: DEMO_PROJECT_IDS }));
   } catch {
     // Storage full or blocked: the account simply has no demo projects this time.

@@ -23,6 +23,10 @@
 //   web's Manage in Sell / Relist in Sell / See it in Sell / See sales and
 //   payouts. Sell copies of a product and Preview are in the top bar's ⋯.
 // The progress fill is the success tone (the web's).
+// CL-030: once every video is in generation, "Make a video for each product"
+// no longer holds Choose what to sell — it stays open with "… You don't have
+// to wait: what you sell goes live when they're ready."; a video never started
+// still holds it.
 
 import * as React from "react";
 import {
@@ -52,6 +56,7 @@ import { phoneEarnHref } from "@/lib/manual/phone-earn";
 import { currentVersionOf, phonePlanState, runLineOf, sectionsWord, writtenCountOf } from "@/lib/manual/phone-plan-money";
 import { phoneHrefOf } from "@/lib/manual/phone-project";
 import { headerText } from "@/lib/manual/project-summary";
+import { videosStartBlockerOf } from "@/lib/manual/readiness";
 import { cn } from "@/lib/utils";
 import { Chevron, LIST_CARD, LIST_DIVIDERS, LIST_ROW } from "../kit/list";
 import { useEarn } from "./context";
@@ -107,7 +112,10 @@ export function EarnHub({ titleRef }: { titleRef: React.RefObject<HTMLHeadingEle
   const total = all.reduce((n, g) => n + g.tasks.length + 1, 0);
   const done = all.reduce((n, g) => n + (g.step.state === "done" ? g.tasks.length + 1 : g.tasks.filter((t) => t.ok).length), 0);
   const current = all.find((g) => g.step.state === "current");
-  const canAct = !!current && ready && !current.tasks.some((t) => !t.ok);
+  // Every video in generation: the videos task no longer holds the choice (CL-030).
+  const videosStarted = videosStartBlockerOf(view.videos.readiness.sell) === null;
+  const holds = (t: Task) => !t.ok && (t.id !== "videos" || !videosStarted);
+  const canAct = !!current && ready && !current.tasks.some(holds);
   const heldId = React.useId();
 
   const stepList = (
@@ -124,6 +132,7 @@ export function EarnHub({ titleRef }: { titleRef: React.RefObject<HTMLHeadingEle
           projectId={project.id}
           license={brief?.state.license ?? null}
           announce={announce}
+          videosStarted={videosStarted}
         />
       ))}
     </ol>
@@ -354,7 +363,10 @@ function StepGroup({
   projectId,
   license,
   announce,
+  videosStarted,
 }: {
+  /** Every video in generation (CL-030): the videos task then no longer holds the choice. */
+  videosStarted: boolean;
   step: EarnPathStep;
   tasks: Task[];
   ready: boolean;
@@ -366,7 +378,7 @@ function StepGroup({
   announce: (m: string) => void;
 }) {
   const current = step.state === "current";
-  const firstMissing = current ? tasks.find((t) => !t.ok) : undefined;
+  const firstMissing = current ? tasks.find((t) => !t.ok && (t.id !== "videos" || !videosStarted)) : undefined;
   const canAct = current && ready && !firstMissing;
   const note = step.state === "done" ? "Done" : current ? "Now" : "Later";
 
@@ -401,7 +413,9 @@ function StepGroup({
       {step.state !== "done" && ready && (
         <ul className={cn("flex flex-col", !current && "opacity-60")}>
           {tasks.map((t) => {
-            const open = t === firstMissing;
+            // The videos task, started but not ready, stays open with its fix (the web's).
+            const started = current && !t.ok && t.id === "videos" && videosStarted;
+            const open = t === firstMissing || started;
             return (
               <li key={t.id} className="flex items-start gap-4 py-2">
                 <TaskMark ok={t.ok} />
@@ -411,8 +425,8 @@ function StepGroup({
                     <span className="sr-only">{t.ok ? ", done" : ", not done yet"}</span>
                   </span>
                   {open && (
-                    <div id={NEXT_FIX_ID} className="flex scroll-mt-8 flex-col gap-4">
-                      <span className={EARN_NOTE}>{t.reason}</span>
+                    <div id={t === firstMissing ? NEXT_FIX_ID : undefined} className="flex scroll-mt-8 flex-col gap-4">
+                      <span className={EARN_NOTE}>{started ? `${t.reason} You don't have to wait: what you sell goes live when they're ready.` : t.reason}</span>
                       <StepFix step={t} projectId={projectId} license={license} announce={announce} />
                     </div>
                   )}

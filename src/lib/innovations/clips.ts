@@ -26,9 +26,11 @@
 import { CREATORS, PROJECTS, type ProjectCategory } from "../feed";
 import { CATALOGUES } from "../manual/journey";
 import { formatAmount } from "../wallet/money";
-import type { FeedShare } from "./feed-prefs";
+import { savedRows, type FeedShare } from "./feed-prefs";
 import { follows, type Reactions } from "./reactions";
 import { SAMPLE_POSTS } from "./sample-posts";
+import { parseShareItemId, webItemHref } from "./share-items";
+import { commentAnchor, mineSlugOf, postHref, postProductHref } from "./slug";
 import type { InnovationPost, PostPerson } from "./types";
 
 export type ClipKind = "project" | "product";
@@ -59,6 +61,9 @@ export type FeedClip = {
   projectId: string;
   productId: string | null;
   title: string;
+  /** A Product clip's project ("Smart plant watering hub"), as a share's card says it ("from …"); null
+   *  for a Project clip. */
+  projectTitle: string | null;
   description: string;
   category: ProjectCategory | null;
   creator: PostPerson;
@@ -147,6 +152,7 @@ export function clipsOfPost(post: InnovationPost): FeedClip[] {
       kind: "project",
       productId: null,
       title: post.title,
+      projectTitle: null,
       description: post.description,
       video: { src: first.video.src, label: first.video.label },
       poster: first.video.poster ?? first.image,
@@ -161,6 +167,7 @@ export function clipsOfPost(post: InnovationPost): FeedClip[] {
       kind: "product",
       productId: p.id,
       title: p.name,
+      projectTitle: post.title,
       description: p.summary,
       video: { src: p.video.src, label: p.video.label },
       poster: p.video.poster ?? p.image,
@@ -182,6 +189,12 @@ export const FEED_CLIPS: readonly FeedClip[] = SAMPLE_POSTS.flatMap(clipsOfPost)
 /** A sample clip by its id; a project you shared (`mine:…`) is found in `useFeedClips`. */
 export function clipById(id: string): FeedClip | null {
   return FEED_CLIPS.find((c) => c.id === id) ?? null;
+}
+
+/** How many of a sample creator's projects play on the Feed now (SOC-16: only what is listed is on
+ *  the Feed, so the Following sheet's "{n} projects in the Feed" counts these, not every post). */
+export function feedProjectCountOf(creatorId: string): number {
+  return FEED_CLIPS.filter((c) => c.kind === "project" && c.creator.id === creatorId).length;
 }
 
 // ─────────────────────────── a project you shared ───────────────────────────
@@ -240,6 +253,7 @@ export function mineClipsOf(input: MineClipInput): FeedClip[] {
       kind: "project",
       productId: null,
       title: input.title,
+      projectTitle: null,
       description: input.description,
       video: { src: "", label: `${input.title} video` },
       takeId: lead?.takeId ?? null,
@@ -255,6 +269,7 @@ export function mineClipsOf(input: MineClipInput): FeedClip[] {
       kind: "product",
       productId: v.productId,
       title: v.name,
+      projectTitle: input.title,
       description: v.summary,
       video: { src: "", label: `${v.name} video` },
       takeId: v.takeId,
@@ -321,8 +336,8 @@ export function orderClips(clips: readonly FeedClip[], choices: ClipChoices = NO
 }
 
 /** The Following tab: the clips of the creators the viewer follows (their own choice, else the
- *  dataset's — `withDataset` false: their own choice only, as a new account on the phone starts
- *  following no one), newest first; hidden ones left out. */
+ *  dataset's — the web's rule, which the phone's Feed, profile and Following sheet all use;
+ *  `withDataset` false: their own choice only), newest first; hidden ones left out. */
 export function followingClips(clips: readonly FeedClip[], reactions: Reactions, choices: ClipChoices = NO_CHOICES, withDataset = true): FeedClip[] {
   const gone = new Set(choices.hidden);
   return clips
@@ -338,14 +353,57 @@ export function clipDetailsHref(c: Pick<FeedClip, "projectId" | "productId">): s
 }
 
 /** Where an offer's button goes: the marketplace of the project or product (buying has one home).
- *  A project you shared has its own marketplace page (the buyer's view of your listing). */
-export function clipBuyHref(c: Pick<FeedClip, "projectId" | "productId"> & { source?: FeedClip["source"] }): string {
-  if (c.source === "mine") return `/m/projects/${encodeURIComponent(c.projectId)}/market`;
-  return `${clipDetailsHref(c)}?tab=marketplace`;
+ *  A project you shared has its own marketplace page (the buyer's view of your listing); a product's
+ *  own copies sell only on that product's market view (CL-018 scope). A sample's copies are the
+ *  whole project's, so a sample product's clip buys on its project's marketplace. The page's buy box
+ *  opens on the kind the clip's pill shows first (`?nft=`, owner 2026-11-22: what the buyer saw is
+ *  what is picked). */
+export function clipBuyHref(c: Pick<FeedClip, "projectId" | "productId"> & { source?: FeedClip["source"]; offers?: readonly Pick<ClipOffer, "kind">[] }): string {
+  const project = `/m/projects/${encodeURIComponent(c.projectId)}`;
+  const kind = c.offers?.[0]?.kind ?? null;
+  const nft = kind ? `nft=${kind}` : null;
+  if (c.source === "mine") return c.productId ? `${clipDetailsHref(c)}?view=market` : `${project}/market${nft ? `?${nft}` : ""}`;
+  return `${project}?tab=marketplace${nft ? `&${nft}` : ""}`;
 }
 
-/** The address of one clip on its own (Copy link, Saved › View original post). */
+/** The address of one clip on its own, inside the app (Saved › View original post, a notice). */
 export const clipHref = (id: string) => `/m/clip/${encodeURIComponent(id)}`;
+
+/** What the web address of your own project needs: its name (the post's slug) and whether you shared
+ *  it (then it has an Innovations post). */
+export type MineWebFacts = { name: string; shared: boolean };
+
+/** The public web page of a clip or a shareable item, by its id (SOC-19): what Copy link and Share via…
+ *  hand outside the app, so a friend on a computer opens the web's page, as Share profile hands the
+ *  web's /creators/<handle> — never a phone-only /m address. The web's Copy link gives the post (post
+ *  page) or the marketplace page (marketplace Share):
+ *  - a sample's clip or item: its Innovations post, a product its post's product page;
+ *  - your own: its post once you shared the project (`mine(projectId).shared`), else its marketplace
+ *    page (it is on the Feed because it is listed);
+ *  - `market` (a marketplace screen's Share while the item is on the Marketplace): its marketplace page,
+ *    as the web's marketplace Share copies its own page. */
+export function webHrefOfItem(id: string, mine: (projectId: string) => MineWebFacts | null, market = false): string {
+  const at = parseShareItemId(id);
+  if (!at) return "/marketplace";
+  if (market) return webItemHref(at);
+  const onPost = (slug: string) => (at.productId ? postProductHref(slug, at.productId) : postHref(slug));
+  if (at.source === "sample") {
+    const post = SAMPLE_POSTS.find((p) => p.id === `sample:${at.projectId}`);
+    return post ? onPost(post.slug) : webItemHref(at);
+  }
+  const facts = mine(at.projectId);
+  return facts?.shared ? onPost(mineSlugOf({ id: at.projectId, name: facts.name })) : webItemHref(at);
+}
+
+/** A comment's public web address (SOC-19): its post's page on Innovations, where the web shows
+ *  the same thread, opened on the comment (`#comment-<id>`). `itemHref` is the item's web page
+ *  (`webHrefOfItem`); a product's comments live on its post, so its product page gives the post.
+ *  null when the item has no post on the web (on the marketplace only): only the phone shows its
+ *  comments, so its phone address stays. */
+export function webCommentHrefOf(itemHref: string, commentId: string): string | null {
+  const post = /^\/innovations\/[^/?#]+/.exec(itemHref);
+  return post ? `${post[0]}#${commentAnchor(commentId)}` : null;
+}
 
 /** "Buy Main NFT (0.25 ETH)", "Place bid (0.01 ETH)" on an auction (the marketplace's words for
  *  the Figma's "Make an offer"), "Buy Physical NFT (0.04 ETH)" for a copy. */
@@ -360,3 +418,77 @@ export const OFFER_NAME: Readonly<Record<ClipOfferKind, string>> = {
   physical: "Physical NFT",
   virtual: "Virtual NFT",
 };
+
+// ─────────────────────────── a post off the Feed ───────────────────────────
+// The Feed plays only what is on the marketplace, but a post stays after its item leaves it, as the
+// web's post page does: Saved and Appreciated still list it, its address still leads somewhere, and
+// its comments are still read.
+
+/** The id of a post's item (share-items.ts), which is also its Project clip's id: "sample:p12" →
+ *  "p12"; "mine:<projectId>" stays as it is. */
+export const postItemIdOf = (postId: string) => postId.replace(/^sample:/, "");
+
+/** A post of the samples' or of yours ("sample:…", "mine:…"), not a share's own thread ("share:…"). */
+const isPostId = (id: string) => id.startsWith("sample:") || id.startsWith(MINE);
+
+/** A row of Saved or Appreciated: one clip of a post on the Feed, or a post with none (`clip` null). */
+export type PostRow<C> = { postId: string; clip: C | null; at: number | null };
+
+type PostClipRef = Pick<FeedClip, "id" | "postId" | "kind">;
+
+/** The newest date this phone noted for saving a post or any of its clips; null when it knows none. */
+function newestMarkOf(savedAt: Readonly<Record<string, number>>, postId: string): number | null {
+  const base = postItemIdOf(postId);
+  let at = 0;
+  for (const [k, v] of Object.entries(savedAt)) {
+    if (k === postId || k === base || k.startsWith(`${base}${PRODUCT_SEP}`)) at = Math.max(at, v || 0);
+  }
+  return at || null;
+}
+
+/** The marks this phone keeps for a post (`savedAt` keys: the post's, its clips'), so unsaving a
+ *  post with no clip leaves no date behind. */
+export function postMarksOf(savedAt: Readonly<Record<string, number>>, postId: string): string[] {
+  const base = postItemIdOf(postId);
+  return Object.keys(savedAt).filter((k) => k === postId || k === base || k.startsWith(`${base}${PRODUCT_SEP}`));
+}
+
+/** Saved (SOC-4): every post on the web's Saved list. A post with a clip on the Feed is listed by its
+ *  clips as `savedRows` lists them; a post with none (never on the marketplace, or off sale now) is
+ *  listed as itself, dated by the newest mark this phone keeps for it — so a post saved on the web,
+ *  or saved here while it was on sale, is never missing. Newest saved first, as `savedRows` orders. */
+export function savedPostRows<C extends PostClipRef>(savedPosts: readonly string[], savedAt: Readonly<Record<string, number>>, clips: readonly C[]): PostRow<C>[] {
+  const posts = savedPosts.filter(isPostId);
+  const index = new Map(posts.map((p, i) => [p, i] as const));
+  const listed = savedRows(posts, savedAt, clips).map((r) => ({ postId: r.clip.postId, clip: r.clip as C | null, at: r.at, i: index.get(r.clip.postId) ?? 0 }));
+  const shown = new Set(listed.map((r) => r.postId));
+  const bare = posts.flatMap((postId, i) => (shown.has(postId) ? [] : [{ postId, clip: null, at: newestMarkOf(savedAt, postId), i }]));
+  return [...listed, ...bare].sort((a, b) => (b.at ?? 0) - (a.at ?? 0) || b.i - a.i).map(({ postId, clip, at }) => ({ postId, clip, at }));
+}
+
+/** Appreciated (SOC-4): every post you appreciated, newest first — its Project clip while it plays on
+ *  the Feed, else the post itself. A share's own appreciations stay on the Timeline. */
+export function appreciatedPostRows<C extends PostClipRef>(appreciated: readonly string[], clips: readonly C[]): PostRow<C>[] {
+  return appreciated
+    .filter(isPostId)
+    .map((postId) => ({ postId, clip: clips.find((c) => c.postId === postId && c.kind === "project") ?? null, at: null }))
+    .reverse();
+}
+
+/** Where a clip's address leads when the clip isn't on the Feed but its item is still there — it left
+ *  the Marketplace, or was never on it (SOC-9, SOC-3); the web's post page stays, comments and all:
+ *  - an address that opens the comments (`?comment=`: a comment notice, a copied comment link) opens
+ *    the post on its maker's Timeline (`timeline`, that profile's address) with its comments, on that
+ *    comment;
+ *  - any other, or a post on no Timeline (`timeline` null: your own project, never shared), opens the
+ *    item's details, never "Clip not found". */
+export function offFeedHrefOf(
+  item: Pick<FeedClip, "projectId" | "productId" | "postId">,
+  comment: string | null,
+  timeline: string | null,
+): string {
+  if (comment === null || !timeline) return clipDetailsHref(item);
+  const q = new URLSearchParams({ post: item.postId });
+  if (comment) q.set("comment", comment);
+  return `${timeline}?${q}`;
+}

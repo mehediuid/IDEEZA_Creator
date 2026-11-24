@@ -13,12 +13,15 @@
 // four groups, one list, no tabs) open in tall sheets from their rows.
 // While the welcome offer runs, the web's offer band — folded to one strip
 // with its countdown, the rest behind ⓘ — sits over the plans and every paid
-// price is the offer's. The Credits tab puts its Purchase in the
+// price is the offer's. Under the lead, what the maker used in the last 30
+// days and the smallest plan that covers it ("Tinkerer fits you.", CL-032),
+// that plan's card with a Fits you badge when it is above theirs. `?pick=` opens
+// the list on a plan (the Profile hub's "Upgrade to Builder"). The Credits tab puts its Purchase in the
 // same bar; Billing has none. The Figma's partner logos and website footer
 // are the landing page's, not the app's, and aren't drawn here.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AiMagicIcon,
   ArrowDown01Icon,
@@ -43,7 +46,10 @@ import { OfferSticker, useWelcomeOffer } from "@/components/credits/welcome-offe
 import { countdown, offerPrice } from "@/lib/account/welcome-offer";
 import { discountFor, type BillingCycle } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
-import { HIGH_VIDEO_TIER, PLANS, YEARLY_OFF, planOf, priceOf, relationOf, type Plan, type PlanTier, type Subscription } from "@/lib/create/plans";
+import { useCredits } from "@/lib/create/credits";
+import { fitsYou, takesPlanSlot, usageOf } from "@/lib/create/upsell";
+import { useManualProjects } from "@/lib/manual/projects";
+import { HIGH_VIDEO_TIER, PLANS, YEARLY_OFF, creditsMonthly, planOf, priceOf, relationOf, type Plan, type PlanTier, type Subscription } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
 import { FaqList } from "../help/faq-list";
 import { BottomBar } from "../kit/bottom-bar";
@@ -145,8 +151,18 @@ function PlansTab() {
   const offerLive = offer.ready && offer.live;
   const [cycle, setCycle] = React.useState<BillingCycle>("monthly");
   const [synced, setSynced] = React.useState(false);
-  const [picked, setPicked] = React.useState<PlanTier | null>(null);
+  const pickParam = useSearchParams().get("pick");
+  const [picked, setPicked] = React.useState<PlanTier | null>(() => ORDER.find((t) => t === pickParam) ?? null);
   const [cancelling, setCancelling] = React.useState(false);
+  // Upgrade plan E1 (the web's PlansPanel): what you used in the last 30 days, and the smallest plan that
+  // covers it — a plan above yours is named, otherwise your own plan covers it (never a nudge down).
+  const { hydrated: creditsReady, ledger } = useCredits();
+  const { hydrated: projectsReady, projects } = useManualProjects();
+  const [now] = React.useState(() => Date.now());
+  const usage = usageOf(ledger, projects.filter((p) => takesPlanSlot(p.id)).length, now);
+  const fitTier = fitsYou(usage);
+  const fit = ORDER.indexOf(fitTier) > ORDER.indexOf(sub.tier) ? fitTier : sub.tier;
+  const showUse = hydrated && creditsReady && projectsReady && (usage.credits > 0 || usage.projects > 0);
   const [comparing, setComparing] = React.useState(false);
   const [faqs, setFaqs] = React.useState(false);
 
@@ -196,9 +212,28 @@ function PlansTab() {
         />
         <div className="flex flex-col gap-4">
           <p className={cn(T.meta, "text-center")}>Break creative boundaries with flexible plans made just for you.</p>
+          {showUse && (
+            <p className={cn(T.meta, "text-center")}>
+              Last 30 days: {usage.credits.toLocaleString("en-US")} {usage.credits === 1 ? "credit" : "credits"} ·{" "}
+              {usage.projects.toLocaleString("en-US")} {usage.projects === 1 ? "project" : "projects"}.{" "}
+              <strong className="font-semibold text-text-primary">
+                {fit === sub.tier ? `Your ${planOf(fit).name} plan covers that.` : `${planOf(fit).name} fits you.`}
+              </strong>
+            </p>
+          )}
           <ul role="radiogroup" aria-labelledby="choose-plan" className="flex flex-col gap-6">
             {PAID.map((p, i) => (
-              <PlanCard key={p.tier} plan={p} below={i === 0 ? FREE : PAID[i - 1]} cycle={cycle} offer={offerLive} first={i === 0} checked={tier === p.tier} onSelect={() => setPicked(p.tier)} />
+              <PlanCard
+                key={p.tier}
+                plan={p}
+                below={i === 0 ? FREE : PAID[i - 1]}
+                cycle={cycle}
+                offer={offerLive}
+                first={i === 0}
+                fits={showUse && fit !== sub.tier && fit === p.tier}
+                checked={tier === p.tier}
+                onSelect={() => setPicked(p.tier)}
+              />
             ))}
             <PlanCard plan={FREE} cycle="monthly" offer={false} checked={tier === "free"} onSelect={() => setPicked("free")} />
           </ul>
@@ -232,6 +267,7 @@ function PlanCard({
   cycle,
   offer,
   first,
+  fits,
   checked,
   onSelect,
 }: {
@@ -240,6 +276,8 @@ function PlanCard({
   cycle: BillingCycle;
   offer: boolean;
   first?: boolean;
+  /** The smallest plan that covers the last 30 days' use, above the maker's (upgrade plan E1). */
+  fits?: boolean;
   checked: boolean;
   onSelect: () => void;
 }) {
@@ -284,6 +322,7 @@ function PlanCard({
     >
       <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className={cn(T.title, p.popular && "text-text-brand")}>{name}</span>
+        {fits && <Badge tone="success">Fits you</Badge>}
         {p.popular && <Badge tone="brand-solid">Most popular</Badge>}
         {rel === "current" && <Badge tone="success">Current plan</Badge>}
         {rel === "scheduled" && <Badge tone="warning">Starts {sub.renewsAt ? dateOf(sub.renewsAt) : "on renewal"}</Badge>}
@@ -306,7 +345,7 @@ function PlanCard({
           <Icon icon={AiMagicIcon} size={16} />
         </span>
         <span>
-          AI credits: <CreditChip value={p.credits} /> / month
+          AI credits: <CreditChip value={p.credits} /> {creditsMonthly(p.tier) ? "/ month" : "once"}
         </span>
       </span>
     </RadioCard>
@@ -356,13 +395,18 @@ function ComparePlans({ cycle, offer }: { cycle: BillingCycle; offer: boolean })
         {PLANS.map((p) => {
           const per = priceOf(p.tier, p.monthly > 0 ? cycle : "monthly").perMonth;
           const offered = offer && p.monthly > 0;
+          // The web's Compare heads (plans-panel.tsx CompareHead, MON-18): an annual price says it's
+          // billed yearly, and with the welcome offer the usual price shows struck through.
+          const yearly = p.monthly > 0 && cycle === "yearly";
           return (
             <span key={p.tier} className="flex min-w-0 flex-col py-2">
               <span className={cn(T.rowTitle, "truncate")}>{p.tier === "free" ? "Free" : p.name}</span>
               <span className={cn(T.micro, "tabular-nums", offered && "text-text-success")}>
                 {dollars(offered ? offerPrice(per).final : per)}/mo
-                {offered && <span className="sr-only"> with the welcome offer, then {dollars(per)}</span>}
+                {offered && <span className="sr-only"> with the welcome offer, then</span>}
               </span>
+              {offered && <s className={cn(T.micro, "tabular-nums text-text-tertiary")}>{dollars(per)}/mo</s>}
+              {yearly && <span className={cn(T.micro, "text-text-tertiary")}>billed yearly</span>}
             </span>
           );
         })}

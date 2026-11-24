@@ -49,15 +49,15 @@ export function FeedTopNav({ tab, onTab, guard }: { tab: FeedTab; onTab: (t: Fee
             </button>
           ))}
         </div>
-        <NavIcon icon={Activity01Icon} label="Marketplace activity" onClick={() => go("Sign in to see marketplace activity", "/m/market-activity")} />
+        <NavIcon icon={Activity01Icon} label="Marketplace activity" onClick={() => go("Log In to see marketplace activity", "/m/market-activity")} />
       </div>
       <div className="flex items-center gap-4">
-        <NavIcon icon={Search01Icon} label="Search" onClick={() => go("Sign in to search", "/m/search")} />
+        <NavIcon icon={Search01Icon} label="Search" onClick={() => go("Log In to search", "/m/search")} />
         <span className="relative">
           <NavIcon
             icon={Notification01Icon}
             label={badge > 0 ? `Notifications, ${badge} new` : "Notifications"}
-            onClick={() => go("Sign in to see your notifications", "/m/notifications")}
+            onClick={() => go("Log In to see your notifications", "/m/notifications")}
           />
           {badge > 0 && (
             <span

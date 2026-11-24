@@ -37,6 +37,7 @@ import { MobileTabs, tabPanelProps, useTabParam } from "../kit/tabs";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
+import { useShareAction } from "../feed/share-action";
 import { SampleMarketSection, SampleShop, SampleShopBar } from "../project-earn/buyer/sample-shop";
 import { InfoRow, LIST_CARD, ListCard, PhoneStatusChip, ProductRow, SectionHeading, SubLine } from "./parts";
 import { Description } from "./project-screen";
@@ -58,6 +59,8 @@ export function SampleProject({ post, id }: { post: InnovationPost; id: string }
   const ask = `/m${startHref({ kind: "post", to: feedPersonId(post.creator.id), slug: post.slug }, ME)}`;
   const creator = creatorHrefOf(post);
   const facts = [post.category, `Shared ${formatDate(post.sharedAt)}`].filter(Boolean).join(" · ");
+  // Share (owner 2026-11-22): anyone may share it while it is on the Marketplace.
+  const share = useShareAction(id);
 
   // An in-page link to a tab ("See all" → Products) switches it in place.
   const onTabLink = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -74,7 +77,7 @@ export function SampleProject({ post, id }: { post: InnovationPost; id: string }
 
   return (
     <SampleShop post={post} id={id}>
-    <Screen top={<TopBar back />} footer={<SampleShopBar ask={ask} />}>
+    <Screen top={<TopBar back actions={share.action ? [share.action] : []} />} footer={<SampleShopBar ask={ask} />}>
       <ProjectHero post={post} />
       <header className="flex flex-col gap-2 px-8 pb-6">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -105,6 +108,7 @@ export function SampleProject({ post, id }: { post: InnovationPost; id: string }
         {tab === "products" && <SampleProducts post={post} id={id} />}
         {tab === "media" && <SampleMedia post={post} />}
       </div>
+      {share.sheets}
     </Screen>
     </SampleShop>
   );

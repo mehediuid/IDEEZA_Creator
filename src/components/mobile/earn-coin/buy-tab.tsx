@@ -6,7 +6,7 @@
 // Ready to claim · Pending, a row to Wallet balance, where the full card,
 // the network and the token address are), then every presale purchase of the
 // connected demo account as a row — its IDZ, chain and date, and at the end
-// where it stands: Unlocks in … (a countdown), Claim (through the wallet
+// where it stands: Claim in … (a countdown, the web's words), Claim (through the wallet
 // sheet), Claimed. The row opens the purchase's sheet with every field (Txn
 // ID, Wallet Address, You paid, Date) and its Claim. Filters are one row of
 // chips: Chain Type and Status (Figma), Month and Year (the web's table);
@@ -30,7 +30,7 @@ import { NETWORKS, type Network } from "@/lib/brief/types";
 import { cn } from "@/lib/utils";
 import { demoAddress, readWallet } from "@/lib/wallet/demo-wallet";
 import { compareAmounts, formatAmount } from "@/lib/wallet/money";
-import { LOCK_WORDS, claimRequestOf, countdownOf } from "@/lib/wallet/presale";
+import { LOCK_WORDS, claimInOf, claimRequestOf, countdownOf } from "@/lib/wallet/presale";
 import {
   PURCHASE_STATUSES,
   filterPurchases,
@@ -64,7 +64,6 @@ import {
   MONTH_OPTIONS,
   SectionHead,
   TestnetLine,
-  clockOf,
   shortNetworkOf,
   useEarnState,
   whenOf,
@@ -256,10 +255,12 @@ function PurchaseState({ p, now, busy, onClaim, lockId }: { p: Purchase; now: nu
         Claim
       </Button>
     );
+  // The web's pill words ("Claim in 1 m 58 s", purchase-table.tsx), as the phone's wallet ledger says it (MON-19).
+  const left = claimInOf(p.buy.unlocksAt - now);
   return (
-    <span id={lockId} role="timer" aria-label={`Unlocks in ${clockOf(p.buy.unlocksAt - now)}`} className="inline-flex shrink-0">
+    <span id={lockId} role="timer" aria-label={left} className="inline-flex shrink-0">
       <Badge tone="error" icon={<Icon icon={AlarmClockIcon} size={12} />} className="tabular-nums">
-        <span aria-hidden>Unlocks in {clockOf(p.buy.unlocksAt - now)}</span>
+        <span aria-hidden>{left}</span>
       </Badge>
     </span>
   );

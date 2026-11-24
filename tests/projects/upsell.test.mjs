@@ -93,7 +93,8 @@ test("C5: the plan's projects are checked at the question and the build gate, ne
   assert.match(gate, /<ProjectLimitCard/);
   assert.match(gate, /\{!limited && \(/, "the Build button and the spend lines go while the card shows");
   const setup = src("components/create/setup-turn.tsx");
-  assert.match(setup, /const choosing = !multi \|\| addTo !== null \|\| projects\.length > 0;/, "several products may go into a project you have");
+  // Owner 2026-11-24 withdrew D3: several products always start a new project (Add a product's project aside).
+  assert.match(setup, /const choosing = \(!multi && projects\.length > 0\) \|\| addTo !== null;/, "only one product picks a project you have");
 });
 
 test("one capped card a day across the app; the same card keeps showing that day", () => {
@@ -147,16 +148,19 @@ test("C4: the low-credits notice says when they refill and names the next plan u
   assert.equal(plain.body, "Your low mark is 8. Buy credits to keep building.", "without the new inputs, the old words");
 });
 
-test("D3: each month's credits get a notice, never the account's first grant, and only for a week", () => {
+test("D3: a paid plan's monthly credits get a notice, never the account's first grant, and only for a week", () => {
   const ledger = [
     { id: "g0", delta: 10, reason: "grant", ts: NOW - 40 * DAY },
     { id: "g1", delta: 10, reason: "grant", ts: NOW - 10 * DAY },
     { id: "g2", delta: 10, reason: "grant", ts: NOW - DAY },
   ];
-  const notes = S.coinNotices(coinIn({ ledger, onFree: true, pitch: { name: "Builder", credits: 300 } })).filter((n) => n.id.startsWith("coin:grant:"));
+  const tinkerer = ledger.map((l) => ({ ...l, delta: 50, pack: "Tinkerer" }));
+  const notes = S.coinNotices(coinIn({ ledger: tinkerer, onFree: false })).filter((n) => n.id.startsWith("coin:grant:"));
   assert.deepEqual(notes.map((n) => n.id), ["coin:grant:g2"]);
-  assert.equal(notes[0].title, "Your 10 free credits are back");
-  assert.equal(notes[0].body, "Want 300 a month? See Builder.");
+  // Free's credits come once and never come back (owner 2026-11-24): an older ledger's monthly
+  // Free grants get no "are back" notice.
+  const free = ledger.map((l) => ({ ...l, pack: "Free" }));
+  assert.equal(S.coinNotices(coinIn({ ledger: free, onFree: true, pitch: { name: "Builder", credits: 300 } })).some((n) => n.id.startsWith("coin:grant:")), false);
   const first = S.coinNotices(coinIn({ ledger: [{ id: "only", delta: 10, reason: "grant", ts: NOW - DAY }], onFree: true }));
   assert.equal(first.filter((n) => n.id.startsWith("coin:grant:")).length, 0, "the sign-up grant is no news");
   const paid = S.coinNotices(coinIn({ ledger: [ledger[1], { ...ledger[2], delta: 300 }], onFree: false, pitch: { name: "Disruptor", credits: 1200 } }));

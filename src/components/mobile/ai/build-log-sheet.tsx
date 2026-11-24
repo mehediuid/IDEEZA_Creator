@@ -34,6 +34,7 @@ import { useDates } from "@/lib/settings/use-dates";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { Sheet } from "../kit/sheet";
+import { InspirationChip } from "./parts";
 import type { ConceptFlow } from "./use-concept-flow";
 
 type StageState = "done" | "live" | "upcoming";
@@ -331,6 +332,11 @@ function Stage({
                 <span className="flex min-w-0 flex-col">
                   <span className={T.rowTitle}>{e.title}</span>
                   {e.detail && <span className={T.meta}>{e.title === "You" ? `“${e.detail}”` : e.detail}</span>}
+                  {e.image && (
+                    <span className="pt-2">
+                      <InspirationChip src={e.image} name={e.imageName} />
+                    </span>
+                  )}
                 </span>
                 <span className={cn(T.meta, "shrink-0 text-text-tertiary")}>{time(e.ts)}</span>
               </li>

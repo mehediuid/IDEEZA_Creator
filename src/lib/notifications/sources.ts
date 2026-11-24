@@ -298,11 +298,11 @@ export type CoinInput = {
   /** The paid plan, or null on Free. */
   plan: { subId: string; tier: string; name: string; renewsAt: number | null; autoRenew: boolean; pendingName: string | null } | null;
   now: number;
-  /** When the month's plan credits come back (upgrade plan C4). */
+  /** When a paid plan's next monthly credits come (upgrade plan C4); null on Free, whose come once. */
   refillAt?: number | null;
   /** The next plan up, named beside a fix (upgrade plan C4, D3); null on the top plan. */
   pitch?: { name: string; credits: number } | null;
-  /** On Free: a refill's notice names the next plan up (upgrade plan D3). */
+  /** On Free (no monthly credits, owner 2026-11-24). */
   onFree?: boolean;
   /** The welcome offer while it runs: its last hour gets one notice (upgrade plan F1). */
   offer?: { startedAt: number; endsAt: number } | null;
@@ -364,18 +364,18 @@ export function coinNotices(c: CoinInput): Notice[] {
     }
   }
 
-  // The month's plan credits arriving (upgrade plan D3): every grant of the
-  // last week but the account's very first.
+  // A paid plan's month of credits arriving (upgrade plan D3): every paid grant of the last week
+  // but the account's very first grant. Free's credits come once and never come back (owner
+  // 2026-11-24), so a Free grant (older ledgers hold one a month) gets no notice.
   const grants = c.ledger.filter((l) => l.reason === "grant").sort((a, b) => a.ts - b.ts);
   for (const g of grants.slice(1)) {
-    if (g.ts > c.now || c.now - g.ts > 7 * DAY) continue;
+    if (g.pack === "Free" || g.ts > c.now || c.now - g.ts > 7 * DAY) continue;
     out.push({
       id: `coin:grant:${g.id}`,
       kind: "coin",
       tag: "Coin · Credits",
-      title: c.onFree ? `Your ${g.delta} free credits are back` : `Your ${credits(g.delta)} for this month are here`,
-      ...(c.onFree && c.pitch ? { body: `Want ${c.pitch.credits.toLocaleString("en-US")} a month? See ${c.pitch.name}.` } : {}),
-      href: c.onFree ? PLAN_PRICING_HREF : CREDITS_HREF,
+      title: `Your ${credits(g.delta)} for this month are here`,
+      href: CREDITS_HREF,
       at: g.ts,
     });
   }

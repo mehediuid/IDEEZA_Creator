@@ -77,7 +77,7 @@ export type CreditEntry = {
   id: string;
   delta: number;
   /** `topup`: the free demo top-ups of earlier builds, kept readable.
-   *  `purchase`: credits bought. `grant`: the plan's monthly credits.
+   *  `purchase`: credits bought. `grant`: a paid plan's monthly credits, or Free's one grant.
    *  `expiry`: a lot ran out of time. `redeem`: a code's free credits. */
   reason: ChargeReason | "seed" | "refund" | "topup" | "purchase" | "grant" | "expiry" | "redeem";
   /** What was charged: a build id, or a concept turn id. The field keeps
@@ -278,11 +278,11 @@ export function purchaseState(state: CreditsState, order: CreditOrder): CreditsS
   });
 }
 
-// A plan's credits for one monthly period, expiring when the period ends.
-// Idempotent per grant id (lib/create/plans.ts `grantDue`).
+// A paid plan's credits for one monthly period, expiring when the period ends; Free's one grant
+// (expiresAt null) never runs out of time. Idempotent per grant id (lib/create/plans.ts `grantDue`).
 export function grantState(
   state: CreditsState,
-  grant: { orderId: string; credits: number; plan: string; ts: number; expiresAt: number },
+  grant: { orderId: string; credits: number; plan: string; ts: number; expiresAt: number | null },
 ): CreditsState {
   if (grant.credits <= 0 || state.ledger.some((e) => e.orderId === grant.orderId)) return state;
   return applyEntry(state, {
@@ -291,7 +291,7 @@ export function grantState(
     reason: "grant",
     orderId: grant.orderId,
     ts: grant.ts,
-    expiresAt: grant.expiresAt,
+    ...(grant.expiresAt !== null ? { expiresAt: grant.expiresAt } : {}),
     pack: grant.plan,
   });
 }

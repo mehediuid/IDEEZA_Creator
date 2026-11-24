@@ -91,7 +91,7 @@ const OWNER = { kind: "local-owner" } as const;
 /** The projects a build may join: `can(owner, "product.add")` under each one's lock
  *  (the guards' `lockOf`, decision 12; P2-SAVE-5 as changed). Every chooser that offers existing
  *  projects leaves a locked one out. */
-function joinableOf(projects: readonly ManualProject[], guards: Guards): ManualProject[] {
+export function joinableOf(projects: readonly ManualProject[], guards: Guards): ManualProject[] {
   return projects.filter((p) => can(OWNER, "product.add", { locked: guards.lockOf(p) !== null }));
 }
 

@@ -21,7 +21,7 @@
 // with every build, free, and never alone.
 
 import type { BuildItem, BuildItemKind } from "./history";
-import { DEFAULT_QUALITY, type RenderQuality } from "./quality";
+import { DEFAULT_QUALITY, QUALITIES, type RenderQuality } from "./quality";
 
 /** The same three levels as Home's Quality. */
 export type PieceQuality = RenderQuality;
@@ -337,3 +337,15 @@ export function choiceOfItem(item: BuildItem): Pick<PieceChoice, "quality" | "op
 export function isLeftOut(item: BuildItem): boolean {
   return item.status === "skipped" && item.omitted === true;
 }
+
+/** A whole product's build — every piece, nothing optimized — at one Quality: 5, 8 or 11 credits
+ *  at Low, Medium or High. The words that price a build read it, so they never drift. */
+export function wholeProductCost(quality: PieceQuality = DEFAULT_QUALITY): number {
+  return pickCost(defaultPick(quality));
+}
+
+/** "5, 8 or 11": a whole product's build at Low, Medium and High. */
+export const WHOLE_PRODUCT_COSTS: string = (() => {
+  const c = QUALITIES.map((q) => String(wholeProductCost(q)));
+  return c.length > 1 ? `${c.slice(0, -1).join(", ")} or ${c[c.length - 1]}` : c.join("");
+})();

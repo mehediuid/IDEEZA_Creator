@@ -10,8 +10,8 @@ import { AiMagicIcon, CheckmarkCircle02Icon, CircleIcon, CpuIcon, Image01Icon } 
 import { Icon } from "@/components/dashboard/icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { Banner, type BannerTone } from "@/components/ideeza/banner";
-import { currentAccount, needsSourceQuestion, readAccounts, readSession } from "@/lib/account/auth";
-import { phonePasswordChecks } from "@/lib/account/phone";
+import { currentAccount, needsAccountDetails, needsSourceQuestion, readAccounts, readSession } from "@/lib/account/auth";
+import { clockOf, phonePasswordChecks } from "@/lib/account/phone";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 
@@ -39,8 +39,10 @@ const STRENGTH = [
 
 /** "Password checklist (live)": the web's five rules, each ticking (icon and
  *  text success) as it is met, under the web's strength bar (one segment a
- *  rule, Weak · Fair · Almost there · Strong). */
-export function PasswordChecklist({ password, id }: { password: string; id?: string }) {
+ *  rule, Weak · Fair · Almost there · Strong). `invalid` (Create account was
+ *  pressed with rules unmet): the unmet ones read in the error ink, as the
+ *  web's do (AUTH-14). */
+export function PasswordChecklist({ password, id, invalid }: { password: string; id?: string; invalid?: boolean }) {
   const checks = phonePasswordChecks(password);
   const met = checks.filter((c) => c.met).length;
   const level = STRENGTH[password ? met : 0];
@@ -56,7 +58,7 @@ export function PasswordChecklist({ password, id }: { password: string; id?: str
       </div>
       <ul aria-label="Password rules" className="flex flex-col gap-2">
         {checks.map((c) => (
-          <li key={c.id} className={cn(T.meta, "flex items-center gap-4", c.met && "text-text-success")}>
+          <li key={c.id} className={cn(T.meta, "flex items-center gap-4", c.met ? "text-text-success" : invalid && "text-text-error")}>
             <span className={c.met ? "text-[color:var(--color-icon-success)]" : "text-[color:var(--color-icon-secondary)]"}>
               <Icon icon={c.met ? CheckmarkCircle02Icon : CircleIcon} size={16} />
             </span>
@@ -88,15 +90,31 @@ export const REFUSED_ALERT: AlertSpec = {
   body: "This browser wouldn’t save that. Check that it allows this site to store data, then try again.",
 };
 
+/** Too many wrong passwords (Log In, Link accounts): this phone's own pause, which the web
+ *  doesn't have, so it says plainly that it is this phone's (AUTH-9). */
+export function signInPausedBody(ms: number): string {
+  return `Log In is paused on this phone. Try again in ${clockOf(ms)}, or reset your password.`;
+}
+
 /** Where a new account goes once it is in, as on the web: the one question
  *  ("Where did you hear about IDEEZA?") when the link that brought it didn't
- *  say, then the Welcome map; both carry where it was going. Nothing else is
- *  asked: the name and birthday came with Sign up, and the handle and the rest
- *  of the profile wait in Settings and Edit profile, as on the web. */
+ *  say — after Sign up's date of birth and Terms box when Google or Facebook
+ *  made the account (AUTH-2) — then where it set out for (AUTH-4: the web goes
+ *  straight to `next`), or the Welcome map when that is Home. Nothing else is
+ *  asked: the handle and the rest of the profile wait in Settings and Edit
+ *  profile, as on the web. */
 export function landingAfterSignUp(next: string): string {
   const account = currentAccount(readAccounts(), readSession());
-  const tail = next === "/m" ? "" : `?next=${encodeURIComponent(next)}`;
-  return `${account && needsSourceQuestion(account) ? "/m/source" : "/m/welcome-map"}${tail}`;
+  if (account && (needsAccountDetails(account) || needsSourceQuestion(account))) {
+    return `/m/source${next === "/m" ? "" : `?next=${encodeURIComponent(next)}`}`;
+  }
+  return afterSignUpQuestions(next);
+}
+
+/** After the questions: the Welcome map for a plain sign-up, else straight on to the page it set
+ *  out for (AUTH-4), never dropping it. */
+export function afterSignUpQuestions(next: string): string {
+  return next === "/m" ? "/m/welcome-map" : next;
 }
 
 /** AU-01 · Splash: IDEEZA's brand moment while the app works out where to

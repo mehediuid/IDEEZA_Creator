@@ -25,7 +25,8 @@ import { can } from "@/lib/manual/permissions";
 import { productPiecesOf, productVersionView, type ProductVersionView } from "@/lib/manual/product-page";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { canCtxOf, conceptOf, type ProjectProduct } from "@/lib/manual/project-read";
-import { holdingOf } from "@/lib/market/sales";
+import { useResales } from "@/components/projects/purchased/resales-store";
+import { heldCopiesOf } from "../project-earn/buyer/held";
 import type { Sale } from "@/lib/market/types";
 import { keptQuery, MARKET_VIEW, phoneProductPath } from "@/lib/manual/phone-product";
 import type { DemoBuyerId } from "@/lib/wallet/types";
@@ -85,6 +86,8 @@ export function useProductData(id: string, productId: string): ProductData {
   const market = search.get("view") === MARKET_VIEW;
   const data = useProjectPageData(id, market ? "market" : "project");
   const { chats } = useCreateHistory();
+  // Who holds each copy now (CL-036): a copy sold on is no longer this buyer's.
+  const resales = useResales();
   const searchText = search.toString();
 
   const ready = data.state === "ready" ? data : null;
@@ -120,7 +123,7 @@ export function useProductData(id: string, productId: string): ProductData {
   const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
   const chatRow = ownerFacts && job ? (chats.find((c) => c.id === job.chatId) ?? null) : null;
   const query = keptQuery(searchText);
-  const copies = buyerId ? (holdingOf(project.id, buyerId, view.sales, { productId: product.id })?.editions ?? []) : [];
+  const copies: Sale[] = buyerId ? heldCopiesOf(view.sales, buyerId, resales, (s) => s.item.productId === product.id) : [];
   const ctx: ProductCtx = {
     ...ready,
     product,

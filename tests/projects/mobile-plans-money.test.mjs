@@ -18,6 +18,19 @@ test("this month's plan credits come from the period's grant lot", () => {
   assert.equal(allowanceOf(ledger, lotsOf(ledger), { id: "sub_b", startedAt: sub.startedAt }, now), null);
 });
 
+test("Free's credits: its one grant, with no end date (owner 2026-11-24)", () => {
+  const now = Date.UTC(2026, 3, 20);
+  const sub = { id: "sub_f", startedAt: Date.UTC(2026, 0, 10), tier: "free" };
+  const ledger = [
+    { id: "s", delta: 8, reason: "seed", ts: Date.UTC(2026, 0, 9) },
+    { id: "g", delta: 10, reason: "grant", orderId: "grant_free", pack: "Free", ts: Date.UTC(2026, 0, 10) },
+    { id: "b", delta: -5, reason: "build", buildId: "x", ts: Date.UTC(2026, 0, 12) },
+  ];
+  const a = allowanceOf(ledger, lotsOf(ledger), sub, now);
+  assert.deepEqual(a, { allowance: 10, used: 0, remaining: 10, endsAt: null }); // the seed never ends either, and came first
+  assert.equal(allowanceOf(ledger.slice(0, 1), lotsOf(ledger.slice(0, 1)), sub, now), null);
+});
+
 test("a lot is active, used or expired", () => {
   assert.equal(lotStateOf({ remaining: 3, expiresAt: null }, 10), "active");
   assert.equal(lotStateOf({ remaining: 0, expiresAt: 100 }, 10), "used");
@@ -47,4 +60,31 @@ test("withdrawals total by status, and filter by words, status and date", () => 
 test("a statement period reads as a month or a year", () => {
   assert.equal(periodLabel(2026, null), "2026");
   assert.equal(periodLabel(2026, 1), "January 2026");
+});
+
+test("the phone says when credits refill only on a paid plan: the day comes from nextCreditsAt (null on Free)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const upsell = await readFile(new URL("../../src/components/mobile/plans/upsell.tsx", import.meta.url), "utf8");
+  assert.match(upsell, /nextCreditsAt\(sub, now\)/);
+  assert.doesNotMatch(upsell, /creditPeriod\(sub, now\)\.end/);
+  const screens = await readFile(new URL("../../src/components/mobile/plans/credit-screens.tsx", import.meta.url), "utf8");
+  assert.match(screens, /once \? "Free credits" : "This month"/);
+});
+
+test("several products start a new project; one product picks New project or A project I have (owner 2026-11-24)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const setup = await readFile(new URL("../../src/components/mobile/ai/setup.tsx", import.meta.url), "utf8");
+  assert.match(setup, /const choosing = \(!multi && projects\.length > 0\) \|\| addTo !== null;/);
+  assert.match(setup, />New project</);
+  assert.match(setup, />A project I have</);
+  assert.doesNotMatch(setup, /go in one project: one you have, or a new one/);
+  const flow = await readFile(new URL("../../src/components/mobile/ai/use-concept-flow.ts", import.meta.url), "utf8");
+  assert.match(flow, /projects: gateMulti \? \[\] : setupProjects/);
+});
+
+test("the phone's Listing type is two radio cards, not a button group that reads as tabs (owner 2026-11-24)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(new URL("../../src/components/mobile/project-earn/listing-fields.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /ButtonGroup/);
+  assert.match(src, /role="radiogroup" aria-labelledby=\{ids\.type\}/);
 });

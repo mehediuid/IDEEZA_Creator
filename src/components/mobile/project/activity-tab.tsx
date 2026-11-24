@@ -10,7 +10,9 @@
 // open the proof viewer (04n: the kit's full-screen viewer, "Prototype · proof
 // 1 of 3 · date", ← Download →) and link rows that ask first (04h) — and ⋮
 // with Edit activity · Delete activity (04d), Delete asking first (04g).
-// Planning is made automatically, so it has no ⋮.
+// Planning is made automatically, so it has no ⋮. Once the project is minted
+// or has copies, an "NFT activity · Earn › Sell" row under the history says
+// where its NFTs keep their own activity (the web's Activity card, PRJ-6).
 
 import * as React from "react";
 import Link from "next/link";
@@ -25,21 +27,24 @@ import {
   MoreVerticalIcon,
   PencilEdit01Icon,
   Pdf01Icon,
+  Store01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { buttonVariants } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { getMediaFile, removeActivity, useJourney } from "@/lib/manual/journey-store";
-import { helpOf, historyOf, labelOf, type JourneyEntry, type MediaRef, type PriceSnapshot } from "@/lib/manual/journey";
+import { WHOLE_PROJECT_SCOPE, helpOf, historyOf, labelOf, type JourneyEntry, type MediaRef, type PriceSnapshot } from "@/lib/manual/journey";
 import { can } from "@/lib/manual/permissions";
 import { formatDate } from "@/lib/manual/project-summary";
 import { formatAmount } from "@/lib/manual/rail-copy";
+import { phoneEarnHref } from "@/lib/manual/phone-earn";
 import { phoneProjectPath } from "@/lib/manual/phone-project";
 import { cn } from "@/lib/utils";
 import { BottomBar } from "../kit/bottom-bar";
 import { ConfirmSheet } from "../kit/confirm-sheet";
 import { ImageViewer } from "../kit/image-viewer";
+import { ListCard, ListRow } from "../kit/list";
 import { MEDIA_INK } from "../kit/media";
 import { ActionSheet, Sheet } from "../kit/sheet";
 import { useToast } from "../kit/toast";
@@ -75,6 +80,9 @@ export function ActivityTab() {
   const [prices, setPrices] = React.useState<PriceSnapshot | null>(null);
   const [viewing, setViewing] = React.useState<Viewing | null>(null);
   const editHref = (e: JourneyEntry) => phoneProjectPath(project.id, `activity/${encodeURIComponent(e.id)}`);
+  // The web's rule (activity-card.tsx): minted, or copies of the whole project.
+  const minted = view.summary.status !== "draft" && view.mint.status !== "notMinted";
+  const hasNft = minted || view.editions.some((t) => t.productId === WHOLE_PROJECT_SCOPE);
 
   return (
     <div className="flex flex-col gap-6">
@@ -153,6 +161,11 @@ export function ActivityTab() {
           </li>
         ))}
       </ul>
+      {hasNft && (
+        <ListCard label="NFT activity">
+          <ListRow href={phoneEarnHref(project.id, "sell")} icon={Store01Icon} title="NFT activity" meta="Earn › Sell" />
+        </ListCard>
+      )}
 
       <ActionSheet
         open={actions !== null}

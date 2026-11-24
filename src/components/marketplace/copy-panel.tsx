@@ -37,9 +37,10 @@ import { checkoutBlocks, IN_CHECKOUT_BUYER_LINE } from "@/lib/market/checkout-ho
 import { useCheckoutHolds } from "@/lib/market/checkout-hold-store";
 import { editionChainOf, trackCardOf, tracksOf } from "@/lib/market/editions";
 import { KIND_LABEL, USE_LABEL } from "@/lib/market/sell-flow";
+import type { Token } from "@/lib/brief/types";
 import type { EditionKind, EditionTrack, EditionUse, Listing, Sale } from "@/lib/market/types";
 import { buyerLabel } from "@/lib/wallet/identities";
-import { formatAmount } from "@/lib/wallet/money";
+import { compareAmounts, formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,20 @@ function listedOf(view: ProjectView, scopeId: string, kind: EditionKind): Listed
 /** The kinds a scope has on sale, Physical first. */
 export function listedKindsOf(view: ProjectView, scopeId: string): EditionKind[] {
   return KINDS.filter((k) => listedOf(view, scopeId, k).length > 0);
+}
+
+/** "Physical NFT on sale · from 0.008 ETH": what of a product's own is listed, at its lowest This
+ *  version price — the shop's product card line (CL-018), read by the phone's product rows too. */
+export function saleLineOf(view: ProjectView, productId: string): string | null {
+  const kinds = listedKindsOf(view, productId);
+  if (!kinds.length) return null;
+  let low: { regular: string; token: Token } | null = null;
+  for (const t of tracksOf(productId, view.editions)) {
+    if (!t.listing || !kinds.includes(t.kind)) continue;
+    if (!low || (t.listing.token === low.token && compareAmounts(t.listing.regular, low.regular) < 0)) low = t.listing;
+  }
+  const what = kinds.length > 1 ? "Physical and Virtual NFTs" : KIND_LABEL[kinds[0]];
+  return low ? `${what} on sale · from ${formatAmount(low.regular, low.token)}` : `${what} on sale`;
 }
 
 /** The kind a buyer already holds in this scope, so the box opens on what they own. */

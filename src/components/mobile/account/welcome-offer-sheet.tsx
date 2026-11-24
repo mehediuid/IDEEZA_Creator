@@ -5,10 +5,14 @@
 // off its first payment on any plan for 12 hours. As on the web it pops up
 // once on Home — after the Welcome map and the tour, when
 // no other sheet is up — and that starts the clock. Here it is an M09 sheet:
-// the web's 50% OFF mark, the time left, Monthly · Annual, the three paid
-// plans with the struck-through price, Claim 50% off → the phone's checkout,
-// and Maybe later. Closed, it never pops up again; the offer waits on Plan &
-// pricing and the checkout until it ends or is used.
+// the web's gift line ("A welcome gift, just for you") with the time left,
+// the 50% OFF mark, Monthly · Annual, the three paid plans with the
+// struck-through price and Most popular on Builder, Compare all plans, Claim
+// 50% off → the phone's checkout, and Maybe later (AUTH-7, CL-004). Compare
+// all plans opens Plan & pricing without closing the offer for good: back on
+// Home it pops up again. Closed (✕, Maybe later or a claim), it never pops up
+// again; the offer waits on Plan & pricing and the checkout until it ends or
+// is used.
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -20,6 +24,7 @@ import { OFFER_OFF, closeOffer, countdown, offerPrice, startOffer } from "@/lib/
 import { usd, type BillingCycle } from "@/lib/create/credit-pricing";
 import { PLANS, priceOf, type PlanTier } from "@/lib/create/plans";
 import { cn } from "@/lib/utils";
+import { Chevron, LIST_CARD, LIST_ROW } from "../kit/list";
 import { Sheet } from "../kit/sheet";
 import { MobileTabs } from "../kit/tabs";
 import { T } from "../type";
@@ -79,13 +84,18 @@ export function WelcomeOfferSheet() {
   };
   const picked = PAID.find((p) => p.tier === tier) ?? PAID[0];
   const mine = pay(picked.tier);
+  /** Compare all plans: Plan & pricing, the offer only put away (it comes back on Home). */
+  const compare = () => {
+    setOpen(false);
+    router.push("/m/plans");
+  };
 
   return (
     <Sheet
       open
       onClose={close}
       title={`Welcome gift: ${OFF} off any plan`}
-      description={`Your first ${unit} of any plan. Ends in ${countdown(offer.left)}.`}
+      description={`A welcome gift, just for you: your first ${unit} of any plan. Ends in ${countdown(offer.left)}.`}
       actions={
         <>
           <Button
@@ -124,7 +134,10 @@ export function WelcomeOfferSheet() {
               <input type="radio" name="offer-plan" className="sr-only" checked={on} onChange={() => setTier(p.tier)} />
               <Radio checked={on} decorative />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className={T.rowTitle}>{p.name}</span>
+                <span className={cn(T.rowTitle, "flex flex-wrap items-center gap-x-4 gap-y-1")}>
+                  {p.name}
+                  {p.popular && <Badge tone="brand">Most popular</Badge>}
+                </span>
                 <span className={T.meta}>{p.credits.toLocaleString("en-US")} AI credits a month</span>
               </span>
               <span className="flex flex-col items-end gap-2">
@@ -138,6 +151,10 @@ export function WelcomeOfferSheet() {
           );
         })}
       </div>
+      <button type="button" onClick={compare} className={cn(LIST_CARD, LIST_ROW, "flex-row")}>
+        <span className={cn(T.rowTitle, "min-w-0 flex-1")}>Compare all plans</span>
+        <Chevron />
+      </button>
       <p className={cn(T.meta, "text-center text-text-tertiary")}>
         Then {usd(mine.period)} a {unit}. Cancel any time. Testnet demo: no real money moves.
       </p>

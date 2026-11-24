@@ -4,11 +4,19 @@
 // "Share to your Feed" — you (A16 Avatar SM and your name) with the audience
 // under your name (Public ⌄, a pick-one sheet "Post audience": Public or Only
 // me; no Friends, D-1), then the caption as the Figma draws it, borderless
-// right under you ("Say something about this post..."), then the clip being
-// shared as a small card (its picture, title and creator: what the share will
-// show), then Share now and Cancel. A share is real: the clip leads your Feed with "You shared", your
+// right under you, in the web dialog's words ("Say something about this
+// project…" / "…product…", SOC-15), then the item being shared as a small card
+// (its picture, title, "by" its creator and, for a product, "from" its project:
+// what the share will show), then Share now. An item you shared before says so
+// over the card ("You shared this on …") and the button reads Share again
+// (SOC-12): a second share is a second post on your Timeline, as on the web.
+// A share is real: the clip leads your Feed with "You shared", your
 // audience and your caption (lib/innovations/clips.ts `feedClips`), and its ⋯
 // takes it off again. A write the phone refuses keeps the caption and says so.
+// Any item live on the Marketplace can be shared the same way (owner 2026-11-22, Facebook's re-share:
+// your words over the original, with its creator): a clip from the Feed, or a project or product from
+// its marketplace screen (`ShareTarget`). View then opens the Feed on it when it plays there, else
+// your profile's Timeline.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +28,7 @@ import { AUDIENCES, CAPTION_MAX, captionProblem, withShare, type ShareAudience }
 import type { FeedClip } from "@/lib/innovations/clips";
 import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMe } from "@/lib/people/profile-store";
+import { formatDate } from "@/lib/settings/dates";
 import { cn } from "@/lib/utils";
 import { LIST_CARD } from "../kit/list";
 import { PickSheet } from "../kit/pick-list";
@@ -31,13 +40,36 @@ import { newId, useFeedPrefs } from "./use-feed";
 
 const AUDIENCE_ICON = { public: Globe02Icon, "only-me": LockIcon } as const;
 
+/** What is being shared, as the sheet shows it: its id (share-items.ts), whether it is a project or a
+ *  product, its picture, title, maker and (a product) project, and whether it plays on the Feed. */
+export type ShareTarget = {
+  id: string;
+  kind: "project" | "product";
+  title: string;
+  /** A product's project ("from …"); null for a project. */
+  projectTitle: string | null;
+  cover: string | null;
+  by: string;
+  plays: boolean;
+};
+
+export const shareTargetOfClip = (clip: FeedClip): ShareTarget => ({
+  id: clip.id,
+  kind: clip.kind,
+  title: clip.title,
+  projectTitle: clip.projectTitle,
+  cover: clip.poster,
+  by: clip.creator.name,
+  plays: true,
+});
+
 export function ClipShare({
-  clip,
+  item,
   open,
   onClose,
   onFeed = false,
 }: {
-  clip: FeedClip;
+  item: ShareTarget;
   open: boolean;
   onClose: () => void;
   /** Shared from the Feed itself: the clip moves to its front, where it is being watched. */
@@ -47,7 +79,9 @@ export function ClipShare({
   const photo = useMyPhoto();
   const toast = useToast();
   const router = useRouter();
-  const { update } = useFeedPrefs();
+  const { prefs, update } = useFeedPrefs();
+  // The last time you shared this item (SOC-12): sharing again makes a second post, so the sheet says so.
+  const sharedAt = prefs.shares.reduce<number | null>((at, s) => (s.clipId === item.id && (at === null || s.at > at) ? s.at : at), null);
   const [caption, setCaption] = React.useState("");
   const [audience, setAudience] = React.useState<ShareAudience>("public");
   const [picking, setPicking] = React.useState(false);
@@ -64,7 +98,7 @@ export function ClipShare({
 
   const share = () => {
     if (problem) return;
-    const ok = update((p) => withShare(p, { id: newId("share"), clipId: clip.id, caption, audience, at: Date.now() }));
+    const ok = update((p) => withShare(p, { id: newId("share"), clipId: item.id, caption, audience, at: Date.now() }));
     if (!ok) {
       setFailed(true);
       return;
@@ -78,8 +112,10 @@ export function ClipShare({
             action: {
               label: "View",
               onClick: () => {
-                rememberFeedClip(clip.id);
-                router.push("/m");
+                if (item.plays) {
+                  rememberFeedClip(item.id);
+                  router.push("/m");
+                } else router.push("/m/creators/me");
               },
             },
           },
@@ -98,7 +134,7 @@ export function ClipShare({
         actions={
           <>
             <Button size="xl" className="w-full" disabled={!!problem} onClick={share}>
-              {failed ? "Try again" : "Share now"}
+              {failed ? "Try again" : sharedAt !== null ? "Share again" : "Share now"}
             </Button>
           </>
         }
@@ -121,14 +157,14 @@ export function ClipShare({
         </div>
         <div className="flex flex-col gap-2">
           <label className="sr-only" htmlFor={fieldId}>
-            Say something about this post
+            {`Say something about this ${item.kind}`}
           </label>
           <textarea
             id={fieldId}
             value={caption}
             rows={3}
             aria-invalid={!!problem || undefined}
-            placeholder="Say something about this post..."
+            placeholder={`Say something about this ${item.kind}…`}
             onChange={(e) => {
               setCaption(e.target.value);
               setFailed(false);
@@ -142,17 +178,19 @@ export function ClipShare({
             </span>
           )}
         </div>
-        {/* What the share shows: the clip itself. */}
+        {sharedAt !== null && <p className={T.meta}>You shared this on {formatDate(sharedAt)}.</p>}
+        {/* What the share shows: the item itself, with its maker and (a product) its project. */}
         <div className={cn(LIST_CARD, "flex-row items-center gap-6 p-4")}>
-          {clip.poster ? (
-            // eslint-disable-next-line @next/next/no-img-element -- the clip's picture
-            <img src={clip.poster} alt="" className="size-[56px] shrink-0 rounded-md object-cover" />
+          {item.cover ? (
+            // eslint-disable-next-line @next/next/no-img-element -- the item's picture
+            <img src={item.cover} alt="" className="size-[56px] shrink-0 rounded-md object-cover" />
           ) : (
             <span aria-hidden className="size-[56px] shrink-0 rounded-md bg-bg-subtle" />
           )}
           <span className="flex min-w-0 flex-col gap-1">
-            <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>{clip.title}</span>
-            <span className={cn(T.meta, "truncate")}>{clip.creator.name}</span>
+            <span className={cn(T.rowTitle, "line-clamp-2 break-words")}>{item.title}</span>
+            <span className={cn(T.meta, "truncate")}>{`by ${item.by}`}</span>
+            {item.projectTitle && <span className={cn(T.meta, "truncate")}>{`from ${item.projectTitle}`}</span>}
           </span>
         </div>
       </Sheet>

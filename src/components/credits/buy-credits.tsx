@@ -42,8 +42,9 @@ import {
   type CreditPack,
   type PackId,
 } from "@/lib/create/credit-pricing";
-import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { jobCost, useCreateHistory, type BuildJob } from "@/lib/create/history";
+import { WHOLE_PRODUCT_COSTS } from "@/lib/create/pieces";
 import { useSettings } from "@/lib/settings/use-settings";
 import { useCreatePlan, useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
@@ -245,7 +246,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
       title={title}
       description={
         step === "choose"
-          ? `Credits pay for AI work. A concept render uses ${CONCEPT_COST}, a whole-product build uses ${BUILD_COST} per product — less when you pick fewer pieces.`
+          ? `Credits pay for AI work. A concept render uses ${CONCEPT_COST}, a whole-product build uses ${WHOLE_PRODUCT_COSTS} per product by Quality — less when you pick fewer pieces.`
           : undefined
       }
       size={step === "pay" ? "lg" : "md"}

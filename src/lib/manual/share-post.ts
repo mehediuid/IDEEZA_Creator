@@ -27,3 +27,13 @@ export const STORY_MISSING = "Write a few words for the post — why you built i
 export function sharePostBlocker(post: SharePost): string | null {
   return post.story.trim() ? null : STORY_MISSING;
 }
+
+/** The phone's Stop sharing (owner 2026-11-22: a share stays on your Timeline; the Feed shows what is
+ *  listed): the post leaves your Timeline, and the project stays on the Feed while it is for sale. */
+export function stopSharingBodyOf(onFeed: boolean): string {
+  return onFeed
+    ? "The post leaves your Timeline. The project stays on the Feed while it’s for sale. Its comments are kept and come back if you share again."
+    : "The post leaves your Timeline, and only you can open it. Its comments are kept and come back if you share again.";
+}
+
+export const STOPPED_SHARING = "Stopped sharing. The post left your Timeline.";

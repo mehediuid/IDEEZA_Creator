@@ -21,7 +21,10 @@ const copy = await import("../../.tmp-test/lib/video/video-copy.js");
 test("the market header leads with the post's media stage and names the creator", () => {
   const header = read(MARKET + "market-header.tsx");
   assert.match(header, /<PostMediaStage post=\{post\} mine=\{mine\} \/>/);
-  assert.match(header, /<ProjectHeader \{\.\.\.props\} context="market" creatorName=\{creator\} \/>/);
+  assert.match(header, /<ProjectHeader \{\.\.\.props\} context="market" creatorName=\{creator\} parts=\{PARTS\} \/>/);
+  // Owner, 2026-11-22: Share at the end of the title row; your own project, so Copy link and the networks.
+  assert.match(header, /const PARTS = \{ titleRow: \[MarketShare\] \}/);
+  assert.match(header, /<MarketShareButton itemId=\{shareItemId\("mine", project\.id\)\}/);
   assert.doesNotMatch(header, /Your project page/, "the owner's way back is the banner's");
   const shared = read("components/projects/details/header.tsx");
   assert.match(shared, /replace\(\/\^Created by you\(\?: · \)\?\/, ""\)/);

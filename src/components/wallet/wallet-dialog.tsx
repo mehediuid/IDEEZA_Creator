@@ -28,8 +28,16 @@
 // Violet: a request's primary is the brand violet, and the page's own violet
 // is under the scrim, so one is in view. Manage mode, once connected, has no
 // violet at all: nothing in it is the page's next step.
+//
+// The phone app (/m) shares this provider: a request that reaches it there
+// (Auto top-up, mounted at the root) is drawn by the phone's own wallet sheet,
+// from the bottom (mobile/earn-coin/wallet-dialog-phone.tsx, MON-9), loaded
+// only there. Everywhere else, at every width, this dialog is unchanged.
 
 import * as React from "react";
+import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
+import { useDeviceMode } from "@/components/mobile/device";
 import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, IconButton, ModalFrame, Radio, TestnetDemoBadge } from "@/components/ideeza";
@@ -143,8 +151,24 @@ export function useWalletClock(): number {
   );
 }
 
+/** The phone app's form of this dialog: the phone's wallet sheet, fetched only on /m. */
+const PhoneWalletDialog = dynamic(() => import("@/components/mobile/earn-coin/wallet-dialog-phone").then((m) => m.PhoneWalletDialog), {
+  ssr: false,
+  loading: () => null,
+});
+
+/** Inside the phone app (/m), on the phone itself or in the desktop's phone frame — not the desktop
+ *  page that draws that frame, which keeps this dialog. */
+function useInPhoneApp(): boolean {
+  const pathname = usePathname() ?? "";
+  const mode = useDeviceMode();
+  return (pathname === "/m" || pathname.startsWith("/m/")) && (mode === "phone" || mode === "framed");
+}
+
 export function WalletDialog(props: WalletDialogProps) {
+  const phone = useInPhoneApp();
   if (!props.open) return null;
+  if (phone) return <PhoneWalletDialog {...props} />;
   if (props.mode === "request" && props.request) return <RequestDialog {...props} view={props.request} />;
   return <ManageDialog {...props} />;
 }

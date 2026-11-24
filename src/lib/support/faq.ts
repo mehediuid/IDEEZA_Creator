@@ -6,7 +6,15 @@
 // that does it. Search folds case and matches every typed word anywhere in
 // the question or the answer, questions first.
 //
-// Pure, no imports.
+// Pure. A build's pieces are named from the build's own table
+// (lib/create/pieces.ts), as the AI tab names them (SET-17), so the answer
+// never drifts from what a build makes.
+
+import { PICKABLE_KINDS, PIECES, WHOLE_PRODUCT_COSTS } from "../create/pieces";
+
+/** "PCB, Code, 3D Module, Assembly and Wiring": the pieces a build makes for each product. */
+const names = PICKABLE_KINDS.map((k) => PIECES[k].name);
+export const BUILD_PIECES = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names.join("");
 
 export type FaqItem = { id: string; q: string; a: string; link?: { label: string; href: string } };
 
@@ -14,7 +22,7 @@ export const FAQS: readonly FaqItem[] = [
   {
     id: "no-knowledge",
     q: "Can I use IDEEZA without knowing hardware design?",
-    a: "Yes. Describe your idea in plain words on the AI tab. AI draws concepts for each product, and a build gives every product five pieces: a 3D model, a PCB, firmware code, wiring and a parts list.",
+    a: `Yes. Describe your idea in plain words on the AI tab. AI draws concepts for each product, and a build makes ${BUILD_PIECES} for each one, plus its parts list.`,
     link: { label: "Start with an idea", href: "/m/ai" },
   },
   {
@@ -25,13 +33,13 @@ export const FAQS: readonly FaqItem[] = [
   {
     id: "credits",
     q: "What does a credit pay for?",
-    a: "AI work. A concept drawing (a first draft, a refine or a regenerate) uses 1 credit, and a build uses 4 for each product in it. Your plan adds credits every month, and you can buy more any time.",
+    a: `AI work. A concept drawing (a first draft, a refine or a regenerate) uses 1 credit, and a build uses ${WHOLE_PRODUCT_COSTS} for each product in it, by its Quality (Low, Medium or High), less when you pick fewer pieces. Free gives its credits once; a paid plan adds credits every month, and you can buy more any time.`,
     link: { label: "See your credits", href: "/m/plans/credits" },
   },
   {
     id: "pricing",
     q: "Pricing & availability",
-    a: "Free is $0 with 10 AI credits a month. Tinkerer is $8 a month (50 credits), Builder $10 (300 credits) and Disruptor $20 (1,200 credits). Paying yearly takes 20% off. Every plan, Free included, can mint, list and buy.",
+    a: "Free is $0 with 10 AI credits, once. Tinkerer is $8 a month (50 credits), Builder $10 (300 credits) and Disruptor $20 (1,200 credits). Paying yearly takes 20% off. Every plan, Free included, can mint, list and buy.",
     link: { label: "Compare plans", href: "/m/plans" },
   },
   {
@@ -61,7 +69,7 @@ export const FAQS: readonly FaqItem[] = [
   {
     id: "identity",
     q: "Why do I need to verify my identity?",
-    a: "Your first withdrawal asks for it, and so does selling physical copies. Level 1 asks your legal name, your country and your mobile number. From $1,000 and from $5,000 of total sales, fuller checks with ID documents are asked. Nothing is checked or limited in this demo.",
+    a: "Your first withdrawal asks for it, and so does selling physical copies. Level 1 asks your legal name and your country. From $1,000 and from $5,000 of total sales, fuller checks with ID documents are asked. Nothing is checked or limited in this demo.",
     link: { label: "KYC verification", href: "/m/settings/kyc" },
   },
   {

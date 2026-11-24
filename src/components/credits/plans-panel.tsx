@@ -41,11 +41,13 @@ import { discountFor, usd, type BillingCycle } from "@/lib/create/credit-pricing
 import { useCreatePlan } from "@/lib/create/plan";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useCredits } from "@/lib/create/credits";
+import { WHOLE_PRODUCT_COSTS } from "@/lib/create/pieces";
 import { fitsYou, takesPlanSlot, usageOf } from "@/lib/create/upsell";
 import {
   HIGH_VIDEO_TIER,
   PLANS,
   YEARLY_OFF,
+  creditsMonthly,
   lossesOf,
   planOf,
   priceOf,
@@ -234,7 +236,7 @@ function Features({ plan: p, className }: { plan: Plan; className?: string }) {
           <Icon icon={AiMagicIcon} size={20} />
         </span>
         <span>
-          AI credits: <CreditChip value={p.credits} /> / month
+          AI credits: <CreditChip value={p.credits} /> {creditsMonthly(p.tier) ? "/ month" : "once"}
         </span>
       </li>
       {rows.map((r) => (
@@ -340,7 +342,9 @@ export const COMPARE: { group: string; rows: Row[] }[] = [
   {
     group: "AI & resources",
     rows: [
-      { label: "AI credits / month", values: PLANS.map((p) => p.credits), chip: true },
+      { label: "AI credits", values: PLANS.map((p) => p.credits), chip: true },
+      // Free gives its credits once (owner 2026-11-24); a paid plan's come every month.
+      { label: "AI credits given", values: PLANS.map((p) => (creditsMonthly(p.tier) ? "Monthly" : "Once")) },
       { label: "AI queue", values: ["Basic queue", "Standard queue", "Priority queue", "Fast-track queue"] },
       { label: "AI credit discount", values: [false, false, "15% · 25% yearly", "25% · 35% yearly"] },
       { label: "Help & support", values: ["Community", "Standard", "Priority", "Priority"] },
@@ -495,12 +499,12 @@ export const FAQ: Record<FaqTab, { q: string; a: string }[]> = {
   general: [
     {
       q: "Is IDEEZA priced on usage or a subscription?",
-      a: "Both, kept simple. A plan adds AI credits every month and sets how many projects, exports and contributors you have. AI work spends credits, and you can buy more credits any time.",
+      a: "Both, kept simple. Free gives its AI credits once; a paid plan adds AI credits every month. Every plan sets how many projects, exports and contributors you have. AI work spends credits, and you can buy more credits any time.",
     },
-    { q: "What does a credit pay for?", a: "AI work. A concept render (a first draft, a refine or a regenerate) uses 1 credit, and a build uses 4 for each product in it." },
+    { q: "What does a credit pay for?", a: `AI work. A concept render (a first draft, a refine or a regenerate) uses 1 credit, and a build uses ${WHOLE_PRODUCT_COSTS} for each product in it, by its Quality.` },
     {
-      q: "What happens to my credits each month?",
-      a: "Your plan adds its credits at the start of each monthly period, and they last until the period ends. Credits you buy last 12 months. The credits that expire first are spent first.",
+      q: "When do I get my plan's credits?",
+      a: "Free gives its credits once, when your account starts, and they never expire. A paid plan adds its credits at the start of each monthly period, and they last until the period ends. Credits you buy last 12 months. The credits that expire first are spent first.",
     },
     {
       q: "Can I change or cancel my plan?",

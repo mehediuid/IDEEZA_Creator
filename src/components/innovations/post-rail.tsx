@@ -6,7 +6,9 @@
 // places each block in the flow (post-page.tsx), and on a phone the actions
 // move to the sticky bar at the bottom (PostActionBar). Sharing has one home
 // in each place: a Share menu with Copy link and the four networks
-// (owner, 2026-11-15), for the maker and a visitor alike.
+// (owner, 2026-11-15), for the maker and a visitor alike. On someone else's
+// post whose project is live on the Marketplace, Share to Innovations leads
+// it (owner, 2026-11-22: a re-share with your words over the original).
 
 import { FollowButton } from "@/components/profile/person-actions";
 import { PersonName } from "@/components/profile/person-name";
@@ -25,6 +27,7 @@ import {
   Link01Icon,
   Linkedin01Icon,
   NewTwitterIcon,
+  News01Icon,
   Share08Icon,
   WhatsappIcon,
 } from "@hugeicons/core-free-icons";
@@ -58,6 +61,9 @@ export type PostActions = {
   copyLink: () => void;
   /** Opens the network's share page for this post in a new tab. */
   shareTo: (network: ShareNetwork) => void;
+  /** Opens Share to Innovations for the post's project: only on someone else's post whose
+   *  project is live on the Marketplace (absent otherwise, and the row with it). */
+  shareToInnovations?: () => void;
 };
 
 const firstName = (name: string) => name.split(" ")[0] || name;
@@ -147,15 +153,21 @@ const NETWORK_ICON: Record<ShareNetwork, Parameters<typeof Icon>[0]["icon"]> = {
   whatsapp: WhatsappIcon,
 };
 
-/** Share: Copy link, then Facebook, LinkedIn, X and WhatsApp, behind one trigger. */
+/** Share: Share to Innovations when it is offered, then Copy link, then Facebook, LinkedIn, X and
+ *  WhatsApp, behind one trigger. The marketplace pages' Share (shares/share-button.tsx) is this menu. */
 export function ShareMenu({
   actions,
   trigger,
+  label = "Share this post",
 }: {
-  actions: PostActions;
+  actions: Pick<PostActions, "copyLink" | "shareTo" | "shareToInnovations">;
   trigger: (props: MenuTriggerProps) => React.ReactNode;
+  label?: string;
 }) {
   const items: MenuItem[] = [
+    ...(actions.shareToInnovations
+      ? [{ id: "innovations", label: "Share to Innovations", icon: <Icon icon={News01Icon} size={20} />, onSelect: actions.shareToInnovations }]
+      : []),
     { id: "copy", label: "Copy link", icon: <Icon icon={Link01Icon} size={20} />, onSelect: actions.copyLink },
     ...SHARE_NETWORKS.map((n) => ({
       id: n.id,
@@ -164,7 +176,7 @@ export function ShareMenu({
       onSelect: () => actions.shareTo(n.id),
     })),
   ];
-  return <Menu label="Share this post" align="end" items={items} trigger={trigger} />;
+  return <Menu label={label} align="end" items={items} trigger={trigger} />;
 }
 
 export function AppreciateButton({

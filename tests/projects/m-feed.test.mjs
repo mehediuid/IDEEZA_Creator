@@ -67,6 +67,12 @@ test("addresses: details, the marketplace, the clip itself", () => {
   assert.equal(clips.clipDetailsHref({ projectId: "p1", productId: null }), "/m/projects/p1");
   assert.equal(clips.clipDetailsHref({ projectId: "p1", productId: "remote" }), "/m/projects/p1/products/remote");
   assert.equal(clips.clipBuyHref({ projectId: "p1", productId: null }), "/m/projects/p1?tab=marketplace");
+  // A sample's copies are the whole project's; your own product's copies sell on its market view.
+  assert.equal(clips.clipBuyHref({ projectId: "p1", productId: "remote" }), "/m/projects/p1?tab=marketplace");
+  // The buy box opens on the kind the pill shows first.
+  assert.equal(clips.clipBuyHref({ projectId: "p1", productId: "remote", offers: [{ kind: "physical" }] }), "/m/projects/p1?tab=marketplace&nft=physical");
+  assert.equal(clips.clipBuyHref({ projectId: "m7", productId: null, source: "mine", offers: [{ kind: "main" }] }), "/m/projects/m7/market?nft=main");
+  assert.equal(clips.clipBuyHref({ projectId: "m7", productId: "base", source: "mine" }), "/m/projects/m7/products/base?view=market");
   assert.equal(clips.clipHref("p1~remote"), "/m/clip/p1~remote");
 });
 
@@ -294,7 +300,7 @@ test("a project you shared is a clip: mine:<projectId>, a Product clip per furth
   assert.equal(mine[0].source, "mine");
   assert.equal(mine[0].poster, "/cover.png");
   assert.equal(mine[1].offers[0].kind, "physical");
-  assert.equal(clips.clipBuyHref(mine[0]), "/m/projects/m7/market");
+  assert.equal(clips.clipBuyHref(mine[0]), "/m/projects/m7/market?nft=main");
   assert.equal(clips.clipHref(mine[0].id), "/m/clip/mine%3Am7");
   assert.ok(clips.isMineClipId("mine:m7"));
   // Without a video in this browser the post is still a clip (its cover), so it shows on the Feed.

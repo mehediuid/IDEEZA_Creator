@@ -7,19 +7,28 @@
 // Report a problem, Tutorials and the web Support menu's Tour guide (the
 // phone tour again, from Home). `?q=`
 // keeps the search in the address; a search that lands on one question opens
-// it once, and it closes like any other.
+// it once, and it closes like any other. The screen is titled Help, as the
+// rows that open it say. Until the first product is made, "Your first
+// product" brings back the first-product guide (the web Tour Guide panel's
+// guide button and its words), so ✕ on the guide's strip is never final.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight01Icon, BubbleChatQuestionIcon, Bug01Icon, Mortarboard02Icon, Navigation03Icon, Search01Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, BubbleChatQuestionIcon, Bug01Icon, Compass01Icon, Mortarboard02Icon, Navigation03Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { SearchInput } from "@/components/ideeza/search-input";
+import { GUIDE_TITLE } from "@/components/tour/guide-card";
+import { updateTour, useTourRecord } from "@/components/tour/use-tour";
+import { useAuth } from "@/lib/account/auth";
 import { updatePhone } from "@/lib/account/phone";
 import { FAQS, searchFaqs } from "@/lib/support/faq";
+import { withGuide } from "@/lib/tour/state";
+import type { GuideState } from "@/lib/tour/types";
 import { cn } from "@/lib/utils";
 import { ListCard, ListRow } from "../kit/list";
 import { EmptyState } from "../kit/state";
+import { usePhoneGuide } from "../guide/use-guide";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
@@ -53,7 +62,7 @@ export function FaqScreen() {
   };
 
   return (
-    <Screen top={<TopBar back="/m/profile" title="FAQs" actions={[{ icon: BubbleChatQuestionIcon, label: "Contact support", onClick: () => router.push("/m/help/contact") }]} />} className="px-8 pb-12 pt-4">
+    <Screen top={<TopBar back="/m/profile" title="Help" actions={[{ icon: BubbleChatQuestionIcon, label: "Contact support", onClick: () => router.push("/m/help/contact") }]} />} className="px-8 pb-12 pt-4">
       <div className="flex flex-col gap-8">
         <SearchInput size="xl" aria-label="Search the questions" placeholder="Enter a search term here" value={query} onValueChange={type} onClear={() => type("")} />
         {shown.length === 0 ? (
@@ -87,10 +96,36 @@ export function FaqScreen() {
             <ListRow icon={BubbleChatQuestionIcon} title="Contact support" meta="Write to the IDEEZA team" href="/m/help/contact" />
             <ListRow icon={Bug01Icon} title="Report a problem" meta="Something broken, slow or confusing" href="/m/help/report?from=/m/help" />
             <ListRow icon={Mortarboard02Icon} title="Tutorials" meta="Learn IDEEZA step by step" href="/m/tutorials" />
+            <FirstProductRow />
             <ListRow icon={Navigation03Icon} title="Tour guide" meta="Take the tour again" onClick={retakeTour} />
           </ListCard>
         </section>
       </div>
     </Screen>
   );
+}
+
+/** The web Tour Guide panel's guide button, by the guide's state. */
+const GUIDE_BUTTON: Record<GuideState, string> = {
+  off: "Start the guide",
+  open: "Show the guide",
+  small: "Show the guide",
+  closed: "Show the guide again",
+  done: "Show the guide",
+};
+
+/** "Your first product": while the first product isn't made, it opens the guide again (after ✕ on
+ *  its strip too) and goes where its step happens, where the strip shows it (guide/use-guide). */
+function FirstProductRow() {
+  const router = useRouter();
+  const { signedIn } = useAuth();
+  const rec = useTourRecord();
+  const guide = usePhoneGuide();
+  const state = rec?.guide ?? "off";
+  if (!signedIn || !guide?.now || state === "done") return null;
+  const show = () => {
+    updateTour((prev) => withGuide(prev, "open"));
+    router.push(guide.href ?? "/m/ai");
+  };
+  return <ListRow icon={Compass01Icon} title={GUIDE_TITLE} meta={GUIDE_BUTTON[state]} onClick={show} />;
 }

@@ -6,7 +6,9 @@
 //   contributor preview's read-only): + as an icon button beside the heading,
 //   then rows — the newest entry (a tap opens the history), History (n), and
 //   once the product has an NFT, NFT activity in Earn › Sell (its Physical and
-//   Virtual NFTs keep their own activity there) with how many are on sale;
+//   Virtual NFTs keep their own activity there), at this product's copies.
+//   How they sell is Earn's line in the bottom bar (CL-031), so this row
+//   doesn't repeat it;
 // - `HeaderActivity` — what everyone else reads in the header (10h, 10x,
 //   31b): "{product} activity", Now with its type, the description, its proof,
 //   and Earlier (n) opening the rest in place (Hide earlier);
@@ -39,13 +41,11 @@ import { Badge } from "@/components/ideeza/badge";
 import { buttonVariants } from "@/components/ideeza/button";
 import { iconButtonVariants } from "@/components/ideeza/icon-button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
-import { earnHref } from "@/lib/manual/earn-route";
 import { activitiesOf, helpOf, historyOf, labelOf, shortOf, type JourneyEntry, type MediaRef, type ProjectJourney } from "@/lib/manual/journey";
 import { productAddedAt } from "@/lib/manual/journey-dates";
 import { removeActivity, useJourney } from "@/lib/manual/journey-store";
 import { can } from "@/lib/manual/permissions";
 import { formatDate } from "@/lib/manual/project-summary";
-import { phoneHrefOf } from "@/lib/manual/phone-project";
 import { productPricesOf, type ProductPrices } from "@/lib/manual/phone-product";
 import { USE_LABEL } from "@/lib/market/sell-flow";
 import { formatAmount } from "@/lib/wallet/money";
@@ -61,7 +61,7 @@ import { Chevron, LIST_CARD, LIST_ROW, ListCard, ListRow } from "../kit/list";
 import { PRESSED_SECONDARY } from "../kit/press";
 import { T } from "../type";
 import { ProofTile, ProofViewer } from "../project/activity-tab";
-import { useListedCopies } from "./overview";
+import { useProductEarn } from "./earn-bar";
 import { CARD, LinkButton, SectionHead } from "./parts";
 import { ProductProvider, useProduct, useProductData } from "./use-product";
 import { ProductLoading, ProductMissing, ProjectMissing } from "./states";
@@ -79,25 +79,25 @@ export function useProductHistory(journey?: ProjectJourney): JourneyEntry[] {
   );
 }
 
-/** Where this product's NFTs keep their activity: Earn › Sell at its copies (the web's
- *  `earnHref(id, "copies")`), once it has one. */
+/** Where this product's NFTs keep their activity: Earn › Sell at its copies (where Earn goes,
+ *  `productEarnHref`), once it has one. */
 function useNftLine(): string | null {
-  const { project, view, product } = useProduct();
+  const { view, product } = useProduct();
+  const earn = useProductEarn();
   const hasNft = view.editions.some((t) => t.productId === product.id);
-  return hasNft ? (phoneHrefOf(earnHref(project.id, "copies")) ?? null) : null;
+  return hasNft ? earn.href : null;
 }
 
 // ─────────────────────────── the object page's Activity section (10) ───────────────────────────
 
 /** The owner's (and a contributor preview's) Activity: + as a 44 px icon button beside the heading,
  *  then rows — the newest entry (a whole-row tap opens the history), History (n), and once the
- *  product has an NFT, NFT activity in Earn › Sell with how many of its copies are on sale. */
+ *  product has an NFT, NFT activity in Earn › Sell. */
 export function ActivitySection() {
   const { project, view, viewer, product, path } = useProduct();
   const { record } = useJourney(project.id);
   const entries = useProductHistory();
   const nft = useNftLine();
-  const onSale = useListedCopies().length;
   const now = entries[0];
   const stored = activitiesOf(record, { kind: "product", productId: product.id }).length;
   const canAdd = can(viewer, "activity.write", view.canCtx);
@@ -132,7 +132,7 @@ export function ActivitySection() {
           </Link>
         </li>
         {stored > 0 && <ListRow href={path("activity")} icon={WorkHistoryIcon} title="History" value={String(stored + 1)} />}
-        {nft && <ListRow href={nft} icon={Store01Icon} title="NFT activity" meta="Earn › Sell" value={onSale > 0 ? `${onSale} on sale` : undefined} />}
+        {nft && <ListRow href={nft} icon={Store01Icon} title="NFT activity" meta="Earn › Sell" />}
       </ListCard>
     </section>
   );

@@ -17,7 +17,8 @@
 // break, Withdraw IDZ) rows with a chevron, every button in the bottom bar.
 // Then AU-64: deletion scheduled for 30 days; live listings come down now;
 // Done signs out to Welcome. Signing in before the date offers Restore
-// (AU-65, restore.tsx).
+// (AU-65, restore.tsx) — in the app only: the website's sign-in doesn't read
+// a deletion yet, so step 4 and the scheduled screen say so (SET-5).
 
 import * as React from "react";
 import { Coins01Icon, CreditCardIcon, Diamond01Icon, Download04Icon, Folder01Icon, Message01Icon, PauseIcon, Tag01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
@@ -51,7 +52,7 @@ import { useOnline } from "../kit/states";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { DownloadStatus, useDownload } from "./data-download";
-import { useSessionAt } from "./security";
+import { DELETE_APP_ONLY, useSessionAt } from "./security";
 import { SettingsGroup, SettingsRow } from "./kit";
 import { signOutToWelcome } from "./sign-out";
 
@@ -163,7 +164,7 @@ export function DeleteAccount() {
     const day = dates.date(scheduled.until, { style: "day" });
     const rows: [string, string][] = [
       ["Now", lose.listings.length ? "Hidden · listings taken down" : "Hidden"],
-      [`Until ${day}`, "Sign in to restore it"],
+      [`Until ${day}`, "Log In to restore it"],
       [`After ${day}`, "Deleted for good"],
     ];
     return (
@@ -178,9 +179,10 @@ export function DeleteAccount() {
       >
         <div className={`${ACCOUNT_CONTENT} pt-12`}>
           <AccountHeading title={`Your account will be deleted on ${until}`}>
-            Signing in before then restores it. We’ve sent the details to {email}.
+            {/* No email is sent (the prototype sends none), so it promises none. */}
+            Signing in to the app before then restores it.
           </AccountHeading>
-          <SettingsGroup>
+          <SettingsGroup footer={DELETE_APP_ONLY}>
             {rows.map(([term, value]) => (
               <SettingsRow key={term} label={term} value={value} />
             ))}
@@ -360,7 +362,7 @@ export function DeleteAccount() {
           <>
             <AccountHeading title="Confirm it’s you">
               {provider
-                ? `Sign in with ${PROVIDER_WORDS[provider]} once more to delete your account.`
+                ? `Log In with ${PROVIDER_WORDS[provider]} once more to delete your account.`
                 : "Enter your password to delete your account."}
             </AccountHeading>
             <AccountAlert
@@ -400,7 +402,7 @@ export function DeleteAccount() {
               </Field>
             )}
             <AccountAlert
-              alert={{ tone: "info", title: `Deleted on ${until}`, body: "Until then your account is hidden. Sign in before then to restore it." }}
+              alert={{ tone: "info", title: `Deleted on ${until}`, body: "Until then your account is hidden in the app. Log In to the app before then to restore it. The website still signs you in as usual for now." }}
             />
           </>
         )}

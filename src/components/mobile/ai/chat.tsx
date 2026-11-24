@@ -7,11 +7,15 @@
 // composer at the foot (held once a build holds the concepts). The top bar
 // has the Build log one tap away (the Figma's chat frames) and ⋯ with
 // History, a new idea and Delete. All of it runs on the web's stores through
-// `useConceptFlow`.
+// `useConceptFlow`. Out of credits, the composer gets the state row with Buy
+// credits and the next plan up (CL-032); the maker's first ready build gets the
+// first-build card (Free, once); the idea's inspiration image shows as a chip
+// in the maker's bubble (CL-027).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Add01Icon, AnalyticsUpIcon, Clock01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, AnalyticsUpIcon, Bug01Icon, Clock01Icon, Coins01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { REPORT_PROBLEM, reportProblemHref } from "../help/report-link";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { useSecondClock } from "@/components/create/use-clock";
 import { CONCEPT_COST } from "@/lib/create/credits";
@@ -27,13 +31,15 @@ import { OfflineBanner } from "../kit/states";
 import { useToast } from "../kit/toast";
 import { BuildCard, BuildConfirmSheet, FinishedCard, FinishedFoot, isFinished } from "./build";
 import { BuildLogSheet } from "./build-log-sheet";
+import { BuyCreditsSheet } from "./buy-credits-sheet";
 import { BuildBar, BuildOptionsSheet, ConceptImageViewer, ConceptSheet, ConceptStage, ConceptsMini, RefineSheet } from "./concepts";
 import { DeleteChatSheet } from "./delete-chat-sheet";
 import { NetworkCard } from "./network";
 import { CreditsFoot, OFFLINE_REASON, PromptBubble, Stepper } from "./parts";
 import { PromptBox } from "./prompt-box";
 import { SaveSheet } from "./save-sheet";
-import { ProductQuestion, ProjectSheet, ReadingCard, RequiredStep } from "./setup";
+import { FirstBuildCard, OutOfCreditsRow } from "../plans/upsell";
+import { ProductQuestion, ProjectSheet, ReadingCard, RequiredStep, productNameOf } from "./setup";
 import { SpecSheet } from "./spec-sheet";
 import { useConceptFlow, type Gate, type SetupTurn } from "./use-concept-flow";
 
@@ -57,8 +63,9 @@ export function AiChat({ chatId }: { chatId: string }) {
   const addTo = flow.setupProjects.find((p) => p.preselect) ?? null;
   const picked = picks ?? new Set(addTo ? [] : (setup?.companions.map((c) => c.id) ?? []));
   // With one product the project was chosen on its page, so the question answers itself once
-  // the idea is read (the web's rule) — when a concept can be drawn now.
-  const answersItself = asking && !!addTo && (setup?.companions.length ?? 0) === 0 && flow.canRender && flow.online;
+  // the idea is read (the web's rule) — online. Credits are never checked here: the render
+  // charges or fails, as on the web (CRE-2).
+  const answersItself = asking && !!addTo && (setup?.companions.length ?? 0) === 0 && flow.online;
   const needsProductQ = asking && (setup?.companions.length ?? 0) > 0 && !productsConfirmed;
   const projectOpen = asking && !needsProductQ && !projectDismissed && !answersItself;
 
@@ -76,6 +83,7 @@ export function AiChat({ chatId }: { chatId: string }) {
   const [conceptProduct, setConceptProduct] = React.useState("primary");
   const [optionsOpen, setOptionsOpen] = React.useState(false);
   const [imageFor, setImageFor] = React.useState<string | null>(null);
+  const [buying, setBuying] = React.useState(false);
 
   const job = flow.activeBuild;
   const notify = useNotifyPrePrompt();
@@ -163,12 +171,16 @@ export function AiChat({ chatId }: { chatId: string }) {
     </div>
   ) : conceptStage || flow.held || asking ? (
     // While the project question is open its card carries the next step, so the composer
-    // (disabled until it's answered) gives the thumb zone up; the credits line stays.
+    // (disabled until it's answered) gives the thumb zone up; the credits line stays. Out of
+    // credits, the web keeps its CL-032 line under the composer while the question is open:
+    // here the same row, with Buy credits (CRE-2).
     <div className="pt-2">
+      {asking && flow.creditsHydrated && !flow.canRender && <OutOfCreditsRow className="mx-8 mb-4 mt-2" onBuy={() => setBuying(true)} />}
       <CreditsFoot right={footRight} />
     </div>
   ) : (
     <div className="pt-4">
+      {flow.creditsHydrated && !flow.canRender && <OutOfCreditsRow className="mx-8 mb-4" onBuy={() => setBuying(true)} />}
       <PromptBox
         value={draft}
         onChange={setDraft}
@@ -177,7 +189,6 @@ export function AiChat({ chatId }: { chatId: string }) {
         enhanceMode={flow.target.kind === "refine" ? "change" : "brief"}
         disabled={flow.setupPending}
         canSend={flow.canRender}
-        sendReason={!flow.canRender ? "You are out of credits — top them up to draw another concept." : undefined}
         onSubmit={(text) => {
           if (flow.submit(text)) return;
           toast({
@@ -211,7 +222,7 @@ export function AiChat({ chatId }: { chatId: string }) {
       >
         <div className="flex flex-col gap-6 px-8 pb-8 pt-2">
           <OfflineBanner />
-          {firstAsk?.role === "user" && <PromptBubble text={firstAsk.text} />}
+          {firstAsk?.role === "user" && <PromptBubble text={firstAsk.text} image={firstAsk.image} imageName={firstAsk.imageName} />}
           {setup && <ReadingCard setup={setup} now={now} projectName={flow.projectName} />}
           {needsProductQ && setup && (
             <ProductQuestion
@@ -224,7 +235,7 @@ export function AiChat({ chatId }: { chatId: string }) {
                 setPicks(next);
               }}
               addTo={addTo}
-              held={!flow.online ? OFFLINE_REASON : flow.creditsHydrated && flow.balance < (1 + picked.size) * CONCEPT_COST ? "Not enough credits to draw these concepts" : null}
+              held={flow.online ? null : OFFLINE_REASON}
               onContinue={() => {
                 if (addTo) return flow.answerSetup({ projectId: addTo.id, projectName: "", picked: setup.companions.filter((c) => picked.has(c.id)).map((c) => c.id) });
                 setProductsConfirmed(true);
@@ -235,6 +246,7 @@ export function AiChat({ chatId }: { chatId: string }) {
           {asking && !needsProductQ && projectDismissed && <RequiredStep onOpen={() => setProjectDismissed(false)} />}
 
           {finished && job && <FinishedCard job={job} flow={flow} product={buildProduct} onProduct={setBuildProduct} onSpec={setSpecFor} />}
+          {finished && job && <FirstBuildCard jobId={job.id} />}
           {job && !finished && <BuildCard job={job} product={buildProduct} onProduct={setBuildProduct} />}
 
           {conceptStage && !job && (
@@ -250,11 +262,11 @@ export function AiChat({ chatId }: { chatId: string }) {
           open={projectOpen}
           onClose={() => setProjectDismissed(true)}
           products={1 + picked.size}
-          productNames={[setup.productName?.trim() || "Your product", ...setup.companions.filter((c) => picked.has(c.id)).map((c) => c.name)]}
+          productNames={[productNameOf(setup), ...setup.companions.filter((c) => picked.has(c.id)).map((c) => c.name)]}
           onChangeProducts={() => setProductsConfirmed(false)}
           held={flow.online ? null : OFFLINE_REASON}
           projects={flow.setupProjects}
-          canAfford={(n) => flow.balance >= n || !flow.creditsHydrated}
+          onBuyCredits={flow.creditsHydrated && !flow.canRender ? () => setBuying(true) : null}
           onStart={(a) => flow.answerSetup({ ...a, picked: [...picked].filter((id) => setup.companions.some((c) => c.id === id)) })}
         />
       )}
@@ -291,6 +303,8 @@ export function AiChat({ chatId }: { chatId: string }) {
       />
       {job && flow.saveInfo && <SaveSheet open={saveOpen} job={job} info={flow.saveInfo} onClose={() => setSaveOpen(false)} />}
       {notify.sheet}
+      {/* At the question: the concepts it is about to draw, so the pack picked covers them all. */}
+      <BuyCreditsSheet open={buying} onClose={() => setBuying(false)} need={(asking ? 1 + picked.size : 1) * CONCEPT_COST} />
       <BuildLogSheet open={logOpen} onClose={() => setLogOpen(false)} flow={flow} />
       <ActionSheet
         open={menu}
@@ -298,6 +312,8 @@ export function AiChat({ chatId }: { chatId: string }) {
         items={[
           { label: "History", icon: Clock01Icon, onSelect: () => router.push("/m/ai/history") },
           { label: "New idea", icon: Add01Icon, onSelect: () => router.push("/m/ai") },
+          { label: "Buy credits", icon: Coins01Icon, onSelect: () => setBuying(true) },
+          { label: REPORT_PROBLEM, icon: Bug01Icon, onSelect: () => router.push(reportProblemHref()) },
           { label: "Delete this chat", icon: Delete02Icon, onSelect: () => setDeleting(true), destructive: true },
         ]}
       />

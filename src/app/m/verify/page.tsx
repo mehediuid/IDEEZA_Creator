@@ -3,16 +3,18 @@
 // AU-12 · Verify email: the 6-digit code for the account waiting for its
 // email (Create account, or Sign in → Send code). Email verified (12h), then
 // as on the web: the one question when the link didn't say, and the Welcome
-// map (landingAfterSignUp). Back does
-// what "Wrong email? Change it" does: the waiting account is dropped and
-// Create account opens again with the email filled in, so the same email can
-// be used (it never says "already has an account" for one's own sign-up).
+// map, or straight on to the page they set out for (landingAfterSignUp). Back
+// does what "Wrong email? Change it" does: the waiting account is dropped and
+// Create account opens again with the email, the first and last name (as on
+// the web) and the date of birth filled in (AUTH-6), so the same email can be
+// used (it never says "already has an account" for one's own sign-up).
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ideeza/button";
 import { CodeStep } from "@/components/mobile/account/code-step";
 import { ACCOUNT_CONTENT, landingAfterSignUp } from "@/components/mobile/account/parts";
+import { birthDateParts } from "@/components/mobile/account/sign-up-fields";
 import { BottomBar } from "@/components/mobile/kit/bottom-bar";
 import { Screen } from "@/components/mobile/screen";
 import { TopBar } from "@/components/mobile/top-bar";
@@ -28,11 +30,14 @@ export default function VerifyPage() {
   // Kept once the code is right: verifying ends the wait, and the page must not
   // take that for "nothing to verify" while it goes on.
   const [email, setEmail] = React.useState<string | null>(null);
+  // "Wrong email?" is on its way back to Create account with what was typed: dropping the wait
+  // must not send it there empty first (the web's check-email holds `busy` the same way).
+  const [leaving, setLeaving] = React.useState(false);
   const shown = waiting?.email ?? email;
 
   React.useEffect(() => {
-    if (!waiting && !email) router.replace("/m/sign-up");
-  }, [waiting, email, router]);
+    if (!waiting && !email && !leaving) router.replace("/m/sign-up");
+  }, [waiting, email, leaving, router]);
   if (!shown) return null;
 
   const verified = async () => {
@@ -44,10 +49,21 @@ export default function VerifyPage() {
     window.setTimeout(() => window.location.replace(after), 600);
   };
 
-  /** Wrong email: the waiting account is dropped, and Create account opens with the email kept. */
+  /** Wrong email: the waiting account is dropped, and Create account opens with the email, the
+   *  names and the date of birth kept (never the password). */
   const change = () => {
+    const born = birthDateParts(waiting?.birthDate ?? "");
+    const kept = {
+      email: shown,
+      ...(waiting?.firstName ? { first: waiting.firstName } : {}),
+      ...(waiting?.lastName ? { last: waiting.lastName } : {}),
+      ...(born.day ? born : {}),
+      ...(next === "/m" ? {} : { next }),
+    };
+    setLeaving(true);
+    setEmail(shown);
     discardUnverified();
-    router.replace(`/m/sign-up?${new URLSearchParams({ email: shown, ...(next === "/m" ? {} : { next }) })}`);
+    router.replace(`/m/sign-up?${new URLSearchParams(kept)}`);
   };
 
   return (

@@ -9,8 +9,11 @@
 // price and its dollars. A row opens the sale in a sheet: the token, from the
 // seller to the buyer, the quantity, and the way on to the project (a sample)
 // or the sale in Earn › Money (yours). Every sale this browser knows is here:
-// the web's marketplace record (market-store, yours and the demo buyers') and
-// the Feed samples bought on the phone. Money is Testnet demo. The list's
+// the web's marketplace record (market-store, yours and the demo buyers'), the
+// Feed samples bought on the phone, and the copies holders sold on to each
+// other (CL-036: a real sale — the buyer pays, the seller and the creator are
+// paid; BUY-16), a row each as "Physical NFT · from {seller}", opening the
+// project's shop on that kind. Money is Testnet demo. The list's
 // heading is "Recent sales" where the Figma says "Top Specialties": a named
 // departure, as the list is the sales, newest first.
 
@@ -22,11 +25,14 @@ import { Badge } from "@/components/ideeza/badge";
 import { Button } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { useSampleSales } from "@/components/mobile/project-earn/buyer/sample-sales-store";
+import { useResales } from "@/components/projects/purchased/resales-store";
 import { PROJECTS } from "@/lib/feed";
 import { OFFER_NAME } from "@/lib/innovations/clips";
 import { activityRows, chartPoints, chartTop, dailySales, dollars, smoothPath, weekStats } from "@/lib/market/activity-stats";
 import { useMarket } from "@/lib/market/market-store";
 import { useManualProjects } from "@/lib/manual/projects";
+import { phoneMarketHref } from "@/lib/manual/phone-earn";
+import { buyerNameOf } from "@/lib/market/resales";
 import { initialsOf } from "@/lib/people/ids";
 import { formatDate } from "@/lib/settings/dates";
 import { useSettings } from "@/lib/settings/use-settings";
@@ -61,11 +67,18 @@ export function MarketActivity() {
   const { hydrated, data } = useMarket();
   const { projects } = useManualProjects();
   const sampleSales = useSampleSales();
+  const resales = useResales();
   const [period, setPeriod] = useTabParam<Period>("days", PERIOD_VALUES, "30");
   const days = Number(period);
   const [open, setOpen] = React.useState<Row | null>(null);
 
-  // One list: the marketplace's sales, and the Feed samples bought on this phone (seller = the creator).
+  // A copy sold on between holders (BUY-16): who sold it and its kind, by the row's id.
+  const soldOn = React.useMemo(
+    () => new Map(resales.filter((r) => r.sale).map((r) => [r.id, { seller: buyerNameOf(r.sellerId), kind: r.kind }] as const)),
+    [resales],
+  );
+  // One list: the marketplace's sales, the Feed samples bought on this phone (seller = the creator), and the
+  // copies sold on between holders (the copy's number as its ID).
   const allSales = React.useMemo(
     () => [
       ...data.sales,
@@ -80,8 +93,25 @@ export function MarketActivity() {
         buyerAddress: s.buyerAddress,
         tokenId: null,
       })),
+      ...resales.flatMap((r) =>
+        r.sale
+          ? [
+              {
+                id: r.id,
+                projectId: r.projectId,
+                at: r.sale.at,
+                token: r.token,
+                price: r.price,
+                item: { nft: r.kind },
+                sellerAddress: r.sellerAddress,
+                buyerAddress: r.sale.buyerAddress,
+                tokenId: r.serial,
+              },
+            ]
+          : [],
+      ),
     ],
-    [data.sales, sampleSales],
+    [data.sales, sampleSales, resales],
   );
   const since = now - days * 86_400_000;
   const sales = React.useMemo(() => allSales.filter((s) => s.at > since), [allSales, since]);
@@ -92,8 +122,19 @@ export function MarketActivity() {
   const rows = activityRows(sales);
   const sample = (id: string) => PROJECTS.find((p) => p.id === id) ?? null;
   const nameOf = (id: string) => sample(id)?.title ?? (projects.find((p) => p.id === id)?.name.trim() || "Untitled project");
-  const hrefOf = (r: Row) =>
-    sample(r.projectId) ? `/m/projects/${encodeURIComponent(r.projectId)}?tab=marketplace` : `/m/projects/${encodeURIComponent(r.projectId)}/earn/money?sale=${encodeURIComponent(r.id)}`;
+  // A sample's sale opens its Marketplace; a copy sold on, the shop on its kind (where From holders lists them);
+  // your own sale, the sale in Earn › Money.
+  const hrefOf = (r: Row) => {
+    const resale = soldOn.get(r.id);
+    if (sample(r.projectId)) return `/m/projects/${encodeURIComponent(r.projectId)}?tab=marketplace${resale ? `&nft=${resale.kind}` : ""}`;
+    if (resale) return `${phoneMarketHref(r.projectId)}?nft=${resale.kind}`;
+    return `/m/projects/${encodeURIComponent(r.projectId)}/earn/money?sale=${encodeURIComponent(r.id)}`;
+  };
+  // "Physical NFT · from Mira" for a copy sold on, else the NFT alone.
+  const offerOf = (r: Row) => {
+    const resale = soldOn.get(r.id);
+    return resale ? `${OFFER_NAME[r.nft]} · from ${resale.seller}` : OFFER_NAME[r.nft];
+  };
   const date = (ms: number) => formatDate(ms, settings.language.dateLocale, { style: "medium" });
   const tick = (ms: number) => {
     const d = new Date(ms);
@@ -182,7 +223,7 @@ export function MarketActivity() {
                         <span className="flex min-w-0 flex-1 flex-col gap-1">
                           <span className={cn(T.rowTitle, "truncate")}>{nameOf(r.projectId)}</span>
                           <span className={cn(T.meta, "truncate")}>
-                            {OFFER_NAME[r.nft]} · {date(r.at)}
+                            {offerOf(r)} · {date(r.at)}
                           </span>
                         </span>
                         <span className="flex shrink-0 flex-col items-end gap-1">
@@ -214,7 +255,7 @@ export function MarketActivity() {
                 router.push(hrefOf(r));
               }}
             >
-              {sample(open.projectId) ? "View project" : "View sale"}
+              {sample(open.projectId) || soldOn.has(open.id) ? "View project" : "View sale"}
             </Button>
           )
         }

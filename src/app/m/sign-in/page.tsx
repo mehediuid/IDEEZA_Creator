@@ -4,15 +4,19 @@
 // In", Email and Password (with its eye), Remember me and Forgot password,
 // Log In, "Or login with" Google and Facebook, and "Don't Have an Account?
 // Sign Up". Its states, as drawn: a field's own error under it — "Invalid
-// email address", "Your password is incorrect!" — and Account Suspended (the
+// email address", a wrong email or password (in the web's words, "That email
+// and password don't match.", so it never says which one) — and Account Suspended (the
 // title becomes "Welcome to IDEEZA", a red alert, the button "Account
 // Suspended"). Kept from before: empty fields on submit, too many tries with
-// a countdown, email not verified → Send code, offline with the input kept.
-// Suspended and session expired have no cause in this demo:
-// `?demo=suspended|expired` shows them (the Shared kit links there).
-// Remember me unticked: the sign-in lasts while this tab does. A provider
-// that failed after starting here says so here (AU-04c), and a browser that
-// won't save the sign-in says that.
+// a countdown (this phone's own lock — the web has none, so the alert also
+// says it is this phone's, AUTH-9), email not verified → Send code, offline
+// with the input kept. Suspended has no cause in this demo: `?demo=suspended`
+// shows it (the Shared kit links there). Remember me unticked: the sign-in
+// lasts while this tab does; the next open lands on Welcome, which says the
+// session expired and hands `?expired=1` and the opened page (`next`) on to
+// here (AUTH-8), so "Your session expired" shows here too (`?demo=expired`
+// shows it as well). A provider that failed after starting here says so here
+// (AU-04c), and a browser that won't save the sign-in says that.
 
 import * as React from "react";
 import Link from "next/link";
@@ -21,7 +25,7 @@ import { Field, PasswordInput, errorProps, useFieldIds } from "@/components/auth
 import { Button } from "@/components/ideeza/button";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { TextInput } from "@/components/ideeza/text-input";
-import { ACCOUNT_CONTENT, AccountAlert, REFUSED_ALERT, type AlertSpec } from "@/components/mobile/account/parts";
+import { ACCOUNT_CONTENT, AccountAlert, REFUSED_ALERT, signInPausedBody, type AlertSpec } from "@/components/mobile/account/parts";
 import { WayMark, useProviderSheet } from "@/components/mobile/account/ways-in";
 import { SwitchLine, TEXT_LINK } from "@/components/mobile/kit/bottom-bar";
 import { useOnline } from "@/components/mobile/kit/states";
@@ -34,7 +38,6 @@ import {
   afterPhoneSignIn,
   afterRightSignIn,
   afterWrongSignIn,
-  clockOf,
   issueCode,
   mobileNext,
   readTries,
@@ -45,11 +48,15 @@ import { cn } from "@/lib/utils";
 
 type Outcome = null | "wrong" | "unverified" | "suspended" | "refused";
 
+/** The time of an action (kept out of render, where reading the clock is impure). */
+const clockNow = () => Date.now();
+
 export default function SignInPage() {
   const router = useRouter();
   const params = useSearchParams();
   const next = mobileNext(params.get("next"));
   const demo = params.get("demo");
+  const expired = demo === "expired" || params.get("expired") === "1";
   const ids = useFieldIds(["email", "password"] as const);
   const online = useOnline();
   const [email, setEmail] = React.useState(params.get("email") ?? "");
@@ -79,7 +86,7 @@ export default function SignInPage() {
 
   const emailError =
     touched.submit && !email.trim() ? "Enter your email." : (touched.email || touched.submit) && email.trim() && !isEmail(email) ? "Invalid email address" : "";
-  const passwordError = touched.submit && !password ? "Enter your password." : outcome === "wrong" ? "Your password is incorrect!" : "";
+  const passwordError = touched.submit && !password ? "Enter your password." : outcome === "wrong" ? "That email and password don't match." : "";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,21 +94,21 @@ export default function SignInPage() {
     if (!email.trim() || !isEmail(email) || !password || !online || lockedFor || suspended) return;
     setBusy(true);
     setFailed(null);
-    const result = await signIn(email, password, Date.now(), next);
+    const result = await signIn(email, password, clockNow(), next);
     if (result === "ok") {
       saveTries(afterRightSignIn(readTries(), email));
       return enter(remember);
     }
     setBusy(false);
     if (result === "wrong") {
-      saveTries(afterWrongSignIn(readTries(), email, Date.now()));
-      setNow(Date.now());
+      saveTries(afterWrongSignIn(readTries(), email, clockNow()));
+      setNow(clockNow());
     }
     setOutcome(result);
   };
 
   const sendCode = () => {
-    issueCode("verify", email, Date.now());
+    issueCode("verify", email, clockNow());
     router.push(`/m/verify${next === "/m" ? "" : `?next=${encodeURIComponent(next)}`}`);
   };
 
@@ -114,7 +121,7 @@ export default function SignInPage() {
     : !online
       ? { tone: "attention", title: "You’re offline", body: "Your details are kept. Log in when you’re back online." }
       : lockedFor
-        ? { tone: "error", title: "Too many tries", body: `Try again in ${clockOf(lockedFor)}, or reset your password.` }
+        ? { tone: "error", title: "Too many tries", body: signInPausedBody(lockedFor) }
         : outcome === "refused"
           ? REFUSED_ALERT
           : outcome === "unverified"
@@ -130,7 +137,7 @@ export default function SignInPage() {
             }
           : failed
             ? { tone: "error", title: `Couldn’t log in with ${PROVIDER_WORDS[failed]}`, body: "Try again, or use another way." }
-            : demo === "expired"
+            : expired
               ? { tone: "info", title: "Your session expired", body: "Log in again to go back where you were." }
               : null;
 

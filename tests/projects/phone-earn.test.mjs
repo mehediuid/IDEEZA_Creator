@@ -45,3 +45,16 @@ test("the buyer's view, the previews and a product's video and AR screens", () =
   assert.equal(e.phoneProductVideoHref("p1", "prd_1"), "/m/projects/p1/products/prd_1/video");
   assert.equal(e.phoneProductArHref("p1", "prd_1"), "/m/projects/p1/products/prd_1/ar");
 });
+
+test("where a shared project's post shows: on the Feed while something of it is for sale, else on your Timeline (SOC-6)", async () => {
+  const { forSaleNowOf, SHARE_OFF_FEED_LINE } = await import("../../.tmp-test/lib/manual/phone-earn.js");
+  const none = { listing: { kind: "none" }, lock: null, editions: [] };
+  assert.equal(forSaleNowOf(none), false);
+  assert.equal(forSaleNowOf({ ...none, listing: { kind: "live" } }), true);
+  // A paused or ended Main listing isn't for sale.
+  assert.equal(forSaleNowOf({ ...none, listing: { kind: "paused" } }), false);
+  // A listed copy is, until the project is sold in full.
+  assert.equal(forSaleNowOf({ ...none, editions: [{ listing: null }, { listing: { regular: "0.01" } }] }), true);
+  assert.equal(forSaleNowOf({ ...none, lock: { reason: "sold" }, editions: [{ listing: { regular: "0.01" } }] }), false);
+  assert.match(SHARE_OFF_FEED_LINE, /your Timeline\. It joins the Feed once it’s for sale\.$/);
+});

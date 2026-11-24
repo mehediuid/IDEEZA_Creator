@@ -37,6 +37,7 @@ import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { useGetPaid } from "./get-paid-screen";
 import { CARD, Row, RowsCard, n, payoutLine } from "./parts";
+import { formatAmount } from "@/lib/wallet/money";
 
 const PER_PAGE = 10;
 const STATUS_TONE: Record<WithdrawalStatus, "success" | "brand-outline" | "warning"> = { complete: "success", "in-progress": "brand-outline", pending: "warning" };
@@ -426,7 +427,7 @@ export function StatementScreen() {
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-end tabular-nums">
-                    <span className="text-text-primary">{r[1] === "Withdrawal" && r[5] === "IDZ" ? payoutLine((r[4] || "0").replace(/^-/, ""), "IDZ").replace("≈ ", "≈ −") : `${r[4]} ${r[5]}`}</span>
+                    <span className="text-text-primary">{r[1] === "Withdrawal" && r[5] === "IDZ" ? `≈ ${formatAmount(r[4] || "0", "IDZ").replace(/^-/, "−")}` : `${r[4]} ${r[5]}`}</span>
                     <span className="text-text-secondary">{formatUsd(r[6] || "0")}</span>
                   </span>
                 </li>

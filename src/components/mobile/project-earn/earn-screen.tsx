@@ -19,13 +19,17 @@
 //
 // Owner only (`canOpenEarn`): anyone else — a Feed sample included — gets
 // "Only the owner can manage earning". Bones while the stores are read; an
-// unknown address says the project isn't here.
+// unknown address says the project isn't here. A write the browser refused
+// says so under the top bar, as on the project screen (EARN-18, the web's
+// Earn shell).
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LockIcon, ShoppingBag01Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import { Bug01Icon, LockIcon, ShoppingBag01Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import { REPORT_PROBLEM, reportProblemHref } from "../help/report-link";
 import { Skeleton } from "@/components/ideeza/skeleton";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
+import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { commercialFactsOf, commercialStateOf } from "@/lib/commerce/state";
 import type { EarnSection } from "@/lib/manual/earn-route";
 import { canOpenEarn, earnNextOf } from "@/lib/manual/earn-view";
@@ -149,7 +153,10 @@ function EarnReady({ data, section: opened }: { data: Ready; section: EarnSectio
   React.useEffect(() => {
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (!id) return;
-    const raf = requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" })));
+    // Before the mint a product's own row (`#editions-<product>`) isn't there: its copies section is.
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => (document.getElementById(id) ?? (id.startsWith("editions-") ? document.getElementById("copies") : null))?.scrollIntoView({ block: "start" })),
+    );
     return () => cancelAnimationFrame(raf);
   }, [section]);
 
@@ -162,6 +169,7 @@ function EarnReady({ data, section: opened }: { data: Ready; section: EarnSectio
   const hubItems: ActionSheetItem[] = [
     ...(preview ? [{ label: "Preview as others see it", icon: ViewIcon, onSelect: () => router.push(phonePreviewHref(project.id, "buyer")) }] : []),
     ...(isLive && commercial !== "given" ? [{ label: "Sell copies of a product", icon: ShoppingBag01Icon, onSelect: () => openSection("sell", "copies") }] : []),
+    { label: REPORT_PROBLEM, icon: Bug01Icon, onSelect: () => router.push(reportProblemHref()) },
   ];
   const actions: TopBarAction[] = hub
     ? hubItems.length
@@ -184,6 +192,7 @@ function EarnReady({ data, section: opened }: { data: Ready; section: EarnSectio
           footer={<div ref={setFootEl} />}
         >
           <OfflineBanner />
+          <StorageErrorBanner className="mx-8 mb-6" />
           <div className={hub ? "px-8 pb-12 pt-2" : "px-8 pb-12 pt-4"}>
             {hub && <EarnHub titleRef={titleRef} />}
             {section === "sell" && <EarnSellTab />}

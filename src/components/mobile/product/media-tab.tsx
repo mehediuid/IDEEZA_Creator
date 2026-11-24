@@ -71,12 +71,13 @@ export function MediaTab({ oneHeading = false, screen = false }: { oneHeading?: 
   );
 }
 
-/** The video's state in a few words, for the object page's Media row. */
+/** The video's state in a few words, for the object page's Media row: the web's words
+ *  (`statusCopy`). Since CL-030 a video never stops a share or a sale — a listing waits for it —
+ *  so "No video yet" says no more than that (LEAD-1); Generate AI video is the Media screen's
+ *  one primary. */
 export function videoLine(status: ProductVideoStatus | null): string {
   if (!status) return "Video";
   switch (status.state) {
-    case "none":
-      return "No video yet — needed to share or sell";
     case "ready":
       return status.review ? `Video ready · Take ${status.review.n} to review` : `Take ${status.take.n} in use`;
     default:

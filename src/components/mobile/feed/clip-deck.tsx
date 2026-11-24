@@ -5,7 +5,8 @@
 // comments, sharing to your Feed and the ⋯ menu. The clip on screen plays;
 // the ones beside it load. Each clip reads its heart, count and comments from
 // the web's stores (reactions.ts, comments-store.ts), so they agree with the
-// web's post page.
+// web's post page. Your own clip's Share opens your project's share, never the
+// re-share of others' items (SOC-13).
 //
 // The deck remembers the clip on screen (`restoreKey`, for this tab's session),
 // so Back from a clip's details returns to that clip, not to the first one.
@@ -24,8 +25,8 @@ import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { useToast } from "../kit/toast";
 import { ClipComments } from "./clip-comments";
-import { ClipMenu } from "./clip-menu";
-import { ClipShare } from "./clip-share";
+import { ClipMenu, OwnClipShare } from "./clip-menu";
+import { ClipShare, shareTargetOfClip } from "./clip-share";
 import { ClipView } from "./clip-view";
 import { useFeedPrefs } from "./use-feed";
 import type { Guard } from "./use-guest";
@@ -155,7 +156,11 @@ export function ClipDeck({
             guard={guard}
             focusId={startWithComments && openClip.id === clips[0]?.id ? focusComment : null}
           />
-          <ClipShare clip={openClip} open={open?.kind === "share"} onClose={() => setOpen(null)} onFeed={restoreKey === "feed"} />
+          {openClip.source === "mine" ? (
+            <OwnClipShare clip={openClip} open={open?.kind === "share"} onClose={() => setOpen(null)} />
+          ) : (
+            <ClipShare item={shareTargetOfClip(openClip)} open={open?.kind === "share"} onClose={() => setOpen(null)} onFeed={restoreKey === "feed"} />
+          )}
           <ClipMenu clip={openClip} open={open?.kind === "menu"} onClose={() => setOpen(null)} height={heights[openClip.id] ?? null} guard={guard} />
         </>
       )}
@@ -189,31 +194,31 @@ function WiredClip({
   const { reactions, toggle, markViewed, setFollow } = useReactions();
   const comments = useCommentCount(clip.postId, sampleSeedOf(clip.postId));
   const counts = countsOf(reactions, clip.postId, clip.base);
-  // Your own choice only: a new account starts following no one (the dataset is the web's demo).
-  const following = follows(reactions, clip.creator.id, false);
+  // The web's rule (person-actions): your own choice, else the sample dataset's — as the profile says.
+  const following = follows(reactions, clip.creator.id, clip.followedByDataset);
   const failed = () => toast({ title: "This phone couldn’t save that. Nothing changed.", lead: "error" });
   const go = (title: string, href: string) => guard(title, () => router.push(href), href);
 
   // Your own clip opens your own profile.
   const creatorHref = clip.source === "mine" ? "/profile" : profileHrefOf(clip.creator.id, "innovations");
   const handlers = {
-    onDetails: () => go(clip.kind === "project" ? "Sign in to see this project" : "Sign in to see this product", clipDetailsHref(clip)),
+    onDetails: () => go(clip.kind === "project" ? "Log In to see this project" : "Log In to see this product", clipDetailsHref(clip)),
     onCreator: () => {
-      if (creatorHref) go(`Sign in to see ${clip.creator.name}’s profile`, `/m${creatorHref}`);
+      if (creatorHref) go(`Log In to see ${clip.creator.name}’s profile`, `/m${creatorHref}`);
     },
     onFollow: () =>
-      guard(`Sign in to follow ${clip.creator.name}`, () => {
+      guard(`Log In to follow ${clip.creator.name}`, () => {
         if (!setFollow(clip.creator.id, !following)) failed();
       }),
     onAppreciate: () =>
-      guard("Sign in to appreciate this", () => {
+      guard("Log In to appreciate this", () => {
         if (!toggle("appreciated", clip.postId)) failed();
       }),
     onComments: () => onOpen("comments"),
-    onShare: () => guard("Sign in to share this video", () => onOpen("share")),
+    onShare: () => guard("Log In to share this video", () => onOpen("share")),
     onMore: () => onOpen("menu"),
-    onArVr: () => go("Sign in to view it in AR/VR", `/m/clip/${encodeURIComponent(clip.id)}/ar`),
-    onBuy: () => go("Sign in to buy", clipBuyHref(clip)),
+    onArVr: () => go("Log In to view it in AR/VR", `/m/clip/${encodeURIComponent(clip.id)}/ar`),
+    onBuy: () => go("Log In to buy", clipBuyHref(clip)),
     onSeen: () => markViewed(clip.postId),
     onHeight,
   };

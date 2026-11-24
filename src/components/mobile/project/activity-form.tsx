@@ -160,6 +160,7 @@ function ActivityForm({
   const listingFacts = useListingFacts(projectId, products);
   const mode = entry ? "edit" : "add";
   const ids = useFieldIds(["type", "name", "description", "media"] as const);
+  const proofHintId = React.useId();
   const [type, setType] = React.useState(entry?.type ?? "");
   const [picking, setPicking] = React.useState(false);
   const [rules, setRules] = React.useState(false);
@@ -226,6 +227,14 @@ function ActivityForm({
   const busy = saving || files.some((f) => f.status === "saving");
   const types = catalogueOf(target);
   const picked = types.find((t) => t.id === type) ?? null;
+  // The web form's proof hint, word for word (details/activity/form.tsx, PRJ-7): bad news
+  // shouldn't wait for a photo, and a Virtual update never leaks the paid files.
+  const proofHint =
+    type === "delay-notice" || type === "fix-notice"
+      ? "A screenshot of your supplier's email or a written notice works as proof."
+      : target.kind === "virtual"
+        ? "Don't attach the paid files: people who buy a copy get those with it. A changelog or a screenshot works."
+        : null;
 
   const addFiles = (list: FileList | null) => {
     if (!list?.length) return;
@@ -407,9 +416,14 @@ function ActivityForm({
           <p id={ids.media.id} className={FIELD_LABEL}>
             Attach media
           </p>
+          {proofHint && (
+            <p id={proofHintId} className={T.meta}>
+              {proofHint}
+            </p>
+          )}
           <button
             type="button"
-            aria-describedby={mediaError ? ids.media.errorId : undefined}
+            aria-describedby={[proofHint ? proofHintId : "", mediaError ? ids.media.errorId : ""].filter(Boolean).join(" ") || undefined}
             onClick={() => fileRef.current?.click()}
             className={cn(
               "flex flex-col items-center gap-2 rounded-xl border-[length:var(--border-width-1-5)] border-dashed px-8 py-8 text-center outline-none focus-visible:ring-2 focus-visible:ring-border-focus",

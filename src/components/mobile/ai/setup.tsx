@@ -10,12 +10,23 @@
 //   product — one grouped list: the described product always included, each
 //   other product a whole-row tick with why it is needed and the trash; the
 //   web's note behind ⓘ; Continue in a foot that sticks to the screen's foot;
-// · Which project is this for? (505–864): a sheet, for one product — the
-//   projects as pick rows in the sheet ("+ Start a new project" first, its
-//   name field under it), the decided products as a row back to the
-//   question; What should the project be
-//   called? (5110) for several, which make one new project. Start drawing
-//   shows the credits and stays off until there is a project. A chat started
+// · Which project is this for? (505–864): a sheet with two clear choices
+//   (owner 2026-11-24: the plain "+ Start a new project" row over a bare list
+//   read as instructions, not choices) — New project (picked first, its name
+//   field inside) and A project I have (the projects as pick rows inside).
+//   Only ONE product asks it. Several products always start a new project
+//   (owner 2026-11-24: "with several products I can only create a project, I
+//   can't pick one I have"; §4.4.8), so their sheet only names it (5110, What
+//   should the project be called?), the decided products as a row back to the
+//   question. With every one of the plan's projects in
+//   use, "+ Start a new project" says so before it is picked ("3 of 3 used on
+//   Free · Builder gives you 20"), and picking it shows the plan's card in
+//   place of the name field; Start drawing waits with the web's reason, and
+//   nothing is drawn or charged. Start drawing shows the credits and stays
+//   off until there is a project — never for credits (the web's rule, CRE-2):
+//   each concept charges as it is drawn, or fails with "Your credit balance ran
+//   out before this render started. Nothing was charged." Out of credits, the
+//   sheet opens on the out-of-credits row, Buy credits in place. A chat started
 //   from a project's Add a product keeps that project (owner rule: it never
 //   makes a new one): nothing starts ticked, and the product question's
 //   button is Start drawing into it;
@@ -35,20 +46,27 @@ import { CreditBadge } from "@/components/credits/credit-badge";
 import { CONCEPT_COST } from "@/lib/create/credits";
 import type { SetupAnswer } from "@/lib/create/history";
 import { relativeLabel } from "@/components/create/use-clock";
+import { titleFromPrompt } from "@/components/create/setup-turn";
+import { useNewProjectHint, useProjectRoom } from "@/components/projects/project-limit";
 import { cn } from "@/lib/utils";
 import { T } from "../type";
 import { Sheet } from "../kit/sheet";
-import { Eyebrow } from "../kit/eyebrow";
 import { LIST_DIVIDERS, ListCard, ListRow } from "../kit/list";
 import { PickList } from "../kit/pick-list";
+import { RadioCard } from "../plans/parts";
+import { OutOfCreditsRow, ProjectLimitCard } from "../plans/upsell";
 import { DASHED } from "./parts";
 import type { SetupTurn } from "./use-concept-flow";
-
-const NEW = "__new__";
 
 // ─────────────────────────── reading card ───────────────────────────
 
 type Row = { key: string; text: string; tone: "done" | "info" | "next" | "working"; when: string };
+
+/** The described product's name: the model's reading of it, else the maker's own first words — never
+ *  a generic "Your product" (the web's titleFromPrompt, CRE-20). */
+export function productNameOf(setup: SetupTurn): string {
+  return setup.productName?.trim() || titleFromPrompt(setup.prompt);
+}
 
 export function ReadingCard({ setup, now, projectName }: { setup: SetupTurn; now: number; projectName: string }) {
   const done = setup.status === "answered";
@@ -63,7 +81,7 @@ export function ReadingCard({ setup, now, projectName }: { setup: SetupTurn; now
   const rel = relativeLabel(setup.ts, now);
   const when = rel.charAt(0).toUpperCase() + rel.slice(1);
   const n = 1 + (setup.answer ? setup.answer.picked.length : setup.companions.length);
-  const names = [setup.productName?.trim() || "Your product", ...setup.companions.filter((c) => !setup.answer || setup.answer.picked.includes(c.id)).map((c) => c.name)];
+  const names = [productNameOf(setup), ...setup.companions.filter((c) => !setup.answer || setup.answer.picked.includes(c.id)).map((c) => c.name)];
   const rows: Row[] =
     setup.status === "loading"
       ? [
@@ -146,10 +164,10 @@ export function ProductQuestion({
   onContinue: () => void;
   /** The project this chat adds to: Continue becomes Start drawing, with its credits. */
   addTo?: { id: string; name: string } | null;
-  /** Why Start drawing can't run now (offline, short of credits). */
+  /** Why Start drawing can't run now (offline). Credits never hold it (the web's rule). */
   held?: string | null;
 }) {
-  const name = setup.productName?.trim() || "Your product";
+  const name = productNameOf(setup);
   const chosen = 1 + setup.companions.filter((c) => picked.has(c.id)).length;
   const [info, setInfo] = React.useState(false);
   // The web's whole note (setup-turn.tsx): one short line inline, all of it behind ⓘ (lens 1).
@@ -240,17 +258,8 @@ export function ProductQuestion({
           </p>
         )}
       </div>
-      <Sheet
-        open={info}
-        onClose={() => setInfo(false)}
-        title="What should we build?"
-        description={note}
-        actions={
-          <Button size="xl" className="w-full" onClick={() => setInfo(false)}>
-            Done
-          </Button>
-        }
-      />
+      {/* An ⓘ sheet: ✕, swipe and the scrim close it — no Done that only closes (kit rule). */}
+      <Sheet open={info} onClose={() => setInfo(false)} title="What should we build?" description={note} />
     </section>
   );
 }
@@ -265,7 +274,7 @@ export function ProjectSheet({
   onChangeProducts,
   projects,
   onStart,
-  canAfford,
+  onBuyCredits,
   held,
 }: {
   open: boolean;
@@ -278,27 +287,52 @@ export function ProjectSheet({
   onChangeProducts?: () => void;
   projects: { id: string; name: string; preselect?: boolean; detail?: string }[];
   onStart: (answer: Pick<SetupAnswer, "projectId" | "projectName">) => void;
-  canAfford: (n: number) => boolean;
+  /** Out of credits: the row with Buy credits opens the sheet (null with a credit to draw with). */
+  onBuyCredits?: (() => void) | null;
   /** Why Start drawing can't run now (offline). */
   held?: string | null;
 }) {
   const multi = products > 1;
   const addTo = projects.find((p) => p.preselect) ?? null;
-  // Several products with no project to add to name one new project; otherwise the question is which project.
-  const choosing = !multi || addTo !== null;
-  const [touched, setTouched] = React.useState<string | null>(null);
-  const choice = touched ?? addTo?.id ?? null;
+  // One product: which project — one the maker has, or a new one. Several products always make a new
+  // project (owner 2026-11-24), so they only need its name — unless the chat came from a project's Add a
+  // product (a preselected one), whose project they join.
+  // With no project to pick, one product only needs a name too.
+  const choosing = (!multi && projects.length > 0) || addTo !== null;
+  const [mode, setMode] = React.useState<"new" | "existing">(addTo ? "existing" : "new");
+  const [picked, setPicked] = React.useState<string | null>(addTo?.id ?? null);
   const [name, setName] = React.useState("");
   const nameId = React.useId();
-  const isNew = !choosing || choice === NEW;
+  const existingRef = React.useRef<HTMLDivElement>(null);
+  // The plan's projects (CL-034): when they're all in use a new project can't start — the card takes the
+  // name field's place, before any credit is spent. When one frees up the name field comes back.
+  const room = useProjectRoom();
+  const newHint = useNewProjectHint();
+  const isNew = !choosing || mode === "new";
+  const newBlocked = room.full && isNew;
   const cost = products * CONCEPT_COST;
-  const ready = isNew ? name.trim().length > 0 : !!choice;
-  const afford = canAfford(cost);
-  const reason = !ready ? (isNew ? "Name the project first" : "Pick a project first") : !afford ? "Not enough credits to draw these concepts" : (held ?? null);
+  const ready = !newBlocked && (isNew ? name.trim().length > 0 : !!picked);
+  const reason = newBlocked
+    ? choosing && projects.length > 0
+      ? "Pick a project you have, or upgrade"
+      : "Upgrade to start a new project"
+    : !ready
+      ? isNew
+        ? "Name the project first"
+        : "Pick a project first"
+      : (held ?? null);
+  // "Use a project I have": A project I have picked and its projects brought into view.
+  const useExisting = () => {
+    setMode("existing");
+    requestAnimationFrame(() => {
+      existingRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      existingRef.current?.querySelector<HTMLElement>("[role=option]")?.focus({ preventScroll: true });
+    });
+  };
 
   const start = () => {
     if (reason) return;
-    onStart(isNew ? { projectId: "", projectName: name.trim() } : { projectId: choice!, projectName: "" });
+    onStart(isNew ? { projectId: "", projectName: name.trim() } : { projectId: picked!, projectName: "" });
   };
 
   const nameField = (
@@ -326,10 +360,12 @@ export function ProjectSheet({
         multi
           ? addTo
             ? `You're adding ${products} products to ${addTo.name}. You can pick another project, or start a new one.`
-            : `${products} products belong together, so they go in one new project.`
+            : `${products} products belong together, so they start one new project.`
           : addTo
             ? `You're adding a product to ${addTo.name}. You can pick another project, or start a new one.`
-            : "A single product can join a project you already have, or start a new one."
+            : choosing
+              ? "Start a new project with it, or add it to one you have."
+              : "This product starts a new project."
       }
       actions={
         <>
@@ -344,6 +380,8 @@ export function ProjectSheet({
         </>
       }
     >
+      {/* Out of credits: the web's CL-032 line stays in view while the question is open (CRE-2). */}
+      {onBuyCredits && <OutOfCreditsRow onBuy={onBuyCredits} />}
       {/* The products decided a step back: a row that returns to the question (lens 4). */}
       {productNames && productNames.length > 1 && (
         <ListCard label="Products">
@@ -357,26 +395,38 @@ export function ProjectSheet({
       {/* The projects as pick rows in this sheet, not a field that opens a second sheet: the
           sheet scrolls while its title and Start drawing stay pinned, so a long list never
           pushes the question away (the web's reason for its dropdown). */}
+      {/* Two choices, each a card with its radio; what the picked one needs sits inside it. */}
       {choosing && (
-        <div className="flex flex-col gap-2">
-          <PickList
-            label="New project"
-            value={choice}
-            options={[{ value: NEW, label: "+ Start a new project", helper: multi ? "These products become its first." : "This product becomes its first." }]}
-            onPick={setTouched}
-          />
-          {isNew && nameField}
+        <ul role="radiogroup" aria-label={multi ? "Where these products go" : "Where this product goes"} className="flex flex-col gap-4">
+          <RadioCard
+            checked={mode === "new"}
+            onSelect={() => setMode("new")}
+            below={mode === "new" ? (newBlocked ? <ProjectLimitCard onUseExisting={projects.length > 0 ? useExisting : undefined} /> : nameField) : undefined}
+          >
+            <span className={T.rowTitle}>New project</span>
+            <span className={T.meta}>{newHint ?? (multi ? "These products start it." : "This product starts it.")}</span>
+          </RadioCard>
           {projects.length > 0 && (
-            <>
-              <Eyebrow tone="tertiary" as="h3" className="pt-4">
-                Existing projects
-              </Eyebrow>
-              <PickList label="Existing projects" value={choice} options={projects.map((p) => ({ value: p.id, label: p.name, helper: p.detail }))} onPick={setTouched} />
-            </>
+            <RadioCard
+              checked={mode === "existing"}
+              onSelect={useExisting}
+              below={
+                mode === "existing" ? (
+                  <div ref={existingRef} className="scroll-mt-4">
+                    <PickList label="Your projects" value={picked} options={projects.map((p) => ({ value: p.id, label: p.name, helper: p.detail }))} onPick={setPicked} />
+                  </div>
+                ) : undefined
+              }
+            >
+              <span className={T.rowTitle}>A project I have</span>
+              <span className={T.meta}>
+                Add it to one of your {projects.length} {projects.length === 1 ? "project" : "projects"}.
+              </span>
+            </RadioCard>
           )}
-        </div>
+        </ul>
       )}
-      {!choosing && nameField}
+      {!choosing && (newBlocked ? <ProjectLimitCard /> : nameField)}
     </Sheet>
   );
 }

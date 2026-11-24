@@ -6,13 +6,22 @@
 // or to the Feed when the link was opened on its own), the home indicator in
 // its On media tone. Any clip the Feed can play opens here, a project you
 // shared too (`mine:<projectId>`). A link that named a comment opens the
-// comments on it. A clip that isn't there (any more) says so and leads back.
+// comments on it.
+// A clip that isn't on the Feed (any more) while its item is still there — off
+// sale, or never on the marketplace — leads on, as the web's post page stays
+// (SOC-9, SOC-3, `offFeedHrefOf`): a link to its comments opens the post on its
+// maker's Timeline with its comments, on that comment; any other link opens the
+// item's details. Only an item that is gone says "Clip not found".
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Skeleton } from "@/components/ideeza/skeleton";
-import { isMineClipId } from "@/lib/innovations/clips";
+import { useShareItems } from "@/components/shares/use-share-items";
+import { isMineClipId, offFeedHrefOf } from "@/lib/innovations/clips";
+import { useManualProjects } from "@/lib/manual/projects";
+import { profileHrefOf } from "@/lib/people/ids";
 import { HomeIndicator } from "../home-indicator";
 import { NotFoundState } from "../kit/state";
 import { useGoBack } from "../nav-trail";
@@ -23,14 +32,45 @@ import { ClipDeck } from "./clip-deck";
 import { useFeedClips } from "./use-clips";
 import { useGuestGuard } from "./use-guest";
 
+/** Your own profile on the phone (it always finds you, handle or not). */
+const MY_PROFILE = "/m/creators/me";
+
+/** Where the address of a clip that isn't on the Feed leads, once this phone's stores are read
+ *  (`ready`); `href` null: its item is gone (or `skip`: there is nothing to work out yet). */
+function useOffFeedHref(id: string, comment: string | null, skip: boolean): { ready: boolean; href: string | null } {
+  const items = useShareItems();
+  const { hydrated: projectsRead, projects } = useManualProjects();
+  const ready = items.hydrated && projectsRead;
+  if (skip || !ready) return { ready, href: null };
+  const item = items.itemOf(id);
+  if (!item) return { ready, href: null };
+  // The post's Timeline: a sample's maker's profile; yours once you shared the project.
+  const sampleProfile = item.source === "sample" ? profileHrefOf(item.creator.id, "innovations") : null;
+  const timeline =
+    item.source === "sample"
+      ? sampleProfile && `/m${sampleProfile}`
+      : typeof projects.find((p) => p.id === item.projectId)?.showcasedAt === "number"
+        ? MY_PROFILE
+        : null;
+  return { ready, href: offFeedHrefOf(item, comment, timeline) };
+}
+
 export function ClipPage({ id, comment }: { id: string; comment: string | null }) {
+  const router = useRouter();
   const { hydrated, byId } = useFeedClips();
   const clip = byId(id);
   const { guard, gate } = useGuestGuard();
   const clips = React.useMemo(() => (clip ? [clip] : []), [clip]);
   const back = useGoBack("/m");
+  // Whether the clip is on the Feed is known at once for a sample, once this phone is read for yours.
+  const known = !!clip || hydrated || !isMineClipId(id);
+  const off = useOffFeedHref(id, comment, !!clip || !known);
+  const moveTo = off.href;
+  React.useEffect(() => {
+    if (moveTo) router.replace(moveTo);
+  }, [moveTo, router]);
 
-  if (!clip && isMineClipId(id) && !hydrated) {
+  if (!clip && (!known || !off.ready || moveTo)) {
     return (
       <div data-theme="dark" role="status" aria-label="Loading the clip" className="flex h-full items-end bg-bg-page px-8 pb-10">
         <div className="flex flex-1 flex-col gap-4">

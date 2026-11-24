@@ -51,14 +51,14 @@ export function FeedHome() {
 
   // Every clip of the tab as it reads now (your shares carry your caption).
   const live = React.useMemo(
-    () => (tab === "following" ? followingClips(FEED_CLIPS, reactions, undefined, false) : feedClips(FEED_CLIPS, mine, prefs.shares, NO_HIDDEN)),
+    () => (tab === "following" ? followingClips(FEED_CLIPS, reactions) : feedClips(FEED_CLIPS, mine, prefs.shares, NO_HIDDEN)),
     [tab, reactions, mine, prefs.shares],
   );
   // The order, taken once per tab — and again when what you shared changes.
   const sig = tab === "feed" ? `${prefs.shares.map((s) => s.id).join(",")}|${mine.map((c) => c.id).join(",")}` : "";
   const [order, setOrder] = React.useState<{ tab: FeedTab; sig: string; ids: string[] } | null>(null);
   if (ready && (order?.tab !== tab || order.sig !== sig)) {
-    const list = tab === "following" ? followingClips(FEED_CLIPS, reactions, prefs, false) : feedClips(FEED_CLIPS, mine, prefs.shares, prefs);
+    const list = tab === "following" ? followingClips(FEED_CLIPS, reactions, prefs) : feedClips(FEED_CLIPS, mine, prefs.shares, prefs);
     setOrder({ tab, sig, ids: list.map((c) => c.id) });
   }
   const gone = React.useMemo(() => new Set([...prefs.hidden, ...(tab === "feed" ? prefs.notInterested : [])]), [prefs, tab]);
