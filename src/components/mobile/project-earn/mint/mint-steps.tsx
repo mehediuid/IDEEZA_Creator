@@ -19,8 +19,9 @@
 // · MintReview — a reject or a failure first (13l); then, while a video the
 //   gate needs hasn't started, "Start your videos" leads the screen (owner
 //   2026-11-24: the videos are the step's most important job and sat last,
-//   under facts shown louder): a brand card with how many have started and
-//   each video as a row opening its maker, and the foot's primary is Start
+//   under facts shown louder; then "no coloured card, no box in a box"): a
+//   plain section with how many have started and one list, a row per video
+//   (Start opens its maker), and the foot's primary is Start
 //   the videos (the next one to start) until all have; What is minted as a
 //   summary card (shared as, the name, its products, the price, share and
 //   royalties large for a Sell); videos still rendering right under it; Terms;
@@ -657,52 +658,49 @@ function VideosBlock({ projectId, readiness, gated, selling, first = false }: { 
   const pv = readiness.project;
   const pvCopy = pv ? projectRowCopy(pv) : null;
   const pvAction = pvCopy ? projectActionLabel(pvCopy.action) : null;
+  // In the lead variant a video not started reads "No video yet" with a short Start, so the names keep their room.
+  const pvNotStarted = !!pv && (pv.state === "make" || pv.state === "failed" || pv.state === "waiting" || pv.state === "outdated");
   const rows = gated && blocker && (
     <ListCard label="Videos">
       {readiness.products
         .filter((p) => p.video.state !== "ready")
         .map((p) => {
           const copy = statusCopy(p.video);
-          const label = actionLabel(copy.action);
+          const notStarted = p.video.state === "none" || p.video.state === "failed";
           return (
             <VideoFixRow
               key={p.productId}
               title={displayProductName(p.name)}
-              line={copy.text}
-              action={label}
+              line={first && notStarted && p.video.state === "none" ? "No video yet" : copy.text}
+              action={first && notStarted ? "Start" : actionLabel(copy.action)}
               onOpen={() => router.push(phoneProductVideoHref(projectId, p.productId))}
             />
           );
         })}
-      {pv && pvCopy && !pv.ok && <VideoFixRow title="Project video" line={pvCopy.text} action={pvAction} onOpen={() => router.push(phoneProjectPath(projectId, "video"))} />}
+      {pv && pvCopy && !pv.ok && (
+        <VideoFixRow
+          title="Project video"
+          line={first && pv.state === "make" ? "No video yet" : pvCopy.text}
+          action={first && pvNotStarted ? "Start" : pvAction}
+          onOpen={() => router.push(phoneProjectPath(projectId, "video"))}
+        />
+      )}
     </ListCard>
   );
   if (first) {
     const total = videoCountOf(readiness).total;
     const started = total - videosNotStartedOf(readiness).length;
+    // Plain like the screen's other sections (owner 2026-11-24: no coloured card, no box in a box):
+    // its place at the top and the foot's Start the videos carry it.
     return (
-      <section aria-labelledby={headingId} className="flex flex-col gap-6 rounded-xl border-[length:var(--border-width-1-5)] border-solid border-border-brand bg-bg-brand-subtle p-8">
-        <div className="flex flex-col gap-3">
-          <span className="w-fit">
-            <Badge tone="brand">Before you sign</Badge>
-          </span>
-          <h3 id={headingId} className={T.title}>
+      <section aria-labelledby={headingId} className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between gap-4">
+          <h3 id={headingId} className={H3}>
             Start your videos
           </h3>
-          <p className={cn(T.body, "text-text-primary")}>
-            {selling
-              ? "Buyers see each product in its video. Start every one now: they keep rendering while you sign, and the listing goes live once each is ready."
-              : "Every product needs its video. Start every one now: they keep rendering while you sign."}
-          </p>
+          <span className={NOTE}>{`${started} of ${total} started`}</span>
         </div>
-        <div className="flex flex-col gap-2">
-          <div aria-hidden className="flex gap-2">
-            {Array.from({ length: total }, (_, n) => (
-              <span key={n} className={cn("h-[4px] flex-1 rounded-full", n < started ? "bg-bg-brand" : "bg-bg-subtle")} />
-            ))}
-          </div>
-          <p className={T.meta}>{`${started} of ${total} started`}</p>
-        </div>
+        <p className={NOTE}>{selling ? "Start each one before you sign. They keep rendering after, and the listing goes live once all are ready." : "Start each one before you sign. They keep rendering after."}</p>
         {rows}
       </section>
     );
