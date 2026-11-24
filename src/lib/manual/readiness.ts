@@ -244,16 +244,6 @@ export function videosNotStartedOf(r: Readiness): string[] {
   return out;
 }
 
-/** The next video to start, in the order `videosNotStartedOf` names them: a product (no video yet,
- *  or its render failed), then the project video. Null once every one has started. */
-export function nextVideoToStartOf(r: Readiness): { kind: "product"; productId: string; name: string } | { kind: "project" } | null {
-  const p = r.products.find((x) => x.video.state === "none" || x.video.state === "failed");
-  if (p) return { kind: "product", productId: p.productId, name: p.name.trim() ? p.name : "Not named yet" };
-  const pv = r.project;
-  if (pv && (pv.state === "make" || pv.state === "failed" || pv.state === "waiting" || pv.state === "outdated")) return { kind: "project" };
-  return null;
-}
-
 /** Owner, 2026-11-18 (second word): a maker moves on — lists, sells copies, relists, shares — only
  *  once every video it needs is in generation. What's still rendering or waiting for review then
  *  holds what was signed off the marketplace and Innovations (lib/market/held.ts); a video never

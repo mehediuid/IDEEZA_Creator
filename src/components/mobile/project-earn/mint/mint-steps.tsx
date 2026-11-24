@@ -17,14 +17,14 @@
 //   all of them once Continue was pressed (13h). An instant mint the wallet
 //   can't pay says so under Minting type (13g);
 // · MintReview — a reject or a failure first (13l); then, while a video the
-//   gate needs hasn't started, "Start your videos" leads the screen (owner
+//   gate needs hasn't started, "Generate your videos" leads the screen (owner
 //   2026-11-24: the videos are the step's most important job and sat last,
 //   under facts shown louder; then "no coloured card, no box in a box"): a
-//   plain section, "Generate your videos", how many have started, then
+//   plain section with how many have started, then
 //   Product videos (a row per product) and Project video (the project's row),
-//   each with Generate video opening its maker, and the foot's primary is Generate
-//   the videos (the next one to start) until all have; What is minted as a
-//   videos still rendering in the same place; the ladder's missing steps as a
+//   each with Generate video opening its maker; the foot stays the next step's
+//   name (Sign and list), off with its reason until every video has started
+//   (the web's rule, owner 2026-11-24); videos still rendering in the same place; the ladder's missing steps as a
 //   state card; then ONE closed row, Listing details (Mint details), whose line
 //   is the gist ("car · Buy now 1 USDC · 100% of the project · nothing to pay
 //   now") — inside: the products and every term in one list, the share-sale
@@ -721,8 +721,8 @@ function VideosBlock({
     // Plain like the screen's other sections (owner 2026-11-24: no coloured card, no box in a box),
     // and it says which is which (owner: "which is a product video, which the project video? and
     // Start what? — the videos have to be generated"): Product videos, a row per product, and
-    // Project video, the project's one row, each with Generate video. Its place at the top and the
-    // foot's Generate the videos carry it.
+    // Project video, the project's one row, each with Generate video. Its place at the top carries it;
+    // the foot stays Sign and list, off until every video has started (the web's rule).
     return (
       <section aria-labelledby={headingId} className="flex flex-col gap-4">
         <div className="flex items-baseline justify-between gap-4">

@@ -53,12 +53,11 @@ import {
 import { briefDraftKey } from "@/lib/brief/types";
 import { bumpMinted } from "@/lib/brief/wallet";
 import { useCreateHistory } from "@/lib/create/history";
-import { phoneEarnHref, phoneMintIntentOf, phoneProductVideoHref } from "@/lib/manual/phone-earn";
-import { phoneProjectPath } from "@/lib/manual/phone-project";
+import { phoneEarnHref, phoneMintIntentOf } from "@/lib/manual/phone-earn";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { buildsOf, listingMetadataOf, productsOfProject, type ProjectProduct } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
-import { currentProductsOf, nextVideoToStartOf, readinessOf, videosBlockerOf, videosNotStartedOf, videosStartBlockerOf, type ReadinessFacts } from "@/lib/manual/readiness";
+import { currentProductsOf, readinessOf, videosBlockerOf, videosStartBlockerOf, type ReadinessFacts } from "@/lib/manual/readiness";
 import { hold, heldId } from "@/lib/market/held";
 import { createListing, listingViewOf } from "@/lib/market/listing";
 import { HELD_DONE_LINE, cleanBenefits, listRequestOf, listedMintingType } from "@/lib/market/listing-flow";
@@ -214,10 +213,6 @@ export function MintFlow({ projectId }: { projectId: string }) {
   const reviewReason = state.intent
     ? reviewMissing({ intent: state.intent, details: detailsReason, shortfall: shortfall?.missing ?? null, readiness: gated, holdVideos: true })
     : null;
-  // A video the gate needs not started yet: the foot's primary opens the next one to start (owner
-  // 2026-11-24, the videos first), and Sign comes back once every one has.
-  const nextVideo = step === "review" && gated ? nextVideoToStartOf(gated) : null;
-  const videosLeft = nextVideo && gated ? videosNotStartedOf(gated).length : 0;
 
   const commit = async () => {
     const p = project;
@@ -398,14 +393,6 @@ export function MintFlow({ projectId }: { projectId: string }) {
           onReview={toReview}
           onSign={() => void commit()}
           onDone={() => router.replace(projectHref)}
-          startVideos={
-            nextVideo
-              ? {
-                  left: videosLeft,
-                  onStart: () => router.push(nextVideo.kind === "product" ? phoneProductVideoHref(project.id, nextVideo.productId) : phoneProjectPath(project.id, "video")),
-                }
-              : null
-          }
         />
       }
     >
@@ -464,7 +451,6 @@ function MintFooter({
   onReview,
   onSign,
   onDone,
-  startVideos,
 }: {
   step: MintStepId;
   state: MintState;
@@ -478,8 +464,6 @@ function MintFooter({
   onReview: () => void;
   onSign: () => void;
   onDone: () => void;
-  /** Videos still to start on Review: the primary opens the next one instead of Sign. */
-  startVideos: { left: number; onStart: () => void } | null;
 }) {
   const reasonId = React.useId();
   if (step === "success") {
@@ -492,16 +476,9 @@ function MintFooter({
       </BottomBar>
     );
   }
-  const reason =
-    step === "choose"
-      ? state.intent
-        ? null
-        : "Pick how it goes out."
-      : step === "details"
-        ? detailsReason
-        : startVideos
-          ? `${startVideos.left} ${startVideos.left === 1 ? "video" : "videos"} to generate, then ${ctaOf(state, type)}`
-          : reviewReason;
+  // The step's primary is always the next step's own name (the web's rule, owner 2026-11-24): on
+  // Review "Sign and list", off with its reason under it until every video has started.
+  const reason = step === "choose" ? (state.intent ? null : "Pick how it goes out.") : step === "details" ? detailsReason : reviewReason;
   const primary =
     step === "choose" ? (
       <Button size="xl" className="w-full" disabled={!state.intent} onClick={onChoose}>
@@ -523,10 +500,6 @@ function MintFooter({
         }}
       >
         Continue to review
-      </Button>
-    ) : startVideos ? (
-      <Button size="xl" className="w-full" aria-describedby={reasonId} onClick={startVideos.onStart}>
-        Generate the videos
       </Button>
     ) : (
       <Button size="xl" className="w-full" disabled={!!reviewReason || minting} loading={minting} aria-describedby={reviewReason ? reasonId : undefined} onClick={onSign}>
