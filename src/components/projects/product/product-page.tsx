@@ -84,13 +84,15 @@ import { LockedPiecePanel, PostProductLinks, PostRailBlocks } from "@/components
 import { PostMissing } from "@/components/innovations/post-states";
 import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-store";
 import { minePostOf } from "@/lib/innovations/mine-post";
-import { postHref } from "@/lib/innovations/slug";
+import { postHref, postIdOfProject } from "@/lib/innovations/slug";
 import { useEditProductDetails } from "./edit-product-details";
 import { DeliverablesAccess } from "./product-deliverables";
 import { ClampedText, ConceptImage } from "./product-identity";
 import { ProductMenu } from "./product-menu";
 import { ProductRail } from "./product-rail";
 import { CreatorRailBlock, StoryRailBlock } from "@/components/marketplace/market-rail";
+import { MarketReportMenu } from "@/components/marketplace/report-menu";
+import { productReportIdOf } from "@/lib/data/reports";
 import type { ProductSlotProps } from "./product-slots";
 import { LockLine, ProductLoading, ProductMissing, UNBUILT } from "./product-states";
 import { ProductTabs } from "./product-tabs";
@@ -353,7 +355,10 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                         >
                           {name}
                         </h1>
-                        <MarketShareButton itemId={shareItemId("mine", project.id, product.id)} title={name} />
+                        <div className="flex shrink-0 items-center gap-4">
+                          <MarketShareButton itemId={shareItemId("mine", project.id, product.id)} title={name} />
+                          <MarketReportMenu reportId={productReportIdOf(postIdOfProject(project.id), product.id)} target="product" />
+                        </div>
                       </div>
                     ) : (
                       <h1

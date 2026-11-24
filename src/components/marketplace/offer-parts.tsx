@@ -17,14 +17,16 @@
 // - LegalLine: the one legal line under the Main NFT, always shown.
 
 import * as React from "react";
-import { ArrowDown01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Blockchain01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Radio, TestnetDemoBadge } from "@/components/ideeza";
+import { Badge, ModalFrame, Radio, TestnetDemoBadge } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { Network, Token } from "@/lib/brief/types";
 import type { ProjectView } from "@/lib/manual/project-read";
-import { formatDateTime } from "@/lib/manual/project-summary";
+import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
+import { DEMO_MINT_FOOTNOTE } from "@/lib/manual/rail-copy";
+import { chainRowsOf, type ChainRecord } from "@/lib/market/chain-record";
 import { timeLeftLabel } from "@/lib/market/auction";
 import { useMarket } from "@/lib/market/market-store";
 import type { AuctionState, EditionKind, Listing } from "@/lib/market/types";
@@ -122,7 +124,7 @@ export function soldWhatOf(listing: Listing): string {
 }
 
 /** Lazy while nothing is on chain yet: the token is minted at the sale. */
-function isLazy(listing: Listing, view: ProjectView): boolean {
+export function isLazy(listing: Listing, view: ProjectView): boolean {
   if (view.mint.status === "lazyMinted") return true;
   if (view.mint.status === "onChain") return false;
   return listing.mintingType === "lazy";
@@ -255,6 +257,35 @@ export function MoreFacts({ children, title = "NFT details" }: { children: React
         </div>
       )}
     </div>
+  );
+}
+
+/** "View on blockchain" — every NFT tab's, under its NFT details (owner, 2026-11-24): the record of the NFT the
+ *  tab sells (chain-record.ts) in a dialog. Nothing links to an explorer (§3.1): the prototype's tokens and
+ *  transactions are a testnet demo made in this browser, and the dialog says so in the mint's own words. */
+export function ViewOnChain({ what, record }: { what: string; record: ChainRecord }) {
+  const [open, setOpen] = React.useState(false);
+  const rows = chainRowsOf(record, formatDate);
+  return (
+    <>
+      <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={QUIET_LINK}>
+        <Icon icon={Blockchain01Icon} size={16} />
+        View on blockchain
+      </button>
+      <ModalFrame open={open} onClose={() => setOpen(false)} size="sm" title="On the blockchain" description={what}>
+        <div className="flex flex-col gap-8">
+          <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-8 gap-y-4">
+            {rows.map((r) => (
+              <React.Fragment key={r.label}>
+                <dt className="text-sm font-medium text-text-secondary">{r.label}</dt>
+                <dd className="m-0 min-w-0 break-words text-md font-medium tabular-nums text-text-primary">{r.value}</dd>
+              </React.Fragment>
+            ))}
+          </dl>
+          <p className="m-0 text-sm text-text-secondary">{DEMO_MINT_FOOTNOTE}</p>
+        </div>
+      </ModalFrame>
+    </>
   );
 }
 

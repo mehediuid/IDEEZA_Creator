@@ -44,7 +44,7 @@ import { compareAmounts, formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
-import { ChoiceRows, FactGrid, MoreFacts, OfferTop, WalletLine } from "./offer-parts";
+import { ChoiceRows, FactGrid, MoreFacts, OfferTop, ViewOnChain, WalletLine } from "./offer-parts";
 import { useEditionPurchase, type EditionTier } from "./purchase-dialog";
 import { HolderOffers } from "./holder-offers";
 import { useResales } from "@/components/projects/purchased/resales-store";
@@ -195,6 +195,24 @@ export function CopyPanel({
         </p>
         <CopyActivity project={project} track={track} sales={view.sales} />
       </MoreFacts>
+      <ViewOnChain
+        what={`${name} · ${scopeName}`}
+        record={{
+          kind: "copy",
+          network: chain.network,
+          collection: chain.collection,
+          minted: card.sold,
+          of: card.total,
+          txs: view.sales
+            .filter((s) => s.item.nft !== "main" && s.item.trackId === track.id)
+            .map((s) => ({
+              at: s.at,
+              txHash: s.txHash,
+              serial: s.item.nft !== "main" ? s.item.serial : null,
+              mine: buyerId !== null && holderOf(ownSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId,
+            })),
+        }}
+      />
     </>
   );
 }

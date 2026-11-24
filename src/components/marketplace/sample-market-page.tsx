@@ -55,6 +55,7 @@ import type { SampleMarket } from "@/lib/market/sample-market";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
 import type { OfferTab } from "./offer-parts";
 import { OnInnovationsBlock, SampleCreatorBlock } from "./rail-blocks";
+import { MarketReportMenu } from "./report-menu";
 import { SampleOfferBox } from "./sample-offer-box";
 import { SampleMediaTab, SampleProductsTab } from "./sample-products";
 
@@ -141,7 +142,10 @@ function SampleMarketBody({ market, initialTab }: { market: SampleMarket; initia
                       {post.title}
                     </h1>
                   </div>
-                  <MarketShareButton itemId={feedId} title={post.title} className="ml-auto" />
+                  <div className="ml-auto flex shrink-0 items-center gap-4">
+                    <MarketShareButton itemId={feedId} title={post.title} />
+                    <MarketReportMenu reportId={post.id} target="project" />
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
                   <StatusChip status={status.status} word={status.word} />

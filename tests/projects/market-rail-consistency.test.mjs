@@ -137,3 +137,54 @@ test("the Marketplace block says what the buyer owns, in web terms (owner, 2026-
   assert.match(read(MARKET + "sample-offer-box.tsx"), /owned: ownedOf\(o\)/);
   for (const f of ["copy-panel.tsx", "sample-offer-box.tsx"]) assert.doesNotMatch(read(MARKET + f), /you own \$\{owned\}/, f);
 });
+
+const chain = await import("../../.tmp-test/lib/market/chain-record.js");
+const reports = await import("../../.tmp-test/lib/data/reports.js");
+
+test("View on blockchain: every NFT tab shows its record, and nothing links to an explorer (owner, 2026-11-24)", () => {
+  const date = () => "Nov 18, 2026";
+  const tx = (over) => ({ at: 1, txHash: "0x" + "ab".repeat(32), serial: null, mine: false, ...over });
+  const main = chain.chainRowsOf({ kind: "main", network: "baseSepolia", collection: "IDEEZA Creators", tokenId: null, lazy: true, holder: "Tomas Berg", txs: [] }, date);
+  assert.deepEqual(main.map((r) => r.label), ["Blockchain", "Collection", "Token", "Held by", "Last transaction"]);
+  assert.equal(main.find((r) => r.label === "Token").value, "Minted when it's bought");
+  assert.equal(main.find((r) => r.label === "Last transaction").value, "None yet");
+  const own = chain.chainRowsOf({ kind: "main", network: "baseSepolia", collection: "My IDEEZA Collection", tokenId: 3, lazy: true, holder: "Maya Karim", txs: [] }, date);
+  assert.equal(own.find((r) => r.label === "Token").value, "#3 · minted when it's bought");
+  const copy = chain.chainRowsOf(
+    { kind: "copy", network: "baseSepolia", collection: "IDEEZA Creators", minted: 2, of: 50, txs: [tx({ serial: 1, mine: true, at: 1 }), tx({ serial: 2, at: 2, txHash: "0x" + "cd".repeat(32) })] },
+    date,
+  );
+  assert.deepEqual(copy.map((r) => r.label), ["Blockchain", "Collection", "Copies minted", "Your copies", "Last transaction"]);
+  assert.equal(copy.find((r) => r.label === "Copies minted").value, "2 of 50");
+  assert.equal(copy.find((r) => r.label === "Your copies").value, "#1");
+  assert.match(copy.find((r) => r.label === "Last transaction").value, /^0xcdcd…cdcd · Nov 18, 2026$/, "the newest transaction");
+  const parts = read(MARKET + "offer-parts.tsx");
+  assert.match(parts, /View on blockchain/);
+  assert.match(parts, /\{DEMO_MINT_FOOTNOTE\}/);
+  assert.doesNotMatch(parts, /basescan|etherscan|explorer\.|https?:\/\//i, "no explorer link: nothing is on a real chain");
+  // In every tab: the Main NFT (a listing's and a sample's) and each copy panel (a listing's, its products', a sample's).
+  assert.match(read(MARKET + "buyer-rail.tsx"), /<ViewOnChain\s+what=\{`Main NFT · \$\{project\.name\}`\}/);
+  assert.match(read(MARKET + "copy-panel.tsx"), /<ViewOnChain\s+what=\{`\$\{name\} · \$\{scopeName\}`\}/);
+  const sample = read(MARKET + "sample-offer-box.tsx");
+  assert.match(sample, /<ViewOnChain\s+what=\{`Main NFT · \$\{post\.title\}`\}/);
+  assert.match(sample, /<ViewOnChain\s+what=\{`\$\{offer\.name\} · \$\{post\.title\}`\}/);
+});
+
+test("Report: the ⋯ beside Share on every marketplace page reports the project or the product (owner, 2026-11-24)", () => {
+  assert.equal(reports.productReportIdOf("sample:p12", "hub"), "sample:p12#hub");
+  assert.deepEqual(reports.reportedIdParts("sample:p12#hub"), { postId: "sample:p12", productId: "hub" });
+  assert.deepEqual(reports.reportedIdParts("sample:p12"), { postId: "sample:p12", productId: null });
+  const rows = reports.reportsYouMade(
+    { profiles: [], posts: ["sample:p12", "sample:p12#hub", "sample:gone#x"], comments: [], messages: { conversations: [], entries: [], reports: [] }, problems: [] },
+    { person: () => null, personHref: () => null, post: (id) => (id === "sample:p12" ? { title: "Hub project", href: "/x" } : id === "sample:p12#hub" ? { title: "Watering Hub", href: "/x" } : null) },
+  );
+  assert.deepEqual(rows.map((r) => r.what), ["The post “Hub project”", "The product “Watering Hub”", "A product that is no longer here"]);
+  const menu = read(MARKET + "report-menu.tsx");
+  assert.match(menu, /label: `Report \$\{target\}`/);
+  assert.match(menu, /<ReportDialog\s+open=\{reporting\}\s+target=\{target\}/);
+  assert.match(read("components/innovations/report-dialog.tsx"), /project: "Report this project",\s+product: "Report this product",/);
+  assert.match(read(MARKET + "market-header.tsx"), /<MarketReportMenu reportId=\{postIdOfProject\(project\.id\)\} target="project" \/>/);
+  assert.match(read(MARKET + "sample-market-page.tsx"), /<MarketReportMenu reportId=\{post\.id\} target="project" \/>/);
+  assert.match(read(MARKET + "sample-product-page.tsx"), /<MarketReportMenu reportId=\{productReportIdOf\(post\.id, product\.id\)\} target="product" \/>/);
+  assert.match(read("components/projects/product/product-page.tsx"), /<MarketReportMenu reportId=\{productReportIdOf\(postIdOfProject\(project\.id\), product\.id\)\} target="product" \/>/);
+});

@@ -60,7 +60,7 @@ import { useResales } from "@/components/projects/purchased/resales-store";
 import { sampleSaleKeyOf } from "@/lib/market/purchases";
 import { holderOf } from "@/lib/market/resales";
 import { HolderOffers } from "./holder-offers";
-import { ChoiceRows, FactGrid, LegalLine, MoreFacts, OfferTabs, OfferTop, WalletLine, type OfferTab } from "./offer-parts";
+import { ChoiceRows, FactGrid, LegalLine, MoreFacts, OfferTabs, OfferTop, ViewOnChain, WalletLine, type OfferTab } from "./offer-parts";
 
 /** The web's words for a project sold in full (lib/market/purchase.ts). */
 const LOCKED = "This project was sold in full, so its NFTs aren't for sale any more.";
@@ -203,6 +203,18 @@ function MainPanel({
         <p className="m-0 text-sm text-text-tertiary">{FACTS_NOTE}</p>
         <ActivityLine last={state.soldTo} listedAt={post.sharedAt} />
       </MoreFacts>
+      <ViewOnChain
+        what={`Main NFT · ${post.title}`}
+        record={{
+          kind: "main",
+          network: SAMPLE_NETWORK,
+          collection: SAMPLE_COLLECTION,
+          tokenId: null,
+          lazy: true,
+          holder: state.soldTo ? buyerLabel(state.soldTo.buyerId) : post.creator.name,
+          txs: state.soldTo ? [{ at: state.soldTo.at, txHash: state.soldTo.txHash, serial: null, mine: state.soldTo.buyerId === buyerId }] : [],
+        }}
+      />
     </>
   );
 }
@@ -284,6 +296,22 @@ function CopyPanel({
         <p className="m-0 text-sm text-text-tertiary">{FACTS_NOTE}</p>
         <ActivityLine last={state.sales.at(-1) ?? null} listedAt={post.sharedAt} />
       </MoreFacts>
+      <ViewOnChain
+        what={`${offer.name} · ${post.title}`}
+        record={{
+          kind: "copy",
+          network: SAMPLE_NETWORK,
+          collection: SAMPLE_COLLECTION,
+          minted: state.count,
+          of: state.of,
+          txs: state.sales.map((s) => ({
+            at: s.at,
+            txHash: s.txHash,
+            serial: s.serial,
+            mine: holderOf(sampleSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId,
+          })),
+        }}
+      />
     </>
   );
 }

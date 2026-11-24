@@ -37,7 +37,9 @@ import { shareItemId } from "@/lib/innovations/share-items";
 import type { PostProduct } from "@/lib/innovations/types";
 import type { SampleMarket } from "@/lib/market/sample-market";
 import { cn } from "@/lib/utils";
+import { productReportIdOf } from "@/lib/data/reports";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
+import { MarketReportMenu } from "./report-menu";
 import { SampleCreatorBlock } from "./rail-blocks";
 import { SampleStoryBlock } from "./sample-market-page";
 
@@ -100,7 +102,10 @@ function SampleProductBody({ market, product }: { market: SampleMarket; product:
                     >
                       {product.name}
                     </h1>
-                    <MarketShareButton itemId={shareItemId("sample", feedId, product.id)} title={product.name} />
+                    <div className="flex shrink-0 items-center gap-4">
+                      <MarketShareButton itemId={shareItemId("sample", feedId, product.id)} title={product.name} />
+                      <MarketReportMenu reportId={productReportIdOf(post.id, product.id)} target="product" />
+                    </div>
                   </div>
                   <p className="text-sm text-text-secondary">
                     Part of{" "}
