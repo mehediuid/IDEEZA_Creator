@@ -40,7 +40,7 @@ export { Spinner } from "./spinner";
 export { ProgressBar } from "./progress-bar";
 export { Divider } from "./divider";
 export { StateCard } from "./state-card";
-export { ModalFrame, ConfirmDialog, type ModalFrameProps, type ConfirmDialogProps } from "./dialog";
+export { ModalFrame, ConfirmDialog, IntentBadge, type ModalFrameProps, type ConfirmDialogProps } from "./dialog";
 // T20: the Activity History drawer's atom — a right-docked ModalFrame sibling.
 export { Drawer, type DrawerProps } from "./drawer";
 // O01 App Shell's page frame and O02 Page Header (Figma F07 — Page Layout).

@@ -1,7 +1,9 @@
 "use client";
 
 // Settings › Account › Sign-in and security: Deactivate account and Delete
-// account (owner, 2026-11-24), each a dialog in the Withdraw dialog's frame.
+// account (owner, 2026-11-24), each drawn as the DS M11 Confirm Dialog: the
+// intent badge in _Modal header's icon row (Delete danger, Deactivate info),
+// the title and its line, then A01 MD actions (owner: the DS has this dialog).
 //   Deactivate — one step: what happens (hidden, no time limit, a paid plan
 //     stops renewing), then Confirm it's you, then Deactivate account.
 //   Delete — three steps: Why you're leaving · What you'll lose · Confirm
@@ -17,7 +19,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Banner, Button, ModalFrame, Radio, Skeleton, Textarea } from "@/components/ideeza";
+import { Delete02Icon, PauseIcon } from "@hugeicons/core-free-icons";
+import { Banner, Button, IntentBadge, ModalFrame, Radio, Skeleton, Textarea } from "@/components/ideeza";
 import { leaveAccount } from "@/components/account-leave/leave";
 import { useLeaveFacts, type LeaveBlock } from "@/components/account-leave/use-leave-facts";
 import { Field, FIELD_ERROR, PasswordInput, errorProps, useFieldIds } from "@/components/auth/auth-parts";
@@ -129,13 +132,13 @@ function useProof(email: string) {
 
 type Proof = ReturnType<typeof useProof>;
 
-function ConfirmItsYou({ email, proof, disabled }: { email: string; proof: Proof; disabled: boolean }) {
+function ConfirmItsYou({ email, proof, disabled, heading = true }: { email: string; proof: Proof; disabled: boolean; heading?: boolean }) {
   const ids = useFieldIds(["password"] as const);
   const f = proof.field;
   const error = f.wrong ? "That’s not your password." : "";
   return (
     <section className="flex flex-col gap-[12px]" aria-label="Confirm it’s you">
-      <h3 className={SECTION}>Confirm it’s you</h3>
+      {heading && <h3 className={SECTION}>Confirm it’s you</h3>}
       {proof.passwordless ? (
         f.vouched ? (
           <p className="m-0 text-md font-medium leading-md text-text-success">Verified. It’s you.</p>
@@ -222,16 +225,17 @@ export function DeactivateDialog({ onClose, onSwitch }: { onClose: () => void; o
       closeUnavailable={confirm.busy}
       size="sm"
       sheet
+      icon={<IntentBadge tone="primary" icon={PauseIcon} />}
       title="Deactivate account"
       description={leftHeadingOf("deactivated", "Sign in", "").line}
       footer={
         <div className="flex w-full flex-col gap-[8px]">
           <Failure text={confirm.failed ? "Couldn’t deactivate your account. Nothing changed. Try again." : !online ? OFFLINE : null} />
           <div className="flex flex-wrap items-center justify-end gap-[8px]">
-            <Button type="button" hierarchy="secondary" size="lg" className={TAP} disabled={confirm.busy} onClick={close}>
+            <Button type="button" hierarchy="secondary" size="md" className={TAP} disabled={confirm.busy} onClick={close}>
               Cancel
             </Button>
-            <Button type="button" hierarchy="primary" size="lg" className={TAP} loading={confirm.busy} disabled={!can} onClick={() => void confirm.run(proof, "")}>
+            <Button type="button" hierarchy="primary" size="md" className={TAP} loading={confirm.busy} disabled={!can} onClick={() => void confirm.run(proof, "")}>
               Deactivate account
             </Button>
           </div>
@@ -286,14 +290,14 @@ export function DeleteDialog({ onClose, onSwitch }: { onClose: () => void; onSwi
     at < 2 ? (
       <div className="flex w-full flex-wrap items-center justify-end gap-[8px]">
         {at > 0 && (
-          <Button type="button" hierarchy="ghost" size="lg" className={cn("mr-auto", TAP)} onClick={() => setAt(at - 1)}>
+          <Button type="button" hierarchy="ghost" size="md" className={cn("mr-auto", TAP)} onClick={() => setAt(at - 1)}>
             Back
           </Button>
         )}
-        <Button type="button" hierarchy="secondary" size="lg" className={TAP} onClick={close}>
+        <Button type="button" hierarchy="secondary" size="md" className={TAP} onClick={close}>
           Cancel
         </Button>
-        <Button type="button" hierarchy="primary" size="lg" className={TAP} disabled={at === 1 && (!ready || blocks.length > 0)} onClick={() => setAt(at + 1)}>
+        <Button type="button" hierarchy="primary" size="md" className={TAP} disabled={at === 1 && (!ready || blocks.length > 0)} onClick={() => setAt(at + 1)}>
           Continue
         </Button>
       </div>
@@ -301,17 +305,17 @@ export function DeleteDialog({ onClose, onSwitch }: { onClose: () => void; onSwi
       <div className="flex w-full flex-col gap-[8px]">
         <Failure text={confirm.failed ? "Couldn’t delete your account. Nothing changed. Try again." : !online ? OFFLINE : null} />
         <div className="flex flex-wrap items-center justify-end gap-[8px]">
-          <Button type="button" hierarchy="ghost" size="lg" className={cn("mr-auto", TAP)} disabled={confirm.busy} onClick={() => setAt(1)}>
+          <Button type="button" hierarchy="ghost" size="md" className={cn("mr-auto", TAP)} disabled={confirm.busy} onClick={() => setAt(1)}>
             Back
           </Button>
           {/* The owner's ask: a copy, right beside the button that deletes. */}
-          <Button type="button" hierarchy="secondary" size="lg" className={TAP} loading={making} disabled={confirm.busy} onClick={() => void dl.start("leave")}>
+          <Button type="button" hierarchy="secondary" size="md" className={TAP} loading={making} disabled={confirm.busy} onClick={() => void dl.start("leave")}>
             {made ? "Download again" : "Download your information"}
           </Button>
           <Button
             type="button"
             hierarchy="danger"
-            size="lg"
+            size="md"
             className={TAP}
             loading={confirm.busy}
             disabled={!proof.ready || making || !online || confirm.busy}
@@ -331,6 +335,7 @@ export function DeleteDialog({ onClose, onSwitch }: { onClose: () => void; onSwi
       size="sm"
       sheet
       role={at === 2 ? "alertdialog" : "dialog"}
+      icon={<IntentBadge tone="danger" icon={Delete02Icon} />}
       title="Delete account"
       description={`Step ${at + 1} of ${STEPS.length}: ${STEPS[at]}`}
       footer={footer}
@@ -391,7 +396,7 @@ export function DeleteDialog({ onClose, onSwitch }: { onClose: () => void; onSwi
 
         {at === 2 && (
           <>
-            <ConfirmItsYou email={email} proof={proof} disabled={confirm.busy} />
+            <ConfirmItsYou email={email} proof={proof} disabled={confirm.busy} heading={false} />
             <Banner tone="info" title={`Deleted on ${until}`}>
               Sign in before then and it’s active again.
             </Banner>

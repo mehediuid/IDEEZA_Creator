@@ -226,6 +226,16 @@ const INTENT = {
   primary: "bg-[var(--color-bg-info-subtle)] text-[color:var(--color-icon-blue)]",
 } as const;
 
+/** M11's intent badge — the 44 px circle in _Modal header's icon row — for ModalFrame's `icon`
+ *  (ConfirmDialog draws it; a stepped dialog that ends in the same decision uses it too). */
+export function IntentBadge({ tone = "danger", icon = InformationCircleIcon }: { tone?: "danger" | "primary"; icon?: IconValue }) {
+  return (
+    <span aria-hidden className={cn("inline-flex size-[var(--touch-min)] items-center justify-center rounded-full", INTENT[tone])}>
+      <Icon icon={icon} size={24} />
+    </span>
+  );
+}
+
 /** Figma 15 and 17 — a decision that removes something, said plainly, with
  *  the way out first and the danger second. Cancel takes the focus. Drawn as
  *  M11: the intent badge, the title, the message 4 px under it, A01 MD actions. */
@@ -252,11 +262,7 @@ export function ConfirmDialog({
       role={tone === "danger" ? "alertdialog" : "dialog"}
       size="xs"
       initialFocus={cancelRef}
-      icon={
-        <span aria-hidden className={cn("inline-flex size-[var(--touch-min)] items-center justify-center rounded-full", INTENT[tone])}>
-          <Icon icon={icon} size={24} />
-        </span>
-      }
+      icon={<IntentBadge tone={tone} icon={icon} />}
       bodyContinuesHeader
       footer={
         <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
