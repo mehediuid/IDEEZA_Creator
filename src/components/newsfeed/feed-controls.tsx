@@ -7,6 +7,7 @@
 import * as React from "react";
 import { Search01Icon, ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { Button } from "@/components/ideeza";
 import { NARROW_COLUMN } from "@/components/ideeza/page";
 import {
   MODES,
@@ -64,12 +65,9 @@ export function FeedControls({
           aria-label="Search projects and creators"
           className="h-[48px] w-full rounded-full border border-border bg-bg-surface pl-[44px] pr-[108px] text-md text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus placeholder:text-text-tertiary"
         />
-        <button
-          type="submit"
-          className="absolute right-[6px] top-1/2 inline-flex h-[36px] -translate-y-1/2 items-center rounded-full bg-violet-600 px-[18px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
+        <Button type="submit" hierarchy="primary" size="md" className="absolute right-[6px] top-1/2 -translate-y-1/2">
           Search
-        </button>
+        </Button>
       </form>
 
       {/* Modes */}

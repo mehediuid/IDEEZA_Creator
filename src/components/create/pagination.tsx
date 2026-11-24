@@ -8,7 +8,8 @@
 //   • <nav aria-label="Pagination"> wrapper.
 //   • Current page carries aria-current="page" — screen readers
 //     announce position even when colour is suppressed.
-//   • All controls are real <button>s ≥ 36×36 with focus rings.
+//   • All controls are the DS Button (A01, 36 px): the current page
+//     primary, the other pages ghost, the arrows secondary icon-only.
 //   • Window of 5 numeric pages around the current; the first and last
 //     pages are always pinned with an ellipsis between them.
 
@@ -18,6 +19,7 @@ import {
   ArrowRight01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { Button } from "@/components/ideeza";
 
 export const HISTORY_PAGE_SIZE = 10;
 
@@ -58,21 +60,17 @@ export function Pagination({
             </li>
           ) : (
             <li key={it}>
-              <button
+              <Button
                 type="button"
+                hierarchy={it === page ? "primary" : "ghost"}
+                size="md"
                 aria-label={`Page ${it}`}
                 aria-current={it === page ? "page" : undefined}
                 onClick={() => onPage(it)}
-                className={[
-                  "inline-flex h-[36px] min-w-[36px] items-center justify-center rounded-md px-[10px] text-md outline-none transition-colors duration-fast",
-                  "focus-visible:ring-2 focus-visible:ring-border-focus",
-                  it === page
-                    ? "bg-violet-600 font-semibold text-text-on-brand"
-                    : "font-regular text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
-                ].join(" ")}
+                className="min-w-[36px]"
               >
                 {it}
-              </button>
+              </Button>
             </li>
           ),
         )}
@@ -101,15 +99,9 @@ function NavButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={onClick}
-      className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-md border border-border bg-bg-surface text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-40"
-    >
+    <Button type="button" hierarchy="secondary" size="md" iconOnly aria-label={ariaLabel} disabled={disabled} onClick={onClick}>
       {children}
-    </button>
+    </Button>
   );
 }
 
