@@ -15,9 +15,11 @@
 //        Never backed up = the one primary button on the page.
 //      - Privacy at a glance: open or locked, who can message you, location;
 //        View as public.
-// Every card is drawn the same way: its page's icon and title with an arrow
-// to that page, the facts as rows, and its own action at the foot (the foot
-// lines up across a row). The Phase 1 "Most visited" tiles went (nothing
+// Everything is the Settings kit and DS atoms only (owner, 2026-11-24: no
+// design outside the design system): the band is drawn like a SettingsCard,
+// and every status card IS a SettingsCard — its page's icon and title, an
+// arrow to that page as its action, the facts as rows, and its own buttons
+// in the card's footer (footers line up across a row). The Phase 1 "Most visited" tiles went (nothing
 // counts visits, so the title wasn't true) and so did the two legal cards
 // that led nowhere.
 
@@ -51,13 +53,16 @@ import { useSettings } from "@/lib/settings/use-settings";
 import { cn } from "@/lib/utils";
 import { useGetPaidData } from "./get-paid/parts";
 import { PAGE_ICON } from "./nav-icons";
+import { SettingsCard } from "./settings-card";
 import { SettingsFrame } from "./settings-frame";
 import { SettingsNav } from "./settings-nav";
 
 /** Phones get 44 px targets. */
 const TAP = "[@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
 const SECTION_TITLE = "m-0 text-lg font-semibold leading-lg text-text-primary";
-const ACTION = (hierarchy: "primary" | "tonal" | "ghost") => buttonVariants({ hierarchy, size: "md", className: TAP });
+// Through cn() as the DS Button does: buttonVariants alone keeps clashing classes
+// (an icon-only button kept the size's side padding and squeezed its icon).
+const ACTION = (hierarchy: "primary" | "tonal" | "ghost") => cn(buttonVariants({ hierarchy, size: "md" }), TAP);
 
 export function SettingsHome() {
   return (
@@ -95,18 +100,19 @@ function AccountBand() {
   const handle = fields.handle && handleProblem(fields.handle) === null ? `@${cleanHandle(fields.handle)}` : null;
   const meta = [account?.email, handle].filter(Boolean).join(" · ");
   return (
+    // A SettingsCard's own box (settings-card.tsx). On a phone Edit profile
+    // drops under the name, in the name's column.
     <section
       aria-label="Your account"
-      className="flex flex-col gap-[20px] rounded-2xl border border-solid border-border bg-[radial-gradient(80%_140%_at_100%_0%,var(--color-bg-brand-subtle)_0%,transparent_65%)] p-[20px] max-md:p-[16px]"
+      className="flex flex-col gap-[16px] rounded-xl border border-solid border-border bg-bg-surface px-[16px] py-[16px]"
     >
-      <div className="flex flex-wrap items-center gap-x-[16px] gap-y-[12px]">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-[16px] gap-y-[12px] max-md:grid-cols-[auto_minmax(0,1fr)]">
         {ready ? (
           <Avatar size="lg" initials={initialsOf(name, fields.latinName || null)} src={photo.url ?? undefined} className="shrink-0" />
         ) : (
           <Skeleton shape="circle" size="lg" className="shrink-0" />
         )}
-        {/* Its 220 px basis makes Edit profile wrap to its own line when the band is narrow. */}
-        <div className="flex min-w-0 flex-1 basis-[220px] flex-col gap-[2px]">
+        <div className="flex min-w-0 flex-col gap-[2px]">
           {ready ? (
             <>
               <div className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
@@ -122,13 +128,12 @@ function AccountBand() {
             </>
           ) : (
             <>
-              <Skeleton shape="text" size="lg" className="my-[4px] w-[200px] max-w-full" />
-              <Skeleton shape="text" size="md" className="w-[260px] max-w-full" />
+              <Skeleton shape="text" size="lg" className="my-[4px] max-w-full" />
+              <Skeleton shape="text" size="md" className="max-w-full" />
             </>
           )}
         </div>
-        {/* On a phone it wraps under the name, lined up with it. */}
-        <Link href={`${profileHref}?edit=1`} className={cn(ACTION("tonal"), "max-md:ml-[64px]")}>
+        <Link href={`${profileHref}?edit=1`} className={cn(ACTION("tonal"), "max-md:col-start-2 max-md:justify-self-start")}>
           <Icon icon={PencilEdit02Icon} size={16} />
           Edit profile
         </Link>
@@ -201,7 +206,7 @@ function FindSetting() {
 
 // ─────────────────────────── the status cards ───────────────────────────
 
-/** One status card: its page's icon and title with an arrow to that page, facts, then its action. */
+/** One status card: a SettingsCard with its page's icon and title, an arrow to that page, facts, then its buttons. */
 function StatusCard({
   id,
   page,
@@ -217,36 +222,33 @@ function StatusCard({
   children: React.ReactNode;
   actions: React.ReactNode;
 }) {
-  const titleId = React.useId();
   const to = settingsPage(page);
   return (
-    <section
+    <SettingsCard
       id={id}
-      aria-labelledby={titleId}
-      className="flex min-w-0 flex-col rounded-2xl border border-solid border-border bg-bg-surface p-[20px] max-md:p-[16px]"
-    >
-      <div className="flex items-center gap-[12px]">
-        <span aria-hidden className="flex shrink-0 text-text-secondary">
-          <Icon icon={PAGE_ICON[page]} size={20} />
-        </span>
-        <h2 id={titleId} className="m-0 min-w-0 flex-1 text-lg font-semibold leading-lg text-text-primary">
+      title={
+        <span className="flex items-center gap-[12px]">
+          <span aria-hidden className="flex shrink-0 text-text-secondary">
+            <Icon icon={PAGE_ICON[page]} size={20} />
+          </span>
           {title}
-        </h2>
+        </span>
+      }
+      description={description}
+      action={
         <Link
           href={to.href}
           aria-label={`Open ${to.label}`}
           title={to.label}
-          className={cn(buttonVariants({ hierarchy: "ghost", size: "sm", iconOnly: true }), "group -my-[4px] -mr-[6px] text-text-tertiary", TAP)}
+          className={cn(buttonVariants({ hierarchy: "ghost", size: "sm", iconOnly: true }), "-my-[4px]", TAP)}
         >
-          <span className="inline-flex transition-transform duration-fast group-hover:translate-x-[2px] motion-reduce:transition-none motion-reduce:group-hover:translate-x-0">
-            <Icon icon={ArrowRight01Icon} size={16} />
-          </span>
+          <Icon icon={ArrowRight01Icon} size={16} />
         </Link>
-      </div>
-      {description != null && <p className="m-0 mt-[8px] max-w-[62ch] text-md leading-md text-text-secondary">{description}</p>}
-      <div className="mt-[12px] flex flex-col">{children}</div>
-      <div className="mt-auto flex flex-wrap items-center gap-[8px] pt-[16px]">{actions}</div>
-    </section>
+      }
+      footer={actions}
+    >
+      {children}
+    </SettingsCard>
   );
 }
 
@@ -273,7 +275,7 @@ function Facts({ items }: { items: Fact[] }) {
 }
 
 /** A value still loading. */
-const LOADING = <Skeleton shape="text" size="sm" className="ml-auto w-[64px]" />;
+const LOADING = <Skeleton shape="text" size="sm" className="ml-auto" />;
 
 function PlanCard() {
   const { hydrated: planReady, plan, sub } = useCreatePlan();

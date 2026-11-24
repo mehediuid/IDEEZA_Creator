@@ -2,7 +2,9 @@
 
 // The pieces a settings page is made of (User Panel V2 "✅ Settings"):
 //   SettingsCard  — a bordered card; its header is the title and, on the
-//                   right, the card's one action (Figma's "Edit").
+//                   right, the card's one action (Figma's "Edit"). An optional
+//                   `footer` sits at the card's foot, so cards side by side in
+//                   a grid row line their footers up.
 //   SettingsRow   — label and helper on the left, the control on the right,
 //                   a hairline between rows. With `href` / `onClick` and no
 //                   control the whole row is the link, with a chevron
@@ -32,6 +34,7 @@ export function SettingsCard({
   description,
   action,
   children,
+  footer,
   className,
 }: {
   id?: string;
@@ -39,6 +42,8 @@ export function SettingsCard({
   description?: React.ReactNode;
   action?: React.ReactNode;
   children?: React.ReactNode;
+  /** Buttons at the card's foot (pushed to the bottom when the card is stretched). */
+  footer?: React.ReactNode;
   className?: string;
 }) {
   const titleId = React.useId();
@@ -58,6 +63,7 @@ export function SettingsCard({
         {action != null && <div className="flex shrink-0 items-center gap-[8px]">{action}</div>}
       </div>
       {children != null && <div className="mt-[8px] flex flex-col">{children}</div>}
+      {footer != null && <div className="mt-auto flex flex-wrap items-center gap-[8px] pt-[16px]">{footer}</div>}
     </section>
   );
 }
