@@ -99,3 +99,27 @@ test("Creator and On Innovations are drawn once and shown on every marketplace p
   const route = read("app/(create)/marketplace/[id]/products/[productId]/page.tsx");
   assert.match(route, /if \(sample\) return <SampleProductPage market=\{sample\} productId=\{idOf\(productId\)\} \/>;/);
 });
+
+const purchases = await import("../../.tmp-test/lib/market/purchases.js");
+
+test("the Marketplace block says what the buyer owns, in web terms (owner, 2026-11-24)", () => {
+  const line = (kind, n, extra = {}) => ({ kind, use: kind === "main" ? null : "Personal use", product: null, sharePct: null, copies: Array.from({ length: n }, () => ({})), paid: [], unitsPerCopy: null, ...extra });
+  assert.equal(purchases.ownedWhatOf({ lines: [line("virtual", 1), line("virtual", 1, { use: "Business use" })] }), "2 Virtual NFTs");
+  assert.equal(purchases.ownedWhatOf({ lines: [line("physical", 1)] }), "1 Physical NFT");
+  assert.equal(purchases.ownedWhatOf({ lines: [line("main", 1, { sharePct: 100 })] }), "the Main NFT");
+  assert.equal(
+    purchases.ownedWhatOf({ lines: [line("main", 1, { sharePct: 10 }), line("physical", 2), line("virtual", 1)] }),
+    "a 10% share of the Main NFT, 2 Physical NFTs and 1 Virtual NFT",
+  );
+  assert.equal(purchases.ownedWhatOf({ lines: [] }), null);
+  const see = read("components/projects/purchased/see-what-you-own.tsx");
+  assert.match(see, /You own \{what\} of \{projectName \?\? "this project"\}/);
+  assert.match(see, /\{p\.count === 1 \? "See it" : "See them"\}/);
+  assert.doesNotMatch(see, />\s*See what you own\s*</, "never the bare link");
+  assert.match(read("components/projects/editions/edition-block.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} projectName=\{project\.name\} \/>/);
+  // The Use row holding copies says so; the price's line no longer repeats it.
+  assert.match(read(MARKET + "offer-parts.tsx"), /\{o\.owned \? <Badge tone="success">You own \{o\.owned\}<\/Badge> : null\}/);
+  assert.match(read(MARKET + "copy-panel.tsx"), /owned: ownedOn\(t\.id\)/);
+  assert.match(read(MARKET + "sample-offer-box.tsx"), /owned: ownedOf\(o\)/);
+  for (const f of ["copy-panel.tsx", "sample-offer-box.tsx"]) assert.doesNotMatch(read(MARKET + f), /you own \$\{owned\}/, f);
+});

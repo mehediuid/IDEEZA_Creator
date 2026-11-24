@@ -377,7 +377,7 @@ function PublicBody({ project, view, product, viewer, now, announce, tracks }: P
       </OfferTabs>
       {/* With the purchase, as on every marketplace page's Marketplace block (owner, 2026-11-24). */}
       {buyerId !== null && view.sales.some((s) => s.projectId === project.id && s.buyerId === buyerId) && (
-        <SeeWhatYouOwn projectId={project.id} />
+        <SeeWhatYouOwn projectId={project.id} projectName={project.name} />
       )}
       {!buyerId && (
         <Link href={`/marketplace/${project.id}/products/${product.id}`} className={LINK}>

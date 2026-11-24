@@ -125,7 +125,7 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
   assert.match(read("components/innovations/post-product-bits.tsx"), /Open your files/, "the locked pieces lead a holder to them");
   // With the purchase: the foot of every marketplace page's Marketplace block (owner, 2026-11-24: one rail everywhere).
   assert.match(read("components/marketplace/buyer-rail.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} \/>/);
-  assert.match(read("components/projects/editions/edition-block.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} \/>/);
+  assert.match(read("components/projects/editions/edition-block.tsx"), /<SeeWhatYouOwn projectId=\{project\.id\} projectName=\{project\.name\} \/>/);
   assert.doesNotMatch(read("components/marketplace/market-rail.tsx"), /SeeWhatYouOwn/, "never in the Creator block");
   assert.match(read("components/marketplace/sample-offer-box.tsx"), /<SeeWhatYouOwn projectId=\{feedId\} \/>/);
 

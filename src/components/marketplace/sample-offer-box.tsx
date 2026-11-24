@@ -236,11 +236,10 @@ function CopyPanel({
   const state = copyUseStateOf(offer, feedId, sales);
   const blocked = copyUseBlockOf(offer, feedId, sales);
   const price = formatAmount(offer.price, offer.token);
-  // Held now: a copy sold on is its new holder's (resales.ts).
-  const owned = state.sales.filter((s) => holderOf(sampleSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length;
-  const sub = [state.of !== null ? `${state.count} of ${state.of} sold` : state.count ? `${state.count} sold` : null, owned > 0 ? `you own ${owned}` : null]
-    .filter(Boolean)
-    .join(" · ");
+  // Held now: a copy sold on is its new holder's (resales.ts). Each Use row says how many it holds.
+  const ownedOf = (o: UseOffer) =>
+    copyUseStateOf(o, feedId, sales).sales.filter((s) => holderOf(sampleSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length;
+  const sub = state.of !== null ? `${state.count} of ${state.of} sold` : state.count ? `${state.count} sold` : null;
 
   return (
     <>
@@ -252,7 +251,13 @@ function CopyPanel({
         onChange={setPickedUse}
         options={uses.map((o) => {
           const why = copyUseBlockOf(o, feedId, sales);
-          return { value: o.use, label: o.use, aside: why ? (copyUseStateOf(o, feedId, sales).locked ? "Not for sale" : "Sold out") : formatAmount(o.price, o.token), disabled: why !== null };
+          return {
+            value: o.use,
+            label: o.use,
+            aside: why ? (copyUseStateOf(o, feedId, sales).locked ? "Not for sale" : "Sold out") : formatAmount(o.price, o.token),
+            disabled: why !== null,
+            owned: ownedOf(o),
+          };
         })}
       />
       <OfferTop overline={offer.name} price={price} sub={sub ? <span className="tabular-nums">{sub}</span> : undefined} />

@@ -128,10 +128,11 @@ export function CopyPanel({
   // price), the updates come with it, as before.
   const tier: EditionTier = track.listing.regular === track.listing.extended ? "extended" : "regular";
   const price = formatAmount(track.listing.regular, track.listing.token);
-  // Held now: a copy sold on is its new holder's (resales.ts).
-  const owned = buyerId
-    ? view.sales.filter((s) => s.item.nft !== "main" && s.item.trackId === track.id && holderOf(ownSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length
-    : 0;
+  // Held now: a copy sold on is its new holder's (resales.ts). Each Use row says how many it holds.
+  const ownedOn = (trackId: string) =>
+    buyerId
+      ? view.sales.filter((s) => s.item.nft !== "main" && s.item.trackId === trackId && holderOf(ownSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length
+      : 0;
   const name = `${KIND_LABEL[kind]} · ${USE_LABEL[track.use]}`;
 
   return (
@@ -149,7 +150,7 @@ export function CopyPanel({
           const t = offers.find((o) => o.use === use);
           if (!t) return { value: `none:${use}`, label: USE_LABEL[use], aside: "Not on sale", disabled: true };
           const soldOut = trackCardOf(t, view.sales).soldOut;
-          return { value: t.id, label: USE_LABEL[use], aside: soldOut ? "Sold out" : formatAmount(t.listing.regular, t.listing.token), disabled: soldOut };
+          return { value: t.id, label: USE_LABEL[use], aside: soldOut ? "Sold out" : formatAmount(t.listing.regular, t.listing.token), disabled: soldOut, owned: ownedOn(t.id) };
         })}
       />
 
@@ -159,7 +160,6 @@ export function CopyPanel({
         sub={
           <span className="tabular-nums">
             {soldLineOf(card.sold, card.total)}
-            {owned > 0 ? ` · you own ${owned}` : ""}
           </span>
         }
       />

@@ -297,7 +297,8 @@ export function DealFacts({ listing, view }: { listing: Listing; view: ProjectVi
   );
 }
 
-export type ChoiceRow = { value: string; label: string; aside: string; disabled?: boolean };
+/** `owned`: how many copies of this choice the buyer holds — the row says "You own n" (owner, 2026-11-24). */
+export type ChoiceRow = { value: string; label: string; aside: string; disabled?: boolean; owned?: number };
 
 /** A choice as radio rows: each with its word and what stands beside it (a price, "Sold out", "Not on sale").
  *  A row that can't be picked stays, greyed, so the buyer sees every use there is (owner, 2026-11-16). */
@@ -339,7 +340,10 @@ export function ChoiceRows({
               className="peer sr-only"
             />
             <Radio checked={on} decorative size="sm" className="peer-focus-visible:ring-2 peer-focus-visible:ring-border-focus" />
-            <span className="min-w-0 flex-1 text-md font-semibold text-text-primary">{o.label}</span>
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="text-md font-semibold text-text-primary">{o.label}</span>
+              {o.owned ? <Badge tone="success">You own {o.owned}</Badge> : null}
+            </span>
             <span className="shrink-0 text-md tabular-nums text-text-secondary">{o.aside}</span>
           </label>
         );
