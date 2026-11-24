@@ -93,7 +93,8 @@ test("C5: the plan's projects are checked at the question and the build gate, ne
   assert.match(gate, /<ProjectLimitCard/);
   assert.match(gate, /\{!limited && \(/, "the Build button and the spend lines go while the card shows");
   const setup = src("components/create/setup-turn.tsx");
-  assert.match(setup, /const choosing = !multi \|\| addTo !== null \|\| projects\.length > 0;/, "several products may go into a project you have");
+  // Owner 2026-11-24 withdrew D3: several products always start a new project (Add a product's project aside).
+  assert.match(setup, /const choosing = \(!multi && projects\.length > 0\) \|\| addTo !== null;/, "only one product picks a project you have");
 });
 
 test("one capped card a day across the app; the same card keeps showing that day", () => {
