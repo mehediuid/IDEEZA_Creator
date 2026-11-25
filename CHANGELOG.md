@@ -6,6 +6,11 @@ to build and how to check it is done, and links to its Jira ticket.
 
 | CL | Change | In the prototype | Jira | Production |
 | --- | --- | --- | --- | --- |
+| [CL-053](#cl-053-download-a-bought-copys-files-one-unit-at-a-time) | Download a bought copy's files, one unit at a time | 25 Nov 2026 | Not created yet | Not started |
+| [CL-052](#cl-052-a-physical-copys-units-said-where-you-pick-the-use) | A Physical copy's units, said where you pick the use | 25 Nov 2026 | Not created yet | Not started |
+| [CL-051](#cl-051-report-a-project-or-product-on-the-marketplace) | Report a project or product on the marketplace | 25 Nov 2026 | Not created yet | Not started |
+| [CL-050](#cl-050-view-on-blockchain-in-every-nft-tab) | View on blockchain in every NFT tab | 25 Nov 2026 | Not created yet | Not started |
+| [CL-049](#cl-049-explore-marketplace-details-the-same-page-and-rail-everywhere) | Explore marketplace details: the same page and rail everywhere | 25 Nov 2026 | Not created yet | Not started |
 | [CL-048](#cl-048-buttons-drawn-from-the-design-system-everywhere) | Buttons drawn from the design system everywhere | 24 Nov 2026 | Not created yet | Not started |
 | [CL-047](#cl-047-settings-home-your-account-first-then-where-you-stand) | Settings home: your account first, then where you stand | 24 Nov 2026 | Not created yet | Not started |
 | [CL-046](#cl-046-deactivate-or-delete-your-account-and-signing-in-makes-it-active-again) | Deactivate or delete your account, and signing in makes it active again | 24 Nov 2026 | [PR-9780](https://ideeza.atlassian.net/browse/PR-9780) | Not started |
@@ -78,6 +83,190 @@ state, mobile); Design (DS components and tokens); Before → After screenshots.
 No code: no file names, functions or commit hashes. Screenshots go in
 docs/changelog/ as <date>-<short-name>-before.png / -after.png.
 -->
+
+---
+
+## CL-053 Download a bought copy's files, one unit at a time
+
+**In the prototype:** 25 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** My projects › Purchased › a project (`/projects/purchased/<project>`), its **Your copies** list (web); on the mobile app, a bought copy's own screen (Purchased › a project › a copy). Web and mobile app.
+
+After buying a Physical or a Virtual NFT, the buyer downloads its files from the copy itself. A Physical copy's files are what a maker manufactures from, so each download uses one of the copy's units.
+
+### What to build
+
+**Download files on each copy**
+
+- [ ] Every row of **Your copies** has a **Download files** button (secondary, download icon) at the row's far right, after **Send to manufacturing** and **Sell this copy**. Under the row, right-aligned: what the download holds, e.g. *Netlist, firmware and parts list, in one .zip · each download uses 1 unit* (a Virtual copy: *Parts list and render, in one .zip*).
+- [ ] Narrow row (under 560 px wide: a phone, or a narrow page beside the sidebar): **Download files** is the small button (SM) beside **Sell this copy**, and the line under the row starts from the left. Nothing wraps onto a line of its own and nothing overflows.
+- [ ] The download is one .zip, named after the project, the copy number and the kind, e.g. *air-quality-room-sensor-copy-7-physical-nft.zip*. It holds what the copy's kind opens for every product the copy covers: a product's own copy, that product; a copy of the whole project, every product, each in its own folder.
+  - Physical NFT: the firmware, the parts list (CSV), the netlist (CSV, the PCB's and the wiring's) and the 3D model (.glb) when the build has one.
+  - Virtual NFT: the parts list, the 3D model (.glb) when the build has one, and the render (the product's picture).
+  - Only pieces the build has ready go in. A file that can't be fetched is left out, and the line says so: *The 3D model couldn't be added; the other files are in the zip.* If nothing can be added: *The files couldn't be downloaded. Try again.*
+- [ ] The files come only from **Download files**: the product's Overview and its piece tabs (3D model, PCB, Firmware, Wiring, Assembly, Parts) have no download of their own on this page, and on the mobile app neither the product screen nor a piece screen has one.
+
+**A Physical download uses 1 unit**
+
+- [ ] **Download files** on a Physical copy asks first, in the confirm dialog (mobile app: the confirm sheet): title *Download the files for 1 unit?*, body *Copy #7 of 50 has 40 units left. Downloading its files uses 1, so 39 will be left. A unit used doesn't come back.* (the last unit: *…so none will be left.*), buttons **Cancel** and **Download**.
+- [ ] **Download** saves the zip, then takes 1 unit from that copy: its bar and line move on (*11 of 50 units made · 39 left*), and so does what a sale would hand over (*If you sell copy #7, the buyer gets the 39 units left; the 11 you made stay yours.*). Cancel takes nothing.
+- [ ] With no units left the button stays, greyed (aria-disabled), and the line says *No units left on this copy, so its files can't be downloaded again.*
+- [ ] While the copy is for sale the button is greyed the same way: *Take the copy off sale first: no units are used while it's for sale.*
+- [ ] A Virtual copy downloads at once, with no question; it has no units.
+- [ ] How many units a copy has is IDEEZA's rule, not the creator's (CL-052).
+
+**Copy number, explained**
+
+- [ ] A copy's number is a title in the normal font: *Copy #7 of 50* (no total known: *Copy #3*), never "#7 of 50" in a code font. *If you sell copy #7…* uses the same words.
+- [ ] Beside it, a help button (question mark). Web: on hover, focus or tap a tooltip; mobile app: a sheet. It says *Copy 7 of the 50 Business use Physical NFTs the creator listed. Its number stays with it, even when you sell it on.* (no total known: *Copy 3 of the Personal use Virtual NFTs, in the order they were bought. Its number stays with it, even when you sell it on.*)
+
+### Design
+
+- A01 Button secondary with the download icon (MD; SM in a narrow row), M11 Confirm dialog (primary, download icon) on the web, the kit confirm sheet on the mobile app; A19 Tooltip for the help on the web, the kit info sheet on the mobile app. Units bar and lines as before.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| After |
+| --- |
+| ![Your copies: Copy #1 of 50 and Copy #7 of 50, each with Download files at the right and the help tooltip open](docs/changelog/2026-11-25-copy-download-after.png) |
+| ![Download the files for 1 unit? Copy #7 of 50 has 40 units left](docs/changelog/2026-11-25-copy-download-confirm-after.png) |
+
+---
+
+## CL-052 A Physical copy's units, said where you pick the use
+
+**In the prototype:** 25 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Explore marketplace › a project or product, its **Physical NFT** tab (`/marketplace/<project>`, `/marketplace/<project>/products/<product>`). Web.
+
+A Physical NFT copy lets its holder manufacture units. How many is IDEEZA's own rule, by use: Personal use 1 unit, Business use 50. The creator sets how many copies are sold, never how many units a copy makes.
+
+### What to build
+
+- [ ] Each **Use** row of a Physical NFT tab has a second line under its name: *Makes up to 1 unit* (Personal use), *Makes up to 50 units* (Business use). Virtual NFT rows have no such line.
+- [ ] **NFT details** of a Physical NFT tab lists **Units per copy** for the use picked (*1* or *50*), after **Copies**.
+- [ ] The Sell form has no units field, and nothing lets a listing change a copy's units.
+- [ ] **NFT details** shows only what the listing says. **Copies** shows the number of copies listed; when a listing names no total, there is no **Copies** line (never "No limit"). Same on the mobile app's buy box.
+
+### Design
+
+- The Use row's existing radio row (the radio row's own text styles); the second line is the row's secondary text. NFT details' existing fact grid.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| After |
+| --- |
+| ![Physical NFT: Personal use, Makes up to 1 unit; Business use, Makes up to 50 units](docs/changelog/2026-11-25-market-sample-rail-after.png) |
+
+---
+
+## CL-051 Report a project or product on the marketplace
+
+**In the prototype:** 25 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Explore marketplace › a project (`/marketplace/<project>`) and a product (`/marketplace/<project>/products/<product>`). Web.
+
+Anyone looking at a marketplace project or product can report it.
+
+### What to build
+
+- [ ] Beside **Share**, at the end of the title row, a **⋯** button (*More actions for this project* / *…for this product*). Its menu has one item: **Report project** on a project, **Report product** on a product.
+- [ ] It opens the Report dialog: title *Report this project* / *Report this product*, *Tell us what's wrong. The creator won't see who reported it.*, a reason (*Spam*, *Harassment or hate*, *Stolen design*, *Misleading*, *Something else*), *Anything else (optional)*, **Cancel** and **Send report**. **Send report** without a reason says *Pick a reason first.*
+- [ ] After sending, a toast confirms it, and the menu item reads **Reported** (disabled, *You reported this project.*). A project's report is the same as reporting its Innovations post: the post shows **Reported** too.
+- [ ] Settings › Privacy & safety › **Reports you made** lists it: *The post "Air quality room sensor"*, or *The product "PlantPal"*.
+
+### Design
+
+- Icon button (⋯), M12 menu, the Innovations Report dialog (M11 frame, radio rows, textarea) unchanged.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| After |
+| --- |
+| ![Report this project: a reason picked, Send report](docs/changelog/2026-11-25-report-project-after.png) |
+
+---
+
+## CL-050 View on blockchain in every NFT tab
+
+**In the prototype:** 25 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Explore marketplace › a project or product, every **Main NFT**, **Physical NFT** and **Virtual NFT** tab. Web.
+
+Every tab shows where its NFT lives on the chain.
+
+### What to build
+
+- [ ] Under **NFT details** in every tab: **View on blockchain** (blockchain icon).
+- [ ] It opens *On the blockchain*, with the tab's NFT under the title (*Main NFT · Air quality room sensor*, *Physical NFT · Personal use · Air quality room sensor*) and its record:
+  - Main NFT: **Blockchain**, **Collection**, **Token** (its number; a lazy mint not yet bought: *Minted when it's bought*), **Held by** (the creator, or who bought it), **Last transaction** (short hash · date, or *None yet*).
+  - Physical or Virtual NFT, for the use picked: **Blockchain**, **Collection**, **Copies minted** (*1 of 50*: a copy is minted when it is bought), **Your copies** (*#1*, or *None*), **Last transaction**.
+- [ ] Production: **View on blockchain** opens the token on the chain's block explorer. The prototype's tokens and transactions are a testnet demo made in the browser, so its dialog shows the record and says *Testnet demo — the token, signature and transaction were made in this browser. Nothing is on a real blockchain, so there's no explorer page for them.*
+
+### Design
+
+- A quiet text button (the tab's link style) with the blockchain icon; the M11 dialog frame (SM) with a label/value list.
+
+### Screenshots
+
+A new feature, so there is no before.
+
+| After |
+| --- |
+| ![On the blockchain: Physical NFT, Personal use, copies minted 1 of 50, your copy #1, last transaction](docs/changelog/2026-11-25-view-on-blockchain-after.png) |
+
+---
+
+## CL-049 Explore marketplace details: the same page and rail everywhere
+
+**In the prototype:** 25 November 2026 · **Jira:** not created yet · **Production:** Not started
+
+**Screen:** Explore marketplace › every details page: a project (`/marketplace/<project>`) and a product (`/marketplace/<project>/products/<product>`), for every project on the marketplace. Web.
+
+Every marketplace project and product shows its information the same way: one page layout, and one right rail with its blocks in one order.
+
+### What to build
+
+**One rail**
+
+- [ ] The right rail is one surface with thin dividers between blocks (never a separate card per block), in this order: **Marketplace** (the buy box) → **Creator** → **On Innovations** → the page's facts (a project: **About**, **Recent**; a product: **Specs**, **Build check**). A block with nothing to say is left out.
+- [ ] **Creator**: heading *Creator*, the avatar, the name (a link to the profile) and *4 projects on Innovations*, then the way to them: **Follow** and **Message** for another creator; **Ask the creator**, or **Get creator support** for a buyer who holds a copy, on your own listing. Buttons 44 px, the rail's full width (two side by side).
+- [ ] **On Innovations** (only while the project is shared there): *342 appreciations · 6 comments*, *The creator's story and the conversation about {project} are on its Innovations post.*, **Read the story**.
+- [ ] A product page has **Creator** and **On Innovations** too, under its Marketplace block.
+- [ ] Below 1024 px the rail follows the page: Marketplace and Creator under the header (above the tabs), the other blocks after the tabs, closed.
+
+**What you own**
+
+- [ ] At the foot of the Marketplace block, for a buyer who holds anything of the project: *You own 2 Physical NFTs and 1 Virtual NFT of this project · **See them** ›* (one thing: **See it**; the Main NFT: *the Main NFT* or *a 10% share of the Main NFT*). On a product page it names the project: *…of Smart Plant Pot*. It opens what they bought.
+- [ ] In a copy tab, the Use row they hold has a *You own 1* badge; the price's line no longer repeats it.
+
+**The same page for every project**
+
+- [ ] The top: the Testnet demo strip, then the breadcrumb *Explore marketplace › {project}*.
+- [ ] The header: the media, then the title with **Share** and **⋯** at the row's end, the status chip (**Listed**, or **Sold** once its Main NFT is bought) and its line (*Listed Jun 15, 2025 · Buy now · 0.3 ETH*), *Created by {creator} · Listed {date} · {category} · {n products} · {n parts}*, the description (5 lines, then **Show more**) and **Project activity**.
+- [ ] Under the header the tabs **Products** and **Media**. **Products**: the heading, *2 products · 27 parts*, then a card per product (picture, name, stage chip, its first specs); a card opens the product's marketplace page. **Media**: the images grid with its viewer; the group is headed *Images* (never "From your builds" for a buyer).
+- [ ] A product opens inside the marketplace (*Explore marketplace › {project} › {product}*), never on its Innovations post: the header (picture, name, **Share**, **⋯**, *Part of {project} · Created by {creator}*, summary, the product's activity), the tabs (Media, 3D model, Parts, then PCB, Firmware and Wiring, locked until bought) and the rail.
+
+### Design
+
+- The project page's frame and rail: one rail surface (360 px, rounded, thin dividers), the rail block heading style, the avatar + name group, A01 buttons. Products tab = the project page's own Products tab (heading, count line, product cards); Media = its image tiles and lightbox.
+
+### Screenshots
+
+These pages were never built, so there is no before.
+
+| After |
+| --- |
+| ![Another creator's project: buy box, View on blockchain, You own line, Creator and On Innovations in one rail](docs/changelog/2026-11-25-market-sample-rail-after.png) |
+| ![Your own listing: the same rail, with About and Recent, and the Products tab](docs/changelog/2026-11-25-market-listing-rail-after.png) |
+| ![Products tab: a card per product, the rail's On Innovations and Recent](docs/changelog/2026-11-25-market-sample-products-after.png) |
+| ![A product inside the marketplace: Creator, On Innovations and Specs in the rail](docs/changelog/2026-11-25-market-sample-product-after.png) |
 
 ---
 
@@ -842,6 +1031,8 @@ A new feature, so there is no before.
 **In the prototype:** 19 November 2026 · **Jira:** [PR-9715](https://ideeza.atlassian.net/browse/PR-9715) · **Production:** Not started
 
 **Screen:** My projects › Purchased › a project (`/projects/purchased/<project>`). Web app only. It replaces the page in [CL-020](#cl-020-my-projects-purchased), which was never built: build this one.
+
+**Changed by [CL-053](#cl-053-download-a-bought-copys-files-one-unit-at-a-time)** (25 November 2026): a copy's files download from its row in Your copies (a Physical download uses 1 unit), the piece tabs have no download of their own, and a copy's number reads *Copy #7 of 50* with a help. Build those from CL-053.
 
 Each project a creator bought from has its own page. It shows the project in the marketplace page's frame and what each kind of NFT opens: the products themselves first, then the copies with their units, then the rules folded away. A whole project bought is the buyer's own project and opens as one ([CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase)).
 
@@ -1853,6 +2044,8 @@ Demo stand-ins (prototype only): the Testnet demo strip above the grid and on ev
 **In the prototype:** 17 November 2026 · **Jira:** [PR-9661](https://ideeza.atlassian.net/browse/PR-9661) · **Production:** Not started
 
 **Screen:** Explore marketplace › a listed project, `/marketplace/<project>` (a card's tag can open a tab: `?nft=main`, `?nft=physical`, `?nft=virtual`), and a product's marketplace page, `/marketplace/<project>/products/<product>`. The page is now a shop page that answers a buyer's questions in order; the project's story stays on its Innovations post. The creator's Preview as buyer (`/projects/<project>?view=buyer`) shows the same box.
+
+**Changed by [CL-049](#cl-049-explore-marketplace-details-the-same-page-and-rail-everywhere), [CL-050](#cl-050-view-on-blockchain-in-every-nft-tab), [CL-051](#cl-051-report-a-project-or-product-on-the-marketplace) and [CL-052](#cl-052-a-physical-copys-units-said-where-you-pick-the-use)** (25 November 2026): every marketplace project and product now has the same page and one rail (Marketplace → Creator → On Innovations → facts), a product opens inside the marketplace, *See what you own* says what is owned, every NFT tab has View on blockchain, the title row has ⋯ › Report, and a Physical Use row says how many units it makes. Build those parts from CL-049…CL-052.
 
 ### What to build
 
