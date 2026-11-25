@@ -546,6 +546,20 @@ export function ownedWhatOf(p: Pick<PurchasedProject, "lines">): string | null {
   return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
+/** A bought copy's title (owner, 2026-11-25: "#1 of 50" read as a code): "Copy #7 of 50" · "Copy #3" · "Copy". */
+export function copyTitleOf(serial: number | null, of: number | null): string {
+  if (serial === null) return "Copy";
+  return of !== null ? `Copy #${serial} of ${of}` : `Copy #${serial}`;
+}
+
+/** What the copy's number means, for its ⓘ help. `use` and `kind` name the listing the copy came from. */
+export function copyNumberHelpOf(serial: number | null, of: number | null, kind: "physical" | "virtual", use: string | null): string {
+  const what = `${use ? `${use} ` : ""}${KIND_NAME[kind]}s`;
+  if (serial === null) return `One of the ${what} you bought. The copy is yours until you sell it on.`;
+  const which = of !== null ? `Copy ${serial} of the ${of} ${what} the creator listed` : `Copy ${serial} of the ${what}, in the order they were bought`;
+  return `${which}. Its number stays with it, even when you sell it on.`;
+}
+
 /** The uses held, Personal first. */
 export function usesOf(p: PurchasedProject): PurchaseUse[] {
   return (["Personal use", "Business use"] as PurchaseUse[]).filter((u) => p.lines.some((l) => l.use === u));

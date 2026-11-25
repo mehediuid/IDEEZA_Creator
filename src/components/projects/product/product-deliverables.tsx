@@ -46,6 +46,10 @@ import { ConceptImage } from "./product-identity";
  *  `can(viewer, "deliverables.download", view.canCtx)` (O12, P2-MARKETPLACE-21). */
 export const DeliverablesAccess = React.createContext(false);
 
+/** False hides each piece's own download (the Purchased page: a bought copy's files come from its row's Download
+ *  files, which uses a unit — owner, 2026-11-25). */
+export const PieceDownloads = React.createContext(true);
+
 /** Each preview in a named scroll region the keyboard can reach (COR-34). */
 const REGION: Record<Exclude<BuildItemKind, "3d" | "assembly">, string> = {
   pcb: "PCB layout, scrollable",
@@ -246,12 +250,13 @@ const BUTTON = "self-start [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 /** The panel's files, or — for a viewer who may not take them — where the files come from. */
 function Downloads({ kind, job, product, ready }: { kind: BuildItemKind; job: BuildJob; product: BuildProduct; ready: boolean }) {
+  const shown = React.useContext(PieceDownloads);
   const allowed = React.useContext(DeliverablesAccess);
   const id = React.useId();
   const [model, setModel] = React.useState<"idle" | "busy" | "failed">("idle");
   const file = allowed && ready ? fileFor(kind, product) : null;
   const glb = allowed && ready && kind === "3d" ? modelFileOf(job, product) : null;
-  if (allowed && !file && !glb) return null;
+  if (!shown || (allowed && !file && !glb)) return null;
 
   const downloadModel = async (target: { url: string; filename: string }) => {
     setModel("busy");

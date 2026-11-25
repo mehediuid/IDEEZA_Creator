@@ -122,7 +122,7 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
   assert.match(page, /<DeliverablesAccess\.Provider value>/, "a holder takes the files the pieces offer, as the maker does");
   // No placeholder downloads: a Main NFT opens the project; a copy's Download files zips the pieces' own files (owner, 2026-11-25).
   assert.doesNotMatch(page, /no files to download/, "no placeholder downloads");
-  assert.match(page, /useNftDownload\(kind, build, \{ name: product\.name, image: product\.image \}\)/, "the one Download is the real files");
+  assert.match(page, /const download = useCopyDownload\(kind, products, zipName\);/, "the one Download is the real files, on each copy");
   assert.match(page, /<PostMediaStage post=\{post\} mine=\{mine\} \/>/, "media first, as the marketplace and Innovations pages");
   assert.match(read("components/innovations/post-product-bits.tsx"), /Open your files/, "the locked pieces lead a holder to them");
   // With the purchase: the foot of every marketplace page's Marketplace block (owner, 2026-11-24: one rail everywhere).
@@ -133,17 +133,39 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
 
 });
 
-test("after buying, Download files takes everything the copy's kind opens in one .zip (owner, 2026-11-25)", () => {
+test("Download files sits on each bought copy and a Physical download uses 1 unit (owner, 2026-11-25)", () => {
   const dl = read("components/projects/purchased/nft-download.ts");
   assert.match(dl, /physical: \["3d", "pcb", "code", "wiring", "parts"\]/);
   assert.match(dl, /virtual: \["3d", "parts"\]/);
-  assert.match(dl, /const render = kind === "virtual" \? product\.image \|\| job\.conceptImageUrl \|\| null : null;/, "a Virtual copy licenses the renders");
-  assert.match(dl, /makeZip\(entries\)/);
-  assert.match(dl, /`\$\{base\}-\$\{kind\}-nft-files\.zip`/);
+  assert.match(dl, /const render = kind === "virtual" \? p\.image \|\| job\.conceptImageUrl \|\| null : null;/, "a Virtual copy licenses the renders");
+  assert.match(dl, /folder: several \? `\$\{slug\(p\.name\)\}\/` : ""/, "a whole-project copy: each product in its own folder");
+  assert.match(dl, /saveBlob\([^;]+\);\s*onSaved\?\.\(\);/, "the unit is taken once the zip is saved, never before");
   const web = read("components/projects/purchased/purchased-page.tsx");
-  assert.match(web, /\{kind !== "main" && <DownloadFiles kind=\{kind\} build=\{build\} product=\{product\} primary=\{!href\} \/>\}/);
-  assert.match(web, />\s*Download files\s*</);
-  const phone = read("components/mobile/purchased/product-screen.tsx");
-  assert.match(phone, /const download = useNftDownload\(kind, build, \{ name: product\.name, image: product\.image \}\);/);
-  assert.match(phone, />\s*Download files\s*</);
+  assert.doesNotMatch(web, /DownloadFiles/, "not on the product's Overview");
+  assert.match(web, /<PieceDownloads\.Provider value=\{false\}>/, "no piece tab downloads on the Purchased page");
+  assert.match(web, /appendUnits\(\{ id: `dl_[^`]+`, copyKey: c\.key, holder: buyerId, units: 1, at: Date\.now\(\) \}\)/);
+  assert.match(web, /const blocked = units \? \(c\.listing \? ON_SALE : units\.left === 0 \? NO_UNITS_LEFT : null\) : null;/);
+  assert.match(web, /title="Download the files for 1 unit\?"/);
+  assert.match(web, /<InfoTip label=\{`What \$\{title\} means`\} text=\{copyNumberHelpOf\(c\.serial, c\.of, kind, helpUse\)\} wrap \/>/);
+  assert.doesNotMatch(web, /font-mono text-lg tabular-nums/, "the number is a title, not code");
+  const deliverables = read("components/projects/product/product-deliverables.tsx");
+  assert.match(deliverables, /export const PieceDownloads = React\.createContext\(true\);/);
+  assert.match(deliverables, /if \(!shown \|\| \(allowed && !file && !glb\)\) return null;/);
+  const phoneCopy = read("components/mobile/purchased/copy-screen.tsx");
+  assert.match(phoneCopy, /title="Download the files for 1 unit\?"/);
+  assert.match(phoneCopy, /<InfoButton title=\{number\} label=\{`What \$\{number\} means`\}>/);
+  const phoneProduct = read("components/mobile/purchased/product-screen.tsx");
+  assert.doesNotMatch(phoneProduct, /PieceFile|useBuildModelDownload|useCopyDownload|<BottomBar/, "no download on the product or piece screens");
+});
+
+test("a copy's title and help say what its number is (owner, 2026-11-25)", async () => {
+  const P = await import("../../.tmp-test/lib/market/purchases.js");
+  assert.equal(P.copyTitleOf(7, 50), "Copy #7 of 50");
+  assert.equal(P.copyTitleOf(3, null), "Copy #3");
+  assert.equal(P.copyTitleOf(null, null), "Copy");
+  assert.equal(
+    P.copyNumberHelpOf(7, 50, "physical", "Business use"),
+    "Copy 7 of the 50 Business use Physical NFTs the creator listed. Its number stays with it, even when you sell it on.",
+  );
+  assert.equal(P.copyNumberHelpOf(1, null, "virtual", "Personal use"), "Copy 1 of the Personal use Virtual NFTs, in the order they were bought. Its number stays with it, even when you sell it on.");
 });

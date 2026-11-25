@@ -24,9 +24,11 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight01Icon, Cancel01Icon, Coins01Icon, Download04Icon, ImageNotFound01Icon, ShoppingBag01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
-import { useNftDownload } from "./nft-download";
+import { copyZipName, useCopyDownload, type CopyProduct } from "./nft-download";
+import { appendUnits } from "./units-store";
+import { InfoTip } from "@/components/projects/editions/create-dialog";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Button, StateCard, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
+import { Badge, Button, ConfirmDialog, StateCard, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import { CARD, PostImg } from "@/components/innovations/post-bits";
 import { PostMediaStage } from "@/components/innovations/post-media";
 import { MakerBlock } from "@/components/innovations/post-rail";
@@ -40,7 +42,7 @@ import { Breadcrumb } from "@/components/projects/details/breadcrumb";
 import { ProjectSkeleton } from "@/components/projects/details/page-states";
 import { TabStrip, type TabDef } from "@/components/projects/details/tab-strip";
 import { useProjectPageData } from "@/components/projects/details/use-project-page-data";
-import { DeliverablesAccess, ProductPiecePanel } from "@/components/projects/product/product-deliverables";
+import { DeliverablesAccess, PieceDownloads, ProductPiecePanel } from "@/components/projects/product/product-deliverables";
 import { productsOf, useCreateHistory, type BuildItemKind, type BuildJob, type BuildProduct } from "@/lib/create/history";
 import { sampleBuildsOf } from "@/lib/demo/acquired-projects";
 import { minePostOf } from "@/lib/innovations/mine-post";
@@ -50,6 +52,8 @@ import { useMarket } from "@/lib/market/market-store";
 import {
   KIND_NAME,
   LICENCE,
+  copyNumberHelpOf,
+  copyTitleOf,
   lineTitleOf,
   purchaseHrefOf,
   wholeProjectIdOf,
@@ -61,7 +65,6 @@ import {
   type PurchasedProject,
 } from "@/lib/market/purchases";
 import { sampleMarketOf } from "@/lib/market/sample-market";
-import type { EditionKind } from "@/lib/market/types";
 import { copyUnitsOf, unitsLineOf, unitsOnResale, type CopyUnits, type UnitsEntry } from "@/lib/market/units";
 import { useMe } from "@/lib/people/profile-store";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
@@ -69,6 +72,7 @@ import { addAmounts, formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { Amount } from "@/lib/wallet/types";
 import type { DemoBuyer } from "@/lib/wallet/identities";
+import type { DemoBuyerId } from "@/lib/wallet/types";
 import type { Token } from "@/lib/brief/types";
 import { cn } from "@/lib/utils";
 import { useUnitsLog } from "./units-store";
@@ -425,11 +429,16 @@ function KindPanel({
       {covered.length > 0 && <ProductsView kind={kind} post={post} covered={covered} buildOf={buildOf} />}
       <YourCopies
         projectId={p.id}
+        projectName={p.name}
         kind={kind}
         lines={lines}
         buyer={buyer}
         log={log}
         setOf={!scoped && post.products.length > 1 ? post.products.map((x) => x.name) : null}
+        // A product's own copy covers that product; a whole-project copy covers each one (its files, each in a folder).
+        productsOf={(l) =>
+          (l.product ? covered.filter(({ x }) => x.name === l.product) : covered).map(({ x, i }) => ({ name: x.name, image: x.image, build: buildOf(i) }))
+        }
       />
       <div className="flex flex-col">
         <MoreFacts title="What you can and can't do">
@@ -453,19 +462,24 @@ function KindPanel({
  *  each use allows sits folded below, for when they look it up. */
 function YourCopies({
   projectId,
+  projectName,
   kind,
   lines,
   buyer,
   log,
   setOf,
+  productsOf,
 }: {
   projectId: string;
+  projectName: string;
   kind: Exclude<PurchaseKind, "main">;
   lines: PurchaseLine[];
   buyer: DemoBuyer;
   log: readonly UnitsEntry[];
   /** The products one whole-project copy covers, when there are several. */
   setOf: string[] | null;
+  /** What a line's copies cover, for their Download files. */
+  productsOf: (l: PurchaseLine) => CopyProduct[];
 }) {
   const noteId = React.useId();
   const headId = React.useId();
@@ -490,10 +504,15 @@ function YourCopies({
             <CopyRow
               key={c.id}
               copy={c}
+              kind={kind}
               use={[l.use, l.product].filter(Boolean).join(" · ")}
+              helpUse={l.use}
               units={l.unitsPerCopy !== null ? copyUnitsOf(c.key, l.unitsPerCopy, buyer.id, log) : null}
               noteId={noteId}
               sellHref={purchasedEarnHref(projectId, "sell", c.key)}
+              products={productsOf(l)}
+              zipName={copyZipName(projectName, c.serial, kind)}
+              buyerId={buyer.id}
             />
           )),
         )}
@@ -507,14 +526,60 @@ function YourCopies({
   );
 }
 
-function CopyRow({ copy: c, use, units, noteId, sellHref }: { copy: PurchaseCopy; use: string; units: CopyUnits | null; noteId: string; sellHref: string }) {
-  const number = c.serial !== null ? `#${c.serial}${c.of !== null ? ` of ${c.of}` : ""}` : "—";
+/** Why a Physical copy's files can't be downloaded now (each download takes one of its units). */
+const NO_UNITS_LEFT = "No units left on this copy, so its files can't be downloaded again.";
+const ON_SALE = "Take the copy off sale first: no units are used while it's for sale.";
+
+function CopyRow({
+  copy: c,
+  kind,
+  use,
+  helpUse,
+  units,
+  noteId,
+  sellHref,
+  products,
+  zipName,
+  buyerId,
+}: {
+  copy: PurchaseCopy;
+  kind: Exclude<PurchaseKind, "main">;
+  use: string;
+  /** The use alone, for the number's help ("Business use"). */
+  helpUse: string | null;
+  units: CopyUnits | null;
+  noteId: string;
+  sellHref: string;
+  /** What the copy covers: its files come in one .zip. */
+  products: CopyProduct[];
+  zipName: string;
+  buyerId: DemoBuyerId;
+}) {
+  const title = copyTitleOf(c.serial, c.of);
+  const short = c.serial !== null ? `copy #${c.serial}` : "this copy";
   const resale = units ? unitsOnResale(units) : null;
+  const download = useCopyDownload(kind, products, zipName);
+  const [asking, setAsking] = React.useState(false);
+  const reasonId = React.useId();
+  // A Physical copy's download takes one of its units (owner, 2026-11-25): none left, or listed, and it waits.
+  const blocked = units ? (c.listing ? ON_SALE : units.left === 0 ? NO_UNITS_LEFT : null) : null;
+  const take = () =>
+    download.run(
+      units
+        ? () => {
+            appendUnits({ id: `dl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`, copyKey: c.key, holder: buyerId, units: 1, at: Date.now() });
+          }
+        : undefined,
+    );
+  const left = units ? units.left - 1 : 0;
   return (
     <li className="flex flex-col gap-4 border-x-0 border-b-0 border-t border-solid border-border py-6 first:border-t-0 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <span className="font-mono text-lg tabular-nums text-text-primary">{number}</span>
+          <span className="flex items-center gap-2">
+            <span className="text-lg font-semibold leading-lg tabular-nums text-text-primary">{title}</span>
+            <InfoTip label={`What ${title} means`} text={copyNumberHelpOf(c.serial, c.of, kind, helpUse)} wrap />
+          </span>
           {use && <Badge tone="neutral">{use}</Badge>}
           {c.listing && <Badge tone="brand" className="font-semibold">For sale · {formatAmount(c.listing.price, c.listing.token)}</Badge>}
         </span>
@@ -530,7 +595,7 @@ function CopyRow({ copy: c, use, units, noteId, sellHref }: { copy: PurchaseCopy
         <div className="flex flex-col gap-2">
           <div
             role="meter"
-            aria-label={`Units made with ${number}`}
+            aria-label={`Units made with ${title}`}
             aria-valuemin={0}
             aria-valuemax={units.allowance}
             aria-valuenow={units.made}
@@ -541,13 +606,32 @@ function CopyRow({ copy: c, use, units, noteId, sellHref }: { copy: PurchaseCopy
           <span className="text-md tabular-nums text-text-primary">{unitsLineOf(units)}</span>
           {resale && (
             <span className="text-sm leading-sm text-text-secondary">
-              If you sell {number.split(" ")[0]}, the buyer gets {resale.buyerGets === 0 ? "no units" : `the ${resale.buyerGets} ${resale.buyerGets === 1 ? "unit" : "units"}`} left
+              If you sell {short}, the buyer gets {resale.buyerGets === 0 ? "no units" : `the ${resale.buyerGets} ${resale.buyerGets === 1 ? "unit" : "units"}`} left
               {resale.sellerKeeps > 0 ? `; the ${resale.sellerKeeps} you made stay yours.` : "."}
             </span>
           )}
         </div>
       )}
       <div className="flex flex-wrap gap-4">
+        {download.what && (
+          <Button
+            type="button"
+            hierarchy="secondary"
+            size="md"
+            iconLeading={<Icon icon={Download04Icon} size={16} />}
+            loading={download.state === "busy"}
+            aria-disabled={blocked ? true : undefined}
+            aria-describedby={blocked ? reasonId : undefined}
+            onClick={() => {
+              if (blocked || download.state === "busy") return;
+              if (units) setAsking(true);
+              else take();
+            }}
+            className={cn("max-md:min-h-[var(--touch-min)]", blocked && "cursor-not-allowed opacity-60")}
+          >
+            Download files
+          </Button>
+        )}
         {units && (
           <Button type="button" hierarchy="secondary" size="md" disabled aria-describedby={noteId} className="max-md:min-h-[var(--touch-min)]">
             Send to manufacturing
@@ -560,6 +644,29 @@ function CopyRow({ copy: c, use, units, noteId, sellHref }: { copy: PurchaseCopy
           {c.listing ? "Manage the listing" : "Sell this copy"}
         </Link>
       </div>
+      {download.what && (
+        <p id={blocked ? reasonId : undefined} aria-live="polite" className={cn("m-0 text-sm leading-sm", download.state === "failed" ? "text-text-error" : "text-text-secondary")}>
+          {blocked ?? (download.note || `${download.what}, in one .zip${units ? " · each download uses 1 unit" : ""}`)}
+        </p>
+      )}
+      {units && (
+        <ConfirmDialog
+          open={asking}
+          tone="primary"
+          icon={Download04Icon}
+          title="Download the files for 1 unit?"
+          confirmLabel="Download"
+          onCancel={() => setAsking(false)}
+          onConfirm={() => {
+            setAsking(false);
+            take();
+          }}
+        >
+          {`${title} has ${units.left} ${units.left === 1 ? "unit" : "units"} left. Downloading its files uses 1, so ${
+            left === 0 ? "none will be left" : `${left} will be left`
+          }. A unit used doesn't come back.`}
+        </ConfirmDialog>
+      )}
     </li>
   );
 }
@@ -664,7 +771,6 @@ function ProductDetail({
                 <Icon icon={ArrowRight01Icon} size={16} />
               </a>
             )}
-            {kind !== "main" && <DownloadFiles kind={kind} build={build} product={product} primary={!href} />}
             {product.specs.length > 0 && (
               <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-4">
                 {product.specs.map((s) => (
@@ -687,36 +793,13 @@ function ProductDetail({
       ) : build ? (
         // A holder takes the files this kind unlocks, as the maker does (the panel's own downloads).
         <DeliverablesAccess.Provider value>
-          <ProductPiecePanel job={build.job} product={build.bp} kind={tab} chatHref={null} />
+          {/* The files come from each copy's Download files, which takes a unit (owner, 2026-11-25): no piece download here. */}
+          <PieceDownloads.Provider value={false}>
+            <ProductPiecePanel job={build.job} product={build.bp} kind={tab} chatHref={null} />
+          </PieceDownloads.Provider>
         </DeliverablesAccess.Provider>
       ) : null}
     </article>
-  );
-}
-
-/** Everything this kind opens for the product, in one .zip (owner, 2026-11-25: a Download button after buying);
- *  each piece tab keeps its own file too. The card's main action when it has no Open in your project. */
-function DownloadFiles({ kind, build, product, primary }: { kind: EditionKind; build: ProductBuild; product: PostProduct; primary: boolean }) {
-  const d = useNftDownload(kind, build, { name: product.name, image: product.image });
-  if (!d.what) return null;
-  return (
-    <div className="flex flex-col gap-2">
-      <Button
-        type="button"
-        hierarchy={primary ? "primary" : "secondary"}
-        size="md"
-        iconLeading={<Icon icon={Download04Icon} size={16} />}
-        loading={d.state === "busy"}
-        onClick={d.run}
-        className="self-start"
-      >
-        Download files
-      </Button>
-      <p className="m-0 text-sm text-text-secondary">{d.what}, in one .zip</p>
-      <p aria-live="polite" className={cn("m-0 text-sm empty:hidden", d.state === "failed" ? "text-text-error" : "text-text-secondary")}>
-        {d.note}
-      </p>
-    </div>
   );
 }
 
