@@ -10,7 +10,7 @@ to build and how to check it is done, and links to its Jira ticket.
 | [CL-047](#cl-047-settings-home-your-account-first-then-where-you-stand) | Settings home: your account first, then where you stand | 24 Nov 2026 | Not created yet | Not started |
 | [CL-046](#cl-046-deactivate-or-delete-your-account-and-signing-in-makes-it-active-again) | Deactivate or delete your account, and signing in makes it active again | 24 Nov 2026 | [PR-9780](https://ideeza.atlassian.net/browse/PR-9780) | Not started |
 | [CL-045](#cl-045-small-web-fixes-found-while-matching-the-phone) | Small web fixes found while matching the phone | 24 Nov 2026 | Not created yet | Not started |
-| [CL-044](#cl-044-a-profiles-activity-is-only-for-its-owner) | A profile's Activity is only for its owner | 24 Nov 2026 | Not created yet | Not started |
+| [CL-044](#cl-044-a-profiles-activity-is-only-for-its-owner) | A profile's Activity is only for its owner | 24 Nov 2026 | [PR-9783](https://ideeza.atlassian.net/browse/PR-9783) (one Story for the profile) | Not started |
 | [CL-043](#cl-043-the-project-question-after-an-ai-idea-several-products-start-a-new-project) | The project question after an AI idea: several products start a new project | 24 Nov 2026 | Not created yet | Not started |
 | [CL-042](#cl-042-the-free-plans-ai-credits-come-once) | The Free plan's AI credits come once | 24 Nov 2026 | Not created yet | Not started |
 | [CL-041](#cl-041-share-any-project-or-product-on-the-marketplace) | Share any project or product on the Marketplace | 24 Nov 2026 | Not created yet | Not started |
@@ -284,7 +284,7 @@ A fix to pages that were never built, so there is no before.
 
 ## CL-044 A profile's Activity is only for its owner
 
-**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+**In the prototype:** 24 November 2026 · **Jira:** [PR-9783](https://ideeza.atlassian.net/browse/PR-9783) (one Story for the profile) · **Production:** Not started
 
 **Screen:** a creator's profile (`/creators/<handle>`, and your own at `/creators/me`) on the web, and the profile in the mobile app (`/m/creators/<handle>`, `/m/creators/me`). Settings › Privacy › **Lock your profile**.
 
