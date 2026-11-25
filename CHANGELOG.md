@@ -10,11 +10,11 @@ to build and how to check it is done, and links to its Jira ticket.
 | [CL-047](#cl-047-settings-home-your-account-first-then-where-you-stand) | Settings home: your account first, then where you stand | 24 Nov 2026 | Not created yet | Not started |
 | [CL-046](#cl-046-deactivate-or-delete-your-account-and-signing-in-makes-it-active-again) | Deactivate or delete your account, and signing in makes it active again | 24 Nov 2026 | [PR-9780](https://ideeza.atlassian.net/browse/PR-9780) | Not started |
 | [CL-045](#cl-045-small-web-fixes-found-while-matching-the-phone) | Small web fixes found while matching the phone | 24 Nov 2026 | Not created yet | Not started |
-| [CL-044](#cl-044-a-profiles-activity-is-only-for-its-owner) | A profile's Activity is only for its owner | 24 Nov 2026 | [PR-9783](https://ideeza.atlassian.net/browse/PR-9783) (one Story for the profile) | Not started |
+| [CL-044](#cl-044-a-profiles-activity-is-only-for-its-owner) | A profile's Activity is only for its owner | 24 Nov 2026 | Web: not created yet · Mobile app: [PR-9783](https://ideeza.atlassian.net/browse/PR-9783) | Not started |
 | [CL-043](#cl-043-the-project-question-after-an-ai-idea-several-products-start-a-new-project) | The project question after an AI idea: several products start a new project | 24 Nov 2026 | Not created yet | Not started |
 | [CL-042](#cl-042-the-free-plans-ai-credits-come-once) | The Free plan's AI credits come once | 24 Nov 2026 | Not created yet | Not started |
 | [CL-041](#cl-041-share-any-project-or-product-on-the-marketplace) | Share any project or product on the Marketplace | 24 Nov 2026 | Not created yet | Not started |
-| [CL-040](#cl-040-mobile-app-the-same-as-the-website-a-to-z) | Mobile app: the same as the website, A to Z | 24 Nov 2026 | Not created yet | Not started |
+| [CL-040](#cl-040-mobile-app-the-same-as-the-website-a-to-z) | Mobile app: the same as the website, A to Z | 24 Nov 2026 | Epic [PR-9785](https://ideeza.atlassian.net/browse/PR-9785) Mobile App · Profile: [PR-9783](https://ideeza.atlassian.net/browse/PR-9783); the rest not created yet | Not started |
 | [CL-039](#cl-039-earn--sell-every-tile-says-which-nft-it-is) | Earn › Sell: every tile says which NFT it is | 19 Nov 2026 | Not created yet | Not started |
 | [CL-038](#cl-038-a-whole-project-you-bought-opens-as-your-project-with-its-purchase) | A whole project you bought opens as your project, with its Purchase | 19 Nov 2026 | Not created yet | Not started |
 | [CL-037](#cl-037-my-projects--all-what-you-bought-is-there-too) | My projects › All: what you bought is there too | 19 Nov 2026 | Not created yet | Not started |
@@ -59,7 +59,9 @@ Each entry is one Story in Jira's IDEEZA-PRODUCT project (PR), under one of two
 epics: [PR-9007](https://ideeza.atlassian.net/browse/PR-9007) **Landing Page, Sign
 Up and Sign In** (everything before the Creator Panel) and
 [PR-9008](https://ideeza.atlassian.net/browse/PR-9008) **Creator Panel**
-(everything after signing in). A new entry gets its Story once its release is
+(everything after signing in). The mobile app has its own epic,
+[PR-9785](https://ideeza.atlassian.net/browse/PR-9785) **Mobile App**: its
+stories cover the mobile app only, never the website. A new entry gets its Story once its release is
 approved.
 
 Some changes exist only because the prototype keeps everything in the browser
@@ -284,7 +286,7 @@ A fix to pages that were never built, so there is no before.
 
 ## CL-044 A profile's Activity is only for its owner
 
-**In the prototype:** 24 November 2026 · **Jira:** [PR-9783](https://ideeza.atlassian.net/browse/PR-9783) (one Story for the profile) · **Production:** Not started
+**In the prototype:** 24 November 2026 · **Jira:** web not created yet · mobile app [PR-9783](https://ideeza.atlassian.net/browse/PR-9783) (the profile) · **Production:** Not started
 
 **Screen:** a creator's profile (`/creators/<handle>`, and your own at `/creators/me`) on the web, and the profile in the mobile app (`/m/creators/<handle>`, `/m/creators/me`). Settings › Privacy › **Lock your profile**.
 
@@ -480,7 +482,7 @@ A new feature, so there is no before.
 
 ## CL-040 Mobile app: the same as the website, A to Z
 
-**In the prototype:** 24 November 2026 · **Jira:** not created yet · **Production:** Not started
+**In the prototype:** 24 November 2026 · **Jira:** epic [PR-9785](https://ideeza.atlassian.net/browse/PR-9785) Mobile App; the profile is [PR-9783](https://ideeza.atlassian.net/browse/PR-9783), the rest not created yet · **Production:** Not started
 
 **Screen:** the mobile app at `/m`. This changes [CL-010](#cl-010-mobile-app-native-mobile-ux-everywhere).
 
