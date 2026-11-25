@@ -1,7 +1,8 @@
 "use client";
 
-// Report — one dialog for a comment and for a post (plan §7): a reason, an
-// optional note, Send report. The maker never sees who reported it. Until
+// Report — one dialog for a comment, a post, and an Explore marketplace
+// project or product (plan §7; owner, 2026-11-24: marketplace items can be
+// reported too): a reason, an optional note, Send report. The maker never sees who reported it. Until
 // there is moderation the report is kept in this browser, so the same thing
 // can't be reported twice (the menu then reads "Reported").
 
@@ -11,6 +12,13 @@ import { Button, ModalFrame, Radio, Textarea } from "@/components/ideeza";
 export const REPORT_REASONS = ["Spam", "Harassment or hate", "Stolen design", "Misleading", "Something else"] as const;
 export type ReportReason = (typeof REPORT_REASONS)[number];
 
+const REPORT_TITLE = {
+  comment: "Report this comment",
+  post: "Report this post",
+  project: "Report this project",
+  product: "Report this product",
+} as const;
+
 export function ReportDialog({
   open,
   target,
@@ -18,7 +26,7 @@ export function ReportDialog({
   onClose,
 }: {
   open: boolean;
-  target: "comment" | "post";
+  target: "comment" | "post" | "project" | "product";
   onSend: (reason: ReportReason, note: string) => void;
   onClose: () => void;
 }) {
@@ -50,8 +58,12 @@ export function ReportDialog({
       open={open}
       onClose={onClose}
       size="sm"
-      title={target === "post" ? "Report this post" : "Report this comment"}
-      description="Tell us what's wrong. The maker won't see who reported it."
+      title={REPORT_TITLE[target]}
+      description={
+        target === "project" || target === "product"
+          ? "Tell us what's wrong. The creator won't see who reported it."
+          : "Tell us what's wrong. The maker won't see who reported it."
+      }
       footer={
         <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
           <Button type="button" hierarchy="secondary" size="lg" onClick={onClose}>

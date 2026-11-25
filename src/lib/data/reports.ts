@@ -18,6 +18,18 @@ export const SENT_REPORTS_KEY = "ideeza:support:sent";
 export const SENT_MAX = 200;
 
 export const STATUS_RECEIVED = "Received, not reviewed yet";
+
+/** A product reported on Explore marketplace (owner, 2026-11-24): kept beside the reported posts as
+ *  "{post id}#{product id}", so a project's report stays its post's (Innovations and the phone read it). */
+export function productReportIdOf(postId: string, productId: string): string {
+  return `${postId}#${productId}`;
+}
+
+/** A reported id read back: the post, and the product when it is one. */
+export function reportedIdParts(id: string): { postId: string; productId: string | null } {
+  const at = id.indexOf("#");
+  return at < 0 ? { postId: id, productId: null } : { postId: id.slice(0, at), productId: id.slice(at + 1) };
+}
 export const STATUS_SENT = "Sent to the IDEEZA team";
 
 export type SentReport = { ref: string; kind: ProblemKind; title: string; at: number };
@@ -165,10 +177,12 @@ export function reportsYouMade(src: MadeSources, names: MadeNames): ReportRow[] 
 
   for (const postId of src.posts) {
     const post = names.post(postId);
+    // A product reported on Explore marketplace: the lookup names the product.
+    const product = reportedIdParts(postId).productId !== null;
     undated.push({
       id: `post:${postId}`,
       kind: "post",
-      what: post ? `The post “${post.title}”` : "A post that is no longer here",
+      what: post ? `The ${product ? "product" : "post"} “${post.title}”` : `A ${product ? "product" : "post"} that is no longer here`,
       quote: null,
       href: post?.href ?? null,
       at: null,

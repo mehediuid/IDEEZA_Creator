@@ -73,17 +73,23 @@ const plural = (n: number, one: string, many: string) => `${formatCount(n)} ${n 
 
 /** How many posts the maker has on Innovations: this browser's shared projects
  *  for "You", the sample posts for a sample maker. */
-function useMakerPostCount(post: InnovationPost): number {
+/** How many projects a creator has on Innovations: yours from this browser, a sample creator's from code. */
+export function useMakerPostCount(creatorId: string): number {
   const { projects } = useManualProjects();
-  if (post.creator.id === ME_ID) return projects.filter((p) => typeof p.showcasedAt === "number").length;
-  return SAMPLE_POSTS.filter((p) => p.creator.id === post.creator.id).length;
+  if (creatorId === ME_ID) return projects.filter((p) => typeof p.showcasedAt === "number").length;
+  return SAMPLE_POSTS.filter((p) => p.creator.id === creatorId).length;
+}
+
+/** The maker's line under their name, here and in the marketplace's Creator block. */
+export function makerLineOf(count: number): string {
+  return count > 0 ? `${count} ${count === 1 ? "project" : "projects"} on Innovations` : "Nothing on Innovations right now";
 }
 
 /** The maker: a card in the rail, a row under the title on a phone. */
 export function MakerBlock({ post, owner, layout, className }: { post: InnovationPost; owner: boolean; layout: "card" | "row"; className?: string }) {
-  const count = useMakerPostCount(post);
+  const count = useMakerPostCount(post.creator.id);
   const maker = post.creator;
-  const supporting = count > 0 ? `${count} ${count === 1 ? "project" : "projects"} on Innovations` : "Nothing on Innovations right now";
+  const supporting = makerLineOf(count);
   const refusal = useMessageRefusal(maker);
   const reasonId = React.useId();
 

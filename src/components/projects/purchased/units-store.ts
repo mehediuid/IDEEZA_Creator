@@ -1,8 +1,9 @@
 "use client";
 
 // The units made with Physical NFT copies in this browser (`UNITS_KEY`, lib/market/units.ts): a live read that
-// follows this tab and another. The manufacturing flow that writes an order comes later; until then the log holds
-// the demo orders the planter adds.
+// follows this tab and another. A copy's Download files writes one unit (owner, 2026-11-25: "when the user
+// downloads, the amount comes off their manufacturing units"; appendUnits); the log also holds the demo orders the
+// planter adds.
 
 import * as React from "react";
 import { normalizeUnits, UNITS_KEY, type UnitsEntry } from "@/lib/market/units";
@@ -33,12 +34,29 @@ function read(): UnitsEntry[] {
   return log;
 }
 
+const listeners = new Set<() => void>();
+
+/** Adds one entry to the log; false when this browser couldn't keep it (nothing is then taken). */
+export function appendUnits(entry: UnitsEntry): boolean {
+  try {
+    window.localStorage.setItem(UNITS_KEY, JSON.stringify([...read(), entry]));
+  } catch {
+    return false;
+  }
+  for (const l of listeners) l();
+  return true;
+}
+
 function subscribe(onChange: () => void): () => void {
   const onStorage = (e: StorageEvent) => {
     if (e.key === null || e.key === UNITS_KEY) onChange();
   };
+  listeners.add(onChange);
   window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export function useUnitsLog(): UnitsEntry[] {

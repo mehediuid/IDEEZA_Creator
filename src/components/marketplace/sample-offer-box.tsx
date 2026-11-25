@@ -1,7 +1,9 @@
 "use client";
 
 // The Marketplace box of another creator's sample (sample-market.ts; owner,
-// 2026-11-16: the marketplace always has Innovations' data). The same box as
+// 2026-11-16: the marketplace always has Innovations' data): the rail's first
+// block, a RailBlock on the rail's one surface like a listing's of this
+// browser (owner, 2026-11-24: one rail everywhere). The same box as
 // this browser's own listings (buyer-rail.tsx, copy-panel.tsx): tabs Main NFT /
 // Physical NFT / Virtual NFT, only the ones the post's rows sell, one panel at
 // a time, each the same buy box — what is sold as the overline, the price
@@ -19,7 +21,7 @@ import * as React from "react";
 import { Button } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
-import { listingUnitsLine } from "@/lib/market/units";
+import { listingUnitsLine, unitsAllowanceOf, unitsUpToOf, type UnitsUse } from "@/lib/market/units";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
 import { formatDate } from "@/lib/manual/project-summary";
 import {
@@ -52,14 +54,13 @@ import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { SeeWhatYouOwn } from "@/components/projects/purchased/see-what-you-own";
-import { CARD } from "@/components/innovations/post-bits";
+import { RailBlock } from "@/components/projects/details/rail-block";
 import { readSampleSales, useSampleSales, writeSampleSales } from "@/components/mobile/project-earn/buyer/sample-sales-store";
-import { cn } from "@/lib/utils";
 import { useResales } from "@/components/projects/purchased/resales-store";
 import { sampleSaleKeyOf } from "@/lib/market/purchases";
 import { holderOf } from "@/lib/market/resales";
 import { HolderOffers } from "./holder-offers";
-import { ChoiceRows, FactGrid, LegalLine, MoreFacts, OfferTabs, OfferTop, WalletLine, type OfferTab } from "./offer-parts";
+import { ChoiceRows, FactGrid, LegalLine, MoreFacts, OfferTabs, OfferTop, ViewOnChain, WalletLine, type OfferTab } from "./offer-parts";
 
 /** The web's words for a project sold in full (lib/market/purchase.ts). */
 const LOCKED = "This project was sold in full, so its NFTs aren't for sale any more.";
@@ -71,13 +72,11 @@ export function SampleOfferBox({
   market,
   announce,
   initialTab,
-  className,
 }: {
   market: SampleMarket;
   announce: (message: string) => void;
   /** The tab a card's clicked tag asked for. */
   initialTab?: OfferTab | null;
-  className?: string;
 }) {
   const all = useSampleSales();
   const { buyer } = useActiveBuyer();
@@ -132,10 +131,7 @@ export function SampleOfferBox({
 
   const main = offers.find((o) => o.kind === "main") ?? null;
   return (
-    <section aria-labelledby={`${feedId}-market`} className={cn(CARD, "flex flex-col gap-7", className)}>
-      <h2 id={`${feedId}-market`} className="text-lg font-bold leading-lg text-text-primary">
-        Marketplace
-      </h2>
+    <RailBlock title="Marketplace" collapsible={false}>
       <OfferTabs tabs={tabs} active={tab} onSelect={setPicked}>
         {tab === "main" && main ? (
           <MainPanel market={market} offer={main} sales={sales} buyerId={buyer.id} busy={busy === main.name} now={now} onBuy={() => buy(main)} />
@@ -154,7 +150,7 @@ export function SampleOfferBox({
         )}
       </OfferTabs>
       {held.length > 0 && <SeeWhatYouOwn projectId={feedId} />}
-    </section>
+    </RailBlock>
   );
 }
 
@@ -207,6 +203,18 @@ function MainPanel({
         <p className="m-0 text-sm text-text-tertiary">{FACTS_NOTE}</p>
         <ActivityLine last={state.soldTo} listedAt={post.sharedAt} />
       </MoreFacts>
+      <ViewOnChain
+        what={`Main NFT · ${post.title}`}
+        record={{
+          kind: "main",
+          network: SAMPLE_NETWORK,
+          collection: SAMPLE_COLLECTION,
+          tokenId: null,
+          lazy: true,
+          holder: state.soldTo ? buyerLabel(state.soldTo.buyerId) : post.creator.name,
+          txs: state.soldTo ? [{ at: state.soldTo.at, txHash: state.soldTo.txHash, serial: null, mine: state.soldTo.buyerId === buyerId }] : [],
+        }}
+      />
     </>
   );
 }
@@ -240,11 +248,10 @@ function CopyPanel({
   const state = copyUseStateOf(offer, feedId, sales);
   const blocked = copyUseBlockOf(offer, feedId, sales);
   const price = formatAmount(offer.price, offer.token);
-  // Held now: a copy sold on is its new holder's (resales.ts).
-  const owned = state.sales.filter((s) => holderOf(sampleSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length;
-  const sub = [state.of !== null ? `${state.count} of ${state.of} sold` : state.count ? `${state.count} sold` : null, owned > 0 ? `you own ${owned}` : null]
-    .filter(Boolean)
-    .join(" · ");
+  // Held now: a copy sold on is its new holder's (resales.ts). Each Use row says how many it holds.
+  const ownedOf = (o: UseOffer) =>
+    copyUseStateOf(o, feedId, sales).sales.filter((s) => holderOf(sampleSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length;
+  const sub = state.of !== null ? `${state.count} of ${state.of} sold` : state.count ? `${state.count} sold` : null;
 
   return (
     <>
@@ -256,7 +263,14 @@ function CopyPanel({
         onChange={setPickedUse}
         options={uses.map((o) => {
           const why = copyUseBlockOf(o, feedId, sales);
-          return { value: o.use, label: o.use, aside: why ? (copyUseStateOf(o, feedId, sales).locked ? "Not for sale" : "Sold out") : formatAmount(o.price, o.token), disabled: why !== null };
+          return {
+            value: o.use,
+            label: o.use,
+            aside: why ? (copyUseStateOf(o, feedId, sales).locked ? "Not for sale" : "Sold out") : formatAmount(o.price, o.token),
+            disabled: why !== null,
+            owned: ownedOf(o),
+            detail: kind === "physical" ? unitsUpToOf(unitsAllowanceOf(o.use as UnitsUse)) : undefined,
+          };
         })}
       />
       <OfferTop overline={offer.name} price={price} sub={sub ? <span className="tabular-nums">{sub}</span> : undefined} />
@@ -272,8 +286,11 @@ function CopyPanel({
       <MoreFacts>
         <FactGrid
           facts={[
-            { label: "Copies", value: state.of !== null ? `${state.of}` : "No limit" },
+            // Only what the post's row says: a row that names no total has no Copies fact (owner, 2026-11-24).
+            ...(state.of !== null ? [{ label: "Copies", value: `${state.of}` }] : []),
             { label: "Use", value: offer.use },
+            // A Physical copy's units, for the use picked (units.ts).
+            ...(kind === "physical" ? [{ label: "Units per copy", value: `${unitsAllowanceOf(offer.use as UnitsUse)}` }] : []),
             { label: "Royalties", value: `${SAMPLE_ROYALTIES_PCT}%` },
             { label: "Minting", value: "Lazy" },
             { label: "Chain", value: networkLabelOf(SAMPLE_NETWORK) },
@@ -283,6 +300,22 @@ function CopyPanel({
         <p className="m-0 text-sm text-text-tertiary">{FACTS_NOTE}</p>
         <ActivityLine last={state.sales.at(-1) ?? null} listedAt={post.sharedAt} />
       </MoreFacts>
+      <ViewOnChain
+        what={`${offer.name} · ${post.title}`}
+        record={{
+          kind: "copy",
+          network: SAMPLE_NETWORK,
+          collection: SAMPLE_COLLECTION,
+          minted: state.count,
+          of: state.of,
+          txs: state.sales.map((s) => ({
+            at: s.at,
+            txHash: s.txHash,
+            serial: s.serial,
+            mine: holderOf(sampleSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId,
+          })),
+        }}
+      />
     </>
   );
 }

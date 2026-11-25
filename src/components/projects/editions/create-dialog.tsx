@@ -89,7 +89,7 @@ export function ReadOnlyField({ label, value, hint }: { label: string; value: st
 }
 
 /** "?" beside a label: the help shows on hover, focus and tap, and Escape hides it. */
-export function InfoTip({ label, text }: { label: string; text: string }) {
+export function InfoTip({ label, text, wrap = false }: { label: string; text: string; wrap?: boolean }) {
   const [show, setShow] = React.useState(false);
   const tipId = React.useId();
   return (
@@ -116,7 +116,7 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
       </button>
       {show && (
         <span id={tipId} className="pointer-events-none absolute bottom-full left-1/2 z-popover mb-1 -translate-x-1/2">
-          <Tooltip label={text} />
+          <Tooltip label={text} wrap={wrap} />
         </span>
       )}
     </span>

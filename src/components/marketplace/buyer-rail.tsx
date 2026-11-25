@@ -31,6 +31,8 @@
 // - The way to the creator — "Get creator support" for a holder of any sale of
 //   the project (Main or a copy), about the newest one, else "Ask the
 //   creator", about the listing — is the Creator block's (market-rail.tsx).
+// - "See what you own" closes the block for a buyer who holds any sale of the
+//   project, as on a sample's page (owner, 2026-11-24: one rail everywhere).
 //
 // Every `can()` passes `view.canCtx` (listingLive, auction, holding); an auction
 // asks again at the card's own clock, so Place bid goes the moment it ends.
@@ -57,13 +59,16 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { RailBlock } from "@/components/projects/details/rail-block";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { cn } from "@/lib/utils";
+import { SeeWhatYouOwn } from "@/components/projects/purchased/see-what-you-own";
 import { BidCard, useAfterDialogClose, useAuctionClock } from "./bid-card";
 import { CopyPanel, heldKindOf, listedKindsOf } from "./copy-panel";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { usePurchase } from "./purchase-dialog";
 import { PurchasedSummary } from "./purchased-summary";
 import { NFT_PARAM, offerTabOf } from "./offer-tab";
-import { AuctionTop, DealFacts, LegalLine, MoreFacts, OfferTabs, OfferTop, soldWhatOf, WalletLine, type OfferTab } from "./offer-parts";
+import { AuctionTop, DealFacts, isLazy, LegalLine, MoreFacts, OfferTabs, OfferTop, soldWhatOf, ViewOnChain, WalletLine, type OfferTab } from "./offer-parts";
+import { useCreatorName } from "./use-creator-name";
+import { buyerLabel } from "@/lib/wallet/identities";
 
 const QUIET_LINK =
   "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
@@ -141,23 +146,46 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
           <PreviewBody project={project} view={view} listing={listing} auction={auction} clock={clock} announce={announce} />
         ) : null}
       </OfferTabs>
+      {/* With the purchase, as on a sample's page (rail-blocks.tsx): what this buyer holds of the project. */}
+      {buyerId !== null && view.sales.some((s) => s.projectId === project.id && s.buyerId === buyerId) && (
+        <SeeWhatYouOwn projectId={project.id} />
+      )}
     </RailBlock>
   );
 }
 
-/** The Main NFT's facts and activity, folded at the foot of its tab. */
+/** The Main NFT's facts and activity, folded at the foot of its tab, then View on blockchain. */
 function MainFacts({ project, listing, view }: { project: SlotProps["project"]; listing: Listing; view: ProjectView }) {
+  const creator = useCreatorName();
+  const sales = view.sales.filter((s) => s.projectId === project.id && s.item.nft === "main");
+  const soldPct = sales.reduce((n, s) => n + (s.item.nft === "main" ? s.item.sharePct : 0), 0);
+  const buyers = [...new Set(sales.map((s) => buyerLabel(s.buyerId)))];
+  const holder = buyers.length === 0 ? creator : soldPct >= 100 ? buyers.join(", ") : [creator, ...buyers].join(", ");
   return (
-    <MoreFacts>
-      <DealFacts listing={listing} view={view} />
-      <ActivityNow
-        variant="line"
-        projectId={project.id}
-        target={{ kind: "main" }}
-        heading="Activity"
-        emptyNote={`No activity yet · listed ${formatDate(listing.listedAt)}`}
+    <>
+      <MoreFacts>
+        <DealFacts listing={listing} view={view} />
+        <ActivityNow
+          variant="line"
+          projectId={project.id}
+          target={{ kind: "main" }}
+          heading="Activity"
+          emptyNote={`No activity yet · listed ${formatDate(listing.listedAt)}`}
+        />
+      </MoreFacts>
+      <ViewOnChain
+        what={`Main NFT · ${project.name}`}
+        record={{
+          kind: "main",
+          network: listing.network,
+          collection: listing.collection,
+          tokenId: view.mint.tokenId,
+          lazy: isLazy(listing, view),
+          holder,
+          txs: sales.map((s) => ({ at: s.at, txHash: s.txHash, serial: null, mine: false })),
+        }}
       />
-    </MoreFacts>
+    </>
   );
 }
 

@@ -6,26 +6,31 @@
 // · a Physical copy's units: the bar, "10 of 50 units made · 40 left" and what a sale would hand over ("If you
 //   sell #7, the buyer gets the 40 units left; the 10 you made stay yours.");
 // · its facts: Paid, Bought (or Bought from {holder}), Collection, Blockchain;
-// · Send to manufacturing, greyed with the web's reason (its flow comes next), and What you can and can't do
-//   for this copy's use (a sheet);
+// · Download files (owner, 2026-11-25): one .zip of what the copy's kind opens for every product it covers;
+//   a Physical copy's download takes 1 of its units, asked first in the kit's confirm sheet, and waits while the
+//   copy is for sale or has no units left; Send to manufacturing, greyed with the web's reason (its flow comes
+//   next); What you can and can't do for this copy's use (a sheet);
+// · the title says what the number is ("Copy #7 of 50"), its ⓘ sheet what it means;
 // · the bottom bar's one primary: Sell this copy, or Manage the listing while it is for sale — both open its
 //   screen on Earn › Sell.
 // A copy the buyer doesn't hold any more (sold on, or another demo creator picked) says so, with Back.
 
 import * as React from "react";
-import { Factory01Icon, LegalDocument01Icon, ShoppingBag01Icon } from "@hugeicons/core-free-icons";
+import { Download04Icon, Factory01Icon, LegalDocument01Icon, ShoppingBag01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza/badge";
 import { buttonVariants } from "@/components/ideeza/button";
 import { TestnetDemoBadge } from "@/components/ideeza/testnet-demo-badge";
 import { KIND_ICON } from "@/components/marketplace/kind-icon";
-import { useUnitsLog } from "@/components/projects/purchased/units-store";
+import { appendUnits, useUnitsLog } from "@/components/projects/purchased/units-store";
+import { copyZipName, useCopyDownload, type CopyProduct } from "@/components/projects/purchased/nft-download";
 import { usePurchased } from "@/components/projects/purchased/use-purchased";
 import { tileKeyOfCopy } from "@/lib/market/resale-desk";
 import { formatDate } from "@/lib/manual/project-summary";
-import { KIND_NAME, wholeProjectOnly, type PurchasedProject } from "@/lib/market/purchases";
+import { copyNumberHelpOf, copyTitleOf, KIND_NAME, wholeProjectOnly, type PurchaseCopy, type PurchaseLine, type PurchasedProject } from "@/lib/market/purchases";
 import type { EditionKind } from "@/lib/market/types";
-import { copyUnitsOf, unitsLineOf, unitsOnResale } from "@/lib/market/units";
+import { copyUnitsOf, unitsLineOf, unitsOnResale, type CopyUnits } from "@/lib/market/units";
+import type { DemoBuyerId } from "@/lib/wallet/types";
 import type { DemoBuyer } from "@/lib/wallet/identities";
 import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
@@ -39,8 +44,14 @@ import { FactRows } from "../project-earn/parts";
 import { Screen } from "../screen";
 import { TopBar } from "../top-bar";
 import { T } from "../type";
-import { andList, copyOf, LicenceSheet, NothingBought, numberOf, PurchasedLoading, UnitsMeter, useScrolledPast } from "./parts";
+import { andList, copyOf, LicenceSheet, NothingBought, PurchasedLoading, UnitsMeter, useScrolledPast, WithPost, type PostRead } from "./parts";
+import { ConfirmSheet } from "../kit/confirm-sheet";
+import { InfoButton } from "../project-earn/parts";
 import { PURCHASED_TAB_HREF, purchasedKindHref, purchasedPhoneHrefOf, resaleItemPath } from "./paths";
+
+/** The web's reasons a Physical copy's files wait (purchased-page.tsx). */
+const NO_UNITS_LEFT = "No units left on this copy, so its files can't be downloaded again.";
+const ON_SALE = "Take the copy off sale first: no units are used while it's for sale.";
 
 const MANUFACTURING_LATER = "Sending a copy to manufacturing comes in the next step of the prototype. No units are made with a copy while it's for sale.";
 
@@ -71,7 +82,7 @@ function CopyBody({ p, buyer, line, copy: c }: { p: PurchasedProject; buyer: Dem
   const titleRef = React.useRef<HTMLHeadingElement>(null);
   const gone = useScrolledPast(titleRef);
   const kind = line.kind as EditionKind;
-  const number = numberOf(c.serial, c.of);
+  const number = copyTitleOf(c.serial, c.of);
   const units = line.unitsPerCopy !== null ? copyUnitsOf(c.key, line.unitsPerCopy, buyer.id, log) : null;
   const resale = units ? unitsOnResale(units) : null;
   const of = line.product ? `A copy of ${line.product}, from ${p.name}.` : p.products.length > 1 ? `A copy of the whole project: ${andList(p.products)}.` : `A copy of ${p.name}.`;
@@ -97,9 +108,12 @@ function CopyBody({ p, buyer, line, copy: c }: { p: PurchasedProject; buyer: Dem
             {[KIND_NAME[kind], line.use].filter(Boolean).join(" · ")}
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <h1 ref={titleRef} className={cn(T.display, "font-mono tabular-nums")}>
+            <h1 ref={titleRef} className={cn(T.display, "tabular-nums")}>
               {number}
             </h1>
+            <InfoButton title={number} label={`What ${number} means`}>
+              <p className={T.body}>{copyNumberHelpOf(c.serial, c.of, kind, line.use)}</p>
+            </InfoButton>
             {c.listing && <Badge tone="brand">For sale · {formatAmount(c.listing.price, c.listing.token)}</Badge>}
           </div>
           <p className={T.body}>{of}</p>
@@ -114,7 +128,7 @@ function CopyBody({ p, buyer, line, copy: c }: { p: PurchasedProject; buyer: Dem
             <p className={cn(T.rowTitle, "tabular-nums")}>{unitsLineOf(units)}</p>
             {resale && (
               <p className={T.meta}>
-                If you sell {number.split(" ")[0]}, the buyer gets {resale.buyerGets === 0 ? "no units" : `the ${resale.buyerGets} ${resale.buyerGets === 1 ? "unit" : "units"}`} left
+                If you sell {c.serial !== null ? `copy #${c.serial}` : "this copy"}, the buyer gets {resale.buyerGets === 0 ? "no units" : `the ${resale.buyerGets} ${resale.buyerGets === 1 ? "unit" : "units"}`} left
                 {resale.sellerKeeps > 0 ? `; the ${resale.sellerKeeps} you made stay yours.` : "."}
               </p>
             )}
@@ -141,11 +155,90 @@ function CopyBody({ p, buyer, line, copy: c }: { p: PurchasedProject; buyer: Dem
         </section>
 
         <ListCard label="What you can do with it">
+          <WithPost p={p} loading={null} missing={null}>
+            {(read) => <DownloadRow p={p} kind={kind} line={line} copy={c} units={units} buyerId={buyer.id} read={read} title={number} />}
+          </WithPost>
           {units && <ListRow icon={Factory01Icon} title="Send to manufacturing" disabled reason={MANUFACTURING_LATER} onClick={() => undefined} />}
           <ListRow icon={LegalDocument01Icon} title="What you can and can't do" meta={line.use ?? undefined} onClick={() => setRules(true)} />
         </ListCard>
       </div>
       <LicenceSheet open={rules} onClose={() => setRules(false)} kind={kind} lines={[line]} />
     </Screen>
+  );
+}
+
+/** Download files: the copy's .zip (nft-download.ts). A Physical copy's download takes 1 unit, so it asks first and
+ *  waits while the copy is for sale or has none left (the web's words). */
+function DownloadRow({
+  p,
+  kind,
+  line,
+  copy: c,
+  units,
+  buyerId,
+  read,
+  title,
+}: {
+  p: PurchasedProject;
+  kind: EditionKind;
+  line: PurchaseLine;
+  copy: PurchaseCopy;
+  units: CopyUnits | null;
+  buyerId: DemoBuyerId;
+  read: PostRead;
+  title: string;
+}) {
+  const products = React.useMemo<CopyProduct[]>(
+    () =>
+      read.post.products
+        .map((x, i) => ({ x, i }))
+        .filter(({ x }) => !line.product || x.name === line.product)
+        .map(({ x, i }) => ({ name: x.name, image: x.image, build: read.buildOf(i) })),
+    [read, line.product],
+  );
+  const download = useCopyDownload(kind, products, copyZipName(p.name, c.serial, kind));
+  const [asking, setAsking] = React.useState(false);
+  if (!download.what) return null;
+  const blocked = units ? (c.listing ? ON_SALE : units.left === 0 ? NO_UNITS_LEFT : null) : null;
+  const take = () =>
+    download.run(
+      units
+        ? () => {
+            appendUnits({ id: `dl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`, copyKey: c.key, holder: buyerId, units: 1, at: Date.now() });
+          }
+        : undefined,
+    );
+  const left = units ? units.left - 1 : 0;
+  const meta = download.state === "busy" ? "Making the .zip…" : download.note || `${download.what}, in one .zip${units ? " · uses 1 unit" : ""}`;
+  return (
+    <>
+      <ListRow
+        icon={Download04Icon}
+        title="Download files"
+        meta={meta}
+        disabled={!!blocked}
+        reason={blocked ?? undefined}
+        onClick={() => {
+          if (blocked || download.state === "busy") return;
+          if (units) setAsking(true);
+          else take();
+        }}
+      />
+      {units && (
+        <ConfirmSheet
+          open={asking}
+          onClose={() => setAsking(false)}
+          title="Download the files for 1 unit?"
+          body={`${title} has ${units.left} ${units.left === 1 ? "unit" : "units"} left. Downloading its files uses 1, so ${
+            left === 0 ? "none will be left" : `${left} will be left`
+          }. A unit used doesn't come back.`}
+          verb="Download"
+          onConfirm={() => {
+            setAsking(false);
+            take();
+          }}
+        />
+      )}
+    </>
   );
 }

@@ -65,6 +65,7 @@ import { EditDialog } from "./edit-dialog";
 import { ListDialog } from "./list-dialog";
 import { CopyPanel, heldKindOf } from "@/components/marketplace/copy-panel";
 import { OfferTabs } from "@/components/marketplace/offer-parts";
+import { SeeWhatYouOwn } from "@/components/projects/purchased/see-what-you-own";
 
 const KINDS: EditionKind[] = ["physical", "virtual"];
 const USES: EditionUse[] = ["private", "commercial"];
@@ -374,6 +375,10 @@ function PublicBody({ project, view, product, viewer, now, announce, tracks }: P
           announce={announce}
         />
       </OfferTabs>
+      {/* With the purchase, as on every marketplace page's Marketplace block (owner, 2026-11-24). */}
+      {buyerId !== null && view.sales.some((s) => s.projectId === project.id && s.buyerId === buyerId) && (
+        <SeeWhatYouOwn projectId={project.id} projectName={project.name} />
+      )}
       {!buyerId && (
         <Link href={`/marketplace/${project.id}/products/${product.id}`} className={LINK}>
           View on Explore marketplace

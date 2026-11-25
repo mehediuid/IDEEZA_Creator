@@ -26,7 +26,7 @@
 import * as React from "react";
 import { Button, TestnetDemoBadge } from "@/components/ideeza";
 import { helperLineOf } from "@/components/projects/editions/edition-block";
-import { listingUnitsLine } from "@/lib/market/units";
+import { listingUnitsLine, unitsAllowanceOf, unitsUpToOf, type UnitsUse } from "@/lib/market/units";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { historyOf, labelOf } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
@@ -44,7 +44,7 @@ import { compareAmounts, formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
-import { ChoiceRows, FactGrid, MoreFacts, OfferTop, WalletLine } from "./offer-parts";
+import { ChoiceRows, FactGrid, MoreFacts, OfferTop, ViewOnChain, WalletLine } from "./offer-parts";
 import { useEditionPurchase, type EditionTier } from "./purchase-dialog";
 import { HolderOffers } from "./holder-offers";
 import { useResales } from "@/components/projects/purchased/resales-store";
@@ -128,10 +128,11 @@ export function CopyPanel({
   // price), the updates come with it, as before.
   const tier: EditionTier = track.listing.regular === track.listing.extended ? "extended" : "regular";
   const price = formatAmount(track.listing.regular, track.listing.token);
-  // Held now: a copy sold on is its new holder's (resales.ts).
-  const owned = buyerId
-    ? view.sales.filter((s) => s.item.nft !== "main" && s.item.trackId === track.id && holderOf(ownSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length
-    : 0;
+  // Held now: a copy sold on is its new holder's (resales.ts). Each Use row says how many it holds.
+  const ownedOn = (trackId: string) =>
+    buyerId
+      ? view.sales.filter((s) => s.item.nft !== "main" && s.item.trackId === trackId && holderOf(ownSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId).length
+      : 0;
   const name = `${KIND_LABEL[kind]} · ${USE_LABEL[track.use]}`;
 
   return (
@@ -149,7 +150,14 @@ export function CopyPanel({
           const t = offers.find((o) => o.use === use);
           if (!t) return { value: `none:${use}`, label: USE_LABEL[use], aside: "Not on sale", disabled: true };
           const soldOut = trackCardOf(t, view.sales).soldOut;
-          return { value: t.id, label: USE_LABEL[use], aside: soldOut ? "Sold out" : formatAmount(t.listing.regular, t.listing.token), disabled: soldOut };
+          return {
+            value: t.id,
+            label: USE_LABEL[use],
+            aside: soldOut ? "Sold out" : formatAmount(t.listing.regular, t.listing.token),
+            disabled: soldOut,
+            owned: ownedOn(t.id),
+            detail: kind === "physical" ? unitsUpToOf(unitsAllowanceOf(USE_LABEL[use] as UnitsUse)) : undefined,
+          };
         })}
       />
 
@@ -159,7 +167,6 @@ export function CopyPanel({
         sub={
           <span className="tabular-nums">
             {soldLineOf(card.sold, card.total)}
-            {owned > 0 ? ` · you own ${owned}` : ""}
           </span>
         }
       />
@@ -184,6 +191,8 @@ export function CopyPanel({
         <FactGrid
           facts={[
             { label: "Copies", value: `${card.total}` },
+            // A Physical copy's units, for the use picked (units.ts).
+            ...(kind === "physical" ? [{ label: "Units per copy", value: `${unitsAllowanceOf(USE_LABEL[track.use] as UnitsUse)}` }] : []),
             { label: "Royalties", value: `${track.listing.royaltyPct}%` },
             { label: "Minting", value: "Lazy" },
             { label: "Chain", value: networkLabelOf(chain.network) },
@@ -195,6 +204,24 @@ export function CopyPanel({
         </p>
         <CopyActivity project={project} track={track} sales={view.sales} />
       </MoreFacts>
+      <ViewOnChain
+        what={`${name} · ${scopeName}`}
+        record={{
+          kind: "copy",
+          network: chain.network,
+          collection: chain.collection,
+          minted: card.sold,
+          of: card.total,
+          txs: view.sales
+            .filter((s) => s.item.nft !== "main" && s.item.trackId === track.id)
+            .map((s) => ({
+              at: s.at,
+              txHash: s.txHash,
+              serial: s.item.nft !== "main" ? s.item.serial : null,
+              mine: buyerId !== null && holderOf(ownSaleKeyOf(s) ?? s.id, s.buyerId, resales) === buyerId,
+            })),
+        }}
+      />
     </>
   );
 }

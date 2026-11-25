@@ -35,7 +35,10 @@ test("units never move between copies and never go past the allowance; Personal 
   assert.equal(U.copyUnitsOf(KEY, 50, "buyer-mira", log).left, 50, "another copy's units are its own");
   assert.equal(U.copyUnitsOf(KEY, 50, "buyer-mira", [{ id: "x", copyKey: KEY, holder: "buyer-mira", units: 70, at: NOW }]).left, 0);
   assert.equal(U.unitsAllowanceOf("Personal use"), 1);
-  assert.equal(U.unitsAllowanceOf("Business use", 20), 20, "the creator's number wins once the listing has one");
+  assert.equal(U.unitsAllowanceOf("Business use"), 50);
+  // IDEEZA's own rule (owner, 2026-11-24): the creator never sets a copy's units, so nothing can change them.
+  assert.equal(U.unitsAllowanceOf.length, 1, "no creator's number to pass");
+  assert.deepEqual(U.IDEEZA_UNITS, { "Personal use": 1, "Business use": 50 });
   assert.match(U.listingUnitsLine(), /^Each copy lets you make up to 1 unit for Personal use or 50 for Business use\. If you sell the copy, the units left go with it\.$/);
   assert.deepEqual(U.normalizeUnits([{ id: "a", copyKey: KEY, holder: "buyer-mira", units: 0, at: 1 }, "bad", { id: "b", copyKey: KEY, holder: "buyer-mira", units: 2, at: 1 }]).map((e) => e.id), ["b"]);
 });

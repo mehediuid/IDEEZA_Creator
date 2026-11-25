@@ -17,14 +17,16 @@
 // - LegalLine: the one legal line under the Main NFT, always shown.
 
 import * as React from "react";
-import { ArrowDown01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Blockchain01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Radio, TestnetDemoBadge } from "@/components/ideeza";
+import { Badge, ModalFrame, Radio, TestnetDemoBadge } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { Network, Token } from "@/lib/brief/types";
 import type { ProjectView } from "@/lib/manual/project-read";
-import { formatDateTime } from "@/lib/manual/project-summary";
+import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
+import { DEMO_MINT_FOOTNOTE } from "@/lib/manual/rail-copy";
+import { chainRowsOf, type ChainRecord } from "@/lib/market/chain-record";
 import { timeLeftLabel } from "@/lib/market/auction";
 import { useMarket } from "@/lib/market/market-store";
 import type { AuctionState, EditionKind, Listing } from "@/lib/market/types";
@@ -122,7 +124,7 @@ export function soldWhatOf(listing: Listing): string {
 }
 
 /** Lazy while nothing is on chain yet: the token is minted at the sale. */
-function isLazy(listing: Listing, view: ProjectView): boolean {
+export function isLazy(listing: Listing, view: ProjectView): boolean {
   if (view.mint.status === "lazyMinted") return true;
   if (view.mint.status === "onChain") return false;
   return listing.mintingType === "lazy";
@@ -258,6 +260,35 @@ export function MoreFacts({ children, title = "NFT details" }: { children: React
   );
 }
 
+/** "View on blockchain" — every NFT tab's, under its NFT details (owner, 2026-11-24): the record of the NFT the
+ *  tab sells (chain-record.ts) in a dialog. Nothing links to an explorer (§3.1): the prototype's tokens and
+ *  transactions are a testnet demo made in this browser, and the dialog says so in the mint's own words. */
+export function ViewOnChain({ what, record }: { what: string; record: ChainRecord }) {
+  const [open, setOpen] = React.useState(false);
+  const rows = chainRowsOf(record, formatDate);
+  return (
+    <>
+      <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={QUIET_LINK}>
+        <Icon icon={Blockchain01Icon} size={16} />
+        View on blockchain
+      </button>
+      <ModalFrame open={open} onClose={() => setOpen(false)} size="sm" title="On the blockchain" description={what}>
+        <div className="flex flex-col gap-8">
+          <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-8 gap-y-4">
+            {rows.map((r) => (
+              <React.Fragment key={r.label}>
+                <dt className="text-sm font-medium text-text-secondary">{r.label}</dt>
+                <dd className="m-0 min-w-0 break-words text-md font-medium tabular-nums text-text-primary">{r.value}</dd>
+              </React.Fragment>
+            ))}
+          </dl>
+          <p className="m-0 text-sm text-text-secondary">{DEMO_MINT_FOOTNOTE}</p>
+        </div>
+      </ModalFrame>
+    </>
+  );
+}
+
 export type Fact = { label: string; value: string };
 
 /** Facts as a compact grid: a small label over each value, three to a row. */
@@ -297,7 +328,9 @@ export function DealFacts({ listing, view }: { listing: Listing; view: ProjectVi
   );
 }
 
-export type ChoiceRow = { value: string; label: string; aside: string; disabled?: boolean };
+/** `owned`: how many copies of this choice the buyer holds — the row says "You own n" (owner, 2026-11-24).
+ *  `detail`: a second line under the word — a Physical copy's units ("Makes up to 50 units"). */
+export type ChoiceRow = { value: string; label: string; aside: string; disabled?: boolean; owned?: number; detail?: string };
 
 /** A choice as radio rows: each with its word and what stands beside it (a price, "Sold out", "Not on sale").
  *  A row that can't be picked stays, greyed, so the buyer sees every use there is (owner, 2026-11-16). */
@@ -339,7 +372,13 @@ export function ChoiceRows({
               className="peer sr-only"
             />
             <Radio checked={on} decorative size="sm" className="peer-focus-visible:ring-2 peer-focus-visible:ring-border-focus" />
-            <span className="min-w-0 flex-1 text-md font-semibold text-text-primary">{o.label}</span>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="text-md font-semibold text-text-primary">{o.label}</span>
+                {o.owned ? <Badge tone="success">You own {o.owned}</Badge> : null}
+              </span>
+              {o.detail ? <span className="text-sm text-text-secondary">{o.detail}</span> : null}
+            </span>
             <span className="shrink-0 text-md tabular-nums text-text-secondary">{o.aside}</span>
           </label>
         );

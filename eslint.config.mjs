@@ -25,6 +25,7 @@ export const ENGINEERING_COMPOSITION = [
   "src/lib/manual/project-summary.ts",
   "src/lib/manual/rail-copy.ts",
   "src/lib/manual/rail-rows.ts",
+  "src/lib/manual/sample-record.ts",
 ];
 export const ENGINEERING_EXCEPTIONS = [
   "src/lib/manual/customers.ts",

@@ -528,6 +528,38 @@ export function cardChipsOf(p: PurchasedProject): string[] {
   return out;
 }
 
+/** What a buyer holds of a project, said on its marketplace pages (owner, 2026-11-24: a bare "See what you
+ *  own" didn't say what): "the Main NFT" · "a 10% share of the Main NFT" · "2 Virtual NFTs" ·
+ *  "1 Physical NFT and 2 Virtual NFTs". Web terms only (never "Whole project"). Null when nothing is held. */
+export function ownedWhatOf(p: Pick<PurchasedProject, "lines">): string | null {
+  const parts: string[] = [];
+  const main = p.lines.filter((l) => l.kind === "main");
+  if (main.length > 0) {
+    const pct = main.reduce((n, l) => n + (l.sharePct ?? 0), 0);
+    parts.push(pct >= 100 ? "the Main NFT" : `a ${pct}% share of the Main NFT`);
+  }
+  for (const kind of ["physical", "virtual"] as const) {
+    const n = p.lines.filter((l) => l.kind === kind).reduce((sum, l) => sum + l.copies.length, 0);
+    if (n > 0) parts.push(`${n} ${KIND_NAME[kind]}${n === 1 ? "" : "s"}`);
+  }
+  if (parts.length === 0) return null;
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/** A bought copy's title (owner, 2026-11-25: "#1 of 50" read as a code): "Copy #7 of 50" · "Copy #3" · "Copy". */
+export function copyTitleOf(serial: number | null, of: number | null): string {
+  if (serial === null) return "Copy";
+  return of !== null ? `Copy #${serial} of ${of}` : `Copy #${serial}`;
+}
+
+/** What the copy's number means, for its ⓘ help. `use` and `kind` name the listing the copy came from. */
+export function copyNumberHelpOf(serial: number | null, of: number | null, kind: "physical" | "virtual", use: string | null): string {
+  const what = `${use ? `${use} ` : ""}${KIND_NAME[kind]}s`;
+  if (serial === null) return `One of the ${what} you bought. The copy is yours until you sell it on.`;
+  const which = of !== null ? `Copy ${serial} of the ${of} ${what} the creator listed` : `Copy ${serial} of the ${what}, in the order they were bought`;
+  return `${which}. Its number stays with it, even when you sell it on.`;
+}
+
 /** The uses held, Personal first. */
 export function usesOf(p: PurchasedProject): PurchaseUse[] {
   return (["Personal use", "Business use"] as PurchaseUse[]).filter((u) => p.lines.some((l) => l.use === u));

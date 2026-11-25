@@ -9,16 +9,12 @@
 // · a piece `…/products/<productId>/<piece>?nft=…`: the piece view only — the board and the wiring map (each
 //   scrolls inside its box), Pin to pin as rows, the firmware read-only with line numbers, the parts list (its
 //   summary, then a row per part), the 3D model and the assembly in the phone's 3D viewer — then "What this
-//   covers", and its file as the bottom bar's one primary: a holder takes the files this kind opens — the 3D
-//   model's own Download 3D model (.glb) when the build made one for this product (BUY-8).
+//   covers". Its files come from each copy's Download files (copy-screen.tsx), which takes a unit (owner,
+//   2026-11-25), so a piece screen has no download of its own.
 // A piece this kind doesn't open, or the build doesn't have, is a state card with Back to the product.
 
 import * as React from "react";
-import { Download04Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Button } from "@/components/ideeza/button";
 import { coversFor, PcbPreview, WiringPreview } from "@/components/create/deliverable-previews";
-import { fileFor, save } from "@/components/projects/product/product-deliverables";
 import { usePurchased } from "@/components/projects/purchased/use-purchased";
 import { bomFor, firmwareFor, isSampleModel, netsFor } from "@/lib/create/build-artifacts";
 import type { BuildItemKind, BuildJob, BuildProduct } from "@/lib/create/history";
@@ -27,11 +23,9 @@ import { KIND_NAME, wholeProjectOnly } from "@/lib/market/purchases";
 import type { EditionKind } from "@/lib/market/types";
 import { cn } from "@/lib/utils";
 import { PIECE_ICON } from "../ai/build";
-import { BottomBar } from "../kit/bottom-bar";
 import { LIST_CARD, LIST_DIVIDERS, ListCard, ListRow } from "../kit/list";
 import { EmptyState } from "../kit/state";
 import { OfflineBanner } from "../kit/states";
-import { MODEL_FAILED, MODEL_LABEL, useBuildModelDownload } from "../product/build-tab";
 import { ModelPiece } from "../product/model-view";
 import { MediaHero } from "../project/sample-project";
 import { InfoRow } from "../project/parts";
@@ -164,7 +158,7 @@ function PieceBody({ id, piece, read, product, index, kind }: Found & { id: stri
   const item = build.bp.items.find((i) => i.kind === word.id);
   const ready = item?.status === "ready";
   return (
-    <Screen top={<TopBar back={back} title={word.label} />} footer={ready ? <PieceFile kind={word.id} job={build.job} bp={build.bp} /> : undefined}>
+    <Screen top={<TopBar back={back} title={word.label} />}>
       <div className="flex flex-col gap-8 px-8 pb-12">
         <p className={T.meta}>
           {product.name} · {word.label} files are yours · view only on a phone
@@ -177,34 +171,6 @@ function PieceBody({ id, piece, read, product, index, kind }: Found & { id: stri
         {ready && <Covers kind={word.id} job={build.job} bp={build.bp} />}
       </div>
     </Screen>
-  );
-}
-
-/** The piece's file as the bar's one primary (the web's DeliverablesAccess for a holder): the 3D model's own .glb
- *  when the build made one for this product (BUY-8 — for a Virtual NFT the model is the thing licensed), else the
- *  piece's file; none, no bar. */
-function PieceFile({ kind, job, bp }: { kind: BuildItemKind; job: BuildJob; bp: BuildProduct }) {
-  const model = useBuildModelDownload(job, bp);
-  if (kind === "3d" && model.file) {
-    return (
-      <BottomBar>
-        <Button size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} loading={model.state === "busy"} onClick={model.run}>
-          {MODEL_LABEL}
-        </Button>
-        <p aria-live="polite" className={cn(T.meta, "text-text-error empty:hidden")}>
-          {model.state === "failed" ? MODEL_FAILED : ""}
-        </p>
-      </BottomBar>
-    );
-  }
-  const file = fileFor(kind, bp);
-  if (!file) return null;
-  return (
-    <BottomBar>
-      <Button size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} onClick={() => save(file)}>
-        {file.label}
-      </Button>
-    </BottomBar>
   );
 }
 

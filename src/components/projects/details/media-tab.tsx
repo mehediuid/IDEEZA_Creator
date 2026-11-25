@@ -207,7 +207,8 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
         <EmptyMedia />
       ) : (
         <>
-          <h3 className="mt-7 text-md font-semibold text-text-secondary">From your builds</h3>
+          {/* A buyer's page never says "your" for the maker's builds (owner, 2026-11-24): "Images", as a sample's. */}
+          <h3 className="mt-7 text-md font-semibold text-text-secondary">{ownerFacts ? "From your builds" : "Images"}</h3>
           {(coverNote || write.failed) && (
             <Banner tone="attention" className="mt-4">
               {coverNote ?? WRITE_FAILED}

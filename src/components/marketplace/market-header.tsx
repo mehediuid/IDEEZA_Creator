@@ -26,11 +26,18 @@ import type { HeaderSlotProps, SlotProps } from "@/components/projects/details/s
 import { MarketShareButton } from "@/components/shares/share-button";
 import { minePostOf } from "@/lib/innovations/mine-post";
 import { shareItemId } from "@/lib/innovations/share-items";
+import { postIdOfProject } from "@/lib/innovations/slug";
+import { MarketReportMenu } from "./report-menu";
 import { useCreatorName } from "./use-creator-name";
 
-/** The title row's Share, pushed to the row's end. */
+/** The title row's Share, then ⋯ with Report project (owner, 2026-11-24), pushed to the row's end. */
 function MarketShare({ project }: SlotProps) {
-  return <MarketShareButton itemId={shareItemId("mine", project.id)} title={project.name.trim() || "Untitled project"} className="ml-auto" />;
+  return (
+    <div className="ml-auto flex shrink-0 items-center gap-4">
+      <MarketShareButton itemId={shareItemId("mine", project.id)} title={project.name.trim() || "Untitled project"} />
+      <MarketReportMenu reportId={postIdOfProject(project.id)} target="project" />
+    </div>
+  );
 }
 
 const PARTS = { titleRow: [MarketShare] };

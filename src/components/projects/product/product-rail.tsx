@@ -7,7 +7,8 @@
 // 1. Marketplace: Physical NFT · Virtual NFT editions — PRODUCT_SLOTS.rail
 //    (T27), the buyer's side only since Build and Earn P0 (the owner's
 //    controls are Earn › Sell): it shows only listed tracks, else it is
-//    absent.
+//    absent. On Explore marketplace the Creator and On Innovations blocks
+//    follow it (`buyer`), the order every marketplace page's rail keeps.
 // 2. Specs and 3. Build check (product-facts.tsx; owner, 2026-10-11: facts
 //    out of the header): a built product's labelled facts and its check, and
 //    the project's network with a link to its tab (not on a post).
@@ -37,6 +38,7 @@ export function ProductRail({
   confidence,
   partChanges,
   post,
+  buyer,
 }: {
   slot: ProductSlotProps;
   /** This product inside the build of the version on screen; null when none stands behind it. */
@@ -47,6 +49,9 @@ export function ProductRail({
   /** An Innovations post's own blocks, which stand in for the Marketplace and Editor blocks (plan §6):
    *  the post shows the prices and buying stays on the Marketplace page. */
   post?: React.ReactNode;
+  /** Explore marketplace: the Creator and On Innovations blocks under the Marketplace block, as on
+   *  every marketplace page (owner, 2026-11-24: one rail everywhere; marketplace/rail-blocks.tsx). */
+  buyer?: React.ReactNode;
 }) {
   const Marketplace = PRODUCT_SLOTS.rail.marketplace;
   const network = useNetworkFact(slot, !post);
@@ -54,6 +59,7 @@ export function ProductRail({
     <aside aria-label="Product record" className={cn(RAIL_SURFACE, "empty:hidden")}>
       {!post && can(slot.viewer, "facts.seeOwnerOnly") && <ActivityCard {...slot} productId={slot.product.id} />}
       {!post && Marketplace ? <Marketplace {...slot} /> : null}
+      {buyer}
       {(built || network) && <ProductSpecsBlock product={built} partChanges={partChanges} network={network} />}
       {confidence && <ProductCheckBlock confidence={confidence} />}
       {post ?? (

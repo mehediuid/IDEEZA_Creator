@@ -77,22 +77,7 @@ function useBuildOf(product: PostProduct): { job: BuildJob; bp: BuildProduct } |
 function ProductBody({ post, product, seed, mine }: { post: InnovationPost; product: PostProduct; seed: CommentSeed; mine: MinePostFacts | null }) {
   const index = post.products.indexOf(product);
   const comments = useCommentCount(post.id, seed);
-  const build = useBuildOf(product);
   const { titleRef, live } = usePageArrival(`${post.id}:${product.id}`, product.name, `${product.name} · ${post.title} · Innovations · IDEEZA`);
-
-  const open: TabDef<TabId>[] = [];
-  // Media leads and opens on the product's video (owner, 2026-10-13).
-  if (product.video || product.image) open.push({ id: "media", label: "Media" });
-  for (const k of ["3d", "parts"] as const) if (product.pieces.includes(k)) open.push({ id: k, label: PIECE_LABEL[k] });
-  // A holder of a Physical NFT (or the whole project) has these pieces: no lock on their tabs (plan D6).
-  const { ready, purchases } = usePurchased();
-  const projectId = post.source === "sample" ? post.id.replace(/^sample:/, "") : post.projectId;
-  const held = ready && projectId !== null && post.creator.id !== ME_ID && heldFilesHrefOf(purchases, projectId) !== null;
-  const locked: TabDef<TabId>[] = (["pcb", "code", "wiring"] as const)
-    .filter((k) => product.pieces.includes(k as PostPiece))
-    .map((k) => ({ id: k, label: PIECE_LABEL[k], icon: held ? undefined : <Icon icon={SquareLock02Icon} size={14} /> }));
-  const first = open[0]?.id ?? locked[0]?.id ?? null;
-  const [tab, setTab] = React.useState<TabId | null>(first);
 
   const threadHref = `${postHref(post.slug)}#comments`;
   const meta = [`Product ${index + 1} of ${post.products.length}`, product.parts.length > 0 ? partsLabel(product.parts.length) : null].filter(Boolean).join(" · ");
@@ -124,19 +109,7 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
 
         <div className={POST_COLUMNS}>
           <div className="flex min-w-0 flex-col gap-8">
-            {tab ? (
-              <>
-                <TabStrip label="What this product includes" groups={[open, locked]} active={tab} onSelect={setTab} />
-                <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="min-w-0 [container-type:inline-size]">
-                  {tab === "media" && <MediaPanel post={post} product={product} mine={mine} />}
-                  {tab === "3d" && <ModelPanel post={post} product={product} build={build} />}
-                  {tab === "parts" && <PartsPanel post={post} product={product} build={build} />}
-                  {isLocked(tab) && <LockedPiecePanel post={post} kind={tab} />}
-                </div>
-              </>
-            ) : (
-              <p className="text-md leading-md text-text-secondary">This product has nothing to show yet.</p>
-            )}
+            <PostProductTabs post={post} product={product} mine={mine} />
           </div>
 
           <aside aria-label="Product facts" className="flex min-w-0 flex-col gap-8">
@@ -193,7 +166,39 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
   );
 }
 
-// ─────────────────────────── panels ───────────────────────────
+// ─────────────────────────── tabs and panels ───────────────────────────
+
+/** What the product includes, a tab each: Media, the 3D model and the parts open to everyone, then
+ *  the PCB, firmware and wiring that come with a copy (D2). Explore marketplace's page for a
+ *  sample's product shows the same tabs (marketplace/sample-product-page.tsx). */
+export function PostProductTabs({ post, product, mine }: { post: InnovationPost; product: PostProduct; mine: MinePostFacts | null }) {
+  const build = useBuildOf(product);
+  const open: TabDef<TabId>[] = [];
+  // Media leads and opens on the product's video (owner, 2026-10-13).
+  if (product.video || product.image) open.push({ id: "media", label: "Media" });
+  for (const k of ["3d", "parts"] as const) if (product.pieces.includes(k)) open.push({ id: k, label: PIECE_LABEL[k] });
+  // A holder of a Physical NFT (or the whole project) has these pieces: no lock on their tabs (plan D6).
+  const { ready, purchases } = usePurchased();
+  const projectId = post.source === "sample" ? post.id.replace(/^sample:/, "") : post.projectId;
+  const held = ready && projectId !== null && post.creator.id !== ME_ID && heldFilesHrefOf(purchases, projectId) !== null;
+  const locked: TabDef<TabId>[] = (["pcb", "code", "wiring"] as const)
+    .filter((k) => product.pieces.includes(k as PostPiece))
+    .map((k) => ({ id: k, label: PIECE_LABEL[k], icon: held ? undefined : <Icon icon={SquareLock02Icon} size={14} /> }));
+  const first = open[0]?.id ?? locked[0]?.id ?? null;
+  const [tab, setTab] = React.useState<TabId | null>(first);
+  if (!tab) return <p className="text-md leading-md text-text-secondary">This product has nothing to show yet.</p>;
+  return (
+    <>
+      <TabStrip label="What this product includes" groups={[open, locked]} active={tab} onSelect={setTab} />
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="min-w-0 [container-type:inline-size]">
+        {tab === "media" && <MediaPanel post={post} product={product} mine={mine} />}
+        {tab === "3d" && <ModelPanel post={post} product={product} build={build} />}
+        {tab === "parts" && <PartsPanel post={post} product={product} build={build} />}
+        {isLocked(tab) && <LockedPiecePanel post={post} kind={tab} />}
+      </div>
+    </>
+  );
+}
 
 /** The product's video first, at full width; then its image. */
 function MediaPanel({ post, product, mine }: { post: InnovationPost; product: PostProduct; mine: MinePostFacts | null }) {
@@ -307,7 +312,7 @@ function PartsPanel({ post, product, build }: { post: InnovationPost; product: P
 }
 
 /** The product's own Activity, as on a product page read by a visitor (a sample post's journey). */
-function SampleProductActivity({ post, productId, name }: { post: InnovationPost; productId: string; name: string }) {
+export function SampleProductActivity({ post, productId, name }: { post: InnovationPost; productId: string; name: string }) {
   // As on the post page: the journey's own clock until hydrated, so the server and the browser agree.
   const now = useMinuteClock();
   const journey = React.useMemo(() => sampleJourneyOf(post, now > 0 ? now : undefined), [post, now]);

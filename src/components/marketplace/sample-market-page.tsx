@@ -3,153 +3,192 @@
 // /marketplace/<feed id> for another creator's sample (sample-market.ts;
 // owner, 2026-11-16: the marketplace always has the data Innovations has). The
 // shop page the marketplace gives this browser's own listings (owner,
-// 2026-11-15), read from the sample's Innovations post:
-// - the media first, then the title and "Created by {creator}";
-// - the Marketplace box (sample-offer-box.tsx), with the Creator and "On
-//   Innovations" beside it in the rail — under the title in one column, so
-//   the price is never below the fold;
-// - About this project and What's inside (the post's own rows, each opening
-//   the product on the post);
+// 2026-11-15), read from the sample's Innovations post, in the SAME frame and
+// order as a listing's page (owner, 2026-11-24: "every marketplace details
+// page shows its information the same way — the rail most of all"):
+// - the Testnet demo banner with Shopping as, then the breadcrumb;
+// - the media first, then the header as ProjectHeader reads it for a buyer:
+//   the title with Share at the row's end, the status chip ("Listed", or
+//   "Sold" once its Main NFT is bought) and its line, "Created by {creator} ·
+//   …", the description (five lines, then Show more) and Project activity
+//   (the sample's journey);
+// - the rail as the project page's one surface (ProjectFrame, COR-54): the
+//   Marketplace box (sample-offer-box.tsx) and the Creator block lead it —
+//   under the header in one column, so the price is never below the fold —
+//   then On Innovations and Recent (lib/manual/sample-record.ts);
+// - the tabs a listing's page has, Products and Media, the same cards and
+//   image grid (sample-products.tsx), each product opening its marketplace
+//   page (sample-product-page.tsx);
 // - the story and the conversation stay on the post: "On Innovations" says
 //   how many and links there, never a copy.
-// The prototype-only Testnet demo banner with Shopping as sits under the
-// breadcrumb, as on every marketplace page. Share sits beside the title
-// (owner, 2026-11-22): Share to Innovations while the sample is on the
-// Marketplace, then Copy link and the networks (shares/share-button.tsx).
+// Share sits at the end of the title row (owner, 2026-11-22): Share to
+// Innovations while the sample is on the Marketplace, then Copy link and the
+// networks (shares/share-button.tsx).
 
 import * as React from "react";
-import Link from "next/link";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Badge, buttonVariants } from "@/components/ideeza";
+import { usePathname, useSearchParams } from "next/navigation";
+import { TabStrip } from "@/components/projects/details/tab-strip";
 import { PersonName } from "@/components/profile/person-name";
 import { LiveRegion, usePageArrival } from "@/components/projects/details/arrival";
 import { Breadcrumb } from "@/components/projects/details/breadcrumb";
-import { CARD, partsLabel, productsLabel } from "@/components/innovations/post-bits";
-import { PostToastProvider } from "@/components/innovations/toast";
-import { MarketShareButton } from "@/components/shares/share-button";
+import { ActivityNow } from "@/components/projects/details/activity/now-block";
+import { DescriptionText } from "@/components/projects/details/description-editor";
+import { ProjectFrame, RailRest } from "@/components/projects/details/frame";
+import { RecentBlock } from "@/components/projects/details/rail-log";
+import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
+import { StatusChip } from "@/components/projects/status-chip";
+import { partsLabel, productsLabel } from "@/components/innovations/post-bits";
 import { PostMediaStage } from "@/components/innovations/post-media";
-import { WhatsInside } from "@/components/innovations/post-page";
-import { MakerBlock } from "@/components/innovations/post-rail";
-import { NARROW_ONLY, POST_COLUMNS, POST_CONTENT, POST_PAGE, WIDE_ONLY } from "@/components/innovations/post-states";
+import { PostToastProvider } from "@/components/innovations/toast";
+import { useSampleSales } from "@/components/mobile/project-earn/buyer/sample-sales-store";
+import { MarketShareButton } from "@/components/shares/share-button";
 import { useCommentCount } from "@/lib/innovations/comments-store";
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
+import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import { sampleSeedOf } from "@/lib/innovations/sample-posts";
 import { postHref } from "@/lib/innovations/slug";
 import type { InnovationPost } from "@/lib/innovations/types";
-import { marketDocTitle } from "@/lib/manual/project-route";
+import { marketDocTitle, parseProjectTab, PROJECT_TAB_LABEL, withTab, type ProjectTabId } from "@/lib/manual/project-route";
+import { formatDate } from "@/lib/manual/project-summary";
+import { sampleLogLinesOf, sampleStatusOf } from "@/lib/manual/sample-record";
 import type { SampleMarket } from "@/lib/market/sample-market";
-import { cn } from "@/lib/utils";
 import { DemoBuyerBanner } from "./demo-buyer-banner";
 import type { OfferTab } from "./offer-parts";
+import { OnInnovationsBlock, SampleCreatorBlock } from "./rail-blocks";
+import { MarketReportMenu } from "./report-menu";
 import { SampleOfferBox } from "./sample-offer-box";
+import { SampleMediaTab, SampleProductsTab } from "./sample-products";
 
 export function SampleMarketPage({ market, initialTab = null }: { market: SampleMarket; initialTab?: OfferTab | null }) {
   // The toast (Link copied, Shared to Innovations) sits outside the page container, so it is the window's.
+  // useSearchParams (the tab) needs a boundary so the route can still be pre-rendered.
   return (
     <PostToastProvider>
-      <SampleMarketBody market={market} initialTab={initialTab} />
+      <React.Suspense fallback={null}>
+        <SampleMarketBody market={market} initialTab={initialTab} />
+      </React.Suspense>
     </PostToastProvider>
   );
 }
 
+/** The tabs a listing's page shows a buyer (shell.tsx): Products and Media, a history entry each
+ *  (COR-20), the panel as the shell draws it. */
+const SAMPLE_TABS = ["products", "media"] as const;
+
+function SampleTabs({ post, feedId }: { post: InnovationPost; feedId: string }) {
+  const search = useSearchParams();
+  const pathname = usePathname();
+  const asked = parseProjectTab(search.get("tab"));
+  const active = (SAMPLE_TABS as readonly string[]).includes(asked) ? asked : "products";
+  const select = (id: ProjectTabId) => {
+    if (id === active) return;
+    const qs = withTab(search.toString(), id);
+    window.history.pushState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  };
+  return (
+    <>
+      <TabStrip
+        label="Project sections"
+        groups={[SAMPLE_TABS.map((id) => ({ id, label: PROJECT_TAB_LABEL[id] }))]}
+        active={active}
+        onSelect={select}
+      />
+      <div
+        id={`panel-${active}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${active}`}
+        tabIndex={0}
+        className="rounded-lg pt-10 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        {active === "media" ? <SampleMediaTab post={post} /> : <SampleProductsTab post={post} feedId={feedId} />}
+      </div>
+    </>
+  );
+}
+
 function SampleMarketBody({ market, initialTab }: { market: SampleMarket; initialTab: OfferTab | null }) {
-  const { post } = market;
-  const { titleRef, live, announce } = usePageArrival(`market:${market.feedId}`, post.title, marketDocTitle(post.title));
-  const meta = [post.category, productsLabel(post.products.length), post.partsCount > 0 ? partsLabel(post.partsCount) : null].filter(Boolean).join(" · ");
+  const { post, feedId } = market;
+  const { titleRef, live, announce } = usePageArrival(`market:${feedId}`, post.title, marketDocTitle(post.title));
+  const sales = useSampleSales();
+  const now = useMinuteClock();
+  const status = sampleStatusOf(market, sales, now);
+  const logLines = React.useMemo(() => sampleLogLinesOf(market, sales), [market, sales]);
+  // As on the post page: the journey's own clock until hydrated, so the server and the browser agree.
+  const journey = React.useMemo(() => sampleJourneyOf(post, now > 0 ? now : undefined), [post, now]);
+  const meta = [
+    status.status === "listed" ? `Listed ${formatDate(post.sharedAt)}` : null,
+    post.category,
+    productsLabel(post.products.length),
+    post.partsCount > 0 ? partsLabel(post.partsCount) : null,
+  ].filter((m): m is string => Boolean(m));
 
   return (
-    <div className={POST_PAGE}>
-      <div className={POST_CONTENT}>
-        <Breadcrumb trail={[{ label: "Explore marketplace", href: "/marketplace" }, { label: post.title }]} />
-        <DemoBuyerBanner sample />
-
-        <div className={POST_COLUMNS}>
-          <div className="flex min-w-0 flex-col gap-12">
+    <>
+      <ProjectFrame
+        banner={<DemoBuyerBanner className="mb-10" sample />}
+        breadcrumb={<Breadcrumb trail={[{ label: "Explore marketplace", href: "/marketplace" }, { label: post.title }]} />}
+        head={
+          <div className="flex flex-col gap-10">
             <PostMediaStage post={post} mine={null} />
-
-            <header className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                <h1
-                  ref={titleRef}
-                  tabIndex={-1}
-                  className="text-4xl font-semibold leading-4xl tracking-near text-text-primary outline-none max-md:text-2xl max-md:leading-2xl max-md:tracking-normal"
-                >
-                  {post.title}
-                </h1>
-                {post.minted && (
-                  <Badge tone="success" className="font-semibold">
-                    Minted
-                  </Badge>
-                )}
-                <MarketShareButton itemId={market.feedId} title={post.title} className="ml-auto" />
+            <header className="flex flex-col gap-8 [container-type:inline-size]">
+              <div className="flex min-w-0 flex-1 flex-col gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="min-w-0 max-w-full">
+                    <h1
+                      ref={titleRef}
+                      tabIndex={-1}
+                      className="min-w-0 truncate text-3xl font-semibold leading-3xl tracking-slight text-text-primary outline-none"
+                    >
+                      {post.title}
+                    </h1>
+                  </div>
+                  <div className="ml-auto flex shrink-0 items-center gap-4">
+                    <MarketShareButton itemId={feedId} title={post.title} />
+                    <MarketReportMenu reportId={post.id} target="project" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
+                  <StatusChip status={status.status} word={status.word} />
+                </div>
+                {status.line && <p className="min-w-0 text-md text-text-secondary">{status.line}</p>}
+                <p className="text-sm text-text-secondary">
+                  Created by{" "}
+                  <PersonName id={post.creator.id} from="innovations" tone="secondary">
+                    {post.creator.name}
+                  </PersonName>
+                  {meta.map((m) => (
+                    <React.Fragment key={m}> · {m}</React.Fragment>
+                  ))}
+                </p>
+                <DescriptionText text={post.description} />
+                <ActivityNow projectId={post.id} target={{ kind: "project" }} defaultAt={post.createdAt} heading="Project activity" journey={journey} />
               </div>
-              <p className="m-0 text-md leading-md text-text-secondary">
-                Created by{" "}
-                <PersonName id={post.creator.id} from="innovations">
-                  {post.creator.name}
-                </PersonName>
-                {meta && <span aria-hidden> · </span>}
-                {meta}
-              </p>
             </header>
-
-            <div className={cn(NARROW_ONLY, "flex flex-col gap-8")}>
-              <SampleOfferBox market={market} announce={announce} initialTab={initialTab} />
-              <MakerBlock post={post} owner={false} layout="card" />
-            </div>
-
-            {post.description && (
-              <section aria-labelledby={`${market.feedId}-about`} className="flex flex-col gap-4">
-                <h2 id={`${market.feedId}-about`} className="text-xl font-bold leading-xl text-text-primary">
-                  About this project
-                </h2>
-                <p className="m-0 max-w-[68ch] text-lg leading-relaxed text-text-primary">{post.description}</p>
-              </section>
-            )}
-            {post.products.length > 0 && <WhatsInside post={post} />}
-            <OnInnovations post={post} className={NARROW_ONLY} />
           </div>
-
-          <aside aria-label="Buy and the creator" className={cn(WIDE_ONLY, "min-w-0 flex-col self-stretch")}>
-            <div className="sticky top-[24px] flex flex-col gap-8">
-              <SampleOfferBox market={market} announce={announce} initialTab={initialTab} />
-              <MakerBlock post={post} owner={false} layout="card" />
-              <OnInnovations post={post} />
-            </div>
-          </aside>
-        </div>
-      </div>
+        }
+        lead={
+          <div className="divide-y divide-border">
+            <SampleOfferBox market={market} announce={announce} initialTab={initialTab} />
+            <SampleCreatorBlock post={post} />
+          </div>
+        }
+        main={<SampleTabs post={post} feedId={feedId} />}
+        rail={
+          <RailRest label="Project record">
+            <SampleStoryBlock post={post} />
+            <RecentBlock lines={logLines} />
+          </RailRest>
+        }
+      />
       <LiveRegion text={live} />
-    </div>
+    </>
   );
 }
 
 /** The mirror of the post's "On Marketplace" card: its counts, and the way to the story. */
-export function OnInnovations({ post, className }: { post: InnovationPost; className?: string }) {
-  const id = React.useId();
+export function SampleStoryBlock({ post }: { post: InnovationPost }) {
   const { reactions } = useReactions();
   const comments = useCommentCount(post.id, sampleSeedOf(post.id)) ?? 0;
   const { appreciations } = countsOf(reactions, post.id, post.base);
-  return (
-    <section aria-labelledby={id} className={cn(CARD, "flex flex-col gap-6", className)}>
-      <h2 id={id} className="text-lg font-bold leading-lg text-text-primary">
-        On Innovations
-      </h2>
-      <p className="m-0 text-md text-text-secondary">
-        <span className="tabular-nums">
-          {appreciations} {appreciations === 1 ? "appreciation" : "appreciations"} · {comments} {comments === 1 ? "comment" : "comments"}
-        </span>
-        <br />
-        The creator&apos;s story and the conversation about {post.title} are on its Innovations post.
-      </p>
-      <Link
-        href={postHref(post.slug)}
-        className={cn(buttonVariants({ hierarchy: "secondary", size: "lg" }), "h-[44px] w-full gap-2 hover:text-[color:var(--color-button-secondary-text)]")}
-      >
-        Read the story
-        <Icon icon={ArrowRight01Icon} size={16} />
-      </Link>
-    </section>
-  );
+  return <OnInnovationsBlock title={post.title} href={postHref(post.slug)} appreciations={appreciations} comments={comments} />;
 }

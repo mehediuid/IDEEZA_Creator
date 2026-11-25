@@ -11,6 +11,7 @@ import { storedCommentsIn, type PostComment } from "@/lib/innovations/comments";
 import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
 import { mineSlugOf, postHref } from "@/lib/innovations/slug";
 import { useManualProjects } from "@/lib/manual/projects";
+import { reportedIdParts } from "@/lib/data/reports";
 
 const COMMENTS_PREFIX = "ideeza:innovations:comments:";
 
@@ -58,14 +59,24 @@ const SAMPLE_BY_ID = new Map(SAMPLE_POSTS.map((p) => [p.id, p]));
 export function usePostLookup(): { hydrated: boolean; post: (postId: string) => PostInfo | null } {
   const { hydrated, projects } = useManualProjects();
   const post = React.useCallback(
-    (postId: string): PostInfo | null => {
-      const sample = SAMPLE_BY_ID.get(postId);
-      if (sample) return { title: sample.title, href: postHref(sample.slug), maker: sample.creator.name };
-      if (postId.startsWith("mine:")) {
-        const p = projects.find((x) => x.id === postId.slice("mine:".length));
-        if (p) return { title: p.name, href: postHref(mineSlugOf(p)), maker: null };
-      }
-      return null;
+    (id: string): PostInfo | null => {
+      const postOf = (postId: string): PostInfo | null => {
+        const sample = SAMPLE_BY_ID.get(postId);
+        if (sample) return { title: sample.title, href: postHref(sample.slug), maker: sample.creator.name };
+        if (postId.startsWith("mine:")) {
+          const p = projects.find((x) => x.id === postId.slice("mine:".length));
+          if (p) return { title: p.name, href: postHref(mineSlugOf(p)), maker: null };
+        }
+        return null;
+      };
+      // A product reported on Explore marketplace: its name, at its project's post.
+      const { postId, productId } = reportedIdParts(id);
+      if (productId === null) return postOf(postId);
+      const name = SAMPLE_BY_ID.has(postId)
+        ? SAMPLE_BY_ID.get(postId)?.products.find((x) => x.id === productId)?.name
+        : projects.find((x) => `mine:${x.id}` === postId)?.products?.find((x) => x.id === productId)?.name;
+      const base = postOf(postId);
+      return base && name ? { ...base, title: name } : null;
     },
     [projects],
   );
