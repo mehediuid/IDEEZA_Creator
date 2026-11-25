@@ -572,8 +572,11 @@ function CopyRow({
         : undefined,
     );
   const left = units ? units.left - 1 : 0;
+  const downloadLine = blocked ?? (download.note || `${download.what}, in one .zip${units ? " · each download uses 1 unit" : ""}`);
   return (
-    <li className="flex flex-col gap-4 border-x-0 border-b-0 border-t border-solid border-border py-6 first:border-t-0 first:pt-0 last:pb-0">
+    // The row is its own container: under 560 px (a phone, or a narrow page beside the sidebar) Download is the small
+    // button beside Sell this copy and its line runs the full width, so the row never breaks.
+    <li className="flex flex-col gap-4 [container-type:inline-size] border-x-0 border-b-0 border-t border-solid border-border py-6 first:border-t-0 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span className="flex items-center gap-2">
@@ -612,7 +615,7 @@ function CopyRow({
           )}
         </div>
       )}
-      <div className="flex flex-wrap items-start gap-4">
+      <div className="flex flex-wrap items-start gap-4 [@container(max-width:559px)]:items-center">
         {units && (
           <Button type="button" hierarchy="secondary" size="md" disabled aria-describedby={noteId} className="max-md:min-h-[var(--touch-min)]">
             Send to manufacturing
@@ -624,14 +627,16 @@ function CopyRow({
         >
           {c.listing ? "Manage the listing" : "Sell this copy"}
         </Link>
-        {/* Download at the row's far right, its line under it (owner, 2026-11-25). */}
-        {download.what && (
-          <div className="ml-auto flex max-w-full flex-col items-end gap-2">
+        {/* Download at the row's far right, its line under it (owner, 2026-11-25); in a narrow row the DS small
+            button beside Sell this copy, its line the full width under the row (owner: small on a phone). */}
+        {download.what &&
+          (["md", "sm"] as const).map((size) => (
             <Button
+              key={size}
               type="button"
               hierarchy="secondary"
-              size="md"
-              iconLeading={<Icon icon={Download04Icon} size={16} />}
+              size={size}
+              iconLeading={<Icon icon={Download04Icon} size={size === "md" ? 16 : 14} />}
               loading={download.state === "busy"}
               aria-disabled={blocked ? true : undefined}
               aria-describedby={blocked ? reasonId : undefined}
@@ -640,20 +645,29 @@ function CopyRow({
                 if (units) setAsking(true);
                 else take();
               }}
-              className={cn("max-md:min-h-[var(--touch-min)]", blocked && "cursor-not-allowed opacity-60")}
+              className={cn(
+                "ml-auto",
+                size === "md" ? "[@container(max-width:559px)]:hidden" : "[@container(min-width:560px)]:hidden",
+                blocked && "cursor-not-allowed opacity-60",
+              )}
             >
               Download files
             </Button>
-            <p
-              id={blocked ? reasonId : undefined}
-              aria-live="polite"
-              className={cn("m-0 text-right text-sm leading-sm", download.state === "failed" ? "text-text-error" : "text-text-secondary")}
-            >
-              {blocked ?? (download.note || `${download.what}, in one .zip${units ? " · each download uses 1 unit" : ""}`)}
-            </p>
-          </div>
-        )}
+          ))}
       </div>
+      {download.what && (
+        // Under the row, so it never widens the buttons' line: right, under Download; in a narrow row, from the left.
+        <p
+          id={blocked ? reasonId : undefined}
+          aria-live="polite"
+          className={cn(
+            "m-0 text-right text-sm leading-sm [@container(max-width:559px)]:text-left",
+            download.state === "failed" ? "text-text-error" : "text-text-secondary",
+          )}
+        >
+          {downloadLine}
+        </p>
+      )}
       {units && (
         <ConfirmDialog
           open={asking}
