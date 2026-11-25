@@ -612,26 +612,7 @@ function CopyRow({
           )}
         </div>
       )}
-      <div className="flex flex-wrap gap-4">
-        {download.what && (
-          <Button
-            type="button"
-            hierarchy="secondary"
-            size="md"
-            iconLeading={<Icon icon={Download04Icon} size={16} />}
-            loading={download.state === "busy"}
-            aria-disabled={blocked ? true : undefined}
-            aria-describedby={blocked ? reasonId : undefined}
-            onClick={() => {
-              if (blocked || download.state === "busy") return;
-              if (units) setAsking(true);
-              else take();
-            }}
-            className={cn("max-md:min-h-[var(--touch-min)]", blocked && "cursor-not-allowed opacity-60")}
-          >
-            Download files
-          </Button>
-        )}
+      <div className="flex flex-wrap items-start gap-4">
         {units && (
           <Button type="button" hierarchy="secondary" size="md" disabled aria-describedby={noteId} className="max-md:min-h-[var(--touch-min)]">
             Send to manufacturing
@@ -643,12 +624,36 @@ function CopyRow({
         >
           {c.listing ? "Manage the listing" : "Sell this copy"}
         </Link>
+        {/* Download at the row's far right, its line under it (owner, 2026-11-25). */}
+        {download.what && (
+          <div className="ml-auto flex max-w-full flex-col items-end gap-2">
+            <Button
+              type="button"
+              hierarchy="secondary"
+              size="md"
+              iconLeading={<Icon icon={Download04Icon} size={16} />}
+              loading={download.state === "busy"}
+              aria-disabled={blocked ? true : undefined}
+              aria-describedby={blocked ? reasonId : undefined}
+              onClick={() => {
+                if (blocked || download.state === "busy") return;
+                if (units) setAsking(true);
+                else take();
+              }}
+              className={cn("max-md:min-h-[var(--touch-min)]", blocked && "cursor-not-allowed opacity-60")}
+            >
+              Download files
+            </Button>
+            <p
+              id={blocked ? reasonId : undefined}
+              aria-live="polite"
+              className={cn("m-0 text-right text-sm leading-sm", download.state === "failed" ? "text-text-error" : "text-text-secondary")}
+            >
+              {blocked ?? (download.note || `${download.what}, in one .zip${units ? " · each download uses 1 unit" : ""}`)}
+            </p>
+          </div>
+        )}
       </div>
-      {download.what && (
-        <p id={blocked ? reasonId : undefined} aria-live="polite" className={cn("m-0 text-sm leading-sm", download.state === "failed" ? "text-text-error" : "text-text-secondary")}>
-          {blocked ?? (download.note || `${download.what}, in one .zip${units ? " · each download uses 1 unit" : ""}`)}
-        </p>
-      )}
       {units && (
         <ConfirmDialog
           open={asking}
