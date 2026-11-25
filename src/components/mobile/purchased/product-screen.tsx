@@ -40,6 +40,7 @@ import { TopBar } from "../top-bar";
 import { T } from "../type";
 import { coveredOf, heldKindsOf, NothingBought, piecesOf, PurchasedLoading, VIRTUAL_NOTE, WithPost, type PieceWord, type PostRead } from "./parts";
 import { piecePath, productPath, PURCHASED_TAB_HREF, purchasedKindHref, purchasedPhoneHrefOf } from "./paths";
+import { useNftDownload } from "@/components/projects/purchased/nft-download";
 
 type Found = { read: PostRead; product: PostProduct; index: number; kind: EditionKind };
 
@@ -82,8 +83,24 @@ function ProductBody({ id, read, product, index, kind }: Found & { id: string })
   const build = read.buildOf(index);
   const pieces = piecesOf(kind, build);
   const video = product.video?.kind === "video" ? product.video : null;
+  // Everything this kind opens for the product, in one .zip (the web's Download files; owner, 2026-11-25).
+  const download = useNftDownload(kind, build, { name: product.name, image: product.image });
   return (
-    <Screen top={<TopBar back={purchasedKindHref(id, kind)} title={product.name} />}>
+    <Screen
+      top={<TopBar back={purchasedKindHref(id, kind)} title={product.name} />}
+      footer={
+        download.what ? (
+          <BottomBar>
+            <Button size="xl" className="w-full" iconLeading={<Icon icon={Download04Icon} size={20} />} loading={download.state === "busy"} onClick={download.run}>
+              Download files
+            </Button>
+            <p aria-live="polite" className={cn(T.meta, download.state === "failed" && "text-text-error")}>
+              {download.note || `${download.what}, in one .zip`}
+            </p>
+          </BottomBar>
+        ) : undefined
+      }
+    >
       <OfflineBanner />
       <MediaHero video={video ? { src: video.src, alt: video.alt } : null} picture={video?.poster ?? product.image ?? build?.job.conceptImageUrl ?? null} name={product.name} />
       <div className="flex flex-col gap-12 px-8 pb-12">

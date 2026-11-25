@@ -23,7 +23,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight01Icon, Cancel01Icon, Coins01Icon, ImageNotFound01Icon, ShoppingBag01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, Cancel01Icon, Coins01Icon, Download04Icon, ImageNotFound01Icon, ShoppingBag01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { useNftDownload } from "./nft-download";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, Button, StateCard, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import { CARD, PostImg } from "@/components/innovations/post-bits";
@@ -60,6 +61,7 @@ import {
   type PurchasedProject,
 } from "@/lib/market/purchases";
 import { sampleMarketOf } from "@/lib/market/sample-market";
+import type { EditionKind } from "@/lib/market/types";
 import { copyUnitsOf, unitsLineOf, unitsOnResale, type CopyUnits, type UnitsEntry } from "@/lib/market/units";
 import { useMe } from "@/lib/people/profile-store";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
@@ -662,6 +664,7 @@ function ProductDetail({
                 <Icon icon={ArrowRight01Icon} size={16} />
               </a>
             )}
+            {kind !== "main" && <DownloadFiles kind={kind} build={build} product={product} primary={!href} />}
             {product.specs.length > 0 && (
               <dl className="m-0 grid grid-cols-2 gap-x-6 gap-y-4">
                 {product.specs.map((s) => (
@@ -688,6 +691,32 @@ function ProductDetail({
         </DeliverablesAccess.Provider>
       ) : null}
     </article>
+  );
+}
+
+/** Everything this kind opens for the product, in one .zip (owner, 2026-11-25: a Download button after buying);
+ *  each piece tab keeps its own file too. The card's main action when it has no Open in your project. */
+function DownloadFiles({ kind, build, product, primary }: { kind: EditionKind; build: ProductBuild; product: PostProduct; primary: boolean }) {
+  const d = useNftDownload(kind, build, { name: product.name, image: product.image });
+  if (!d.what) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <Button
+        type="button"
+        hierarchy={primary ? "primary" : "secondary"}
+        size="md"
+        iconLeading={<Icon icon={Download04Icon} size={16} />}
+        loading={d.state === "busy"}
+        onClick={d.run}
+        className="self-start"
+      >
+        Download files
+      </Button>
+      <p className="m-0 text-sm text-text-secondary">{d.what}, in one .zip</p>
+      <p aria-live="polite" className={cn("m-0 text-sm empty:hidden", d.state === "failed" ? "text-text-error" : "text-text-secondary")}>
+        {d.note}
+      </p>
+    </div>
   );
 }
 

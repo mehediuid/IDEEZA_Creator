@@ -120,7 +120,9 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
   assert.match(page, /<OfferTabs tabs=\{held\} active=\{tab\} onSelect=\{setTab\} label="Your NFTs">/, "a tab per kind held, with everything about that kind in it");
   assert.match(page, /<ProductPiecePanel job=\{build\.job\} product=\{build\.bp\} kind=\{tab\} chatHref=\{null\} \/>/, "each product's pieces in the project's own panels");
   assert.match(page, /<DeliverablesAccess\.Provider value>/, "a holder takes the files the pieces offer, as the maker does");
-  assert.doesNotMatch(page, /Download04Icon|no files to download/, "no placeholder downloads: a Main NFT opens the project, copies take the pieces' own files");
+  // No placeholder downloads: a Main NFT opens the project; a copy's Download files zips the pieces' own files (owner, 2026-11-25).
+  assert.doesNotMatch(page, /no files to download/, "no placeholder downloads");
+  assert.match(page, /useNftDownload\(kind, build, \{ name: product\.name, image: product\.image \}\)/, "the one Download is the real files");
   assert.match(page, /<PostMediaStage post=\{post\} mine=\{mine\} \/>/, "media first, as the marketplace and Innovations pages");
   assert.match(read("components/innovations/post-product-bits.tsx"), /Open your files/, "the locked pieces lead a holder to them");
   // With the purchase: the foot of every marketplace page's Marketplace block (owner, 2026-11-24: one rail everywhere).
@@ -129,4 +131,19 @@ test("My projects has a Purchased tab beside the outcomes, and the purchased pag
   assert.doesNotMatch(read("components/marketplace/market-rail.tsx"), /SeeWhatYouOwn/, "never in the Creator block");
   assert.match(read("components/marketplace/sample-offer-box.tsx"), /<SeeWhatYouOwn projectId=\{feedId\} \/>/);
 
+});
+
+test("after buying, Download files takes everything the copy's kind opens in one .zip (owner, 2026-11-25)", () => {
+  const dl = read("components/projects/purchased/nft-download.ts");
+  assert.match(dl, /physical: \["3d", "pcb", "code", "wiring", "parts"\]/);
+  assert.match(dl, /virtual: \["3d", "parts"\]/);
+  assert.match(dl, /const render = kind === "virtual" \? product\.image \|\| job\.conceptImageUrl \|\| null : null;/, "a Virtual copy licenses the renders");
+  assert.match(dl, /makeZip\(entries\)/);
+  assert.match(dl, /`\$\{base\}-\$\{kind\}-nft-files\.zip`/);
+  const web = read("components/projects/purchased/purchased-page.tsx");
+  assert.match(web, /\{kind !== "main" && <DownloadFiles kind=\{kind\} build=\{build\} product=\{product\} primary=\{!href\} \/>\}/);
+  assert.match(web, />\s*Download files\s*</);
+  const phone = read("components/mobile/purchased/product-screen.tsx");
+  assert.match(phone, /const download = useNftDownload\(kind, build, \{ name: product\.name, image: product\.image \}\);/);
+  assert.match(phone, />\s*Download files\s*</);
 });
